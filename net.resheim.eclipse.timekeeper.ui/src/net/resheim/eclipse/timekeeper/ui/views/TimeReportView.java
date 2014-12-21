@@ -220,8 +220,8 @@ public class TimeReportView extends ViewPart {
 
 		@Override
 		protected void setValue(Object element, Object value) {
-			if (element instanceof ITask) {
-				ITask task = (ITask) element;
+			if (element instanceof AbstractTask) {
+				AbstractTask task = (AbstractTask) element;
 				if (value instanceof String) {
 					String[] split = ((String) value).split(":");
 					// Only minutes are given
@@ -234,6 +234,7 @@ public class TimeReportView extends ViewPart {
 						TimekeeperPlugin.setValue(task, getDateString(weekday), Integer.toString(newValue));
 					}
 					viewer.update(element, null);
+					viewer.update(TimekeeperPlugin.getProjectName(task), null);
 				}
 			}
 		}
