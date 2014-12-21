@@ -144,11 +144,13 @@ public class TimekeeperPlugin extends Plugin implements BundleActivator {
 					kv[1] = value;
 					found = true;
 				}
-				sb.append(kv[0]);
-				sb.append('=');
-				sb.append(kv[1]);
-				if (i < split.length - 1) {
-					sb.append(';');
+				if (kv.length == 2) {
+					sb.append(kv[0]);
+					sb.append('=');
+					sb.append(kv[1]);
+					if (i < split.length - 1) {
+						sb.append(';');
+					}
 				}
 			}
 			if (!found) {
