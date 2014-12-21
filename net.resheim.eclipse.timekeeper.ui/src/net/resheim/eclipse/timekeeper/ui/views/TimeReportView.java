@@ -33,25 +33,17 @@ import org.eclipse.jface.viewers.ViewerSorter;
 import org.eclipse.mylyn.commons.ui.CommonImages;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTaskContainer;
-import org.eclipse.mylyn.internal.tasks.core.DayDateRange;
-import org.eclipse.mylyn.internal.tasks.core.Person;
-import org.eclipse.mylyn.internal.tasks.core.RepositoryQuery;
-import org.eclipse.mylyn.internal.tasks.core.ScheduledTaskContainer;
 import org.eclipse.mylyn.internal.tasks.core.TaskCategory;
 import org.eclipse.mylyn.internal.tasks.core.TaskGroup;
 import org.eclipse.mylyn.internal.tasks.core.UncategorizedTaskContainer;
-import org.eclipse.mylyn.internal.tasks.core.UnmatchedTaskContainer;
 import org.eclipse.mylyn.internal.tasks.core.UnsubmittedTaskContainer;
-import org.eclipse.mylyn.internal.tasks.core.WeekDateRange;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.core.IRepositoryElement;
 import org.eclipse.mylyn.tasks.core.IRepositoryQuery;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.core.ITaskActivationListener;
 import org.eclipse.mylyn.tasks.core.ITaskContainer;
-import org.eclipse.mylyn.tasks.core.TaskRepository;
 import org.eclipse.mylyn.tasks.ui.AbstractRepositoryConnectorUi;
-import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.mylyn.tasks.ui.TasksUiImages;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Image;
@@ -64,7 +56,6 @@ import org.eclipse.ui.IWorkbenchActionConstants;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.part.ViewPart;
 
-
 /**
  * Associate task repository with project attribute
  * 
@@ -75,8 +66,7 @@ import org.eclipse.ui.part.ViewPart;
 @SuppressWarnings("restriction")
 public class TimeReportView extends ViewPart {
 
-	private final class TaskActivationListener implements
-			ITaskActivationListener {
+	private final class TaskActivationListener implements ITaskActivationListener {
 		@Override
 		public void taskDeactivated(ITask task) {
 			viewer.setInput(getViewSite());
@@ -103,22 +93,28 @@ public class TimeReportView extends ViewPart {
 
 	class ViewContentProvider implements ITreeContentProvider {
 		public void dispose() {
-			TasksUiPlugin.getTaskActivityManager().removeActivationListener(
-					taskActivationListener);
+			TasksUiPlugin.getTaskActivityManager().removeActivationListener(taskActivationListener);
 		}
-		private String getParentContainerSummary(AbstractTask task){
-			if (task.getParentContainers().size()>0){
-				AbstractTaskContainer next = task.getParentContainers().iterator().next();				
+
+		/**
+		 * Returns the name of the container holding the supplied task.
+		 * 
+		 * @param task
+		 *            task to find the name for
+		 * @return the name of the task
+		 */
+		private String getParentContainerSummary(AbstractTask task) {
+			if (task.getParentContainers().size() > 0) {
+				AbstractTaskContainer next = task.getParentContainers().iterator().next();
 				return next.getSummary();
 			}
 			return null;
 		}
-		
+
 		public Object[] getElements(Object parent) {
 			Set<String> projects = new HashSet<>();
 			Collection<AbstractTask> filteredTasks = new ArrayList<>();
-			Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList()
-					.getAllTasks();
+			Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
 			for (AbstractTask task : allTasks) {
 				if (task.getAttribute(TimekeeperPlugin.ATTR_ID) != null) {
 					filteredTasks.add(task);
@@ -146,16 +142,15 @@ public class TimeReportView extends ViewPart {
 		@Override
 		public Object[] getChildren(Object parentElement) {
 			Collection<AbstractTask> filteredTasks = new ArrayList<>();
-			if (parentElement instanceof String){
-				Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList()
-						.getAllTasks();
+			if (parentElement instanceof String) {
+				Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
 				for (AbstractTask task : allTasks) {
-					if (task.getAttribute(TimekeeperPlugin.ATTR_ID) != null){
+					if (task.getAttribute(TimekeeperPlugin.ATTR_ID) != null) {
 						String c = task.getConnectorKind();
 						switch (c) {
 						case "github":
 						case "local":
-							if (parentElement.equals(getParentContainerSummary(task))){
+							if (parentElement.equals(getParentContainerSummary(task))) {
 								filteredTasks.add(task);
 							}
 							break;
@@ -173,14 +168,14 @@ public class TimeReportView extends ViewPart {
 
 		@Override
 		public Object getParent(Object element) {
-			if (element instanceof ITask){
+			if (element instanceof ITask) {
 				String c = ((AbstractTask) element).getConnectorKind();
 				switch (c) {
 				case "github":
 				case "local":
 					return getParentContainerSummary((AbstractTask) element);
 				case "bugzilla":
-					return ((ITask) element).getAttribute("product");					
+					return ((ITask) element).getAttribute("product");
 				default:
 					break;
 				}
@@ -224,8 +219,7 @@ public class TimeReportView extends ViewPart {
 	}
 
 	public void createPartControl(Composite parent) {
-		viewer = new TreeViewer(parent, SWT.MULTI | SWT.H_SCROLL
-				| SWT.V_SCROLL | SWT.FULL_SELECTION);
+		viewer = new TreeViewer(parent, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION);
 		viewer.setContentProvider(new ViewContentProvider());
 
 		createTitleColumn();
@@ -244,14 +238,11 @@ public class TimeReportView extends ViewPart {
 		hookDoubleClickAction();
 		contributeToActionBars();
 		taskActivationListener = new TaskActivationListener();
-		TasksUiPlugin.getTaskActivityManager().addActivationListener(
-				taskActivationListener);
+		TasksUiPlugin.getTaskActivityManager().addActivationListener(taskActivationListener);
 	}
 
-	private TreeViewerColumn createTableViewerColumn(String title, int bound,
-			final int colNumber) {
-		final TreeViewerColumn viewerColumn = new TreeViewerColumn(viewer,
-				SWT.NONE);
+	private TreeViewerColumn createTableViewerColumn(String title, int bound, final int colNumber) {
+		final TreeViewerColumn viewerColumn = new TreeViewerColumn(viewer, SWT.NONE);
 		TreeColumn column = viewerColumn.getColumn();
 		column.setText(title);
 		column.setWidth(bound);
@@ -260,31 +251,32 @@ public class TimeReportView extends ViewPart {
 		return viewerColumn;
 	}
 
-	private void createTimeColumn(int weekday, String title) {		
+	private void createTimeColumn(int weekday, String title) {
 		TreeViewerColumn keyColumn = createTableViewerColumn(title, 50, 1 + weekday);
 		keyColumn.setLabelProvider(new ColumnLabelProvider() {
 
 			@Override
 			public String getText(Object element) {
-				if (element instanceof String){
+				if (element instanceof String) {
 					// TODO: Return the sum for the project
 					return "";
 				}
-				AbstractTask task = (AbstractTask) element;				
-				LocalDate date = LocalDate.now();				
+				AbstractTask task = (AbstractTask) element;
+				LocalDate date = LocalDate.now();
 				WeekFields weekFields = WeekFields.of(Locale.getDefault());
 				// Current day in the week
 				int day = date.get(weekFields.dayOfWeek());
 				// First date of the week
 				LocalDate first = date.minusDays(day - 1);
-				int seconds = TimekeeperPlugin.getIntValue(task, first.plusDays(weekday).toString());				
-				if (seconds>0) {
-					return DurationFormatUtils.formatDuration(seconds*1000, "H:mm:ss", true);
+				int seconds = TimekeeperPlugin.getIntValue(task, first.plusDays(weekday).toString());
+				if (seconds > 0) {
+					return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm:ss", true);
 				}
 				return "";
 			}
 		});
 	}
+
 	private class CompositeImageDescriptor {
 
 		ImageDescriptor icon;
@@ -292,21 +284,22 @@ public class TimeReportView extends ViewPart {
 		ImageDescriptor overlayKind;
 
 	};
-	
+
 	private class LP extends ColumnLabelProvider {
 		public String getText(Object element) {
-			if (element instanceof String){
+			if (element instanceof String) {
 				return (String) element;
 			}
-			ITask task = ((ITask)element);
-			StringBuilder sb  = new StringBuilder();
-			if (task.getTaskKey()!=null){
+			ITask task = ((ITask) element);
+			StringBuilder sb = new StringBuilder();
+			if (task.getTaskKey() != null) {
 				sb.append(task.getTaskKey());
 				sb.append(": ");
 			}
 			sb.append(task.getSummary());
 			return sb.toString();
 		}
+
 		@Override
 		public Image getImage(Object element) {
 			CompositeImageDescriptor compositeDescriptor = getImageDescriptor(element);
@@ -322,7 +315,7 @@ public class TimeReportView extends ViewPart {
 				return CommonImages.getCompositeTaskImage(compositeDescriptor.icon, null, false);
 			}
 		}
-		
+
 		private CompositeImageDescriptor getImageDescriptor(Object object) {
 			CompositeImageDescriptor compositeDescriptor = new CompositeImageDescriptor();
 			if (object instanceof UncategorizedTaskContainer) {
@@ -355,34 +348,13 @@ public class TimeReportView extends ViewPart {
 					compositeDescriptor.icon = connectorUi.getImageDescriptor(element);
 					return compositeDescriptor;
 				} else {
-					if (element instanceof UnmatchedTaskContainer) {
-						compositeDescriptor.icon = TasksUiImages.QUERY_UNMATCHED;
-					} else if (element instanceof RepositoryQuery) {
-						compositeDescriptor.icon = ((RepositoryQuery) element).getAutoUpdate()
-								? TasksUiImages.QUERY
-								: TasksUiImages.QUERY_OFFLINE;
-					} else if (element instanceof ITask) {
-						compositeDescriptor.icon = TasksUiImages.TASK;
-					} else if (element instanceof ScheduledTaskContainer) {
-						ScheduledTaskContainer scheduledTaskContainer = (ScheduledTaskContainer) element;
-						if (scheduledTaskContainer.getDateRange() instanceof DayDateRange) {
-							if (scheduledTaskContainer.isPresent()) {
-								compositeDescriptor.icon = CommonImages.SCHEDULE_DAY;
-							} else {
-								compositeDescriptor.icon = CommonImages.SCHEDULE;
-							}
-						} else if (scheduledTaskContainer.getDateRange() instanceof WeekDateRange) {
-							compositeDescriptor.icon = CommonImages.SCHEDULE_WEEK;
-						} else {
-							compositeDescriptor.icon = TasksUiImages.QUERY_UNMATCHED;
-						}
-					}
+					compositeDescriptor.icon = TasksUiImages.TASK;
 					return compositeDescriptor;
 				}
 			}
 			return compositeDescriptor;
 		}
-		
+
 	}
 
 	private void createTitleColumn() {
@@ -432,11 +404,10 @@ public class TimeReportView extends ViewPart {
 	private void makeActions() {
 		action1 = new Action() {
 			public void run() {
-				Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList()
-						.getAllTasks();
+				Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
 				for (AbstractTask abstractTask : allTasks) {
 					if (!abstractTask.isActive()) {
-						//abstractTask.setAttribute(ACCUMULATED_ID, null);
+						// abstractTask.setAttribute(ACCUMULATED_ID, null);
 					}
 				}
 				viewer.setInput(getViewSite());
@@ -459,8 +430,7 @@ public class TimeReportView extends ViewPart {
 		doubleClickAction = new Action() {
 			public void run() {
 				ISelection selection = viewer.getSelection();
-				Object obj = ((IStructuredSelection) selection)
-						.getFirstElement();
+				Object obj = ((IStructuredSelection) selection).getFirstElement();
 				showMessage("Double-click detected on " + obj.toString());
 			}
 		};
@@ -474,7 +444,6 @@ public class TimeReportView extends ViewPart {
 	}
 
 	private void showMessage(String message) {
-		MessageDialog.openInformation(viewer.getControl().getShell(),
-				"Sample View", message);
+		MessageDialog.openInformation(viewer.getControl().getShell(), "Sample View", message);
 	}
 }
