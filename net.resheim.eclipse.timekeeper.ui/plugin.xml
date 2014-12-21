@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+
+   <extension
+         point="org.eclipse.ui.views">
+      <category
+            name="Timekeeper"
+            id="net.resheim.eclipse.timekeeper.ui">
+      </category>
+      <view
+            name="Timekeeper"
+            icon="icons/full/obj16/date_obj.gif"
+            category="net.resheim.eclipse.timekeeper.ui"
+            class="net.resheim.eclipse.timekeeper.ui.views.TimeReportView"
+            id="net.resheim.eclipse.timekeeper.ui.views.SampleView">
+      </view>
+   </extension>
+   <extension
+         point="org.eclipse.ui.perspectiveExtensions">
+      <perspectiveExtension
+            targetID="org.eclipse.jdt.ui.JavaPerspective">
+         <view
+               ratio="0.5"
+               relative="org.eclipse.ui.views.ProblemView"
+               relationship="right"
+               id="net.resheim.eclipse.timekeeper.ui.views.SampleView">
+         </view>
+      </perspectiveExtension>
+   </extension>
+   <extension
+         point="org.eclipse.help.contexts">
+      <contexts
+            file="contexts.xml">
+      </contexts>
+   </extension>
+
+</plugin>

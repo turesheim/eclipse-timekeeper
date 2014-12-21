@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site>
+   <description>
+      Eclipse Utilities
+   </description>
+   <feature url="features/net.resheim.eclipse.timekeeper_1.0.0.qualifier.jar" id="net.resheim.eclipse.timekeeper" version="1.0.0.qualifier">
+      <category name="features"/>
+   </feature>
+   <category-def name="features" label="Eclipse Timekeeper">
+      <description>
+         A simple extension of Mylyn Tasks that tracks the time a task is active and presents the result in a view.
+      </description>
+   </category-def>
+</site>
