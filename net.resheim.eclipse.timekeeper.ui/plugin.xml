@@ -9,10 +9,10 @@
             id="net.resheim.eclipse.timekeeper.ui">
       </category>
       <view
-            name="Timekeeper"
+            name="Workweek"
             icon="icons/full/obj16/date_obj.gif"
             category="net.resheim.eclipse.timekeeper.ui"
-            class="net.resheim.eclipse.timekeeper.ui.views.TimeReportView"
+            class="net.resheim.eclipse.timekeeper.ui.views.WorkWeekView"
             id="net.resheim.eclipse.timekeeper.ui.views.SampleView">
       </view>
    </extension>

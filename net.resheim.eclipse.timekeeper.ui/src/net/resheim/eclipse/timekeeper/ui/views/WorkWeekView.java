@@ -75,7 +75,7 @@ import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.part.ViewPart;
 
 @SuppressWarnings("restriction")
-public class TimeReportView extends ViewPart {
+public class WorkWeekView extends ViewPart {
 
 	private class CompositeImageDescriptor {
 
@@ -331,7 +331,7 @@ public class TimeReportView extends ViewPart {
 	/**
 	 * The constructor.
 	 */
-	public TimeReportView() {
+	public WorkWeekView() {
 		// Determine the first date of the week
 		LocalDate date = LocalDate.now();
 		WeekFields weekFields = WeekFields.of(Locale.getDefault());
@@ -463,7 +463,7 @@ public class TimeReportView extends ViewPart {
 		menuMgr.setRemoveAllWhenShown(true);
 		menuMgr.addMenuListener(new IMenuListener() {
 			public void menuAboutToShow(IMenuManager manager) {
-				TimeReportView.this.fillContextMenu(manager);
+				WorkWeekView.this.fillContextMenu(manager);
 			}
 		});
 		Menu menu = menuMgr.createContextMenu(viewer.getControl());
