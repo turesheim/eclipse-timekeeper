@@ -1,3 +1,15 @@
+/*******************************************************************************
+ * Copyright (c) 2014 Torkild U. Resheim.
+ *
+ * All rights reserved. This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License v1.0 which
+ * accompanies this distribution, and is available at
+ * http://www.eclipse.org/legal/epl-v10.html
+ *
+ * Contributors:
+ *    Torkild U. Resheim - initial API and implementation
+ *******************************************************************************/
+
 package net.resheim.eclipse.timekeeper.ui.views;
 
 import java.time.LocalDate;
@@ -32,7 +44,6 @@ import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.viewers.ViewerSorter;
 import org.eclipse.mylyn.commons.ui.CommonImages;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
-import org.eclipse.mylyn.internal.tasks.core.AbstractTaskContainer;
 import org.eclipse.mylyn.internal.tasks.core.TaskCategory;
 import org.eclipse.mylyn.internal.tasks.core.TaskGroup;
 import org.eclipse.mylyn.internal.tasks.core.UncategorizedTaskContainer;
@@ -56,13 +67,6 @@ import org.eclipse.ui.IWorkbenchActionConstants;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.part.ViewPart;
 
-/**
- * Associate task repository with project attribute
- * 
- * 
- * @author torkild
- *
- */
 @SuppressWarnings("restriction")
 public class TimeReportView extends ViewPart {
 
@@ -96,21 +100,6 @@ public class TimeReportView extends ViewPart {
 			TasksUiPlugin.getTaskActivityManager().removeActivationListener(taskActivationListener);
 		}
 
-		/**
-		 * Returns the name of the container holding the supplied task.
-		 * 
-		 * @param task
-		 *            task to find the name for
-		 * @return the name of the task
-		 */
-		private String getParentContainerSummary(AbstractTask task) {
-			if (task.getParentContainers().size() > 0) {
-				AbstractTaskContainer next = task.getParentContainers().iterator().next();
-				return next.getSummary();
-			}
-			return null;
-		}
-
 		public Object[] getElements(Object parent) {
 			Set<String> projects = new HashSet<>();
 			Collection<AbstractTask> filteredTasks = new ArrayList<>();
@@ -121,16 +110,7 @@ public class TimeReportView extends ViewPart {
 				}
 			}
 			for (AbstractTask task : filteredTasks) {
-				String c = task.getConnectorKind();
-				switch (c) {
-				case "github":
-				case "local":
-					projects.add(getParentContainerSummary(task));
-					break;
-				case "bugzilla":
-					projects.add(task.getAttribute("product"));
-					break;
-				}
+				projects.add(TimekeeperPlugin.getProjectName(task));
 			}
 			return projects.toArray();
 		}
@@ -146,19 +126,8 @@ public class TimeReportView extends ViewPart {
 				Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
 				for (AbstractTask task : allTasks) {
 					if (task.getAttribute(TimekeeperPlugin.ATTR_ID) != null) {
-						String c = task.getConnectorKind();
-						switch (c) {
-						case "github":
-						case "local":
-							if (parentElement.equals(getParentContainerSummary(task))) {
-								filteredTasks.add(task);
-							}
-							break;
-						case "bugzilla":
-							if (parentElement.equals(task.getAttribute("product"))) {
-								filteredTasks.add(task);
-							}
-							break;
+						if (parentElement.equals(TimekeeperPlugin.getProjectName(task))) {
+							filteredTasks.add(task);
 						}
 					}
 				}
@@ -169,16 +138,7 @@ public class TimeReportView extends ViewPart {
 		@Override
 		public Object getParent(Object element) {
 			if (element instanceof ITask) {
-				String c = ((AbstractTask) element).getConnectorKind();
-				switch (c) {
-				case "github":
-				case "local":
-					return getParentContainerSummary((AbstractTask) element);
-				case "bugzilla":
-					return ((ITask) element).getAttribute("product");
-				default:
-					break;
-				}
+				return TimekeeperPlugin.getProjectName((AbstractTask) element);
 			}
 			return null;
 		}
@@ -218,6 +178,7 @@ public class TimeReportView extends ViewPart {
 		fillLocalToolBar(bars.getToolBarManager());
 	}
 
+	@Override
 	public void createPartControl(Composite parent) {
 		viewer = new TreeViewer(parent, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION);
 		viewer.setContentProvider(new ViewContentProvider());
@@ -286,6 +247,7 @@ public class TimeReportView extends ViewPart {
 	};
 
 	private class LP extends ColumnLabelProvider {
+		@Override
 		public String getText(Object element) {
 			if (element instanceof String) {
 				return (String) element;
@@ -403,6 +365,7 @@ public class TimeReportView extends ViewPart {
 
 	private void makeActions() {
 		action1 = new Action() {
+			@Override
 			public void run() {
 				Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
 				for (AbstractTask abstractTask : allTasks) {
@@ -419,6 +382,7 @@ public class TimeReportView extends ViewPart {
 				.getImageDescriptor(ISharedImages.IMG_OBJS_INFO_TSK));
 
 		action2 = new Action() {
+			@Override
 			public void run() {
 				showMessage("Action 2 executed");
 			}
@@ -428,6 +392,7 @@ public class TimeReportView extends ViewPart {
 		action2.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
 				.getImageDescriptor(ISharedImages.IMG_OBJS_INFO_TSK));
 		doubleClickAction = new Action() {
+			@Override
 			public void run() {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
@@ -439,6 +404,7 @@ public class TimeReportView extends ViewPart {
 	/**
 	 * Passing the focus request to the viewer's control.
 	 */
+	@Override
 	public void setFocus() {
 		viewer.getControl().setFocus();
 	}
