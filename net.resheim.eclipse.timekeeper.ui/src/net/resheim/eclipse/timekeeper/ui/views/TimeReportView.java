@@ -32,12 +32,16 @@ import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.action.Separator;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.resource.ImageDescriptor;
+import org.eclipse.jface.viewers.CellEditor;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
+import org.eclipse.jface.viewers.ColumnViewer;
 import org.eclipse.jface.viewers.DoubleClickEvent;
+import org.eclipse.jface.viewers.EditingSupport;
 import org.eclipse.jface.viewers.IDoubleClickListener;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.ITreeContentProvider;
+import org.eclipse.jface.viewers.TextCellEditor;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.TreeViewerColumn;
 import org.eclipse.jface.viewers.Viewer;
@@ -170,6 +174,11 @@ public class TimeReportView extends ViewPart {
 	 * The constructor.
 	 */
 	public TimeReportView() {
+		// Determine the first date of the week
+		LocalDate date = LocalDate.now();
+		WeekFields weekFields = WeekFields.of(Locale.getDefault());
+		int day = date.get(weekFields.dayOfWeek());
+		firstDayOfWeek = date.minusDays(day - 1);
 	}
 
 	private void contributeToActionBars() {
@@ -212,8 +221,66 @@ public class TimeReportView extends ViewPart {
 		return viewerColumn;
 	}
 
+	private class TimeEditingSupport extends EditingSupport {
+
+		int weekday;
+
+		public TimeEditingSupport(ColumnViewer viewer, int weekday) {
+			super(viewer);
+			this.weekday = weekday;
+		}
+
+		@Override
+		protected CellEditor getCellEditor(Object element) {
+			return new TextCellEditor(viewer.getTree());
+		}
+
+		@Override
+		protected boolean canEdit(Object element) {
+			if (element instanceof ITask) {
+				return true;
+			}
+			return false;
+		}
+
+		@Override
+		protected Object getValue(Object element) {
+			if (element instanceof ITask) {
+				AbstractTask task = (AbstractTask) element;
+				int seconds = TimekeeperPlugin.getIntValue(task, getDateString(weekday));
+				if (seconds > 0) {
+					return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
+				}
+				return "0:00";
+			}
+			return "";
+		}
+
+		@Override
+		protected void setValue(Object element, Object value) {
+			if (element instanceof ITask) {
+				ITask task = (ITask) element;
+				if (value instanceof String) {
+					String[] split = ((String) value).split(":");
+					// Only minutes are given
+					if (split.length == 1) {
+						int newValue = Integer.parseInt(split[0]) * 60;
+						TimekeeperPlugin.setValue(task, getDateString(weekday), Integer.toString(newValue));
+					}
+					if (split.length == 2) {
+						int newValue = Integer.parseInt(split[0]) * 3600 + Integer.parseInt(split[1]) * 60;
+						TimekeeperPlugin.setValue(task, getDateString(weekday), Integer.toString(newValue));
+					}
+					viewer.update(element, null);
+				}
+			}
+		}
+
+	}
+
 	private void createTimeColumn(int weekday, String title) {
 		TreeViewerColumn keyColumn = createTableViewerColumn(title, 50, 1 + weekday);
+		keyColumn.setEditingSupport(new TimeEditingSupport(keyColumn.getViewer(), weekday));
 		keyColumn.setLabelProvider(new ColumnLabelProvider() {
 
 			@Override
@@ -223,19 +290,25 @@ public class TimeReportView extends ViewPart {
 					return "";
 				}
 				AbstractTask task = (AbstractTask) element;
-				LocalDate date = LocalDate.now();
-				WeekFields weekFields = WeekFields.of(Locale.getDefault());
-				// Current day in the week
-				int day = date.get(weekFields.dayOfWeek());
-				// First date of the week
-				LocalDate first = date.minusDays(day - 1);
-				int seconds = TimekeeperPlugin.getIntValue(task, first.plusDays(weekday).toString());
+				int seconds = TimekeeperPlugin.getIntValue(task, getDateString(weekday));
 				if (seconds > 0) {
-					return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm:ss", true);
+					return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
 				}
 				return "";
 			}
 		});
+	}
+
+	private final LocalDate firstDayOfWeek;
+
+	/**
+	 * Returns a string representation of the date.
+	 *
+	 * @param weekday
+	 * @return
+	 */
+	private String getDateString(int weekday) {
+		return firstDayOfWeek.plusDays(weekday).toString();
 	}
 
 	private class CompositeImageDescriptor {
