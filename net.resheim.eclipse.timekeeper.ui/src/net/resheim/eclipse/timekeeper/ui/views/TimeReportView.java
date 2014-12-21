@@ -174,7 +174,7 @@ public class TimeReportView extends ViewPart {
 
 		@Override
 		public void taskActivated(ITask task) {
-			viewer.update(task, null);
+			viewer.refresh();
 		}
 
 		@Override
