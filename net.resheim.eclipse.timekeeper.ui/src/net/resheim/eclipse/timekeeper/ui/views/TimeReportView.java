@@ -15,11 +15,9 @@ package net.resheim.eclipse.timekeeper.ui.views;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.WeekFields;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Locale;
-import java.util.Set;
+import java.util.stream.Collectors;
 
 import net.resheim.eclipse.timekeeper.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.ui.Activator;
@@ -249,33 +247,27 @@ public class TimeReportView extends ViewPart {
 
 		@Override
 		public Object[] getChildren(Object parentElement) {
-			Collection<AbstractTask> filteredTasks = new ArrayList<>();
+			// TODO: Reuse calculation from getElements(Object) maybe?
 			if (parentElement instanceof String) {
+				String p = (String) parentElement;
 				Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
-				for (AbstractTask task : allTasks) {
-					if (task.getAttribute(TimekeeperPlugin.ATTR_ID) != null) {
-						if (parentElement.equals(TimekeeperPlugin.getProjectName(task))) {
-							filteredTasks.add(task);
-						}
-					}
-				}
+				return allTasks
+						.parallelStream()
+						.filter(t -> t.getAttribute(TimekeeperPlugin.ATTR_ID) != null)
+						.filter(t -> p.equals(TimekeeperPlugin.getProjectName(t)))
+						.toArray(size -> new AbstractTask[size]);
 			}
-			return filteredTasks.toArray();
+			return new Object[0];
 		}
 
 		public Object[] getElements(Object parent) {
-			Set<String> projects = new HashSet<>();
-			Collection<AbstractTask> filteredTasks = new ArrayList<>();
+			// TODO: Use modification date to determine whether or not it should be checked
 			Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
-			for (AbstractTask task : allTasks) {
-				if (task.getAttribute(TimekeeperPlugin.ATTR_ID) != null) {
-					filteredTasks.add(task);
-				}
-			}
-			for (AbstractTask task : filteredTasks) {
-				projects.add(TimekeeperPlugin.getProjectName(task));
-			}
-			return projects.toArray();
+			return allTasks
+					.parallelStream()
+					.filter(t -> t.getAttribute(TimekeeperPlugin.ATTR_ID) != null)
+					.collect(Collectors.groupingBy(t -> TimekeeperPlugin.getProjectName(t)))
+					.keySet().toArray();
 		}
 
 		@Override
@@ -299,6 +291,26 @@ public class TimeReportView extends ViewPart {
 		public void inputChanged(Viewer v, Object oldInput, Object newInput) {
 			v.refresh();
 		}
+	}
+
+	/**
+	 * Calculates the total amount of seconds accumulated on the project for the
+	 * specified date.
+	 *
+	 * @param date
+	 *            the date to calculate for
+	 * @param project
+	 *            the project to calculate for
+	 * @return the total amount of seconds accumulated
+	 */
+	private static int getSum(LocalDate date, String project) {
+		Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
+		final String d = date.toString();
+		return allTasks
+				.parallelStream()
+				.filter(t -> t.getAttribute(TimekeeperPlugin.ATTR_ID) != null)
+				.filter(t -> project.equals(TimekeeperPlugin.getProjectName(t)))
+				.mapToInt(t -> TimekeeperPlugin.getIntValue(t, d)).sum();
 	}
 
 	public static final String ID = "net.resheim.eclipse.timekeeper.ui.views.SampleView";
@@ -396,12 +408,14 @@ public class TimeReportView extends ViewPart {
 
 			@Override
 			public String getText(Object element) {
+				int seconds = 0;
 				if (element instanceof String) {
-					// TODO: Return the sum for the project
-					return "";
+					LocalDate date = firstDayOfWeek.plusDays(weekday);
+					seconds = getSum(date, (String) element);
+				} else {
+					AbstractTask task = (AbstractTask) element;
+					seconds = TimekeeperPlugin.getIntValue(task, getDateString(weekday));
 				}
-				AbstractTask task = (AbstractTask) element;
-				int seconds = TimekeeperPlugin.getIntValue(task, getDateString(weekday));
 				if (seconds > 0) {
 					return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
 				}
