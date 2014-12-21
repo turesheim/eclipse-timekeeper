@@ -77,6 +77,8 @@ import org.eclipse.ui.part.ViewPart;
 @SuppressWarnings("restriction")
 public class WorkWeekView extends ViewPart {
 
+	private final LocalDate firstDayOfWeek;
+
 	private class CompositeImageDescriptor {
 
 		ImageDescriptor icon;
@@ -179,7 +181,7 @@ public class WorkWeekView extends ViewPart {
 
 		@Override
 		public void taskDeactivated(ITask task) {
-			viewer.update(task, null);
+			viewer.refresh();
 		}
 	}
 
@@ -224,17 +226,24 @@ public class WorkWeekView extends ViewPart {
 				AbstractTask task = (AbstractTask) element;
 				if (value instanceof String) {
 					String[] split = ((String) value).split(":");
+					int newValue = 0;
 					// Only minutes are given
 					if (split.length == 1) {
-						int newValue = Integer.parseInt(split[0]) * 60;
+						newValue = Integer.parseInt(split[0]) * 60;
 						TimekeeperPlugin.setValue(task, getDateString(weekday), Integer.toString(newValue));
 					}
 					if (split.length == 2) {
-						int newValue = Integer.parseInt(split[0]) * 3600 + Integer.parseInt(split[1]) * 60;
+						newValue = Integer.parseInt(split[0]) * 3600 + Integer.parseInt(split[1]) * 60;
 						TimekeeperPlugin.setValue(task, getDateString(weekday), Integer.toString(newValue));
 					}
-					viewer.update(element, null);
-					viewer.update(TimekeeperPlugin.getProjectName(task), null);
+					// If the new value is 0, the task may have no time
+					// logged for the week and should be removed.
+					if (newValue == 0) {
+						viewer.refresh();
+					} else {
+						viewer.update(element, null);
+						viewer.update(TimekeeperPlugin.getProjectName(task), null);
+					}
 				}
 			}
 		}
@@ -251,22 +260,30 @@ public class WorkWeekView extends ViewPart {
 			// TODO: Reuse calculation from getElements(Object) maybe?
 			if (parentElement instanceof String) {
 				String p = (String) parentElement;
-				Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
-				return allTasks
-						.parallelStream()
+				return TasksUiPlugin.getTaskList().getAllTasks()
+						.stream()
 						.filter(t -> t.getAttribute(TimekeeperPlugin.ATTR_ID) != null)
 						.filter(t -> p.equals(TimekeeperPlugin.getProjectName(t)))
+						.filter(t -> hasData(t, firstDayOfWeek) || t.isActive())
 						.toArray(size -> new AbstractTask[size]);
 			}
 			return new Object[0];
 		}
 
+		private boolean hasData(AbstractTask task, LocalDate startDate) {
+			int sum = 0;
+			for (int i = 0; i < 7; i++) {
+				String ds = startDate.plusDays(i).toString();
+				sum += TimekeeperPlugin.getIntValue(task, ds);
+			}
+			return sum > 0;
+		}
+
 		public Object[] getElements(Object parent) {
-			// TODO: Use modification date to determine whether or not it should be checked
-			Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
-			return allTasks
-					.parallelStream()
+			return TasksUiPlugin.getTaskList().getAllTasks()
+					.stream()
 					.filter(t -> t.getAttribute(TimekeeperPlugin.ATTR_ID) != null)
+					.filter(t -> hasData(t, firstDayOfWeek) || t.isActive())
 					.collect(Collectors.groupingBy(t -> TimekeeperPlugin.getProjectName(t)))
 					.keySet().toArray();
 		}
@@ -305,10 +322,9 @@ public class WorkWeekView extends ViewPart {
 	 * @return the total amount of seconds accumulated
 	 */
 	private static int getSum(LocalDate date, String project) {
-		Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
 		final String d = date.toString();
-		return allTasks
-				.parallelStream()
+		return TasksUiPlugin.getTaskList().getAllTasks()
+				.stream()
 				.filter(t -> t.getAttribute(TimekeeperPlugin.ATTR_ID) != null)
 				.filter(t -> project.equals(TimekeeperPlugin.getProjectName(t)))
 				.mapToInt(t -> TimekeeperPlugin.getIntValue(t, d)).sum();
@@ -322,7 +338,6 @@ public class WorkWeekView extends ViewPart {
 
 	private Action doubleClickAction;
 
-	private final LocalDate firstDayOfWeek;
 
 	private TaskActivationListener taskActivationListener;
 
@@ -351,14 +366,13 @@ public class WorkWeekView extends ViewPart {
 	@Override
 	public void createPartControl(Composite parent) {
 		ScrolledComposite root = new ScrolledComposite(parent, SWT.V_SCROLL);
-		root.setBackground(parent.getBackground());
+		root.setBackgroundMode(SWT.INHERIT_DEFAULT);
 		root.setExpandHorizontal(true);
 		root.setExpandVertical(true);
 
 		Composite main = new Composite(root, SWT.NONE);
-		main.setBackground(parent.getBackground());
+		main.setBackgroundMode(SWT.INHERIT_DEFAULT);
 		main.setLayout(new GridLayout());
-		root.setContent(main);
 
 		Text dateTimeLabel = new Text(main, SWT.NONE);
 		dateTimeLabel.setLayoutData(new GridData());
@@ -368,6 +382,7 @@ public class WorkWeekView extends ViewPart {
 		sb.append(" starting at ");
 		sb.append(firstDayOfWeek.format(dateFormat));
 		dateTimeLabel.setText(sb.toString());
+
 		viewer = new TreeViewer(main, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION);
 		viewer.setContentProvider(new ViewContentProvider());
 		GridData layoutData = new GridData(SWT.FILL, SWT.FILL, true, true);
@@ -383,6 +398,8 @@ public class WorkWeekView extends ViewPart {
 		viewer.setInput(getViewSite());
 
 		viewer.getTree().setHeaderVisible(true);
+
+		root.setContent(main);
 
 		makeActions();
 		hookContextMenu();
