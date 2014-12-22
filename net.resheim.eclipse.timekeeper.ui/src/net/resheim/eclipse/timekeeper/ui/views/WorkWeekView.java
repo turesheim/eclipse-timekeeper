@@ -15,7 +15,6 @@ package net.resheim.eclipse.timekeeper.ui.views;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.WeekFields;
-import java.util.Collection;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
@@ -61,10 +60,13 @@ import org.eclipse.mylyn.tasks.ui.AbstractRepositoryConnectorUi;
 import org.eclipse.mylyn.tasks.ui.TasksUiImages;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.ScrolledComposite;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.DateTime;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.TreeColumn;
@@ -246,7 +248,7 @@ public class WorkWeekView extends ViewPart {
 
 	}
 
-	class ViewContentProvider implements ITreeContentProvider {
+	private class ViewContentProvider implements ITreeContentProvider {
 
 		public void dispose() {
 		}
@@ -304,10 +306,21 @@ public class WorkWeekView extends ViewPart {
 
 		public void inputChanged(Viewer v, Object oldInput, Object newInput) {
 			v.refresh();
+			// Also update the week label
+			StringBuilder sb = new StringBuilder();
+			sb.append("Showing week ");
+			sb.append(firstDayOfWeek.format(weekFormat));
+			sb.append(" starting at");
+			dateTimeLabel.setText(sb.toString());
+			dateChooser.setDate(firstDayOfWeek.getYear(), firstDayOfWeek.getMonthValue() - 1,
+					firstDayOfWeek.getDayOfMonth());
+			TreeColumn[] columns = viewer.getTree().getColumns();
+			String[] headings = Activator.getDefault().getHeadings(firstDayOfWeek);
+			for (int i = 1; i < columns.length; i++) {
+				columns[i].setText(headings[i - 1]);
+			}
 		}
 	}
-
-	private static final DateTimeFormatter dateFormat = DateTimeFormatter.ISO_LOCAL_DATE;
 
 	public static final String ID = "net.resheim.eclipse.timekeeper.ui.views.SampleView";
 
@@ -332,18 +345,21 @@ public class WorkWeekView extends ViewPart {
 				.mapToInt(t -> TimekeeperPlugin.getIntValue(t, d)).sum();
 	}
 
-	private Action action1;
+	private Action previousWeekAction;
 
-	private Action action2;
-
+	private Action nextWeekAction;
 
 	private Action doubleClickAction;
 
-	private final LocalDate firstDayOfWeek;
+	private LocalDate firstDayOfWeek;
 
 	private TaskActivationListener taskActivationListener;
 
 	private TreeViewer viewer;
+
+	private Text dateTimeLabel;
+
+	private DateTime dateChooser;
 
 	/**
 	 * The constructor.
@@ -374,27 +390,42 @@ public class WorkWeekView extends ViewPart {
 		Composite main = ft.createComposite(root);
 		ft.adapt(main);
 		root.setContent(main);
-		GridLayout layout2 = new GridLayout();
+		GridLayout layout2 = new GridLayout(2, false);
 		main.setLayout(layout2);
 
-		Text dateTimeLabel = new Text(main, SWT.NONE);
-		dateTimeLabel.setLayoutData(new GridData());
-		StringBuilder sb = new StringBuilder();
-		sb.append("Showing week ");
-		sb.append(firstDayOfWeek.format(weekFormat));
-		sb.append(" starting at ");
-		sb.append(firstDayOfWeek.format(dateFormat));
-		dateTimeLabel.setText(sb.toString());
+		dateTimeLabel = new Text(main, SWT.NONE);
+		GridData gdLabel = new GridData();
+		gdLabel.verticalIndent = 2;
+		gdLabel.verticalAlignment = SWT.BEGINNING;
+		dateTimeLabel.setLayoutData(gdLabel);
+
+		dateChooser = new DateTime(main, SWT.DROP_DOWN | SWT.DATE | SWT.LONG);
+		GridData gdChooser = new GridData();
+		gdChooser.verticalAlignment = SWT.BEGINNING;
+		dateChooser.setLayoutData(gdChooser);
+		ft.adapt(dateChooser);
+		dateChooser.addSelectionListener(new SelectionAdapter() {
+
+			@Override
+			public void widgetSelected(SelectionEvent event) {
+				// Determine the first date of the week
+				LocalDate date = LocalDate.of(dateChooser.getYear(), dateChooser.getMonth() + 1, dateChooser.getDay());
+				WeekFields weekFields = WeekFields.of(Locale.getDefault());
+				int day = date.get(weekFields.dayOfWeek());
+				firstDayOfWeek = date.minusDays(day - 1);
+				viewer.setInput(this);
+			}
+		});
 
 		viewer = new TreeViewer(main, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION);
 		viewer.setContentProvider(new ViewContentProvider());
 		GridData layoutData = new GridData(SWT.FILL, SWT.FILL, true, true);
+		layoutData.horizontalSpan = 2;
 		viewer.getControl().setLayoutData(layoutData);
 
 		createTitleColumn();
-		String[] headings = Activator.getDefault().getHeadings(LocalDate.now());
 		for (int i = 0; i < 7; i++) {
-			createTimeColumn(i, headings[i]);
+			createTimeColumn(i);
 		}
 
 		viewer.setComparator(new ViewerComparator() {
@@ -433,8 +464,10 @@ public class WorkWeekView extends ViewPart {
 		return viewerColumn;
 	}
 
-	private void createTimeColumn(int weekday, String title) {
-		TreeViewerColumn keyColumn = createTableViewerColumn(title, 50, 1 + weekday);
+	private void createTimeColumn(int weekday) {
+		TreeViewerColumn keyColumn = createTableViewerColumn("-", 50, 1 + weekday);
+		keyColumn.getColumn().setMoveable(false);
+		keyColumn.getColumn().setAlignment(SWT.RIGHT);
 		keyColumn.setEditingSupport(new TimeEditingSupport(keyColumn.getViewer(), weekday));
 		keyColumn.setLabelProvider(new ColumnLabelProvider() {
 
@@ -468,21 +501,21 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void fillContextMenu(IMenuManager manager) {
-		manager.add(action1);
-		manager.add(action2);
+		manager.add(previousWeekAction);
+		manager.add(nextWeekAction);
 		// Other plug-ins can contribute there actions here
 		manager.add(new Separator(IWorkbenchActionConstants.MB_ADDITIONS));
 	}
 
 	private void fillLocalPullDown(IMenuManager manager) {
-		manager.add(action1);
-		manager.add(new Separator());
-		manager.add(action2);
+		// manager.add(action1);
+		// manager.add(new Separator());
+		// manager.add(action2);
 	}
 
 	private void fillLocalToolBar(IToolBarManager manager) {
-		manager.add(action1);
-		manager.add(action2);
+		manager.add(previousWeekAction);
+		manager.add(nextWeekAction);
 	}
 
 	/**
@@ -517,33 +550,28 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void makeActions() {
-		action1 = new Action() {
+		previousWeekAction = new Action() {
 			@Override
 			public void run() {
-				Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
-				for (AbstractTask abstractTask : allTasks) {
-					if (!abstractTask.isActive()) {
-						// abstractTask.setAttribute(ACCUMULATED_ID, null);
-					}
-				}
+				firstDayOfWeek = firstDayOfWeek.minusDays(7);
 				viewer.setInput(getViewSite());
 			}
 		};
-		action1.setText("Action 1");
-		action1.setToolTipText("Action 1 tooltip");
-		action1.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
-				.getImageDescriptor(ISharedImages.IMG_OBJS_INFO_TSK));
+		previousWeekAction.setToolTipText("Show previous week");
+		previousWeekAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
+				.getImageDescriptor(ISharedImages.IMG_TOOL_BACK));
 
-		action2 = new Action() {
+		nextWeekAction = new Action() {
 			@Override
 			public void run() {
-				showMessage("Action 2 executed");
+				firstDayOfWeek = firstDayOfWeek.plusDays(7);
+				viewer.setInput(getViewSite());
 			}
 		};
-		action2.setText("Action 2");
-		action2.setToolTipText("Action 2 tooltip");
-		action2.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
-				.getImageDescriptor(ISharedImages.IMG_OBJS_INFO_TSK));
+		nextWeekAction.setToolTipText("Show next week");
+		nextWeekAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
+				.getImageDescriptor(ISharedImages.IMG_TOOL_FORWARD));
+
 		doubleClickAction = new Action() {
 			@Override
 			public void run() {

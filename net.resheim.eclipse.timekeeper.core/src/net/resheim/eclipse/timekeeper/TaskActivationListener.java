@@ -39,7 +39,7 @@ public class TaskActivationListener implements ITaskActivationListener {
 			LocalDateTime parse = LocalDateTime.parse(startString);
 			LocalDateTime now = LocalDateTime.now();
 			long seconds = parse.until(now, ChronoUnit.SECONDS);
-			String time = now.toLocalDate().toString();
+			String time = parse.toLocalDate().toString();
 			String accumulatedString = TimekeeperPlugin.getValue(task, time);
 			if (accumulatedString != null) {
 				long accumulated = Long.parseLong(accumulatedString);
