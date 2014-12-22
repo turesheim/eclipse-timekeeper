@@ -44,7 +44,7 @@ import org.eclipse.jface.viewers.TextCellEditor;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.TreeViewerColumn;
 import org.eclipse.jface.viewers.Viewer;
-import org.eclipse.jface.viewers.ViewerSorter;
+import org.eclipse.jface.viewers.ViewerComparator;
 import org.eclipse.mylyn.commons.ui.CommonImages;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.TaskCategory;
@@ -78,10 +78,7 @@ import org.eclipse.ui.part.ViewPart;
 @SuppressWarnings("restriction")
 public class WorkWeekView extends ViewPart {
 
-	private final LocalDate firstDayOfWeek;
-
-
-	private class LP extends ColumnLabelProvider {
+	private class TaskLabelProvider extends ColumnLabelProvider {
 
 		private class CompositeImageDescriptor {
 
@@ -160,9 +157,6 @@ public class WorkWeekView extends ViewPart {
 			return sb.toString();
 		}
 
-	}
-
-	class NameSorter extends ViewerSorter {
 	}
 
 	private final class TaskActivationListener implements ITaskActivationListener {
@@ -272,15 +266,6 @@ public class WorkWeekView extends ViewPart {
 			return new Object[0];
 		}
 
-		private boolean hasData(AbstractTask task, LocalDate startDate) {
-			int sum = 0;
-			for (int i = 0; i < 7; i++) {
-				String ds = startDate.plusDays(i).toString();
-				sum += TimekeeperPlugin.getIntValue(task, ds);
-			}
-			return sum > 0;
-		}
-
 		public Object[] getElements(Object parent) {
 			return TasksUiPlugin.getTaskList().getAllTasks()
 					.stream()
@@ -308,10 +293,25 @@ public class WorkWeekView extends ViewPart {
 			return false;
 		}
 
+		private boolean hasData(AbstractTask task, LocalDate startDate) {
+			int sum = 0;
+			for (int i = 0; i < 7; i++) {
+				String ds = startDate.plusDays(i).toString();
+				sum += TimekeeperPlugin.getIntValue(task, ds);
+			}
+			return sum > 0;
+		}
+
 		public void inputChanged(Viewer v, Object oldInput, Object newInput) {
 			v.refresh();
 		}
 	}
+
+	private static final DateTimeFormatter dateFormat = DateTimeFormatter.ISO_LOCAL_DATE;
+
+	public static final String ID = "net.resheim.eclipse.timekeeper.ui.views.SampleView";
+
+	private static final DateTimeFormatter weekFormat = DateTimeFormatter.ofPattern("w");
 
 	/**
 	 * Calculates the total amount of seconds accumulated on the project for the
@@ -332,14 +332,14 @@ public class WorkWeekView extends ViewPart {
 				.mapToInt(t -> TimekeeperPlugin.getIntValue(t, d)).sum();
 	}
 
-	public static final String ID = "net.resheim.eclipse.timekeeper.ui.views.SampleView";
-
 	private Action action1;
 
 	private Action action2;
 
+
 	private Action doubleClickAction;
 
+	private final LocalDate firstDayOfWeek;
 
 	private TaskActivationListener taskActivationListener;
 
@@ -355,20 +355,10 @@ public class WorkWeekView extends ViewPart {
 		int day = date.get(weekFields.dayOfWeek());
 		firstDayOfWeek = date.minusDays(day - 1);
 	}
-
 	private void contributeToActionBars() {
 		IActionBars bars = getViewSite().getActionBars();
 		fillLocalPullDown(bars.getMenuManager());
 		fillLocalToolBar(bars.getToolBarManager());
-	}
-
-	private static final DateTimeFormatter weekFormat = DateTimeFormatter.ofPattern("w");
-	private static final DateTimeFormatter dateFormat = DateTimeFormatter.ISO_LOCAL_DATE;
-
-	@Override
-	public void dispose() {
-		TasksUiPlugin.getTaskActivityManager().removeActivationListener(taskActivationListener);
-		super.dispose();
 	}
 
 	@Override
@@ -407,7 +397,18 @@ public class WorkWeekView extends ViewPart {
 			createTimeColumn(i, headings[i]);
 		}
 
-		viewer.setSorter(new NameSorter());
+		viewer.setComparator(new ViewerComparator() {
+
+			@Override
+			public int compare(Viewer viewer, Object e1, Object e2) {
+				if (e1 instanceof ITask && e2 instanceof ITask) {
+					String s1 = ((ITask) e1).getTaskId();
+					String s2 = ((ITask) e2).getTaskId();
+					return s1.compareTo(s2);
+				}
+				return super.compare(viewer, e1, e2);
+			}
+		});
 
 		viewer.getTree().setHeaderVisible(true);
 
@@ -453,11 +454,17 @@ public class WorkWeekView extends ViewPart {
 				return "";
 			}
 		});
-	};
+	}
 
 	private void createTitleColumn() {
 		TreeViewerColumn keyColumn = createTableViewerColumn("Activity", 400, 1);
-		keyColumn.setLabelProvider(new LP());
+		keyColumn.setLabelProvider(new TaskLabelProvider());
+	};
+
+	@Override
+	public void dispose() {
+		TasksUiPlugin.getTaskActivityManager().removeActivationListener(taskActivationListener);
+		super.dispose();
 	}
 
 	private void fillContextMenu(IMenuManager manager) {
