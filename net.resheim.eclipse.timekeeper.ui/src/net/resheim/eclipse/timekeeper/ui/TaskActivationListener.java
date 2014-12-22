@@ -9,7 +9,7 @@
  * Contributors:
  *    Torkild U. Resheim - initial API and implementation
  *******************************************************************************/
-package net.resheim.eclipse.timekeeper;
+package net.resheim.eclipse.timekeeper.ui;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -29,27 +29,27 @@ public class TaskActivationListener implements ITaskActivationListener {
 	@Override
 	public void preTaskActivated(ITask task) {
 		LocalDateTime now = LocalDateTime.now();
-		TimekeeperPlugin.setValue(task, TimekeeperPlugin.START, now.toString());
+		Activator.setValue(task, Activator.START, now.toString());
 	}
 
 	@Override
 	public void preTaskDeactivated(ITask task) {
-		String startString = TimekeeperPlugin.getValue(task, TimekeeperPlugin.START);
+		String startString = Activator.getValue(task, Activator.START);
 		if (startString != null) {
 			LocalDateTime parse = LocalDateTime.parse(startString);
 			LocalDateTime now = LocalDateTime.now();
 			long seconds = parse.until(now, ChronoUnit.SECONDS);
 			String time = parse.toLocalDate().toString();
-			String accumulatedString = TimekeeperPlugin.getValue(task, time);
+			String accumulatedString = Activator.getValue(task, time);
 			if (accumulatedString != null) {
 				long accumulated = Long.parseLong(accumulatedString);
 				accumulated = accumulated + seconds;
-				TimekeeperPlugin.setValue(task, time, Long.toString(accumulated));
+				Activator.setValue(task, time, Long.toString(accumulated));
 			} else {
-				TimekeeperPlugin.setValue(task, time, Long.toString(seconds));
+				Activator.setValue(task, time, Long.toString(seconds));
 			}
 		}
-		TimekeeperPlugin.clearValue(task, TimekeeperPlugin.START);
+		Activator.clearValue(task, Activator.START);
 	}
 
 	@Override

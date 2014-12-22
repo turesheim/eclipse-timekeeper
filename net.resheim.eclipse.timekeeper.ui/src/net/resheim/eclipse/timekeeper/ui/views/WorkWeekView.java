@@ -15,13 +15,14 @@ package net.resheim.eclipse.timekeeper.ui.views;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.WeekFields;
+import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
-import net.resheim.eclipse.timekeeper.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.ui.Activator;
 
 import org.apache.commons.lang.time.DurationFormatUtils;
+import org.eclipse.core.runtime.CoreException;
 import org.eclipse.jface.action.Action;
 import org.eclipse.jface.action.IMenuListener;
 import org.eclipse.jface.action.IMenuManager;
@@ -46,6 +47,7 @@ import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.viewers.ViewerComparator;
 import org.eclipse.mylyn.commons.ui.CommonImages;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
+import org.eclipse.mylyn.internal.tasks.core.LocalTask;
 import org.eclipse.mylyn.internal.tasks.core.TaskCategory;
 import org.eclipse.mylyn.internal.tasks.core.TaskGroup;
 import org.eclipse.mylyn.internal.tasks.core.UncategorizedTaskContainer;
@@ -56,7 +58,11 @@ import org.eclipse.mylyn.tasks.core.IRepositoryQuery;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.core.ITaskActivationListener;
 import org.eclipse.mylyn.tasks.core.ITaskContainer;
+import org.eclipse.mylyn.tasks.core.TaskRepository;
+import org.eclipse.mylyn.tasks.core.data.TaskAttribute;
+import org.eclipse.mylyn.tasks.core.data.TaskData;
 import org.eclipse.mylyn.tasks.ui.AbstractRepositoryConnectorUi;
+import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.mylyn.tasks.ui.TasksUiImages;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.ScrolledComposite;
@@ -209,7 +215,7 @@ public class WorkWeekView extends ViewPart {
 		protected Object getValue(Object element) {
 			if (element instanceof ITask) {
 				AbstractTask task = (AbstractTask) element;
-				int seconds = TimekeeperPlugin.getIntValue(task, getDateString(weekday));
+				int seconds = Activator.getIntValue(task, getDateString(weekday));
 				if (seconds > 0) {
 					return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
 				}
@@ -228,11 +234,11 @@ public class WorkWeekView extends ViewPart {
 					// Only minutes are given
 					if (split.length == 1) {
 						newValue = Integer.parseInt(split[0]) * 60;
-						TimekeeperPlugin.setValue(task, getDateString(weekday), Integer.toString(newValue));
+						Activator.setValue(task, getDateString(weekday), Integer.toString(newValue));
 					}
 					if (split.length == 2) {
 						newValue = Integer.parseInt(split[0]) * 3600 + Integer.parseInt(split[1]) * 60;
-						TimekeeperPlugin.setValue(task, getDateString(weekday), Integer.toString(newValue));
+						Activator.setValue(task, getDateString(weekday), Integer.toString(newValue));
 					}
 					// If the new value is 0, the task may have no time
 					// logged for the week and should be removed.
@@ -240,7 +246,7 @@ public class WorkWeekView extends ViewPart {
 						viewer.refresh();
 					} else {
 						viewer.update(element, null);
-						viewer.update(TimekeeperPlugin.getProjectName(task), null);
+						viewer.update(Activator.getProjectName(task), null);
 					}
 				}
 			}
@@ -260,8 +266,8 @@ public class WorkWeekView extends ViewPart {
 				String p = (String) parentElement;
 				return TasksUiPlugin.getTaskList().getAllTasks()
 						.stream()
-						.filter(t -> t.getAttribute(TimekeeperPlugin.ATTR_ID) != null)
-						.filter(t -> p.equals(TimekeeperPlugin.getProjectName(t)))
+						.filter(t -> t.getAttribute(Activator.ATTR_ID) != null)
+						.filter(t -> p.equals(Activator.getProjectName(t)))
 						.filter(t -> hasData(t, firstDayOfWeek) || t.isActive())
 						.toArray(size -> new AbstractTask[size]);
 			}
@@ -271,16 +277,16 @@ public class WorkWeekView extends ViewPart {
 		public Object[] getElements(Object parent) {
 			return TasksUiPlugin.getTaskList().getAllTasks()
 					.stream()
-					.filter(t -> t.getAttribute(TimekeeperPlugin.ATTR_ID) != null)
+					.filter(t -> t.getAttribute(Activator.ATTR_ID) != null)
 					.filter(t -> hasData(t, firstDayOfWeek) || t.isActive())
-					.collect(Collectors.groupingBy(t -> TimekeeperPlugin.getProjectName(t)))
+					.collect(Collectors.groupingBy(t -> Activator.getProjectName(t)))
 					.keySet().toArray();
 		}
 
 		@Override
 		public Object getParent(Object element) {
 			if (element instanceof ITask) {
-				return TimekeeperPlugin.getProjectName((AbstractTask) element);
+				return Activator.getProjectName((AbstractTask) element);
 			}
 			return null;
 		}
@@ -299,7 +305,7 @@ public class WorkWeekView extends ViewPart {
 			int sum = 0;
 			for (int i = 0; i < 7; i++) {
 				String ds = startDate.plusDays(i).toString();
-				sum += TimekeeperPlugin.getIntValue(task, ds);
+				sum += Activator.getIntValue(task, ds);
 			}
 			return sum > 0;
 		}
@@ -340,9 +346,9 @@ public class WorkWeekView extends ViewPart {
 		final String d = date.toString();
 		return TasksUiPlugin.getTaskList().getAllTasks()
 				.stream()
-				.filter(t -> t.getAttribute(TimekeeperPlugin.ATTR_ID) != null)
-				.filter(t -> project.equals(TimekeeperPlugin.getProjectName(t)))
-				.mapToInt(t -> TimekeeperPlugin.getIntValue(t, d)).sum();
+				.filter(t -> t.getAttribute(Activator.ATTR_ID) != null)
+				.filter(t -> project.equals(Activator.getProjectName(t))).mapToInt(t -> Activator.getIntValue(t, d))
+				.sum();
 	}
 
 	private Action previousWeekAction;
@@ -350,6 +356,8 @@ public class WorkWeekView extends ViewPart {
 	private Action nextWeekAction;
 
 	private Action doubleClickAction;
+
+	private MenuManager projectFieldMenu;
 
 	private LocalDate firstDayOfWeek;
 
@@ -486,7 +494,7 @@ public class WorkWeekView extends ViewPart {
 					seconds = getSum(date, (String) element);
 				} else {
 					AbstractTask task = (AbstractTask) element;
-					seconds = TimekeeperPlugin.getIntValue(task, getDateString(weekday));
+					seconds = Activator.getIntValue(task, getDateString(weekday));
 				}
 				if (seconds > 0) {
 					return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
@@ -510,6 +518,7 @@ public class WorkWeekView extends ViewPart {
 	private void fillContextMenu(IMenuManager manager) {
 		manager.add(previousWeekAction);
 		manager.add(nextWeekAction);
+		manager.add(projectFieldMenu);
 		// Other plug-ins can contribute there actions here
 		manager.add(new Separator(IWorkbenchActionConstants.MB_ADDITIONS));
 	}
@@ -587,6 +596,65 @@ public class WorkWeekView extends ViewPart {
 				showMessage("Double-click detected on " + obj.toString());
 			}
 		};
+		projectFieldMenu = new MenuManager("Set Grouping Field", null);
+		projectFieldMenu.setRemoveAllWhenShown(true);
+		projectFieldMenu.addMenuListener(new IMenuListener() {
+
+			public void menuAboutToShow(IMenuManager manager) {
+
+				ISelection selection = viewer.getSelection();
+				if (selection instanceof IStructuredSelection) {
+					Object firstElement = ((IStructuredSelection) selection).getFirstElement();
+					if (firstElement instanceof AbstractTask) {
+						AbstractTask task = (AbstractTask) firstElement;
+						// No way to change project on local tasks
+						if (task instanceof LocalTask) {
+							return;
+						}
+						String url = task.getRepositoryUrl();
+						TaskRepository repository = TasksUiPlugin.getRepositoryManager().getRepository(url);
+						try {
+							TaskData taskData = TasksUi.getTaskDataManager().getTaskData(task);
+							List<TaskAttribute> attributesByType = taskData.getAttributeMapper().getAttributesByType(
+									taskData, TaskAttribute.TYPE_SINGLE_SELECT);
+							// customfield_10410 = subproject
+							for (TaskAttribute taskAttribute : attributesByType) {
+								final String label = taskAttribute.getMetaData().getLabel();
+								if (label != null) {
+									final String id = taskAttribute.getId();
+									Action a = new Action(label.replaceAll(":", "")) {
+										@Override
+										public void run() {
+											setProjectField(repository, id);
+										}
+
+									};
+									manager.add(a);
+								}
+							}
+							Action a = new Action("Default") {
+								@Override
+								public void run() {
+									setProjectField(repository, null);
+								}
+
+							};
+							manager.add(a);
+						} catch (CoreException e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+		});
+	}
+
+	private void setProjectField(TaskRepository repository, String string) {
+		if (null == string) {
+			repository.removeProperty(Activator.ATTR_ID + ".grouping");
+		}
+		repository.setProperty(Activator.ATTR_ID + ".grouping", string);
+		viewer.refresh();
 	}
 
 	/**
