@@ -435,6 +435,13 @@ public class WorkWeekView extends ViewPart {
 				if (e1 instanceof ITask && e2 instanceof ITask) {
 					String s1 = ((ITask) e1).getTaskId();
 					String s2 = ((ITask) e2).getTaskId();
+					try {
+						int i1 = Integer.parseInt(s1);
+						int i2 = Integer.parseInt(s2);
+						return i1 - i2;
+					} catch (NumberFormatException e) {
+
+					}
 					return s1.compareTo(s2);
 				}
 				return super.compare(viewer, e1, e2);
