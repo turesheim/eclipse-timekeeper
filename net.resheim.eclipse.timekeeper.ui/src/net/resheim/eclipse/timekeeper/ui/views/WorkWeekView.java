@@ -72,6 +72,7 @@ import org.eclipse.ui.IActionBars;
 import org.eclipse.ui.ISharedImages;
 import org.eclipse.ui.IWorkbenchActionConstants;
 import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.forms.widgets.FormToolkit;
 import org.eclipse.ui.part.ViewPart;
 
 @SuppressWarnings("restriction")
@@ -79,15 +80,16 @@ public class WorkWeekView extends ViewPart {
 
 	private final LocalDate firstDayOfWeek;
 
-	private class CompositeImageDescriptor {
-
-		ImageDescriptor icon;
-
-		ImageDescriptor overlayKind;
-
-	}
 
 	private class LP extends ColumnLabelProvider {
+
+		private class CompositeImageDescriptor {
+
+			ImageDescriptor icon;
+
+			ImageDescriptor overlayKind;
+
+		}
 		@Override
 		public Image getImage(Object element) {
 			CompositeImageDescriptor compositeDescriptor = getImageDescriptor(element);
@@ -251,8 +253,8 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	class ViewContentProvider implements ITreeContentProvider {
+
 		public void dispose() {
-			TasksUiPlugin.getTaskActivityManager().removeActivationListener(taskActivationListener);
 		}
 
 		@Override
@@ -364,15 +366,26 @@ public class WorkWeekView extends ViewPart {
 	private static final DateTimeFormatter dateFormat = DateTimeFormatter.ISO_LOCAL_DATE;
 
 	@Override
+	public void dispose() {
+		TasksUiPlugin.getTaskActivityManager().removeActivationListener(taskActivationListener);
+		super.dispose();
+	}
+
+	@Override
 	public void createPartControl(Composite parent) {
+		FormToolkit ft = new FormToolkit(parent.getDisplay());
 		ScrolledComposite root = new ScrolledComposite(parent, SWT.V_SCROLL);
-		root.setBackgroundMode(SWT.INHERIT_DEFAULT);
+		ft.adapt(root);
+		GridLayout layout = new GridLayout();
+		root.setLayout(layout);
 		root.setExpandHorizontal(true);
 		root.setExpandVertical(true);
 
-		Composite main = new Composite(root, SWT.NONE);
-		main.setBackgroundMode(SWT.INHERIT_DEFAULT);
-		main.setLayout(new GridLayout());
+		Composite main = ft.createComposite(root);
+		ft.adapt(main);
+		root.setContent(main);
+		GridLayout layout2 = new GridLayout();
+		main.setLayout(layout2);
 
 		Text dateTimeLabel = new Text(main, SWT.NONE);
 		dateTimeLabel.setLayoutData(new GridData());
@@ -395,11 +408,8 @@ public class WorkWeekView extends ViewPart {
 		}
 
 		viewer.setSorter(new NameSorter());
-		viewer.setInput(getViewSite());
 
 		viewer.getTree().setHeaderVisible(true);
-
-		root.setContent(main);
 
 		makeActions();
 		hookContextMenu();
@@ -407,6 +417,9 @@ public class WorkWeekView extends ViewPart {
 		contributeToActionBars();
 		taskActivationListener = new TaskActivationListener();
 		TasksUiPlugin.getTaskActivityManager().addActivationListener(taskActivationListener);
+		viewer.setInput(getViewSite());
+		// Force a redraw so content is visible
+		root.pack();
 	}
 
 	private TreeViewerColumn createTableViewerColumn(String title, int bound, final int colNumber) {
