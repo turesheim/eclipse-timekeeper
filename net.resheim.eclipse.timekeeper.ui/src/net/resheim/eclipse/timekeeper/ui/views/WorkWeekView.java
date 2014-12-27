@@ -396,6 +396,10 @@ public class WorkWeekView extends ViewPart {
 
 	private DateTime dateChooser;
 
+	private Action deactivateAction;
+
+	private Action activateAction;
+
 	/**
 	 * The constructor.
 	 */
@@ -545,7 +549,17 @@ public class WorkWeekView extends ViewPart {
 	private void fillContextMenu(IMenuManager manager) {
 		manager.add(previousWeekAction);
 		manager.add(nextWeekAction);
-		manager.add(projectFieldMenu);
+		ISelection selection = viewer.getSelection();
+		Object obj = ((IStructuredSelection) selection).getFirstElement();
+		if (obj instanceof ITask) {
+			if (((ITask) obj).isActive()) {
+				manager.add(deactivateAction);
+			} else {
+				manager.add(activateAction);
+			}
+			manager.add(new Separator());
+			manager.add(projectFieldMenu);
+		}
 		// Other plug-ins can contribute there actions here
 		manager.add(new Separator(IWorkbenchActionConstants.MB_ADDITIONS));
 	}
@@ -627,6 +641,27 @@ public class WorkWeekView extends ViewPart {
 				}
 			}
 		};
+		deactivateAction = new Action("Deactivate") {
+			@Override
+			public void run() {
+				ISelection selection = viewer.getSelection();
+				Object obj = ((IStructuredSelection) selection).getFirstElement();
+				if (obj instanceof ITask) {
+					TasksUi.getTaskActivityManager().deactivateTask((ITask) obj);
+				}
+			}
+		};
+		activateAction = new Action("Activate") {
+			@Override
+			public void run() {
+				ISelection selection = viewer.getSelection();
+				Object obj = ((IStructuredSelection) selection).getFirstElement();
+				if (obj instanceof ITask) {
+					TasksUi.getTaskActivityManager().activateTask((ITask) obj);
+				}
+			}
+		};
+
 		projectFieldMenu = new MenuManager("Set Grouping Field", null);
 		projectFieldMenu.setRemoveAllWhenShown(true);
 		projectFieldMenu.addMenuListener(new IMenuListener() {
@@ -669,7 +704,6 @@ public class WorkWeekView extends ViewPart {
 								public void run() {
 									setProjectField(repository, null);
 								}
-
 							};
 							manager.add(a);
 						} catch (CoreException e) {
