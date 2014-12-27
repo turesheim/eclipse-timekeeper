@@ -29,7 +29,6 @@ import org.eclipse.jface.action.IMenuManager;
 import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.action.Separator;
-import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.jface.viewers.CellEditor;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
@@ -64,6 +63,7 @@ import org.eclipse.mylyn.tasks.core.data.TaskData;
 import org.eclipse.mylyn.tasks.ui.AbstractRepositoryConnectorUi;
 import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.mylyn.tasks.ui.TasksUiImages;
+import org.eclipse.mylyn.tasks.ui.TasksUiUtil;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.ScrolledComposite;
 import org.eclipse.swt.events.SelectionAdapter;
@@ -261,7 +261,7 @@ public class WorkWeekView extends ViewPart {
 
 		@Override
 		public Object[] getChildren(Object parentElement) {
-			// TODO: Reuse calculation from getElements(Object) maybe?
+			// TODO: Maybe reuse calculation from getElements(Object)?
 			if (parentElement instanceof String) {
 				String p = (String) parentElement;
 				return TasksUiPlugin.getTaskList().getAllTasks()
@@ -573,6 +573,7 @@ public class WorkWeekView extends ViewPart {
 				viewer.setInput(getViewSite());
 			}
 		};
+		previousWeekAction.setText("Previous Week");
 		previousWeekAction.setToolTipText("Show previous week");
 		previousWeekAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
 				.getImageDescriptor(ISharedImages.IMG_TOOL_BACK));
@@ -584,6 +585,7 @@ public class WorkWeekView extends ViewPart {
 				viewer.setInput(getViewSite());
 			}
 		};
+		nextWeekAction.setText("Next Week");
 		nextWeekAction.setToolTipText("Show next week");
 		nextWeekAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
 				.getImageDescriptor(ISharedImages.IMG_TOOL_FORWARD));
@@ -593,7 +595,9 @@ public class WorkWeekView extends ViewPart {
 			public void run() {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
-				showMessage("Double-click detected on " + obj.toString());
+				if (obj instanceof ITask) {
+					TasksUiUtil.openTask((ITask) obj);
+				}
 			}
 		};
 		projectFieldMenu = new MenuManager("Set Grouping Field", null);
@@ -632,6 +636,7 @@ public class WorkWeekView extends ViewPart {
 									manager.add(a);
 								}
 							}
+							manager.add(new Separator());
 							Action a = new Action("Default") {
 								@Override
 								public void run() {
@@ -663,9 +668,5 @@ public class WorkWeekView extends ViewPart {
 	@Override
 	public void setFocus() {
 		viewer.getControl().setFocus();
-	}
-
-	private void showMessage(String message) {
-		MessageDialog.openInformation(viewer.getControl().getShell(), "Sample View", message);
 	}
 }

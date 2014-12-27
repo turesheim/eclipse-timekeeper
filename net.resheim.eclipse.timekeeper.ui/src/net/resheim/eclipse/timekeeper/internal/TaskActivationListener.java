@@ -9,11 +9,13 @@
  * Contributors:
  *    Torkild U. Resheim - initial API and implementation
  *******************************************************************************/
-package net.resheim.eclipse.timekeeper.ui;
+package net.resheim.eclipse.timekeeper.internal;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
+
+import net.resheim.eclipse.timekeeper.ui.Activator;
 
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.core.ITaskActivationListener;
