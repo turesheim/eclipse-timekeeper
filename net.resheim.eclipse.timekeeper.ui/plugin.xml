@@ -37,7 +37,7 @@
    <extension
          point="org.eclipse.mylyn.tasks.core.taskActivationListeners">
       <listener
-            class="net.resheim.eclipse.timekeeper.ui.TaskActivationListener"
+            class="net.resheim.eclipse.timekeeper.internal.TaskActivationListener"
             id="net.resheim.eclipse.timekeeper.taskActivationListener">
       </listener>
    </extension>

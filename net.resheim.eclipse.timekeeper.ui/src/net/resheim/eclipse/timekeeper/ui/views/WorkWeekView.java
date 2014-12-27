@@ -30,16 +30,21 @@ import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.action.Separator;
 import org.eclipse.jface.resource.ImageDescriptor;
+import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.jface.viewers.CellEditor;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
 import org.eclipse.jface.viewers.ColumnViewer;
 import org.eclipse.jface.viewers.DoubleClickEvent;
 import org.eclipse.jface.viewers.EditingSupport;
 import org.eclipse.jface.viewers.IDoubleClickListener;
+import org.eclipse.jface.viewers.IFontProvider;
+import org.eclipse.jface.viewers.ILabelProvider;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.ITreeContentProvider;
+import org.eclipse.jface.viewers.LabelProvider;
 import org.eclipse.jface.viewers.TextCellEditor;
+import org.eclipse.jface.viewers.TreeColumnViewerLabelProvider;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.TreeViewerColumn;
 import org.eclipse.jface.viewers.Viewer;
@@ -68,6 +73,7 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.ScrolledComposite;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -86,15 +92,36 @@ import org.eclipse.ui.part.ViewPart;
 @SuppressWarnings("restriction")
 public class WorkWeekView extends ViewPart {
 
-	private class TaskLabelProvider extends ColumnLabelProvider {
+	private class TaskLabelProvider extends LabelProvider implements IFontProvider, ILabelProvider {
+
+		@Override
+		public Font getFont(Object element) {
+			if (element instanceof ITask){
+				if (((ITask) element).isActive()) {
+					return JFaceResources.getFontRegistry().getBold(
+							JFaceResources.DIALOG_FONT);
+				}
+			}
+			if (element instanceof String){
+				String p = (String) element;
+				if (TasksUiPlugin.getTaskList().getAllTasks()
+						.stream()
+						.filter(t -> t.getAttribute(Activator.ATTR_ID) != null)
+						.filter(t -> p.equals(Activator.getProjectName(t)))
+						.anyMatch(t -> t.isActive())){
+					return JFaceResources.getFontRegistry().getBold(
+							JFaceResources.DIALOG_FONT);
+				}
+
+			}
+			return JFaceResources.getDialogFont();
+		}
 
 		private class CompositeImageDescriptor {
-
 			ImageDescriptor icon;
-
 			ImageDescriptor overlayKind;
-
 		}
+
 		@Override
 		public Image getImage(Object element) {
 			CompositeImageDescriptor compositeDescriptor = getImageDescriptor(element);
@@ -480,11 +507,11 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void createTimeColumn(int weekday) {
-		TreeViewerColumn keyColumn = createTableViewerColumn("-", 50, 1 + weekday);
-		keyColumn.getColumn().setMoveable(false);
-		keyColumn.getColumn().setAlignment(SWT.RIGHT);
-		keyColumn.setEditingSupport(new TimeEditingSupport(keyColumn.getViewer(), weekday));
-		keyColumn.setLabelProvider(new ColumnLabelProvider() {
+		TreeViewerColumn column = createTableViewerColumn("-", 50, 1 + weekday);
+		column.getColumn().setMoveable(false);
+		column.getColumn().setAlignment(SWT.RIGHT);
+		column.setEditingSupport(new TimeEditingSupport(column.getViewer(), weekday));
+		column.setLabelProvider(new ColumnLabelProvider() {
 
 			@Override
 			public String getText(Object element) {
@@ -505,8 +532,8 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void createTitleColumn() {
-		TreeViewerColumn keyColumn = createTableViewerColumn("Activity", 400, 1);
-		keyColumn.setLabelProvider(new TaskLabelProvider());
+		TreeViewerColumn column = createTableViewerColumn("Activity", 400, 1);
+		column.setLabelProvider(new TreeColumnViewerLabelProvider(new TaskLabelProvider()));
 	};
 
 	@Override
