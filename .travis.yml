@@ -1,3 +1,4 @@
 language: java
+script: "mvn clean verify -f net.resheim.eclipse.timekeeper-parent/pom.xml"
 jdk:
   - oraclejdk8
