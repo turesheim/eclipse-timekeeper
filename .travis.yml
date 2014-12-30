@@ -1,8 +1,19 @@
 language: java
 sudo: false
-script: "mvn clean verify -f net.resheim.eclipse.timekeeper-parent/pom.xml"
+script: mvn clean verify -f net.resheim.eclipse.timekeeper-parent/pom.xml
 jdk:
-  - oraclejdk8
+- oraclejdk8
 cache:
   directories:
   - $HOME/.m2
+deploy:
+  provider: releases
+  skip_cleanup: true
+  api_key:
+    secure: UAKAsUbB0H3sCOkarR0gK2WqATpCxXcIqh5T8H8bGtmOxcAoNyhkdf0m/CnKcEEvn2XW/c5mE28Y4Wb7XV7RmVB/SyQtH+JqyQsDpIKLWUKDACfxbSqCxfSyamioMHqbHITzTzogmGEgFOGFhHgOV0RsZ0uJZQuQ+5BhB3KLnEg=
+  file: ${HOME}/build/${TRAVIS_REPO_SLUG}/net.resheim.eclipse.timekeeper-site/target/site/artifacts.jar
+  file: ${HOME}/build/${TRAVIS_REPO_SLUG}/net.resheim.eclipse.timekeeper-site/target/site/content.jar
+  on:
+    repo: turesheim/eclipse-timekeeper
+    tags: true
+    all_branches: true
