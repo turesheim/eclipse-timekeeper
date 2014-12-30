@@ -38,20 +38,7 @@
 
 	<properties>
 		<tycho.version>0.21.0</tycho.version>
-		<tycho-extras-version>0.21.0</tycho-extras-version>
 	</properties>
-
-	<pluginRepositories>
-		<pluginRepository>
-			<id>sonatype-snapshots</id>
-			<url>https://repository.sonatype.org/content/repositories/snapshots/</url>
-		</pluginRepository>
-		<pluginRepository>
-			<id>maven.eclipse.org</id>
-			<url>http://maven.eclipse.org/nexus/content/repositories/milestone-luna/</url>
-		</pluginRepository>
-	</pluginRepositories>
-
 
 	<organization>
 		<name>Torkild U. Resheim</name>
@@ -108,29 +95,6 @@
 						</environment>
 					</environments>
 				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>build-helper-maven-plugin</artifactId>
-				<version>1.7</version>
-			</plugin>
-			<!-- computes git revision for manifest -->
-			<plugin>
-				<groupId>org.eclipse.tycho</groupId>
-				<artifactId>tycho-packaging-plugin</artifactId>
-				<version>${tycho.version}</version>
-				<configuration>
-					<archive>
-						<addMavenDescriptor>false</addMavenDescriptor>
-					</archive>
-				</configuration>
-				<dependencies>
-					<dependency>
-						<groupId>org.eclipse.tycho.extras</groupId>
-						<artifactId>tycho-sourceref-jgit</artifactId>
-						<version>${tycho-extras-version}</version>
-					</dependency>
-				</dependencies>
 			</plugin>
 		</plugins>
 	</build>
