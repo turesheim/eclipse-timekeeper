@@ -399,6 +399,8 @@ public class WorkWeekView extends ViewPart {
 
 	private Action activateAction;
 
+	private Action exportAction;
+
 	/**
 	 * The constructor.
 	 */
@@ -568,6 +570,8 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void fillLocalToolBar(IToolBarManager manager) {
+		manager.add(exportAction);
+		manager.add(new Separator());
 		manager.add(previousWeekAction);
 		manager.add(nextWeekAction);
 	}
@@ -604,6 +608,19 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void makeActions() {
+
+		exportAction = new Action() {
+
+			@Override
+			public void run() {
+				ExportToClipboard export = new ExportToClipboard();
+				export.exportAsHTML(firstDayOfWeek);
+			}
+
+		};
+		exportAction.setText("Export to clipboard");
+		exportAction.setImageDescriptor(Activator.getImageDescriptor("icons/full/elcl16/export.gif"));
+
 		previousWeekAction = new Action() {
 			@Override
 			public void run() {
