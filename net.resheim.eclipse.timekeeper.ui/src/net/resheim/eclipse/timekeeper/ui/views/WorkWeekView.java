@@ -84,7 +84,6 @@ import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.TreeColumn;
 import org.eclipse.ui.IActionBars;
 import org.eclipse.ui.ISharedImages;
-import org.eclipse.ui.IWorkbenchActionConstants;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.forms.widgets.FormToolkit;
 import org.eclipse.ui.part.ViewPart;
@@ -560,8 +559,6 @@ public class WorkWeekView extends ViewPart {
 			manager.add(new Separator());
 			manager.add(projectFieldMenu);
 		}
-		// Other plug-ins can contribute there actions here
-		manager.add(new Separator(IWorkbenchActionConstants.MB_ADDITIONS));
 	}
 
 	private void fillLocalPullDown(IMenuManager manager) {
