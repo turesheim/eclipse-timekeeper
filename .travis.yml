@@ -11,7 +11,8 @@ deploy:
   skip_cleanup: true
   api_key:
     secure: UAKAsUbB0H3sCOkarR0gK2WqATpCxXcIqh5T8H8bGtmOxcAoNyhkdf0m/CnKcEEvn2XW/c5mE28Y4Wb7XV7RmVB/SyQtH+JqyQsDpIKLWUKDACfxbSqCxfSyamioMHqbHITzTzogmGEgFOGFhHgOV0RsZ0uJZQuQ+5BhB3KLnEg=
-  file: "./net.resheim.eclipse.timekeeper/target/net.resheim.eclipse.timekeeper-*.zip"
+  file_glob: true
+  file: ${HOME}/build/${TRAVIS_REPO_SLUG}/net.resheim.eclipse.timekeeper-site/target/net.resheim.eclipse.timekeeper-*.zip
   on:
     repo: turesheim/eclipse-timekeeper
     tags: true
