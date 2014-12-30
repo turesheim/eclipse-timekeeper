@@ -12,6 +12,7 @@
 package net.resheim.eclipse.timekeeper.internal;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 
@@ -40,8 +41,11 @@ public class TaskActivationListener implements ITaskActivationListener {
 			LocalDateTime stopped = LocalDateTime.now();
 			long seconds = started.until(stopped, ChronoUnit.SECONDS);
 			String time = DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
-			boolean confirm = MessageDialog.openConfirm(Display.getCurrent().getActiveShell(), "Add elapsed time?",
-					"Work was already started on this task on " + startString + " add the elapsed time (" + time
+			boolean confirm = MessageDialog.openConfirm(Display.getCurrent().getActiveShell(),
+					"Add elapsed time?",
+					"Work was already started on this task on " 
+							+ started.format(DateTimeFormatter.RFC_1123_DATE_TIME)
+							+ " add the elapsed time (" + time
 							+ ") to the task total?");
 			if (confirm) {
 				accumulateTime(task, startString);
