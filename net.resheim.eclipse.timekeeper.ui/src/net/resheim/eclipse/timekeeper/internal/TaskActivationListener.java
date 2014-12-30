@@ -17,8 +17,11 @@ import java.util.HashMap;
 
 import net.resheim.eclipse.timekeeper.ui.Activator;
 
+import org.apache.commons.lang.time.DurationFormatUtils;
+import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.core.ITaskActivationListener;
+import org.eclipse.swt.widgets.Display;
 
 public class TaskActivationListener implements ITaskActivationListener {
 
@@ -31,6 +34,19 @@ public class TaskActivationListener implements ITaskActivationListener {
 	@Override
 	public void preTaskActivated(ITask task) {
 		LocalDateTime now = LocalDateTime.now();
+		String startString = Activator.getValue(task, Activator.START);
+		if (startString != null) {
+			LocalDateTime started = LocalDateTime.parse(startString);
+			LocalDateTime stopped = LocalDateTime.now();
+			long seconds = started.until(stopped, ChronoUnit.SECONDS);
+			String time = DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
+			boolean confirm = MessageDialog.openConfirm(Display.getCurrent().getActiveShell(), "Add elapsed time?",
+					"Work was already started on this task on " + startString + " add the elapsed time (" + time
+							+ ") to the task total?");
+			if (confirm) {
+				accumulateTime(task, startString);
+			}
+		}
 		Activator.setValue(task, Activator.START, now.toString());
 	}
 
@@ -38,20 +54,25 @@ public class TaskActivationListener implements ITaskActivationListener {
 	public void preTaskDeactivated(ITask task) {
 		String startString = Activator.getValue(task, Activator.START);
 		if (startString != null) {
-			LocalDateTime parse = LocalDateTime.parse(startString);
-			LocalDateTime now = LocalDateTime.now();
-			long seconds = parse.until(now, ChronoUnit.SECONDS);
-			String time = parse.toLocalDate().toString();
-			String accumulatedString = Activator.getValue(task, time);
-			if (accumulatedString != null) {
-				long accumulated = Long.parseLong(accumulatedString);
-				accumulated = accumulated + seconds;
-				Activator.setValue(task, time, Long.toString(accumulated));
-			} else {
-				Activator.setValue(task, time, Long.toString(seconds));
-			}
+			accumulateTime(task, startString);
 		}
 		Activator.clearValue(task, Activator.START);
+	}
+
+	private void accumulateTime(ITask task, String startString) {
+		LocalDateTime started = LocalDateTime.parse(startString);
+		LocalDateTime stopped = LocalDateTime.now();
+		long seconds = started.until(stopped, ChronoUnit.SECONDS);
+		// Store the elapsed time at the date
+		String time = started.toLocalDate().toString();
+		String accumulatedString = Activator.getValue(task, time);
+		if (accumulatedString != null) {
+			long accumulated = Long.parseLong(accumulatedString);
+			accumulated = accumulated + seconds;
+			Activator.setValue(task, time, Long.toString(accumulated));
+		} else {
+			Activator.setValue(task, time, Long.toString(seconds));
+		}
 	}
 
 	@Override
