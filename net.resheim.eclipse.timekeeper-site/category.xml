@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site>
+   <feature url="features/net.resheim.eclipse.timekeeper_1.0.0.qualifier.jar" id="net.resheim.eclipse.timekeeper" version="1.0.0.qualifier">
+      <category name="main"/>
+   </feature>
+   <category-def name="main" label="Eclipse Timekeeper">
+      <description>
+         A simple extension of Mylyn Tasks that tracks the time a task is active and presents the result in a workweek view.
+      </description>
+   </category-def>
+</site>
