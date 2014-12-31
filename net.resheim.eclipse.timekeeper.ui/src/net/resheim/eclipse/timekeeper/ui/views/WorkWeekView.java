@@ -103,9 +103,8 @@ public class WorkWeekView extends ViewPart {
 			}
 			if (element instanceof String){
 				String p = (String) element;
-				if (TasksUiPlugin.getTaskList().getAllTasks()
+				if (filtered
 						.stream()
-						.filter(t -> t.getAttribute(Activator.ATTR_ID) != null)
 						.filter(t -> p.equals(Activator.getProjectName(t)))
 						.anyMatch(t -> t.isActive())){
 					return JFaceResources.getFontRegistry().getBold(
@@ -280,33 +279,39 @@ public class WorkWeekView extends ViewPart {
 
 	}
 
+	private List<AbstractTask> filtered;
+
 	private class ViewContentProvider implements ITreeContentProvider {
+
 
 		public void dispose() {
 		}
 
 		@Override
 		public Object[] getChildren(Object parentElement) {
-			// TODO: Maybe reuse calculation from getElements(Object)?
 			if (parentElement instanceof String) {
 				String p = (String) parentElement;
-				return TasksUiPlugin.getTaskList().getAllTasks()
+				long start = System.currentTimeMillis();
+				Object[] tasks = filtered
 						.stream()
-						.filter(t -> t.getAttribute(Activator.ATTR_ID) != null)
 						.filter(t -> p.equals(Activator.getProjectName(t)))
-						.filter(t -> hasData(t, firstDayOfWeek) || t.isActive())
 						.toArray(size -> new AbstractTask[size]);
+				long end = System.currentTimeMillis();
+				System.out.println("Task filtering in " + (end - start) + "ms");
+				return tasks;
 			}
 			return new Object[0];
 		}
 
 		public Object[] getElements(Object parent) {
-			return TasksUiPlugin.getTaskList().getAllTasks()
+			long start = System.currentTimeMillis();
+			Object[] projects = filtered
 					.stream()
-					.filter(t -> t.getAttribute(Activator.ATTR_ID) != null)
-					.filter(t -> hasData(t, firstDayOfWeek) || t.isActive())
 					.collect(Collectors.groupingBy(t -> Activator.getProjectName(t)))
 					.keySet().toArray();
+			long end = System.currentTimeMillis();
+			System.out.println("Project filtering in " + (end - start) + "ms");
+			return projects;
 		}
 
 		@Override
@@ -327,15 +332,6 @@ public class WorkWeekView extends ViewPart {
 			return false;
 		}
 
-		private boolean hasData(AbstractTask task, LocalDate startDate) {
-			int sum = 0;
-			for (int i = 0; i < 7; i++) {
-				String ds = startDate.plusDays(i).toString();
-				sum += Activator.getIntValue(task, ds);
-			}
-			return sum > 0;
-		}
-
 		public void inputChanged(Viewer v, Object oldInput, Object newInput) {
 			v.refresh();
 			// Also update the week label
@@ -351,6 +347,8 @@ public class WorkWeekView extends ViewPart {
 			for (int i = 1; i < columns.length; i++) {
 				columns[i].setText(headings[i - 1]);
 			}
+			// Make sure we have some content
+			filter();
 		}
 	}
 
@@ -368,15 +366,31 @@ public class WorkWeekView extends ViewPart {
 	 *            the project to calculate for
 	 * @return the total amount of seconds accumulated
 	 */
-	private static int getSum(LocalDate date, String project) {
+	private int getSum(LocalDate date, String project) {
 		final String d = date.toString();
-		return TasksUiPlugin.getTaskList().getAllTasks()
+		return filtered
 				.stream()
-				.filter(t -> t.getAttribute(Activator.ATTR_ID) != null)
 				.filter(t -> project.equals(Activator.getProjectName(t))).mapToInt(t -> Activator.getIntValue(t, d))
 				.sum();
 	}
 
+	private boolean hasData(AbstractTask task, LocalDate startDate) {
+		int sum = 0;
+		for (int i = 0; i < 7; i++) {
+			String ds = startDate.plusDays(i).toString();
+			sum += Activator.getIntValue(task, ds);
+		}
+		return sum > 0;
+	}
+
+	private void filter() {
+		long start = System.currentTimeMillis();
+		filtered = TasksUiPlugin.getTaskList().getAllTasks().stream()
+				.filter(t -> hasData(t, firstDayOfWeek) || t.isActive()).collect(Collectors.toList());
+		long end = System.currentTimeMillis();
+		System.out.println("Initial filtering in " + (end - start) + "ms");
+
+	}
 	private Action previousWeekAction;
 
 	private Action nextWeekAction;
@@ -458,7 +472,8 @@ public class WorkWeekView extends ViewPart {
 		});
 
 		viewer = new TreeViewer(main, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION);
-		viewer.setContentProvider(new ViewContentProvider());
+		ViewContentProvider provider = new ViewContentProvider();
+		viewer.setContentProvider(provider);
 		GridData layoutData = new GridData(SWT.FILL, SWT.FILL, true, true);
 		layoutData.horizontalSpan = 2;
 		viewer.getControl().setLayoutData(layoutData);
