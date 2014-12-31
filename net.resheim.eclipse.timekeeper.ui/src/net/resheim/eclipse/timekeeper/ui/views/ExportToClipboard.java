@@ -12,6 +12,7 @@
 package net.resheim.eclipse.timekeeper.ui.views;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -22,6 +23,7 @@ import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.swt.dnd.Clipboard;
 import org.eclipse.swt.dnd.HTMLTransfer;
+import org.eclipse.swt.dnd.TextTransfer;
 import org.eclipse.swt.dnd.Transfer;
 import org.eclipse.swt.widgets.Display;
 
@@ -37,6 +39,7 @@ public class ExportToClipboard {
 		return sum > 0;
 	}
 
+	private static final DateTimeFormatter weekFormat = DateTimeFormatter.ofPattern("w - YYYY");
 
 	public void exportAsHTML(LocalDate firstDayOfWeek) {
 		StringBuilder sb = new StringBuilder();
@@ -48,12 +51,16 @@ public class ExportToClipboard {
 				.collect(Collectors.toList());
 		sb.append("<table>");
 		sb.append(System.lineSeparator());
-		sb.append("<th style=\"background: #eeeeee\">");
+		sb.append("<tr style=\"background: #eeeeee\">");
+		sb.append("<th>");
+		sb.append("Week ");
+		sb.append(firstDayOfWeek.format(weekFormat));
+		sb.append("</th>");
 		String[] headings = Activator.getDefault().getHeadings(firstDayOfWeek);
 		for (String heading : headings) {
-			sb.append("<td style=\"background: #eeeeee\">");
+			sb.append("<th>");
 			sb.append(heading);
-			sb.append("</td>");
+			sb.append("</th>");
 		}
 		sb.append("</th>");
 		sb.append(System.lineSeparator());
@@ -80,8 +87,9 @@ public class ExportToClipboard {
 		}
 		sb.append("</table>");
 		HTMLTransfer textTransfer = HTMLTransfer.getInstance();
+		TextTransfer tt = TextTransfer.getInstance();
 		Clipboard clipboard = new Clipboard(Display.getCurrent());
-		clipboard.setContents(new String[] { sb.toString() }, new Transfer[] { textTransfer });
+		clipboard.setContents(new String[] { sb.toString(), sb.toString() }, new Transfer[] { textTransfer, tt });
 		clipboard.dispose();
 	}
 
