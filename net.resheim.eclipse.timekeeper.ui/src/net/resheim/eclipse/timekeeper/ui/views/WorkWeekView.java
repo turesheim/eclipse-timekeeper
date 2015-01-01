@@ -445,11 +445,12 @@ public class WorkWeekView extends ViewPart {
 		ft.adapt(main);
 		root.setContent(main);
 		GridLayout layout2 = new GridLayout(2, false);
+		layout2.horizontalSpacing = 0;
 		main.setLayout(layout2);
 
 		dateTimeLabel = new Text(main, SWT.NONE);
 		GridData gdLabel = new GridData();
-		gdLabel.verticalIndent = 2;
+		gdLabel.verticalIndent = 3;
 		gdLabel.verticalAlignment = SWT.BEGINNING;
 		dateTimeLabel.setLayoutData(gdLabel);
 
