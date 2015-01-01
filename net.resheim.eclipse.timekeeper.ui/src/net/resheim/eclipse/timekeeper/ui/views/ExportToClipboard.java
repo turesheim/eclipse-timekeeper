@@ -75,7 +75,7 @@ public class ExportToClipboard {
 			sb.append(task.getSummary());
 			sb.append("</a>");
 			for (int i = 0; i < 7; i++) {
-				sb.append("</td><td>");
+				sb.append("</td><td style=\"text-align: right\">");
 				String weekday = firstDayOfWeek.plusDays(i).toString();
 				int seconds = Activator.getIntValue(task, weekday);
 				if (seconds > 60) {
