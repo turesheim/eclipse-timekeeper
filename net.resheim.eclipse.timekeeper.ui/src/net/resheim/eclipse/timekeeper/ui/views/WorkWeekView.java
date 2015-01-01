@@ -216,7 +216,7 @@ public class WorkWeekView extends ViewPart {
 
 	private class TimeEditingSupport extends EditingSupport {
 
-		int weekday;
+		private final int weekday;
 
 		public TimeEditingSupport(ColumnViewer viewer, int weekday) {
 			super(viewer);
@@ -254,17 +254,22 @@ public class WorkWeekView extends ViewPart {
 			if (element instanceof AbstractTask) {
 				AbstractTask task = (AbstractTask) element;
 				if (value instanceof String) {
-					String[] split = ((String) value).split(":");
+					String string = ((String) value).replace(',', '.');
 					int newValue = 0;
-					// Only minutes are given
-					if (split.length == 1) {
-						newValue = Integer.parseInt(split[0]) * 60;
-						Activator.setValue(task, getDateString(weekday), Integer.toString(newValue));
+					if (string.indexOf('.') > -1) {
+						double d = Double.parseDouble(string);
+						newValue = (int) (d * 3600);
+					} else {
+						String[] split = string.split(":");
+						// Only minutes are given
+						if (split.length == 1) {
+							newValue = Integer.parseInt(split[0]) * 60;
+						}
+						if (split.length == 2) {
+							newValue = Integer.parseInt(split[0]) * 3600 + Integer.parseInt(split[1]) * 60;
+						}
 					}
-					if (split.length == 2) {
-						newValue = Integer.parseInt(split[0]) * 3600 + Integer.parseInt(split[1]) * 60;
-						Activator.setValue(task, getDateString(weekday), Integer.toString(newValue));
-					}
+					Activator.setValue(task, getDateString(weekday), Integer.toString(newValue));
 					// If the new value is 0, the task may have no time
 					// logged for the week and should be removed.
 					if (newValue == 0) {
