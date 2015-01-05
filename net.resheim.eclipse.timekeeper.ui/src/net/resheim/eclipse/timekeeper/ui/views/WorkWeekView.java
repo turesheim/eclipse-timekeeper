@@ -17,6 +17,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.WeekFields;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import net.resheim.eclipse.timekeeper.ui.Activator;
@@ -51,8 +52,10 @@ import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.viewers.ViewerComparator;
 import org.eclipse.mylyn.commons.ui.CommonImages;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
+import org.eclipse.mylyn.internal.tasks.core.ITaskListChangeListener;
 import org.eclipse.mylyn.internal.tasks.core.LocalTask;
 import org.eclipse.mylyn.internal.tasks.core.TaskCategory;
+import org.eclipse.mylyn.internal.tasks.core.TaskContainerDelta;
 import org.eclipse.mylyn.internal.tasks.core.TaskGroup;
 import org.eclipse.mylyn.internal.tasks.core.UncategorizedTaskContainer;
 import org.eclipse.mylyn.internal.tasks.core.UnsubmittedTaskContainer;
@@ -193,7 +196,7 @@ public class WorkWeekView extends ViewPart {
 
 	}
 
-	private final class TaskActivationListener implements ITaskActivationListener {
+	private final class TaskListener implements ITaskActivationListener, ITaskListChangeListener {
 		@Override
 		public void preTaskActivated(ITask task) {
 			// Do nothing
@@ -206,12 +209,27 @@ public class WorkWeekView extends ViewPart {
 
 		@Override
 		public void taskActivated(ITask task) {
-			viewer.refresh();
+			updateAll();
 		}
 
 		@Override
 		public void taskDeactivated(ITask task) {
-			viewer.refresh();
+			updateAll();
+		}
+
+		@Override
+		public void containersChanged(Set<TaskContainerDelta> arg0) {
+			updateAll();
+		}
+
+		private void updateAll() {
+			getSite().getShell().getDisplay().asyncExec(new Runnable() {
+
+				@Override
+				public void run() {
+					viewer.refresh();
+				}
+			});
 		}
 	}
 
@@ -407,7 +425,7 @@ public class WorkWeekView extends ViewPart {
 
 	private LocalDate firstDayOfWeek;
 
-	private TaskActivationListener taskActivationListener;
+	private TaskListener taskListener;
 
 	private TreeViewer viewer;
 
@@ -516,8 +534,9 @@ public class WorkWeekView extends ViewPart {
 		hookContextMenu();
 		hookDoubleClickAction();
 		contributeToActionBars();
-		taskActivationListener = new TaskActivationListener();
-		TasksUiPlugin.getTaskActivityManager().addActivationListener(taskActivationListener);
+		taskListener = new TaskListener();
+		TasksUiPlugin.getTaskActivityManager().addActivationListener(taskListener);
+		TasksUiPlugin.getTaskList().addChangeListener(taskListener);
 		viewer.setInput(getViewSite());
 		// Force a redraw so content is visible
 		root.pack();
@@ -565,7 +584,8 @@ public class WorkWeekView extends ViewPart {
 
 	@Override
 	public void dispose() {
-		TasksUiPlugin.getTaskActivityManager().removeActivationListener(taskActivationListener);
+		TasksUiPlugin.getTaskActivityManager().removeActivationListener(taskListener);
+		TasksUiPlugin.getTaskList().removeChangeListener(taskListener);
 		super.dispose();
 	}
 
