@@ -41,5 +41,13 @@
             id="net.resheim.eclipse.timekeeper.taskActivationListener">
       </listener>
    </extension>
+   <extension
+         point="org.eclipse.ui.contexts">
+      <context
+            id="net.resheim.eclipse.timekeeper.ui.workweek"
+            name="Workweek"
+            parentId="org.eclipse.ui.contexts.window">
+      </context>
+   </extension>
 
 </plugin>

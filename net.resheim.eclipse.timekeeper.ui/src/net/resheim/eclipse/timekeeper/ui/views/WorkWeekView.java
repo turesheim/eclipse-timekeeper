@@ -85,6 +85,7 @@ import org.eclipse.swt.widgets.TreeColumn;
 import org.eclipse.ui.IActionBars;
 import org.eclipse.ui.ISharedImages;
 import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.contexts.IContextService;
 import org.eclipse.ui.forms.widgets.FormToolkit;
 import org.eclipse.ui.part.ViewPart;
 
@@ -764,5 +765,7 @@ public class WorkWeekView extends ViewPart {
 	@Override
 	public void setFocus() {
 		viewer.getControl().setFocus();
+		IContextService contextService = (IContextService) PlatformUI.getWorkbench().getService(IContextService.class);
+		contextService.activateContext("net.resheim.eclipse.timekeeper.ui.workweek");
 	}
 }
