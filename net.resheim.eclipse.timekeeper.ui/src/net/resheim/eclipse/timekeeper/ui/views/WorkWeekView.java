@@ -227,6 +227,7 @@ public class WorkWeekView extends ViewPart {
 
 				@Override
 				public void run() {
+					filter();
 					viewer.refresh();
 				}
 			});
