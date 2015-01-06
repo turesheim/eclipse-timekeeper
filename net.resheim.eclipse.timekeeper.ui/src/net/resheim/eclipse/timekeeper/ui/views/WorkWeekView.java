@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2014 Torkild U. Resheim.
+ * Copyright (c) 2014, 2015 Torkild U. Resheim.
  *
  * All rights reserved. This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License v1.0 which
@@ -97,6 +97,11 @@ public class WorkWeekView extends ViewPart {
 
 	private class TaskLabelProvider extends LabelProvider implements IFontProvider, ILabelProvider {
 
+		private class CompositeImageDescriptor {
+			ImageDescriptor icon;
+			ImageDescriptor overlayKind;
+		}
+
 		@Override
 		public Font getFont(Object element) {
 			if (element instanceof ITask){
@@ -117,11 +122,6 @@ public class WorkWeekView extends ViewPart {
 
 			}
 			return JFaceResources.getDialogFont();
-		}
-
-		private class CompositeImageDescriptor {
-			ImageDescriptor icon;
-			ImageDescriptor overlayKind;
 		}
 
 		@Override
@@ -195,8 +195,12 @@ public class WorkWeekView extends ViewPart {
 		}
 
 	}
-
 	private final class TaskListener implements ITaskActivationListener, ITaskListChangeListener {
+		@Override
+		public void containersChanged(Set<TaskContainerDelta> arg0) {
+			updateAll();
+		}
+
 		@Override
 		public void preTaskActivated(ITask task) {
 			// Do nothing
@@ -214,11 +218,6 @@ public class WorkWeekView extends ViewPart {
 
 		@Override
 		public void taskDeactivated(ITask task) {
-			updateAll();
-		}
-
-		@Override
-		public void containersChanged(Set<TaskContainerDelta> arg0) {
 			updateAll();
 		}
 
@@ -261,10 +260,7 @@ public class WorkWeekView extends ViewPart {
 			if (element instanceof ITask) {
 				AbstractTask task = (AbstractTask) element;
 				int seconds = Activator.getIntValue(task, getDateString(weekday));
-				if (seconds > 0) {
-					return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
-				}
-				return "0:00";
+				return getFormattedPeriod(seconds);
 			}
 			return "";
 		}
@@ -303,8 +299,6 @@ public class WorkWeekView extends ViewPart {
 		}
 
 	}
-
-	private List<AbstractTask> filtered;
 
 	private class ViewContentProvider implements ITreeContentProvider {
 
@@ -358,7 +352,13 @@ public class WorkWeekView extends ViewPart {
 		}
 
 		public void inputChanged(Viewer v, Object oldInput, Object newInput) {
+
+			// Make sure we have some content
+			filter();
+
+			// Update the contents
 			v.refresh();
+
 			// Also update the week label
 			StringBuilder sb = new StringBuilder();
 			sb.append("Showing week ");
@@ -367,55 +367,24 @@ public class WorkWeekView extends ViewPart {
 			dateTimeLabel.setText(sb.toString());
 			dateChooser.setDate(firstDayOfWeek.getYear(), firstDayOfWeek.getMonthValue() - 1,
 					firstDayOfWeek.getDayOfMonth());
+
+			// Update the column headers
 			TreeColumn[] columns = viewer.getTree().getColumns();
 			String[] headings = Activator.getDefault().getHeadings(firstDayOfWeek);
 			for (int i = 1; i < columns.length; i++) {
+				LocalDate date = firstDayOfWeek.plusDays(i - 1);
 				columns[i].setText(headings[i - 1]);
+				columns[i].setToolTipText(getFormattedPeriod(getSum(date)));
 			}
-			// Make sure we have some content
-			filter();
 		}
 	}
+
+	private List<AbstractTask> filtered;
 
 	public static final String ID = "net.resheim.eclipse.timekeeper.ui.views.SampleView";
 
 	private static final DateTimeFormatter weekFormat = DateTimeFormatter.ofPattern("w");
 
-	/**
-	 * Calculates the total amount of seconds accumulated on the project for the
-	 * specified date.
-	 *
-	 * @param date
-	 *            the date to calculate for
-	 * @param project
-	 *            the project to calculate for
-	 * @return the total amount of seconds accumulated
-	 */
-	private int getSum(LocalDate date, String project) {
-		final String d = date.toString();
-		return filtered
-				.stream()
-				.filter(t -> project.equals(Activator.getProjectName(t))).mapToInt(t -> Activator.getIntValue(t, d))
-				.sum();
-	}
-
-	private boolean hasData(AbstractTask task, LocalDate startDate) {
-		int sum = 0;
-		for (int i = 0; i < 7; i++) {
-			String ds = startDate.plusDays(i).toString();
-			sum += Activator.getIntValue(task, ds);
-		}
-		return sum > 0;
-	}
-
-	private void filter() {
-		long start = System.currentTimeMillis();
-		filtered = TasksUiPlugin.getTaskList().getAllTasks().stream()
-				.filter(t -> hasData(t, firstDayOfWeek) || t.isActive()).collect(Collectors.toList());
-		long end = System.currentTimeMillis();
-		System.out.println("Initial filtering in " + (end - start) + "ms");
-
-	}
 	private Action previousWeekAction;
 
 	private Action nextWeekAction;
@@ -450,6 +419,7 @@ public class WorkWeekView extends ViewPart {
 		int day = date.get(weekFields.dayOfWeek());
 		firstDayOfWeek = date.minusDays(day - 1);
 	}
+
 	private void contributeToActionBars() {
 		IActionBars bars = getViewSite().getActionBars();
 		fillLocalPullDown(bars.getMenuManager());
@@ -581,8 +551,7 @@ public class WorkWeekView extends ViewPart {
 	private void createTitleColumn() {
 		TreeViewerColumn column = createTableViewerColumn("Activity", 400, 1);
 		column.setLabelProvider(new TreeColumnViewerLabelProvider(new TaskLabelProvider()));
-	};
-
+	}
 	@Override
 	public void dispose() {
 		TasksUiPlugin.getTaskActivityManager().removeActivationListener(taskListener);
@@ -619,6 +588,15 @@ public class WorkWeekView extends ViewPart {
 		manager.add(nextWeekAction);
 	}
 
+	private void filter() {
+		long start = System.currentTimeMillis();
+		filtered = TasksUiPlugin.getTaskList().getAllTasks().stream()
+				.filter(t -> hasData(t, firstDayOfWeek) || t.isActive()).collect(Collectors.toList());
+		long end = System.currentTimeMillis();
+		System.out.println("Initial filtering in " + (end - start) + "ms");
+
+	};
+
 	/**
 	 * Returns a string representation of the date.
 	 *
@@ -627,6 +605,58 @@ public class WorkWeekView extends ViewPart {
 	 */
 	private String getDateString(int weekday) {
 		return firstDayOfWeek.plusDays(weekday).toString();
+	}
+
+	private String getFormattedPeriod(int seconds) {
+		if (seconds > 0) {
+			return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
+		}
+		return "0:00";
+	}
+
+	/**
+	 * Calculates the total amount of seconds accumulated on specified date.
+	 *
+	 * @param date
+	 *            the date to calculate for
+	 * @return the total amount of seconds accumulated
+	 */
+	private int getSum(LocalDate date) {
+		final String d = date.toString();
+		// May not have been initialised when first called.
+		if (filtered == null) {
+			return 0;
+		}
+		return filtered
+				.stream().mapToInt(t -> Activator.getIntValue(t, d))
+				.sum();
+	}
+
+	/**
+	 * Calculates the total amount of seconds accumulated on the project for the
+	 * specified date.
+	 *
+	 * @param date
+	 *            the date to calculate for
+	 * @param project
+	 *            the project to calculate for
+	 * @return the total amount of seconds accumulated
+	 */
+	private int getSum(LocalDate date, String project) {
+		final String d = date.toString();
+		return filtered
+				.stream()
+				.filter(t -> project.equals(Activator.getProjectName(t))).mapToInt(t -> Activator.getIntValue(t, d))
+				.sum();
+	}
+
+	private boolean hasData(AbstractTask task, LocalDate startDate) {
+		int sum = 0;
+		for (int i = 0; i < 7; i++) {
+			String ds = startDate.plusDays(i).toString();
+			sum += Activator.getIntValue(task, ds);
+		}
+		return sum > 0;
 	}
 
 	private void hookContextMenu() {
@@ -772,14 +802,6 @@ public class WorkWeekView extends ViewPart {
 		});
 	}
 
-	private void setProjectField(TaskRepository repository, String string) {
-		if (null == string) {
-			repository.removeProperty(Activator.ATTR_ID + ".grouping");
-		}
-		repository.setProperty(Activator.ATTR_ID + ".grouping", string);
-		viewer.refresh();
-	}
-
 	/**
 	 * Passing the focus request to the viewer's control.
 	 */
@@ -788,5 +810,13 @@ public class WorkWeekView extends ViewPart {
 		viewer.getControl().setFocus();
 		IContextService contextService = (IContextService) PlatformUI.getWorkbench().getService(IContextService.class);
 		contextService.activateContext("net.resheim.eclipse.timekeeper.ui.workweek");
+	}
+
+	private void setProjectField(TaskRepository repository, String string) {
+		if (null == string) {
+			repository.removeProperty(Activator.ATTR_ID + ".grouping");
+		}
+		repository.setProperty(Activator.ATTR_ID + ".grouping", string);
+		viewer.refresh();
 	}
 }
