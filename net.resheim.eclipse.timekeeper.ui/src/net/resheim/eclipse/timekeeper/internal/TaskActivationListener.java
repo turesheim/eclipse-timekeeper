@@ -43,9 +43,9 @@ public class TaskActivationListener implements ITaskActivationListener {
 			String time = DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
 			boolean confirm = MessageDialog.openConfirm(Display.getCurrent().getActiveShell(),
 					"Add elapsed time?",
-					"Work was already started on this task on " 
-							+ started.format(DateTimeFormatter.RFC_1123_DATE_TIME)
-							+ " add the elapsed time (" + time
+					"Work was already started on this task on "
+							+ started.format(DateTimeFormatter.ISO_LOCAL_DATE)
+							+ ". Continue and add the elapsed time since (" + time
 							+ ") to the task total?");
 			if (confirm) {
 				accumulateTime(task, startString);
