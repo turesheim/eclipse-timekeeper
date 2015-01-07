@@ -66,14 +66,14 @@ public class ExportToClipboard {
 		sb.append(System.lineSeparator());
 		for (AbstractTask task : tasks) {
 			sb.append("<tr><td>");
-			sb.append("<a href=\"" + task.getUrl() + "\">");
 			String taskKey = task.getTaskKey();
 			if (taskKey != null) {
+				sb.append("<a href=\"" + task.getUrl() + "\">");
 				sb.append(taskKey);
+				sb.append("</a>");
 				sb.append(": ");
 			}
 			sb.append(task.getSummary());
-			sb.append("</a>");
 			for (int i = 0; i < 7; i++) {
 				sb.append("</td><td style=\"text-align: right\">");
 				String weekday = firstDayOfWeek.plusDays(i).toString();
