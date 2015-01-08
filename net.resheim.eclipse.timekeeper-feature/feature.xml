@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <feature
       id="net.resheim.eclipse.timekeeper"
-      label="Timekeeper-feature"
+      label="%featureName"
       version="1.0.0.qualifier"
-      provider-name="Torkild U. Resheim">
+      provider-name="%providerName"
+      plugin="net.resheim.eclipse.timekeeper.ui">
 
    <description>
       %description
