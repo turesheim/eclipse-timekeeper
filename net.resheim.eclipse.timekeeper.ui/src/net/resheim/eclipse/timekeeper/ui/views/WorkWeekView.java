@@ -196,6 +196,7 @@ public class WorkWeekView extends ViewPart {
 
 	}
 	private final class TaskListener implements ITaskActivationListener, ITaskListChangeListener {
+
 		@Override
 		public void containersChanged(Set<TaskContainerDelta> arg0) {
 			updateAll();
@@ -294,6 +295,7 @@ public class WorkWeekView extends ViewPart {
 						viewer.update(element, null);
 						viewer.update(Activator.getProjectName(task), null);
 					}
+					updateColumnTooltips();
 				}
 			}
 		}
@@ -657,6 +659,14 @@ public class WorkWeekView extends ViewPart {
 			sum += Activator.getIntValue(task, ds);
 		}
 		return sum > 0;
+	}
+
+	private void updateColumnTooltips() {
+		TreeColumn[] columns = viewer.getTree().getColumns();
+		for (int i = 1; i < columns.length; i++) {
+			LocalDate date = firstDayOfWeek.plusDays(i - 1);
+			columns[i].setToolTipText(getFormattedPeriod(getSum(date)));
+		}
 	}
 
 	private void hookContextMenu() {
