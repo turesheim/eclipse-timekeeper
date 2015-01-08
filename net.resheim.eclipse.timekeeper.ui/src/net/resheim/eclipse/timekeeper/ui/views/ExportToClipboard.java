@@ -49,7 +49,7 @@ public class ExportToClipboard {
 				.filter(t -> t.getAttribute(Activator.ATTR_ID) != null)
 				.filter(t -> hasData(t, firstDayOfWeek))
 				.collect(Collectors.toList());
-		sb.append("<table>");
+		sb.append("<table style=\"border: 1px solid #eeeeee\">");
 		sb.append(System.lineSeparator());
 		sb.append("<tr style=\"background: #eeeeee\">");
 		sb.append("<th>");
