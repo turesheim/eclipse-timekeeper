@@ -95,6 +95,11 @@ import org.eclipse.ui.part.ViewPart;
 @SuppressWarnings("restriction")
 public class WorkWeekView extends ViewPart {
 
+	private final WeeklySummary summary = new WeeklySummary();
+
+	private class WeeklySummary {
+	}
+
 	private class TaskLabelProvider extends LabelProvider implements IFontProvider, ILabelProvider {
 
 		private class CompositeImageDescriptor {
@@ -184,14 +189,20 @@ public class WorkWeekView extends ViewPart {
 			if (element instanceof String) {
 				return (String) element;
 			}
-			ITask task = ((ITask) element);
-			StringBuilder sb = new StringBuilder();
-			if (task.getTaskKey() != null) {
-				sb.append(task.getTaskKey());
-				sb.append(": ");
+			if (element instanceof ITask) {
+				ITask task = ((ITask) element);
+				StringBuilder sb = new StringBuilder();
+				if (task.getTaskKey() != null) {
+					sb.append(task.getTaskKey());
+					sb.append(": ");
+				}
+				sb.append(task.getSummary());
+				return sb.toString();
 			}
-			sb.append(task.getSummary());
-			return sb.toString();
+			if (element instanceof WeeklySummary) {
+				return "Daily total";
+			}
+			return null;
 		}
 
 	}
@@ -294,8 +305,8 @@ public class WorkWeekView extends ViewPart {
 					} else {
 						viewer.update(element, null);
 						viewer.update(Activator.getProjectName(task), null);
+						viewer.update(summary, null);
 					}
-					updateColumnTooltips();
 				}
 			}
 		}
@@ -312,27 +323,27 @@ public class WorkWeekView extends ViewPart {
 		public Object[] getChildren(Object parentElement) {
 			if (parentElement instanceof String) {
 				String p = (String) parentElement;
-				long start = System.currentTimeMillis();
 				Object[] tasks = filtered
 						.stream()
 						.filter(t -> p.equals(Activator.getProjectName(t)))
 						.toArray(size -> new AbstractTask[size]);
-				long end = System.currentTimeMillis();
-				System.out.println("Task filtering in " + (end - start) + "ms");
 				return tasks;
 			}
 			return new Object[0];
 		}
 
 		public Object[] getElements(Object parent) {
-			long start = System.currentTimeMillis();
 			Object[] projects = filtered
 					.stream()
 					.collect(Collectors.groupingBy(t -> Activator.getProjectName(t)))
 					.keySet().toArray();
-			long end = System.currentTimeMillis();
-			System.out.println("Project filtering in " + (end - start) + "ms");
-			return projects;
+			if (projects.length==0){
+				return new Object[0];
+			}
+			Object[] elements = new Object[projects.length+1];
+			System.arraycopy(projects, 0, elements, 0, projects.length);
+			elements[projects.length] = summary;
+			return elements;
 		}
 
 		@Override
@@ -354,6 +365,10 @@ public class WorkWeekView extends ViewPart {
 		}
 
 		public void inputChanged(Viewer v, Object oldInput, Object newInput) {
+
+			if (v.getControl().isDisposed() || dateTimeLabel.isDisposed()) {
+				return;
+			}
 
 			// Make sure we have some content
 			filter();
@@ -497,6 +512,9 @@ public class WorkWeekView extends ViewPart {
 					}
 					return s1.compareTo(s2);
 				}
+				if (e1 instanceof WeeklySummary) {
+					return 1;
+				}
 				return super.compare(viewer, e1, e2);
 			}
 		});
@@ -535,12 +553,14 @@ public class WorkWeekView extends ViewPart {
 			@Override
 			public String getText(Object element) {
 				int seconds = 0;
+				LocalDate date = firstDayOfWeek.plusDays(weekday);
 				if (element instanceof String) {
-					LocalDate date = firstDayOfWeek.plusDays(weekday);
 					seconds = getSum(date, (String) element);
-				} else {
+				} else if (element instanceof ITask) {
 					AbstractTask task = (AbstractTask) element;
 					seconds = Activator.getIntValue(task, getDateString(weekday));
+				} else if (element instanceof WeeklySummary) {
+					seconds = getSum(date);
 				}
 				if (seconds > 0) {
 					return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
@@ -591,12 +611,9 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void filter() {
-		long start = System.currentTimeMillis();
 		filtered = TasksUiPlugin.getTaskList().getAllTasks().stream()
-				.filter(t -> hasData(t, firstDayOfWeek) || t.isActive()).collect(Collectors.toList());
-		long end = System.currentTimeMillis();
-		System.out.println("Initial filtering in " + (end - start) + "ms");
-
+				.filter(t -> hasData(t, firstDayOfWeek) || t.isActive())
+				.collect(Collectors.toList());
 	};
 
 	/**
@@ -659,14 +676,6 @@ public class WorkWeekView extends ViewPart {
 			sum += Activator.getIntValue(task, ds);
 		}
 		return sum > 0;
-	}
-
-	private void updateColumnTooltips() {
-		TreeColumn[] columns = viewer.getTree().getColumns();
-		for (int i = 1; i < columns.length; i++) {
-			LocalDate date = firstDayOfWeek.plusDays(i - 1);
-			columns[i].setToolTipText(getFormattedPeriod(getSum(date)));
-		}
 	}
 
 	private void hookContextMenu() {
