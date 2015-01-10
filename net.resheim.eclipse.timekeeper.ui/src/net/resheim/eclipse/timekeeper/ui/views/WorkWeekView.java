@@ -38,12 +38,9 @@ import org.eclipse.jface.viewers.ColumnViewer;
 import org.eclipse.jface.viewers.DoubleClickEvent;
 import org.eclipse.jface.viewers.EditingSupport;
 import org.eclipse.jface.viewers.IDoubleClickListener;
-import org.eclipse.jface.viewers.IFontProvider;
-import org.eclipse.jface.viewers.ILabelProvider;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.ITreeContentProvider;
-import org.eclipse.jface.viewers.LabelProvider;
 import org.eclipse.jface.viewers.TextCellEditor;
 import org.eclipse.jface.viewers.TreeColumnViewerLabelProvider;
 import org.eclipse.jface.viewers.TreeViewer;
@@ -76,12 +73,14 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.ScrolledComposite;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.DateTime;
+import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.TreeColumn;
@@ -97,14 +96,39 @@ public class WorkWeekView extends ViewPart {
 
 	private final WeeklySummary summary = new WeeklySummary();
 
+	private final class ViewerComparatorExtension extends ViewerComparator {
+		@Override
+		public int compare(Viewer viewer, Object e1, Object e2) {
+			if (e1 instanceof ITask && e2 instanceof ITask) {
+				String s1 = ((ITask) e1).getTaskId();
+				String s2 = ((ITask) e2).getTaskId();
+				try {
+					int i1 = Integer.parseInt(s1);
+					int i2 = Integer.parseInt(s2);
+					return i1 - i2;
+				} catch (NumberFormatException e) {
+
+				}
+				return s1.compareTo(s2);
+			}
+			if (e1 instanceof WeeklySummary) {
+				return 1;
+			}
+			return super.compare(viewer, e1, e2);
+		}
+	}
+
 	private class WeeklySummary {
 	}
 
-	private class TaskLabelProvider extends LabelProvider implements IFontProvider, ILabelProvider {
+	private class ViewColumnLabelProvider extends ColumnLabelProvider {
 
-		private class CompositeImageDescriptor {
-			ImageDescriptor icon;
-			ImageDescriptor overlayKind;
+		@Override
+		public Color getBackground(Object element) {
+			if (element instanceof WeeklySummary) {
+				return Display.getCurrent().getSystemColor(SWT.COLOR_INFO_BACKGROUND);
+			}
+			return super.getBackground(element);
 		}
 
 		@Override
@@ -127,6 +151,14 @@ public class WorkWeekView extends ViewPart {
 
 			}
 			return JFaceResources.getDialogFont();
+		}
+	}
+
+	private class TaskLabelProvider extends ViewColumnLabelProvider {
+
+		private class CompositeImageDescriptor {
+			ImageDescriptor icon;
+			ImageDescriptor overlayKind;
 		}
 
 		@Override
@@ -496,30 +528,9 @@ public class WorkWeekView extends ViewPart {
 			createTimeColumn(i);
 		}
 
-		viewer.setComparator(new ViewerComparator() {
-
-			@Override
-			public int compare(Viewer viewer, Object e1, Object e2) {
-				if (e1 instanceof ITask && e2 instanceof ITask) {
-					String s1 = ((ITask) e1).getTaskId();
-					String s2 = ((ITask) e2).getTaskId();
-					try {
-						int i1 = Integer.parseInt(s1);
-						int i2 = Integer.parseInt(s2);
-						return i1 - i2;
-					} catch (NumberFormatException e) {
-
-					}
-					return s1.compareTo(s2);
-				}
-				if (e1 instanceof WeeklySummary) {
-					return 1;
-				}
-				return super.compare(viewer, e1, e2);
-			}
-		});
-
+		viewer.setComparator(new ViewerComparatorExtension());
 		viewer.getTree().setHeaderVisible(true);
+		viewer.getTree().setLinesVisible(true);
 
 		makeActions();
 		hookContextMenu();
@@ -548,7 +559,7 @@ public class WorkWeekView extends ViewPart {
 		column.getColumn().setMoveable(false);
 		column.getColumn().setAlignment(SWT.RIGHT);
 		column.setEditingSupport(new TimeEditingSupport(column.getViewer(), weekday));
-		column.setLabelProvider(new ColumnLabelProvider() {
+		column.setLabelProvider(new ViewColumnLabelProvider() {
 
 			@Override
 			public String getText(Object element) {
