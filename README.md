@@ -8,6 +8,8 @@ Whenever a task is *activated* in Mylyn it will automatically show up in the **W
 
 The context menu and toolbar buttons can be used to browse back and forward by one week. The current locale is used to determine week numbers.
 
+There is a button in the toolbar for copying the workweek in HTML format to the clipboard.
+
 There is built in support for *GitHub* and *Bugzilla* task repositories, however other repository types should also work. Tasks from *GitHub* are grouped by the name of the first query they appear in. Tasks from *Bugzilla* repositories are grouped by the *product*. When for instance using a *JIRA* repository you may want to group by a different field, this can be done by right clicking on a task and selecting a field from the **Set Grouping Field...** menu.
 
 Note that the timekeeping data are stored in the task repository so they follow your workspace. If the workspace is lost, so is the timekeeping data.
@@ -39,4 +41,4 @@ This project started out as an experiment, attempting to make use of the *Java 8
 
 ## License
 
-Copyright © 2014 Torkild Ulvøy Resheim. All rights reserved. This program and the accompanying materials are made available under the terms of the Eclipse Public License v1.0 which accompanies this distribution, and is available at http://www.eclipse.org/legal/epl-v10.html
+Copyright © 2014-2015 Torkild Ulvøy Resheim. All rights reserved. This program and the accompanying materials are made available under the terms of the Eclipse Public License v1.0 which accompanies this distribution, and is available at http://www.eclipse.org/legal/epl-v10.html
