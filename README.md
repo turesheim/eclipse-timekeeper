@@ -6,9 +6,11 @@ This is a simple time-tracking plug-in integrating with [Eclipse Mylyn](http://e
 
 Whenever a task is *activated* in Mylyn it will automatically show up in the **Workweek** view with a bold label, and the amount of time the task is active will be tracked. When the task is *deactivated* the active time is added to the total for the task on the particular day. It is also possible to manually edit the time by clicking into the cell. If a number is typed, such as *45*, it will be translated into minutes and show up as *0:45*. If a decimal number is entered, for example *1.5*, it will be translated to *1:30*. The decimal separator can be either "," or ".".
 
+If a tasks active when Eclipse is closed you will be asked whether or not to add the duration in between when Eclipse is started again. If you answer **Yes** the time will be added to the total for the starting date. If you answer **Cancel** no time is added.
+
 The context menu and toolbar buttons can be used to browse back and forward by one week. The current locale is used to determine week numbers.
 
-There is a button in the toolbar for copying the workweek in HTML format to the clipboard.
+Left of the navigation buttons there is a button for copying the workweek in HTML format to the clipboard.
 
 There is built in support for *GitHub* and *Bugzilla* task repositories, however other repository types should also work. Tasks from *GitHub* are grouped by the name of the first query they appear in. Tasks from *Bugzilla* repositories are grouped by the *product*. When for instance using a *JIRA* repository you may want to group by a different field, this can be done by right clicking on a task and selecting a field from the **Set Grouping Field...** menu.
 
