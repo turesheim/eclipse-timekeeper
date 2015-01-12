@@ -18,7 +18,6 @@ import java.time.temporal.WeekFields;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import net.resheim.eclipse.timekeeper.ui.Activator;
 
@@ -40,7 +39,6 @@ import org.eclipse.jface.viewers.EditingSupport;
 import org.eclipse.jface.viewers.IDoubleClickListener;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
-import org.eclipse.jface.viewers.ITreeContentProvider;
 import org.eclipse.jface.viewers.TextCellEditor;
 import org.eclipse.jface.viewers.TreeColumnViewerLabelProvider;
 import org.eclipse.jface.viewers.TreeViewer;
@@ -94,7 +92,7 @@ import org.eclipse.ui.part.ViewPart;
 @SuppressWarnings("restriction")
 public class WorkWeekView extends ViewPart {
 
-	private final WeeklySummary summary = new WeeklySummary();
+	final WeeklySummary summary = new WeeklySummary();
 
 	private final class ViewerComparatorExtension extends ViewerComparator {
 		@Override
@@ -118,9 +116,6 @@ public class WorkWeekView extends ViewPart {
 		}
 	}
 
-	private class WeeklySummary {
-	}
-
 	private class ViewColumnLabelProvider extends ColumnLabelProvider {
 
 		@Override
@@ -141,7 +136,7 @@ public class WorkWeekView extends ViewPart {
 			}
 			if (element instanceof String){
 				String p = (String) element;
-				if (filtered
+				if (contentProvider.getFiltered()
 						.stream()
 						.filter(t -> p.equals(Activator.getProjectName(t)))
 						.anyMatch(t -> t.isActive())){
@@ -270,8 +265,7 @@ public class WorkWeekView extends ViewPart {
 
 				@Override
 				public void run() {
-					filter();
-					viewer.refresh();
+					viewer.setInput(getViewSite());
 				}
 			});
 		}
@@ -345,55 +339,10 @@ public class WorkWeekView extends ViewPart {
 
 	}
 
-	private class ViewContentProvider implements ITreeContentProvider {
+	private class ViewContentProvider extends AbstractContentProvider {
 
 
 		public void dispose() {
-		}
-
-		@Override
-		public Object[] getChildren(Object parentElement) {
-			if (parentElement instanceof String) {
-				String p = (String) parentElement;
-				Object[] tasks = filtered
-						.stream()
-						.filter(t -> p.equals(Activator.getProjectName(t)))
-						.toArray(size -> new AbstractTask[size]);
-				return tasks;
-			}
-			return new Object[0];
-		}
-
-		public Object[] getElements(Object parent) {
-			Object[] projects = filtered
-					.stream()
-					.collect(Collectors.groupingBy(t -> Activator.getProjectName(t)))
-					.keySet().toArray();
-			if (projects.length==0){
-				return new Object[0];
-			}
-			Object[] elements = new Object[projects.length+1];
-			System.arraycopy(projects, 0, elements, 0, projects.length);
-			elements[projects.length] = summary;
-			return elements;
-		}
-
-		@Override
-		public Object getParent(Object element) {
-			if (element instanceof ITask) {
-				return Activator.getProjectName((AbstractTask) element);
-			}
-			return null;
-		}
-
-		@Override
-		public boolean hasChildren(Object element) {
-			// Projects are guaranteed to have tasks as children, tasks are
-			// guaranteed to not have any children.
-			if (element instanceof String) {
-				return true;
-			}
-			return false;
 		}
 
 		public void inputChanged(Viewer v, Object oldInput, Object newInput) {
@@ -402,33 +351,32 @@ public class WorkWeekView extends ViewPart {
 				return;
 			}
 
-			// Make sure we have some content
 			filter();
-
-			// Update the contents
 			v.refresh();
+			updateWeekLabel();
+			updateColumHeaders();
+		}
 
-			// Also update the week label
-			StringBuilder sb = new StringBuilder();
-			sb.append("Showing week ");
-			sb.append(firstDayOfWeek.format(weekFormat));
-			sb.append(" starting at");
-			dateTimeLabel.setText(sb.toString());
-			dateChooser.setDate(firstDayOfWeek.getYear(), firstDayOfWeek.getMonthValue() - 1,
-					firstDayOfWeek.getDayOfMonth());
-
-			// Update the column headers
+		private void updateColumHeaders() {
 			TreeColumn[] columns = viewer.getTree().getColumns();
-			String[] headings = Activator.getDefault().getHeadings(firstDayOfWeek);
+			String[] headings = Activator.getDefault().getHeadings(getFirstDayOfWeek());
 			for (int i = 1; i < columns.length; i++) {
-				LocalDate date = firstDayOfWeek.plusDays(i - 1);
+				LocalDate date = getFirstDayOfWeek().plusDays(i - 1);
 				columns[i].setText(headings[i - 1]);
-				columns[i].setToolTipText(getFormattedPeriod(getSum(date)));
+				columns[i].setToolTipText(getFormattedPeriod(getSum(filtered, date)));
 			}
 		}
-	}
 
-	private List<AbstractTask> filtered;
+		private void updateWeekLabel() {
+			StringBuilder sb = new StringBuilder();
+			sb.append("Showing week ");
+			sb.append(getFirstDayOfWeek().format(weekFormat));
+			sb.append(" starting at");
+			dateTimeLabel.setText(sb.toString());
+			dateChooser.setDate(getFirstDayOfWeek().getYear(), getFirstDayOfWeek().getMonthValue() - 1,
+					getFirstDayOfWeek().getDayOfMonth());
+		}
+	}
 
 	public static final String ID = "net.resheim.eclipse.timekeeper.ui.views.SampleView";
 
@@ -442,7 +390,6 @@ public class WorkWeekView extends ViewPart {
 
 	private MenuManager projectFieldMenu;
 
-	private LocalDate firstDayOfWeek;
 
 	private TaskListener taskListener;
 
@@ -458,15 +405,12 @@ public class WorkWeekView extends ViewPart {
 
 	private Action exportAction;
 
+	private AbstractContentProvider contentProvider;
+
 	/**
 	 * The constructor.
 	 */
 	public WorkWeekView() {
-		// Determine the first date of the week
-		LocalDate date = LocalDate.now();
-		WeekFields weekFields = WeekFields.of(Locale.getDefault());
-		int day = date.get(weekFields.dayOfWeek());
-		firstDayOfWeek = date.minusDays(day - 1);
 	}
 
 	private void contributeToActionBars() {
@@ -511,14 +455,14 @@ public class WorkWeekView extends ViewPart {
 				LocalDate date = LocalDate.of(dateChooser.getYear(), dateChooser.getMonth() + 1, dateChooser.getDay());
 				WeekFields weekFields = WeekFields.of(Locale.getDefault());
 				int day = date.get(weekFields.dayOfWeek());
-				firstDayOfWeek = date.minusDays(day - 1);
+				contentProvider.setFirstDayOfWeek(date.minusDays(day - 1));
 				viewer.setInput(this);
 			}
 		});
 
 		viewer = new TreeViewer(main, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION);
-		ViewContentProvider provider = new ViewContentProvider();
-		viewer.setContentProvider(provider);
+		contentProvider = new ViewContentProvider();
+		viewer.setContentProvider(contentProvider);
 		GridData layoutData = new GridData(SWT.FILL, SWT.FILL, true, true);
 		layoutData.horizontalSpan = 2;
 		viewer.getControl().setLayoutData(layoutData);
@@ -531,6 +475,12 @@ public class WorkWeekView extends ViewPart {
 		viewer.setComparator(new ViewerComparatorExtension());
 		viewer.getTree().setHeaderVisible(true);
 		viewer.getTree().setLinesVisible(true);
+
+		// Determine the first date of the week
+		LocalDate date = LocalDate.now();
+		WeekFields weekFields = WeekFields.of(Locale.getDefault());
+		int day = date.get(weekFields.dayOfWeek());
+		contentProvider.setFirstDayOfWeek(date.minusDays(day - 1));
 
 		makeActions();
 		hookContextMenu();
@@ -564,14 +514,14 @@ public class WorkWeekView extends ViewPart {
 			@Override
 			public String getText(Object element) {
 				int seconds = 0;
-				LocalDate date = firstDayOfWeek.plusDays(weekday);
+				LocalDate date = contentProvider.getFirstDayOfWeek().plusDays(weekday);
 				if (element instanceof String) {
-					seconds = getSum(date, (String) element);
+					seconds = getSum(contentProvider.getFiltered(), date, (String) element);
 				} else if (element instanceof ITask) {
 					AbstractTask task = (AbstractTask) element;
 					seconds = Activator.getIntValue(task, getDateString(weekday));
 				} else if (element instanceof WeeklySummary) {
-					seconds = getSum(date);
+					seconds = getSum(contentProvider.getFiltered(), date);
 				}
 				if (seconds > 0) {
 					return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
@@ -621,12 +571,6 @@ public class WorkWeekView extends ViewPart {
 		manager.add(nextWeekAction);
 	}
 
-	private void filter() {
-		filtered = TasksUiPlugin.getTaskList().getAllTasks().stream()
-				.filter(t -> hasData(t, firstDayOfWeek) || t.isActive())
-				.collect(Collectors.toList());
-	};
-
 	/**
 	 * Returns a string representation of the date.
 	 *
@@ -634,7 +578,7 @@ public class WorkWeekView extends ViewPart {
 	 * @return
 	 */
 	private String getDateString(int weekday) {
-		return firstDayOfWeek.plusDays(weekday).toString();
+		return contentProvider.getFirstDayOfWeek().plusDays(weekday).toString();
 	}
 
 	private String getFormattedPeriod(int seconds) {
@@ -651,7 +595,7 @@ public class WorkWeekView extends ViewPart {
 	 *            the date to calculate for
 	 * @return the total amount of seconds accumulated
 	 */
-	private int getSum(LocalDate date) {
+	private int getSum(List<ITask> filtered, LocalDate date) {
 		final String d = date.toString();
 		// May not have been initialised when first called.
 		if (filtered == null) {
@@ -672,21 +616,12 @@ public class WorkWeekView extends ViewPart {
 	 *            the project to calculate for
 	 * @return the total amount of seconds accumulated
 	 */
-	private int getSum(LocalDate date, String project) {
+	private int getSum(List<ITask> filtered, LocalDate date, String project) {
 		final String d = date.toString();
 		return filtered
 				.stream()
 				.filter(t -> project.equals(Activator.getProjectName(t))).mapToInt(t -> Activator.getIntValue(t, d))
 				.sum();
-	}
-
-	private boolean hasData(AbstractTask task, LocalDate startDate) {
-		int sum = 0;
-		for (int i = 0; i < 7; i++) {
-			String ds = startDate.plusDays(i).toString();
-			sum += Activator.getIntValue(task, ds);
-		}
-		return sum > 0;
 	}
 
 	private void hookContextMenu() {
@@ -717,7 +652,7 @@ public class WorkWeekView extends ViewPart {
 			@Override
 			public void run() {
 				ExportToClipboard export = new ExportToClipboard();
-				export.exportAsHTML(firstDayOfWeek);
+				export.exportAsHTML(contentProvider.getFirstDayOfWeek());
 			}
 
 		};
@@ -727,7 +662,7 @@ public class WorkWeekView extends ViewPart {
 		previousWeekAction = new Action() {
 			@Override
 			public void run() {
-				firstDayOfWeek = firstDayOfWeek.minusDays(7);
+				contentProvider.setFirstDayOfWeek(contentProvider.getFirstDayOfWeek().minusDays(7));
 				viewer.setInput(getViewSite());
 			}
 		};
@@ -739,7 +674,7 @@ public class WorkWeekView extends ViewPart {
 		nextWeekAction = new Action() {
 			@Override
 			public void run() {
-				firstDayOfWeek = firstDayOfWeek.plusDays(7);
+				contentProvider.setFirstDayOfWeek(contentProvider.getFirstDayOfWeek().plusDays(7));
 				viewer.setInput(getViewSite());
 			}
 		};

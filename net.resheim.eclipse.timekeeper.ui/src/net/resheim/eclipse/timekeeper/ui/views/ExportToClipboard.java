@@ -14,13 +14,13 @@ package net.resheim.eclipse.timekeeper.ui.views;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import net.resheim.eclipse.timekeeper.ui.Activator;
 
 import org.apache.commons.lang.time.DurationFormatUtils;
+import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
-import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
+import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.swt.dnd.Clipboard;
 import org.eclipse.swt.dnd.HTMLTransfer;
 import org.eclipse.swt.dnd.TextTransfer;
@@ -30,42 +30,87 @@ import org.eclipse.swt.widgets.Display;
 @SuppressWarnings("restriction")
 public class ExportToClipboard {
 
-	private boolean hasData(AbstractTask task, LocalDate startDate) {
-		int sum = 0;
-		for (int i = 0; i < 7; i++) {
-			String ds = startDate.plusDays(i).toString();
-			sum += Activator.getIntValue(task, ds);
-		}
-		return sum > 0;
-	}
-
 	private static final DateTimeFormatter weekFormat = DateTimeFormatter.ofPattern("w - YYYY");
+	private AbstractContentProvider provider;
 
 	public void exportAsHTML(LocalDate firstDayOfWeek) {
+
+		provider = new AbstractContentProvider() {
+
+			@Override
+			public void inputChanged(Viewer viewer, Object oldInput, Object newInput) {
+				this.setFirstDayOfWeek(firstDayOfWeek);
+				filter();
+			}
+
+			@Override
+			public void dispose() {
+				// ignore
+			}
+		};
+
+		provider.inputChanged(null, null, null);
 		StringBuilder sb = new StringBuilder();
-		List<AbstractTask> tasks =
-				TasksUiPlugin.getTaskList().getAllTasks()
-				.stream()
-				.filter(t -> t.getAttribute(Activator.ATTR_ID) != null)
-				.filter(t -> hasData(t, firstDayOfWeek))
-				.collect(Collectors.toList());
-		sb.append("<table style=\"border: 1px solid #eeeeee\">");
+
+		sb.append("<table style=\"border: 1px solid #aaa; border-collapse: collapse; \">");
 		sb.append(System.lineSeparator());
-		sb.append("<tr style=\"background: #eeeeee\">");
-		sb.append("<th>");
+		sb.append("<tr style=\"background: #dedede; border-bottom: 1px solid #aaa\">");
+		sb.append("<th width=\"44%\">");
 		sb.append("Week ");
 		sb.append(firstDayOfWeek.format(weekFormat));
 		sb.append("</th>");
 		String[] headings = Activator.getDefault().getHeadings(firstDayOfWeek);
 		for (String heading : headings) {
-			sb.append("<th>");
+			sb.append("<th width=\"60em\" style=\"text-align: center; border-left: 1px solid #aaa\">");
 			sb.append(heading);
 			sb.append("</th>");
 		}
 		sb.append("</th>");
 		sb.append(System.lineSeparator());
-		for (AbstractTask task : tasks) {
-			sb.append("<tr><td>");
+
+		Object[] elements = provider.getElements(null);
+		for (Object object : elements) {
+			append(firstDayOfWeek, sb, object);
+		}
+
+		sb.append("</table>");
+		HTMLTransfer textTransfer = HTMLTransfer.getInstance();
+		TextTransfer tt = TextTransfer.getInstance();
+		Clipboard clipboard = new Clipboard(Display.getCurrent());
+		clipboard.setContents(new String[] { sb.toString(), sb.toString() }, new Transfer[] { textTransfer, tt });
+		clipboard.dispose();
+	}
+
+	private void append(LocalDate firstDayOfWeek, StringBuilder sb, Object object) {
+		if (object instanceof String) {
+			sb.append("<tr style=\"background: #eeeeee;\"><td>");
+			sb.append(object);
+			for (int i = 0; i < 7; i++) {
+				sb.append("</td><td style=\"text-align: right; border-left: 1px solid #aaa\">");
+				LocalDate weekday = firstDayOfWeek.plusDays(i);
+				int seconds = getSum(provider.getFiltered(), weekday, (String) object);
+				if (seconds > 60) {
+					sb.append(DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true));
+				}
+			}
+			sb.append("</td></tr>");
+		}
+		if (object instanceof WeeklySummary) {
+			sb.append("<tr style=\"background: #dedede; border-top: 1px solid #aaa;\"><td>");
+			sb.append("Daily total");
+			for (int i = 0; i < 7; i++) {
+				sb.append("</td><td style=\"text-align: right; border-left: 1px solid #aaa\">");
+				LocalDate weekday = firstDayOfWeek.plusDays(i);
+				int seconds = getSum(provider.getFiltered(), weekday);
+				if (seconds > 60) {
+					sb.append(DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true));
+				}
+			}
+			sb.append("</td></tr>");
+		}
+		if (object instanceof ITask) {
+			sb.append("<tr><td>&nbsp;&nbsp;");
+			AbstractTask task = (AbstractTask) object;
 			String taskKey = task.getTaskKey();
 			if (taskKey != null) {
 				sb.append("<a href=\"" + task.getUrl() + "\">");
@@ -75,7 +120,7 @@ public class ExportToClipboard {
 			}
 			sb.append(task.getSummary());
 			for (int i = 0; i < 7; i++) {
-				sb.append("</td><td style=\"text-align: right\">");
+				sb.append("</td><td style=\"text-align: right; border-left: 1px solid #aaa\">");
 				String weekday = firstDayOfWeek.plusDays(i).toString();
 				int seconds = Activator.getIntValue(task, weekday);
 				if (seconds > 60) {
@@ -83,14 +128,44 @@ public class ExportToClipboard {
 				}
 			}
 			sb.append("</td></tr>");
-			sb.append(System.lineSeparator());
 		}
-		sb.append("</table>");
-		HTMLTransfer textTransfer = HTMLTransfer.getInstance();
-		TextTransfer tt = TextTransfer.getInstance();
-		Clipboard clipboard = new Clipboard(Display.getCurrent());
-		clipboard.setContents(new String[] { sb.toString(), sb.toString() }, new Transfer[] { textTransfer, tt });
-		clipboard.dispose();
+		sb.append(System.lineSeparator());
+		if (object instanceof String) {
+			Object[] children = provider.getChildren(object);
+			for (Object o : children) {
+				append(firstDayOfWeek, sb, o);
+			}
+		}
+	}
+
+	/**
+	 * Calculates the total amount of seconds accumulated on the project for the
+	 * specified date.
+	 *
+	 * @param date
+	 *            the date to calculate for
+	 * @param project
+	 *            the project to calculate for
+	 * @return the total amount of seconds accumulated
+	 */
+	private int getSum(List<ITask> filtered, LocalDate date, String project) {
+		final String d = date.toString();
+		return filtered.stream().filter(t -> project.equals(Activator.getProjectName(t)))
+				.mapToInt(t -> Activator.getIntValue(t, d)).sum();
+	}
+
+	/**
+	 * Calculates the total amount of seconds accumulated on specified date.
+	 *
+	 * @param date
+	 *            the date to calculate for
+	 * @return the total amount of seconds accumulated
+	 */
+	private int getSum(List<ITask> filtered, LocalDate date) {
+		final String d = date.toString();
+		return filtered
+				.stream().mapToInt(t -> Activator.getIntValue(t, d))
+				.sum();
 	}
 
 }
