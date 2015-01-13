@@ -29,6 +29,7 @@ import org.eclipse.jface.action.IMenuManager;
 import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.action.Separator;
+import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.jface.viewers.CellEditor;
@@ -308,30 +309,37 @@ public class WorkWeekView extends ViewPart {
 			if (element instanceof AbstractTask) {
 				AbstractTask task = (AbstractTask) element;
 				if (value instanceof String) {
-					String string = ((String) value).replace(',', '.');
-					int newValue = 0;
-					if (string.indexOf('.') > -1) {
-						double d = Double.parseDouble(string);
-						newValue = (int) (d * 3600);
-					} else {
-						String[] split = string.split(":");
-						// Only minutes are given
-						if (split.length == 1) {
-							newValue = Integer.parseInt(split[0]) * 60;
+					int newValue = -1;
+					try {
+						String string = ((String) value).replace(',', '.');
+						if (string.indexOf('.') > -1) {
+							double d = Double.parseDouble(string);
+							newValue = (int) (d * 3600);
+						} else {
+							String[] split = string.split(":");
+							// Only minutes are given
+							if (split.length == 1) {
+								newValue = Integer.parseInt(split[0]) * 60;
+							}
+							if (split.length == 2) {
+								newValue = Integer.parseInt(split[0]) * 3600 + Integer.parseInt(split[1]) * 60;
+							}
 						}
-						if (split.length == 2) {
-							newValue = Integer.parseInt(split[0]) * 3600 + Integer.parseInt(split[1]) * 60;
-						}
+					} catch (Exception e) {
+						MessageDialog.openError(viewer.getControl().getShell(), "Illegal value",
+								"Please enter values in time or decimal form.\nFor instance 1:30 or 1.5/1,5.");
 					}
-					Activator.setValue(task, getDateString(weekday), Integer.toString(newValue));
-					// If the new value is 0, the task may have no time
-					// logged for the week and should be removed.
-					if (newValue == 0) {
-						viewer.refresh();
-					} else {
-						viewer.update(element, null);
-						viewer.update(Activator.getProjectName(task), null);
-						viewer.update(summary, null);
+					if (newValue > -1) {
+						Activator.setValue(task, getDateString(weekday), Integer.toString(newValue));
+						// If the new value is 0, the task may have no time
+						// logged for the week and should be removed.
+						if (newValue == 0) {
+							viewer.refresh();
+						} else {
+							viewer.update(element, null);
+							viewer.update(Activator.getProjectName(task), null);
+							viewer.update(summary, null);
+						}
 					}
 				}
 			}
