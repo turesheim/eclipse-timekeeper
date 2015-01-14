@@ -12,6 +12,7 @@
 package net.resheim.eclipse.timekeeper.ui;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.WeekFields;
 import java.util.Locale;
@@ -180,6 +181,21 @@ public class Activator extends AbstractUIPlugin {
 					}
 				}
 			}
+		}
+		return null;
+	}
+
+	/**
+	 * Returns the start time for the task or <code>null</code>.
+	 *
+	 * @param task
+	 *            the task to obtain the start time for
+	 * @return the start time or <code>null</code>
+	 */
+	public static LocalDateTime getStartTime(ITask task) {
+		String startString = Activator.getValue(task, Activator.START);
+		if (startString != null) {
+			return LocalDateTime.parse(startString);
 		}
 		return null;
 	}

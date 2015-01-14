@@ -225,6 +225,11 @@ public class WorkWeekView extends ViewPart {
 					sb.append(": ");
 				}
 				sb.append(task.getSummary());
+				if (task.isActive()){
+					sb.append(" (Started ");
+					sb.append(timeFormat.format(Activator.getStartTime(task)));
+					sb.append(")");
+				}
 				return sb.toString();
 			}
 			if (element instanceof WeeklySummary) {
@@ -389,6 +394,8 @@ public class WorkWeekView extends ViewPart {
 	public static final String ID = "net.resheim.eclipse.timekeeper.ui.views.SampleView";
 
 	private static final DateTimeFormatter weekFormat = DateTimeFormatter.ofPattern("w");
+
+	private static final DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("EEEE HH:MM", Locale.ENGLISH);
 
 	private Action previousWeekAction;
 
