@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2014 Torkild U. Resheim.
+ * Copyright (c) 2014-2015 Torkild U. Resheim.
  *
  * All rights reserved. This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License v1.0 which
@@ -30,7 +30,8 @@ import org.eclipse.ui.plugin.AbstractUIPlugin;
 import org.osgi.framework.BundleContext;
 
 /**
- * The activator class controls the plug-in life cycle
+ *
+ *
  */
 @SuppressWarnings("restriction")
 public class Activator extends AbstractUIPlugin {
@@ -40,12 +41,16 @@ public class Activator extends AbstractUIPlugin {
 
 	public static final String ATTR_GROUPING = ATTR_ID + ".grouping"; //$NON-NLS-1$
 
+	/** Task repository kind identifier for Bugzilla */
 	public static final String KIND_BUGZILLA = "bugzilla"; //$NON-NLS-1$
 
+	/** Task repository kind identifier for GitHub */
 	public static final String KIND_GITHUB = "github"; //$NON-NLS-1$
 
+	/** Task repository kind identifier for local tasks */
 	public static final String KIND_LOCAL = "local"; //$NON-NLS-1$
 
+	/** Task repository kind identifier for JIRA */
 	public static final String KIND_JIRA = "jira"; //$NON-NLS-1$
 
 	private static final String KV_SEPARATOR = "="; //$NON-NLS-1$
@@ -82,27 +87,40 @@ public class Activator extends AbstractUIPlugin {
 		}
 		task.setAttribute(ATTR_ID, sb.toString());
 	}
+
 	/**
-	 * Returns the shared instance
+	 * Returns the shared plug-in instance.
 	 *
 	 * @return the shared instance
 	 */
 	public static Activator getDefault() {
 		return plugin;
 	}
+
 	/**
 	 * Returns an image descriptor for the image file at the given plug-in
-	 * relative path
+	 * relative path.
 	 *
 	 * @param path
-	 *            the path
+	 *            the path relative to the plug-in root
 	 * @return the image descriptor
 	 */
 	public static ImageDescriptor getImageDescriptor(String path) {
 		return imageDescriptorFromPlugin(PLUGIN_ID, path);
 	}
-	public static int getIntValue(ITask task, String key) {
-		String value = getValue(task, key);
+
+	/**
+	 * Returns the number of seconds the task has been active on the given date.
+	 * If the task has not been active on the date, 0 will be returned.
+	 *
+	 * @param task
+	 *            the task to get active time for
+	 * @param date
+	 *            the date to get active time for
+	 * @return duration in seconds
+	 */
+	public static int getActiveTime(ITask task, LocalDate date) {
+		String value = getValue(task, date.toString());
 		if (value != null) {
 			return Integer.parseInt(value);
 		}

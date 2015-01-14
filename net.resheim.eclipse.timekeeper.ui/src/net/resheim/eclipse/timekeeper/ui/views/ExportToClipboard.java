@@ -121,8 +121,8 @@ public class ExportToClipboard {
 			sb.append(task.getSummary());
 			for (int i = 0; i < 7; i++) {
 				sb.append("</td><td style=\"text-align: right; border-left: 1px solid #aaa\">");
-				String weekday = firstDayOfWeek.plusDays(i).toString();
-				int seconds = Activator.getIntValue(task, weekday);
+				LocalDate weekday = firstDayOfWeek.plusDays(i);
+				int seconds = Activator.getActiveTime(task, weekday);
 				if (seconds > 60) {
 					sb.append(DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true));
 				}
@@ -149,9 +149,10 @@ public class ExportToClipboard {
 	 * @return the total amount of seconds accumulated
 	 */
 	private int getSum(List<ITask> filtered, LocalDate date, String project) {
-		final String d = date.toString();
-		return filtered.stream().filter(t -> project.equals(Activator.getProjectName(t)))
-				.mapToInt(t -> Activator.getIntValue(t, d)).sum();
+		return filtered
+				.stream()
+				.filter(t -> project.equals(Activator.getProjectName(t)))
+				.mapToInt(t -> Activator.getActiveTime(t, date)).sum();
 	}
 
 	/**
@@ -162,9 +163,8 @@ public class ExportToClipboard {
 	 * @return the total amount of seconds accumulated
 	 */
 	private int getSum(List<ITask> filtered, LocalDate date) {
-		final String d = date.toString();
 		return filtered
-				.stream().mapToInt(t -> Activator.getIntValue(t, d))
+				.stream().mapToInt(t -> Activator.getActiveTime(t, date))
 				.sum();
 	}
 

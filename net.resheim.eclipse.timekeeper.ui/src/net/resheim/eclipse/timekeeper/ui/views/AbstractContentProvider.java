@@ -79,8 +79,8 @@ public abstract class AbstractContentProvider implements ITreeContentProvider {
 	private boolean hasData(ITask task, LocalDate startDate) {
 		int sum = 0;
 		for (int i = 0; i < 7; i++) {
-			String ds = startDate.plusDays(i).toString();
-			sum += Activator.getIntValue(task, ds);
+			LocalDate d = startDate.plusDays(i);
+			sum += Activator.getActiveTime(task, d);
 		}
 		return sum > 0;
 	}

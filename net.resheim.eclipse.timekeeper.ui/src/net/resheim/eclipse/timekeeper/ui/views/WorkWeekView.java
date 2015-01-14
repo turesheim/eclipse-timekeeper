@@ -303,7 +303,7 @@ public class WorkWeekView extends ViewPart {
 		protected Object getValue(Object element) {
 			if (element instanceof ITask) {
 				AbstractTask task = (AbstractTask) element;
-				int seconds = Activator.getIntValue(task, getDateString(weekday));
+				int seconds = Activator.getActiveTime(task, getDate(weekday));
 				return getFormattedPeriod(seconds);
 			}
 			return "";
@@ -335,7 +335,7 @@ public class WorkWeekView extends ViewPart {
 								"Please enter values in time or decimal form.\nFor instance 1:30 or 1.5/1,5.");
 					}
 					if (newValue > -1) {
-						Activator.setValue(task, getDateString(weekday), Integer.toString(newValue));
+						Activator.setValue(task, getDate(weekday).toString(), Integer.toString(newValue));
 						// If the new value is 0, the task may have no time
 						// logged for the week and should be removed.
 						if (newValue == 0) {
@@ -534,7 +534,7 @@ public class WorkWeekView extends ViewPart {
 					seconds = getSum(contentProvider.getFiltered(), date, (String) element);
 				} else if (element instanceof ITask) {
 					AbstractTask task = (AbstractTask) element;
-					seconds = Activator.getIntValue(task, getDateString(weekday));
+					seconds = Activator.getActiveTime(task, getDate(weekday));
 				} else if (element instanceof WeeklySummary) {
 					seconds = getSum(contentProvider.getFiltered(), date);
 				}
@@ -592,8 +592,8 @@ public class WorkWeekView extends ViewPart {
 	 * @param weekday
 	 * @return
 	 */
-	private String getDateString(int weekday) {
-		return contentProvider.getFirstDayOfWeek().plusDays(weekday).toString();
+	private LocalDate getDate(int weekday) {
+		return contentProvider.getFirstDayOfWeek().plusDays(weekday);
 	}
 
 	private String getFormattedPeriod(int seconds) {
@@ -611,13 +611,12 @@ public class WorkWeekView extends ViewPart {
 	 * @return the total amount of seconds accumulated
 	 */
 	private int getSum(List<ITask> filtered, LocalDate date) {
-		final String d = date.toString();
 		// May not have been initialised when first called.
 		if (filtered == null) {
 			return 0;
 		}
 		return filtered
-				.stream().mapToInt(t -> Activator.getIntValue(t, d))
+				.stream().mapToInt(t -> Activator.getActiveTime(t, date))
 				.sum();
 	}
 
@@ -632,10 +631,9 @@ public class WorkWeekView extends ViewPart {
 	 * @return the total amount of seconds accumulated
 	 */
 	private int getSum(List<ITask> filtered, LocalDate date, String project) {
-		final String d = date.toString();
 		return filtered
 				.stream()
-				.filter(t -> project.equals(Activator.getProjectName(t))).mapToInt(t -> Activator.getIntValue(t, d))
+				.filter(t -> project.equals(Activator.getProjectName(t))).mapToInt(t -> Activator.getActiveTime(t, date))
 				.sum();
 	}
 
