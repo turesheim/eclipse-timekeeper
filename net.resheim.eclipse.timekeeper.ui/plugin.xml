@@ -13,7 +13,7 @@
             icon="icons/full/eview16/date_obj.gif"
             category="net.resheim.eclipse.timekeeper.ui"
             class="net.resheim.eclipse.timekeeper.ui.views.WorkWeekView"
-            id="net.resheim.eclipse.timekeeper.ui.views.SampleView">
+            id="net.resheim.eclipse.timekeeper.ui.views.workWeek">
       </view>
    </extension>
    <extension
@@ -48,6 +48,26 @@
             name="Workweek"
             parentId="org.eclipse.ui.contexts.window">
       </context>
+   </extension>
+   <extension
+         point="org.eclipse.ui.commands">
+      <command
+            defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.CopyTaskDetailsToHTML"
+            id="net.resheim.eclipse.timekeeper.copyTaskToHTML"
+            name="Copy Details to HTML">
+      </command>
+   </extension>
+   <extension
+         point="org.eclipse.ui.menus">
+      <menuContribution
+            allPopups="false"
+            locationURI="popup:net.resheim.eclipse.timekeeper.ui.views.workWeek?after=task">
+         <command
+               commandId="net.resheim.eclipse.timekeeper.copyTaskToHTML"
+               label="Copy Details to HTML"
+               style="push">
+         </command>
+      </menuContribution>
    </extension>
 
 </plugin>

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2014 Torkild U. Resheim
+ * Copyright (c) 2014, 2015 Torkild U. Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -33,7 +33,24 @@ public class ExportToClipboard {
 	private static final DateTimeFormatter weekFormat = DateTimeFormatter.ofPattern("w - YYYY");
 	private AbstractContentProvider provider;
 
-	public void exportAsHTML(LocalDate firstDayOfWeek) {
+	public void copyTaskAsHTML(ITask task) {
+		StringBuilder sb = new StringBuilder();
+		String taskKey = task.getTaskKey();
+		if (taskKey != null) {
+			sb.append("<a href=\"" + task.getUrl() + "\">");
+			sb.append(taskKey);
+			sb.append("</a>");
+			sb.append(": ");
+		}
+		sb.append(task.getSummary());
+		HTMLTransfer textTransfer = HTMLTransfer.getInstance();
+		TextTransfer tt = TextTransfer.getInstance();
+		Clipboard clipboard = new Clipboard(Display.getCurrent());
+		clipboard.setContents(new String[] { sb.toString(), sb.toString() }, new Transfer[] { textTransfer, tt });
+		clipboard.dispose();
+	}
+
+	public void copyWeekAsHTML(LocalDate firstDayOfWeek) {
 
 		provider = new AbstractContentProvider() {
 
@@ -52,16 +69,16 @@ public class ExportToClipboard {
 		provider.inputChanged(null, null, null);
 		StringBuilder sb = new StringBuilder();
 
-		sb.append("<table style=\"border: 1px solid #aaa; border-collapse: collapse; \">");
+		sb.append("<table width=\"100%\" style=\"border: 1px solid #aaa; border-collapse: collapse; \">");
 		sb.append(System.lineSeparator());
 		sb.append("<tr style=\"background: #dedede; border-bottom: 1px solid #aaa\">");
-		sb.append("<th width=\"44%\">");
+		sb.append("<th>");
 		sb.append("Week ");
 		sb.append(firstDayOfWeek.format(weekFormat));
 		sb.append("</th>");
 		String[] headings = Activator.getDefault().getHeadings(firstDayOfWeek);
 		for (String heading : headings) {
-			sb.append("<th width=\"60em\" style=\"text-align: center; border-left: 1px solid #aaa\">");
+			sb.append("<th width=\"50em\" style=\"text-align: center; border-left: 1px solid #aaa\">");
 			sb.append(heading);
 			sb.append("</th>");
 		}

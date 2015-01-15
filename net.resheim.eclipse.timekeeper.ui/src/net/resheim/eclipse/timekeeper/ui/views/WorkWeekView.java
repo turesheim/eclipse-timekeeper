@@ -476,6 +476,8 @@ public class WorkWeekView extends ViewPart {
 		});
 
 		viewer = new TreeViewer(main, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION);
+		// Make the tree view provide selections
+		getSite().setSelectionProvider(viewer);
 		contentProvider = new ViewContentProvider();
 		viewer.setContentProvider(contentProvider);
 		GridData layoutData = new GridData(SWT.FILL, SWT.FILL, true, true);
@@ -563,6 +565,7 @@ public class WorkWeekView extends ViewPart {
 		ISelection selection = viewer.getSelection();
 		Object obj = ((IStructuredSelection) selection).getFirstElement();
 		if (obj instanceof ITask) {
+			manager.add(new Separator("task"));
 			if (((ITask) obj).isActive()) {
 				manager.add(deactivateAction);
 			} else {
@@ -645,6 +648,7 @@ public class WorkWeekView extends ViewPart {
 				WorkWeekView.this.fillContextMenu(manager);
 			}
 		});
+		// Create a context menu for the view
 		Menu menu = menuMgr.createContextMenu(viewer.getControl());
 		viewer.getControl().setMenu(menu);
 		getSite().registerContextMenu(menuMgr, viewer);
@@ -665,7 +669,7 @@ public class WorkWeekView extends ViewPart {
 			@Override
 			public void run() {
 				ExportToClipboard export = new ExportToClipboard();
-				export.exportAsHTML(contentProvider.getFirstDayOfWeek());
+				export.copyWeekAsHTML(contentProvider.getFirstDayOfWeek());
 			}
 
 		};
