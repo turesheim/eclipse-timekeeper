@@ -8,9 +8,11 @@ Whenever a task is *activated* in Mylyn it will automatically show up in the **W
 
 If a tasks active when Eclipse is closed you will be asked whether or not to add the duration in between when Eclipse is started again. If you answer **Yes** the time will be added to the total for the starting date. If you answer **Cancel** no time is added.
 
-The context menu and toolbar buttons can be used to browse back and forward by one week. The current locale is used to determine week numbers.
+The context menu and toolbar buttons can be used to browse back and forward by one week. The current locale is used to determine week numbers. Left of the navigation buttons there is a button for copying the workweek in HTML format to the clipboard.
 
-Left of the navigation buttons there is a button for copying the workweek in HTML format to the clipboard.
+The task context menu contains an **Copy Details to HTML** entry. This will copy the link and summary details as HTML to the clipboard.
+
+## Supported repository types
 
 There is built in support for *GitHub* and *Bugzilla* task repositories, however other repository types should also work. Tasks from *GitHub* are grouped by the name of the first query they appear in. Tasks from *Bugzilla* repositories are grouped by the *product*. When for instance using a *JIRA* repository you may want to group by a different field, this can be done by right clicking on a task and selecting a field from the **Set Grouping Field...** menu.
 
