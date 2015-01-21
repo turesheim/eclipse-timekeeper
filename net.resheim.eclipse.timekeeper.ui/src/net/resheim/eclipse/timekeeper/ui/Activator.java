@@ -57,12 +57,12 @@ public class Activator extends AbstractUIPlugin {
 	 * The time interval of no keyboard or mouse events after which the system
 	 * is considered idle (1 minute).
 	 */
-	private static final int IDLE_INTERVAL = 60_000;
+	private static final int IDLE_INTERVAL = 30_000;
 	/**
 	 * Trigger time interval for asking whether or not to add idle time to the
-	 * elapsed task time. (5s)
+	 * elapsed task time. (1s)
 	 */
-	private static final int SHORT_INTERVAL = 5000;
+	private static final int SHORT_INTERVAL = 1000;
 
 
 	public static final String ATTR_ID = "net.resheim.eclipse.timekeeper"; //$NON-NLS-1$
@@ -369,37 +369,49 @@ public class Activator extends AbstractUIPlugin {
 		}
 	}
 
-	private synchronized void handleReactivation(long idleTimeMillis) {
-		if (idleTimeMillis < lastIdleTime && lastIdleTime > IDLE_INTERVAL) {
-			// If we have an active task
-			ITask activeTask = TasksUi.getTaskActivityManager().getActiveTask();
-			if (activeTask != null && Activator.getValue(activeTask, Activator.START) != null) {
-				String startString = Activator.getValue(activeTask, Activator.START);
-				LocalDateTime started = LocalDateTime.parse(startString);
-				String time = DurationFormatUtils.formatDuration(lastIdleTime, "H:mm", true);
-				boolean confirm = MessageDialog.openQuestion(Display.getCurrent().getActiveShell(),
-						"Disregard idle time?", MessageFormat.format(
-								"The computer has been idle for {0}. The active task \"{1}: {2}\"\n"
-										+ "was started on {3}. Stop the task and disregard the idle time?",
-										time, activeTask.getTaskKey(), activeTask.getSummary(),
-										// TODO: Improve date formatting
-										started.format(DateTimeFormatter.ofPattern("EEE e, HH:mm", Locale.US))));
-				// Stop task, ignore idle time
-				if (confirm) {
-					LocalDateTime stopped = LocalDateTime.now();
-					long seconds = started.until(stopped, ChronoUnit.SECONDS);
-					// Subtract the idle time
-					seconds = seconds - (lastIdleTime / 1000);
-					// Add to the total
-					accumulateTime(activeTask, startString, seconds);
-					// And clear the value
-					Activator.clearValue(activeTask, Activator.START);
-					// Stop the task
-					TasksUi.getTaskActivityManager().deactivateTask(activeTask);
+	boolean dialogIsOpen = false;
+
+	private void handleReactivation(long idleTimeMillis) {
+		// We want only one dialog open.
+		if (dialogIsOpen) {
+			return;
+		}
+		synchronized (this) {
+			System.out.println(lastIdleTime);
+			if (idleTimeMillis < lastIdleTime && lastIdleTime > IDLE_INTERVAL) {
+				// If we have an active task
+				ITask activeTask = TasksUi.getTaskActivityManager().getActiveTask();
+				if (activeTask != null && Activator.getValue(activeTask, Activator.START) != null) {
+					dialogIsOpen = true;
+					String startString = Activator.getValue(activeTask, Activator.START);
+					LocalDateTime started = LocalDateTime.parse(startString);
+					String time = DurationFormatUtils.formatDuration(lastIdleTime, "H:mm:ss", true);
+					MessageDialog md = new MessageDialog(Display.getCurrent().getActiveShell(), "Disregard idle time?",
+							null, MessageFormat.format(
+									"The computer has been idle for more than {0}. The active task \"{1}: {2}\" was started on {3}. Deactivate the task and disregard the idle time?",
+									time, activeTask.getTaskKey(), activeTask.getSummary(),
+									// TODO: Improve date formatting
+									started.format(DateTimeFormatter.ofPattern("EEE e, HH:mm", Locale.US))),
+									MessageDialog.QUESTION, new String[] { "No", "Yes" }, 1);
+					int open = md.open();
+					dialogIsOpen = false;
+					// Stop task, ignore idle time
+					if (open == 1) {
+						System.out.println("Task stopped and time cleared");
+						LocalDateTime stopped = LocalDateTime.now();
+						long seconds = started.until(stopped, ChronoUnit.SECONDS);
+						// Subtract the idle time
+						seconds = seconds - (lastIdleTime / 1000);
+						// Add to the total
+						accumulateTime(activeTask, startString, seconds);
+						// And clear the value
+						Activator.clearValue(activeTask, Activator.START);
+						// Stop the task
+						TasksUi.getTaskActivityManager().deactivateTask(activeTask);
+					}
 				}
 			}
 		}
-		lastIdleTime = idleTimeMillis;
 	}
 
 	private void installIdleHandler() {
@@ -434,8 +446,9 @@ public class Activator extends AbstractUIPlugin {
 					if (idleTimeMillis < lastIdleTime && lastIdleTime > IDLE_INTERVAL) {
 						handleReactivation(idleTimeMillis);
 					}
-					display.timerExec(SHORT_INTERVAL, this);
 					lastIdleTime = idleTimeMillis;
+					System.out.println("Idle for " + lastIdleTime + "ms, dialog open is " + dialogIsOpen);
+					display.timerExec(SHORT_INTERVAL, this);
 				}
 			}
 		};

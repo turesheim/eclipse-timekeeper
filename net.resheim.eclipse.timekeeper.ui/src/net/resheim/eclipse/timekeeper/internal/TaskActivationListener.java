@@ -42,7 +42,8 @@ public class TaskActivationListener implements ITaskActivationListener {
 			LocalDateTime stopped = LocalDateTime.now();
 			long seconds = started.until(stopped, ChronoUnit.SECONDS);
 			String time = DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
-			boolean confirm = MessageDialog.openQuestion(Display.getCurrent().getActiveShell(),
+			// XXX: This can be a bit confusing
+			boolean confirm = MessageDialog.openConfirm(Display.getCurrent().getActiveShell(),
 					"Add elapsed time?",
 					"Work was already started on this task on "
 							+ started.format(DateTimeFormatter.ofPattern("EEE e, HH:mm", Locale.US))
