@@ -1,6 +1,6 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
-Bundle-Name: Timekeeper UI
+Bundle-Name: Eclipse Timekeeper
 Bundle-SymbolicName: net.resheim.eclipse.timekeeper.ui;singleton:=true
 Bundle-Version: 1.0.0.qualifier
 Bundle-Activator: net.resheim.eclipse.timekeeper.ui.Activator
@@ -15,3 +15,7 @@ Require-Bundle: org.eclipse.ui,
  org.eclipse.ui.forms
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Bundle-ActivationPolicy: lazy
+Bundle-ClassPath: .,
+ lib/jna-4.1.0.jar,
+ lib/jna-platform-4.1.0.jar
+Bundle-Vendor: Torkild U. Resheim
