@@ -57,7 +57,7 @@ public class Activator extends AbstractUIPlugin {
 	 * The time interval of no keyboard or mouse events after which the system
 	 * is considered idle (1 minute).
 	 */
-	private static final int IDLE_INTERVAL = 30_000;
+	private static final int IDLE_INTERVAL = 60_000;
 	/**
 	 * Trigger time interval for asking whether or not to add idle time to the
 	 * elapsed task time. (1s)
@@ -386,10 +386,16 @@ public class Activator extends AbstractUIPlugin {
 					String startString = Activator.getValue(activeTask, Activator.START);
 					LocalDateTime started = LocalDateTime.parse(startString);
 					String time = DurationFormatUtils.formatDuration(lastIdleTime, "H:mm:ss", true);
+					StringBuilder sb = new StringBuilder();
+					if (activeTask.getTaskKey() != null) {
+						sb.append(activeTask.getTaskKey());
+						sb.append(": ");
+					}
+					sb.append(activeTask.getSummary());
 					MessageDialog md = new MessageDialog(Display.getCurrent().getActiveShell(), "Disregard idle time?",
 							null, MessageFormat.format(
-									"The computer has been idle for more than {0}. The active task \"{1}: {2}\" was started on {3}. Deactivate the task and disregard the idle time?",
-									time, activeTask.getTaskKey(), activeTask.getSummary(),
+									"The computer has been idle for more than {0}. The active task \"{1}\" was started on {2}. Deactivate the task and disregard the idle time?",
+									time, sb.toString(),
 									// TODO: Improve date formatting
 									started.format(DateTimeFormatter.ofPattern("EEE e, HH:mm", Locale.US))),
 									MessageDialog.QUESTION, new String[] { "No", "Yes" }, 1);
