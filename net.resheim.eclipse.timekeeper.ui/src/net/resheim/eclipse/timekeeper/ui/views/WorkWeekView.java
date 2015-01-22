@@ -227,6 +227,7 @@ public class WorkWeekView extends ViewPart {
 				sb.append(task.getSummary());
 				if (task.isActive()){
 					sb.append(" (Started ");
+					System.out.println(Activator.getStartTime(task));
 					sb.append(timeFormat.format(Activator.getStartTime(task)));
 					sb.append(")");
 				}
@@ -395,7 +396,7 @@ public class WorkWeekView extends ViewPart {
 
 	private static final DateTimeFormatter weekFormat = DateTimeFormatter.ofPattern("w");
 
-	private static final DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("EEEE HH:MM", Locale.ENGLISH);
+	private static final DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("EEEE HH:mm", Locale.ENGLISH);
 
 	private Action previousWeekAction;
 
