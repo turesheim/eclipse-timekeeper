@@ -37,7 +37,7 @@
 	</licenses>
 
 	<properties>
-		<tycho.version>0.21.0</tycho.version>
+		<tycho.version>0.22.0</tycho.version>
 	</properties>
 
 	<organization>
@@ -47,6 +47,14 @@
 
 	<build>
 		<plugins>
+			<plugin>
+			  <groupId>org.eclipse.tycho</groupId>
+			  <artifactId>tycho-compiler-plugin</artifactId>
+			  <version>${tycho.version}</version>
+			  <configuration>
+			    <useProjectSettings>true</useProjectSettings>
+			  </configuration>
+			</plugin>
 			<plugin>
 				<groupId>org.eclipse.tycho</groupId>
 				<artifactId>tycho-maven-plugin</artifactId>
