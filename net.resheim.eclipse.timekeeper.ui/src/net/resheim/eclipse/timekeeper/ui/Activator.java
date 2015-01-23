@@ -45,19 +45,15 @@ import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
 import org.osgi.framework.BundleContext;
 
-/**
- *
- *
- */
 @SuppressWarnings("restriction")
 public class Activator extends AbstractUIPlugin {
 
 
 	/**
 	 * The time interval of no keyboard or mouse events after which the system
-	 * is considered idle (1 minute).
+	 * is considered idle (5 minutes).
 	 */
-	private static final int IDLE_INTERVAL = 60_000;
+	private static final int IDLE_INTERVAL = 300_000;
 	/**
 	 * Trigger time interval for asking whether or not to add idle time to the
 	 * elapsed task time. (1s)
