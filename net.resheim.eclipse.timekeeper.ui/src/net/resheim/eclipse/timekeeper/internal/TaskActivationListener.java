@@ -37,20 +37,20 @@ public class TaskActivationListener implements ITaskActivationListener {
 	public void preTaskActivated(ITask task) {
 		LocalDateTime now = LocalDateTime.now();
 		String startString = Activator.getValue(task, Activator.START);
+		String tickString = Activator.getValue(task, Activator.TICK);
 		if (startString != null) {
-			LocalDateTime started = LocalDateTime.parse(startString);
+			LocalDateTime ticked = LocalDateTime.parse(tickString);
 			LocalDateTime stopped = LocalDateTime.now();
-			long seconds = started.until(stopped, ChronoUnit.SECONDS);
+			long seconds = ticked.until(stopped, ChronoUnit.SECONDS);
 			String time = DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
-			// XXX: This can be a bit confusing
-			boolean confirm = MessageDialog.openConfirm(Display.getCurrent().getActiveShell(),
+			boolean confirm = MessageDialog.openConfirm(
+					Display.getCurrent().getActiveShell(),
 					"Add elapsed time?",
-					"Work was already started on this task on "
-							+ started.format(DateTimeFormatter.ofPattern("EEE e, HH:mm", Locale.US))
-							+ ". Continue and add the elapsed time since (" + time
-							+ ") to the task total?");
+					"Work was already started and task was last updated on "
+							+ ticked.format(DateTimeFormatter.ofPattern("EEE e, HH:mm", Locale.US))
+							+ ". Continue and add the elapsed time since (" + time + ") to the task total?");
 			if (confirm) {
-				accumulateTime(task, startString);
+				Activator.accumulateTime(task, startString, seconds);
 			}
 		}
 		Activator.setValue(task, Activator.START, now.toString());
@@ -58,27 +58,8 @@ public class TaskActivationListener implements ITaskActivationListener {
 
 	@Override
 	public void preTaskDeactivated(ITask task) {
-		String startString = Activator.getValue(task, Activator.START);
-		if (startString != null) {
-			accumulateTime(task, startString);
-		}
 		Activator.clearValue(task, Activator.START);
-	}
-
-	private void accumulateTime(ITask task, String startString) {
-		LocalDateTime started = LocalDateTime.parse(startString);
-		LocalDateTime stopped = LocalDateTime.now();
-		long seconds = started.until(stopped, ChronoUnit.SECONDS);
-		// Store the elapsed time at the date
-		String time = started.toLocalDate().toString();
-		String accumulatedString = Activator.getValue(task, time);
-		if (accumulatedString != null) {
-			long accumulated = Long.parseLong(accumulatedString);
-			accumulated = accumulated + seconds;
-			Activator.setValue(task, time, Long.toString(accumulated));
-		} else {
-			Activator.setValue(task, time, Long.toString(seconds));
-		}
+		Activator.clearValue(task, Activator.TICK);
 	}
 
 	@Override

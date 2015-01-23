@@ -240,6 +240,7 @@ public class WorkWeekView extends ViewPart {
 		}
 
 	}
+
 	private final class TaskListener implements ITaskActivationListener, ITaskListChangeListener {
 
 		@Override
@@ -276,6 +277,7 @@ public class WorkWeekView extends ViewPart {
 				}
 			});
 		}
+
 	}
 
 	private class TimeEditingSupport extends EditingSupport {

@@ -15,7 +15,6 @@ import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.time.temporal.WeekFields;
 import java.util.Locale;
 
@@ -49,21 +48,15 @@ import org.osgi.framework.BundleContext;
 public class Activator extends AbstractUIPlugin {
 
 
+	public static final String ATTR_ID = "net.resheim.eclipse.timekeeper"; //$NON-NLS-1$
+
+	public static final String ATTR_GROUPING = ATTR_ID + ".grouping"; //$NON-NLS-1$
+
 	/**
 	 * The time interval of no keyboard or mouse events after which the system
 	 * is considered idle (5 minutes).
 	 */
 	private static final int IDLE_INTERVAL = 300_000;
-	/**
-	 * Trigger time interval for asking whether or not to add idle time to the
-	 * elapsed task time. (1s)
-	 */
-	private static final int SHORT_INTERVAL = 1000;
-
-
-	public static final String ATTR_ID = "net.resheim.eclipse.timekeeper"; //$NON-NLS-1$
-
-	public static final String ATTR_GROUPING = ATTR_ID + ".grouping"; //$NON-NLS-1$
 
 	/** Task repository kind identifier for Bugzilla */
 	public static final String KIND_BUGZILLA = "bugzilla"; //$NON-NLS-1$
@@ -79,17 +72,39 @@ public class Activator extends AbstractUIPlugin {
 
 	private static final String KV_SEPARATOR = "="; //$NON-NLS-1$
 
+	private static long lastIdleTime;
+
 	private static final String PAIR_SEPARATOR = ";"; //$NON-NLS-1$
 
 	// The shared instance
 	private static Activator plugin;
 
-	private static long lastIdleTime;
-
 	// The plug-in ID
 	public static final String PLUGIN_ID = "net.resheim.eclipse.timekeeper.ui"; //$NON-NLS-1$
 
+	/**
+	 * Trigger time interval for asking whether or not to add idle time to the
+	 * elapsed task time. (1s)
+	 */
+	private static final int SHORT_INTERVAL = 1000;
+
 	public static final String START = "start"; //$NON-NLS-1$
+
+	public static final String TICK = "tick"; //$NON-NLS-1$
+
+	public synchronized static void accumulateTime(ITask task, String dateString, long seconds) {
+		String accumulatedString = Activator.getValue(task, dateString);
+		if (accumulatedString != null) {
+			long accumulated = Long.parseLong(accumulatedString);
+			accumulated = accumulated + seconds;
+			Activator.setValue(task, dateString, Long.toString(accumulated));
+		} else {
+			Activator.setValue(task, dateString, Long.toString(seconds));
+		}
+		String now = LocalDateTime.now().toString();
+		Activator.setValue(task, TICK, now);
+	}
+
 	public static void clearValue(ITask task, String key) {
 		StringBuilder sb = new StringBuilder();
 		String attribute = task.getAttribute(ATTR_ID);
@@ -291,13 +306,15 @@ public class Activator extends AbstractUIPlugin {
 		task.setAttribute(ATTR_ID, sb.toString());
 	}
 
+	/** Platform specific idle time detector */
+	private IdleTimeDetector detector;
+
+	boolean dialogIsOpen = false;
 	private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEE d").withLocale(Locale.US);
 
 	private Runnable handler;
 
 	private Listener reactivationListener;
-	/** Platform specific idle time detector */
-	private IdleTimeDetector detector;
 
 	/**
 	 * The constructor
@@ -327,61 +344,27 @@ public class Activator extends AbstractUIPlugin {
 		return headings;
 	}
 
-	/*
-	 * (non-Javadoc)
-	 *
-	 * @see
-	 * org.eclipse.ui.plugin.AbstractUIPlugin#start(org.osgi.framework.BundleContext
-	 * )
-	 */
-	@Override
-	public void start(BundleContext context) throws Exception {
-		super.start(context);
-		plugin = this;
-		installIdleHandler();
-	}
-
-	/*
-	 * (non-Javadoc)
-	 *
-	 * @see
-	 * org.eclipse.ui.plugin.AbstractUIPlugin#stop(org.osgi.framework.BundleContext
-	 * )
-	 */
-	@Override
-	public void stop(BundleContext context) throws Exception {
-		plugin = null;
-		super.stop(context);
-	}
-
-	private void accumulateTime(ITask task, String startString, long seconds) {
-		String accumulatedString = Activator.getValue(task, startString);
-		if (accumulatedString != null) {
-			long accumulated = Long.parseLong(accumulatedString);
-			accumulated = accumulated + seconds;
-			Activator.setValue(task, startString, Long.toString(accumulated));
-		} else {
-			Activator.setValue(task, startString, Long.toString(seconds));
-		}
-	}
-
-	boolean dialogIsOpen = false;
-
 	private void handleReactivation(long idleTimeMillis) {
 		// We want only one dialog open.
 		if (dialogIsOpen) {
 			return;
 		}
 		synchronized (this) {
-			System.out.println(lastIdleTime);
 			if (idleTimeMillis < lastIdleTime && lastIdleTime > IDLE_INTERVAL) {
 				// If we have an active task
 				ITask activeTask = TasksUi.getTaskActivityManager().getActiveTask();
 				if (activeTask != null && Activator.getValue(activeTask, Activator.START) != null) {
 					dialogIsOpen = true;
 					String startString = Activator.getValue(activeTask, Activator.START);
+					String tickString = Activator.getValue(activeTask, Activator.TICK);
 					LocalDateTime started = LocalDateTime.parse(startString);
+					LocalDateTime ticked = LocalDateTime.parse(tickString);
+					// Subtract the IDLE_INTERVAL time the computer _was_
+					// idle while counting up to the threshold. During this
+					// period fields were updated. Thus must be adjusted for.
+					ticked = ticked.minusNanos(IDLE_INTERVAL);
 					String time = DurationFormatUtils.formatDuration(lastIdleTime, "H:mm:ss", true);
+
 					StringBuilder sb = new StringBuilder();
 					if (activeTask.getTaskKey() != null) {
 						sb.append(activeTask.getTaskKey());
@@ -390,25 +373,16 @@ public class Activator extends AbstractUIPlugin {
 					sb.append(activeTask.getSummary());
 					MessageDialog md = new MessageDialog(Display.getCurrent().getActiveShell(), "Disregard idle time?",
 							null, MessageFormat.format(
-									"The computer has been idle for more than {0}. The active task \"{1}\" was started on {2}. Deactivate the task and disregard the idle time?",
+									"The computer has been idle since {0}, more than {1}. The active task \"{2}\" was started on {3}. Deactivate the task and disregard the idle time?",
+									ticked.format(DateTimeFormatter.ofPattern("EEE e, HH:mm", Locale.US)),
 									time, sb.toString(),
-									// TODO: Improve date formatting
 									started.format(DateTimeFormatter.ofPattern("EEE e, HH:mm", Locale.US))),
 									MessageDialog.QUESTION, new String[] { "No", "Yes" }, 1);
 					int open = md.open();
 					dialogIsOpen = false;
 					// Stop task, ignore idle time
 					if (open == 1) {
-						System.out.println("Task stopped and time cleared");
-						LocalDateTime stopped = LocalDateTime.now();
-						long seconds = started.until(stopped, ChronoUnit.SECONDS);
-						// Subtract the idle time
-						seconds = seconds - (lastIdleTime / 1000);
-						// Add to the total
-						accumulateTime(activeTask, startString, seconds);
-						// And clear the value
-						Activator.clearValue(activeTask, Activator.START);
-						// Stop the task
+						// TODO: Subtract IDLE_INTERVAL from active time
 						TasksUi.getTaskActivityManager().deactivateTask(activeTask);
 					}
 				}
@@ -416,7 +390,7 @@ public class Activator extends AbstractUIPlugin {
 		}
 	}
 
-	private void installIdleHandler() {
+	private void installTaxameter() {
 
 		switch (Platform.getOS()) {
 		case Platform.OS_MACOSX:
@@ -433,23 +407,24 @@ public class Activator extends AbstractUIPlugin {
 			break;
 		}
 
-		// Update the idle time variable every few seconds. If the system has
-		// been activated since the last time checked, and the activation
-		// listener has not been triggered we also need to handle reactivation.
-		// The frequent update is required as not to get into a race condition
-		// with the reactivation listener and not being able to detect the
-		// actual idle time. Worst case is SHORT_INTERVAL amount of time will
-		// not be accounted for.
 		final Display display = PlatformUI.getWorkbench().getDisplay();
 		handler = new Runnable() {
 			public void run() {
 				if (!display.isDisposed() && !PlatformUI.getWorkbench().isClosing()) {
 					long idleTimeMillis = detector.getIdleTimeMillis();
+					ITask task = TasksUi.getTaskActivityManager().getActiveTask();
 					if (idleTimeMillis < lastIdleTime && lastIdleTime > IDLE_INTERVAL) {
+						// Was idle on last check, reactivate
 						handleReactivation(idleTimeMillis);
+					} else if (task != null && lastIdleTime < IDLE_INTERVAL) {
+						// Currently not idle so accumulate spent time
+						LocalDate now = LocalDate.now();
+						accumulateTime(task, now.toString(), SHORT_INTERVAL / 1000);
 					}
 					lastIdleTime = idleTimeMillis;
-					System.out.println("Idle for " + lastIdleTime + "ms, dialog open is " + dialogIsOpen);
+					if (lastIdleTime > SHORT_INTERVAL) {
+						System.out.println("Idle for " + (lastIdleTime / 1000) + "s, dialog open is " + dialogIsOpen);
+					}
 					display.timerExec(SHORT_INTERVAL, this);
 				}
 			}
@@ -470,6 +445,33 @@ public class Activator extends AbstractUIPlugin {
 		};
 		display.addFilter(SWT.KeyUp, reactivationListener);
 		display.addFilter(SWT.MouseUp, reactivationListener);
+	}
+
+	/*
+	 * (non-Javadoc)
+	 *
+	 * @see
+	 * org.eclipse.ui.plugin.AbstractUIPlugin#start(org.osgi.framework.BundleContext
+	 * )
+	 */
+	@Override
+	public void start(BundleContext context) throws Exception {
+		super.start(context);
+		plugin = this;
+		installTaxameter();
+	}
+
+	/*
+	 * (non-Javadoc)
+	 *
+	 * @see
+	 * org.eclipse.ui.plugin.AbstractUIPlugin#stop(org.osgi.framework.BundleContext
+	 * )
+	 */
+	@Override
+	public void stop(BundleContext context) throws Exception {
+		plugin = null;
+		super.stop(context);
 	}
 
 }
