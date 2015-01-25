@@ -14,7 +14,7 @@ The task context menu contains an **Copy Details to HTML** entry. This will copy
 
 ### Tracking inactive time
 
-If you have an active task and go AFK, not touching the mouse or keyboard for more than one minute, the _Eclipse Timekeeper_ will start tracking idle time. As soon as you start doing something within the application where this plug-in is installed you will be presented a dialog where you can choose whether or not to disregard the idle time. Answer **Yes** and the task will be _deactivated_ and the time AFK will not be added to the total. **No** will perform no action, so the idle time will be added to the total. Note that the idle tracker is system wide, so activity in any application will not trigger the idle counter. 
+If you have an active task and go AFK, not touching the mouse or keyboard for more than five minutes, the _Eclipse Timekeeper_ will start tracking idle time. As soon as activity is detected again a dialog where you can choose whether or not to disregard the idle time will be displayed. Answer **Yes** and the task will be _deactivated_ and the time AFK will not be added to the total. **No** will perform no action, so the idle time will be added to the total. Note that the idle tracker is system wide, so activity in any application will not trigger the idle counter. 
 
 
 ## Supported repository types

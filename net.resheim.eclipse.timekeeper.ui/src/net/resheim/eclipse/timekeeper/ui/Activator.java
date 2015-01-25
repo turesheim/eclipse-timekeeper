@@ -15,6 +15,7 @@ import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.WeekFields;
 import java.util.Locale;
 
@@ -76,15 +77,12 @@ public class Activator extends AbstractUIPlugin {
 
 	private static final String PAIR_SEPARATOR = ";"; //$NON-NLS-1$
 
-	// The shared instance
 	private static Activator plugin;
 
-	// The plug-in ID
 	public static final String PLUGIN_ID = "net.resheim.eclipse.timekeeper.ui"; //$NON-NLS-1$
 
 	/**
-	 * Trigger time interval for asking whether or not to add idle time to the
-	 * elapsed task time. (1s)
+	 * Time interval for updating elapsed time on a task (1s)
 	 */
 	private static final int SHORT_INTERVAL = 1000;
 
@@ -92,6 +90,16 @@ public class Activator extends AbstractUIPlugin {
 
 	public static final String TICK = "tick"; //$NON-NLS-1$
 
+	/**
+	 * Accumulates a number of seconds to the task on the specified date.
+	 *
+	 * @param task
+	 *            the task to add to
+	 * @param dateString
+	 *            the date in ISO-8601 format (uuuu-MM-dd)
+	 * @param seconds
+	 *            the number of seconds to add
+	 */
 	public synchronized static void accumulateTime(ITask task, String dateString, long seconds) {
 		String accumulatedString = Activator.getValue(task, dateString);
 		if (accumulatedString != null) {
@@ -101,10 +109,36 @@ public class Activator extends AbstractUIPlugin {
 		} else {
 			Activator.setValue(task, dateString, Long.toString(seconds));
 		}
-		String now = LocalDateTime.now().toString();
-		Activator.setValue(task, TICK, now);
 	}
 
+	/**
+	 * Reduces the time on a task by the given amount of seconds.
+	 *
+	 * @param task
+	 *            the task to subtract from
+	 * @param dateString
+	 *            the date in ISO-8601 format (uuuu-MM-dd)
+	 * @param seconds
+	 *            the number of seconds to subtract
+	 */
+	public synchronized static void reduceTime(ITask task, String dateString, long seconds) {
+		String accumulatedString = Activator.getValue(task, dateString);
+		if (accumulatedString != null) {
+			long accumulated = Long.parseLong(accumulatedString);
+			accumulated = accumulated - seconds;
+			Activator.setValue(task, dateString, Long.toString(accumulated));
+		}
+	}
+
+	/**
+	 * Clears the given value. This will remove both the key and the value from
+	 * the task data.
+	 *
+	 * @param task
+	 *            the task to clear
+	 * @param key
+	 *            the key to remove
+	 */
 	public static void clearValue(ITask task, String key) {
 		StringBuilder sb = new StringBuilder();
 		String attribute = task.getAttribute(ATTR_ID);
@@ -352,11 +386,11 @@ public class Activator extends AbstractUIPlugin {
 		synchronized (this) {
 			if (idleTimeMillis < lastIdleTime && lastIdleTime > IDLE_INTERVAL) {
 				// If we have an active task
-				ITask activeTask = TasksUi.getTaskActivityManager().getActiveTask();
-				if (activeTask != null && Activator.getValue(activeTask, Activator.START) != null) {
+				ITask task = TasksUi.getTaskActivityManager().getActiveTask();
+				if (task != null && Activator.getValue(task, Activator.START) != null) {
 					dialogIsOpen = true;
-					String startString = Activator.getValue(activeTask, Activator.START);
-					String tickString = Activator.getValue(activeTask, Activator.TICK);
+					String startString = Activator.getValue(task, Activator.START);
+					String tickString = Activator.getValue(task, Activator.TICK);
 					LocalDateTime started = LocalDateTime.parse(startString);
 					LocalDateTime ticked = LocalDateTime.parse(tickString);
 					// Subtract the IDLE_INTERVAL time the computer _was_
@@ -366,11 +400,11 @@ public class Activator extends AbstractUIPlugin {
 					String time = DurationFormatUtils.formatDuration(lastIdleTime, "H:mm:ss", true);
 
 					StringBuilder sb = new StringBuilder();
-					if (activeTask.getTaskKey() != null) {
-						sb.append(activeTask.getTaskKey());
+					if (task.getTaskKey() != null) {
+						sb.append(task.getTaskKey());
 						sb.append(": ");
 					}
-					sb.append(activeTask.getSummary());
+					sb.append(task.getSummary());
 					MessageDialog md = new MessageDialog(Display.getCurrent().getActiveShell(), "Disregard idle time?",
 							null, MessageFormat.format(
 									"The computer has been idle since {0}, more than {1}. The active task \"{2}\" was started on {3}. Deactivate the task and disregard the idle time?",
@@ -380,10 +414,16 @@ public class Activator extends AbstractUIPlugin {
 									MessageDialog.QUESTION, new String[] { "No", "Yes" }, 1);
 					int open = md.open();
 					dialogIsOpen = false;
-					// Stop task, ignore idle time
 					if (open == 1) {
-						// TODO: Subtract IDLE_INTERVAL from active time
-						TasksUi.getTaskActivityManager().deactivateTask(activeTask);
+						// Stop task, subtract initial idle time
+						TasksUi.getTaskActivityManager().deactivateTask(task);
+						reduceTime(task, ticked.toLocalDate().toString(), IDLE_INTERVAL / 1000);
+					} else {
+						// Continue task, add idle time
+						LocalDateTime now = LocalDateTime.now();
+						long seconds = ticked.until(now, ChronoUnit.SECONDS);
+						accumulateTime(task, ticked.toLocalDate().toString(), seconds);
+						Activator.setValue(task, Activator.TICK, now.toString());
 					}
 				}
 			}
@@ -420,6 +460,7 @@ public class Activator extends AbstractUIPlugin {
 						// Currently not idle so accumulate spent time
 						LocalDate now = LocalDate.now();
 						accumulateTime(task, now.toString(), SHORT_INTERVAL / 1000);
+						Activator.setValue(task, Activator.TICK, now.toString());
 					}
 					lastIdleTime = idleTimeMillis;
 					if (lastIdleTime > SHORT_INTERVAL) {
