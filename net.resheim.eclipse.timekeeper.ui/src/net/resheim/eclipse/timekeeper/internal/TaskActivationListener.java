@@ -50,9 +50,10 @@ public class TaskActivationListener implements ITaskActivationListener {
 							+ ticked.format(DateTimeFormatter.ofPattern("EEE e, HH:mm", Locale.US))
 							+ ". Continue and add the elapsed time since (" + time + ") to the task total?");
 			if (confirm) {
-				Activator.accumulateTime(task, startString, seconds);
+				Activator.accumulateTime(task, startString, ticked.until(LocalDateTime.now(), ChronoUnit.MILLIS));
 			}
 		}
+		Activator.setValue(task, Activator.TICK, now.toString());
 		Activator.setValue(task, Activator.START, now.toString());
 	}
 

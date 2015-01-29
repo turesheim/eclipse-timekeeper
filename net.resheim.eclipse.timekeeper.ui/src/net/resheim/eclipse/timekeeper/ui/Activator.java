@@ -18,6 +18,8 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.WeekFields;
 import java.util.Locale;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import net.resheim.eclipse.timekeeper.internal.idle.GenericIdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.IdleTimeDetector;
@@ -57,7 +59,7 @@ public class Activator extends AbstractUIPlugin {
 	 * The time interval of no keyboard or mouse events after which the system
 	 * is considered idle (5 minutes).
 	 */
-	private static final int IDLE_INTERVAL = 300_000;
+	private static final int IDLE_INTERVAL = 60_000;
 
 	/** Task repository kind identifier for Bugzilla */
 	public static final String KIND_BUGZILLA = "bugzilla"; //$NON-NLS-1$
@@ -82,25 +84,37 @@ public class Activator extends AbstractUIPlugin {
 	public static final String PLUGIN_ID = "net.resheim.eclipse.timekeeper.ui"; //$NON-NLS-1$
 
 	/**
-	 * Time interval for updating elapsed time on a task (5s)
+	 * Time interval for updating elapsed time on a task (1s)
 	 */
-	private static final int SHORT_INTERVAL = 5000;
+	private static final int SHORT_INTERVAL = 1000;
 
 	public static final String START = "start"; //$NON-NLS-1$
 
 	public static final String TICK = "tick"; //$NON-NLS-1$
 
+	private static long remainder = 0;
+
 	/**
-	 * Accumulates a number of seconds to the task on the specified date.
+	 * Accumulates a number of seconds to the task on the specified date. The
+	 * amount is given in milliseconds which is used to handle passed time that
+	 * exceed the one second resolution that is used by the storage mechanism.
+	 * This will not be exact, however the difference is negligible and will be
+	 * at most one second in total.
 	 *
 	 * @param task
 	 *            the task to add to
 	 * @param dateString
 	 *            the date in ISO-8601 format (uuuu-MM-dd)
-	 * @param seconds
-	 *            the number of seconds to add
+	 * @param millis
+	 *            the number of milliseconds to add
 	 */
-	public synchronized static void accumulateTime(ITask task, String dateString, long seconds) {
+	public synchronized static void accumulateTime(ITask task, String dateString, long millis) {
+		millis = millis + remainder;
+		long seconds = millis / 1000;
+		remainder = millis - (seconds * 1000);
+		if (seconds == 0) {
+			return;
+		}
 		String accumulatedString = Activator.getValue(task, dateString);
 		if (accumulatedString != null) {
 			long accumulated = Long.parseLong(accumulatedString);
@@ -346,8 +360,6 @@ public class Activator extends AbstractUIPlugin {
 	boolean dialogIsOpen = false;
 	private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEE d").withLocale(Locale.US);
 
-	private Runnable handler;
-
 	private Listener reactivationListener;
 
 	/**
@@ -378,6 +390,11 @@ public class Activator extends AbstractUIPlugin {
 		return headings;
 	}
 
+	/**
+	 * Must be called by the UI-thread
+	 *
+	 * @param idleTimeMillis
+	 */
 	private void handleReactivation(long idleTimeMillis) {
 		// We want only one dialog open.
 		if (dialogIsOpen) {
@@ -389,10 +406,10 @@ public class Activator extends AbstractUIPlugin {
 				ITask task = TasksUi.getTaskActivityManager().getActiveTask();
 				if (task != null && Activator.getValue(task, Activator.START) != null) {
 					dialogIsOpen = true;
-					String startString = Activator.getValue(task, Activator.START);
 					String tickString = Activator.getValue(task, Activator.TICK);
-					LocalDateTime started = LocalDateTime.parse(startString);
+					LocalDateTime started = getActiveSince();
 					LocalDateTime ticked = LocalDateTime.parse(tickString);
+					LocalDateTime lastTick = ticked;
 					// Subtract the IDLE_INTERVAL time the computer _was_
 					// idle while counting up to the threshold. During this
 					// period fields were updated. Thus must be adjusted for.
@@ -408,9 +425,9 @@ public class Activator extends AbstractUIPlugin {
 					MessageDialog md = new MessageDialog(Display.getCurrent().getActiveShell(), "Disregard idle time?",
 							null, MessageFormat.format(
 									"The computer has been idle since {0}, more than {1}. The active task \"{2}\" was started on {3}. Deactivate the task and disregard the idle time?",
-									ticked.format(DateTimeFormatter.ofPattern("EEE e, HH:mm", Locale.US)),
+									ticked.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US)),
 									time, sb.toString(),
-									started.format(DateTimeFormatter.ofPattern("EEE e, HH:mm", Locale.US))),
+									started.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US))),
 									MessageDialog.QUESTION, new String[] { "No", "Yes" }, 1);
 					int open = md.open();
 					dialogIsOpen = false;
@@ -421,9 +438,7 @@ public class Activator extends AbstractUIPlugin {
 					} else {
 						// Continue task, add idle time
 						LocalDateTime now = LocalDateTime.now();
-						long seconds = ticked.until(now, ChronoUnit.SECONDS);
-						MessageDialog.openInformation(Display.getCurrent().getActiveShell(), "Time added", MessageFormat
-								.format("Added {0} to task.",DurationFormatUtils.formatDuration(seconds * 1000, "H:mm:ss", true)));
+						long seconds = lastTick.until(now, ChronoUnit.MILLIS);
 						accumulateTime(task, ticked.toLocalDate().toString(), seconds);
 						Activator.setValue(task, Activator.TICK, now.toString());
 					}
@@ -447,15 +462,15 @@ public class Activator extends AbstractUIPlugin {
 	}
 
 	/**
-	 * Returns the number of seconds the active task has been active
+	 * Returns the number of milliseconds the active task has been active
 	 *
-	 * @return the active seconds or "0"
+	 * @return the active milliseconds or "0"
 	 */
 	public long getActiveTime() {
 		LocalDateTime activeSince = getActiveSince();
 		if (activeSince != null) {
 			LocalDateTime now = LocalDateTime.now();
-			return activeSince.until(now, ChronoUnit.SECONDS);
+			return activeSince.until(now, ChronoUnit.MILLIS);
 		}
 		return 0;
 	}
@@ -508,27 +523,30 @@ public class Activator extends AbstractUIPlugin {
 			break;
 		}
 
-		final Display display = PlatformUI.getWorkbench().getDisplay();
-		handler = new Runnable() {
+		Timer timer = new Timer("Timekeeper", true);
+		timer.scheduleAtFixedRate(new TimerTask() {
+			@Override
 			public void run() {
-				if (!display.isDisposed() && !PlatformUI.getWorkbench().isClosing()) {
+				if (!PlatformUI.getWorkbench().isClosing()) {
 					long idleTimeMillis = detector.getIdleTimeMillis();
 					ITask task = TasksUi.getTaskActivityManager().getActiveTask();
-					if (idleTimeMillis < lastIdleTime && lastIdleTime > IDLE_INTERVAL) {
-						// Was idle on last check, reactivate
-						handleReactivation(idleTimeMillis);
-					} else if (task != null && lastIdleTime < IDLE_INTERVAL) {
-						// Currently not idle so accumulate spent time
-						LocalDateTime now = LocalDateTime.now();
-						accumulateTime(task, now.toLocalDate().toString(), SHORT_INTERVAL / 1000);
-						Activator.setValue(task, Activator.TICK, now.toString());
+					if (null != task) {
+						if (idleTimeMillis < lastIdleTime && lastIdleTime > IDLE_INTERVAL) {
+							// Was idle on last check, reactivate
+							Display.getDefault().syncExec(() -> handleReactivation(idleTimeMillis));
+						} else if (lastIdleTime < IDLE_INTERVAL) {
+							String tickString = Activator.getValue(task, Activator.TICK);
+							LocalDateTime now = LocalDateTime.now();
+							LocalDateTime ticked = LocalDateTime.parse(tickString);
+							// Currently not idle so accumulate spent time
+							accumulateTime(task, now.toLocalDate().toString(), ticked.until(now, ChronoUnit.MILLIS));
+							Activator.setValue(task, Activator.TICK, now.toString());
+						}
 					}
 					lastIdleTime = idleTimeMillis;
-					display.timerExec(SHORT_INTERVAL, this);
 				}
 			}
-		};
-		display.timerExec(SHORT_INTERVAL, handler);
+		}, SHORT_INTERVAL, SHORT_INTERVAL);
 
 		// Immediately run the idle handler if the system has been idle and
 		// the user has pressed a key or mouse button _inside_ the running
@@ -542,6 +560,7 @@ public class Activator extends AbstractUIPlugin {
 				lastIdleTime = idleTimeMillis;
 			}
 		};
+		final Display display = PlatformUI.getWorkbench().getDisplay();
 		display.addFilter(SWT.KeyUp, reactivationListener);
 		display.addFilter(SWT.MouseUp, reactivationListener);
 	}
