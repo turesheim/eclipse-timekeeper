@@ -82,9 +82,9 @@ public class Activator extends AbstractUIPlugin {
 	public static final String PLUGIN_ID = "net.resheim.eclipse.timekeeper.ui"; //$NON-NLS-1$
 
 	/**
-	 * Time interval for updating elapsed time on a task (1s)
+	 * Time interval for updating elapsed time on a task (5s)
 	 */
-	private static final int SHORT_INTERVAL = 1000;
+	private static final int SHORT_INTERVAL = 5000;
 
 	public static final String START = "start"; //$NON-NLS-1$
 
@@ -422,12 +422,73 @@ public class Activator extends AbstractUIPlugin {
 						// Continue task, add idle time
 						LocalDateTime now = LocalDateTime.now();
 						long seconds = ticked.until(now, ChronoUnit.SECONDS);
+						MessageDialog.openInformation(Display.getCurrent().getActiveShell(), "Time added", MessageFormat
+								.format("Added {0} to task.",DurationFormatUtils.formatDuration(seconds * 1000, "H:mm:ss", true)));
 						accumulateTime(task, ticked.toLocalDate().toString(), seconds);
 						Activator.setValue(task, Activator.TICK, now.toString());
 					}
 				}
 			}
 		}
+	}
+
+	/**
+	 * Returns <code>true</code> if the session is considered idle. Note that if
+	 * no task is active, the session will never be considered idle.
+	 *
+	 * @return <code>true</code> if idle
+	 */
+	public boolean isIdle(){
+		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
+		if (task != null && Activator.getValue(task, Activator.START) != null) {
+			return lastIdleTime > IDLE_INTERVAL;
+		}
+		return false;
+	}
+
+	/**
+	 * Returns the number of seconds the active task has been active
+	 *
+	 * @return the active seconds or "0"
+	 */
+	public long getActiveTime() {
+		LocalDateTime activeSince = getActiveSince();
+		if (activeSince != null) {
+			LocalDateTime now = LocalDateTime.now();
+			return activeSince.until(now, ChronoUnit.SECONDS);
+		}
+		return 0;
+	}
+
+	/**
+	 * Returns the current active time, or <code>null</code> if a task has not
+	 * been started.
+	 *
+	 * @return the active time or <code>null</code>
+	 */
+	public LocalDateTime getActiveSince() {
+		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
+		if (task != null) {
+			String startString = Activator.getValue(task, Activator.START);
+			LocalDateTime started = LocalDateTime.parse(startString);
+			return started;
+		}
+		return null;
+	}
+
+	/**
+	 *
+	 * @return
+	 */
+	public LocalDateTime getIdleSince() {
+		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
+		if (task != null && Activator.getValue(task, Activator.START) != null) {
+			String tickString = Activator.getValue(task, Activator.TICK);
+			LocalDateTime ticked = LocalDateTime.parse(tickString);
+			ticked = ticked.minusNanos(IDLE_INTERVAL);
+			return ticked;
+		}
+		return null;
 	}
 
 	private void installTaxameter() {
@@ -458,14 +519,11 @@ public class Activator extends AbstractUIPlugin {
 						handleReactivation(idleTimeMillis);
 					} else if (task != null && lastIdleTime < IDLE_INTERVAL) {
 						// Currently not idle so accumulate spent time
-						LocalDate now = LocalDate.now();
-						accumulateTime(task, now.toString(), SHORT_INTERVAL / 1000);
+						LocalDateTime now = LocalDateTime.now();
+						accumulateTime(task, now.toLocalDate().toString(), SHORT_INTERVAL / 1000);
 						Activator.setValue(task, Activator.TICK, now.toString());
 					}
 					lastIdleTime = idleTimeMillis;
-					if (lastIdleTime > SHORT_INTERVAL) {
-						System.out.println("Idle for " + (lastIdleTime / 1000) + "s, dialog open is " + dialogIsOpen);
-					}
 					display.timerExec(SHORT_INTERVAL, this);
 				}
 			}

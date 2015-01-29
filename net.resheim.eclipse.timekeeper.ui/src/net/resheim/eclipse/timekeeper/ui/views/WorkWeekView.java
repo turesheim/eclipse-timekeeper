@@ -12,7 +12,9 @@
 
 package net.resheim.eclipse.timekeeper.ui.views;
 
+import java.text.MessageFormat;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.WeekFields;
 import java.util.List;
@@ -93,7 +95,8 @@ import org.eclipse.ui.part.ViewPart;
 @SuppressWarnings("restriction")
 public class WorkWeekView extends ViewPart {
 
-	final WeeklySummary summary = new WeeklySummary();
+	/** Update the status field every 30 seconds */
+	private static final int UPDATE_INTERVAL = 1_000;
 
 	private final class ViewerComparatorExtension extends ViewerComparator {
 		@Override
@@ -129,20 +132,19 @@ public class WorkWeekView extends ViewPart {
 
 		@Override
 		public Font getFont(Object element) {
-			if (element instanceof ITask){
+			if (element instanceof ITask) {
 				if (((ITask) element).isActive()) {
-					return JFaceResources.getFontRegistry().getBold(
-							JFaceResources.DIALOG_FONT);
+					return JFaceResources.getFontRegistry().getBold(JFaceResources.DIALOG_FONT);
 				}
 			}
-			if (element instanceof String){
+			if (element instanceof String) {
 				String p = (String) element;
-				if (contentProvider.getFiltered()
+				if (contentProvider
+						.getFiltered()
 						.stream()
 						.filter(t -> p.equals(Activator.getProjectName(t)))
-						.anyMatch(t -> t.isActive())){
-					return JFaceResources.getFontRegistry().getBold(
-							JFaceResources.DIALOG_FONT);
+						.anyMatch(t -> t.isActive())) {
+					return JFaceResources.getFontRegistry().getBold(JFaceResources.DIALOG_FONT);
 				}
 
 			}
@@ -225,12 +227,6 @@ public class WorkWeekView extends ViewPart {
 					sb.append(": ");
 				}
 				sb.append(task.getSummary());
-				if (task.isActive()){
-					sb.append(" (Started ");
-					System.out.println(Activator.getStartTime(task));
-					sb.append(timeFormat.format(Activator.getStartTime(task)));
-					sb.append(")");
-				}
 				return sb.toString();
 			}
 			if (element instanceof WeeklySummary) {
@@ -346,13 +342,47 @@ public class WorkWeekView extends ViewPart {
 						} else {
 							viewer.update(element, null);
 							viewer.update(Activator.getProjectName(task), null);
-							viewer.update(summary, null);
+							viewer.update(AbstractContentProvider.WEEKLY_SUMMARY, null);
 						}
 					}
 				}
 			}
 		}
 
+	}
+
+	private void installStatusUpdater() {
+		final Display display = PlatformUI.getWorkbench().getDisplay();
+		Runnable handler = new Runnable() {
+			public void run() {
+				if (!display.isDisposed() && !PlatformUI.getWorkbench().isClosing() && !statusLabel.isDisposed()) {
+					if (!viewer.isCellEditorActive()) {
+						ITask activeTask = TasksUi.getTaskActivityManager().getActiveTask();
+						if (Activator.getDefault().isIdle()) {
+							statusLabel.setText("Idle since "
+									+ timeFormat.format(Activator.getDefault().getIdleSince()));
+							viewer.refresh(activeTask);
+							viewer.refresh(contentProvider.getParent(activeTask));
+							viewer.refresh(AbstractContentProvider.WEEKLY_SUMMARY);
+						} else if (Activator.getDefault().getActiveTime() > 0) {
+							long activeTime = Activator.getDefault().getActiveTime();
+							LocalDateTime activeSince = Activator.getDefault().getActiveSince();
+							statusLabel.setText(MessageFormat.format("Active since {0}, {1} elapsed",
+									timeFormat.format(activeSince),
+									DurationFormatUtils.formatDurationWords(activeTime * 1000, true, true)));
+
+							viewer.refresh(activeTask);
+							viewer.refresh(contentProvider.getParent(activeTask));
+							viewer.refresh(AbstractContentProvider.WEEKLY_SUMMARY);
+						} else {
+							statusLabel.setText("");
+						}
+					}
+					display.timerExec(UPDATE_INTERVAL, this);
+				}
+			}
+		};
+		display.timerExec(UPDATE_INTERVAL, handler);
 	}
 
 	private class ViewContentProvider extends AbstractContentProvider {
@@ -425,6 +455,8 @@ public class WorkWeekView extends ViewPart {
 
 	private AbstractContentProvider contentProvider;
 
+	private Text statusLabel;
+
 	/**
 	 * The constructor.
 	 */
@@ -450,7 +482,7 @@ public class WorkWeekView extends ViewPart {
 		Composite main = ft.createComposite(root);
 		ft.adapt(main);
 		root.setContent(main);
-		GridLayout layout2 = new GridLayout(2, false);
+		GridLayout layout2 = new GridLayout(3, false);
 		layout2.horizontalSpacing = 0;
 		main.setLayout(layout2);
 
@@ -478,13 +510,21 @@ public class WorkWeekView extends ViewPart {
 			}
 		});
 
+		statusLabel = new Text(main, SWT.NONE);
+		GridData gdStatusLabel = new GridData();
+		gdStatusLabel.grabExcessHorizontalSpace = true;
+		gdStatusLabel.horizontalAlignment = SWT.FILL;
+		gdStatusLabel.verticalIndent = 3;
+		gdStatusLabel.verticalAlignment = SWT.BEGINNING;
+		statusLabel.setLayoutData(gdStatusLabel);
+
 		viewer = new TreeViewer(main, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION);
 		// Make the tree view provide selections
 		getSite().setSelectionProvider(viewer);
 		contentProvider = new ViewContentProvider();
 		viewer.setContentProvider(contentProvider);
 		GridData layoutData = new GridData(SWT.FILL, SWT.FILL, true, true);
-		layoutData.horizontalSpan = 2;
+		layoutData.horizontalSpan = 3;
 		viewer.getControl().setLayoutData(layoutData);
 
 		createTitleColumn();
@@ -512,6 +552,7 @@ public class WorkWeekView extends ViewPart {
 		viewer.setInput(getViewSite());
 		// Force a redraw so content is visible
 		root.pack();
+		installStatusUpdater();
 	}
 
 	private TreeViewerColumn createTableViewerColumn(String title, int bound, final int colNumber) {
@@ -622,7 +663,8 @@ public class WorkWeekView extends ViewPart {
 			return 0;
 		}
 		return filtered
-				.stream().mapToInt(t -> Activator.getActiveTime(t, date))
+				.stream()
+				.mapToInt(t -> Activator.getActiveTime(t, date))
 				.sum();
 	}
 
@@ -637,10 +679,8 @@ public class WorkWeekView extends ViewPart {
 	 * @return the total amount of seconds accumulated
 	 */
 	private int getSum(List<ITask> filtered, LocalDate date, String project) {
-		return filtered
-				.stream()
-				.filter(t -> project.equals(Activator.getProjectName(t))).mapToInt(t -> Activator.getActiveTime(t, date))
-				.sum();
+		return filtered.stream().filter(t -> project.equals(Activator.getProjectName(t)))
+				.mapToInt(t -> Activator.getActiveTime(t, date)).sum();
 	}
 
 	private void hookContextMenu() {

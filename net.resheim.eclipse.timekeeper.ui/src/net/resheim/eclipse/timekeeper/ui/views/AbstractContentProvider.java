@@ -24,6 +24,8 @@ import org.eclipse.mylyn.tasks.core.ITask;
 @SuppressWarnings("restriction")
 public abstract class AbstractContentProvider implements ITreeContentProvider {
 
+	public static final WeeklySummary WEEKLY_SUMMARY = new WeeklySummary();
+
 	protected List<ITask> filtered;
 	private LocalDate firstDayOfWeek;
 
@@ -54,7 +56,7 @@ public abstract class AbstractContentProvider implements ITreeContentProvider {
 		}
 		Object[] elements = new Object[projects.length+1];
 		System.arraycopy(projects, 0, elements, 0, projects.length);
-		elements[projects.length] = new WeeklySummary();
+		elements[projects.length] = WEEKLY_SUMMARY;
 		return elements;
 	}
 
