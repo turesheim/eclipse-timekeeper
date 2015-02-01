@@ -72,11 +72,15 @@ import org.eclipse.mylyn.tasks.ui.TasksUiImages;
 import org.eclipse.mylyn.tasks.ui.TasksUiUtil;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.ScrolledComposite;
+import org.eclipse.swt.events.ControlAdapter;
+import org.eclipse.swt.events.ControlEvent;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.graphics.Point;
+import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
@@ -84,6 +88,7 @@ import org.eclipse.swt.widgets.DateTime;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.Text;
+import org.eclipse.swt.widgets.Tree;
 import org.eclipse.swt.widgets.TreeColumn;
 import org.eclipse.ui.IActionBars;
 import org.eclipse.ui.ISharedImages;
@@ -533,9 +538,31 @@ public class WorkWeekView extends ViewPart {
 			createTimeColumn(i);
 		}
 
+		Tree tree = viewer.getTree();
 		viewer.setComparator(new ViewerComparatorExtension());
-		viewer.getTree().setHeaderVisible(true);
-		viewer.getTree().setLinesVisible(true);
+		tree.setHeaderVisible(true);
+		tree.setLinesVisible(true);
+
+		// Adjust column width when view is resized
+		root.addControlListener(new ControlAdapter() {
+			@Override
+			public void controlResized(ControlEvent e) {
+				Rectangle area = root.getClientArea();
+				int width = area.width - 2 * tree.getBorderWidth();
+				Point vBarSize = tree.getVerticalBar().getSize();
+				width -= vBarSize.x;
+				TreeColumn[] columns = tree.getColumns();
+				int cwidth = 0;
+				for (int i = 1; i < columns.length; i++) {
+					columns[i].pack();
+					if (columns[i].getWidth()<50){
+						columns[i].setWidth(50);
+					}
+					cwidth += columns[i].getWidth();
+				}
+				tree.getColumns()[0].setWidth(width - cwidth);
+			}
+		});
 
 		// Determine the first date of the week
 		LocalDate date = LocalDate.now();
