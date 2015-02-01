@@ -1,6 +1,4 @@
-target "Eclipse Timekeeper Target Platform"
-
-with source requirements
+target "Eclipse Timekeeper Target Platform" with source requirements
 
 location "http://download.eclipse.org/eclipse/updates/3.8" {
     org.eclipse.equinox.p2.sdk.feature.group
@@ -8,10 +6,29 @@ location "http://download.eclipse.org/eclipse/updates/3.8" {
     org.eclipse.pde.core 3.8.0
 }
 
-location "http://download.eclipse.org/mylyn/releases/latest" {
- org.eclipse.mylyn.tasks.core
- org.eclipse.mylyn.tasks.ui
- org.apache.commons.lang
- org.eclipse.mylyn.bugzilla.core
- org.eclipse.mylyn.commons.ui
+// Base dependencies
+location "http://download.eclipse.org/releases/luna/" {
+    org.eclipse.emf.ecore
+    org.eclipse.emf.ecore.xmi
+    org.eclipse.emf.ecore.change
+    org.eclipse.emf.common
+    org.apache.log4j
+    org.apache.commons.collections
 }
+
+location "http://download.eclipse.org/technology/swtbot/releases/2.2.1/" {
+    org.eclipse.swtbot.forms.source.feature.group
+    org.eclipse.swtbot.eclipse.source.feature.group
+    org.eclipse.swtbot.source.feature.group
+    org.hamcrest.library
+    org.hamcrest.core
+}
+
+location "http://download.eclipse.org/mylyn/releases/latest" {
+    org.eclipse.mylyn.tasks.core
+    org.eclipse.mylyn.tasks.ui
+    org.apache.commons.lang
+    org.eclipse.mylyn.bugzilla.core
+    org.eclipse.mylyn.commons.ui
+}
+
