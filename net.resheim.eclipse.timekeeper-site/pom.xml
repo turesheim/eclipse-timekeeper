@@ -22,6 +22,14 @@
 				<configuration>
 					<repositoryName>Eclipse Timekeeper</repositoryName>
 					<finalName>${project.groupId}-${unqualifiedVersion}.${buildQualifier}</finalName>
+					<additionalFileSets>
+						<fileSet>
+							<directory>${basedir}/resources</directory>
+							<includes>
+								<include>**/*.html</include>
+							</includes>
+						</fileSet>
+					</additionalFileSets>
 				</configuration>
 			</plugin>
 		</plugins>
