@@ -274,7 +274,9 @@ public class WorkWeekView extends ViewPart {
 
 				@Override
 				public void run() {
-					viewer.setInput(getViewSite());
+					if (!viewer.getControl().isDisposed()) {
+						viewer.setInput(getViewSite());
+					}
 				}
 			});
 		}
@@ -364,7 +366,8 @@ public class WorkWeekView extends ViewPart {
 					if (!viewer.isCellEditorActive()) {
 						ITask activeTask = TasksUi.getTaskActivityManager().getActiveTask();
 						if (Activator.getDefault().isIdle()) {
-							statusLabel.setText("Idle since "+ timeFormat2.format(Activator.getDefault().getIdleSince()));
+							statusLabel.setText("Idle since "
+									+ timeFormat.format(Activator.getDefault().getIdleSince()));
 							viewer.refresh(activeTask);
 							viewer.refresh(contentProvider.getParent(activeTask));
 							viewer.refresh(AbstractContentProvider.WEEKLY_SUMMARY);
@@ -372,7 +375,7 @@ public class WorkWeekView extends ViewPart {
 							long activeTime = Activator.getDefault().getActiveTime();
 							LocalDateTime activeSince = Activator.getDefault().getActiveSince();
 							statusLabel.setText(MessageFormat.format("Active since {0}, {1} elapsed",
-									timeFormat2.format(activeSince),
+									timeFormat.format(activeSince),
 									DurationFormatUtils.formatDurationWords(activeTime, true, true)));
 
 							viewer.refresh(activeTask);
@@ -432,9 +435,7 @@ public class WorkWeekView extends ViewPart {
 
 	private static final DateTimeFormatter weekFormat = DateTimeFormatter.ofPattern("w");
 
-	private static final DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("EEEE HH:mm", Locale.ENGLISH);
-
-	private static final DateTimeFormatter timeFormat2 = DateTimeFormatter.ofPattern("EEEE HH:mm:ss", Locale.ENGLISH);
+	private static final DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("EEEE HH:mm:ss", Locale.ENGLISH);
 
 	private Action previousWeekAction;
 
@@ -613,7 +614,7 @@ public class WorkWeekView extends ViewPart {
 					seconds = getSum(contentProvider.getFiltered(), date);
 				}
 				if (seconds > 0) {
-					return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm:ss", true);
+					return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
 				}
 				return "";
 			}
