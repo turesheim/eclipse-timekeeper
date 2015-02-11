@@ -15,3 +15,6 @@ target/
 
 # Backup files
 *~
+
+# OSX Metadata
+.DS_Store
