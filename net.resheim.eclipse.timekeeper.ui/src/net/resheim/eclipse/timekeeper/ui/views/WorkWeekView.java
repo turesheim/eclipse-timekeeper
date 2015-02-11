@@ -439,6 +439,8 @@ public class WorkWeekView extends ViewPart {
 
 	private Action previousWeekAction;
 
+	private Action currentWeekAction;
+
 	private Action nextWeekAction;
 
 	private Action doubleClickAction;
@@ -468,6 +470,13 @@ public class WorkWeekView extends ViewPart {
 	 * The constructor.
 	 */
 	public WorkWeekView() {
+	}
+
+	private LocalDate calculateFirstDayOfWeek(LocalDate date) {
+		WeekFields weekFields = WeekFields.of(Locale.getDefault());
+		int day = date.get(weekFields.dayOfWeek());
+		LocalDate firstDayOfWeek = date.minusDays(day - 1);
+		return firstDayOfWeek;
 	}
 
 	private void contributeToActionBars() {
@@ -510,9 +519,7 @@ public class WorkWeekView extends ViewPart {
 			public void widgetSelected(SelectionEvent event) {
 				// Determine the first date of the week
 				LocalDate date = LocalDate.of(dateChooser.getYear(), dateChooser.getMonth() + 1, dateChooser.getDay());
-				WeekFields weekFields = WeekFields.of(Locale.getDefault());
-				int day = date.get(weekFields.dayOfWeek());
-				contentProvider.setFirstDayOfWeek(date.minusDays(day - 1));
+				contentProvider.setFirstDayOfWeek(calculateFirstDayOfWeek(date));
 				viewer.setInput(this);
 			}
 		});
@@ -659,6 +666,7 @@ public class WorkWeekView extends ViewPart {
 		manager.add(exportAction);
 		manager.add(new Separator());
 		manager.add(previousWeekAction);
+		manager.add(currentWeekAction);
 		manager.add(nextWeekAction);
 	}
 
@@ -760,6 +768,17 @@ public class WorkWeekView extends ViewPart {
 		previousWeekAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
 				.getImageDescriptor(ISharedImages.IMG_TOOL_BACK));
 
+		currentWeekAction = new Action() {
+			@Override
+			public void run() {
+				contentProvider.setFirstDayOfWeek(calculateFirstDayOfWeek(LocalDate.now()));
+				viewer.setInput(getViewSite());
+			}
+		};
+		currentWeekAction.setText("Current Week");
+		currentWeekAction.setToolTipText("Show current week");
+		currentWeekAction.setImageDescriptor(Activator.getImageDescriptor("icons/full/elcl16/cur_nav.png"));
+
 		nextWeekAction = new Action() {
 			@Override
 			public void run() {
@@ -771,6 +790,7 @@ public class WorkWeekView extends ViewPart {
 		nextWeekAction.setToolTipText("Show next week");
 		nextWeekAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
 				.getImageDescriptor(ISharedImages.IMG_TOOL_FORWARD));
+
 
 		doubleClickAction = new Action() {
 			@Override
@@ -862,7 +882,7 @@ public class WorkWeekView extends ViewPart {
 	@Override
 	public void setFocus() {
 		viewer.getControl().setFocus();
-		IContextService contextService = (IContextService) PlatformUI.getWorkbench().getService(IContextService.class);
+		IContextService contextService = (IContextService)PlatformUI.getWorkbench().getService(IContextService.class);
 		contextService.activateContext("net.resheim.eclipse.timekeeper.ui.workweek");
 	}
 
