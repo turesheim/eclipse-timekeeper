@@ -2,15 +2,15 @@
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0" y="0" width="16" height="16" viewBox="0, 0, 16, 16">
   <defs>
-    <linearGradient id="Gradient_1" gradientUnits="userSpaceOnUse" x1="7.838" y1="9.407" x2="7.838" y2="0.007">
-      <stop offset="0" stop-color="#FBDD83"/>
-      <stop offset="1" stop-color="#FEFDEF"/>
+    <linearGradient id="Gradient_1" gradientUnits="userSpaceOnUse" x1="7.338" y1="-0.493" x2="7.338" y2="8.907">
+      <stop offset="0.502" stop-color="#FFFFEE"/>
+      <stop offset="1" stop-color="#FBDD83"/>
     </linearGradient>
   </defs>
   <g id="Layer_1">
     <g>
-      <path d="M8,13 C5.239,13 3,10.761 3,8 C3,5.239 5.239,3 8,3 C10.761,3 13,5.239 13,8 C13,10.761 10.761,13 8,13 z" fill="url(#Gradient_1)"/>
-      <path d="M8,13 C5.239,13 3,10.761 3,8 C3,5.239 5.239,3 8,3 C10.761,3 13,5.239 13,8 C13,10.761 10.761,13 8,13 z" fill-opacity="0" stroke="#B27813" stroke-width="1"/>
+      <path d="M7.5,12.5 C4.739,12.5 2.5,10.261 2.5,7.5 C2.5,4.739 4.739,2.5 7.5,2.5 C10.261,2.5 12.5,4.739 12.5,7.5 C12.5,10.261 10.261,12.5 7.5,12.5 z" fill="url(#Gradient_1)"/>
+      <path d="M7.5,12.5 C4.739,12.5 2.5,10.261 2.5,7.5 C2.5,4.739 4.739,2.5 7.5,2.5 C10.261,2.5 12.5,4.739 12.5,7.5 C12.5,10.261 10.261,12.5 7.5,12.5 z" fill-opacity="0" stroke="#B27813" stroke-width="1"/>
     </g>
   </g>
 </svg>
