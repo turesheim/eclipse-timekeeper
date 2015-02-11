@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <?pde?>
 <!-- generated with https://github.com/mbarbero/fr.obeo.releng.targetplatform -->
-<target name="Eclipse Timekeeper Target Platform" sequenceNumber="1422619568">
+<target name="Eclipse Timekeeper Target Platform" sequenceNumber="1423642668">
   <locations>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
       <unit id="org.eclipse.equinox.p2.sdk.feature.group" version="3.8.0.v20120913-155553-9N89H_oGMMn84_uucqpkwz0bBdLL"/>
@@ -27,11 +27,11 @@
       <repository location="http://download.eclipse.org/technology/swtbot/releases/2.2.1/"/>
     </location>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
-      <unit id="org.eclipse.mylyn.tasks.core" version="3.14.0.v20141030-2213"/>
-      <unit id="org.eclipse.mylyn.tasks.ui" version="3.14.0.v20141030-2213"/>
+      <unit id="org.eclipse.mylyn.tasks.core" version="3.14.1.v20150126-2142"/>
+      <unit id="org.eclipse.mylyn.tasks.ui" version="3.14.1.v20150126-2142"/>
       <unit id="org.apache.commons.lang" version="2.6.0.v201404270220"/>
-      <unit id="org.eclipse.mylyn.bugzilla.core" version="3.14.0.v20140930-1847"/>
-      <unit id="org.eclipse.mylyn.commons.ui" version="3.14.0.v20140929-1821"/>
+      <unit id="org.eclipse.mylyn.bugzilla.core" version="3.14.1.v20150126-2142"/>
+      <unit id="org.eclipse.mylyn.commons.ui" version="3.14.1.v20150126-2107"/>
       <repository location="http://download.eclipse.org/mylyn/releases/latest"/>
     </location>
   </locations>
