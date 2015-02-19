@@ -6,15 +6,15 @@ This is a simple time-tracking plug-in integrating with [Eclipse Mylyn](http://e
 
 Whenever a task is *activated* in Mylyn it will automatically show up in the **Workweek** view with a bold label, and the amount of time the task is active will be tracked. When the task is *deactivated* the active time is added to the total for the task on the particular day. It is also possible to manually edit the time by clicking into the cell. If a number is typed, such as *45*, it will be translated into minutes and show up as *0:45*. If a decimal number is entered, for example *1.5*, it will be translated to *1:30*. The decimal separator can be either "," or ".".
 
-If a tasks active when Eclipse is closed you will be asked whether or not to add the duration in between when Eclipse is started again. If you answer **Yes** the time will be added to the total for the starting date. If you answer **Cancel** no time is added.
+If a task is active when Eclipse is closed you will be asked whether or not to add the duration in between when Eclipse is started again. If you answer **Yes** the time will be added to the total for the starting date. If you answer **Cancel** no time is added.
 
 The context menu and toolbar buttons can be used to browse back and forward by one week. The current locale is used to determine week numbers. Left of the navigation buttons there is a button for copying the workweek in HTML format to the clipboard.
 
-The task context menu contains an **Copy Details to HTML** entry. This will copy the link and summary details as HTML to the clipboard.
+The task context menu contains an entry **Copy Details to HTML**. This will copy the link and summary details as HTML to the clipboard.
 
 ### Tracking inactive time
 
-If you have an active task and go AFK, not touching the mouse or keyboard for more than five minutes, the _Eclipse Timekeeper_ will start tracking idle time. As soon as activity is detected again a dialog where you can choose whether or not to disregard the idle time will be displayed. Answer **Yes** and the task will be _deactivated_ and the time AFK will not be added to the total. **No** will perform no action, so the idle time will be added to the total. Note that the idle tracker is system wide, so activity in any application will not trigger the idle counter. 
+If you have an active task and go AFK, not touching the mouse or keyboard for more than five minutes, the _Eclipse Timekeeper_ will start tracking idle time. As soon as activity is detected again a dialog will be displayed where you can choose whether or not to disregard the idle time. Answer **Yes** and the task will be _deactivated_ and the time AFK will not be added to the total. **No** will perform no action, so the idle time will be added to the total. Note that the idle tracker is system wide, so activity in any application will not trigger the idle counter. 
 
 
 ## Supported repository types
