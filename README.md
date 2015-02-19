@@ -26,7 +26,8 @@ Note that the timekeeping data are stored in the task repository so they follow 
 
 ## Installing
 
-There is currently no release from which you can install. Proceed to building yourself if so inclined.
+You can install from the <a href="http://marketplace.eclipse.org/content/timekeeper-eclipse">Eclipse Marketplace</a> or drag <a href="http://marketplace.eclipse.org/marketplace-client-intro?mpc_install=2196325" title="Drag and drop into a running Eclipse Indigo workspace to install OS X Quick Look for Eclipse"><img src="https://marketplace.eclipse.org/sites/all/modules/custom/marketplace/images/installbutton.png" style="border: 0px; margin:0px; padding:0px; vertical-align:bottom;"/>
+</a> into an running Eclipse instance.
 
 ## Building
 
