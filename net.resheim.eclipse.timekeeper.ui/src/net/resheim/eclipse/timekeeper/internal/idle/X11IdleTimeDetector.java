@@ -18,6 +18,7 @@
 
 package net.resheim.eclipse.timekeeper.internal.idle;
 
+import java.util.Arrays;
 import java.util.List;
 
 import com.sun.jna.Library;
@@ -68,19 +69,11 @@ public class X11IdleTimeDetector implements IdleTimeDetector
 		 */
 		public NativeLong event_mask;
 
+		@SuppressWarnings("rawtypes")
 		@Override
-		protected List<String> getFieldOrder() {
-			// ignore
-			return null;
+		protected List getFieldOrder() {
+			return Arrays.asList("window", "state", "kind", "til_or_since", "idle", "event_mask");
 		}
-
-		/*
-    @Override
-    protected List getFieldOrder()
-    {
-      return Arrays.asList("window", "state", "kind", "til_or_since", "idle", "event_mask");
-    }
-		 */
 	}
 
 	/**
