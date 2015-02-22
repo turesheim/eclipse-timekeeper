@@ -18,6 +18,7 @@
 
 package net.resheim.eclipse.timekeeper.internal.idle;
 
+import java.util.Arrays;
 import java.util.List;
 
 import com.sun.jna.Library;
@@ -44,10 +45,10 @@ public class WindowsIdleTimeDetector implements IdleTimeDetector
 		 */
 		public int dwTime;
 
+		@SuppressWarnings("rawtypes")
 		@Override
-		protected List<String> getFieldOrder() {
-			// ignore
-			return null;
+		protected List getFieldOrder() {
+			return Arrays.asList("cbSize", "dwTime");
 		}
 	}
 
