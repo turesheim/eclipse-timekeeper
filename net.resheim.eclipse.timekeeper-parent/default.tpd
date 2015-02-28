@@ -1,13 +1,10 @@
 target "Eclipse Timekeeper Target Platform" with source requirements
 
-location "http://download.eclipse.org/eclipse/updates/3.8" {
-    org.eclipse.equinox.p2.sdk.feature.group
-    org.eclipse.sdk.feature.group
-    org.eclipse.pde.core 3.8.0
-}
-
 // Base dependencies
 location "http://download.eclipse.org/releases/luna/" {
+    org.eclipse.equinox.p2.sdk.feature.group
+    org.eclipse.sdk.feature.group
+    org.eclipse.pde.core
     org.eclipse.emf.ecore
     org.eclipse.emf.ecore.xmi
     org.eclipse.emf.ecore.change
@@ -30,5 +27,9 @@ location "http://download.eclipse.org/mylyn/releases/latest" {
     org.apache.commons.lang
     org.eclipse.mylyn.bugzilla.core
     org.eclipse.mylyn.commons.ui
+}
+
+location "http://www.eclipse.org/swt/updates/4.4" {
+    org.eclipse.swt.tools
 }
 
