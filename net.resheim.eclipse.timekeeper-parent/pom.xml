@@ -10,10 +10,10 @@
 
 	<groupId>net.resheim.eclipse.timekeeper</groupId>
 	<artifactId>net.resheim.eclipse.timekeeper-parent</artifactId>
-	<version>1.0.0-SNAPSHOT</version>
+	<version>1.0.1-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
-	<name>Eclipse Utilities</name>
+	<name>Eclipse Timekeeper</name>
 
 	<issueManagement>
 		<url>https://github.com/turesheim/eclipse-timekeeper/issues</url>
@@ -70,7 +70,7 @@
 						<artifact>
 							<groupId>net.resheim.eclipse.timekeeper</groupId>
 							<artifactId>net.resheim.eclipse.timekeeper-parent</artifactId>
-							<version>1.0.0-SNAPSHOT</version>
+							<version>1.0.1-SNAPSHOT</version>
 							<classifier>default</classifier>
 						</artifact>
 					</target>
@@ -102,7 +102,31 @@
 							<arch>x86_64</arch>
 						</environment>
 					</environments>
+                    <pomDependencies>consider</pomDependencies>
 				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>build-helper-maven-plugin</artifactId>
+				<version>1.7</version>
+			</plugin>
+			<!-- computes git revision for manifest -->
+			<plugin>
+				<groupId>org.eclipse.tycho</groupId>
+				<artifactId>tycho-packaging-plugin</artifactId>
+				<version>${tycho.version}</version>
+				<configuration>
+					<archive>
+						<addMavenDescriptor>false</addMavenDescriptor>
+					</archive>
+				</configuration>
+				<dependencies>
+					<dependency>
+						<groupId>org.eclipse.tycho.extras</groupId>
+						<artifactId>tycho-sourceref-jgit</artifactId>
+						<version>${tycho.version}</version>
+					</dependency>
+				</dependencies>
 			</plugin>
 		</plugins>
 	</build>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <site>
-   <feature url="features/net.resheim.eclipse.timekeeper_1.0.0.qualifier.jar" id="net.resheim.eclipse.timekeeper" version="1.0.0.qualifier">
+   <feature url="features/net.resheim.eclipse.timekeeper_1.0.1.qualifier.jar" id="net.resheim.eclipse.timekeeper" version="1.0.1.qualifier">
       <category name="main"/>
    </feature>
    <category-def name="main" label="Eclipse Timekeeper">

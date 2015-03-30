@@ -8,11 +8,11 @@
 		<artifactId>net.resheim.eclipse.timekeeper-parent</artifactId>
 		<relativePath>../net.resheim.eclipse.timekeeper-parent/pom.xml</relativePath>
 		<groupId>net.resheim.eclipse.timekeeper</groupId>
-		<version>1.0.0-SNAPSHOT</version>
+		<version>1.0.1-SNAPSHOT</version>
 	</parent>
 
 	<artifactId>net.resheim.eclipse.timekeeper</artifactId>
 	<packaging>eclipse-feature</packaging>
-	<version>1.0.0-SNAPSHOT</version>
+	<version>1.0.1-SNAPSHOT</version>
 
 </project>
