@@ -13,12 +13,18 @@ location "http://download.eclipse.org/releases/luna/" {
     org.apache.commons.collections
 }
 
+// UI Testing
 location "http://download.eclipse.org/technology/swtbot/releases/2.2.1/" {
     org.eclipse.swtbot.forms.source.feature.group
     org.eclipse.swtbot.eclipse.source.feature.group
     org.eclipse.swtbot.source.feature.group
     org.hamcrest.library
     org.hamcrest.core
+}
+
+// SWT Debugging
+location "http://www.eclipse.org/swt/updates/4.4" {
+    org.eclipse.swt.tools
 }
 
 location "http://download.eclipse.org/mylyn/releases/latest" {
@@ -29,7 +35,4 @@ location "http://download.eclipse.org/mylyn/releases/latest" {
     org.eclipse.mylyn.commons.ui
 }
 
-location "http://www.eclipse.org/swt/updates/4.4" {
-    org.eclipse.swt.tools
-}
 
