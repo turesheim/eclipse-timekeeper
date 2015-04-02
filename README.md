@@ -33,7 +33,7 @@ You can install from the <a href="http://marketplace.eclipse.org/content/timekee
 
 Clone the project and from the root execute:
 
-    mvn clean verify -f net.resheim.eclipse.timekeeper-parent
+    mvn clean verify
     
 When successful there will be a Eclipse p2 repository at *net.resheim.eclipse.timekeeper-site/target/repository* which you can install from.
 
