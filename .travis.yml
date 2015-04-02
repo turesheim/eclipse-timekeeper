@@ -1,6 +1,6 @@
 language: java
 sudo: false
-script: mvn clean verify -f net.resheim.eclipse.timekeeper-parent/pom.xml
+script: mvn clean verify
 jdk:
   - oraclejdk8
 cache:

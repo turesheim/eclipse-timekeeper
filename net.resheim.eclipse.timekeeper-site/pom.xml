@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
-		<relativePath>../net.resheim.eclipse.timekeeper-parent/pom.xml</relativePath>
+		<relativePath>../pom.xml</relativePath>
 		<artifactId>net.resheim.eclipse.timekeeper-parent</artifactId>
 		<groupId>net.resheim.eclipse.timekeeper</groupId>
 		<version>1.0.1-SNAPSHOT</version>
