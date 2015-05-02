@@ -35,4 +35,9 @@ location "http://download.eclipse.org/mylyn/releases/latest" {
     org.eclipse.mylyn.commons.ui
 }
 
+// Atlassian Connector for Eclipse
+location "http://update.atlassian.com/atlassian-eclipse-plugin/rest/e3.7/" {
+    com.atlassian.connector.eclipse.feature.group    
+}
+
 
