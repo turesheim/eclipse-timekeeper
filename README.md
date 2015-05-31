@@ -14,7 +14,7 @@ The task context menu contains an entry **Copy Details to HTML**. This will copy
 
 ### Tracking inactive time
 
-If you have an active task and go AFK, not touching the mouse or keyboard for more than one minute, the _Eclipse Timekeeper_ will start tracking idle time. As soon as activity is detected again a dialog will be displayed where you can choose whether or not to disregard the idle time. Answer **Yes** and the task will be _deactivated_ and the time AFK will not be added to the total. **No** will perform no action, so the idle time will be added to the total. Note that the idle tracker is system wide, so activity in any application will not trigger the idle timer. 
+If you have an active task and go AFK, not touching the mouse or keyboard for more than one minute, the _Eclipse Timekeeper_ will start tracking idle time. As soon as activity is detected again a dialog will be displayed where you can choose whether or not to subtract the idle time. Answer **Yes** and the time AFK will not be added to the total. **No** will perform no action, so the idle time will be added to the total. Note that the idle tracker is system wide, so activity in any application will not trigger the idle timer. 
 
 
 ## Supported repository types
@@ -39,7 +39,7 @@ When successful there will be a Eclipse p2 repository at *net.resheim.eclipse.ti
 
 ## Note
 
-This project started out as an experiment, attempting to make use of the *Java 8 Date/Time API* along with new collection features such as *Streams*. Hence **Java 8** is absolutely required to execute this bundle.
+This project started out as an experiment, attempting to make use of the *Java 8 Date/Time API* along with new collection features such as *Streams*. Hence **Java 8** is absolutely required to execute this bundle. 
 
 ## License
 

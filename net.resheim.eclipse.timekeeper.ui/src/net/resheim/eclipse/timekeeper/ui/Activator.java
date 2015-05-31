@@ -21,12 +21,6 @@ import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import net.resheim.eclipse.timekeeper.internal.idle.GenericIdleTimeDetector;
-import net.resheim.eclipse.timekeeper.internal.idle.IdleTimeDetector;
-import net.resheim.eclipse.timekeeper.internal.idle.MacIdleTimeDetector;
-import net.resheim.eclipse.timekeeper.internal.idle.WindowsIdleTimeDetector;
-import net.resheim.eclipse.timekeeper.internal.idle.X11IdleTimeDetector;
-
 import org.apache.commons.lang.time.DurationFormatUtils;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.Platform;
@@ -46,6 +40,12 @@ import org.eclipse.swt.widgets.Listener;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
 import org.osgi.framework.BundleContext;
+
+import net.resheim.eclipse.timekeeper.internal.idle.GenericIdleTimeDetector;
+import net.resheim.eclipse.timekeeper.internal.idle.IdleTimeDetector;
+import net.resheim.eclipse.timekeeper.internal.idle.MacIdleTimeDetector;
+import net.resheim.eclipse.timekeeper.internal.idle.WindowsIdleTimeDetector;
+import net.resheim.eclipse.timekeeper.internal.idle.X11IdleTimeDetector;
 
 @SuppressWarnings("restriction")
 public class Activator extends AbstractUIPlugin {
@@ -412,7 +412,7 @@ public class Activator extends AbstractUIPlugin {
 					LocalDateTime lastTick = ticked;
 					// Subtract the IDLE_INTERVAL time the computer _was_
 					// idle while counting up to the threshold. During this
-					// period fields were updated. Thus must be adjusted for.
+					// period fields were updated. This must be adjusted for.
 					ticked = ticked.minusNanos(IDLE_INTERVAL);
 					String time = DurationFormatUtils.formatDuration(lastIdleTime, "H:mm:ss", true);
 
@@ -424,16 +424,15 @@ public class Activator extends AbstractUIPlugin {
 					sb.append(task.getSummary());
 					MessageDialog md = new MessageDialog(Display.getCurrent().getActiveShell(), "Disregard idle time?",
 							null, MessageFormat.format(
-									"The computer has been idle since {0}, more than {1}. The active task \"{2}\" was started on {3}. Deactivate the task and disregard the idle time?",
+									"The computer has been idle since {0}, more than {1}. The active task \"{2}\" was started on {3}. Subtract the idle time from the total?",
 									ticked.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US)),
 									time, sb.toString(),
 									started.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US))),
-									MessageDialog.QUESTION, new String[] { "No", "Yes" }, 1);
+							MessageDialog.QUESTION, new String[] { "No", "Yes" }, 1);
 					int open = md.open();
 					dialogIsOpen = false;
 					if (open == 1) {
-						// Stop task, subtract initial idle time
-						TasksUi.getTaskActivityManager().deactivateTask(task);
+						// Subtract initial idle time
 						reduceTime(task, ticked.toLocalDate().toString(), IDLE_INTERVAL / 1000);
 					} else {
 						// Continue task, add idle time

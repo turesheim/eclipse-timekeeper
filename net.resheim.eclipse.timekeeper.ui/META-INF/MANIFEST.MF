@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Timekeeper for Eclipse
 Bundle-SymbolicName: net.resheim.eclipse.timekeeper.ui;singleton:=true
-Bundle-Version: 1.0.1.qualifier
+Bundle-Version: 1.1.0.qualifier
 Bundle-Activator: net.resheim.eclipse.timekeeper.ui.Activator
 Require-Bundle: org.eclipse.ui,
  org.eclipse.core.runtime,
