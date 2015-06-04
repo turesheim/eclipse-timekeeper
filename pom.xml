@@ -135,6 +135,7 @@
 		<module>net.resheim.eclipse.timekeeper-feature</module>
 		<module>net.resheim.eclipse.timekeeper.ui</module>
 		<module>net.resheim.eclipse.timekeeper-site</module>
+        <module>net.resheim.eclipse.timekeeper.tests</module>
 	</modules>
 
 </project>

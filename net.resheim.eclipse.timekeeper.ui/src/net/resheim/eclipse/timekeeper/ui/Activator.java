@@ -84,9 +84,9 @@ public class Activator extends AbstractUIPlugin {
 	public static final String PLUGIN_ID = "net.resheim.eclipse.timekeeper.ui"; //$NON-NLS-1$
 
 	/**
-	 * Time interval for updating elapsed time on a task (1s)
+	 * Time interval for updating elapsed time on a task (0.5s)
 	 */
-	private static final int SHORT_INTERVAL = 1000;
+	private static final int SHORT_INTERVAL = 500;
 
 	public static final String START = "start"; //$NON-NLS-1$
 
@@ -115,6 +115,31 @@ public class Activator extends AbstractUIPlugin {
 		if (seconds == 0) {
 			return;
 		}
+		String accumulatedString = Activator.getValue(task, dateString);
+		if (accumulatedString != null) {
+			long accumulated = Long.parseLong(accumulatedString);
+			accumulated = accumulated + seconds;
+			Activator.setValue(task, dateString, Long.toString(accumulated));
+		} else {
+			Activator.setValue(task, dateString, Long.toString(seconds));
+		}
+	}
+
+	/**
+	 * Accumulates the remainder to the task.
+	 *
+	 * @param task
+	 *            the task to add to
+	 * @param date
+	 *            the date to add to
+	 */
+	public synchronized static void accumulateRemainder(ITask task, LocalDate date) {
+		long seconds = Math.round((double) remainder / 1000);
+		if (seconds == 0) {
+			return;
+		}
+		remainder = 0;
+		String dateString = date.toString();
 		String accumulatedString = Activator.getValue(task, dateString);
 		if (accumulatedString != null) {
 			long accumulated = Long.parseLong(accumulatedString);
@@ -560,8 +585,13 @@ public class Activator extends AbstractUIPlugin {
 			}
 		};
 		final Display display = PlatformUI.getWorkbench().getDisplay();
-		display.addFilter(SWT.KeyUp, reactivationListener);
-		display.addFilter(SWT.MouseUp, reactivationListener);
+		display.syncExec(new Runnable() {
+			@Override
+			public void run() {
+				display.addFilter(SWT.KeyUp, reactivationListener);
+				display.addFilter(SWT.MouseUp, reactivationListener);
+			}
+		});
 	}
 
 	/*
@@ -589,6 +619,25 @@ public class Activator extends AbstractUIPlugin {
 	public void stop(BundleContext context) throws Exception {
 		plugin = null;
 		super.stop(context);
+	}
+
+	/**
+	 * Returns the number of milliseconds not added to the task's active time.
+	 *
+	 * @return the remaning number of milliseconds
+	 */
+	static long getRemainder() {
+		return remainder;
+	}
+
+	/**
+	 * Sets the number of millisecons to be added to the task's active time.
+	 *
+	 * @param remainder
+	 *            the number of milliseconds
+	 */
+	static void setRemainder(long remainder) {
+		Activator.remainder = remainder;
 	}
 
 }

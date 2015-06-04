@@ -19,3 +19,8 @@ Bundle-ClassPath: .,
  lib/jna-4.1.0.jar,
  lib/jna-platform-4.1.0.jar
 Bundle-Vendor: Torkild U. Resheim
+Export-Package: net.resheim.eclipse.timekeeper.internal;x-friends:="net.resheim.eclipse.timekeeper.tests",
+ net.resheim.eclipse.timekeeper.internal.idle;x-friends:="net.resheim.eclipse.timekeeper.tests",
+ net.resheim.eclipse.timekeeper.ui,
+ net.resheim.eclipse.timekeeper.ui.commands,
+ net.resheim.eclipse.timekeeper.ui.views
