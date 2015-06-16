@@ -26,6 +26,8 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.resource.ImageDescriptor;
+import org.eclipse.jface.util.IPropertyChangeListener;
+import org.eclipse.jface.util.PropertyChangeEvent;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTaskContainer;
 import org.eclipse.mylyn.tasks.core.ITask;
@@ -46,20 +48,15 @@ import net.resheim.eclipse.timekeeper.internal.idle.IdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.MacIdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.WindowsIdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.X11IdleTimeDetector;
+import net.resheim.eclipse.timekeeper.ui.preferences.PreferenceConstants;
 
 @SuppressWarnings("restriction")
-public class Activator extends AbstractUIPlugin {
+public class Activator extends AbstractUIPlugin implements IPropertyChangeListener {
 
 
 	public static final String ATTR_ID = "net.resheim.eclipse.timekeeper"; //$NON-NLS-1$
 
 	public static final String ATTR_GROUPING = ATTR_ID + ".grouping"; //$NON-NLS-1$
-
-	/**
-	 * The time interval of no keyboard or mouse events after which the system
-	 * is considered idle (5 minutes).
-	 */
-	private static final int IDLE_INTERVAL = 60_000;
 
 	/** Task repository kind identifier for Bugzilla */
 	public static final String KIND_BUGZILLA = "bugzilla"; //$NON-NLS-1$
@@ -383,9 +380,16 @@ public class Activator extends AbstractUIPlugin {
 	private IdleTimeDetector detector;
 
 	boolean dialogIsOpen = false;
+
 	private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEE d").withLocale(Locale.US);
 
 	private Listener reactivationListener;
+
+	/** The number of milliseconds before user is considered idle */
+	private static long idleInterval;
+
+	/** The number of milliseconds before user is considered away */
+	private static long afkInterval;
 
 	/**
 	 * The constructor
@@ -426,7 +430,7 @@ public class Activator extends AbstractUIPlugin {
 			return;
 		}
 		synchronized (this) {
-			if (idleTimeMillis < lastIdleTime && lastIdleTime > IDLE_INTERVAL) {
+			if (idleTimeMillis < lastIdleTime && lastIdleTime > idleInterval) {
 				// If we have an active task
 				ITask task = TasksUi.getTaskActivityManager().getActiveTask();
 				if (task != null && Activator.getValue(task, Activator.START) != null) {
@@ -435,36 +439,48 @@ public class Activator extends AbstractUIPlugin {
 					LocalDateTime started = getActiveSince();
 					LocalDateTime ticked = LocalDateTime.parse(tickString);
 					LocalDateTime lastTick = ticked;
-					// Subtract the IDLE_INTERVAL time the computer _was_
-					// idle while counting up to the threshold. During this
-					// period fields were updated. This must be adjusted for.
-					ticked = ticked.minusNanos(IDLE_INTERVAL);
-					String time = DurationFormatUtils.formatDuration(lastIdleTime, "H:mm:ss", true);
 
-					StringBuilder sb = new StringBuilder();
-					if (task.getTaskKey() != null) {
-						sb.append(task.getTaskKey());
-						sb.append(": ");
+					// Subtract the time the computer was idle while counting
+					// up to the threshold (idleInterval). During this period
+					// fields were updated and time passed added to the total.
+					ticked = ticked.minusNanos(idleInterval);
+
+					// If the user have been idle, but not long enough to be
+					// considered AFK we will ask whether or not to add the
+					// idle time to the total.
+					if (lastIdleTime < afkInterval) {
+						String time = DurationFormatUtils.formatDuration(lastIdleTime, "H:mm:ss", true);
+						StringBuilder sb = new StringBuilder();
+						if (task.getTaskKey() != null) {
+							sb.append(task.getTaskKey());
+							sb.append(": ");
+						}
+						sb.append(task.getSummary());
+						MessageDialog md = new MessageDialog(Display.getCurrent().getActiveShell(), "Disregard idle time?",
+								null, MessageFormat.format(
+										"The computer has been idle since {0}, more than {1}. The active task \"{2}\" was started on {3}. Subtract the idle time from the total?",
+										ticked.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US)),
+										time, sb.toString(),
+										started.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US))),
+								MessageDialog.QUESTION, new String[] { "No", "Yes" }, 1);
+						int open = md.open();
+						dialogIsOpen = false;
+						if (open == 1) {
+							// Subtract initial idle time
+							reduceTime(task, ticked.toLocalDate().toString(), idleInterval / 1000);
+						} else {
+							// Continue task, add idle time
+							LocalDateTime now = LocalDateTime.now();
+							long seconds = lastTick.until(now, ChronoUnit.MILLIS);
+							accumulateTime(task, ticked.toLocalDate().toString(), seconds);
+							Activator.setValue(task, Activator.TICK, now.toString());
+						}
 					}
-					sb.append(task.getSummary());
-					MessageDialog md = new MessageDialog(Display.getCurrent().getActiveShell(), "Disregard idle time?",
-							null, MessageFormat.format(
-									"The computer has been idle since {0}, more than {1}. The active task \"{2}\" was started on {3}. Subtract the idle time from the total?",
-									ticked.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US)),
-									time, sb.toString(),
-									started.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US))),
-							MessageDialog.QUESTION, new String[] { "No", "Yes" }, 1);
-					int open = md.open();
-					dialogIsOpen = false;
-					if (open == 1) {
-						// Subtract initial idle time
-						reduceTime(task, ticked.toLocalDate().toString(), IDLE_INTERVAL / 1000);
-					} else {
-						// Continue task, add idle time
-						LocalDateTime now = LocalDateTime.now();
-						long seconds = lastTick.until(now, ChronoUnit.MILLIS);
-						accumulateTime(task, ticked.toLocalDate().toString(), seconds);
-						Activator.setValue(task, Activator.TICK, now.toString());
+					// If the user has been idle long enough to be considered
+					// away we will not as whether or not to add the idle time
+					// simply subtract the initial idle time.
+					else {
+						reduceTime(task, ticked.toLocalDate().toString(), idleInterval / 1000);
 					}
 				}
 			}
@@ -480,7 +496,7 @@ public class Activator extends AbstractUIPlugin {
 	public boolean isIdle(){
 		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
 		if (task != null && Activator.getValue(task, Activator.START) != null) {
-			return lastIdleTime > IDLE_INTERVAL;
+			return lastIdleTime > idleInterval;
 		}
 		return false;
 	}
@@ -524,7 +540,7 @@ public class Activator extends AbstractUIPlugin {
 		if (task != null && Activator.getValue(task, Activator.START) != null) {
 			String tickString = Activator.getValue(task, Activator.TICK);
 			LocalDateTime ticked = LocalDateTime.parse(tickString);
-			ticked = ticked.minusNanos(IDLE_INTERVAL);
+			ticked = ticked.minusNanos(idleInterval);
 			return ticked;
 		}
 		return null;
@@ -555,10 +571,10 @@ public class Activator extends AbstractUIPlugin {
 					long idleTimeMillis = detector.getIdleTimeMillis();
 					ITask task = TasksUi.getTaskActivityManager().getActiveTask();
 					if (null != task) {
-						if (idleTimeMillis < lastIdleTime && lastIdleTime > IDLE_INTERVAL) {
+						if (idleTimeMillis < lastIdleTime && lastIdleTime > idleInterval) {
 							// Was idle on last check, reactivate
 							Display.getDefault().syncExec(() -> handleReactivation(idleTimeMillis));
-						} else if (lastIdleTime < IDLE_INTERVAL) {
+						} else if (lastIdleTime < idleInterval) {
 							String tickString = Activator.getValue(task, Activator.TICK);
 							LocalDateTime now = LocalDateTime.now();
 							LocalDateTime ticked = LocalDateTime.parse(tickString);
@@ -578,7 +594,7 @@ public class Activator extends AbstractUIPlugin {
 		reactivationListener = new Listener() {
 			public void handleEvent(Event event) {
 				long idleTimeMillis = detector.getIdleTimeMillis();
-				if (idleTimeMillis < lastIdleTime && lastIdleTime > IDLE_INTERVAL) {
+				if (idleTimeMillis < lastIdleTime && lastIdleTime > idleInterval) {
 					handleReactivation(idleTimeMillis);
 				}
 				lastIdleTime = idleTimeMillis;
@@ -605,6 +621,9 @@ public class Activator extends AbstractUIPlugin {
 	public void start(BundleContext context) throws Exception {
 		super.start(context);
 		plugin = this;
+		idleInterval = getPreferenceStore().getInt(PreferenceConstants.MINUTES_IDLE) * 60_000;
+		afkInterval = getPreferenceStore().getInt(PreferenceConstants.MINUTES_AWAY) * 60_000;
+		getPreferenceStore().addPropertyChangeListener(this);
 		installTaxameter();
 	}
 
@@ -618,6 +637,7 @@ public class Activator extends AbstractUIPlugin {
 	@Override
 	public void stop(BundleContext context) throws Exception {
 		plugin = null;
+		getPreferenceStore().removePropertyChangeListener(this);
 		super.stop(context);
 	}
 
@@ -631,13 +651,23 @@ public class Activator extends AbstractUIPlugin {
 	}
 
 	/**
-	 * Sets the number of millisecons to be added to the task's active time.
+	 * Sets the number of milliseconds to be added to the task's active time.
 	 *
 	 * @param remainder
 	 *            the number of milliseconds
 	 */
 	static void setRemainder(long remainder) {
 		Activator.remainder = remainder;
+	}
+
+	@Override
+	public void propertyChange(PropertyChangeEvent event) {
+		if (event.getProperty().equals(PreferenceConstants.MINUTES_IDLE)) {
+			idleInterval = Integer.parseInt(event.getNewValue().toString()) * 60_000;
+		}
+		if (event.getProperty().equals(PreferenceConstants.MINUTES_AWAY)) {
+			afkInterval = Integer.parseInt(event.getNewValue().toString()) * 60_000;
+		}
 	}
 
 }

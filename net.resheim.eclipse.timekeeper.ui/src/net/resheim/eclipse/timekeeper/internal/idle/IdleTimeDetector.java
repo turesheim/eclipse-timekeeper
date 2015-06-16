@@ -16,7 +16,7 @@ public interface IdleTimeDetector {
 	/**
 	 * Get the System Idle Time from the OS.
 	 *
-	 * @return The System Idle Time in milliseconds.
+	 * @return the number of milliseconds the system has been considered idle
 	 */
 	public long getIdleTimeMillis();
 
