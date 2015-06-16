@@ -468,6 +468,12 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 						if (open == 1) {
 							// Subtract initial idle time
 							reduceTime(task, ticked.toLocalDate().toString(), idleInterval / 1000);
+							// Reset start indicator
+							if (task.isActive()) {
+								LocalDateTime now = LocalDateTime.now();
+								Activator.setValue(task, Activator.TICK, now.toString());
+								Activator.setValue(task, Activator.START, now.toString());
+							}
 						} else {
 							// Continue task, add idle time
 							LocalDateTime now = LocalDateTime.now();
@@ -481,6 +487,12 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 					// simply subtract the initial idle time.
 					else {
 						reduceTime(task, ticked.toLocalDate().toString(), idleInterval / 1000);
+						// Reset start indicator
+						if (task.isActive()) {
+							LocalDateTime now = LocalDateTime.now();
+							Activator.setValue(task, Activator.TICK, now.toString());
+							Activator.setValue(task, Activator.START, now.toString());
+						}
 					}
 				}
 			}
