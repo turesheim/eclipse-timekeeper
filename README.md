@@ -16,7 +16,6 @@ The task context menu contains an entry **Copy Details to HTML**. This will copy
 
 If you have an active task and go idle, not touching the mouse or keyboard for more than given amount of time (default is five minutes), the _Eclipse Timekeeper_ will start tracking idle time. If activity is detected before the away time (default is thirty minutes) a dialog will be displayed where you can choose whether or not to subtract the idle time. Answer **Yes** and the time idle will not be added to the total. **No** will perform no action, so the idle time will be added to the total. If no activity is detected after the away time, the entire period idle will be subtracted. Note that the idle tracker is system wide, so activity in any application will not trigger the idle timer. The "idle" and "away" periods can be adjusted using preference settings.
 
-
 ## Supported repository types
 
 There is built in support for *GitHub*, *JIRA* and *Bugzilla* task repositories, however other repository types should also work. Tasks from *GitHub* are grouped by the name of the first query they appear in. Tasks from *Bugzilla* repositories are grouped by the *product*. When for instance using a *JIRA* repository you may want to group by a different field, this can be done by right clicking on a task and selecting a field from the **Set Grouping Field...** menu.
