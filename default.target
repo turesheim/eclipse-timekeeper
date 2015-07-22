@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <?pde?>
 <!-- generated with https://github.com/mbarbero/fr.obeo.releng.targetplatform -->
-<target name="Eclipse Timekeeper Target Platform" sequenceNumber="1430587374">
+<target name="Eclipse Timekeeper Target Platform" sequenceNumber="1437568436">
   <locations>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
-      <unit id="org.eclipse.equinox.p2.sdk.feature.group" version="3.9.1.v20150129-0838"/>
-      <unit id="org.eclipse.sdk.feature.group" version="4.4.2.v20150204-1700"/>
-      <unit id="org.eclipse.pde.core" version="3.10.2.v20150127-1015"/>
-      <unit id="org.eclipse.emf.ecore" version="2.10.2.v20150123-0348"/>
-      <unit id="org.eclipse.emf.ecore.xmi" version="2.10.2.v20150123-0348"/>
-      <unit id="org.eclipse.emf.ecore.change" version="2.10.0.v20150123-0348"/>
-      <unit id="org.eclipse.emf.common" version="2.10.1.v20150123-0348"/>
+      <unit id="org.eclipse.equinox.p2.sdk.feature.group" version="3.9.100.v20150601-1708"/>
+      <unit id="org.eclipse.sdk.feature.group" version="4.5.0.v20150603-2358"/>
+      <unit id="org.eclipse.pde.core" version="3.10.100.v20150522-0332"/>
+      <unit id="org.eclipse.emf.ecore" version="2.11.0.v20150512-0501"/>
+      <unit id="org.eclipse.emf.ecore.xmi" version="2.11.0.v20150512-0501"/>
+      <unit id="org.eclipse.emf.ecore.change" version="2.11.0.v20150512-0501"/>
+      <unit id="org.eclipse.emf.common" version="2.11.0.v20150512-0501"/>
       <unit id="org.apache.log4j" version="1.2.15.v201012070815"/>
       <unit id="org.apache.commons.collections" version="3.2.0.v2013030210310"/>
-      <repository location="http://download.eclipse.org/releases/luna/"/>
+      <repository location="http://download.eclipse.org/releases/mars/"/>
     </location>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
       <unit id="org.eclipse.swtbot.forms.source.feature.group" version="2.2.1.201402241301"/>
@@ -28,11 +28,11 @@
       <repository location="http://www.eclipse.org/swt/updates/4.4"/>
     </location>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
-      <unit id="org.eclipse.mylyn.tasks.core" version="3.15.0.v20150311-2102"/>
-      <unit id="org.eclipse.mylyn.tasks.ui" version="3.15.0.v20150316-1810"/>
+      <unit id="org.eclipse.mylyn.tasks.core" version="3.16.0.v20150609-0543"/>
+      <unit id="org.eclipse.mylyn.tasks.ui" version="3.16.0.v20150609-0543"/>
       <unit id="org.apache.commons.lang" version="2.6.0.v201404270220"/>
-      <unit id="org.eclipse.mylyn.bugzilla.core" version="3.15.0.v20150204-0622"/>
-      <unit id="org.eclipse.mylyn.commons.ui" version="3.15.0.v20150112-2323"/>
+      <unit id="org.eclipse.mylyn.bugzilla.core" version="3.16.0.v20150525-2001"/>
+      <unit id="org.eclipse.mylyn.commons.ui" version="3.16.0.v20150609-0602"/>
       <repository location="http://download.eclipse.org/mylyn/releases/latest"/>
     </location>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">

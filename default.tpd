@@ -1,7 +1,7 @@
 target "Eclipse Timekeeper Target Platform" with source requirements
 
 // Base dependencies
-location "http://download.eclipse.org/releases/luna/" {
+location "http://download.eclipse.org/releases/mars/" {
     org.eclipse.equinox.p2.sdk.feature.group
     org.eclipse.sdk.feature.group
     org.eclipse.pde.core
@@ -37,7 +37,7 @@ location "http://download.eclipse.org/mylyn/releases/latest" {
 
 // Atlassian Connector for Eclipse
 location "http://update.atlassian.com/atlassian-eclipse-plugin/rest/e3.7/" {
-    com.atlassian.connector.eclipse.feature.group    
+    com.atlassian.connector.eclipse.feature.group
 }
 
 
