@@ -11,47 +11,38 @@
 
 package net.resheim.eclipse.timekeeper.ui.commands;
 
+import java.time.LocalDate;
+
 import org.eclipse.core.commands.AbstractHandler;
 import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
-import org.eclipse.core.commands.IHandler;
-import org.eclipse.jface.viewers.ISelection;
-import org.eclipse.jface.viewers.IStructuredSelection;
-import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.swt.dnd.Clipboard;
 import org.eclipse.swt.dnd.HTMLTransfer;
 import org.eclipse.swt.dnd.TextTransfer;
 import org.eclipse.swt.dnd.Transfer;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.ui.IWorkbenchPart;
 import org.eclipse.ui.handlers.HandlerUtil;
 
-public class CopyTaskDetailsToHTML extends AbstractHandler implements IHandler {
+import net.resheim.eclipse.timekeeper.ui.export.HTMLExporter;
+import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
+
+public class HTMLToClipboardHandler extends AbstractHandler {
 
 	@Override
 	public Object execute(ExecutionEvent event) throws ExecutionException {
-		ISelection selection = HandlerUtil.getCurrentSelection(event);
-		Object obj = ((IStructuredSelection) selection).getFirstElement();
-		if (obj instanceof ITask) {
-			copyTaskAsHTML((ITask) obj);
+		IWorkbenchPart activePart = HandlerUtil.getActivePart(event);
+		if (activePart instanceof WorkWeekView) {
+			LocalDate firstDayOfWeek = ((WorkWeekView) activePart).getFirstDayOfWeek();
+			HTMLExporter export = new HTMLExporter();
+			String result = export.getData(firstDayOfWeek);
+			HTMLTransfer textTransfer = HTMLTransfer.getInstance();
+			TextTransfer tt = TextTransfer.getInstance();
+			Clipboard clipboard = new Clipboard(Display.getCurrent());
+			clipboard.setContents(new String[] { result, result }, new Transfer[] { textTransfer, tt });
+			clipboard.dispose();
 		}
 		return null;
-	}
-
-	public void copyTaskAsHTML(ITask task) {
-		StringBuilder sb = new StringBuilder();
-		String taskKey = task.getTaskId();
-		if (taskKey != null) {
-			sb.append("<a href=\"" + task.getUrl() + "\">");
-			sb.append(taskKey);
-			sb.append("</a>");
-			sb.append(": ");
-		}
-		sb.append(task.getSummary());
-		HTMLTransfer textTransfer = HTMLTransfer.getInstance();
-		TextTransfer tt = TextTransfer.getInstance();
-		Clipboard clipboard = new Clipboard(Display.getCurrent());
-		clipboard.setContents(new String[] { sb.toString(), sb.toString() }, new Transfer[] { textTransfer, tt });
-		clipboard.dispose();
 	}
 
 }

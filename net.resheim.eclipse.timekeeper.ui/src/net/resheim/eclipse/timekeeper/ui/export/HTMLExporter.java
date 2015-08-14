@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2014, 2015 Torkild U. Resheim
+ * Copyright (c) 2015 Torkild U. Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -9,48 +9,26 @@
  *     Torkild U. Resheim - initial API and implementation
  *******************************************************************************/
 
-package net.resheim.eclipse.timekeeper.ui.views;
+package net.resheim.eclipse.timekeeper.ui.export;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-
-import net.resheim.eclipse.timekeeper.ui.Activator;
 
 import org.apache.commons.lang.time.DurationFormatUtils;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.tasks.core.ITask;
-import org.eclipse.swt.dnd.Clipboard;
-import org.eclipse.swt.dnd.HTMLTransfer;
-import org.eclipse.swt.dnd.TextTransfer;
-import org.eclipse.swt.dnd.Transfer;
-import org.eclipse.swt.widgets.Display;
+
+import net.resheim.eclipse.timekeeper.ui.Activator;
+import net.resheim.eclipse.timekeeper.ui.views.AbstractContentProvider;
+import net.resheim.eclipse.timekeeper.ui.views.WeeklySummary;
 
 @SuppressWarnings("restriction")
-public class ExportToClipboard {
-
+public class HTMLExporter extends AbstractExporter {
 	private static final DateTimeFormatter weekFormat = DateTimeFormatter.ofPattern("w - YYYY");
 	private AbstractContentProvider provider;
 
-	public void copyTaskAsHTML(ITask task) {
-		StringBuilder sb = new StringBuilder();
-		String taskKey = task.getTaskKey();
-		if (taskKey != null) {
-			sb.append("<a href=\"" + task.getUrl() + "\">");
-			sb.append(taskKey);
-			sb.append("</a>");
-			sb.append(": ");
-		}
-		sb.append(task.getSummary());
-		HTMLTransfer textTransfer = HTMLTransfer.getInstance();
-		TextTransfer tt = TextTransfer.getInstance();
-		Clipboard clipboard = new Clipboard(Display.getCurrent());
-		clipboard.setContents(new String[] { sb.toString(), sb.toString() }, new Transfer[] { textTransfer, tt });
-		clipboard.dispose();
-	}
-
-	public void copyWeekAsHTML(LocalDate firstDayOfWeek) {
+	public String getData(LocalDate firstDayOfWeek) {
 
 		provider = new AbstractContentProvider() {
 
@@ -91,11 +69,7 @@ public class ExportToClipboard {
 		}
 
 		sb.append("</table>");
-		HTMLTransfer textTransfer = HTMLTransfer.getInstance();
-		TextTransfer tt = TextTransfer.getInstance();
-		Clipboard clipboard = new Clipboard(Display.getCurrent());
-		clipboard.setContents(new String[] { sb.toString(), sb.toString() }, new Transfer[] { textTransfer, tt });
-		clipboard.dispose();
+		return sb.toString();
 	}
 
 	private void append(LocalDate firstDayOfWeek, StringBuilder sb, Object object) {
@@ -128,7 +102,7 @@ public class ExportToClipboard {
 		if (object instanceof ITask) {
 			sb.append("<tr><td>&nbsp;&nbsp;");
 			AbstractTask task = (AbstractTask) object;
-			String taskKey = task.getTaskKey();
+			String taskKey = task.getTaskId();
 			if (taskKey != null) {
 				sb.append("<a href=\"" + task.getUrl() + "\">");
 				sb.append(taskKey);
@@ -154,35 +128,4 @@ public class ExportToClipboard {
 			}
 		}
 	}
-
-	/**
-	 * Calculates the total amount of seconds accumulated on the project for the
-	 * specified date.
-	 *
-	 * @param date
-	 *            the date to calculate for
-	 * @param project
-	 *            the project to calculate for
-	 * @return the total amount of seconds accumulated
-	 */
-	private int getSum(List<ITask> filtered, LocalDate date, String project) {
-		return filtered
-				.stream()
-				.filter(t -> project.equals(Activator.getProjectName(t)))
-				.mapToInt(t -> Activator.getActiveTime(t, date)).sum();
-	}
-
-	/**
-	 * Calculates the total amount of seconds accumulated on specified date.
-	 *
-	 * @param date
-	 *            the date to calculate for
-	 * @return the total amount of seconds accumulated
-	 */
-	private int getSum(List<ITask> filtered, LocalDate date) {
-		return filtered
-				.stream().mapToInt(t -> Activator.getActiveTime(t, date))
-				.sum();
-	}
-
 }

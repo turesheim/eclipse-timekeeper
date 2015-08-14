@@ -6,20 +6,7 @@ This is a simple time-tracking plug-in integrating with [Eclipse Mylyn](http://e
 
 Whenever a task is *activated* in Mylyn it will automatically show up in the **Workweek** view with a bold label, and the amount of time the task is active will be tracked. When the task is *deactivated* the active time is added to the total for the task on the particular day. It is also possible to manually edit the time by clicking into the cell. If a number is typed, such as *45*, it will be translated into minutes and show up as *0:45*. If a decimal number is entered, for example *1.5*, it will be translated to *1:30*. The decimal separator can be either "," or ".".
 
-The context menu and toolbar buttons can be used to browse back and forward by one week. The current locale is used to determine week numbers. Left of the navigation buttons there is a button for copying the workweek in HTML format to the clipboard.
-
-The task context menu contains an entry **Copy Details to HTML**. This will copy the link and summary details as HTML to the clipboard.
-
-### Tracking inactive time
-
-If you have an active task and go idle, not touching the mouse or keyboard for more than given amount of time (default is five minutes), the _Eclipse Timekeeper_ will start tracking idle time. If activity is detected before the away time (default is thirty minutes) a dialog will be displayed where you can choose whether or not to subtract the idle time. Answer **Yes** and the time idle will not be added to the total. **No** will perform no action, so the idle time will be added to the total. If no activity is detected after the away time, the entire period idle will be subtracted. Note that the idle tracker is system wide, so activity in any application will not trigger the idle timer. The "idle" and "away" periods can be adjusted using preference settings.
-
-## Supported repository types
-
-There is built in support for *GitHub*, *JIRA* and *Bugzilla* task repositories, however other repository types should also work. Tasks from *GitHub* are grouped by the name of the first query they appear in. Tasks from *Bugzilla* repositories are grouped by the *product*. When for instance using a *JIRA* repository you may want to group by a different field, this can be done by right clicking on a task and selecting a field from the **Set Grouping Field...** menu.
-
-Note that the timekeeping data are stored in the task repository so they follow your workspace. If the workspace is lost, so is the timekeeping data.
-
+The context menu and toolbar buttons can be used to browse back and forward by one week. The current locale is used to determine week numbers. Left of the navigation buttons there is a button for copying the workweek in HTML format to the clipboard or exporting to file as CSV or HTML.
 
 ## Installing
 

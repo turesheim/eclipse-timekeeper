@@ -38,6 +38,21 @@
             id="net.resheim.eclipse.timekeeper.copyTaskToHTML"
             name="Copy Details to HTML">
       </command>
+      <command
+            defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.ExportToHTMLHandler"
+            id="net.resheim.eclipse.timekeeper.ui.HTMLExport"
+            name="HTML Export">
+      </command>
+      <command
+            defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.ExportToCSVHandler"
+            id="net.resheim.eclipse.timekeeper.ui.CSVExport"
+            name="CSV Export">
+      </command>
+      <command
+            defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.HTMLToClipboardHandler"
+            id="net.resheim.eclipse.timekeeper.ui.HTMLClipboard"
+            name="HTML to Clipboard">
+      </command>
    </extension>
    <extension
          point="org.eclipse.ui.menus">
@@ -47,6 +62,32 @@
          <command
                commandId="net.resheim.eclipse.timekeeper.copyTaskToHTML"
                label="Copy Details to HTML"
+               style="push">
+         </command>
+      </menuContribution>
+      <menuContribution
+            allPopups="false"
+            locationURI="toolbar:net.resheim.eclipse.timekeeper.ui.views.workWeek?before=navigation">
+         <command
+               commandId="net.resheim.eclipse.timekeeper.ui.HTMLClipboard"
+               icon="icons/full/elcl16/export.gif"
+               id="export"
+               label="Export"
+               style="pulldown"
+               tooltip="Copy week as HTML to clipboard">
+         </command>
+      </menuContribution>
+      <menuContribution
+            allPopups="false"
+            locationURI="menu:export">
+         <command
+               commandId="net.resheim.eclipse.timekeeper.ui.CSVExport"
+               label="Save week as CSV"
+               style="push">
+         </command>
+         <command
+               commandId="net.resheim.eclipse.timekeeper.ui.HTMLExport"
+               label="Save week as HTML"
                style="push">
          </command>
       </menuContribution>

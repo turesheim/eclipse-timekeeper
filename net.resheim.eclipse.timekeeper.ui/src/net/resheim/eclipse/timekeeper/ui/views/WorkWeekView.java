@@ -21,8 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-import net.resheim.eclipse.timekeeper.ui.Activator;
-
 import org.apache.commons.lang.time.DurationFormatUtils;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.jface.action.Action;
@@ -96,6 +94,8 @@ import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.contexts.IContextService;
 import org.eclipse.ui.forms.widgets.FormToolkit;
 import org.eclipse.ui.part.ViewPart;
+
+import net.resheim.eclipse.timekeeper.ui.Activator;
 
 @SuppressWarnings("restriction")
 public class WorkWeekView extends ViewPart {
@@ -227,8 +227,8 @@ public class WorkWeekView extends ViewPart {
 			if (element instanceof ITask) {
 				ITask task = ((ITask) element);
 				StringBuilder sb = new StringBuilder();
-				if (task.getTaskKey() != null) {
-					sb.append(task.getTaskKey());
+				if (task.getTaskId() != null) {
+					sb.append(task.getTaskId());
 					sb.append(": ");
 				}
 				sb.append(task.getSummary());
@@ -460,8 +460,6 @@ public class WorkWeekView extends ViewPart {
 
 	private Action activateAction;
 
-	private Action exportAction;
-
 	private AbstractContentProvider contentProvider;
 
 	private Text statusLabel;
@@ -663,8 +661,8 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void fillLocalToolBar(IToolBarManager manager) {
-		manager.add(exportAction);
-		manager.add(new Separator());
+		manager.add(new Separator("additions"));
+		manager.add(new Separator("navigation"));
 		manager.add(previousWeekAction);
 		manager.add(currentWeekAction);
 		manager.add(nextWeekAction);
@@ -742,19 +740,14 @@ public class WorkWeekView extends ViewPart {
 		});
 	}
 
+	/**
+	 * @return the first day of the week displayed
+	 */
+	public LocalDate getFirstDayOfWeek() {
+		return contentProvider.getFirstDayOfWeek();
+	}
+
 	private void makeActions() {
-
-		exportAction = new Action() {
-
-			@Override
-			public void run() {
-				ExportToClipboard export = new ExportToClipboard();
-				export.copyWeekAsHTML(contentProvider.getFirstDayOfWeek());
-			}
-
-		};
-		exportAction.setText("Export to clipboard");
-		exportAction.setImageDescriptor(Activator.getImageDescriptor("icons/full/elcl16/export.gif"));
 
 		previousWeekAction = new Action() {
 			@Override
@@ -882,7 +875,7 @@ public class WorkWeekView extends ViewPart {
 	@Override
 	public void setFocus() {
 		viewer.getControl().setFocus();
-		IContextService contextService = (IContextService)PlatformUI.getWorkbench().getService(IContextService.class);
+		IContextService contextService = PlatformUI.getWorkbench().getService(IContextService.class);
 		contextService.activateContext("net.resheim.eclipse.timekeeper.ui.workweek");
 	}
 

@@ -11,5 +11,5 @@
 
 package net.resheim.eclipse.timekeeper.ui.views;
 
-class WeeklySummary {
+public class WeeklySummary {
 }

@@ -15,11 +15,11 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import net.resheim.eclipse.timekeeper.ui.Activator;
-
 import org.eclipse.jface.viewers.ITreeContentProvider;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.core.ITask;
+
+import net.resheim.eclipse.timekeeper.ui.Activator;
 
 @SuppressWarnings("restriction")
 public abstract class AbstractContentProvider implements ITreeContentProvider {

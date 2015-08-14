@@ -18,24 +18,35 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import org.eclipse.core.runtime.CoreException;
 import org.eclipse.mylyn.internal.tasks.core.LocalTask;
 import org.eclipse.mylyn.tasks.ui.TasksUi;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 @SuppressWarnings("restriction")
 public class ActivatorTest {
 
-	// private static SWTWorkbenchBot bot;
 
-	@BeforeClass
-	public static void setUp() {
-		// bot = new SWTWorkbenchBot();
+	private LocalTask task;
+
+	@Before
+	public void before(){
+		task = new LocalTask("1", "TestTask");
+	}
+
+	@After
+	public void after(){
+		try {
+			TasksUi.getTaskDataManager().discardEdits(task);
+		} catch (CoreException e) {
+			e.printStackTrace();
+		}
 	}
 
 	@Test
 	public void testStartTime() {
-		LocalTask task = new LocalTask("1", "testStartTime");
 		LocalDateTime expected = LocalDateTime.now();
 		TasksUi.getTaskActivityManager().activateTask(task);
 		LocalDateTime actual = Activator.getStartTime(task);
@@ -45,7 +56,6 @@ public class ActivatorTest {
 
 	@Test
 	public void testActiveTime() {
-		LocalTask task = new LocalTask("2", "testActiveTime");
 		TasksUi.getTaskActivityManager().activateTask(task);
 		long start = System.currentTimeMillis();
 		try {
@@ -61,7 +71,6 @@ public class ActivatorTest {
 
 	@Test
 	public void testRemainder_Less() {
-		LocalTask task = new LocalTask("3", "testRemainder");
 		LocalDate date = LocalDate.now();
 		Activator.setRemainder(450);
 		Activator.accumulateRemainder(task, date);
@@ -71,7 +80,6 @@ public class ActivatorTest {
 
 	@Test
 	public void testRemainder_More() {
-		LocalTask task = new LocalTask("4", "testRemainder");
 		LocalDate date = LocalDate.now();
 		Activator.setRemainder(550);
 		Activator.accumulateRemainder(task, date);
