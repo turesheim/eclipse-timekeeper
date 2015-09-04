@@ -323,7 +323,9 @@ public class WorkWeekView extends ViewPart {
 					int newValue = -1;
 					try {
 						String string = ((String) value).replace(',', '.');
-						if (string.indexOf('.') > -1) {
+						if (string.isEmpty()) {
+							newValue = 0;
+						} else if (string.indexOf('.') > -1) {
 							double d = Double.parseDouble(string);
 							newValue = (int) (d * 3600);
 						} else {
