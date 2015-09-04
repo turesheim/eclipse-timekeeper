@@ -8,7 +8,7 @@ Whenever a task is *activated* in Mylyn it will automatically show up in the **W
 
 The context menu and toolbar buttons can be used to browse back and forward by one week. The current locale is used to determine week numbers. Left of the navigation buttons there is a button for copying the workweek in HTML format to the clipboard or exporting to file as CSV or HTML.
 
-See the [Wiki](/eclipse-timekeeper/wiki)  for more information about how to use
+See the <a href="../../wiki">wiki</a>  for more about usage.
 
 ## Installing
 
