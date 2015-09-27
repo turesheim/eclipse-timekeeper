@@ -19,8 +19,6 @@ import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Test;
-
 import net.resheim.eclipse.timekeeper.ui.Activator;
 
 @SuppressWarnings("restriction")

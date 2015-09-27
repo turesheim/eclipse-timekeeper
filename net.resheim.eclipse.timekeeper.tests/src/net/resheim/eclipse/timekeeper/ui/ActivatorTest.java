@@ -28,16 +28,15 @@ import org.junit.Test;
 @SuppressWarnings("restriction")
 public class ActivatorTest {
 
-
 	private LocalTask task;
 
 	@Before
-	public void before(){
+	public void before() {
 		task = new LocalTask("1", "TestTask");
 	}
 
 	@After
-	public void after(){
+	public void after() {
 		try {
 			TasksUi.getTaskDataManager().discardEdits(task);
 		} catch (CoreException e) {
@@ -54,6 +53,10 @@ public class ActivatorTest {
 		assertTrue(Duration.between(expected, actual).toMillis() < 500);
 	}
 
+	/**
+	 * Verifies that the active time is correctly registered when a task has
+	 * been activated.
+	 */
 	@Test
 	public void testActiveTime() {
 		TasksUi.getTaskActivityManager().activateTask(task);
