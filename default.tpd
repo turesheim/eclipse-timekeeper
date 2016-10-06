@@ -1,7 +1,7 @@
 target "Eclipse Timekeeper Target Platform" with source requirements
 
 // Base dependencies
-location "http://download.eclipse.org/releases/mars/" {
+location "http://download.eclipse.org/releases/neon/" {
     org.eclipse.equinox.p2.sdk.feature.group
     org.eclipse.sdk.feature.group
     org.eclipse.pde.core
@@ -14,19 +14,13 @@ location "http://download.eclipse.org/releases/mars/" {
 }
 
 // UI Testing
-location "http://download.eclipse.org/technology/swtbot/releases/2.2.1/" {
+location "http://download.eclipse.org/technology/swtbot/releases/latest/" {
     org.eclipse.swtbot.forms.source.feature.group
     org.eclipse.swtbot.eclipse.source.feature.group
     org.eclipse.swtbot.source.feature.group
     org.hamcrest.library
     org.hamcrest.core
 }
-
-// SWT Debugging
-location "http://www.eclipse.org/swt/updates/4.4" {
-    org.eclipse.swt.tools
-}
-
 location "http://download.eclipse.org/mylyn/releases/latest" {
     org.eclipse.mylyn.tasks.core
     org.eclipse.mylyn.tasks.ui
