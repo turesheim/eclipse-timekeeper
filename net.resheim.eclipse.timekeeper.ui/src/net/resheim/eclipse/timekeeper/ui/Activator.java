@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2014-2015 Torkild U. Resheim.
+ * Copyright (c) 2014-2017 Torkild U. Resheim.
  *
  * All rights reserved. This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License v1.0 which
@@ -18,6 +18,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.WeekFields;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -43,6 +44,9 @@ import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
 import org.osgi.framework.BundleContext;
 
+import net.resheim.eclipse.timekeeper.db.Activity;
+import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
+import net.resheim.eclipse.timekeeper.db.TrackedTask;
 import net.resheim.eclipse.timekeeper.internal.idle.GenericIdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.IdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.MacIdleTimeDetector;
@@ -53,10 +57,8 @@ import net.resheim.eclipse.timekeeper.ui.preferences.PreferenceConstants;
 @SuppressWarnings("restriction")
 public class Activator extends AbstractUIPlugin implements IPropertyChangeListener {
 
-
-	public static final String ATTR_ID = "net.resheim.eclipse.timekeeper"; //$NON-NLS-1$
-
-	public static final String ATTR_GROUPING = ATTR_ID + ".grouping"; //$NON-NLS-1$
+	/** Repository attribute ID for custom grouping field */
+	public static final String ATTR_GROUPING = TimekeeperPlugin.KEY_VALUELIST_ID + ".grouping"; //$NON-NLS-1$
 
 	/** Task repository kind identifier for Bugzilla */
 	public static final String KIND_BUGZILLA = "bugzilla"; //$NON-NLS-1$
@@ -70,152 +72,17 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 	/** Task repository kind identifier for local tasks */
 	public static final String KIND_LOCAL = "local"; //$NON-NLS-1$
 
-	private static final String KV_SEPARATOR = "="; //$NON-NLS-1$
-
-	private static long lastIdleTime;
-
-	private static final String PAIR_SEPARATOR = ";"; //$NON-NLS-1$
+	/** The number of milliseconds the system has been considered idle */
+	private static long lastIdleTimeMillis;
 
 	private static Activator plugin;
 
 	public static final String PLUGIN_ID = "net.resheim.eclipse.timekeeper.ui"; //$NON-NLS-1$
 
 	/**
-	 * Time interval for updating elapsed time on a task (0.5s)
+	 * Time interval for updating elapsed time on a task (1s)
 	 */
-	private static final int SHORT_INTERVAL = 500;
-
-	public static final String START = "start"; //$NON-NLS-1$
-
-	public static final String TICK = "tick"; //$NON-NLS-1$
-
-	private static long remainder = 0;
-
-	/**
-	 * Accumulates a number of seconds to the task on the specified date. The
-	 * amount is given in milliseconds which is used to handle passed time that
-	 * exceed the one second resolution that is used by the storage mechanism.
-	 * This will not be exact, however the difference is negligible and will be
-	 * at most one second in total.
-	 *
-	 * @param task
-	 *            the task to add to
-	 * @param dateString
-	 *            the date in ISO-8601 format (uuuu-MM-dd)
-	 * @param millis
-	 *            the number of milliseconds to add
-	 */
-	public synchronized static void accumulateTime(ITask task, String dateString, long millis) {
-		millis = millis + remainder;
-		long seconds = millis / 1000;
-		remainder = millis - (seconds * 1000);
-		if (seconds == 0) {
-			return;
-		}
-		String accumulatedString = Activator.getValue(task, dateString);
-		if (accumulatedString != null) {
-			long accumulated = Long.parseLong(accumulatedString);
-			accumulated = accumulated + seconds;
-			Activator.setValue(task, dateString, Long.toString(accumulated));
-		} else {
-			Activator.setValue(task, dateString, Long.toString(seconds));
-		}
-	}
-
-	/**
-	 * Accumulates the remainder to the task.
-	 *
-	 * @param task
-	 *            the task to add to
-	 * @param date
-	 *            the date to add to
-	 */
-	public synchronized static void accumulateRemainder(ITask task, LocalDate date) {
-		long seconds = Math.round((double) remainder / 1000);
-		if (seconds == 0) {
-			return;
-		}
-		remainder = 0;
-		String dateString = date.toString();
-		String accumulatedString = Activator.getValue(task, dateString);
-		if (accumulatedString != null) {
-			long accumulated = Long.parseLong(accumulatedString);
-			accumulated = accumulated + seconds;
-			Activator.setValue(task, dateString, Long.toString(accumulated));
-		} else {
-			Activator.setValue(task, dateString, Long.toString(seconds));
-		}
-	}
-
-	/**
-	 * Reduces the time on a task by the given amount of seconds.
-	 *
-	 * @param task
-	 *            the task to subtract from
-	 * @param dateString
-	 *            the date in ISO-8601 format (uuuu-MM-dd)
-	 * @param seconds
-	 *            the number of seconds to subtract
-	 */
-	public synchronized static void reduceTime(ITask task, String dateString, long seconds) {
-		String accumulatedString = Activator.getValue(task, dateString);
-		if (accumulatedString != null) {
-			long accumulated = Long.parseLong(accumulatedString);
-			accumulated = accumulated - seconds;
-			Activator.setValue(task, dateString, Long.toString(accumulated));
-		}
-	}
-
-	/**
-	 * Clears the given value. This will remove both the key and the value from
-	 * the task data.
-	 *
-	 * @param task
-	 *            the task to clear
-	 * @param key
-	 *            the key to remove
-	 */
-	public static void clearValue(ITask task, String key) {
-		StringBuilder sb = new StringBuilder();
-		String attribute = task.getAttribute(ATTR_ID);
-		if (attribute == null) {
-			return;
-		} else {
-			String[] split = attribute.split(PAIR_SEPARATOR);
-			for (int i = 0; i < split.length; i++) {
-				String string = split[i];
-				String[] kv = string.split(KV_SEPARATOR);
-				if (kv.length == 0 || kv[0].equals(key)) {
-					continue;
-				}
-				sb.append(kv[0]);
-				sb.append('=');
-				sb.append(kv[1]);
-				if (i < split.length - 1) {
-					sb.append(';');
-				}
-			}
-		}
-		task.setAttribute(ATTR_ID, sb.toString());
-	}
-
-	/**
-	 * Returns the number of seconds the task has been active on the given date.
-	 * If the task has not been active on the date, 0 will be returned.
-	 *
-	 * @param task
-	 *            the task to get active time for
-	 * @param date
-	 *            the date to get active time for
-	 * @return duration in seconds
-	 */
-	public static int getActiveTime(ITask task, LocalDate date) {
-		String value = getValue(task, date.toString());
-		if (value != null) {
-			return Integer.parseInt(value);
-		}
-		return 0;
-	}
+	private static final int SHORT_INTERVAL = 1000;
 
 	/**
 	 * Returns the shared plug-in instance.
@@ -258,7 +125,7 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 	 *
 	 * @param task
 	 *            the task to get the project name for
-	 * @return the project name or "&lt;unknown&gt;"
+	 * @return the project name or "&lt;undetermined&gt;"
 	 */
 	public static String getProjectName(ITask task) {
 		String c = task.getConnectorKind();
@@ -290,90 +157,10 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 			default:
 				break;
 			}
-		}catch (CoreException e){
+		} catch (CoreException e) {
 			e.printStackTrace();
 		}
 		return "<undetermined>";
-	}
-
-	/**
-	 * Returns the start time for the task or <code>null</code>.
-	 *
-	 * @param task
-	 *            the task to obtain the start time for
-	 * @return the start time or <code>null</code>
-	 */
-	public static LocalDateTime getStartTime(ITask task) {
-		String startString = Activator.getValue(task, Activator.START);
-		if (startString != null) {
-			return LocalDateTime.parse(startString);
-		}
-		return null;
-	}
-
-	public static String getValue(ITask task, String key) {
-		String attribute = task.getAttribute(ATTR_ID);
-		if (attribute == null) {
-			return null;
-		} else {
-			String[] split = attribute.split(PAIR_SEPARATOR);
-			for (String string : split) {
-				if (string.length() > 0) {
-					String[] kv = string.split(KV_SEPARATOR);
-					if (kv[0].equals(key)) {
-						return kv[1];
-					}
-				}
-			}
-		}
-		return null;
-	}
-
-	/**
-	 * <pre>
-	 * start = current start time
-	 * year-day = duration
-	 * </pre>
-	 *
-	 * @param task
-	 * @param key
-	 * @param value
-	 */
-	public static void setValue(ITask task, String key, String value) {
-		StringBuilder sb = new StringBuilder();
-		String attribute = task.getAttribute(ATTR_ID);
-		if (attribute == null || attribute.length() == 0) {
-			sb.append(key);
-			sb.append('=');
-			sb.append(value);
-		} else {
-			String[] split = attribute.split(PAIR_SEPARATOR);
-			boolean found = false;
-			for (int i = 0; i < split.length; i++) {
-				String string = split[i];
-				String[] kv = string.split(KV_SEPARATOR);
-				if (kv[0].equals(key)) {
-					kv[1] = value;
-					found = true;
-				}
-				if (kv.length == 2) {
-					sb.append(kv[0]);
-					sb.append('=');
-					sb.append(kv[1]);
-					if (i < split.length - 1) {
-						sb.append(';');
-					}
-				}
-			}
-			if (!found) {
-				sb.append(';');
-				sb.append(key);
-				sb.append('=');
-				sb.append(value);
-
-			}
-		}
-		task.setAttribute(ATTR_ID, sb.toString());
 	}
 
 	/** Platform specific idle time detector */
@@ -381,14 +168,21 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 
 	boolean dialogIsOpen = false;
 
+	// TODO: use system locale?
 	private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("EEE d").withLocale(Locale.US);
 
 	private Listener reactivationListener;
 
-	/** The number of milliseconds before user is considered idle */
-	private static long idleInterval;
+	/** The last time any activity was detected */
+	protected LocalDateTime lastActiveTime;
 
-	/** The number of milliseconds before user is considered away */
+	/** The number of milliseconds before user is considered idle */
+	private static long consideredIdleThreshold;
+
+	/**
+	 * The number of milliseconds before user is considered away. The value is
+	 * obtained from preferences
+	 */
 	private static long afkInterval;
 
 	/**
@@ -420,7 +214,8 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 	}
 
 	/**
-	 * Must be called by the UI-thread
+	 * Must be called by the UI-thread. Handles that the session has been idle
+	 * and just reactivated.
 	 *
 	 * @param idleTimeMillis
 	 */
@@ -430,69 +225,53 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 			return;
 		}
 		synchronized (this) {
-			if (idleTimeMillis < lastIdleTime && lastIdleTime > idleInterval) {
+			if (idleTimeMillis < lastIdleTimeMillis && lastIdleTimeMillis > consideredIdleThreshold) {
 				// If we have an active task
 				ITask task = TasksUi.getTaskActivityManager().getActiveTask();
-				if (task != null && Activator.getValue(task, Activator.START) != null) {
+				TrackedTask ttask = TimekeeperPlugin.getDefault().getTask(task);
+				// and we have recorded a starting point
+				if (task != null && ttask.getCurrentActivity().isPresent()) {
 					dialogIsOpen = true;
-					String tickString = Activator.getValue(task, Activator.TICK);
-					LocalDateTime started = getActiveSince();
-					LocalDateTime ticked = LocalDateTime.parse(tickString);
-					LocalDateTime lastTick = ticked;
-
-					// Subtract the time the computer was idle while counting
-					// up to the threshold (idleInterval). During this period
-					// fields were updated and time passed added to the total.
-					ticked = ticked.minusNanos(idleInterval);
+					LocalDateTime ticked = ttask.getTick();
 
 					// If the user have been idle, but not long enough to be
 					// considered AFK we will ask whether or not to add the
 					// idle time to the total.
-					if (lastIdleTime < afkInterval) {
-						String time = DurationFormatUtils.formatDuration(lastIdleTime, "H:mm:ss", true);
+					if (lastIdleTimeMillis < afkInterval) {
+						String time = DurationFormatUtils.formatDuration(lastIdleTimeMillis, "H:mm:ss", true);
 						StringBuilder sb = new StringBuilder();
 						if (task.getTaskKey() != null) {
 							sb.append(task.getTaskKey());
 							sb.append(": ");
 						}
 						sb.append(task.getSummary());
-						MessageDialog md = new MessageDialog(Display.getCurrent().getActiveShell(), "Disregard idle time?",
-								null, MessageFormat.format(
-										"The computer has been idle since {0}, more than {1}. The active task \"{2}\" was started on {3}. Subtract the idle time from the total?",
-										ticked.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US)),
-										time, sb.toString(),
-										started.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US))),
+						MessageDialog md = new MessageDialog(Display.getCurrent().getActiveShell(),
+								"Disregard idle time?", null,
+								MessageFormat.format(
+										"The computer has been idle since {0}, more than {1}. Stop current activity and set end time to last active time? A new activity will be started from now.",
+										ticked.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US)), time),
 								MessageDialog.QUESTION, new String[] { "No", "Yes" }, 1);
 						int open = md.open();
 						dialogIsOpen = false;
 						if (open == 1) {
-							// Subtract initial idle time
-							reduceTime(task, ticked.toLocalDate().toString(), idleInterval / 1000);
-							// Reset start indicator
-							if (task.isActive()) {
-								LocalDateTime now = LocalDateTime.now();
-								Activator.setValue(task, Activator.TICK, now.toString());
-								Activator.setValue(task, Activator.START, now.toString());
-							}
-						} else {
-							// Continue task, add idle time
-							LocalDateTime now = LocalDateTime.now();
-							long seconds = lastTick.until(now, ChronoUnit.MILLIS);
-							accumulateTime(task, ticked.toLocalDate().toString(), seconds);
-							Activator.setValue(task, Activator.TICK, now.toString());
+							// set time to the last activity detected
+							ttask.endActivity(ticked);
+							// and create a new activity
+							ttask.startActivity();
 						}
-					}
-					// If the user has been idle long enough to be considered
-					// away we will not as whether or not to add the idle time
-					// simply subtract the initial idle time.
-					else {
-						reduceTime(task, ticked.toLocalDate().toString(), idleInterval / 1000);
-						// Reset start indicator
-						if (task.isActive()) {
-							LocalDateTime now = LocalDateTime.now();
-							Activator.setValue(task, Activator.TICK, now.toString());
-							Activator.setValue(task, Activator.START, now.toString());
-						}
+					} else {
+						// If the user has been idle long enough to be
+						// considered away, the idle time will be ignored
+						// TODO: Control by preference
+						ttask.endActivity(ticked);
+						String time = DurationFormatUtils.formatDuration(lastIdleTimeMillis, "H:mm:ss", true);
+						TasksUi.getTaskActivityManager().deactivateTask(ttask.getTask());
+						MessageDialog.openInformation(Display.getCurrent().getActiveShell(),
+								"Task automatically deactivated",
+								MessageFormat.format(
+										"You have been away for too long (since {0}) and the currently activity was automatically ended at {1}.",
+										time,
+										ticked.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US))));
 					}
 				}
 			}
@@ -505,55 +284,42 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 	 *
 	 * @return <code>true</code> if idle
 	 */
-	public boolean isIdle(){
+	public boolean isIdle() {
 		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
-		if (task != null && Activator.getValue(task, Activator.START) != null) {
-			return lastIdleTime > idleInterval;
+		if (task != null) {
+			return lastIdleTimeMillis > consideredIdleThreshold;
 		}
 		return false;
 	}
 
 	/**
-	 * Returns the number of milliseconds the active task has been active
-	 *
-	 * @return the active milliseconds or "0"
-	 */
-	public long getActiveTime() {
-		LocalDateTime activeSince = getActiveSince();
-		if (activeSince != null) {
-			LocalDateTime now = LocalDateTime.now();
-			return activeSince.until(now, ChronoUnit.MILLIS);
-		}
-		return 0;
-	}
-
-	/**
 	 * Returns the current active time, or <code>null</code> if a task has not
-	 * been started.
+	 * been started yet.
 	 *
 	 * @return the active time or <code>null</code>
 	 */
 	public LocalDateTime getActiveSince() {
 		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
 		if (task != null) {
-			String startString = Activator.getValue(task, Activator.START);
-			LocalDateTime started = LocalDateTime.parse(startString);
-			return started;
+			TrackedTask trackedTask = TimekeeperPlugin.getDefault().getTask(task);
+			Optional<Activity> currentActivity = trackedTask.getCurrentActivity();
+			if (currentActivity.isPresent()) {
+				return currentActivity.get().getStart();
+			}
 		}
 		return null;
 	}
 
 	/**
+	 * Returns the estimated time the user stopped activty, or <code>null</code>
+	 * if a task has not been started.
 	 *
-	 * @return
+	 * @return the estimated time when user stopped activity
 	 */
 	public LocalDateTime getIdleSince() {
 		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
-		if (task != null && Activator.getValue(task, Activator.START) != null) {
-			String tickString = Activator.getValue(task, Activator.TICK);
-			LocalDateTime ticked = LocalDateTime.parse(tickString);
-			ticked = ticked.minusNanos(idleInterval);
-			return ticked;
+		if (task != null) {
+			return lastActiveTime.minus(consideredIdleThreshold, ChronoUnit.MILLIS);
 		}
 		return null;
 	}
@@ -581,21 +347,18 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 			public void run() {
 				if (!PlatformUI.getWorkbench().isClosing()) {
 					long idleTimeMillis = detector.getIdleTimeMillis();
+					// get the currently active Mylyn task if any
 					ITask task = TasksUi.getTaskActivityManager().getActiveTask();
 					if (null != task) {
-						if (idleTimeMillis < lastIdleTime && lastIdleTime > idleInterval) {
-							// Was idle on last check, reactivate
+						if (idleTimeMillis < lastIdleTimeMillis && lastIdleTimeMillis > consideredIdleThreshold) {
+							// has been idle for too long, but is now activated
 							Display.getDefault().syncExec(() -> handleReactivation(idleTimeMillis));
-						} else if (lastIdleTime < idleInterval) {
-							String tickString = Activator.getValue(task, Activator.TICK);
-							LocalDateTime now = LocalDateTime.now();
-							LocalDateTime ticked = LocalDateTime.parse(tickString);
-							// Currently not idle so accumulate spent time
-							accumulateTime(task, now.toLocalDate().toString(), ticked.until(now, ChronoUnit.MILLIS));
-							Activator.setValue(task, Activator.TICK, now.toString());
+						} else if (lastIdleTimeMillis < consideredIdleThreshold) {
+							lastActiveTime = LocalDateTime.now();
+							TimekeeperPlugin.getDefault().getTask(task).setTick(lastActiveTime);
 						}
 					}
-					lastIdleTime = idleTimeMillis;
+					lastIdleTimeMillis = idleTimeMillis;
 				}
 			}
 		}, SHORT_INTERVAL, SHORT_INTERVAL);
@@ -606,10 +369,10 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 		reactivationListener = new Listener() {
 			public void handleEvent(Event event) {
 				long idleTimeMillis = detector.getIdleTimeMillis();
-				if (idleTimeMillis < lastIdleTime && lastIdleTime > idleInterval) {
+				if (idleTimeMillis < lastIdleTimeMillis && lastIdleTimeMillis > consideredIdleThreshold) {
 					handleReactivation(idleTimeMillis);
 				}
-				lastIdleTime = idleTimeMillis;
+				lastIdleTimeMillis = idleTimeMillis;
 			}
 		};
 		final Display display = PlatformUI.getWorkbench().getDisplay();
@@ -622,30 +385,16 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 		});
 	}
 
-	/*
-	 * (non-Javadoc)
-	 *
-	 * @see
-	 * org.eclipse.ui.plugin.AbstractUIPlugin#start(org.osgi.framework.BundleContext
-	 * )
-	 */
 	@Override
 	public void start(BundleContext context) throws Exception {
 		super.start(context);
 		plugin = this;
-		idleInterval = getPreferenceStore().getInt(PreferenceConstants.MINUTES_IDLE) * 60_000;
+		consideredIdleThreshold = getPreferenceStore().getInt(PreferenceConstants.MINUTES_IDLE) * 60_000;
 		afkInterval = getPreferenceStore().getInt(PreferenceConstants.MINUTES_AWAY) * 60_000;
 		getPreferenceStore().addPropertyChangeListener(this);
 		installTaxameter();
 	}
 
-	/*
-	 * (non-Javadoc)
-	 *
-	 * @see
-	 * org.eclipse.ui.plugin.AbstractUIPlugin#stop(org.osgi.framework.BundleContext
-	 * )
-	 */
 	@Override
 	public void stop(BundleContext context) throws Exception {
 		plugin = null;
@@ -653,32 +402,22 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 		super.stop(context);
 	}
 
-	/**
-	 * Returns the number of milliseconds not added to the task's active time.
-	 *
-	 * @return the remaning number of milliseconds
-	 */
-	static long getRemainder() {
-		return remainder;
-	}
-
-	/**
-	 * Sets the number of milliseconds to be added to the task's active time.
-	 *
-	 * @param remainder
-	 *            the number of milliseconds
-	 */
-	static void setRemainder(long remainder) {
-		Activator.remainder = remainder;
-	}
-
 	@Override
 	public void propertyChange(PropertyChangeEvent event) {
 		if (event.getProperty().equals(PreferenceConstants.MINUTES_IDLE)) {
-			idleInterval = Integer.parseInt(event.getNewValue().toString()) * 60_000;
+			consideredIdleThreshold = Integer.parseInt(event.getNewValue().toString()) * 60_000;
 		}
 		if (event.getProperty().equals(PreferenceConstants.MINUTES_AWAY)) {
 			afkInterval = Integer.parseInt(event.getNewValue().toString()) * 60_000;
+		}
+	}
+
+	public static TrackedTask getActiveTrackedTask() {
+		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
+		if (task != null) {
+			return TimekeeperPlugin.getDefault().getTask(task);
+		} else {
+			return null;
 		}
 	}
 

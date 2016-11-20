@@ -27,6 +27,8 @@ location "http://download.eclipse.org/mylyn/releases/latest" {
     org.apache.commons.lang
     org.eclipse.mylyn.bugzilla.core
     org.eclipse.mylyn.commons.ui
+	// add Bugzilla support for testing etc.
+	org.eclipse.mylyn.bugzilla_feature.feature.group
 }
 
 // Atlassian Connector for Eclipse
@@ -34,4 +36,16 @@ location "http://update.atlassian.com/atlassian-eclipse-plugin/rest/e3.7/" {
     com.atlassian.connector.eclipse.feature.group
 }
 
+// EclipseLink for persistence
+location "http://download.eclipse.org/rt/eclipselink/updates/" {
+	javax.persistence
+	javax.activation
+	javax.xml.bind
+	org.eclipse.persistence.core
+	org.eclipse.persistence.jpa
+}
+
+location "http://download.eclipse.org/gemini/jpa/updates/" {
+    org.eclipse.gemini.jpa
+}
 

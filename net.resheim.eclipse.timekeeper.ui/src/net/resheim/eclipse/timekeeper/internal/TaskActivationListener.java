@@ -11,14 +11,13 @@
  *******************************************************************************/
 package net.resheim.eclipse.timekeeper.internal;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.HashMap;
 
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.core.ITaskActivationListener;
 
-import net.resheim.eclipse.timekeeper.ui.Activator;
+import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
+import net.resheim.eclipse.timekeeper.db.TrackedTask;
 
 public class TaskActivationListener implements ITaskActivationListener {
 
@@ -30,15 +29,12 @@ public class TaskActivationListener implements ITaskActivationListener {
 
 	@Override
 	public void preTaskActivated(ITask task) {
-		LocalDateTime now = LocalDateTime.now();
-		Activator.setValue(task, Activator.TICK, now.toString());
-		Activator.setValue(task, Activator.START, now.toString());
+		TrackedTask ttask = TimekeeperPlugin.getDefault().getTask(task);
+		ttask.startActivity();
 	}
 
 	@Override
 	public void preTaskDeactivated(ITask task) {
-		Activator.clearValue(task, Activator.START);
-		Activator.clearValue(task, Activator.TICK);
 	}
 
 	@Override
@@ -48,7 +44,7 @@ public class TaskActivationListener implements ITaskActivationListener {
 
 	@Override
 	public void taskDeactivated(ITask task) {
-		Activator.accumulateRemainder(task, LocalDate.now());
-		// Do nothing
+		TrackedTask ttask = TimekeeperPlugin.getDefault().getTask(task);
+		ttask.endActivity();
 	}
 }

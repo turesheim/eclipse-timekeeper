@@ -10,15 +10,20 @@
 
 	<groupId>net.resheim.eclipse.timekeeper</groupId>
 	<artifactId>net.resheim.eclipse.timekeeper-parent</artifactId>
-	<version>1.1.0-SNAPSHOT</version>
+	<version>2.0.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<name>Eclipse Timekeeper</name>
 
 	<issueManagement>
-		<url>https://github.com/turesheim/eclipse-timekeeper/issues</url>
 		<system>GitHub</system>
+		<url>https://github.com/turesheim/eclipse-timekeeper/issues</url>
 	</issueManagement>
+
+	<ciManagement>
+		<system>Travis CI</system>
+		<url>https://travis-ci.org/turesheim/eclipse-timekeeper</url>
+	</ciManagement>
 
 	<licenses>
 		<license>
@@ -37,7 +42,8 @@
 	</licenses>
 
 	<properties>
-		<tycho.version>0.22.0</tycho.version>
+		<tycho.version>0.26.0</tycho.version>
+		<tycho.scmUrl>scm:git:git://github.com/turesheim/eclipse-timekeeper.git</tycho.scmUrl>
 	</properties>
 
 	<organization>
@@ -70,7 +76,7 @@
 						<artifact>
 							<groupId>net.resheim.eclipse.timekeeper</groupId>
 							<artifactId>net.resheim.eclipse.timekeeper-parent</artifactId>
-							<version>1.1.0-SNAPSHOT</version>
+							<version>2.0.0-SNAPSHOT</version>
 							<classifier>default</classifier>
 						</artifact>
 					</target>
@@ -133,9 +139,10 @@
 
 	<modules>
 		<module>net.resheim.eclipse.timekeeper-feature</module>
+		<module>net.resheim.eclipse.timekeeper.db</module>
 		<module>net.resheim.eclipse.timekeeper.ui</module>
 		<module>net.resheim.eclipse.timekeeper-site</module>
-        <module>net.resheim.eclipse.timekeeper.tests</module>
+        	<module>net.resheim.eclipse.timekeeper.tests</module>
 	</modules>
 
 </project>

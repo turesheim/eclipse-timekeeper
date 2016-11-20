@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2014, 2015 Torkild U. Resheim.
+ * Copyright (c) 2014-2017 Torkild U. Resheim.
  *
  * All rights reserved. This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License v1.0 which
@@ -16,7 +16,9 @@ import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.WeekFields;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -29,44 +31,29 @@ import org.eclipse.jface.action.IMenuManager;
 import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.action.Separator;
-import org.eclipse.jface.dialogs.MessageDialog;
-import org.eclipse.jface.resource.ImageDescriptor;
-import org.eclipse.jface.resource.JFaceResources;
-import org.eclipse.jface.viewers.CellEditor;
-import org.eclipse.jface.viewers.ColumnLabelProvider;
-import org.eclipse.jface.viewers.ColumnViewer;
+import org.eclipse.jface.viewers.AbstractTreeViewer;
+import org.eclipse.jface.viewers.ColumnViewerToolTipSupport;
 import org.eclipse.jface.viewers.DoubleClickEvent;
-import org.eclipse.jface.viewers.EditingSupport;
 import org.eclipse.jface.viewers.IDoubleClickListener;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
-import org.eclipse.jface.viewers.TextCellEditor;
 import org.eclipse.jface.viewers.TreeColumnViewerLabelProvider;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.TreeViewerColumn;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.viewers.ViewerComparator;
-import org.eclipse.mylyn.commons.ui.CommonImages;
+import org.eclipse.jface.window.ToolTip;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.ITaskListChangeListener;
 import org.eclipse.mylyn.internal.tasks.core.LocalTask;
-import org.eclipse.mylyn.internal.tasks.core.TaskCategory;
 import org.eclipse.mylyn.internal.tasks.core.TaskContainerDelta;
-import org.eclipse.mylyn.internal.tasks.core.TaskGroup;
-import org.eclipse.mylyn.internal.tasks.core.UncategorizedTaskContainer;
-import org.eclipse.mylyn.internal.tasks.core.UnsubmittedTaskContainer;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
-import org.eclipse.mylyn.tasks.core.IRepositoryElement;
-import org.eclipse.mylyn.tasks.core.IRepositoryQuery;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.core.ITaskActivationListener;
-import org.eclipse.mylyn.tasks.core.ITaskContainer;
 import org.eclipse.mylyn.tasks.core.TaskRepository;
 import org.eclipse.mylyn.tasks.core.data.TaskAttribute;
 import org.eclipse.mylyn.tasks.core.data.TaskData;
-import org.eclipse.mylyn.tasks.ui.AbstractRepositoryConnectorUi;
 import org.eclipse.mylyn.tasks.ui.TasksUi;
-import org.eclipse.mylyn.tasks.ui.TasksUiImages;
 import org.eclipse.mylyn.tasks.ui.TasksUiUtil;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.ScrolledComposite;
@@ -74,9 +61,6 @@ import org.eclipse.swt.events.ControlAdapter;
 import org.eclipse.swt.events.ControlEvent;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
-import org.eclipse.swt.graphics.Color;
-import org.eclipse.swt.graphics.Font;
-import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.GridData;
@@ -95,15 +79,19 @@ import org.eclipse.ui.contexts.IContextService;
 import org.eclipse.ui.forms.widgets.FormToolkit;
 import org.eclipse.ui.part.ViewPart;
 
+import net.resheim.eclipse.timekeeper.db.Activity;
+import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
+import net.resheim.eclipse.timekeeper.db.TrackedTask;
 import net.resheim.eclipse.timekeeper.ui.Activator;
 
 @SuppressWarnings("restriction")
 public class WorkWeekView extends ViewPart {
 
-	/** Update the status field every 30 seconds */
+	/** Update the status field every second */
 	private static final int UPDATE_INTERVAL = 1_000;
 
 	private final class ViewerComparatorExtension extends ViewerComparator {
+
 		@Override
 		public int compare(Viewer viewer, Object e1, Object e2) {
 			if (e1 instanceof ITask && e2 instanceof ITask) {
@@ -121,123 +109,10 @@ public class WorkWeekView extends ViewPart {
 			if (e1 instanceof WeeklySummary) {
 				return 1;
 			}
+			if (e1 instanceof Activity && e2 instanceof Activity) {
+				return ((Activity) e1).compareTo((Activity) e2);
+			}
 			return super.compare(viewer, e1, e2);
-		}
-	}
-
-	private class ViewColumnLabelProvider extends ColumnLabelProvider {
-
-		@Override
-		public Color getBackground(Object element) {
-			if (element instanceof WeeklySummary) {
-				return Display.getCurrent().getSystemColor(SWT.COLOR_INFO_BACKGROUND);
-			}
-			return super.getBackground(element);
-		}
-
-		@Override
-		public Font getFont(Object element) {
-			if (element instanceof ITask) {
-				if (((ITask) element).isActive()) {
-					return JFaceResources.getFontRegistry().getBold(JFaceResources.DIALOG_FONT);
-				}
-			}
-			if (element instanceof String) {
-				String p = (String) element;
-				if (contentProvider
-						.getFiltered()
-						.stream()
-						.filter(t -> p.equals(Activator.getProjectName(t)))
-						.anyMatch(t -> t.isActive())) {
-					return JFaceResources.getFontRegistry().getBold(JFaceResources.DIALOG_FONT);
-				}
-
-			}
-			return JFaceResources.getDialogFont();
-		}
-	}
-
-	private class TaskLabelProvider extends ViewColumnLabelProvider {
-
-		private class CompositeImageDescriptor {
-			ImageDescriptor icon;
-			ImageDescriptor overlayKind;
-		}
-
-		@Override
-		public Image getImage(Object element) {
-			CompositeImageDescriptor compositeDescriptor = getImageDescriptor(element);
-			if (element instanceof ITask) {
-				if (compositeDescriptor.overlayKind == null) {
-					compositeDescriptor.overlayKind = CommonImages.OVERLAY_CLEAR;
-				}
-				return CommonImages.getCompositeTaskImage(compositeDescriptor.icon, compositeDescriptor.overlayKind,
-						false);
-			} else if (element instanceof ITaskContainer) {
-				return CommonImages.getCompositeTaskImage(compositeDescriptor.icon, CommonImages.OVERLAY_CLEAR, false);
-			} else {
-				return CommonImages.getCompositeTaskImage(compositeDescriptor.icon, null, false);
-			}
-		}
-
-		private CompositeImageDescriptor getImageDescriptor(Object object) {
-			CompositeImageDescriptor compositeDescriptor = new CompositeImageDescriptor();
-			if (object instanceof UncategorizedTaskContainer) {
-				compositeDescriptor.icon = TasksUiImages.CATEGORY_UNCATEGORIZED;
-				return compositeDescriptor;
-			} else if (object instanceof UnsubmittedTaskContainer) {
-				compositeDescriptor.icon = TasksUiImages.CATEGORY_UNCATEGORIZED;
-				return compositeDescriptor;
-			} else if (object instanceof TaskCategory) {
-				compositeDescriptor.icon = TasksUiImages.CATEGORY;
-			} else if (object instanceof TaskGroup) {
-				compositeDescriptor.icon = CommonImages.GROUPING;
-			}
-
-			if (object instanceof ITaskContainer) {
-				IRepositoryElement element = (IRepositoryElement) object;
-
-				AbstractRepositoryConnectorUi connectorUi = null;
-				if (element instanceof ITask) {
-					ITask repositoryTask = (ITask) element;
-					connectorUi = TasksUiPlugin.getConnectorUi(((ITask) element).getConnectorKind());
-					if (connectorUi != null) {
-						compositeDescriptor.overlayKind = connectorUi.getTaskKindOverlay(repositoryTask);
-					}
-				} else if (element instanceof IRepositoryQuery) {
-					connectorUi = TasksUiPlugin.getConnectorUi(((IRepositoryQuery) element).getConnectorKind());
-				}
-
-				if (connectorUi != null) {
-					compositeDescriptor.icon = connectorUi.getImageDescriptor(element);
-					return compositeDescriptor;
-				} else {
-					compositeDescriptor.icon = TasksUiImages.TASK;
-					return compositeDescriptor;
-				}
-			}
-			return compositeDescriptor;
-		}
-
-		@Override
-		public String getText(Object element) {
-			if (element instanceof String) {
-				return (String) element;
-			}
-			if (element instanceof ITask) {
-				ITask task = ((ITask) element);
-				StringBuilder sb = new StringBuilder();
-				if (task.getTaskId() != null) {
-					sb.append(task.getTaskId());
-					sb.append(": ");
-				}
-				sb.append(task.getSummary());
-				return sb.toString();
-			}
-			if (element instanceof WeeklySummary) {
-				return "Daily total";
-			}
-			return null;
 		}
 
 	}
@@ -283,108 +158,16 @@ public class WorkWeekView extends ViewPart {
 
 	}
 
-	private class TimeEditingSupport extends EditingSupport {
-
-		private final int weekday;
-
-		public TimeEditingSupport(ColumnViewer viewer, int weekday) {
-			super(viewer);
-			this.weekday = weekday;
-		}
-
-		@Override
-		protected boolean canEdit(Object element) {
-			if (element instanceof ITask) {
-				return true;
-			}
-			return false;
-		}
-
-		@Override
-		protected CellEditor getCellEditor(Object element) {
-			return new TextCellEditor(viewer.getTree());
-		}
-
-		@Override
-		protected Object getValue(Object element) {
-			if (element instanceof ITask) {
-				AbstractTask task = (AbstractTask) element;
-				int seconds = Activator.getActiveTime(task, getDate(weekday));
-				return getFormattedPeriod(seconds);
-			}
-			return "";
-		}
-
-		@Override
-		protected void setValue(Object element, Object value) {
-			if (element instanceof AbstractTask) {
-				AbstractTask task = (AbstractTask) element;
-				if (value instanceof String) {
-					int newValue = -1;
-					try {
-						String string = ((String) value).replace(',', '.');
-						if (string.isEmpty()) {
-							newValue = 0;
-						} else if (string.indexOf('.') > -1) {
-							double d = Double.parseDouble(string);
-							newValue = (int) (d * 3600);
-						} else {
-							String[] split = string.split(":");
-							// Only minutes are given
-							if (split.length == 1) {
-								newValue = Integer.parseInt(split[0]) * 60;
-							}
-							if (split.length == 2) {
-								newValue = Integer.parseInt(split[0]) * 3600 + Integer.parseInt(split[1]) * 60;
-							}
-						}
-					} catch (Exception e) {
-						MessageDialog.openError(viewer.getControl().getShell(), "Illegal value",
-								"Please enter values in time or decimal form.\nFor instance 1:30 or 1.5/1,5.");
-					}
-					if (newValue > -1) {
-						Activator.setValue(task, getDate(weekday).toString(), Integer.toString(newValue));
-						// If the new value is 0, the task may have no time
-						// logged for the week and should be removed.
-						if (newValue == 0) {
-							viewer.refresh();
-						} else {
-							viewer.update(element, null);
-							viewer.update(Activator.getProjectName(task), null);
-							viewer.update(AbstractContentProvider.WEEKLY_SUMMARY, null);
-						}
-					}
-				}
-			}
-		}
-
-	}
-
 	private void installStatusUpdater() {
 		final Display display = PlatformUI.getWorkbench().getDisplay();
 		Runnable handler = new Runnable() {
 			public void run() {
 				if (!display.isDisposed() && !PlatformUI.getWorkbench().isClosing() && !statusLabel.isDisposed()) {
 					if (!viewer.isCellEditorActive()) {
-						ITask activeTask = TasksUi.getTaskActivityManager().getActiveTask();
-						if (Activator.getDefault().isIdle()) {
-							statusLabel.setText("Idle since "
-									+ timeFormat.format(Activator.getDefault().getIdleSince()));
-							viewer.refresh(activeTask);
-							viewer.refresh(contentProvider.getParent(activeTask));
-							viewer.refresh(AbstractContentProvider.WEEKLY_SUMMARY);
-						} else if (Activator.getDefault().getActiveTime() > 0) {
-							long activeTime = Activator.getDefault().getActiveTime();
-							LocalDateTime activeSince = Activator.getDefault().getActiveSince();
-							statusLabel.setText(MessageFormat.format("Active since {0}, {1} elapsed",
-									timeFormat.format(activeSince),
-									DurationFormatUtils.formatDurationWords(activeTime, true, true)));
-
-							viewer.refresh(activeTask);
-							viewer.refresh(contentProvider.getParent(activeTask));
-							viewer.refresh(AbstractContentProvider.WEEKLY_SUMMARY);
-						} else {
-							statusLabel.setText("");
+						try {
+							updateStatus();
+						} catch (Exception e) {
+							e.printStackTrace();
 						}
 					}
 					display.timerExec(UPDATE_INTERVAL, this);
@@ -394,7 +177,44 @@ public class WorkWeekView extends ViewPart {
 		display.timerExec(UPDATE_INTERVAL, handler);
 	}
 
-	private class ViewContentProvider extends AbstractContentProvider {
+	/**
+	 * Returns the number of milliseconds the active task has been active
+	 *
+	 * @return the active milliseconds or "0"
+	 */
+	public long getActiveTime() {
+		LocalDateTime activeSince = Activator.getDefault().getActiveSince();
+		if (activeSince != null) {
+			LocalDateTime now = LocalDateTime.now();
+			return activeSince.until(now, ChronoUnit.MILLIS);
+		}
+		return 0;
+	}
+
+	private void updateStatus() throws Exception {
+		ITask activeTask = TasksUi.getTaskActivityManager().getActiveTask();
+		if (activeTask == null) {
+			statusLabel.setText("");
+		} else if (Activator.getDefault().isIdle()) {
+			statusLabel.setText("Idle since " +
+					timeFormat.format(Activator.getDefault().getIdleSince()));
+			viewer.refresh(activeTask);
+			viewer.refresh(contentProvider.getParent(activeTask));
+			viewer.refresh(WeekViewContentProvider.WEEKLY_SUMMARY);
+		} else if (getActiveTime() > 0) {
+			long activeTime = getActiveTime();
+			LocalDateTime activeSince = Activator.getDefault().getActiveSince();
+			statusLabel.setText(MessageFormat.format("Active since {0}, {1} elapsed", timeFormat.format(activeSince),
+					DurationFormatUtils.formatDurationWords(activeTime, true, true)));
+
+			viewer.refresh(activeTask);
+			viewer.refresh(contentProvider.getParent(activeTask));
+			viewer.refresh(WeekViewContentProvider.WEEKLY_SUMMARY);
+		}
+
+	}
+
+	private class ViewContentProvider extends WeekViewContentProvider {
 
 
 		public void dispose() {
@@ -447,8 +267,9 @@ public class WorkWeekView extends ViewPart {
 
 	private Action doubleClickAction;
 
-	private MenuManager projectFieldMenu;
+	private Action deleteAction;
 
+	private MenuManager projectFieldMenu;
 
 	private TaskListener taskListener;
 
@@ -462,7 +283,7 @@ public class WorkWeekView extends ViewPart {
 
 	private Action activateAction;
 
-	private AbstractContentProvider contentProvider;
+	private WeekViewContentProvider contentProvider;
 
 	private Text statusLabel;
 
@@ -548,6 +369,8 @@ public class WorkWeekView extends ViewPart {
 
 		Tree tree = viewer.getTree();
 		viewer.setComparator(new ViewerComparatorExtension());
+		viewer.setAutoExpandLevel(AbstractTreeViewer.ALL_LEVELS);
+		ColumnViewerToolTipSupport.enableFor(viewer, ToolTip.NO_RECREATE);
 		tree.setHeaderVisible(true);
 		tree.setLinesVisible(true);
 
@@ -601,24 +424,34 @@ public class WorkWeekView extends ViewPart {
 		return viewerColumn;
 	}
 
+	/**
+	 * Creates a table column for the given weekday and installs editing support
+	 *
+	 * @param weekday
+	 *            the day of the week, starting from 0
+	 */
 	private void createTimeColumn(int weekday) {
 		TreeViewerColumn column = createTableViewerColumn("-", 50, 1 + weekday);
 		column.getColumn().setMoveable(false);
 		column.getColumn().setAlignment(SWT.RIGHT);
-		column.setEditingSupport(new TimeEditingSupport(column.getViewer(), weekday));
-		column.setLabelProvider(new ViewColumnLabelProvider() {
+		column.setEditingSupport(new TimeEditingSupport((TreeViewer) column.getViewer(), contentProvider, weekday));
+		column.setLabelProvider(new TimeColumnLabelProvider(contentProvider) {
 
 			@Override
 			public String getText(Object element) {
-				int seconds = 0;
+				// Use modern formatting
+				long seconds = 0;
 				LocalDate date = contentProvider.getFirstDayOfWeek().plusDays(weekday);
 				if (element instanceof String) {
 					seconds = getSum(contentProvider.getFiltered(), date, (String) element);
 				} else if (element instanceof ITask) {
 					AbstractTask task = (AbstractTask) element;
-					seconds = Activator.getActiveTime(task, getDate(weekday));
+					TrackedTask trackedTask = TimekeeperPlugin.getDefault().getTask(task);
+					seconds = trackedTask.getDuration(contentProvider.getDate(weekday)).getSeconds();
 				} else if (element instanceof WeeklySummary) {
 					seconds = getSum(contentProvider.getFiltered(), date);
+				} else if (element instanceof Activity) {
+					seconds = ((Activity) element).getDuration(date).getSeconds();
 				}
 				if (seconds > 0) {
 					return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
@@ -630,7 +463,8 @@ public class WorkWeekView extends ViewPart {
 
 	private void createTitleColumn() {
 		TreeViewerColumn column = createTableViewerColumn("Activity", 400, 1);
-		column.setLabelProvider(new TreeColumnViewerLabelProvider(new TaskLabelProvider()));
+		column.setLabelProvider(new TreeColumnViewerLabelProvider(new TitleColumnLabelProvider(contentProvider)));
+		column.setEditingSupport(new ActivitySummaryEditingSupport(viewer));
 	}
 	@Override
 	public void dispose() {
@@ -639,6 +473,9 @@ public class WorkWeekView extends ViewPart {
 		super.dispose();
 	}
 
+	/**
+	 * Populates the view context menu.
+	 */
 	private void fillContextMenu(IMenuManager manager) {
 		manager.add(previousWeekAction);
 		manager.add(nextWeekAction);
@@ -653,6 +490,9 @@ public class WorkWeekView extends ViewPart {
 			}
 			manager.add(new Separator());
 			manager.add(projectFieldMenu);
+		}
+		if (obj instanceof Activity) {
+			manager.add(deleteAction);
 		}
 	}
 
@@ -670,21 +510,12 @@ public class WorkWeekView extends ViewPart {
 		manager.add(nextWeekAction);
 	}
 
-	/**
-	 * Returns a string representation of the date.
-	 *
-	 * @param weekday
-	 * @return
-	 */
-	private LocalDate getDate(int weekday) {
-		return contentProvider.getFirstDayOfWeek().plusDays(weekday);
-	}
-
-	private String getFormattedPeriod(int seconds) {
+	private String getFormattedPeriod(long seconds) {
 		if (seconds > 0) {
 			return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
 		}
-		return "0:00";
+		// TODO: Fix dates with no entries "0:00"
+		return "";
 	}
 
 	/**
@@ -694,14 +525,13 @@ public class WorkWeekView extends ViewPart {
 	 *            the date to calculate for
 	 * @return the total amount of seconds accumulated
 	 */
-	private int getSum(List<ITask> filtered, LocalDate date) {
+	private long getSum(List<ITask> filtered, LocalDate date) {
 		// May not have been initialised when first called.
 		if (filtered == null) {
 			return 0;
 		}
 		return filtered
-				.stream()
-				.mapToInt(t -> Activator.getActiveTime(t, date))
+				.stream().mapToLong(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date).getSeconds())
 				.sum();
 	}
 
@@ -715,9 +545,12 @@ public class WorkWeekView extends ViewPart {
 	 *            the project to calculate for
 	 * @return the total amount of seconds accumulated
 	 */
-	private int getSum(List<ITask> filtered, LocalDate date, String project) {
-		return filtered.stream().filter(t -> project.equals(Activator.getProjectName(t)))
-				.mapToInt(t -> Activator.getActiveTime(t, date)).sum();
+	private long getSum(List<ITask> filtered, LocalDate date, String project) {
+		return filtered
+				.stream()
+				.filter(t -> project.equals(Activator.getProjectName(t)))
+				.mapToLong(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date).getSeconds())
+				.sum();
 	}
 
 	private void hookContextMenu() {
@@ -728,7 +561,7 @@ public class WorkWeekView extends ViewPart {
 				WorkWeekView.this.fillContextMenu(manager);
 			}
 		});
-		// Create a context menu for the view
+		// create a context menu for the view
 		Menu menu = menuMgr.createContextMenu(viewer.getControl());
 		viewer.getControl().setMenu(menu);
 		getSite().registerContextMenu(menuMgr, viewer);
@@ -750,7 +583,7 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void makeActions() {
-
+		// browse to previous week
 		previousWeekAction = new Action() {
 			@Override
 			public void run() {
@@ -763,6 +596,7 @@ public class WorkWeekView extends ViewPart {
 		previousWeekAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
 				.getImageDescriptor(ISharedImages.IMG_TOOL_BACK));
 
+		// browse to current week
 		currentWeekAction = new Action() {
 			@Override
 			public void run() {
@@ -774,6 +608,7 @@ public class WorkWeekView extends ViewPart {
 		currentWeekAction.setToolTipText("Show current week");
 		currentWeekAction.setImageDescriptor(Activator.getImageDescriptor("icons/full/elcl16/cur_nav.png"));
 
+		// browse to next week
 		nextWeekAction = new Action() {
 			@Override
 			public void run() {
@@ -786,7 +621,7 @@ public class WorkWeekView extends ViewPart {
 		nextWeekAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
 				.getImageDescriptor(ISharedImages.IMG_TOOL_FORWARD));
 
-
+		// double click on task
 		doubleClickAction = new Action() {
 			@Override
 			public void run() {
@@ -797,6 +632,8 @@ public class WorkWeekView extends ViewPart {
 				}
 			}
 		};
+
+		// deactivate task
 		deactivateAction = new Action("Deactivate") {
 			@Override
 			public void run() {
@@ -807,6 +644,8 @@ public class WorkWeekView extends ViewPart {
 				}
 			}
 		};
+
+		// activate task
 		activateAction = new Action("Activate") {
 			@Override
 			public void run() {
@@ -817,6 +656,24 @@ public class WorkWeekView extends ViewPart {
 				}
 			}
 		};
+
+		// delete activity
+		deleteAction = new Action("Delete") {
+			@Override
+			public void run() {
+				ISelection selection = viewer.getSelection();
+				Iterator<?> iterator = ((IStructuredSelection) selection).iterator();
+				while (iterator.hasNext()) {
+					Object i = iterator.next();
+					if (i instanceof Activity) {
+						((Activity) i).getTrackedTask().getActivities().remove(i);
+					}
+				}
+				viewer.refresh();
+			}
+		};
+		deleteAction.setImageDescriptor(
+				PlatformUI.getWorkbench().getSharedImages().getImageDescriptor(ISharedImages.IMG_TOOL_DELETE));
 
 		projectFieldMenu = new MenuManager("Set Grouping Field", null);
 		projectFieldMenu.setRemoveAllWhenShown(true);
@@ -865,7 +722,7 @@ public class WorkWeekView extends ViewPart {
 						} catch (CoreException e) {
 							e.printStackTrace();
 						}
-					}
+					} // abstract task menu
 				}
 			}
 		});
@@ -883,9 +740,9 @@ public class WorkWeekView extends ViewPart {
 
 	private void setProjectField(TaskRepository repository, String string) {
 		if (null == string) {
-			repository.removeProperty(Activator.ATTR_ID + ".grouping");
+			repository.removeProperty(TimekeeperPlugin.KEY_VALUELIST_ID + ".grouping");
 		}
-		repository.setProperty(Activator.ATTR_ID + ".grouping", string);
+		repository.setProperty(TimekeeperPlugin.KEY_VALUELIST_ID + ".grouping", string);
 		viewer.refresh();
 	}
 }

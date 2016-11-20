@@ -15,6 +15,10 @@ See the <a href="../../wiki">wiki</a>  for more about usage.
 You can install from the <a href="http://marketplace.eclipse.org/content/timekeeper-eclipse">Eclipse Marketplace</a> or drag <a href="http://marketplace.eclipse.org/marketplace-client-intro?mpc_install=2196325" title="Drag and drop into a running Eclipse Indigo workspace to install Eclipse Timekeeper"><img src="https://marketplace.eclipse.org/sites/all/modules/custom/marketplace/images/installbutton.png" style="border: 0px; margin:0px; padding:0px; vertical-align:bottom;"/>
 </a> into an running Eclipse instance.
 
+### Database configuration
+
+Since version 2.0 data are stored in an SQL database. It is per default stored under **~/.timekeeper/**, one instance per workspace using the embedded [h2 databaes](http://www.h2database.com/html/main.html). If you rather store it on a different location you can change this under **Timekeeper** page in the preference settings. If you'd rather use a database server you can download h2 from their website, start it and change the preference setting accordingly. 
+
 ## Building
 
 Clone the project and from the root execute:

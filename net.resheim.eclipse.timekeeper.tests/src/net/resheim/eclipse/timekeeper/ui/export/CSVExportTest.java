@@ -19,7 +19,8 @@ import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import net.resheim.eclipse.timekeeper.ui.Activator;
+
+import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 
 @SuppressWarnings("restriction")
 public class CSVExportTest {
@@ -45,11 +46,11 @@ public class CSVExportTest {
 	// This test will fail in Maven/Tycho, probably related to Mylyn housekeeping
 	// @Test
 	public void testExport() {
-		LocalDate date = LocalDate.of(1969, 3, 14);
-		Activator.setValue(task, date.toString(), Long.toString(360));
-		CSVExporter exporter = new CSVExporter();
-		String data = exporter.getData(date);
-		Assert.assertEquals("\"1\";\"TestTask\";0,004;;;;;;\n", data);
+//		LocalDate date = LocalDate.of(1969, 3, 14);
+//		TimekeeperPlugin.setValue(task, date.toString(), Long.toString(360));
+//		CSVExporter exporter = new CSVExporter();
+//		String data = exporter.getData(date);
+//		Assert.assertEquals("\"1\";\"TestTask\";0,004;;;;;;\n", data);
 	}
 
 }
