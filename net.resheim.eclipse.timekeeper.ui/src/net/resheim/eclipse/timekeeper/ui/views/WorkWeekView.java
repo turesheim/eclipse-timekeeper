@@ -606,7 +606,10 @@ public class WorkWeekView extends ViewPart {
 		};
 		currentWeekAction.setText("Current Week");
 		currentWeekAction.setToolTipText("Show current week");
-		currentWeekAction.setImageDescriptor(Activator.getImageDescriptor("icons/full/elcl16/cur_nav.png"));
+		currentWeekAction
+		.setImageDescriptor(Activator.getDefault()
+				.getImageRegistry()
+						.getDescriptor(Activator.IMG_TOOL_CURRENT));
 
 		// browse to next week
 		nextWeekAction = new Action() {

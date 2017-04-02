@@ -44,8 +44,14 @@ class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 		ImageDescriptor overlayKind;
 	}
 
+
 	@Override
 	public Image getImage(Object element) {
+		if (element instanceof Activity) {
+			return Activator.getDefault().getImageRegistry().get(Activator.OBJ_ACTIVITY);
+		}
+		// Mylyn stuff, should be rewritten to use Mylyn HiDPI images when these
+		// are ready
 		CompositeImageDescriptor compositeDescriptor = getImageDescriptor(element);
 		if (element instanceof ITask) {
 			if (compositeDescriptor.overlayKind == null) {
@@ -94,9 +100,6 @@ class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 				compositeDescriptor.icon = TasksUiImages.TASK;
 				return compositeDescriptor;
 			}
-		}
-		if (object instanceof Activity) {
-			compositeDescriptor.icon = Activator.getImageDescriptor("icons/full/eview16/time_obj.gif");
 		}
 		return compositeDescriptor;
 	}

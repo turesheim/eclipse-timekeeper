@@ -10,7 +10,7 @@
       </category>
       <view
             name="Workweek"
-            icon="icons/full/eview16/date_obj.gif"
+            icon="icons/full/eview/view_obj.png"
             category="net.resheim.eclipse.timekeeper.ui"
             class="net.resheim.eclipse.timekeeper.ui.views.WorkWeekView"
             id="net.resheim.eclipse.timekeeper.ui.views.workWeek">
@@ -70,7 +70,8 @@
             locationURI="toolbar:net.resheim.eclipse.timekeeper.ui.views.workWeek?before=navigation">
          <command
                commandId="net.resheim.eclipse.timekeeper.ui.HTMLClipboard"
-               icon="icons/full/elcl16/export.gif"
+               icon="icons/full/elcl/export.png"
+               disabledIcon="icons/full/dlcl/export.png"
                id="export"
                label="Export"
                style="pulldown"
