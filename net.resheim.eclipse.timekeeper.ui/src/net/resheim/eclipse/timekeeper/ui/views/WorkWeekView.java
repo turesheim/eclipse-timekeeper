@@ -263,6 +263,8 @@ public class WorkWeekView extends ViewPart {
 
 	private Action currentWeekAction;
 
+	private Action newActivityAction;
+
 	private Action nextWeekAction;
 
 	private Action doubleClickAction;
@@ -485,6 +487,7 @@ public class WorkWeekView extends ViewPart {
 			manager.add(new Separator("task"));
 			if (((ITask) obj).isActive()) {
 				manager.add(deactivateAction);
+				manager.add(newActivityAction);
 			} else {
 				manager.add(activateAction);
 			}
@@ -609,7 +612,7 @@ public class WorkWeekView extends ViewPart {
 		currentWeekAction
 		.setImageDescriptor(Activator.getDefault()
 				.getImageRegistry()
-						.getDescriptor(Activator.IMG_TOOL_CURRENT));
+				.getDescriptor(Activator.IMG_TOOL_CURRENT));
 
 		// browse to next week
 		nextWeekAction = new Action() {
@@ -656,6 +659,22 @@ public class WorkWeekView extends ViewPart {
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
 				if (obj instanceof ITask) {
 					TasksUi.getTaskActivityManager().activateTask((ITask) obj);
+				}
+			}
+		};
+
+		// create a new activity
+		newActivityAction = new Action("New activity") {
+			@Override
+			public void run() {
+				ISelection selection = viewer.getSelection();
+				Object obj = ((IStructuredSelection) selection).getFirstElement();
+				if (obj instanceof ITask) {
+					if (((ITask) obj).isActive()) {
+						TrackedTask task = TimekeeperPlugin.getDefault().getTask((ITask) obj);
+						task.endActivity();
+						task.startActivity();
+					}
 				}
 			}
 		};
