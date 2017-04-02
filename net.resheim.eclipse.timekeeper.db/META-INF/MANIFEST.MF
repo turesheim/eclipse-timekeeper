@@ -1,0 +1,23 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Timekeeper database
+Bundle-SymbolicName: net.resheim.eclipse.timekeeper.db;singleton:=true
+Bundle-Version: 2.0.0.qualifier
+Export-Package: net.resheim.eclipse.timekeeper.db
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Require-Bundle: org.eclipse.mylyn.tasks.core;bundle-version="3.21.0",
+ org.eclipse.core.runtime,
+ javax.persistence;bundle-version="2.1.1",
+ org.eclipse.persistence.core;bundle-version="2.6.4",
+ org.eclipse.persistence.jpa;bundle-version="2.6.4",
+ org.eclipse.persistence.asm;bundle-version="5.0.1",
+ org.eclipse.persistence.jpa.jpql;bundle-version="2.6.4",
+ org.eclipse.mylyn.tasks.ui;bundle-version="3.21.0",
+ org.eclipse.ui;bundle-version="3.108.1"
+Import-Package: org.eclipse.core.resources,
+ org.eclipse.mylyn.internal.tasks.ui,
+ org.eclipse.osgi.service.datalocation
+Bundle-ClassPath: lib/h2-1.4.192.jar,
+ .
+Bundle-ActivationPolicy: lazy
+Bundle-Activator: net.resheim.eclipse.timekeeper.db.TimekeeperPlugin

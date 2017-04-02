@@ -1,8 +1,8 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
-Bundle-Name: Timekeeper for Eclipse
+Bundle-Name: Timekeeper user interface
 Bundle-SymbolicName: net.resheim.eclipse.timekeeper.ui;singleton:=true
-Bundle-Version: 1.1.0.qualifier
+Bundle-Version: 2.0.0.qualifier
 Bundle-Activator: net.resheim.eclipse.timekeeper.ui.Activator
 Require-Bundle: org.eclipse.ui,
  org.eclipse.core.runtime,
@@ -12,7 +12,8 @@ Require-Bundle: org.eclipse.ui,
  org.apache.commons.lang;bundle-version="[2.4.0,3.0.0)",
  org.eclipse.jface,
  org.eclipse.mylyn.commons.ui,
- org.eclipse.ui.forms
+ org.eclipse.ui.forms,
+ net.resheim.eclipse.timekeeper.db;bundle-version="2.0.0"
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Bundle-ActivationPolicy: lazy
 Bundle-ClassPath: .,

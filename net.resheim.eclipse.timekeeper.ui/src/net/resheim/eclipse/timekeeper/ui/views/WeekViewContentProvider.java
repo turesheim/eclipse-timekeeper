@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2014 Torkild U. Resheim
+ * Copyright (c) 2014-2017 Torkild U. Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -11,23 +11,29 @@
 
 package net.resheim.eclipse.timekeeper.ui.views;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.eclipse.jface.viewers.ITreeContentProvider;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.core.ITask;
 
+import net.resheim.eclipse.timekeeper.db.Activity;
+import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
+import net.resheim.eclipse.timekeeper.db.TrackedTask;
 import net.resheim.eclipse.timekeeper.ui.Activator;
 
 @SuppressWarnings("restriction")
-public abstract class AbstractContentProvider implements ITreeContentProvider {
+public abstract class WeekViewContentProvider implements ITreeContentProvider {
 
 	public static final WeeklySummary WEEKLY_SUMMARY = new WeeklySummary();
 
-	protected List<ITask> filtered;
 	private LocalDate firstDayOfWeek;
+
+	protected List<ITask> filtered;
 
 	public List<ITask> getFiltered() {
 		return filtered;
@@ -42,6 +48,12 @@ public abstract class AbstractContentProvider implements ITreeContentProvider {
 					.filter(t -> p.equals(Activator.getProjectName(t)))
 					.toArray(size -> new ITask[size]);
 			return tasks;
+		} else if (parentElement instanceof ITask) {
+			TrackedTask task = TimekeeperPlugin.getDefault().getTask((ITask) parentElement);
+			return task.getActivities()
+					.stream()
+					.filter(a -> hasData(a))
+					.toArray();
 		}
 		return new Object[0];
 	}
@@ -49,12 +61,12 @@ public abstract class AbstractContentProvider implements ITreeContentProvider {
 	public Object[] getElements(Object parent) {
 		Object[] projects = filtered
 				.stream()
-				.collect(Collectors.groupingBy(t -> Activator.getProjectName(t)))
-				.keySet().toArray();
-		if (projects.length==0){
+				.collect(Collectors.groupingBy(t -> Activator.getProjectName(t))).keySet()
+				.toArray();
+		if (projects.length == 0) {
 			return new Object[0];
 		}
-		Object[] elements = new Object[projects.length+1];
+		Object[] elements = new Object[projects.length + 1];
 		System.arraycopy(projects, 0, elements, 0, projects.length);
 		elements[projects.length] = WEEKLY_SUMMARY;
 		return elements;
@@ -75,16 +87,23 @@ public abstract class AbstractContentProvider implements ITreeContentProvider {
 		if (element instanceof String) {
 			return true;
 		}
+		if (element instanceof ITask) {
+			return hasData((ITask) element, firstDayOfWeek);
+		}
 		return false;
 	}
 
-	private boolean hasData(ITask task, LocalDate startDate) {
-		int sum = 0;
-		for (int i = 0; i < 7; i++) {
-			LocalDate d = startDate.plusDays(i);
-			sum += Activator.getActiveTime(task, d);
-		}
-		return sum > 0;
+	private boolean hasData/* this week */(ITask task, LocalDate startDate) {
+		LocalDate endDate = startDate.plusDays(7);
+		TrackedTask ttask = TimekeeperPlugin.getDefault().getTask(task);
+		Stream<Activity> filter = ttask.getActivities().stream()
+				.filter(a -> a.getDuration(startDate, endDate) != Duration.ZERO);
+		return filter.count() > 0;
+	}
+
+	private boolean hasData(Activity activity) {
+		LocalDate endDate = firstDayOfWeek.plusDays(7);
+		return activity.getDuration(firstDayOfWeek, endDate) != Duration.ZERO;
 	}
 
 	protected void filter() {
@@ -100,4 +119,15 @@ public abstract class AbstractContentProvider implements ITreeContentProvider {
 	public void setFirstDayOfWeek(LocalDate firstDayOfWeek) {
 		this.firstDayOfWeek = firstDayOfWeek;
 	}
+
+	/**
+	 * Returns a string representation of the date.
+	 *
+	 * @param weekday
+	 * @return
+	 */
+	LocalDate getDate(int weekday) {
+		return getFirstDayOfWeek().plusDays(weekday);
+	}
+
 }

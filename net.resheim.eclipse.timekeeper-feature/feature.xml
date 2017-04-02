@@ -2,7 +2,7 @@
 <feature
       id="net.resheim.eclipse.timekeeper"
       label="%featureName"
-      version="1.1.0.qualifier"
+      version="2.0.0.qualifier"
       provider-name="%providerName"
       plugin="net.resheim.eclipse.timekeeper.ui">
 
@@ -20,6 +20,48 @@
 
    <plugin
          id="net.resheim.eclipse.timekeeper.ui"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
+         id="net.resheim.eclipse.timekeeper.db"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
+         id="javax.persistence"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
+         id="org.eclipse.persistence.core"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
+         id="org.eclipse.persistence.asm"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
+         id="org.eclipse.persistence.jpa"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
+         id="org.eclipse.persistence.jpa.jpql"
          download-size="0"
          install-size="0"
          version="0.0.0"

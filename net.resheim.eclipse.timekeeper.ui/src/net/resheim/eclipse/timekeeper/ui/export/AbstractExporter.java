@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2015 Torkild U. Resheim
+ * Copyright (c) 2015-2017 Torkild U. Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -16,6 +16,7 @@ import java.util.List;
 
 import org.eclipse.mylyn.tasks.core.ITask;
 
+import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.ui.Activator;
 
 /**
@@ -37,11 +38,13 @@ public abstract class AbstractExporter {
 	 *            the project to calculate for
 	 * @return the total amount of seconds accumulated
 	 */
-	protected int getSum(List<ITask> tasks, LocalDate date, String project) {
+	protected long getSum(List<ITask> tasks, LocalDate date, String project) {
 		return tasks
 				.stream()
 				.filter(t -> project.equals(Activator.getProjectName(t)))
-				.mapToInt(t -> Activator.getActiveTime(t, date)).sum();
+				.map(t -> TimekeeperPlugin.getDefault().getTask(t))
+				.mapToLong(t -> t.getDuration(date).getSeconds())
+				.sum();
 	}
 
 	/**
@@ -53,9 +56,11 @@ public abstract class AbstractExporter {
 	 *            the date to calculate for
 	 * @return the total amount of seconds accumulated
 	 */
-	protected int getSum(List<ITask> tasks, LocalDate date) {
+	protected long getSum(List<ITask> tasks, LocalDate date) {
 		return tasks
-				.stream().mapToInt(t -> Activator.getActiveTime(t, date))
+				.stream()
+				.map(t -> TimekeeperPlugin.getDefault().getTask(t))
+				.mapToLong(t -> t.getDuration(date).getSeconds())
 				.sum();
 	}
 

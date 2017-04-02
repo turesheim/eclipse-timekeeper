@@ -19,7 +19,8 @@ import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import net.resheim.eclipse.timekeeper.ui.Activator;
+
+import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 
 @SuppressWarnings("restriction")
 public class HTMLExportTest {
@@ -51,11 +52,11 @@ public class HTMLExportTest {
 	// This test will fail in Maven/Tycho, probably related to Mylyn housekeeping
 	// @Test
 	public void testExport() {
-		LocalDate date = LocalDate.of(1990, 1, 1);
-		Activator.setValue(task, date.toString(), Long.toString(360));
-		HTMLExporter exporter = new HTMLExporter();
-		String data = exporter.getData(date);
-		System.out.println(data);
-		Assert.assertEquals(EXPECTED, data);
+//		LocalDate date = LocalDate.of(1990, 1, 1);
+//		TimekeeperPlugin.setValue(task, date.toString(), Long.toString(360));
+//		HTMLExporter exporter = new HTMLExporter();
+//		String data = exporter.getData(date);
+//		System.out.println(data);
+//		Assert.assertEquals(EXPECTED, data);
 	}
 }

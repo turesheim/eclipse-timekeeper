@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2015 Torkild U. Resheim
+ * Copyright (c) 2015-2017 Torkild U. Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -18,18 +18,20 @@ import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.tasks.core.ITask;
 
-import net.resheim.eclipse.timekeeper.ui.Activator;
-import net.resheim.eclipse.timekeeper.ui.views.AbstractContentProvider;
+import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
+import net.resheim.eclipse.timekeeper.db.TrackedTask;
+import net.resheim.eclipse.timekeeper.ui.views.WeekViewContentProvider;
 
 @SuppressWarnings("restriction")
 public class CSVExporter extends AbstractExporter {
 
 	private static final String SEPARATOR = ";";
-	private AbstractContentProvider provider;
+	private WeekViewContentProvider provider;
 
+	@Override
 	public String getData(LocalDate firstDayOfWeek) {
 
-		provider = new AbstractContentProvider() {
+		provider = new WeekViewContentProvider() {
 
 			@Override
 			public void inputChanged(Viewer viewer, Object oldInput, Object newInput) {
@@ -72,7 +74,8 @@ public class CSVExporter extends AbstractExporter {
 			for (int i = 0; i < 7; i++) {
 				sb.append(SEPARATOR);
 				LocalDate weekday = firstDayOfWeek.plusDays(i);
-				double seconds = Activator.getActiveTime(task, weekday);
+				TrackedTask ttask = TimekeeperPlugin.getDefault().getTask(task);
+				double seconds = ttask.getDuration(weekday).getSeconds();
 				if (seconds > 60) {
 					// Duration as ISO-8601 won't work, Numbers and Excel
 					// expects fraction of a 24-hour period
