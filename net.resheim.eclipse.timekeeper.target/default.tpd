@@ -1,7 +1,7 @@
 target "Eclipse Timekeeper Target Platform" with source requirements
 
 // Base dependencies
-location "http://download.eclipse.org/releases/oxygen/" {
+location "http://download.eclipse.org/releases/neon/" {
     org.eclipse.equinox.p2.sdk.feature.group
     org.eclipse.sdk.feature.group
     org.eclipse.pde.core

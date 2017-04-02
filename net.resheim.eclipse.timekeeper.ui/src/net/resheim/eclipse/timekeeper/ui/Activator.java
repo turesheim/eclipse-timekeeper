@@ -27,6 +27,7 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.resource.ImageDescriptor;
+import org.eclipse.jface.resource.ImageRegistry;
 import org.eclipse.jface.util.IPropertyChangeListener;
 import org.eclipse.jface.util.PropertyChangeEvent;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
@@ -41,6 +42,7 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.internal.util.BundleUtility;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
 import org.osgi.framework.BundleContext;
 
@@ -56,6 +58,9 @@ import net.resheim.eclipse.timekeeper.ui.preferences.PreferenceConstants;
 
 @SuppressWarnings("restriction")
 public class Activator extends AbstractUIPlugin implements IPropertyChangeListener {
+
+	public static final String OBJ_ACTIVITY = "OBJ_ACTIVITY";
+	public static final String IMG_TOOL_CURRENT = "IMG_TOOL_CURRENT";
 
 	/** Repository attribute ID for custom grouping field */
 	public static final String ATTR_GROUPING = TimekeeperPlugin.KEY_VALUELIST_ID + ".grouping"; //$NON-NLS-1$
@@ -93,16 +98,12 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 		return plugin;
 	}
 
-	/**
-	 * Returns an image descriptor for the image file at the given plug-in
-	 * relative path.
-	 *
-	 * @param path
-	 *            the path relative to the plug-in root
-	 * @return the image descriptor
-	 */
-	public static ImageDescriptor getImageDescriptor(String path) {
-		return imageDescriptorFromPlugin(PLUGIN_ID, path);
+	@Override
+	protected void initializeImageRegistry(ImageRegistry reg) {
+		reg.put(OBJ_ACTIVITY, ImageDescriptor
+				.createFromURL(BundleUtility.find(getBundle(), "icons/full/eview/activity_obj.png")));
+		reg.put(IMG_TOOL_CURRENT, ImageDescriptor
+				.createFromURL(BundleUtility.find(getBundle(), "icons/full/elcl/cur_nav.png")));
 	}
 
 	/**
