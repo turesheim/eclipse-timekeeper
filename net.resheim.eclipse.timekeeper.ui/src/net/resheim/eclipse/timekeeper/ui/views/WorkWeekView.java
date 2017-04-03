@@ -21,6 +21,7 @@ import java.time.temporal.WeekFields;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 
 import org.apache.commons.lang.time.DurationFormatUtils;
@@ -495,7 +496,10 @@ public class WorkWeekView extends ViewPart {
 			manager.add(projectFieldMenu);
 		}
 		if (obj instanceof Activity) {
-			manager.add(deleteAction);
+			Optional<Activity> currentActivity = ((Activity) obj).getTrackedTask().getCurrentActivity();
+			if (!(currentActivity.isPresent() && currentActivity.get().equals(obj))) {
+				manager.add(deleteAction);
+			}
 		}
 	}
 

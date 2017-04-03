@@ -162,7 +162,7 @@ public class Activity implements Comparable<Activity>{
 		this.start = start;
 	}
 
-	public boolean isManual() {
+	public boolean isEdited() {
 		return manual;
 	}
 	
