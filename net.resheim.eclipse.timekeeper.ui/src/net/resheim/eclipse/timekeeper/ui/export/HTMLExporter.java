@@ -11,6 +11,7 @@
 
 package net.resheim.eclipse.timekeeper.ui.export;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
@@ -19,6 +20,7 @@ import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.tasks.core.ITask;
 
+import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.TrackedTask;
 import net.resheim.eclipse.timekeeper.ui.Activator;
@@ -45,6 +47,7 @@ public class HTMLExporter extends AbstractExporter {
 			public void dispose() {
 				// ignore
 			}
+
 		};
 
 		provider.inputChanged(null, null, null);
@@ -69,10 +72,19 @@ public class HTMLExporter extends AbstractExporter {
 		Object[] elements = provider.getElements(null);
 		for (Object object : elements) {
 			append(firstDayOfWeek, sb, object);
+			getSubElements(firstDayOfWeek, sb, object);
 		}
 
 		sb.append("</table>");
 		return sb.toString();
+	}
+
+	private void getSubElements(LocalDate firstDayOfWeek, StringBuilder sb, Object object) {
+		Object[] subElements = provider.getChildren(object);
+		for (Object subElement : subElements) {
+			append(firstDayOfWeek, sb, subElement);
+			getSubElements(firstDayOfWeek, sb, subElement);
+		}
 	}
 
 	private void append(LocalDate firstDayOfWeek, StringBuilder sb, Object object) {
@@ -102,6 +114,22 @@ public class HTMLExporter extends AbstractExporter {
 			}
 			sb.append("</td></tr>");
 		}
+		if (object instanceof Activity) {
+			sb.append("<tr><td>&nbsp;&nbsp;");
+			Activity task = (Activity) object;
+			sb.append(task.getSummary());
+			sb.append("</td>");
+			for (int i = 0; i < 7; i++) {
+				sb.append("</td><td style=\"text-align: right; border-left: 1px solid #aaa\">");
+				LocalDate weekday = firstDayOfWeek.plusDays(i);
+				Duration duration = task.getDuration(weekday);
+				long seconds = duration.getSeconds();
+				if (seconds > 60) {
+					sb.append(DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true));
+				}
+			}
+
+		}
 		if (object instanceof ITask) {
 			sb.append("<tr><td>&nbsp;&nbsp;");
 			AbstractTask task = (AbstractTask) object;
@@ -125,11 +153,5 @@ public class HTMLExporter extends AbstractExporter {
 			sb.append("</td></tr>");
 		}
 		sb.append(System.lineSeparator());
-		if (object instanceof String) {
-			Object[] children = provider.getChildren(object);
-			for (Object o : children) {
-				append(firstDayOfWeek, sb, o);
-			}
-		}
 	}
 }
