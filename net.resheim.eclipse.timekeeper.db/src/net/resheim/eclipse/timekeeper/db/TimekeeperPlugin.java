@@ -35,10 +35,12 @@ import org.eclipse.core.resources.ISaveContext;
 import org.eclipse.core.resources.ISaveParticipant;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.Plugin;
 import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.core.runtime.preferences.IScopeContext;
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
@@ -104,6 +106,8 @@ public class TimekeeperPlugin extends Plugin {
 	
 	public class WorkspaceSaveParticipant implements ISaveParticipant {
 
+		private Job job;
+
 		@Override
 		public void doneSaving(ISaveContext context) {
 		}
@@ -118,14 +122,26 @@ public class TimekeeperPlugin extends Plugin {
 
 		@Override
 		public void saving(ISaveContext context) throws CoreException {
-			Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
-			EntityTransaction transaction = entityManager.getTransaction();
-			transaction.begin();
-			for (AbstractTask abstractTask : allTasks) {
-				TrackedTask task = getTask(abstractTask);
-				entityManager.persist(task);
-			}						
-			transaction.commit();
+			if (job == null) {
+				job = new Job("Saving Timekeeper database") {
+
+					@Override
+					protected IStatus run(IProgressMonitor monitor) {
+						Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
+						EntityTransaction transaction = entityManager.getTransaction();
+						transaction.begin();
+						for (AbstractTask abstractTask : allTasks) {
+							TrackedTask task = getTask(abstractTask);
+							entityManager.persist(task);
+						}
+						transaction.commit();
+						return Status.OK_STATUS;
+					}
+
+				};
+				job.setSystem(true);
+			}
+			job.schedule();
 		}		
 	}
 
