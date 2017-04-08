@@ -88,6 +88,8 @@ import net.resheim.eclipse.timekeeper.ui.Activator;
 @SuppressWarnings("restriction")
 public class WorkWeekView extends ViewPart {
 
+	private static final int TIME_COLUMN_WIDTH = 50;
+
 	/** Update the status field every second */
 	private static final int UPDATE_INTERVAL = 1_000;
 
@@ -377,7 +379,7 @@ public class WorkWeekView extends ViewPart {
 		tree.setHeaderVisible(true);
 		tree.setLinesVisible(true);
 
-		// Adjust column width when view is resized
+		// adjust column width when view is resized
 		root.addControlListener(new ControlAdapter() {
 			@Override
 			public void controlResized(ControlEvent e) {
@@ -389,8 +391,8 @@ public class WorkWeekView extends ViewPart {
 				int cwidth = 0;
 				for (int i = 1; i < columns.length; i++) {
 					columns[i].pack();
-					if (columns[i].getWidth()<50){
-						columns[i].setWidth(50);
+					if (columns[i].getWidth()<TIME_COLUMN_WIDTH){
+						columns[i].setWidth(TIME_COLUMN_WIDTH);
 					}
 					cwidth += columns[i].getWidth();
 				}
@@ -417,13 +419,13 @@ public class WorkWeekView extends ViewPart {
 		installStatusUpdater();
 	}
 
-	private TreeViewerColumn createTableViewerColumn(String title, int bound, final int colNumber) {
+	private TreeViewerColumn createTableViewerColumn(String title, int width, final int colNumber) {
 		final TreeViewerColumn viewerColumn = new TreeViewerColumn(viewer, SWT.NONE);
 		TreeColumn column = viewerColumn.getColumn();
 		column.setText(title);
-		column.setWidth(bound);
+		column.setWidth(width);
 		column.setResizable(true);
-		column.setMoveable(true);
+		column.setMoveable(false);
 		return viewerColumn;
 	}
 
@@ -434,8 +436,7 @@ public class WorkWeekView extends ViewPart {
 	 *            the day of the week, starting from 0
 	 */
 	private void createTimeColumn(int weekday) {
-		TreeViewerColumn column = createTableViewerColumn("-", 50, 1 + weekday);
-		column.getColumn().setMoveable(false);
+		TreeViewerColumn column = createTableViewerColumn("-", TIME_COLUMN_WIDTH, 1 + weekday);
 		column.getColumn().setAlignment(SWT.RIGHT);
 		column.setEditingSupport(new TimeEditingSupport((TreeViewer) column.getViewer(), contentProvider, weekday));
 		column.setLabelProvider(new TimeColumnLabelProvider(contentProvider) {
