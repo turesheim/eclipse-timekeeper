@@ -46,6 +46,8 @@ class TimeEditingSupport extends EditingSupport {
 	private static final String TIME_POINT = "([0-9]|0[0-9]|1[0-9]|2[0-3]):([0-5][0-9])";
 
 	private final int weekday;
+	private int width_i;
+	private int width_0;
 
 	public TimeEditingSupport(TreeViewer viewer, WeekViewContentProvider contentProvider, int weekday) {
 		super(viewer);
@@ -76,7 +78,13 @@ class TimeEditingSupport extends EditingSupport {
 
 	@Override
 	protected CellEditor getCellEditor(Object element) {
-		return new TextCellEditor(((TreeViewer) getViewer()).getTree());
+		TextCellEditor textCellEditor = new TextCellEditor(((TreeViewer) getViewer()).getTree());
+		// make more room for editing
+		width_i = ((TreeViewer) getViewer()).getTree().getColumn(weekday + 1).getWidth();
+		width_0 = ((TreeViewer) getViewer()).getTree().getColumn(0).getWidth();
+		((TreeViewer) getViewer()).getTree().getColumn(weekday + 1).setWidth(width_i + 30);
+		((TreeViewer) getViewer()).getTree().getColumn(0).setWidth(width_0 - 30);
+		return textCellEditor;
 	}
 
 	@Override
@@ -149,5 +157,8 @@ class TimeEditingSupport extends EditingSupport {
 		getViewer().update(task, null);
 		getViewer().update(Activator.getProjectName(task), null);
 		getViewer().update(WeekViewContentProvider.WEEKLY_SUMMARY, null);
+		// restore column sizes
+		((TreeViewer) getViewer()).getTree().getColumn(weekday + 1).setWidth(width_i);
+		((TreeViewer) getViewer()).getTree().getColumn(0).setWidth(width_0);
 	}
 }

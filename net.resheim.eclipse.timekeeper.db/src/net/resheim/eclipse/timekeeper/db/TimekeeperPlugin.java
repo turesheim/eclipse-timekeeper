@@ -51,6 +51,7 @@ import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.osgi.service.datalocation.Location;
 import org.eclipse.persistence.config.PersistenceUnitProperties;
 import org.eclipse.persistence.jpa.PersistenceProvider;
+import org.flywaydb.core.Flyway;
 import org.osgi.framework.BundleContext;
 
 /**
@@ -70,9 +71,9 @@ public class TimekeeperPlugin extends Plugin {
 
 	private static final EntityManager entityManager;		
 	
+	// Database configuration
 	static {
 		Map<String, Object> props = new HashMap<String, Object>();
-
 		// default location
 		String jdbc_url = "jdbc:h2:~/.timekeeper/h2db";
 		try {
@@ -83,10 +84,17 @@ public class TimekeeperPlugin extends Plugin {
 			if (!path.toFile().exists()) {
 				Files.createDirectory(path);
 			}
-			jdbc_url = Platform.getPreferencesService().getString(BUNDLE_ID, "database-url", "jdbc:h2:"+path+"/h2db", new IScopeContext[] {InstanceScope.INSTANCE});		
+			jdbc_url = Platform.getPreferencesService().getString(BUNDLE_ID, "database-url", "jdbc:h2:"+path+"/h2db", new IScopeContext[] {InstanceScope.INSTANCE});			
+			// baseline the database
+	        Flyway flyway = new Flyway();
+	        flyway.setDataSource(jdbc_url, "sa", "");
+	        flyway.setLocations("classpath:/db/");
+	        flyway.setBaselineOnMigrate(true);
+	        flyway.migrate();
 		} catch (IOException | URISyntaxException e) {
 			e.printStackTrace();
 		}
+		
 		// https://www.eclipse.org/forums/index.php?t=msg&goto=541155&
 		props.put(PersistenceUnitProperties.CLASSLOADER, TimekeeperPlugin.class.getClassLoader());
 		
@@ -99,9 +107,11 @@ public class TimekeeperPlugin extends Plugin {
 		props.put(PersistenceUnitProperties.JDBC_USER, "sa");
 		props.put(PersistenceUnitProperties.JDBC_PASSWORD, "");
 		props.put(PersistenceUnitProperties.LOGGING_LEVEL, "fine");
+		// we want flyway to create the database, it gives us better control over migrating
+		props.put(PersistenceUnitProperties.DDL_GENERATION, "none");
 		entityManager = new PersistenceProvider()	
-				.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
-				.createEntityManager();
+		.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
+		.createEntityManager();
 	};		
 	
 	public class WorkspaceSaveParticipant implements ISaveParticipant {

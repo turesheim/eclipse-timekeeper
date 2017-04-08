@@ -21,6 +21,8 @@ location "http://download.eclipse.org/technology/swtbot/releases/latest/" {
     org.hamcrest.library
     org.hamcrest.core
 }
+
+// Mylyn bits
 location "http://download.eclipse.org/mylyn/releases/latest" {
     org.eclipse.mylyn.tasks.core
     org.eclipse.mylyn.tasks.ui

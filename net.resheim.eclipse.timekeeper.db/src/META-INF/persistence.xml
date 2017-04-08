@@ -5,7 +5,6 @@
 	<persistence-unit name="net.resheim.eclipse.timekeeper.db" transaction-type="RESOURCE_LOCAL">
 		<provider>org.eclipse.persistence.jpa.PersistenceProvider</provider>
 		<class>net.resheim.eclipse.timekeeper.db.Activity</class>
-		<class>net.resheim.eclipse.timekeeper.db.Notes</class>
 		<class>net.resheim.eclipse.timekeeper.db.TrackedTask</class>
 		<class>net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConverter</class>
 		<exclude-unlisted-classes>false</exclude-unlisted-classes>

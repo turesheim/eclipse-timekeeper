@@ -74,10 +74,7 @@ public class TrackedTask implements Serializable {
 	/** The last time the task was active while the user was not idle */
 	@Convert(converter = LocalDateTimeAttributeConverter.class)
 	private LocalDateTime tick;
-
-	@OneToMany(cascade = javax.persistence.CascadeType.ALL)
-	private List<Notes> notes;
-
+	
 	@OneToMany(cascade = javax.persistence.CascadeType.ALL)
 	private List<Activity> activities;
 		
@@ -188,15 +185,6 @@ public class TrackedTask implements Serializable {
 	 */
 	public String getId() {
 		return id;
-	}
-
-	/**
-	 * Returns a list of all notes associated with the task
-	 * 
-	 * @return a list of all notes associated with the task
-	 */
-	public List<Notes> getNotes() {
-		return notes;
 	}
 
 	/**
