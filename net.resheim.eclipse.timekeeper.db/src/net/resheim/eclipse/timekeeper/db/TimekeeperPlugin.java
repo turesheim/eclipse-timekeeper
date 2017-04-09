@@ -116,7 +116,7 @@ public class TimekeeperPlugin extends Plugin {
 	
 	public class WorkspaceSaveParticipant implements ISaveParticipant {
 
-		private Job job;
+		private Job saveDatabaseJob;
 
 		@Override
 		public void doneSaving(ISaveContext context) {
@@ -132,8 +132,8 @@ public class TimekeeperPlugin extends Plugin {
 
 		@Override
 		public void saving(ISaveContext context) throws CoreException {
-			if (job == null) {
-				job = new Job("Saving Timekeeper database") {
+			if (saveDatabaseJob == null) {
+				saveDatabaseJob = new Job("Saving Timekeeper database") {
 
 					@Override
 					protected IStatus run(IProgressMonitor monitor) {
@@ -149,9 +149,9 @@ public class TimekeeperPlugin extends Plugin {
 					}
 
 				};
-				job.setSystem(true);
+				saveDatabaseJob.setSystem(true);
 			}
-			job.schedule();
+			saveDatabaseJob.schedule();
 		}		
 	}
 
@@ -170,9 +170,9 @@ public class TimekeeperPlugin extends Plugin {
 	@Override
 	public void start(BundleContext context) throws Exception {
 		super.start(context);
+        cleanTaskActivities();
 		ISaveParticipant saveParticipant = new WorkspaceSaveParticipant();
         ResourcesPlugin.getWorkspace().addSaveParticipant(BUNDLE_ID, saveParticipant);
-        cleanTaskActivities();
 	}
 
 	/**
@@ -182,38 +182,46 @@ public class TimekeeperPlugin extends Plugin {
 	 * guesswork is applied using data from Mylyn.
 	 */
 	private void cleanTaskActivities() {
-		long ps = System.currentTimeMillis();
-		TypedQuery<TrackedTask> createQuery = entityManager.createQuery("SELECT tt FROM TrackedTask tt",
-				TrackedTask.class);
-		List<TrackedTask> resultList = createQuery.getResultList();
-		for (TrackedTask trackedTask : resultList) {
-			if (trackedTask.getCurrentActivity().isPresent()) {
-				ITask task = getTask(trackedTask);
-				if (!task.isActive()) {
-					// try to figure out when it was last active
-					Activity activity = trackedTask.getCurrentActivity().get();
-					ZonedDateTime start = activity.getStart().atZone(ZoneId.systemDefault());
-					ZonedDateTime end = start.plusMinutes(30);
-					while (true) {
-						Calendar s = Calendar.getInstance();
-						Calendar e = Calendar.getInstance();
-						s.setTime(Date.from(start.toInstant()));
-						e.setTime(Date.from(end.toInstant()));
-						long elapsedTime = TasksUi.getTaskActivityManager().getElapsedTime(task, s, e);
-						// update the end time on the activity
-						if (elapsedTime == 0 || e.after(Calendar.getInstance())) {
-							activity.setEnd(LocalDateTime.ofInstant(e.toInstant(), ZoneId.systemDefault()));
-							trackedTask.endActivity();
-							break;
+		Job cleanJob = new Job("Clean up Timekeeper database"){
+
+			@Override
+			protected IStatus run(IProgressMonitor monitor) {
+				long ps = System.currentTimeMillis();
+				TypedQuery<TrackedTask> createQuery = entityManager.createQuery("SELECT tt FROM TrackedTask tt",
+						TrackedTask.class);
+				List<TrackedTask> resultList = createQuery.getResultList();
+				for (TrackedTask trackedTask : resultList) {
+					if (trackedTask.getCurrentActivity().isPresent()) {
+						ITask task = getTask(trackedTask);
+						if (!task.isActive()) {
+							// try to figure out when it was last active
+							Activity activity = trackedTask.getCurrentActivity().get();
+							ZonedDateTime start = activity.getStart().atZone(ZoneId.systemDefault());
+							ZonedDateTime end = start.plusMinutes(30);
+							while (true) {
+								Calendar s = Calendar.getInstance();
+								Calendar e = Calendar.getInstance();
+								s.setTime(Date.from(start.toInstant()));
+								e.setTime(Date.from(end.toInstant()));
+								long elapsedTime = TasksUi.getTaskActivityManager().getElapsedTime(task, s, e);
+								// update the end time on the activity
+								if (elapsedTime == 0 || e.after(Calendar.getInstance())) {
+									activity.setEnd(LocalDateTime.ofInstant(e.toInstant(), ZoneId.systemDefault()));
+									trackedTask.endActivity();
+									break;
+								}
+								start.plusMinutes(30);
+								end.plusMinutes(30);
+							}
 						}
-						start.plusMinutes(30);
-						end.plusMinutes(30);
 					}
 				}
-			}
-		}
-		long pe = System.currentTimeMillis();
-		getLog().log(new Status(IStatus.INFO,BUNDLE_ID,String.format("Cleaned up Timekeeper database in %dms",(pe-ps))));
+				long pe = System.currentTimeMillis();
+				return new Status(IStatus.INFO,BUNDLE_ID,String.format("Cleaned up Timekeeper database in %dms",(pe-ps)));
+			}			
+		};
+		cleanJob.setSystem(false);
+		cleanJob.schedule();
 	}
 
 	@Override
