@@ -11,8 +11,6 @@
 package net.resheim.eclipse.timekeeper.db;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -29,6 +27,7 @@ import java.util.Optional;
 
 import javax.persistence.EntityManager;
 import javax.persistence.EntityTransaction;
+import javax.persistence.PersistenceException;
 import javax.persistence.TypedQuery;
 
 import org.eclipse.core.resources.ISaveContext;
@@ -51,6 +50,7 @@ import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.osgi.service.datalocation.Location;
 import org.eclipse.persistence.config.PersistenceUnitProperties;
 import org.eclipse.persistence.jpa.PersistenceProvider;
+import org.eclipse.ui.statushandlers.StatusManager;
 import org.flywaydb.core.Flyway;
 import org.osgi.framework.BundleContext;
 
@@ -63,36 +63,46 @@ import org.osgi.framework.BundleContext;
 @SuppressWarnings("restriction")
 public class TimekeeperPlugin extends Plugin {
 
+	public static final String DATABASE_URL = "database-url";
+
 	public static final String KEY_VALUELIST_ID = "net.resheim.eclipse.timekeeper"; //$NON-NLS-1$
 	
 	public static final String BUNDLE_ID = "net.resheim.eclipse.timekeeper.db"; //$NON-NLS-1$
 
 	private static TimekeeperPlugin instance;
 
-	private static final EntityManager entityManager;		
+	private static EntityManager entityManager = null;		
 	
-	// Database configuration
-	static {
+	// Database configuration:
+	// Since we need a database pretty early this method starts first, before 
+	// the preference initializer have had the chance to run. So we ensure 
+	// that there always is a database up and running. If the user changes
+	// the database URL a restart is required.
+	private static void init() {
 		Map<String, Object> props = new HashMap<String, Object>();
-		// default location
+		// default, default location
 		String jdbc_url = "jdbc:h2:~/.timekeeper/h2db";
 		try {
 			// use workspace relative path or specified url
-			Location instanceLocation = Platform.getInstanceLocation();			
-			URL dataArea = instanceLocation.getURL();
-			Path path = Paths.get(dataArea.toURI()).resolve(".timekeeper");
+			Location instanceLocation = Platform.getInstanceLocation();
+			Path path = Paths.get(instanceLocation.getURL().getPath()).resolve(".timekeeper");
 			if (!path.toFile().exists()) {
 				Files.createDirectory(path);
 			}
-			jdbc_url = Platform.getPreferencesService().getString(BUNDLE_ID, "database-url", "jdbc:h2:"+path+"/h2db", new IScopeContext[] {InstanceScope.INSTANCE});			
+			StatusManager.getManager()
+					.handle(new Status(IStatus.INFO, BUNDLE_ID, "Timekeeper default path is at " + path));
+			jdbc_url = Platform.getPreferencesService().getString(BUNDLE_ID, DATABASE_URL, "jdbc:h2:" + path + "/h2db",
+					new IScopeContext[] { InstanceScope.INSTANCE });
+			StatusManager.getManager()
+					.handle(new Status(IStatus.INFO, BUNDLE_ID, "Timekeeper is connecting to database at " + jdbc_url));
 			// baseline the database
 	        Flyway flyway = new Flyway();
 	        flyway.setDataSource(jdbc_url, "sa", "");
 	        flyway.setLocations("classpath:/db/");
 	        flyway.setBaselineOnMigrate(true);
 	        flyway.migrate();
-		} catch (IOException | URISyntaxException e) {
-			e.printStackTrace();
+		} catch (IOException e) {
+			StatusManager.getManager().handle(new Status(IStatus.INFO,BUNDLE_ID,"Could not connect to Timekeeper database", e));
 		}
 		
 		// https://www.eclipse.org/forums/index.php?t=msg&goto=541155&
@@ -110,8 +120,8 @@ public class TimekeeperPlugin extends Plugin {
 		// we want flyway to create the database, it gives us better control over migrating
 		props.put(PersistenceUnitProperties.DDL_GENERATION, "none");
 		entityManager = new PersistenceProvider()	
-		.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
-		.createEntityManager();
+			.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
+			.createEntityManager();
 	};		
 	
 	public class WorkspaceSaveParticipant implements ISaveParticipant {
@@ -170,6 +180,7 @@ public class TimekeeperPlugin extends Plugin {
 	@Override
 	public void start(BundleContext context) throws Exception {
 		super.start(context);
+		init();
         cleanTaskActivities();
 		ISaveParticipant saveParticipant = new WorkspaceSaveParticipant();
         ResourcesPlugin.getWorkspace().addSaveParticipant(BUNDLE_ID, saveParticipant);
@@ -187,13 +198,14 @@ public class TimekeeperPlugin extends Plugin {
 			@Override
 			protected IStatus run(IProgressMonitor monitor) {
 				long ps = System.currentTimeMillis();
-				TypedQuery<TrackedTask> createQuery = entityManager.createQuery("SELECT tt FROM TrackedTask tt",
+				TypedQuery<TrackedTask> createQuery = entityManager.createQuery("SELECT tt FROM TRACKEDTASK tt",
 						TrackedTask.class);
 				List<TrackedTask> resultList = createQuery.getResultList();
 				for (TrackedTask trackedTask : resultList) {
 					if (trackedTask.getCurrentActivity().isPresent()) {
 						ITask task = getTask(trackedTask);
-						if (!task.isActive()) {
+						// note that the ITask may not exist in this workspace
+						if (task!=null && !task.isActive()) {
 							// try to figure out when it was last active
 							Activity activity = trackedTask.getCurrentActivity().get();
 							ZonedDateTime start = activity.getStart().atZone(ZoneId.systemDefault());
@@ -228,19 +240,7 @@ public class TimekeeperPlugin extends Plugin {
 	public void stop(BundleContext context) throws Exception {
 		super.stop(context);
 	}
-	
-	/**
-	 * Returns the {@link TrackedTask} with the given identifier.
-	 * 
-	 * @param id the tracked task identifier
-	 * @return
-	 */
-	public Optional<TrackedTask> getTask(String id) {
-		// attempt to load the task from the persistent storage
-		TrackedTask found = entityManager.find(TrackedTask.class, id);
-		return Optional.ofNullable(found);
-	}
-	
+		
 	/**
 	 * Returns the {@link TrackedTask} associated with the given Mylyn task. If
 	 * no such task exists it will be created.
@@ -250,20 +250,15 @@ public class TimekeeperPlugin extends Plugin {
 	 * @return a {@link TrackedTask} associated with the Mylyn task
 	 */
 	public TrackedTask getTask(ITask task) {
-		String id = task.getAttribute(TrackedTask.KEY_IDENTIFIER_ATTR);
-		if (id == null) {
+		TrackedTaskId id = new TrackedTaskId(task.getRepositoryUrl(), task.getTaskId());
+		TrackedTask found = entityManager.find(TrackedTask.class, id);
+		if (found == null) {
 			// no such tracked task exists, create one
 			TrackedTask tt = new TrackedTask(task);
+			entityManager.persist(tt);
 			return tt;
 		} else {
-			Optional<TrackedTask> optional = getTask(id);
-			if (optional.isPresent()) {
-				return optional.get();
-			} else { 
-				TrackedTask tt = new TrackedTask(task);
-				entityManager.persist(tt);
-				return tt;				
-			}
+			return found;
 		}
 	}
 	
@@ -276,8 +271,8 @@ public class TimekeeperPlugin extends Plugin {
 	 * @return a Mylyn task or <code>null</code>
 	 */
 	public ITask getTask(TrackedTask task) {
-		// get the repository then find the task, seems like the Mylyn API is
-		// a bit limited in this area
+		// get the repository then find the task. Seems like the Mylyn API is
+		// a bit limited in this area as I could not find something more usable
 		Optional<TaskRepository> tr = TasksUi.getRepositoryManager().getAllRepositories()
 				.stream()
 				.filter(r -> r.getRepositoryUrl().equals(task.getRepositoryUrl()))
@@ -286,6 +281,70 @@ public class TimekeeperPlugin extends Plugin {
 			return TasksUi.getRepositoryModel().getTask(tr.get(), task.getTaskId());
 		}
 		return null;		
+	}
+
+	/**
+	 * Exports Timekeeper related data to two separate CSV files. One for
+	 * {@link TrackedTask}, another for {@link Activity} instances and yet
+	 * another for the relations between these two.
+	 * 
+	 * TODO: Compress into zip
+	 * 
+	 * @param path
+	 *            the path to the directory
+	 * @throws IOException
+	 */
+	public int exportTo(Path path) throws IOException {
+		if (!path.toFile().exists()) {
+			Files.createDirectory(path);
+		}
+		Path tasks = path.resolve("trackedtask.csv");
+		Path activities = path.resolve("activitiy.csv");
+		Path relations = path.resolve("trackedtask_activity.csv");
+		EntityTransaction transaction = entityManager.getTransaction();
+		transaction.begin();
+		int tasksExported = entityManager.createNativeQuery("CALL CSVWRITE('"+tasks+"', 'SELECT * FROM TRACKEDTASK');").executeUpdate();
+		int activitiesExported = entityManager.createNativeQuery("CALL CSVWRITE('"+activities+"', 'SELECT * FROM ACTIVITY');").executeUpdate();
+		// relations are not autmatically created, so we do this the easy way
+		entityManager.createNativeQuery("CALL CSVWRITE('"+relations+"', 'SELECT * FROM TRACKEDTASK_ACTIVITY');").executeUpdate();
+		transaction.commit();
+		return tasksExported+activitiesExported;
+	}
+
+	public int importFrom(Path path) throws IOException {
+		Path tasks = path.resolve("trackedtask.csv");
+		Path activities = path.resolve("activitiy.csv");
+		Path relations = path.resolve("trackedtask_activity.csv");
+		if (!tasks.toFile().exists()){
+			throw new IOException("'trackedtask.csv' does not exist in the specified location.");
+		}
+		if (!activities.toFile().exists()){
+			throw new IOException("'activitiy.csv' does not exist in the specified location.");
+		}
+		if (!relations.toFile().exists()){
+			throw new IOException("'trackedtask_activity.csv' does not exist in the specified location.");
+		}
+		EntityTransaction transaction = entityManager.getTransaction();
+		try {
+			transaction.begin();		
+			entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE;").executeUpdate();
+			int tasksImported = entityManager.createNativeQuery("MERGE INTO TRACKEDTASK (SELECT * FROM CSVREAD('"+tasks+"'));").executeUpdate();
+			int activitiesImported = entityManager.createNativeQuery("MERGE INTO ACTIVITY (SELECT * FROM CSVREAD('"+activities+"'));").executeUpdate();
+			entityManager.createNativeQuery("MERGE INTO TRACKEDTASK_ACTIVITY (SELECT * FROM CSVREAD('"+relations+"'));").executeUpdate();
+			entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE;").executeUpdate();
+			transaction.commit();
+			// update all instances with potentially new content 
+			TypedQuery<TrackedTask> createQuery = entityManager.createQuery("SELECT tt FROM TRACKEDTASK tt",
+					TrackedTask.class);
+			List<TrackedTask> resultList = createQuery.getResultList();
+			for (TrackedTask trackedTask : resultList) {
+				entityManager.refresh(trackedTask);
+			}
+			return tasksImported+activitiesImported;
+		} catch (PersistenceException e){
+			transaction.rollback();			
+			throw new IOException(e.getMessage());
+		}
 	}
 
 }

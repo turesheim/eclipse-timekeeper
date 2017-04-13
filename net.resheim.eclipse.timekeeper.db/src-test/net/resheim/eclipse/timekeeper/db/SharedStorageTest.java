@@ -188,39 +188,36 @@ public class SharedStorageTest {
 		transaction.commit();
 
 		// ensure that we have the correct values after migrating
-		Query query = entityManager.createQuery("SELECT task FROM TrackedTask task WHERE task.id = :id", String.class);
-		query.setParameter("id", ttask.getId());
-		Object singleResult = query.getSingleResult();
+		TrackedTaskId id = new TrackedTaskId(ttask.getRepositoryUrl(), ttask.getTaskId());
+		TrackedTask dbTask = entityManager.find(TrackedTask.class, id);
 
-		if (singleResult instanceof TrackedTask) {
-			List<Activity> activities = ((TrackedTask) singleResult).getActivities();
+		if (dbTask instanceof TrackedTask) {
+			List<Activity> activities = ((TrackedTask) dbTask).getActivities();
 			Assert.assertEquals(3, activities.size());
-			TrackedTask loaded = (TrackedTask) singleResult;
+			TrackedTask loaded = (TrackedTask) dbTask;
 			Assert.assertEquals(72, loaded.getDuration(now).getSeconds());
 			Assert.assertEquals(108, loaded.getDuration(now.minusDays(1)).getSeconds());
 			Assert.assertEquals(216, loaded.getDuration(now.minusMonths(1)).getSeconds());
 		}
 		Assert.assertEquals(null, mylynTask.getAttribute(TimekeeperPlugin.KEY_VALUELIST_ID));
-		Assert.assertEquals(ttask.getId(), mylynTask.getAttribute(TrackedTask.KEY_IDENTIFIER_ATTR));		
 	}
 	
 	@Test
 	public void testSimpleTaskPersistence() {
-		TrackedTask task = new TrackedTask(mylynTask);
+		TrackedTask ttask = new TrackedTask(mylynTask);
 		LocalDateTime now = LocalDateTime.now();
-		Activity a = new Activity(task,now);
-		task.addActivity(a);
+		Activity a = new Activity(ttask,now);
+		ttask.addActivity(a);
 		a.setStart(now.minus(Duration.ofHours(1)));
 		a.setEnd(now);
-		persist(task);
+		persist(ttask);
 
 		// now attempt to load the task from the persistent storage
-		Query query = entityManager.createQuery("SELECT task FROM TrackedTask task WHERE task.id = :id", String.class);
-		query.setParameter("id", task.getId());
-		Object singleResult = query.getSingleResult();
+		TrackedTaskId id = new TrackedTaskId(ttask.getRepositoryUrl(), ttask.getTaskId());
+		TrackedTask dbTask = entityManager.find(TrackedTask.class, id);
 		// Test the single task
-		if (singleResult instanceof TrackedTask) {
-			List<Activity> activities = ((TrackedTask) singleResult).getActivities();
+		if (dbTask instanceof TrackedTask) {
+			List<Activity> activities = ((TrackedTask) dbTask).getActivities();
 			Assert.assertEquals(1, activities.size());
 			Activity activity = activities.get(0);
 			// duration should be one day
@@ -259,13 +256,12 @@ public class SharedStorageTest {
 		persist(task);
 
 		// now attempt to load the task from the persistent storage
-		Query query = entityManager.createQuery("SELECT task FROM TrackedTask task WHERE task.id = :id", String.class);
-		query.setParameter("id", task.getId());
-		Object singleResult = query.getSingleResult();
+		TrackedTaskId id = new TrackedTaskId(task.getRepositoryUrl(), task.getTaskId());
+		TrackedTask dbTask = entityManager.find(TrackedTask.class, id);
 
 		// verify that the accumulated duration is correct
-		if (singleResult instanceof TrackedTask) {
-			TrackedTask trackedTask = (TrackedTask) singleResult;
+		if (dbTask instanceof TrackedTask) {
+			TrackedTask trackedTask = (TrackedTask) dbTask;
 			// total work on the 14th of March should be 4 hours
 			Assert.assertEquals(Duration.ofHours(4), trackedTask.getDuration(start.toLocalDate()));
 			// total work on the 16th of March should be 24 hours

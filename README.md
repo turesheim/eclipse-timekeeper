@@ -4,7 +4,9 @@ This is a simple time-tracking plug-in integrating with [Eclipse Mylyn](http://e
 
 ![image](https://raw.githubusercontent.com/turesheim/eclipse-timekeeper/gh-pages/screenshots/workweek-view.png)
 
-Whenever a task is *activated* in Mylyn it will automatically show up in the **Workweek** view with a bold label, and the amount of time the task is active will be tracked. When the task is *deactivated* the active time is added to the total for the task on the particular day. It is also possible to manually edit the time by clicking into the cell. If a number is typed, such as *45*, it will be translated into minutes and show up as *0:45*. If a decimal number is entered, for example *1.5*, it will be translated to *1:30*. The decimal separator can be either "," or ".".
+Whenever a task is *activated* in Mylyn it will automatically show up in the **Workweek** view with a bold label, and the amount of time the task is active will be tracked. An *activity* will be added to the task, which is the entity keeping track of the time and a short note. Multiple activities can be added to each task.
+
+When the task is *deactivated* the end time is registered on the activity and the active time is added to the toal for the task on the particular day. It is also possible to manually edit the start and stop times by clicking into the cell.
 
 The context menu and toolbar buttons can be used to browse back and forward by one week. The current locale is used to determine week numbers. Left of the navigation buttons there is a button for copying the workweek in HTML format to the clipboard or exporting to file as CSV or HTML.
 
@@ -17,7 +19,9 @@ You can install from the <a href="http://marketplace.eclipse.org/content/timekee
 
 ### Database configuration
 
-Since version 2.0 data are stored in an SQL database. It is per default stored under **~/.timekeeper/**, one instance per workspace using the embedded [h2 databaes](http://www.h2database.com/html/main.html). If you rather store it on a different location you can change this under **Timekeeper** page in the preference settings. If you'd rather use a database server you can download h2 from their website, start it and change the preference setting accordingly. 
+Since version 2.0 data are stored in an SQL database. It is per default stored under **<workspace>/.timekeeper/**, one instance per workspace using the embedded [h2 database](http://www.h2database.com/html/main.html). If you rather store it on a different location you can change this under **Timekeeper** page in the preference settings. 
+
+If you'd rather use a database server you can download h2 from their website, start it and change the preference setting accordingly. 
 
 ## Building
 

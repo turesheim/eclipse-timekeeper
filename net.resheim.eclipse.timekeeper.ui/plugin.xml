@@ -100,6 +100,12 @@
             id="net.resheim.eclipse.timekeeper.ui.preferences.TimekeeperPreferences"
             name="Timekeeper">
       </page>
+      <page
+            category="net.resheim.eclipse.timekeeper.ui.preferences.TimekeeperPreferences"
+            class="net.resheim.eclipse.timekeeper.ui.preferences.DatabasePreferences"
+            id="net.resheim.eclipse.timekeeper.ui.preferences.DatabasePreferences"
+            name="Database">
+      </page>
    </extension>
    <extension
          point="org.eclipse.core.runtime.preferences">

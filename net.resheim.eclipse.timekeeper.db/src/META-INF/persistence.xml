@@ -7,6 +7,7 @@
 		<class>net.resheim.eclipse.timekeeper.db.Activity</class>
 		<class>net.resheim.eclipse.timekeeper.db.TrackedTask</class>
 		<class>net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConverter</class>
+		<class>net.resheim.eclipse.timekeeper.db.TrackedTaskId</class>
 		<exclude-unlisted-classes>false</exclude-unlisted-classes>
 		<properties>
 			<property name="eclipselink.ddl-generation" value="create-tables" />

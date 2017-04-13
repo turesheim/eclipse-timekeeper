@@ -18,15 +18,16 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.function.BinaryOperator;
 
 import javax.persistence.Column;
 import javax.persistence.Convert;
 import javax.persistence.Entity;
 import javax.persistence.Id;
+import javax.persistence.IdClass;
 import javax.persistence.JoinColumn;
 import javax.persistence.OneToMany;
+import javax.persistence.OneToOne;
 import javax.persistence.Transient;
 
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
@@ -46,33 +47,27 @@ import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConver
  * @author Torkild U. Resheim
  */
 @SuppressWarnings("restriction")
-@Entity(name = "TrackedTask")
+@Entity(name = "TRACKEDTASK")
+@IdClass(value = TrackedTaskId.class)
 public class TrackedTask implements Serializable {
-
-	/**
-	 * Mylyn task attribute key for the associated Timekeeper task identifier.
-	 * Looking at the Mylyn task attribute table using this key should reveal
-	 * this instance's identifier string if there is an association.
-	 */
-	public static final String KEY_IDENTIFIER_ATTR = "net.resheim.eclipse.timekeeper.taskid"; //$NON-NLS-1$
 
 	private static final long serialVersionUID = 2025738836825780128L;
 
 	@Id
-	private String id;
-	
-	@Column
+	@Column(name = "REPOSITORY_URL")
 	private String repositoryUrl;
 
-	@Column
+	@Id
+	@Column(name = "TASK_ID")
 	private String taskId;
 
-	/** The activity that is currently in progress, may be <code>null</code>*/
-	@JoinColumn
+	@OneToOne
+	@JoinColumn(name = "CURRENTACTIVITY_ID")
 	private Activity currentActivity;
 
 	/** The last time the task was active while the user was not idle */
 	@Convert(converter = LocalDateTimeAttributeConverter.class)
+	@Column(name = "TICK")
 	private LocalDateTime tick;
 	
 	@OneToMany(cascade = javax.persistence.CascadeType.ALL)
@@ -179,15 +174,6 @@ public class TrackedTask implements Serializable {
 	}
 	
 	/**
-	 * Returns the tracked task identifier 
-	 * 
-	 * @return the identifier
-	 */
-	public String getId() {
-		return id;
-	}
-
-	/**
 	 * Returns the last time the task was active and not idle
 	 * 
 	 * @return the last time the task was active and not idle
@@ -223,10 +209,6 @@ public class TrackedTask implements Serializable {
 		task.setAttribute("start", null);
 	}
 
-	public void setId(String id) {
-		this.id = id;
-	}
-
 	/**
 	 * Associates given Mylyn Task with this instance. If the Mylyn task already
 	 * have a Timekeeper identifier attribute it will be used as an identifier
@@ -235,18 +217,11 @@ public class TrackedTask implements Serializable {
 	 * @param task
 	 *            the Mylyn task
 	 */
-	private void setTask(ITask task) {
-		String id = task.getAttribute(KEY_IDENTIFIER_ATTR);
-		// create a new identifier if none is specified
-		if (id == null) {
-			id = UUID.randomUUID().toString();
-			task.setAttribute(KEY_IDENTIFIER_ATTR, id);				
-		}
+	void setTask(ITask task) {
 		// associate this tracked task with the Mylyn task
 		this.task = task;
-		this.id = id;
-		this.taskId = task.getTaskId();
-		this.repositoryUrl = task.getRepositoryUrl();
+		taskId = task.getTaskId();
+		repositoryUrl = task.getRepositoryUrl();
 
 		// we have an old fashioned value here. migrate the old data 
 		if (task.getAttribute(TimekeeperPlugin.KEY_VALUELIST_ID) != null) {

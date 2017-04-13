@@ -1,0 +1,54 @@
+package net.resheim.eclipse.timekeeper.db;
+
+import java.io.Serializable;
+
+import javax.persistence.Column;
+import javax.persistence.Embeddable;
+
+@Embeddable
+public class TrackedTaskId implements Serializable {
+
+	private static final long serialVersionUID = 109302590471553755L;
+
+	@Column(name = "REPOSITORY_URL")
+	private String repositoryUrl;
+
+	@Column(name = "TASK_ID")
+	private String taskId;
+	
+	public TrackedTaskId(){}
+
+	public TrackedTaskId(String repositoryUrl, String taskId) {
+		super();
+		this.repositoryUrl = repositoryUrl;
+		this.taskId = taskId;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = result * prime + repositoryUrl.hashCode();
+		result = result * prime + taskId.hashCode();
+		return result;	
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (obj instanceof TrackedTaskId){
+			TrackedTaskId other = (TrackedTaskId)obj;
+			return other.getRepositoryUrl().equals(getRepositoryUrl()) && other.getTaskId().equals(getTaskId());				
+		}
+		return false;
+	}
+
+	public String getRepositoryUrl() {
+		return repositoryUrl;
+	}
+
+
+	public String getTaskId() {
+		return taskId;
+	}
+
+}

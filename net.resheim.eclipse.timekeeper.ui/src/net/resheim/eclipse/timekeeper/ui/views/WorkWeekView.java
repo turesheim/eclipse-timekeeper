@@ -88,6 +88,8 @@ import net.resheim.eclipse.timekeeper.ui.Activator;
 @SuppressWarnings("restriction")
 public class WorkWeekView extends ViewPart {
 
+	public static final String VIEW_ID = "net.resheim.eclipse.timekeeper.ui.views.workWeek";
+
 	private static final int TIME_COLUMN_WIDTH = 50;
 
 	/** Update the status field every second */
@@ -255,8 +257,6 @@ public class WorkWeekView extends ViewPart {
 					getFirstDayOfWeek().getDayOfMonth());
 		}
 	}
-
-	public static final String ID = "net.resheim.eclipse.timekeeper.ui.views.SampleView";
 
 	private static final DateTimeFormatter weekFormat = DateTimeFormatter.ofPattern("w");
 
@@ -771,5 +771,14 @@ public class WorkWeekView extends ViewPart {
 		}
 		repository.setProperty(TimekeeperPlugin.KEY_VALUELIST_ID + ".grouping", string);
 		viewer.refresh();
+	}
+
+	/**
+	 * Used to notify the view that the content have had an massive change.
+	 * Typically after importing a number of records.
+	 */
+	public void refresh() {
+		viewer.getContentProvider().inputChanged(viewer, viewer.getInput(), null);
+		viewer.expandAll();
 	}
 }

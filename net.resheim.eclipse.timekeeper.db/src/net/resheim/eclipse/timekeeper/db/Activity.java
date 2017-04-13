@@ -21,8 +21,9 @@ import javax.persistence.Convert;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
-import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
+
+import org.eclipse.persistence.annotations.UuidGenerator;
 
 import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConverter;
 
@@ -36,28 +37,31 @@ import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConver
  * 
  * @author Torkild U. Resheim
  */
-@Entity
+@Entity(name = "ACTIVITY")
+@UuidGenerator(name = "uuid")
 public class Activity implements Comparable<Activity>{
-	
+		
 	@Id
-	@GeneratedValue
-	private long id;
-
+	@GeneratedValue(generator="uuid")
+	@Column(name = "ID")
+	private String id;
+	
 	/** The time the activity was started */
+	@Column(name = "START_TIME")
 	@Convert(converter = LocalDateTimeAttributeConverter.class)
 	private LocalDateTime start = null;
 	
 	/** The time the activity was stopped */
+	@Column(name = "END_TIME")
 	@Convert(converter = LocalDateTimeAttributeConverter.class)
 	private LocalDateTime end = null;
 	
 	/** Whether or not activity properties have been manually adjusted or created */
-	@Column
+	@Column(name = "ADJUSTED")
 	private boolean manual = false;
 
 	/** The task the activity is associated with */
-	@ManyToOne
-    @JoinColumn(name="trackedtask")
+	@ManyToOne	
 	private TrackedTask trackedtask;
 	
 	/** A short summary of the activity */
