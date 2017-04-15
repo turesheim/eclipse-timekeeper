@@ -219,22 +219,19 @@ public class WorkWeekView extends ViewPart {
 
 	}
 
-	private class ViewContentProvider extends WeekViewContentProvider {
+	private class ContentProvider extends WeekViewContentProvider {
 
-
-		public void dispose() {
-		}
-
+		@Override
 		public void inputChanged(Viewer v, Object oldInput, Object newInput) {
-
+			super.inputChanged(v, oldInput, newInput);
 			if (v.getControl().isDisposed() || dateTimeLabel.isDisposed()) {
 				return;
 			}
+			updateWeekLabel();
+			updateColumHeaders();
 
 			filter();
 			v.refresh();
-			updateWeekLabel();
-			updateColumHeaders();
 		}
 
 		private void updateColumHeaders() {
@@ -256,6 +253,7 @@ public class WorkWeekView extends ViewPart {
 			dateChooser.setDate(getFirstDayOfWeek().getYear(), getFirstDayOfWeek().getMonthValue() - 1,
 					getFirstDayOfWeek().getDayOfMonth());
 		}
+
 	}
 
 	private static final DateTimeFormatter weekFormat = DateTimeFormatter.ofPattern("w");
@@ -361,7 +359,8 @@ public class WorkWeekView extends ViewPart {
 		viewer = new TreeViewer(main, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION);
 		// Make the tree view provide selections
 		getSite().setSelectionProvider(viewer);
-		contentProvider = new ViewContentProvider();
+		contentProvider = new ContentProvider();
+		TimekeeperPlugin.getDefault().addListener(contentProvider);
 		viewer.setContentProvider(contentProvider);
 		GridData layoutData = new GridData(SWT.FILL, SWT.FILL, true, true);
 		layoutData.horizontalSpan = 3;

@@ -29,6 +29,7 @@ public class PreferenceInitializer extends AbstractPreferenceInitializer {
 				Files.createDirectory(path);
 			}
 			store.setDefault(TimekeeperPlugin.DATABASE_URL,"jdbc:h2:"+path+"/h2db");
+			store.setDefault(TimekeeperPlugin.MIXED_MODE_SERVER, false);
 		} catch (Exception e){
 			e.printStackTrace();
 		}

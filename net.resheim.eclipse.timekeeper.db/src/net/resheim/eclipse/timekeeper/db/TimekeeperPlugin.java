@@ -35,9 +35,12 @@ import org.eclipse.core.resources.ISaveParticipant;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.ISafeRunnable;
 import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.ListenerList;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.Plugin;
+import org.eclipse.core.runtime.SafeRunner;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.core.runtime.preferences.IScopeContext;
@@ -65,64 +68,109 @@ public class TimekeeperPlugin extends Plugin {
 
 	public static final String DATABASE_URL = "database-url";
 
+	public static final String MIXED_MODE_SERVER = "start-server";
+
 	public static final String KEY_VALUELIST_ID = "net.resheim.eclipse.timekeeper"; //$NON-NLS-1$
 	
 	public static final String BUNDLE_ID = "net.resheim.eclipse.timekeeper.db"; //$NON-NLS-1$
 
 	private static TimekeeperPlugin instance;
 
-	private static EntityManager entityManager = null;		
+	private static EntityManager entityManager = null;
+	
+	private static final ListenerList<DatabaseChangeListener> listeners = new ListenerList<>();
+	
+	public void addListener(DatabaseChangeListener listener){
+		listeners.add(listener);
+	}
+	
+	public void removeListener(DatabaseChangeListener listener){
+		listeners.remove(listener);
+	}
+	
+	private void notifyListeners(){
+		for (DatabaseChangeListener databaseChangeListener : listeners) {
+			SafeRunner.run(new ISafeRunnable() {				
+				@Override
+				public void run() throws Exception {
+					databaseChangeListener.databaseStateChanged();					
+				}
+			});
+		}
+	}
 	
 	// Database configuration:
 	// Since we need a database pretty early this method starts first, before 
 	// the preference initializer have had the chance to run. So we ensure 
 	// that there always is a database up and running. If the user changes
 	// the database URL a restart is required.
-	private static void init() {
-		Map<String, Object> props = new HashMap<String, Object>();
-		// default, default location
-		String jdbc_url = "jdbc:h2:~/.timekeeper/h2db";
-		try {
-			// use workspace relative path or specified url
-			Location instanceLocation = Platform.getInstanceLocation();
-			Path path = Paths.get(instanceLocation.getURL().getPath()).resolve(".timekeeper");
-			if (!path.toFile().exists()) {
-				Files.createDirectory(path);
-			}
-			StatusManager.getManager()
-					.handle(new Status(IStatus.INFO, BUNDLE_ID, "Timekeeper default path is at " + path));
-			jdbc_url = Platform.getPreferencesService().getString(BUNDLE_ID, DATABASE_URL, "jdbc:h2:" + path + "/h2db",
-					new IScopeContext[] { InstanceScope.INSTANCE });
-			StatusManager.getManager()
-					.handle(new Status(IStatus.INFO, BUNDLE_ID, "Timekeeper is connecting to database at " + jdbc_url));
-			// baseline the database
-	        Flyway flyway = new Flyway();
-	        flyway.setDataSource(jdbc_url, "sa", "");
-	        flyway.setLocations("classpath:/db/");
-	        flyway.setBaselineOnMigrate(true);
-	        flyway.migrate();
-		} catch (IOException e) {
-			StatusManager.getManager().handle(new Status(IStatus.INFO,BUNDLE_ID,"Could not connect to Timekeeper database", e));
-		}
+	private void connectToDatabase() {
+		Job connectDatabaseJob = new Job("Connecting to Timekeeper database") {
+
+			@Override
+			protected IStatus run(IProgressMonitor monitor) {
+				Map<String, Object> props = new HashMap<String, Object>();
+				// default, default location
+				String jdbc_url = "jdbc:h2:~/.timekeeper/h2db";
+				try {
+					// use workspace relative path or specified url
+					Location instanceLocation = Platform.getInstanceLocation();
+					Path path = Paths.get(instanceLocation.getURL().getPath()).resolve(".timekeeper");
+					if (!path.toFile().exists()) {
+						Files.createDirectory(path);
+					}
+					StatusManager.getManager()
+							.handle(new Status(IStatus.INFO, BUNDLE_ID, "Timekeeper default path is at " + path));
+					jdbc_url = Platform.getPreferencesService().getString(BUNDLE_ID, DATABASE_URL, "jdbc:h2:" + path + "/h2db",
+							new IScopeContext[] { InstanceScope.INSTANCE });
+					
+					// whether or not to start the database server.
+					boolean start = Platform.getPreferencesService().getBoolean(BUNDLE_ID, MIXED_MODE_SERVER, false,
+							new IScopeContext[] { InstanceScope.INSTANCE });
+					if (start) {
+						//startDatabaseServer();
+						jdbc_url+=";AUTO_SERVER=TRUE;AUTO_SERVER_PORT=9090";
+					}
+					
+					StatusManager.getManager()
+							.handle(new Status(IStatus.INFO, BUNDLE_ID, "Timekeeper is connecting to database at " + jdbc_url));
+					// baseline the database
+			        Flyway flyway = new Flyway();
+			        flyway.setDataSource(jdbc_url, "sa", "");
+			        flyway.setLocations("classpath:/db/");
+			        flyway.setBaselineOnMigrate(true);
+			        flyway.migrate();
+					// https://www.eclipse.org/forums/index.php?t=msg&goto=541155&
+					props.put(PersistenceUnitProperties.CLASSLOADER, TimekeeperPlugin.class.getClassLoader());
+					
+					// ensure only a in-memory database is used when testing
+					if (Thread.currentThread().getName().equals("WorkbenchTestable")) {
+						jdbc_url = "jdbc:h2:mem:test_mem";
+					}
+					props.put(PersistenceUnitProperties.JDBC_URL, jdbc_url);
+					props.put(PersistenceUnitProperties.JDBC_DRIVER, "org.h2.Driver");
+					props.put(PersistenceUnitProperties.JDBC_USER, "sa");
+					props.put(PersistenceUnitProperties.JDBC_PASSWORD, "");
+					props.put(PersistenceUnitProperties.LOGGING_LEVEL, "fine");
+					// we want flyway to create the database, it gives us better control over migrating
+					props.put(PersistenceUnitProperties.DDL_GENERATION, "none");
+					entityManager = new PersistenceProvider()	
+						.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
+						.createEntityManager();
+				} catch (IOException e) {
+					return new Status(IStatus.INFO,BUNDLE_ID,"Could not connect to Timekeeper database", e);
+				} /*catch (SQLException e) {
+					StatusManager.getManager().handle(new Status(IStatus.ERROR,BUNDLE_ID,"Could not connect start H2 database server", e));
+				}*/
+		        cleanTaskActivities();
+				notifyListeners();
+				return Status.OK_STATUS;
+			}			
+		};
+		connectDatabaseJob.setSystem(false);
+		connectDatabaseJob.schedule();
 		
-		// https://www.eclipse.org/forums/index.php?t=msg&goto=541155&
-		props.put(PersistenceUnitProperties.CLASSLOADER, TimekeeperPlugin.class.getClassLoader());
-		
-		// ensure only a in-memory database is used when testing
-		if (Thread.currentThread().getName().equals("WorkbenchTestable")) {
-			jdbc_url = "jdbc:h2:mem:test_mem";
-		}
-		props.put(PersistenceUnitProperties.JDBC_URL, jdbc_url);
-		props.put(PersistenceUnitProperties.JDBC_DRIVER, "org.h2.Driver");
-		props.put(PersistenceUnitProperties.JDBC_USER, "sa");
-		props.put(PersistenceUnitProperties.JDBC_PASSWORD, "");
-		props.put(PersistenceUnitProperties.LOGGING_LEVEL, "fine");
-		// we want flyway to create the database, it gives us better control over migrating
-		props.put(PersistenceUnitProperties.DDL_GENERATION, "none");
-		entityManager = new PersistenceProvider()	
-			.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
-			.createEntityManager();
-	};		
+	}		
 	
 	public class WorkspaceSaveParticipant implements ISaveParticipant {
 
@@ -155,7 +203,7 @@ public class TimekeeperPlugin extends Plugin {
 							entityManager.persist(task);
 						}
 						transaction.commit();
-						return Status.OK_STATUS;
+						return Status.OK_STATUS;							
 					}
 
 				};
@@ -180,8 +228,7 @@ public class TimekeeperPlugin extends Plugin {
 	@Override
 	public void start(BundleContext context) throws Exception {
 		super.start(context);
-		init();
-        cleanTaskActivities();
+		connectToDatabase();
 		ISaveParticipant saveParticipant = new WorkspaceSaveParticipant();
         ResourcesPlugin.getWorkspace().addSaveParticipant(BUNDLE_ID, saveParticipant);
 	}
@@ -193,47 +240,39 @@ public class TimekeeperPlugin extends Plugin {
 	 * guesswork is applied using data from Mylyn.
 	 */
 	private void cleanTaskActivities() {
-		Job cleanJob = new Job("Clean up Timekeeper database"){
-
-			@Override
-			protected IStatus run(IProgressMonitor monitor) {
-				long ps = System.currentTimeMillis();
-				TypedQuery<TrackedTask> createQuery = entityManager.createQuery("SELECT tt FROM TRACKEDTASK tt",
-						TrackedTask.class);
-				List<TrackedTask> resultList = createQuery.getResultList();
-				for (TrackedTask trackedTask : resultList) {
-					if (trackedTask.getCurrentActivity().isPresent()) {
-						ITask task = getTask(trackedTask);
-						// note that the ITask may not exist in this workspace
-						if (task!=null && !task.isActive()) {
-							// try to figure out when it was last active
-							Activity activity = trackedTask.getCurrentActivity().get();
-							ZonedDateTime start = activity.getStart().atZone(ZoneId.systemDefault());
-							ZonedDateTime end = start.plusMinutes(30);
-							while (true) {
-								Calendar s = Calendar.getInstance();
-								Calendar e = Calendar.getInstance();
-								s.setTime(Date.from(start.toInstant()));
-								e.setTime(Date.from(end.toInstant()));
-								long elapsedTime = TasksUi.getTaskActivityManager().getElapsedTime(task, s, e);
-								// update the end time on the activity
-								if (elapsedTime == 0 || e.after(Calendar.getInstance())) {
-									activity.setEnd(LocalDateTime.ofInstant(e.toInstant(), ZoneId.systemDefault()));
-									trackedTask.endActivity();
-									break;
-								}
-								start.plusMinutes(30);
-								end.plusMinutes(30);
-							}
+		//long ps = System.currentTimeMillis();
+		TypedQuery<TrackedTask> createQuery = entityManager.createQuery("SELECT tt FROM TRACKEDTASK tt",
+				TrackedTask.class);
+		List<TrackedTask> resultList = createQuery.getResultList();
+		for (TrackedTask trackedTask : resultList) {
+			if (trackedTask.getCurrentActivity().isPresent()) {
+				ITask task = getTask(trackedTask);
+				// note that the ITask may not exist in this workspace
+				if (task!=null && !task.isActive()) {
+					// try to figure out when it was last active
+					Activity activity = trackedTask.getCurrentActivity().get();
+					ZonedDateTime start = activity.getStart().atZone(ZoneId.systemDefault());
+					ZonedDateTime end = start.plusMinutes(30);
+					while (true) {
+						Calendar s = Calendar.getInstance();
+						Calendar e = Calendar.getInstance();
+						s.setTime(Date.from(start.toInstant()));
+						e.setTime(Date.from(end.toInstant()));
+						long elapsedTime = TasksUi.getTaskActivityManager().getElapsedTime(task, s, e);
+						// update the end time on the activity
+						if (elapsedTime == 0 || e.after(Calendar.getInstance())) {
+							activity.setEnd(LocalDateTime.ofInstant(e.toInstant(), ZoneId.systemDefault()));
+							trackedTask.endActivity();
+							break;
 						}
+						start.plusMinutes(30);
+						end.plusMinutes(30);
 					}
 				}
-				long pe = System.currentTimeMillis();
-				return new Status(IStatus.INFO,BUNDLE_ID,String.format("Cleaned up Timekeeper database in %dms",(pe-ps)));
-			}			
-		};
-		cleanJob.setSystem(false);
-		cleanJob.schedule();
+			}
+		}					
+//		long pe = System.currentTimeMillis();
+//					return new Status(IStatus.INFO,BUNDLE_ID,String.format("Cleaned up Timekeeper database in %dms",(pe-ps)));
 	}
 
 	@Override
@@ -250,6 +289,10 @@ public class TimekeeperPlugin extends Plugin {
 	 * @return a {@link TrackedTask} associated with the Mylyn task
 	 */
 	public TrackedTask getTask(ITask task) {
+		// this may happen if the UI asks for task details before the database is ready
+		if (entityManager == null){
+			return null;
+		}
 		TrackedTaskId id = new TrackedTaskId(task.getRepositoryUrl(), task.getTaskId());
 		TrackedTask found = entityManager.find(TrackedTask.class, id);
 		if (found == null) {
@@ -259,7 +302,7 @@ public class TimekeeperPlugin extends Plugin {
 			return tt;
 		} else {
 			return found;
-		}
+		}			
 	}
 	
 	/**

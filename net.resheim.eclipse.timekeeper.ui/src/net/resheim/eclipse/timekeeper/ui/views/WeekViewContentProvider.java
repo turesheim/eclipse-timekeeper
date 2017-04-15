@@ -13,30 +13,43 @@ package net.resheim.eclipse.timekeeper.ui.views;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.eclipse.jface.viewers.ITreeContentProvider;
+import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.core.ITask;
 
 import net.resheim.eclipse.timekeeper.db.Activity;
+import net.resheim.eclipse.timekeeper.db.DatabaseChangeListener;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.TrackedTask;
 import net.resheim.eclipse.timekeeper.ui.Activator;
 
 @SuppressWarnings("restriction")
-public abstract class WeekViewContentProvider implements ITreeContentProvider {
+public abstract class WeekViewContentProvider implements ITreeContentProvider, DatabaseChangeListener {
 
 	public static final WeeklySummary WEEKLY_SUMMARY = new WeeklySummary();
 
 	private LocalDate firstDayOfWeek;
 
-	protected List<ITask> filtered;
+	protected List<ITask> filtered = Collections.emptyList();
+
+	private Viewer viewer;
 
 	public List<ITask> getFiltered() {
 		return filtered;
+	}
+
+	public void dispose() {
+		TimekeeperPlugin.getDefault().removeListener(this);
+	}
+
+	public void inputChanged(Viewer v, Object oldInput, Object newInput) {
+		this.viewer = v;
 	}
 
 	@Override
@@ -96,6 +109,11 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider {
 	private boolean hasData/* this week */(ITask task, LocalDate startDate) {
 		LocalDate endDate = startDate.plusDays(7);
 		TrackedTask ttask = TimekeeperPlugin.getDefault().getTask(task);
+		// this will typically only be NULL if the database has not started yet.
+		// See databaseStateChanged()
+		if (ttask == null) {
+			return false;
+		}
 		Stream<Activity> filter = ttask.getActivities().stream()
 				.filter(a -> a.getDuration(startDate, endDate) != Duration.ZERO);
 		return filter.count() > 0;
@@ -128,6 +146,19 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider {
 	 */
 	LocalDate getDate(int weekday) {
 		return getFirstDayOfWeek().plusDays(weekday);
+	}
+
+	@Override
+	public void databaseStateChanged() {
+		filter();
+		if (viewer != null) {
+			viewer.getControl().getDisplay().asyncExec(new Runnable() {
+				@Override
+				public void run() {
+					viewer.refresh();
+				}
+			});
+		}
 	}
 
 }
