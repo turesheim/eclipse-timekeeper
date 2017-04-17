@@ -18,7 +18,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.eclipse.jface.viewers.AbstractTreeViewer;
 import org.eclipse.jface.viewers.ITreeContentProvider;
+import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.core.ITask;
@@ -156,6 +158,9 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 				@Override
 				public void run() {
 					viewer.refresh();
+					if (viewer instanceof TreeViewer) {
+						((AbstractTreeViewer) viewer).expandAll();
+					}
 				}
 			});
 		}

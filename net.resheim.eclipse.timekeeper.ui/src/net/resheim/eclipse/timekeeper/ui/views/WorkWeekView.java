@@ -154,7 +154,7 @@ public class WorkWeekView extends ViewPart {
 
 				@Override
 				public void run() {
-					if (!viewer.getControl().isDisposed()) {
+					if (!viewer.getControl().isDisposed() && !viewer.isCellEditorActive()) {
 						viewer.setInput(getViewSite());
 					}
 				}
@@ -168,13 +168,13 @@ public class WorkWeekView extends ViewPart {
 		Runnable handler = new Runnable() {
 			public void run() {
 				if (!display.isDisposed() && !PlatformUI.getWorkbench().isClosing() && !statusLabel.isDisposed()) {
-					if (!viewer.isCellEditorActive()) {
-						try {
-							updateStatus();
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
-					}
+					// if (!viewer.isCellEditorActive()) {
+					// try {
+					updateStatus();
+					// } catch (Exception e) {
+					// e.printStackTrace();
+					// }
+					// }
 					display.timerExec(UPDATE_INTERVAL, this);
 				}
 			}
@@ -196,25 +196,32 @@ public class WorkWeekView extends ViewPart {
 		return 0;
 	}
 
-	private void updateStatus() throws Exception {
+	private void updateStatus() {
 		ITask activeTask = TasksUi.getTaskActivityManager().getActiveTask();
 		if (activeTask == null) {
 			statusLabel.setText("");
 		} else if (Activator.getDefault().isIdle()) {
 			statusLabel.setText("Idle since " +
 					timeFormat.format(Activator.getDefault().getIdleSince()));
-			viewer.refresh(activeTask);
-			viewer.refresh(contentProvider.getParent(activeTask));
-			viewer.refresh(WeekViewContentProvider.WEEKLY_SUMMARY);
+			// do not refresh with an editor active, that would deactivate the
+			// editor and lose focus
+			if (!viewer.isCellEditorActive()) {
+				viewer.refresh(activeTask);
+				viewer.refresh(contentProvider.getParent(activeTask));
+				viewer.refresh(WeekViewContentProvider.WEEKLY_SUMMARY);
+			}
 		} else if (getActiveTime() > 0) {
 			long activeTime = getActiveTime();
 			LocalDateTime activeSince = Activator.getDefault().getActiveSince();
 			statusLabel.setText(MessageFormat.format("Active since {0}, {1} elapsed", timeFormat.format(activeSince),
 					DurationFormatUtils.formatDurationWords(activeTime, true, true)));
-
-			viewer.refresh(activeTask);
-			viewer.refresh(contentProvider.getParent(activeTask));
-			viewer.refresh(WeekViewContentProvider.WEEKLY_SUMMARY);
+			// do not refresh with an editor active, that would deactivate the
+			// editor and lose focus
+			if (!viewer.isCellEditorActive()) {
+				viewer.refresh(activeTask);
+				viewer.refresh(contentProvider.getParent(activeTask));
+				viewer.refresh(WeekViewContentProvider.WEEKLY_SUMMARY);
+			}
 		}
 
 	}
