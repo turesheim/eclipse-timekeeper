@@ -168,13 +168,7 @@ public class WorkWeekView extends ViewPart {
 		Runnable handler = new Runnable() {
 			public void run() {
 				if (!display.isDisposed() && !PlatformUI.getWorkbench().isClosing() && !statusLabel.isDisposed()) {
-					// if (!viewer.isCellEditorActive()) {
-					// try {
 					updateStatus();
-					// } catch (Exception e) {
-					// e.printStackTrace();
-					// }
-					// }
 					display.timerExec(UPDATE_INTERVAL, this);
 				}
 			}
@@ -236,7 +230,6 @@ public class WorkWeekView extends ViewPart {
 			}
 			updateWeekLabel();
 			updateColumHeaders();
-
 			filter();
 			v.refresh();
 		}
@@ -319,16 +312,16 @@ public class WorkWeekView extends ViewPart {
 	@Override
 	public void createPartControl(Composite parent) {
 		FormToolkit ft = new FormToolkit(parent.getDisplay());
-		ScrolledComposite root = new ScrolledComposite(parent, SWT.V_SCROLL);
-		ft.adapt(root);
+		ScrolledComposite rootComposite = new ScrolledComposite(parent, SWT.V_SCROLL);
+		ft.adapt(rootComposite);
 		GridLayout layout = new GridLayout();
-		root.setLayout(layout);
-		root.setExpandHorizontal(true);
-		root.setExpandVertical(true);
+		rootComposite.setLayout(layout);
+		rootComposite.setExpandHorizontal(true);
+		rootComposite.setExpandVertical(true);
 
-		Composite main = ft.createComposite(root);
+		Composite main = ft.createComposite(rootComposite);
 		ft.adapt(main);
-		root.setContent(main);
+		rootComposite.setContent(main);
 		GridLayout layout2 = new GridLayout(3, false);
 		layout2.horizontalSpacing = 0;
 		main.setLayout(layout2);
@@ -386,23 +379,24 @@ public class WorkWeekView extends ViewPart {
 		tree.setLinesVisible(true);
 
 		// adjust column width when view is resized
-		root.addControlListener(new ControlAdapter() {
+		rootComposite.addControlListener(new ControlAdapter() {
 			@Override
 			public void controlResized(ControlEvent e) {
-				Rectangle area = root.getClientArea();
-				int width = area.width - 2 * tree.getBorderWidth();
+				Rectangle area = rootComposite.getClientArea();
+				int width = area.width - 2 * tree.getBorderWidth() - 8 /* figure out the correct way to obtain this value */;
 				Point vBarSize = tree.getVerticalBar().getSize();
-				width -= vBarSize.x;
+				width -= vBarSize.x * 2;
 				TreeColumn[] columns = tree.getColumns();
 				int cwidth = 0;
 				for (int i = 1; i < columns.length; i++) {
 					columns[i].pack();
-					if (columns[i].getWidth()<TIME_COLUMN_WIDTH){
+					if (columns[i].getWidth() < TIME_COLUMN_WIDTH) {
 						columns[i].setWidth(TIME_COLUMN_WIDTH);
 					}
 					cwidth += columns[i].getWidth();
 				}
-				tree.getColumns()[0].setWidth(width - cwidth);
+				// set the width of the first column
+				columns[0].setWidth(width - cwidth);
 			}
 		});
 
@@ -421,7 +415,7 @@ public class WorkWeekView extends ViewPart {
 		TasksUiPlugin.getTaskList().addChangeListener(taskListener);
 		viewer.setInput(getViewSite());
 		// Force a redraw so content is visible
-		root.pack();
+		rootComposite.pack();
 		installStatusUpdater();
 	}
 
@@ -457,7 +451,9 @@ public class WorkWeekView extends ViewPart {
 				} else if (element instanceof ITask) {
 					AbstractTask task = (AbstractTask) element;
 					TrackedTask trackedTask = TimekeeperPlugin.getDefault().getTask(task);
-					seconds = trackedTask.getDuration(contentProvider.getDate(weekday)).getSeconds();
+					if (trackedTask != null) {
+						seconds = trackedTask.getDuration(contentProvider.getDate(weekday)).getSeconds();
+					}
 				} else if (element instanceof WeeklySummary) {
 					seconds = getSum(contentProvider.getFiltered(), date);
 				} else if (element instanceof Activity) {
@@ -545,7 +541,8 @@ public class WorkWeekView extends ViewPart {
 			return 0;
 		}
 		return filtered
-				.stream().mapToLong(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date).getSeconds())
+				.stream().filter(t -> TimekeeperPlugin.getDefault().getTask(t) != null)
+				.mapToLong(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date).getSeconds())
 				.sum();
 	}
 
@@ -562,6 +559,7 @@ public class WorkWeekView extends ViewPart {
 	private long getSum(List<ITask> filtered, LocalDate date, String project) {
 		return filtered
 				.stream()
+				.filter(t -> TimekeeperPlugin.getDefault().getTask(t) != null)
 				.filter(t -> project.equals(Activator.getProjectName(t)))
 				.mapToLong(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date).getSeconds())
 				.sum();

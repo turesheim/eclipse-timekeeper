@@ -303,9 +303,11 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
 		if (task != null) {
 			TrackedTask trackedTask = TimekeeperPlugin.getDefault().getTask(task);
-			Optional<Activity> currentActivity = trackedTask.getCurrentActivity();
-			if (currentActivity.isPresent()) {
-				return currentActivity.get().getStart();
+			if (trackedTask != null) {
+				Optional<Activity> currentActivity = trackedTask.getCurrentActivity();
+				if (currentActivity.isPresent()) {
+					return currentActivity.get().getStart();
+				}
 			}
 		}
 		return null;
@@ -356,7 +358,10 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 							Display.getDefault().syncExec(() -> handleReactivation(idleTimeMillis));
 						} else if (lastIdleTimeMillis < consideredIdleThreshold) {
 							lastActiveTime = LocalDateTime.now();
-							TimekeeperPlugin.getDefault().getTask(task).setTick(lastActiveTime);
+							TrackedTask trtask = TimekeeperPlugin.getDefault().getTask(task);
+							if (trtask != null) {
+								trtask.setTick(lastActiveTime);
+							}
 						}
 					}
 					lastIdleTimeMillis = idleTimeMillis;

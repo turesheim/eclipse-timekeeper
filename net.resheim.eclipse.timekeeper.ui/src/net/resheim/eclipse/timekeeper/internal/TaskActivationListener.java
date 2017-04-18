@@ -30,7 +30,9 @@ public class TaskActivationListener implements ITaskActivationListener {
 	@Override
 	public void preTaskActivated(ITask task) {
 		TrackedTask ttask = TimekeeperPlugin.getDefault().getTask(task);
-		ttask.startActivity();
+		if (ttask != null) {
+			ttask.startActivity();
+		}
 	}
 
 	@Override
