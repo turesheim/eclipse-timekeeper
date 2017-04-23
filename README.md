@@ -19,9 +19,7 @@ You can install from the <a href="http://marketplace.eclipse.org/content/timekee
 
 ### Database configuration
 
-Since version 2.0 data are stored in an SQL database. It is per default stored under **<workspace>/.timekeeper/**, one instance per workspace using the embedded [h2 database](http://www.h2database.com/html/main.html). If you rather store it on a different location you can change this under **Timekeeper** page in the preference settings. 
-
-If you'd rather use a database server you can download h2 from their website, start it and change the preference setting accordingly. 
+Since version 2.0 data are stored in a embedded [h2 database](http://www.h2database.com/html/main.html) under **~/.timekeeper/**. Timekeeper will utilize a H2 feature known as [*mixed mode*](http://h2database.com/html/features.html#auto_mixed_mode) to automatically start on port 9090 if more connections are required.
 
 ## Building
 
@@ -37,4 +35,4 @@ This project started out as an experiment, attempting to make use of the *Java 8
 
 ## License
 
-Copyright © 2014-2015 Torkild Ulvøy Resheim. All rights reserved. This program and the accompanying materials are made available under the terms of the Eclipse Public License v1.0 which accompanies this distribution, and is available at http://www.eclipse.org/legal/epl-v10.html
+Copyright © 2014-2017 Torkild Ulvøy Resheim. All rights reserved. This program and the accompanying materials are made available under the terms of the Eclipse Public License v1.0 which accompanies this distribution, and is available at http://www.eclipse.org/legal/epl-v10.html

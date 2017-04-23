@@ -17,9 +17,9 @@ import java.nio.file.Paths;
 
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.jface.dialogs.MessageDialog;
-import org.eclipse.jface.preference.BooleanFieldEditor;
 import org.eclipse.jface.preference.FieldEditorPreferencePage;
 import org.eclipse.jface.preference.IPreferenceStore;
+import org.eclipse.jface.preference.RadioGroupFieldEditor;
 import org.eclipse.jface.preference.StringFieldEditor;
 import org.eclipse.jface.util.PropertyChangeEvent;
 import org.eclipse.swt.SWT;
@@ -32,7 +32,6 @@ import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Group;
-import org.eclipse.swt.widgets.Label;
 import org.eclipse.ui.IViewPart;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchPreferencePage;
@@ -44,23 +43,22 @@ import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
 public class DatabasePreferences extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
 
-	private StringFieldEditor editor;
-
 	public DatabasePreferences() {
 		super(FieldEditorPreferencePage.GRID);
 	}
 
 	@Override
 	protected void createFieldEditors() {
-		Group g0 = new Group(getFieldEditorParent(), SWT.SHADOW_ETCHED_IN);
-		g0.setText(Messages.DatabasePreferences_PageTitle);
-		g0.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 2, 1));
-		g0.setLayout(new GridLayout(2, true));
-		editor = new StringFieldEditor(TimekeeperPlugin.DATABASE_URL, Messages.DatabasePreferences_URL, g0);
-		addField(editor);
-		addField(new BooleanFieldEditor(TimekeeperPlugin.MIXED_MODE_SERVER, Messages.DatabasePreferences_MixedMode, g0));
-		Label label = new Label(g0, SWT.WRAP | SWT.LEFT);
-		label.setText(Messages.DatabasePreferences_AutoDescription);
+
+		addField(new RadioGroupFieldEditor(TimekeeperPlugin.DATABASE_LOCATION, "Database location", 1,
+				new String[][] {
+			{ "Shared (in ~/.timekeeper/)", TimekeeperPlugin.DATABASE_LOCATION_SHARED },
+			{ "Relative to workspace (in .timekeeper/)", TimekeeperPlugin.DATABASE_LOCATION_WORKSPACE },
+			{ "Specified by JDBC URL", TimekeeperPlugin.DATABASE_LOCATION_URL },
+				}, getFieldEditorParent(), true));
+
+		addField(new StringFieldEditor(TimekeeperPlugin.DATABASE_URL, Messages.DatabasePreferences_URL,
+				getFieldEditorParent()));
 
 		Group g2 = new Group(getFieldEditorParent(), SWT.SHADOW_ETCHED_IN);
 		g2.setText(Messages.DatabasePreferences_ExportImportTitle);
@@ -98,7 +96,7 @@ public class DatabasePreferences extends FieldEditorPreferencePage implements IW
 
 	@Override
 	public void propertyChange(PropertyChangeEvent event) {
-		if (event.getProperty().equals(TimekeeperPlugin.DATABASE_URL)) {
+		if (event.getProperty().equals(TimekeeperPlugin.DATABASE_LOCATION)) {
 			MessageDialog.openInformation(Display.getCurrent().getActiveShell(), Messages.DatabasePreferences_RestartRequired,
 					Messages.DatabasePreferences_ChangeMessage);
 		}

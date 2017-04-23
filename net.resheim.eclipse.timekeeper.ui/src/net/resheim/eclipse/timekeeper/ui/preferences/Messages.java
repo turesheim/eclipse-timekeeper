@@ -15,7 +15,6 @@ import org.eclipse.osgi.util.NLS;
 
 public class Messages extends NLS {
 	private static final String BUNDLE_NAME = "net.resheim.eclipse.timekeeper.ui.preferences.messages"; //$NON-NLS-1$
-	public static String DatabasePreferences_PageTitle;
 	public static String DatabasePreferences_URL;
 	public static String DatabasePreferences_ExportMessage;
 	public static String DatabasePreferences_ExportError;
@@ -26,8 +25,6 @@ public class Messages extends NLS {
 	public static String DatabasePreferences_DataImported;
 	public static String DatabasePreferences_CreatedMessage;
 	public static String DatabasePreferences_ImportError;
-	public static String DatabasePreferences_MixedMode;
-	public static String DatabasePreferences_AutoDescription;
 	public static String DatabasePreferences_ExportImportTitle;
 	public static String DatabasePreferences_Export;
 	public static String DatabasePreferences_ChooseExportFolder;

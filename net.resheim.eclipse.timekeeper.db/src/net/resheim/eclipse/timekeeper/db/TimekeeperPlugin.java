@@ -66,9 +66,12 @@ import org.osgi.framework.BundleContext;
 @SuppressWarnings("restriction")
 public class TimekeeperPlugin extends Plugin {
 
+	/* Preferences */
 	public static final String DATABASE_URL = "database-url";
-
-	public static final String MIXED_MODE_SERVER = "start-server";
+	public static final String DATABASE_LOCATION = "database-location";
+	public static final String DATABASE_LOCATION_SHARED = "shared";
+	public static final String DATABASE_LOCATION_WORKSPACE = "workspace";
+	public static final String DATABASE_LOCATION_URL = "url";
 
 	public static final String KEY_VALUELIST_ID = "net.resheim.eclipse.timekeeper"; //$NON-NLS-1$
 	
@@ -113,25 +116,19 @@ public class TimekeeperPlugin extends Plugin {
 				// default, default location
 				String jdbc_url = "jdbc:h2:~/.timekeeper/h2db";
 				try {
-					// use workspace relative path or specified url
-					Location instanceLocation = Platform.getInstanceLocation();
-					Path path = Paths.get(instanceLocation.getURL().getPath()).resolve(".timekeeper");
-					if (!path.toFile().exists()) {
-						Files.createDirectory(path);
-					}
-					StatusManager.getManager()
-							.handle(new Status(IStatus.INFO, BUNDLE_ID, "Timekeeper default path is at " + path));
-					jdbc_url = Platform.getPreferencesService().getString(BUNDLE_ID, DATABASE_URL, "jdbc:h2:" + path + "/h2db",
-							new IScopeContext[] { InstanceScope.INSTANCE });
 					
-					// whether or not to start the database server.
-					boolean start = Platform.getPreferencesService().getBoolean(BUNDLE_ID, MIXED_MODE_SERVER, false,
-							new IScopeContext[] { InstanceScope.INSTANCE });
-					if (start) {
-						//startDatabaseServer();
-						jdbc_url+=";AUTO_SERVER=TRUE;AUTO_SERVER_PORT=9090";
-					}
-					
+					String location = Platform.getPreferencesService().getString(BUNDLE_ID, DATABASE_LOCATION, DATABASE_LOCATION_SHARED,new IScopeContext[] { InstanceScope.INSTANCE });
+					switch (location){
+						case DATABASE_LOCATION_SHARED:
+							jdbc_url = getSharedLocation();
+						break;
+						case DATABASE_LOCATION_WORKSPACE:
+							jdbc_url = getWorkspaceLocation();
+						break;
+						case DATABASE_LOCATION_URL:
+						jdbc_url = getSpecifiedLocation();
+						break;
+					}					
 					StatusManager.getManager()
 							.handle(new Status(IStatus.INFO, BUNDLE_ID, "Timekeeper is connecting to database at " + jdbc_url));
 					// baseline the database
@@ -388,6 +385,29 @@ public class TimekeeperPlugin extends Plugin {
 			transaction.rollback();			
 			throw new IOException(e.getMessage());
 		}
+	}
+
+	public String getSharedLocation() {
+		return "jdbc:h2:~/.timekeeper/h2db;AUTO_SERVER=TRUE;AUTO_SERVER_PORT=9090";
+	}
+
+	public String getWorkspaceLocation() throws IOException {
+		String jdbc_url;
+		Location instanceLocation = Platform.getInstanceLocation();
+		Path path = Paths.get(instanceLocation.getURL().getPath()).resolve(".timekeeper");
+		if (!path.toFile().exists()) {
+			Files.createDirectory(path);
+		}
+		jdbc_url = "jdbc:h2:" + path + "/h2db";
+		return jdbc_url;
+	}
+
+	public String getSpecifiedLocation() {
+		String jdbc_url;
+		jdbc_url = Platform.getPreferencesService().getString(BUNDLE_ID, DATABASE_URL, 
+				"jdbc:h2:tcp://localhost/~/.timekeeper/h2db", // note use server location per default
+				new IScopeContext[] { InstanceScope.INSTANCE });
+		return jdbc_url;
 	}
 
 }
