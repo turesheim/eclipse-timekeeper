@@ -19,7 +19,13 @@ You can install from the <a href="http://marketplace.eclipse.org/content/timekee
 
 ### Database configuration
 
-Since version 2.0 data are stored in a embedded [h2 database](http://www.h2database.com/html/main.html) under **~/.timekeeper/**. Timekeeper will utilize a H2 feature known as [*mixed mode*](http://h2database.com/html/features.html#auto_mixed_mode) to automatically start on port 9090 if more connections are required.
+Since version 2.0, data are stored in a embedded [h2 database](http://www.h2database.com/html/main.html) under **~/.timekeeper/**. Timekeeper utilizes a H2 feature known as [*mixed mode*](http://h2database.com/html/features.html#auto_mixed_mode) to automatically start on port 9090 if more connections are required. The location of the database can be changed using the preferences dialog.
+
+### Database upgrades
+
+Data should be automatically copied over to the H2 database when upgrading from 1.0, however this has not been extensively tested. Make a copy of your workspace(s) before upgrading in case something goes wrong. In the worst case scenario; historical data will be lost.
+
+Timekeeper is using [Flyway](https://flywaydb.org) to automatically upgrade the database on post-2.0 relases.
 
 ## Building
 
@@ -27,11 +33,11 @@ Clone the project and from the root execute:
 
     mvn clean verify
 
-When successful there will be a Eclipse p2 repository at *net.resheim.eclipse.timekeeper-site/target/repository* which you can install from.
+When the build completes successfully there will be a Eclipse p2 repository at *net.resheim.eclipse.timekeeper-site/target/repository* which you can install from.
 
 ## Note
 
-This project started out as an experiment, attempting to make use of the *Java 8 Date/Time API* along with new collection features such as *Streams*. Hence **Java 8** is absolutely required to execute this bundle.
+This project started out as an experiment, attempting to make use of the *Java 8 Date/Time API* along with new collection features such as *Streams*. Hence **Java 8** is absolutely required for this feature to work.
 
 ## License
 

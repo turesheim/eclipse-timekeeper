@@ -18,6 +18,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.BinaryOperator;
 
 import javax.persistence.Column;
@@ -31,7 +32,10 @@ import javax.persistence.OneToOne;
 import javax.persistence.Transient;
 
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
+import org.eclipse.mylyn.tasks.core.IRepositoryManager;
 import org.eclipse.mylyn.tasks.core.ITask;
+import org.eclipse.mylyn.tasks.core.TaskRepository;
+import org.eclipse.mylyn.tasks.ui.TasksUi;
 
 import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConverter;
 
@@ -50,6 +54,9 @@ import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConver
 @Entity(name = "TRACKEDTASK")
 @IdClass(value = TrackedTaskId.class)
 public class TrackedTask implements Serializable {
+
+	private static final String LOCAL_REPO_ID = "local";
+	private static final String LOCAL_REPO_KEY_ID = "net.resheim.eclipse.timekeeper.repo-id"; //$NON-NLS-1$
 
 	private static final long serialVersionUID = 2025738836825780128L;
 
@@ -221,7 +228,7 @@ public class TrackedTask implements Serializable {
 		// associate this tracked task with the Mylyn task
 		this.task = task;
 		taskId = task.getTaskId();
-		repositoryUrl = task.getRepositoryUrl();
+		repositoryUrl = getRepositoryUrl(task);
 
 		// we have an old fashioned value here. migrate the old data 
 		if (task.getAttribute(TimekeeperPlugin.KEY_VALUELIST_ID) != null) {
@@ -232,6 +239,35 @@ public class TrackedTask implements Serializable {
 			}
 		}
 	}
+
+	/**
+	 * This method will return the repository URL for tasks in repositories that
+	 * are not local. If the task is in a local repository, the Timekeeper
+	 * repository identifier is returned if it exists. If it does not exist, it
+	 * will be created, associated with the repository and returned.
+	 * 
+	 * @param task
+	 *            the task to get the repository URL for
+	 * @return the repository URL or {@link UUID}
+	 */
+	public static String getRepositoryUrl(ITask task) {
+		String url = task.getRepositoryUrl();
+		if (LOCAL_REPO_ID.equals(task.getRepositoryUrl())){
+			IRepositoryManager repositoryManager = TasksUi.getRepositoryManager();
+			if (repositoryManager == null) { // may happen during testing
+				return LOCAL_REPO_ID;
+			}			
+			TaskRepository repository = repositoryManager.getRepository(task.getConnectorKind(), task.getRepositoryUrl());
+			String id = repository.getProperty(LOCAL_REPO_KEY_ID);
+			if (id == null) {
+				id = LOCAL_REPO_ID+"-"+UUID.randomUUID().toString();
+				repository.setProperty(LOCAL_REPO_KEY_ID, id);
+			}
+			url = id;
+		}
+		return url;
+	}
+	
 
 	/**
 	 * Sets the last time the task was active while the user was not idle.

@@ -290,7 +290,7 @@ public class TimekeeperPlugin extends Plugin {
 		if (entityManager == null){
 			return null;
 		}
-		TrackedTaskId id = new TrackedTaskId(task.getRepositoryUrl(), task.getTaskId());
+		TrackedTaskId id = new TrackedTaskId(TrackedTask.getRepositoryUrl(task), task.getTaskId());
 		TrackedTask found = entityManager.find(TrackedTask.class, id);
 		if (found == null) {
 			// no such tracked task exists, create one
