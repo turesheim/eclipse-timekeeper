@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <?pde?>
 <!-- generated with https://github.com/mbarbero/fr.obeo.releng.targetplatform -->
-<target name="Eclipse Timekeeper Target Platform" sequenceNumber="1491677957">
+<target name="Eclipse Timekeeper Target Platform" sequenceNumber="1496768484">
   <locations>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
-      <unit id="org.eclipse.equinox.p2.sdk.feature.group" version="3.10.0.v20170208-2010"/>
-      <unit id="org.eclipse.sdk.feature.group" version="4.7.0.v20170308-2105"/>
-      <unit id="org.eclipse.pde.core" version="3.11.100.v20170223-1441"/>
-      <unit id="org.eclipse.emf.ecore" version="2.13.0.v20170313-0735"/>
-      <unit id="org.eclipse.emf.ecore.xmi" version="2.13.0.v20170313-0735"/>
-      <unit id="org.eclipse.emf.ecore.change" version="2.11.0.v20170313-0735"/>
-      <unit id="org.eclipse.emf.common" version="2.13.0.v20170313-0735"/>
+      <unit id="org.eclipse.equinox.p2.sdk.feature.group" version="3.9.203.v20170131-1444"/>
+      <unit id="org.eclipse.sdk.feature.group" version="4.6.3.v20170301-0400"/>
+      <unit id="org.eclipse.pde.core" version="3.11.1.v20161115-1951"/>
+      <unit id="org.eclipse.emf.ecore" version="2.12.0.v20160420-0247"/>
+      <unit id="org.eclipse.emf.ecore.xmi" version="2.12.0.v20160420-0247"/>
+      <unit id="org.eclipse.emf.ecore.change" version="2.11.0.v20160420-0247"/>
+      <unit id="org.eclipse.emf.common" version="2.12.0.v20160420-0247"/>
       <unit id="org.apache.log4j" version="1.2.15.v201012070815"/>
       <unit id="org.apache.commons.collections" version="3.2.2.v201511171945"/>
-      <repository location="http://download.eclipse.org/releases/oxygen/"/>
+      <repository location="http://download.eclipse.org/releases/neon/"/>
     </location>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
       <unit id="org.eclipse.swtbot.forms.source.feature.group" version="2.5.0.201609021837"/>
@@ -47,6 +47,13 @@
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
       <unit id="org.eclipse.gemini.jpa" version="1.2.0.M1"/>
       <repository location="http://download.eclipse.org/gemini/jpa/updates/"/>
+    </location>
+    <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
+      <unit id="org.slf4j.api" version="1.7.10.v20170224-1220"/>
+      <unit id="ch.qos.logback.slf4j" version="1.1.2.v20160301-0943"/>
+      <unit id="ch.qos.logback.classic" version="1.1.2.v20160208-0839"/>
+      <unit id="ch.qos.logback.core" version="1.1.2.v20160208-0839"/>
+      <repository location="http://download.eclipse.org/tools/orbit/R-builds/R20170307180635/repository"/>
     </location>
   </locations>
 </target>
