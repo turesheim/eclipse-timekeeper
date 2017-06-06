@@ -98,6 +98,11 @@ public class TimekeeperPlugin extends Plugin {
 				public void run() throws Exception {
 					databaseChangeListener.databaseStateChanged();					
 				}
+
+				@Override
+				public void handleException(Throwable exception) {
+					// ignore
+				}
 			});
 		}
 	}
@@ -129,8 +134,6 @@ public class TimekeeperPlugin extends Plugin {
 						jdbc_url = getSpecifiedLocation();
 						break;
 					}					
-					StatusManager.getManager()
-							.handle(new Status(IStatus.INFO, BUNDLE_ID, "Timekeeper is connecting to database at " + jdbc_url));
 					// baseline the database
 			        Flyway flyway = new Flyway();
 			        flyway.setDataSource(jdbc_url, "sa", "");
@@ -149,24 +152,23 @@ public class TimekeeperPlugin extends Plugin {
 					props.put(PersistenceUnitProperties.JDBC_USER, "sa");
 					props.put(PersistenceUnitProperties.JDBC_PASSWORD, "");
 					props.put(PersistenceUnitProperties.LOGGING_LEVEL, "fine");
-					// we want flyway to create the database, it gives us better control over migrating
+					// we want Flyway to create the database, it gives us better control over migrating
 					props.put(PersistenceUnitProperties.DDL_GENERATION, "none");
 					entityManager = new PersistenceProvider()	
 						.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
 						.createEntityManager();
-				} catch (IOException e) {
-					return new Status(IStatus.INFO,BUNDLE_ID,"Could not connect to Timekeeper database", e);
-				} /*catch (SQLException e) {
-					StatusManager.getManager().handle(new Status(IStatus.ERROR,BUNDLE_ID,"Could not connect start H2 database server", e));
-				}*/
+					StatusManager.getManager()
+						.handle(new Status(IStatus.INFO, BUNDLE_ID, "Timekeeper is connected to database at " + jdbc_url));
+				} catch (Exception e) {
+					return new Status(IStatus.INFO,BUNDLE_ID,"Could not connect to Timekeeper database at "+jdbc_url, e);
+				}
 		        cleanTaskActivities();
 				notifyListeners();
-				return Status.OK_STATUS;
-			}			
+				return Status.OK_STATUS;			}
+
 		};
 		connectDatabaseJob.setSystem(false);
 		connectDatabaseJob.schedule();
-		
 	}		
 	
 	public class WorkspaceSaveParticipant implements ISaveParticipant {
@@ -192,15 +194,19 @@ public class TimekeeperPlugin extends Plugin {
 
 					@Override
 					protected IStatus run(IProgressMonitor monitor) {
-						Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
-						EntityTransaction transaction = entityManager.getTransaction();
-						transaction.begin();
-						for (AbstractTask abstractTask : allTasks) {
-							TrackedTask task = getTask(abstractTask);
-							entityManager.persist(task);
+						if (entityManager != null) {
+							Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
+							EntityTransaction transaction = entityManager.getTransaction();
+							transaction.begin();
+							for (AbstractTask abstractTask : allTasks) {
+								TrackedTask task = getTask(abstractTask);
+								entityManager.persist(task);
+							}
+							transaction.commit();
+							return Status.OK_STATUS;
+						} else {
+							return new Status(IStatus.ERROR, BUNDLE_ID, "Cannot persist data – no database connection.");
 						}
-						transaction.commit();
-						return Status.OK_STATUS;							
 					}
 
 				};
@@ -275,6 +281,9 @@ public class TimekeeperPlugin extends Plugin {
 	@Override
 	public void stop(BundleContext context) throws Exception {
 		super.stop(context);
+		if (entityManager != null) {
+			entityManager.close();
+		}
 	}
 		
 	/**
