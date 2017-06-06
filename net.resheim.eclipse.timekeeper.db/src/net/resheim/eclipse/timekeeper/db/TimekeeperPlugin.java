@@ -126,6 +126,8 @@ public class TimekeeperPlugin extends Plugin {
 					switch (location){
 						case DATABASE_LOCATION_SHARED:
 							jdbc_url = getSharedLocation();
+							// Fix https://github.com/turesheim/eclipse-timekeeper/issues/107
+							System.setProperty("h2.bindAddress", "localhost");
 						break;
 						case DATABASE_LOCATION_WORKSPACE:
 							jdbc_url = getWorkspaceLocation();
