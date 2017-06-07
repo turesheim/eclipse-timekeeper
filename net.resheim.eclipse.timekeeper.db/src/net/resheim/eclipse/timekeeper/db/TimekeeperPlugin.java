@@ -53,7 +53,6 @@ import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.osgi.service.datalocation.Location;
 import org.eclipse.persistence.config.PersistenceUnitProperties;
 import org.eclipse.persistence.jpa.PersistenceProvider;
-import org.eclipse.ui.statushandlers.StatusManager;
 import org.flywaydb.core.Flyway;
 import org.osgi.framework.BundleContext;
 
@@ -159,10 +158,9 @@ public class TimekeeperPlugin extends Plugin {
 					entityManager = new PersistenceProvider()	
 						.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
 						.createEntityManager();
-					StatusManager.getManager()
-						.handle(new Status(IStatus.INFO, BUNDLE_ID, "Timekeeper is connected to database at " + jdbc_url));
 				} catch (Exception e) {
-					return new Status(IStatus.INFO,BUNDLE_ID,"Could not connect to Timekeeper database at "+jdbc_url, e);
+					return new Status(IStatus.ERROR, BUNDLE_ID,
+							"Could not connect to Timekeeper database at " + jdbc_url, e);
 				}
 		        cleanTaskActivities();
 				notifyListeners();
@@ -196,7 +194,7 @@ public class TimekeeperPlugin extends Plugin {
 
 					@Override
 					protected IStatus run(IProgressMonitor monitor) {
-						if (entityManager != null) {
+						if (entityManager != null && entityManager.isOpen()) {
 							Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
 							EntityTransaction transaction = entityManager.getTransaction();
 							transaction.begin();
@@ -276,16 +274,14 @@ public class TimekeeperPlugin extends Plugin {
 				}
 			}
 		}					
-//		long pe = System.currentTimeMillis();
-//					return new Status(IStatus.INFO,BUNDLE_ID,String.format("Cleaned up Timekeeper database in %dms",(pe-ps)));
 	}
 
 	@Override
 	public void stop(BundleContext context) throws Exception {
-		super.stop(context);
-		if (entityManager != null) {
+		if (entityManager != null && entityManager.isOpen()) {
 			entityManager.close();
 		}
+		super.stop(context);
 	}
 		
 	/**
@@ -298,7 +294,7 @@ public class TimekeeperPlugin extends Plugin {
 	 */
 	public TrackedTask getTask(ITask task) {
 		// this may happen if the UI asks for task details before the database is ready
-		if (entityManager == null){
+		if (entityManager == null) {
 			return null;
 		}
 		TrackedTaskId id = new TrackedTaskId(TrackedTask.getRepositoryUrl(task), task.getTaskId());
@@ -398,8 +394,30 @@ public class TimekeeperPlugin extends Plugin {
 		}
 	}
 
+	/**
+	 * <p>
+	 * If the lock file does not exist, it is created. Then a server socket is
+	 * opened on a defined port, and kept open. The port and IP address of the
+	 * process that opened the database is written into the lock file.
+	 * </p>
+	 * <p>
+	 * If the lock file exists, and the lock method is 'file', then the software
+	 * switches to the 'file' method.
+	 * </p>
+	 * <p>
+	 * If the lock file exists, and the lock method is 'socket', then the
+	 * process checks if the port is in use. If the original process is still
+	 * running, the port is in use and this process throws an exception
+	 * (database is in use). If the original process died (for example due to a
+	 * power failure, or abnormal termination of the virtual machine), then the
+	 * port was released. The new process deletes the lock file and starts
+	 * again.
+	 * </p>
+	 * 
+	 * @return a connection URL string for the shared location
+	 */
 	public String getSharedLocation() {
-		return "jdbc:h2:~/.timekeeper/h2db;AUTO_SERVER=TRUE;AUTO_SERVER_PORT=9090";
+		return "jdbc:h2:~/.timekeeper/h2db;AUTO_SERVER=TRUE;FILE_LOCK=SOCKET;AUTO_RECONNECT=TRUE;AUTO_SERVER_PORT=9090";
 	}
 
 	public String getWorkspaceLocation() throws IOException {

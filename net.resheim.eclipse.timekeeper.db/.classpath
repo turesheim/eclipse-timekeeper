@@ -8,13 +8,8 @@
 	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="src" path="src-test"/>
-	<classpathentry exported="true" kind="lib" path="lib/h2-1.4.192.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/h2-1.4.194.jar"/>
 	<classpathentry kind="lib" path="lib/flyway-core-4.1.2.jar" sourcepath="lib/flyway-core-4.1.2-sources.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/4"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/EclipseLink 2.5.2">
-		<attributes>
-			<attribute name="owner.project.facets" value="jpt.jpa"/>
-		</attributes>
-	</classpathentry>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>
