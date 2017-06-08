@@ -109,7 +109,8 @@ class TimeEditingSupport extends EditingSupport {
 		if (element instanceof Activity) {
 			if (value instanceof String) {
 				TrackedTask trackedTask = ((Activity) element).getTrackedTask();
-				ITask task = TimekeeperPlugin.getDefault().getTask(trackedTask);
+				ITask task =  trackedTask.getTask() == null ? 
+						TimekeeperPlugin.getDefault().getTask(trackedTask) : trackedTask.getTask();
 				LocalDateTime start = ((Activity) element).getStart();
 				// has time point or range been specified...
 				Matcher range = Pattern.compile(TIME_RANGE).matcher((String) value);
@@ -153,6 +154,8 @@ class TimeEditingSupport extends EditingSupport {
 	}
 
 	private void update(Object element, ITask task) {
+		Assert.isNotNull(element);
+		Assert.isNotNull(task);
 		getViewer().update(element, null);
 		getViewer().update(task, null);
 		getViewer().update(Activator.getProjectName(task), null);

@@ -249,9 +249,10 @@ public class TimekeeperPlugin extends Plugin {
 		List<TrackedTask> resultList = createQuery.getResultList();
 		for (TrackedTask trackedTask : resultList) {
 			if (trackedTask.getCurrentActivity().isPresent()) {
-				ITask task = getTask(trackedTask);
+				ITask task =  trackedTask.getTask() == null ? 
+						TimekeeperPlugin.getDefault().getTask(trackedTask) : trackedTask.getTask();
 				// note that the ITask may not exist in this workspace
-				if (task!=null && !task.isActive()) {
+				if (task != null && !task.isActive()) {
 					// try to figure out when it was last active
 					Activity activity = trackedTask.getCurrentActivity().get();
 					ZonedDateTime start = activity.getStart().atZone(ZoneId.systemDefault());

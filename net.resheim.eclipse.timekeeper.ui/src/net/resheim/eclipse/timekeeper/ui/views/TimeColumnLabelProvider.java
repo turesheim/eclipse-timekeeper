@@ -56,7 +56,8 @@ abstract class TimeColumnLabelProvider extends ColumnLabelProvider {
 		}
 		if (element instanceof Activity) {
 			TrackedTask trackedTask = ((Activity) element).getTrackedTask();
-			ITask task = TimekeeperPlugin.getDefault().getTask(trackedTask);
+			ITask task =  trackedTask.getTask() == null ? 
+					TimekeeperPlugin.getDefault().getTask(trackedTask) : trackedTask.getTask();
 			if (task != null && task.isActive()) {
 				if (trackedTask.getCurrentActivity().isPresent()
 						&& trackedTask.getCurrentActivity().get().equals(element)) {

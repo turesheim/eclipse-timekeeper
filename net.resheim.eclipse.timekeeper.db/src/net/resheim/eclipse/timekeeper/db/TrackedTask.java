@@ -217,9 +217,7 @@ public class TrackedTask implements Serializable {
 	}
 
 	/**
-	 * Associates given Mylyn Task with this instance. If the Mylyn task already
-	 * have a Timekeeper identifier attribute it will be used as an identifier
-	 * for this instance, otherwise an indentifier string will be created.
+	 * Associates given Mylyn Task with this instance.
 	 * 
 	 * @param task
 	 *            the Mylyn task
@@ -303,9 +301,9 @@ public class TrackedTask implements Serializable {
 	}
 
 	/**
-	 * Returns the {@link ITask} if available. If not, it can be obtained from
-	 * {@link TimekeeperPlugin#getTask(TrackedTask)} which will look in the task
-	 * repository.
+	 * Returns the referenced {@link ITask} if available. If not, it can be
+	 * obtained from {@link TimekeeperPlugin#getTask(TrackedTask)} which will
+	 * examine the Mylyn task repository.
 	 * 
 	 * @return the {@link ITask} or <code>null</code>
 	 */
