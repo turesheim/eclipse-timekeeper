@@ -23,7 +23,7 @@ import org.eclipse.mylyn.tasks.core.ITask;
 import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.TrackedTask;
-import net.resheim.eclipse.timekeeper.ui.Activator;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 import net.resheim.eclipse.timekeeper.ui.views.WeekViewContentProvider;
 import net.resheim.eclipse.timekeeper.ui.views.WeeklySummary;
 
@@ -60,7 +60,7 @@ public class HTMLExporter extends AbstractExporter {
 		sb.append("Week ");
 		sb.append(firstDayOfWeek.format(weekFormat));
 		sb.append("</th>");
-		String[] headings = Activator.getDefault().getHeadings(firstDayOfWeek);
+		String[] headings = TimekeeperUiPlugin.getDefault().getHeadings(firstDayOfWeek);
 		for (String heading : headings) {
 			sb.append("<th width=\"50em\" style=\"text-align: center; border-left: 1px solid #aaa\">");
 			sb.append(heading);

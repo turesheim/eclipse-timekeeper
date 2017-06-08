@@ -83,7 +83,7 @@ import org.eclipse.ui.part.ViewPart;
 import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.TrackedTask;
-import net.resheim.eclipse.timekeeper.ui.Activator;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 @SuppressWarnings("restriction")
 public class WorkWeekView extends ViewPart {
@@ -182,7 +182,7 @@ public class WorkWeekView extends ViewPart {
 	 * @return the active milliseconds or "0"
 	 */
 	public long getActiveTime() {
-		LocalDateTime activeSince = Activator.getDefault().getActiveSince();
+		LocalDateTime activeSince = TimekeeperUiPlugin.getDefault().getActiveSince();
 		if (activeSince != null) {
 			LocalDateTime now = LocalDateTime.now();
 			return activeSince.until(now, ChronoUnit.MILLIS);
@@ -194,9 +194,9 @@ public class WorkWeekView extends ViewPart {
 		ITask activeTask = TasksUi.getTaskActivityManager().getActiveTask();
 		if (activeTask == null) {
 			statusLabel.setText("");
-		} else if (Activator.getDefault().isIdle()) {
+		} else if (TimekeeperUiPlugin.getDefault().isIdle()) {
 			statusLabel.setText("Idle since " +
-					timeFormat.format(Activator.getDefault().getIdleSince()));
+					timeFormat.format(TimekeeperUiPlugin.getDefault().getIdleSince()));
 			// do not refresh with an editor active, that would deactivate the
 			// editor and lose focus
 			if (!viewer.isCellEditorActive()) {
@@ -206,7 +206,7 @@ public class WorkWeekView extends ViewPart {
 			}
 		} else if (getActiveTime() > 0) {
 			long activeTime = getActiveTime();
-			LocalDateTime activeSince = Activator.getDefault().getActiveSince();
+			LocalDateTime activeSince = TimekeeperUiPlugin.getDefault().getActiveSince();
 			statusLabel.setText(MessageFormat.format("Active since {0}, {1} elapsed", timeFormat.format(activeSince),
 					DurationFormatUtils.formatDurationWords(activeTime, true, true)));
 			// do not refresh with an editor active, that would deactivate the
@@ -236,7 +236,7 @@ public class WorkWeekView extends ViewPart {
 
 		private void updateColumHeaders() {
 			TreeColumn[] columns = viewer.getTree().getColumns();
-			String[] headings = Activator.getDefault().getHeadings(getFirstDayOfWeek());
+			String[] headings = TimekeeperUiPlugin.getDefault().getHeadings(getFirstDayOfWeek());
 			for (int i = 1; i < columns.length; i++) {
 				LocalDate date = getFirstDayOfWeek().plusDays(i - 1);
 				columns[i].setText(headings[i - 1]);
@@ -560,7 +560,7 @@ public class WorkWeekView extends ViewPart {
 		return filtered
 				.stream()
 				.filter(t -> TimekeeperPlugin.getDefault().getTask(t) != null)
-				.filter(t -> project.equals(Activator.getProjectName(t)))
+				.filter(t -> project.equals(TimekeeperUiPlugin.getProjectName(t)))
 				.mapToLong(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date).getSeconds())
 				.sum();
 	}
@@ -619,9 +619,9 @@ public class WorkWeekView extends ViewPart {
 		currentWeekAction.setText("Current Week");
 		currentWeekAction.setToolTipText("Show current week");
 		currentWeekAction
-		.setImageDescriptor(Activator.getDefault()
+		.setImageDescriptor(TimekeeperUiPlugin.getDefault()
 				.getImageRegistry()
-				.getDescriptor(Activator.IMG_TOOL_CURRENT));
+				.getDescriptor(TimekeeperUiPlugin.IMG_TOOL_CURRENT));
 
 		// browse to next week
 		nextWeekAction = new Action() {

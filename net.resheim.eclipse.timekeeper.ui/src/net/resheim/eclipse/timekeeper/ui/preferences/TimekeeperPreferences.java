@@ -16,13 +16,13 @@ import org.eclipse.jface.preference.IntegerFieldEditor;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchPreferencePage;
 
-import net.resheim.eclipse.timekeeper.ui.Activator;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 public class TimekeeperPreferences extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
 
 	public TimekeeperPreferences() {
 		super(GRID);
-		setPreferenceStore(Activator.getDefault().getPreferenceStore());
+		setPreferenceStore(TimekeeperUiPlugin.getDefault().getPreferenceStore());
 	}
 
 	@Override

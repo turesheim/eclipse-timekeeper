@@ -80,6 +80,9 @@ public class TimekeeperPlugin extends Plugin {
 
 	private static EntityManager entityManager = null;
 	
+	private static Job saveDatabaseJob;
+
+	
 	private static final ListenerList<DatabaseChangeListener> listeners = new ListenerList<>();
 	
 	public void addListener(DatabaseChangeListener listener){
@@ -173,8 +176,6 @@ public class TimekeeperPlugin extends Plugin {
 	
 	public class WorkspaceSaveParticipant implements ISaveParticipant {
 
-		private Job saveDatabaseJob;
-
 		@Override
 		public void doneSaving(ISaveContext context) {
 		}
@@ -189,29 +190,6 @@ public class TimekeeperPlugin extends Plugin {
 
 		@Override
 		public void saving(ISaveContext context) throws CoreException {
-			if (saveDatabaseJob == null) {
-				saveDatabaseJob = new Job("Saving Timekeeper database") {
-
-					@Override
-					protected IStatus run(IProgressMonitor monitor) {
-						if (entityManager != null && entityManager.isOpen()) {
-							Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
-							EntityTransaction transaction = entityManager.getTransaction();
-							transaction.begin();
-							for (AbstractTask abstractTask : allTasks) {
-								TrackedTask task = getTask(abstractTask);
-								entityManager.persist(task);
-							}
-							transaction.commit();
-							return Status.OK_STATUS;
-						} else {
-							return new Status(IStatus.ERROR, BUNDLE_ID, "Cannot persist data – no database connection.");
-						}
-					}
-
-				};
-				saveDatabaseJob.setSystem(true);
-			}
 			saveDatabaseJob.schedule();
 		}		
 	}
@@ -232,6 +210,7 @@ public class TimekeeperPlugin extends Plugin {
 	public void start(BundleContext context) throws Exception {
 		super.start(context);
 		connectToDatabase();
+		createSaveJob();
 		ISaveParticipant saveParticipant = new WorkspaceSaveParticipant();
         ResourcesPlugin.getWorkspace().addSaveParticipant(BUNDLE_ID, saveParticipant);
 	}
@@ -438,6 +417,30 @@ public class TimekeeperPlugin extends Plugin {
 				"jdbc:h2:tcp://localhost/~/.timekeeper/h2db", // note use server location per default
 				new IScopeContext[] { InstanceScope.INSTANCE });
 		return jdbc_url;
+	}
+
+	private void createSaveJob() {
+		saveDatabaseJob = new Job("Saving Timekeeper database") {
+
+			@Override
+			protected IStatus run(IProgressMonitor monitor) {
+				if (entityManager != null && entityManager.isOpen()) {
+					Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
+					EntityTransaction transaction = entityManager.getTransaction();
+					transaction.begin();
+					for (AbstractTask abstractTask : allTasks) {
+						TrackedTask task = getTask(abstractTask);
+						entityManager.persist(task);
+					}
+					transaction.commit();
+					return Status.OK_STATUS;
+				} else {
+					return new Status(IStatus.ERROR, BUNDLE_ID, "Cannot persist data – no database connection.");
+				}
+			}
+
+		};
+		saveDatabaseJob.setSystem(true);
 	}
 
 }

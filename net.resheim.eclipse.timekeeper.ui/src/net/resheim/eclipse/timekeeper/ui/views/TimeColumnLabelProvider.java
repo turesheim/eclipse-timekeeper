@@ -25,7 +25,7 @@ import org.eclipse.swt.widgets.Display;
 import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.TrackedTask;
-import net.resheim.eclipse.timekeeper.ui.Activator;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 /**
  * Provides label decorations for the columns containing time spent on each
@@ -70,7 +70,7 @@ abstract class TimeColumnLabelProvider extends ColumnLabelProvider {
 			if (contentProvider
 					.getFiltered()
 					.stream()
-					.filter(t -> p.equals(Activator.getProjectName(t)))
+					.filter(t -> p.equals(TimekeeperUiPlugin.getProjectName(t)))
 					.anyMatch(t -> t.isActive())) {
 				return JFaceResources.getFontRegistry().getBold(JFaceResources.DIALOG_FONT);
 			}

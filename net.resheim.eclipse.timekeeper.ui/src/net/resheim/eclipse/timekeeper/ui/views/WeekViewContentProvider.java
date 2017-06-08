@@ -29,7 +29,7 @@ import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.DatabaseChangeListener;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.TrackedTask;
-import net.resheim.eclipse.timekeeper.ui.Activator;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 @SuppressWarnings("restriction")
 public abstract class WeekViewContentProvider implements ITreeContentProvider, DatabaseChangeListener {
@@ -60,7 +60,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 			String p = (String) parentElement;
 			Object[] tasks = filtered
 					.stream()
-					.filter(t -> p.equals(Activator.getProjectName(t)))
+					.filter(t -> p.equals(TimekeeperUiPlugin.getProjectName(t)))
 					.toArray(size -> new ITask[size]);
 			return tasks;
 		} else if (parentElement instanceof ITask) {
@@ -76,7 +76,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	public Object[] getElements(Object parent) {
 		Object[] projects = filtered
 				.stream()
-				.collect(Collectors.groupingBy(t -> Activator.getProjectName(t))).keySet()
+				.collect(Collectors.groupingBy(t -> TimekeeperUiPlugin.getProjectName(t))).keySet()
 				.toArray();
 		if (projects.length == 0) {
 			return new Object[0];
@@ -90,7 +90,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	@Override
 	public Object getParent(Object element) {
 		if (element instanceof ITask) {
-			return Activator.getProjectName((ITask) element);
+			return TimekeeperUiPlugin.getProjectName((ITask) element);
 		}
 		return null;
 	}

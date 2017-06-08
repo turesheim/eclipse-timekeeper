@@ -57,35 +57,38 @@ import net.resheim.eclipse.timekeeper.internal.idle.X11IdleTimeDetector;
 import net.resheim.eclipse.timekeeper.ui.preferences.PreferenceConstants;
 
 @SuppressWarnings("restriction")
-public class Activator extends AbstractUIPlugin implements IPropertyChangeListener {
+public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyChangeListener {
 
 	public static final String OBJ_ACTIVITY = "OBJ_ACTIVITY";
 	public static final String IMG_TOOL_CURRENT = "IMG_TOOL_CURRENT";
 
-	/** Repository attribute ID for custom grouping field */
+	/** Repository attribute ID for custom grouping field. */
 	public static final String ATTR_GROUPING = TimekeeperPlugin.KEY_VALUELIST_ID + ".grouping"; //$NON-NLS-1$
 
-	/** Task repository kind identifier for Bugzilla */
+	/** Task repository kind identifier for Bugzilla. */
 	public static final String KIND_BUGZILLA = "bugzilla"; //$NON-NLS-1$
 
-	/** Task repository kind identifier for GitHub */
+	/** Task repository kind identifier for GitHub. */
 	public static final String KIND_GITHUB = "github"; //$NON-NLS-1$
 
-	/** Task repository kind identifier for JIRA */
+	/** Task repository kind identifier for JIRA. */
 	public static final String KIND_JIRA = "jira"; //$NON-NLS-1$
 
-	/** Task repository kind identifier for local tasks */
+	/** Task repository kind identifier for local tasks. */
 	public static final String KIND_LOCAL = "local"; //$NON-NLS-1$
 
-	/** The number of milliseconds the system has been considered idle */
+	/**
+	 * Previous value of the number of milliseconds the system has been
+	 * considered idle.
+	 */
 	private static long lastIdleTimeMillis;
 
-	private static Activator plugin;
+	private static TimekeeperUiPlugin plugin;
 
 	public static final String PLUGIN_ID = "net.resheim.eclipse.timekeeper.ui"; //$NON-NLS-1$
 
 	/**
-	 * Time interval for updating elapsed time on a task (1s)
+	 * Time interval for updating elapsed time on a task (1s).
 	 */
 	private static final int SHORT_INTERVAL = 1000;
 
@@ -94,7 +97,7 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 	 *
 	 * @return the shared instance
 	 */
-	public static Activator getDefault() {
+	public static TimekeeperUiPlugin getDefault() {
 		return plugin;
 	}
 
@@ -164,7 +167,7 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 		return "<undetermined>";
 	}
 
-	/** Platform specific idle time detector */
+	/** Platform specific idle time detector. */
 	private IdleTimeDetector detector;
 
 	boolean dialogIsOpen = false;
@@ -174,22 +177,22 @@ public class Activator extends AbstractUIPlugin implements IPropertyChangeListen
 
 	private Listener reactivationListener;
 
-	/** The last time any activity was detected */
+	/** The last time any activity was detected. */
 	protected LocalDateTime lastActiveTime;
 
-	/** The number of milliseconds before user is considered idle */
+	/**
+	 * The number of milliseconds before user is considered idle. Controlled by
+	 * a preference setting.
+	 */
 	private static long consideredIdleThreshold;
 
 	/**
-	 * The number of milliseconds before user is considered away. The value is
-	 * obtained from preferences
+	 * The number of milliseconds before user is considered away. Controlled by
+	 * a preference setting.
 	 */
 	private static long afkInterval;
 
-	/**
-	 * The constructor
-	 */
-	public Activator() {
+	public TimekeeperUiPlugin() {
 	}
 
 	/**

@@ -26,7 +26,7 @@ import org.eclipse.mylyn.tasks.core.ITask;
 import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.TrackedTask;
-import net.resheim.eclipse.timekeeper.ui.Activator;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 /**
  * Allows editing of the period an activity lasts if it starts or ends on the
@@ -158,7 +158,7 @@ class TimeEditingSupport extends EditingSupport {
 		Assert.isNotNull(task);
 		getViewer().update(element, null);
 		getViewer().update(task, null);
-		getViewer().update(Activator.getProjectName(task), null);
+		getViewer().update(TimekeeperUiPlugin.getProjectName(task), null);
 		getViewer().update(WeekViewContentProvider.WEEKLY_SUMMARY, null);
 		// restore column sizes
 		((TreeViewer) getViewer()).getTree().getColumn(weekday + 1).setWidth(width_i);

@@ -27,7 +27,7 @@ import org.eclipse.mylyn.tasks.ui.TasksUiImages;
 import org.eclipse.swt.graphics.Image;
 
 import net.resheim.eclipse.timekeeper.db.Activity;
-import net.resheim.eclipse.timekeeper.ui.Activator;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 /**
  * Provides decorations fot the task information column.
@@ -48,7 +48,7 @@ class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 	@Override
 	public Image getImage(Object element) {
 		if (element instanceof Activity) {
-			return Activator.getDefault().getImageRegistry().get(Activator.OBJ_ACTIVITY);
+			return TimekeeperUiPlugin.getDefault().getImageRegistry().get(TimekeeperUiPlugin.OBJ_ACTIVITY);
 		}
 		// Mylyn stuff, should be rewritten to use Mylyn HiDPI images when these
 		// are ready
