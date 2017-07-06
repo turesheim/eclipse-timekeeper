@@ -190,6 +190,7 @@ public class TimekeeperPlugin extends Plugin {
 
 		@Override
 		public void saving(ISaveContext context) throws CoreException {
+			saveDatabaseJob.setSystem(true);
 			saveDatabaseJob.schedule();
 		}		
 	}
@@ -440,7 +441,13 @@ public class TimekeeperPlugin extends Plugin {
 			}
 
 		};
-		saveDatabaseJob.setSystem(true);
+	}
+	
+	public void saveDatabase(){
+		if (saveDatabaseJob != null){
+			saveDatabaseJob.setUser(true);
+			saveDatabaseJob.schedule();
+		}
 	}
 
 }
