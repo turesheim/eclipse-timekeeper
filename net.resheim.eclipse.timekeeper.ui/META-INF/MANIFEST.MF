@@ -1,6 +1,6 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
-Bundle-Name: Timekeeper user interface
+Bundle-Name: Timekeeper
 Bundle-SymbolicName: net.resheim.eclipse.timekeeper.ui;singleton:=true
 Bundle-Version: 2.0.0.qualifier
 Bundle-Activator: net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin
