@@ -24,7 +24,7 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.IWorkbenchPart;
 import org.eclipse.ui.handlers.HandlerUtil;
 
-import net.resheim.eclipse.timekeeper.ui.export.HTMLExporter;
+import net.resheim.eclipse.timekeeper.ui.export.TemplateExporter;
 import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
 public class HTMLToClipboardHandler extends AbstractHandler {
@@ -34,7 +34,8 @@ public class HTMLToClipboardHandler extends AbstractHandler {
 		IWorkbenchPart activePart = HandlerUtil.getActivePart(event);
 		if (activePart instanceof WorkWeekView) {
 			LocalDate firstDayOfWeek = ((WorkWeekView) activePart).getFirstDayOfWeek();
-			HTMLExporter export = new HTMLExporter();
+			// HTMLExporter export = new HTMLExporter();
+			TemplateExporter export = new TemplateExporter();
 			String result = export.getData(firstDayOfWeek);
 			HTMLTransfer textTransfer = HTMLTransfer.getInstance();
 			TextTransfer tt = TextTransfer.getInstance();

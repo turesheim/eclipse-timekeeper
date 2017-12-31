@@ -40,6 +40,12 @@ public class PersistenceHelper {
 				.createEntityManager();
 	};
 
+	/**
+	 * Returns an entity manager that only stores data in memory. This will not
+	 * conflict with any other Timekeeper databases running on the system.
+	 * 
+	 * @return an entity manager for testing
+	 */
 	public static EntityManager getEntityManager() {
 		return entityManager;
 	};

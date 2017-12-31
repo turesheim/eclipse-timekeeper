@@ -1,0 +1,10 @@
+<config>
+	<context-values>
+		<resource path="src-test/test.ftlh">
+			<value key="TrackedTask" object-class="net.resheim.eclipse.timekeeper.db.TrackedTask"/>
+			<value key="Activity" object-class="net.resheim.eclipse.timekeeper.db.Activity"/>
+		</resource>
+	</context-values>
+	<macro-library>
+	</macro-library>
+</config>

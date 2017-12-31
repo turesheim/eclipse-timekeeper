@@ -46,9 +46,12 @@ import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.core.runtime.preferences.IScopeContext;
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
+import org.eclipse.mylyn.internal.tasks.core.AbstractTaskContainer;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.core.TaskRepository;
+import org.eclipse.mylyn.tasks.core.data.TaskAttribute;
+import org.eclipse.mylyn.tasks.core.data.TaskData;
 import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.osgi.service.datalocation.Location;
 import org.eclipse.persistence.config.PersistenceUnitProperties;
@@ -71,6 +74,7 @@ public class TimekeeperPlugin extends Plugin {
 	public static final String DATABASE_LOCATION_SHARED = "shared";
 	public static final String DATABASE_LOCATION_WORKSPACE = "workspace";
 	public static final String DATABASE_LOCATION_URL = "url";
+	public static final String REPORT_TEMPLATES = "report-templates";
 
 	public static final String KEY_VALUELIST_ID = "net.resheim.eclipse.timekeeper"; //$NON-NLS-1$
 	
@@ -84,6 +88,16 @@ public class TimekeeperPlugin extends Plugin {
 
 	
 	private static final ListenerList<DatabaseChangeListener> listeners = new ListenerList<>();
+	/** Task repository kind identifier for Bugzilla. */
+	public static final String KIND_BUGZILLA = "bugzilla"; //$NON-NLS-1$
+	/** Task repository kind identifier for GitHub. */
+	public static final String KIND_GITHUB = "github"; //$NON-NLS-1$
+	/** Task repository kind identifier for JIRA. */
+	public static final String KIND_JIRA = "jira"; //$NON-NLS-1$
+	/** Task repository kind identifier for local tasks. */
+	public static final String KIND_LOCAL = "local"; //$NON-NLS-1$
+	/** Repository attribute ID for custom grouping field. */
+	public static final String ATTR_GROUPING = KEY_VALUELIST_ID + ".grouping"; //$NON-NLS-1$
 	
 	public void addListener(DatabaseChangeListener listener){
 		listeners.add(listener);
@@ -327,16 +341,22 @@ public class TimekeeperPlugin extends Plugin {
 			Files.createDirectory(path);
 		}
 		Path tasks = path.resolve("trackedtask.csv");
-		Path activities = path.resolve("activitiy.csv");
+		Path activities = path.resolve("activity.csv");
 		Path relations = path.resolve("trackedtask_activity.csv");
 		EntityTransaction transaction = entityManager.getTransaction();
 		transaction.begin();
-		int tasksExported = entityManager.createNativeQuery("CALL CSVWRITE('"+tasks+"', 'SELECT * FROM TRACKEDTASK');").executeUpdate();
-		int activitiesExported = entityManager.createNativeQuery("CALL CSVWRITE('"+activities+"', 'SELECT * FROM ACTIVITY');").executeUpdate();
+		int tasksExported = entityManager
+				.createNativeQuery("CALL CSVWRITE('"+tasks+"', 'SELECT * FROM TRACKEDTASK');")
+				.executeUpdate();
+		int activitiesExported = entityManager
+				.createNativeQuery("CALL CSVWRITE('"+activities+"', 'SELECT * FROM ACTIVITY');")
+				.executeUpdate();
 		// relations are not autmatically created, so we do this the easy way
-		entityManager.createNativeQuery("CALL CSVWRITE('"+relations+"', 'SELECT * FROM TRACKEDTASK_ACTIVITY');").executeUpdate();
+		entityManager
+			.createNativeQuery("CALL CSVWRITE('"+relations+"', 'SELECT * FROM TRACKEDTASK_ACTIVITY');")
+			.executeUpdate();
 		transaction.commit();
-		return tasksExported+activitiesExported;
+		return tasksExported + activitiesExported;
 	}
 
 	public int importFrom(Path path) throws IOException {
@@ -347,7 +367,7 @@ public class TimekeeperPlugin extends Plugin {
 			throw new IOException("'trackedtask.csv' does not exist in the specified location.");
 		}
 		if (!activities.toFile().exists()){
-			throw new IOException("'activitiy.csv' does not exist in the specified location.");
+			throw new IOException("'activity.csv' does not exist in the specified location.");
 		}
 		if (!relations.toFile().exists()){
 			throw new IOException("'trackedtask_activity.csv' does not exist in the specified location.");
@@ -356,10 +376,18 @@ public class TimekeeperPlugin extends Plugin {
 		try {
 			transaction.begin();		
 			entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE;").executeUpdate();
-			int tasksImported = entityManager.createNativeQuery("MERGE INTO TRACKEDTASK (SELECT * FROM CSVREAD('"+tasks+"'));").executeUpdate();
-			int activitiesImported = entityManager.createNativeQuery("MERGE INTO ACTIVITY (SELECT * FROM CSVREAD('"+activities+"'));").executeUpdate();
-			entityManager.createNativeQuery("MERGE INTO TRACKEDTASK_ACTIVITY (SELECT * FROM CSVREAD('"+relations+"'));").executeUpdate();
-			entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE;").executeUpdate();
+			int tasksImported = entityManager
+					.createNativeQuery("MERGE INTO TRACKEDTASK (SELECT * FROM CSVREAD('"+tasks+"'));")
+					.executeUpdate();
+			int activitiesImported = entityManager
+					.createNativeQuery("MERGE INTO ACTIVITY (SELECT * FROM CSVREAD('"+activities+"'));")
+					.executeUpdate();
+			entityManager
+				.createNativeQuery("MERGE INTO TRACKEDTASK_ACTIVITY (SELECT * FROM CSVREAD('"+relations+"'));")
+				.executeUpdate();
+			entityManager
+				.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE;")
+				.executeUpdate();
 			transaction.commit();
 			// update all instances with potentially new content 
 			TypedQuery<TrackedTask> createQuery = entityManager.createQuery("SELECT tt FROM TRACKEDTASK tt",
@@ -448,6 +476,77 @@ public class TimekeeperPlugin extends Plugin {
 			saveDatabaseJob.setUser(true);
 			saveDatabaseJob.schedule();
 		}
+	}
+
+	/**
+	 * Returns the name of the container holding the supplied task.
+	 *
+	 * @param task
+	 *            task to find the name for
+	 * @return the name of the task
+	 */
+	public static String getParentContainerSummary(AbstractTask task) {
+		if (task.getParentContainers().size() > 0) {
+			AbstractTaskContainer next = task.getParentContainers().iterator().next();
+			return next.getSummary();
+		}
+		// FIXME: Should return null
+		return "Uncategorized";
+	}
+
+	/**
+	 * Returns the project name for the task if it can be determined.
+	 *
+	 * @param task
+	 *            the task to get the project name for
+	 * @return the project name or "&lt;undetermined&gt;"
+	 */
+	public static String getProjectName(ITask task) {
+		String c = task.getConnectorKind();
+		try {
+			switch (c) {
+			case KIND_GITHUB:
+			case KIND_LOCAL:
+				return getParentContainerSummary((AbstractTask) task);
+				// Bugzilla and JIRA users may want to group on different
+				// values.
+			case KIND_BUGZILLA:
+			case KIND_JIRA:
+				TaskData taskData = TasksUi.getTaskDataManager().getTaskData(task);
+				if (taskData != null) {
+					// This appears to be a pretty slow mechanism
+					TaskRepository taskRepository = taskData.getAttributeMapper().getTaskRepository();
+					String groupingAttribute = taskRepository.getProperty(ATTR_GROUPING);
+					// Use custom grouping if specified
+					if (groupingAttribute != null) {
+						TaskAttribute attribute = taskData.getRoot().getAttribute(groupingAttribute);
+						return attribute.getValue();
+					} else {
+						if (c.equals(KIND_BUGZILLA)) {
+							return task.getAttribute("product"); //$NON-NLS-1$
+						}
+						return getParentContainerSummary((AbstractTask) task);
+					}
+				}
+			default:
+				break;
+			}
+		} catch (CoreException e) {
+			e.printStackTrace();
+		}
+		return "<undetermined>";
+	}
+	
+	/**
+	 * Provides means of setting the {@link EntityManager} of the plug-in. This
+	 * method should only be used for testing.
+	 * 
+	 * @param entityManager
+	 * @see #start(BundleContext)
+	 * @see #connectToDatabase()
+	 */
+	public static void setEntityManager(EntityManager entityManager) {
+		TimekeeperPlugin.entityManager = entityManager;
 	}
 
 }

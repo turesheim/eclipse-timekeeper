@@ -14,9 +14,6 @@
 	<artifactId>net.resheim.eclipse.timekeeper.ui</artifactId>
 	<packaging>eclipse-plugin</packaging>
 
-	<properties>
-	</properties>
-
     <dependencies>
         <dependency>
             <groupId>junit</groupId>

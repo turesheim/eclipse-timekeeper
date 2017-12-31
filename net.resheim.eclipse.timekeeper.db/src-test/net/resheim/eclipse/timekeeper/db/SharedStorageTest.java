@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2016 Torkild U. Resheim
+ * Copyright (c) 2016-2018 Torkild Ulvøy Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,7 +10,7 @@
  *******************************************************************************/
 package net.resheim.eclipse.timekeeper.db;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.fail;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -44,7 +44,6 @@ public class SharedStorageTest {
 	//------------------------------------------------------------------------
 	static long remainder = 0;
 	
-
 	static {
 		entityManager = PersistenceHelper.getEntityManager(); 
 	}
@@ -139,6 +138,11 @@ public class SharedStorageTest {
 	
 	private LocalTask mylynTask;
 
+	@Before
+	public void before() {
+		mylynTask = new LocalTask("1", "TestmylynTask");
+	}
+
 	@After
 	public void after() {
 		// empty all tables
@@ -153,11 +157,6 @@ public class SharedStorageTest {
 		transaction.commit();
 	}
 
-
-	@Before
-	public void before() {
-		mylynTask = new LocalTask("1", "TestmylynTask");
-	}
 	private void persist(TrackedTask ttask) {
 		EntityTransaction transaction = entityManager.getTransaction();
 		transaction.begin();

@@ -29,6 +29,7 @@ import org.eclipse.ui.handlers.HandlerUtil;
 import net.resheim.eclipse.timekeeper.ui.export.HTMLExporter;
 import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
+@Deprecated
 public class ExportToHTMLHandler extends AbstractHandler {
 
 	private static final DateTimeFormatter fileNameFormat = DateTimeFormatter.ofPattern("'Workweek_'w'-'YYYY");

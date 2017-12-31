@@ -23,19 +23,13 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 import org.apache.commons.lang.time.DurationFormatUtils;
-import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.jface.resource.ImageRegistry;
 import org.eclipse.jface.util.IPropertyChangeListener;
 import org.eclipse.jface.util.PropertyChangeEvent;
-import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
-import org.eclipse.mylyn.internal.tasks.core.AbstractTaskContainer;
 import org.eclipse.mylyn.tasks.core.ITask;
-import org.eclipse.mylyn.tasks.core.TaskRepository;
-import org.eclipse.mylyn.tasks.core.data.TaskAttribute;
-import org.eclipse.mylyn.tasks.core.data.TaskData;
 import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Display;
@@ -61,21 +55,6 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 
 	public static final String OBJ_ACTIVITY = "OBJ_ACTIVITY";
 	public static final String IMG_TOOL_CURRENT = "IMG_TOOL_CURRENT";
-
-	/** Repository attribute ID for custom grouping field. */
-	public static final String ATTR_GROUPING = TimekeeperPlugin.KEY_VALUELIST_ID + ".grouping"; //$NON-NLS-1$
-
-	/** Task repository kind identifier for Bugzilla. */
-	public static final String KIND_BUGZILLA = "bugzilla"; //$NON-NLS-1$
-
-	/** Task repository kind identifier for GitHub. */
-	public static final String KIND_GITHUB = "github"; //$NON-NLS-1$
-
-	/** Task repository kind identifier for JIRA. */
-	public static final String KIND_JIRA = "jira"; //$NON-NLS-1$
-
-	/** Task repository kind identifier for local tasks. */
-	public static final String KIND_LOCAL = "local"; //$NON-NLS-1$
 
 	/**
 	 * Previous value of the number of milliseconds the system has been
@@ -107,64 +86,6 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 				.createFromURL(BundleUtility.find(getBundle(), "icons/full/eview/activity_obj.png")));
 		reg.put(IMG_TOOL_CURRENT, ImageDescriptor
 				.createFromURL(BundleUtility.find(getBundle(), "icons/full/elcl/cur_nav.png")));
-	}
-
-	/**
-	 * Returns the name of the container holding the supplied task.
-	 *
-	 * @param task
-	 *            task to find the name for
-	 * @return the name of the task
-	 */
-	private static String getParentContainerSummary(AbstractTask task) {
-		if (task.getParentContainers().size() > 0) {
-			AbstractTaskContainer next = task.getParentContainers().iterator().next();
-			return next.getSummary();
-		}
-		return null;
-	}
-
-	/**
-	 * Returns the project name for the task if it can be determined.
-	 *
-	 * @param task
-	 *            the task to get the project name for
-	 * @return the project name or "&lt;undetermined&gt;"
-	 */
-	public static String getProjectName(ITask task) {
-		String c = task.getConnectorKind();
-		try {
-			switch (c) {
-			case KIND_GITHUB:
-			case KIND_LOCAL:
-				return getParentContainerSummary((AbstractTask) task);
-				// Bugzilla and JIRA users may want to group on different
-				// values.
-			case KIND_BUGZILLA:
-			case KIND_JIRA:
-				TaskData taskData = TasksUi.getTaskDataManager().getTaskData(task);
-				if (taskData != null) {
-					// This appears to be a pretty slow mechanism
-					TaskRepository taskRepository = taskData.getAttributeMapper().getTaskRepository();
-					String groupingAttribute = taskRepository.getProperty(ATTR_GROUPING);
-					// Use custom grouping if specified
-					if (groupingAttribute != null) {
-						TaskAttribute attribute = taskData.getRoot().getAttribute(groupingAttribute);
-						return attribute.getValue();
-					} else {
-						if (c.equals(KIND_BUGZILLA)) {
-							return task.getAttribute("product"); //$NON-NLS-1$
-						}
-						return getParentContainerSummary((AbstractTask) task);
-					}
-				}
-			default:
-				break;
-			}
-		} catch (CoreException e) {
-			e.printStackTrace();
-		}
-		return "<undetermined>";
 	}
 
 	/** Platform specific idle time detector. */

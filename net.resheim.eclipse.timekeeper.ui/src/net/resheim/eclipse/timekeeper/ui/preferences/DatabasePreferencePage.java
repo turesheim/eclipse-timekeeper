@@ -41,9 +41,9 @@ import org.eclipse.ui.preferences.ScopedPreferenceStore;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
-public class DatabasePreferences extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
+public class DatabasePreferencePage extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
 
-	public DatabasePreferences() {
+	public DatabasePreferencePage() {
 		super(FieldEditorPreferencePage.GRID);
 	}
 

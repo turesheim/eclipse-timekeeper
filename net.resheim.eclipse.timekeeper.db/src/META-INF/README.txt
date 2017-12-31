@@ -1,0 +1,1 @@
+persistence.xml has to be here for JPA to pick it up.

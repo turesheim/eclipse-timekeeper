@@ -29,7 +29,6 @@ import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.DatabaseChangeListener;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.TrackedTask;
-import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 @SuppressWarnings("restriction")
 public abstract class WeekViewContentProvider implements ITreeContentProvider, DatabaseChangeListener {
@@ -60,7 +59,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 			String p = (String) parentElement;
 			Object[] tasks = filtered
 					.stream()
-					.filter(t -> p.equals(TimekeeperUiPlugin.getProjectName(t)))
+					.filter(t -> p.equals(TimekeeperPlugin.getProjectName(t)))
 					.toArray(size -> new ITask[size]);
 			return tasks;
 		} else if (parentElement instanceof ITask) {
@@ -76,7 +75,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	public Object[] getElements(Object parent) {
 		Object[] projects = filtered
 				.stream()
-				.collect(Collectors.groupingBy(t -> TimekeeperUiPlugin.getProjectName(t))).keySet()
+				.collect(Collectors.groupingBy(t -> TimekeeperPlugin.getProjectName(t))).keySet()
 				.toArray();
 		if (projects.length == 0) {
 			return new Object[0];
@@ -90,18 +89,18 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	@Override
 	public Object getParent(Object element) {
 		if (element instanceof ITask) {
-			return TimekeeperUiPlugin.getProjectName((ITask) element);
+			return TimekeeperPlugin.getProjectName((ITask) element);
 		}
 		return null;
 	}
 
 	@Override
 	public boolean hasChildren(Object element) {
-		// Projects are guaranteed to have tasks as children, tasks are
-		// guaranteed to not have any children.
+		// projects are guaranteed to have tasks as children
 		if (element instanceof String) {
 			return true;
 		}
+		// only list tasks that has any data
 		if (element instanceof ITask) {
 			return hasData((ITask) element, firstDayOfWeek);
 		}
@@ -116,7 +115,9 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 		if (ttask == null) {
 			return false;
 		}
-		Stream<Activity> filter = ttask.getActivities().stream()
+		Stream<Activity> filter = ttask
+				.getActivities()
+				.stream()
 				.filter(a -> a.getDuration(startDate, endDate) != Duration.ZERO);
 		return filter.count() > 0;
 	}
@@ -127,7 +128,8 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	}
 
 	protected void filter() {
-		filtered = TasksUiPlugin.getTaskList().getAllTasks().stream()
+		filtered = TasksUiPlugin.getTaskList().getAllTasks()
+				.stream()
 				.filter(t -> hasData(t, getFirstDayOfWeek()) || t.isActive())
 				.collect(Collectors.toList());
 	}
@@ -140,12 +142,6 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 		this.firstDayOfWeek = firstDayOfWeek;
 	}
 
-	/**
-	 * Returns a string representation of the date.
-	 *
-	 * @param weekday
-	 * @return
-	 */
 	LocalDate getDate(int weekday) {
 		return getFirstDayOfWeek().plusDays(weekday);
 	}
