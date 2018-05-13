@@ -1,7 +1,7 @@
 target "Eclipse Timekeeper Target Platform" with source requirements
 
 // Base dependencies
-location "http://download.eclipse.org/releases/neon/" {
+location "http://download.eclipse.org/releases/oxygen/" {
     org.eclipse.equinox.p2.sdk.feature.group
     org.eclipse.sdk.feature.group
     org.eclipse.pde.core
@@ -51,7 +51,7 @@ location "http://download.eclipse.org/gemini/jpa/updates/" {
     org.eclipse.gemini.jpa
 }
 
-location "http://download.eclipse.org/tools/orbit/R-builds/R20170307180635/repository" {
+location "http://download.eclipse.org/tools/orbit/downloads/drops/R20180330011457/repository" {
 	org.slf4j.api
 	ch.qos.logback.slf4j
 	ch.qos.logback.classic
