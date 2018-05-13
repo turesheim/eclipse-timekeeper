@@ -49,7 +49,7 @@
             name="CSV Export">
       </command>
       <command
-            defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.HTMLToClipboardHandler"
+            defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.DefaultTemplateToClipboardHandler"
             id="net.resheim.eclipse.timekeeper.ui.HTMLClipboard"
             name="HTML to Clipboard">
       </command>

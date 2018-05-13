@@ -9,7 +9,7 @@
  *     Torkild U. Resheim - initial API and implementation
  *******************************************************************************/
 
-package net.resheim.eclipse.timekeeper.ui.export;
+package net.resheim.eclipse.timekeeper.db.report;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -24,15 +24,13 @@ import java.util.stream.Stream;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.core.ITask;
 
+import freemarker.cache.StringTemplateLoader;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
 import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.TrackedTask;
-import net.resheim.eclipse.timekeeper.db.report.FormatDateTimeMethodModel;
-import net.resheim.eclipse.timekeeper.db.report.FormatDurationMethodModel;
-import net.resheim.eclipse.timekeeper.db.report.GetActivitiesMethodModel;
 import net.resheim.eclipse.timekeeper.db.report.model.WorkWeek;
 
 @SuppressWarnings("restriction")
@@ -40,9 +38,15 @@ public class TemplateExporter extends AbstractExporter {
 
 	static Configuration configuration;
 
-	static {
+	private final ReportTemplate reportTemplate;
+
+	public TemplateExporter(ReportTemplate template) {
+		// TODO: Clean up this mess
 		configuration = new Configuration(Configuration.VERSION_2_3_26);
-		configuration.setClassForTemplateLoading(TemplateExporter.class, "/templates/");
+		StringTemplateLoader templateLoader = new StringTemplateLoader();
+		configuration.setTemplateLoader(templateLoader);
+		templateLoader.putTemplate(template.getName(), template.getCode());		
+		this.reportTemplate = template;
 	}
 
 	private boolean hasData/* this week */(ITask task, LocalDate startDate) {
@@ -61,8 +65,7 @@ public class TemplateExporter extends AbstractExporter {
 	@Override
 	public String getData(LocalDate firstDateOfWeek) {
 		try {
-			// TODO: Obtain template from preferences
-			Template template = configuration.getTemplate("html.ftlh");
+			Template template = configuration.getTemplate(reportTemplate.getName());
 			StringWriter out = new StringWriter();
 
 			List<ITask> filtered = TasksUiPlugin.getTaskList().getAllTasks().stream()
@@ -83,6 +86,7 @@ public class TemplateExporter extends AbstractExporter {
 			contents.put("weeks", weeks);
 			// and do the processing
 			template.process(contents, out);
+			return out.toString();
 
 		} catch (IOException | TemplateException e) {
 			e.printStackTrace();

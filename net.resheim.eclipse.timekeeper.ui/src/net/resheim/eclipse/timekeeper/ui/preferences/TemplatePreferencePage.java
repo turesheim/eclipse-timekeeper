@@ -30,6 +30,8 @@ import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.jface.text.Document;
 import org.eclipse.jface.text.DocumentEvent;
 import org.eclipse.jface.text.IDocumentListener;
+import org.eclipse.jface.text.source.CompositeRuler;
+import org.eclipse.jface.text.source.LineNumberRulerColumn;
 import org.eclipse.jface.text.source.SourceViewer;
 import org.eclipse.jface.text.source.SourceViewerConfiguration;
 import org.eclipse.swt.SWT;
@@ -60,10 +62,14 @@ import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
 public class TemplatePreferencePage extends PreferencePage implements IWorkbenchPreferencePage {
 
 	private List list;
+	/** List of templates that can be modified */
 	private Map<String, ReportTemplate> templates;
 	private SourceViewer sourceViewer;
-
+	/** The currently selected template */
 	private ReportTemplate selectedTemplate;
+	/** Name of the default template */
+	private String defaultTemplate;
+	private Button defaultTemplateButton;
 
 	public TemplatePreferencePage() {
 	}
@@ -75,7 +81,7 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 		container.setLayout(new GridLayout(2, false));
 
 		list = new List(container, SWT.BORDER);
-		list.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 2));
+		list.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 3));
 		list.addSelectionListener(new SelectionAdapter() {
 
 			@Override
@@ -86,8 +92,7 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 							.filter(t -> t.getName().equals(list.getItem(i)))
 							.findFirst();
 					if (o.isPresent()) {
-						selectedTemplate = o.get();
-						sourceViewer.getDocument().set(selectedTemplate.getCode());
+						select(o.get());
 					}
 				}
 			}
@@ -101,7 +106,8 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 
 			@Override
 			public void widgetSelected(SelectionEvent e) {
-				ReportTemplate template = new ReportTemplate("Template #" + (templates.size() + 1), "");
+				ReportTemplate template = new ReportTemplate("Template #" + (templates.size() + 1),
+						ReportTemplate.Type.TEXT, "");
 				templates.put(template.getName(),template);
 				updateListAndSelect(template);
 			}
@@ -123,13 +129,31 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 
 		});
 
+		Button duplicateButton = new Button(container, SWT.NONE);
+		duplicateButton.setLayoutData(new GridData(SWT.LEFT, SWT.TOP, false, false, 1, 1));
+		duplicateButton.setText("Duplicate");
+
+		defaultTemplateButton = new Button(container, SWT.CHECK);
+		defaultTemplateButton.setText("Use as default template");
+		new Label(container, SWT.NONE);
+		defaultTemplateButton.addSelectionListener(new SelectionAdapter() {
+
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				defaultTemplate = selectedTemplate.getName();
+			}
+
+		});
+
 		Label lblNewLabel = new Label(container, SWT.NONE);
 		lblNewLabel.setText("Template code:");
 		new Label(container, SWT.NONE);
 
 		int styles = SWT.V_SCROLL | SWT.H_SCROLL | SWT.MULTI | SWT.BORDER | SWT.FULL_SELECTION;
-
-		sourceViewer = new SourceViewer(container, null, styles);
+		CompositeRuler cr = new CompositeRuler();
+		LineNumberRulerColumn lnrc = new LineNumberRulerColumn();
+		cr.addDecorator(0, lnrc);
+		sourceViewer = new SourceViewer(container, cr, styles);
 		StyledText styledText = sourceViewer.getTextWidget();
 		styledText.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, true, 1, 1));
 		sourceViewer.getControl().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
@@ -159,7 +183,8 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 		templates = new HashMap<>();
 		// and load the contents from the current preferences
 		IPreferenceStore store = new ScopedPreferenceStore(InstanceScope.INSTANCE, TimekeeperPlugin.BUNDLE_ID);
-		byte[] decoded = Base64.getDecoder().decode(store.getString(TimekeeperPlugin.REPORT_TEMPLATES));
+		defaultTemplate = store.getString(TimekeeperPlugin.PREF_DEFAULT_TEMPLATE);
+		byte[] decoded = Base64.getDecoder().decode(store.getString(TimekeeperPlugin.PREF_REPORT_TEMPLATES));
 		ByteArrayInputStream bis = new ByteArrayInputStream(decoded);
 		try {
 			ObjectInputStream ois = new ObjectInputStream(bis);
@@ -188,7 +213,7 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 	protected void performDefaults() {
 		// load _default_ templates to a list
 		IPreferenceStore store = new ScopedPreferenceStore(InstanceScope.INSTANCE, TimekeeperPlugin.BUNDLE_ID);
-		byte[] decoded = Base64.getDecoder().decode(store.getDefaultString(TimekeeperPlugin.REPORT_TEMPLATES));
+		byte[] decoded = Base64.getDecoder().decode(store.getDefaultString(TimekeeperPlugin.PREF_REPORT_TEMPLATES));
 		ByteArrayInputStream bis = new ByteArrayInputStream(decoded);
 		try {
 			ObjectInputStream ois = new ObjectInputStream(bis);
@@ -203,6 +228,7 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 		} catch (IOException | ClassNotFoundException e) {
 			e.printStackTrace();
 		}
+		defaultTemplate = store.getDefaultString(TimekeeperPlugin.PREF_DEFAULT_TEMPLATE);
 	}
 
 	@Override
@@ -215,11 +241,13 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 			templates.values().forEach(t -> saveTemplates.add(t));
 			oos.writeObject(saveTemplates);
 			String encoded = Base64.getEncoder().encodeToString(out.toByteArray());
-			store.setValue(TimekeeperPlugin.REPORT_TEMPLATES, encoded);
+			store.setValue(TimekeeperPlugin.PREF_REPORT_TEMPLATES, encoded);
 		} catch (IOException e) {
 			e.printStackTrace();
 			return false;
 		}
+		// specify which template is the default
+		store.setDefault(TimekeeperPlugin.PREF_DEFAULT_TEMPLATE, defaultTemplate);
 		return true;
 	}
 
@@ -233,18 +261,31 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 				.collect(Collectors.toList());
 		String[] array = collected.toArray(new String[collected.size()]);
 		list.setItems(array);
+		select(template);
+	}
+
+	/**
+	 * Handle that the specified template has been selected.
+	 *
+	 * @param template
+	 *            the selected template
+	 */
+	private void select(ReportTemplate template) {
 		boolean found = false;
+		defaultTemplateButton.setSelection(false);
 		// select the specified template
 		if (template != null) {
-			for (int i = 0; i < array.length; i++) {
-				String name = array[i];
+			for (int i = 0; i < list.getItems().length; i++) {
+				String name = list.getItem(i);
 				if (name.equals(template.getName())) {
 					found = true;
 					list.select(i);
 					selectedTemplate = template;
 					sourceViewer.getDocument().set(templates.get(name).getCode());
 					sourceViewer.moveFocusToWidgetToken();
-					break;
+					if (name.equals(defaultTemplate)) {
+						defaultTemplateButton.setSelection(true);
+					}
 				}
 			}
 		}

@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.eclipse.mylyn.tasks.core.ITask;
@@ -88,9 +89,12 @@ public class WorkWeek {
 	public Duration getSum() {
 		Duration total = Duration.ZERO;
 		for (LocalDate date : dates) {
-			total = total.plus(tasks.stream()
-					.map(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date))
-					.reduce(Duration::plus).get());			
+			Optional<Duration> d = tasks.stream()
+				.map(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date))
+				.reduce(Duration::plus);	
+			if (d.isPresent()) {
+				total = total.plus(d.get());
+			}
 		}
 		return total;
 	}
@@ -113,9 +117,14 @@ public class WorkWeek {
 	 *            the date to calculate the total for
 	 */
 	public Duration getSum(LocalDate date) {
-		return tasks.stream()
+		Optional<Duration> d = tasks.stream()
 			.map(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date))
-			.reduce(Duration::plus).get();
+			.reduce(Duration::plus);
+		if (d.isPresent()) {
+			return d.get();
+		} else {
+			return Duration.ZERO;
+		}
 	}
 
 	/**

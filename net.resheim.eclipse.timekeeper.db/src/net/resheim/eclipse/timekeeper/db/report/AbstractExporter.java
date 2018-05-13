@@ -9,7 +9,7 @@
  *     Torkild U. Resheim - initial API and implementation
  *******************************************************************************/
 
-package net.resheim.eclipse.timekeeper.ui.export;
+package net.resheim.eclipse.timekeeper.db.report;
 
 import java.time.LocalDate;
 import java.util.List;

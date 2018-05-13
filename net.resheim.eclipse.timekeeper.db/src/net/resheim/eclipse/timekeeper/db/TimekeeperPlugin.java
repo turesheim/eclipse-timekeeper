@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2016-2017 Torkild U. Resheim
+ * Copyright © 2016-2018 Torkild U. Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,7 +10,9 @@
  *******************************************************************************/
 package net.resheim.eclipse.timekeeper.db;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -18,6 +20,7 @@ import java.sql.Date;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Base64;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.HashMap;
@@ -45,6 +48,7 @@ import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.core.runtime.preferences.IScopeContext;
 import org.eclipse.core.runtime.preferences.InstanceScope;
+import org.eclipse.jface.preference.IPreferenceStore;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTaskContainer;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
@@ -56,8 +60,11 @@ import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.osgi.service.datalocation.Location;
 import org.eclipse.persistence.config.PersistenceUnitProperties;
 import org.eclipse.persistence.jpa.PersistenceProvider;
+import org.eclipse.ui.preferences.ScopedPreferenceStore;
 import org.flywaydb.core.Flyway;
 import org.osgi.framework.BundleContext;
+
+import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
 
 /**
  * Core features for the time keeping application. Handles database and basic
@@ -69,12 +76,13 @@ import org.osgi.framework.BundleContext;
 public class TimekeeperPlugin extends Plugin {
 
 	/* Preferences */
-	public static final String DATABASE_URL = "database-url";
-	public static final String DATABASE_LOCATION = "database-location";
-	public static final String DATABASE_LOCATION_SHARED = "shared";
-	public static final String DATABASE_LOCATION_WORKSPACE = "workspace";
-	public static final String DATABASE_LOCATION_URL = "url";
-	public static final String REPORT_TEMPLATES = "report-templates";
+	public static final String PREF_DATABASE_URL = "database-url";
+	public static final String PREF_DATABASE_LOCATION = "database-location";
+	public static final String PREF_DATABASE_LOCATION_SHARED = "shared";
+	public static final String PREF_DATABASE_LOCATION_WORKSPACE = "workspace";
+	public static final String PREF_DATABASE_LOCATION_URL = "url";
+	public static final String PREF_REPORT_TEMPLATES = "report-templates";
+	public static final String PREF_DEFAULT_TEMPLATE = "default-template";
 
 	public static final String KEY_VALUELIST_ID = "net.resheim.eclipse.timekeeper"; //$NON-NLS-1$
 	
@@ -124,7 +132,7 @@ public class TimekeeperPlugin extends Plugin {
 	}
 	
 	// Database configuration:
-	// Since we need a database pretty early this method starts first, before 
+	// Since we need a database pretty early, this method starts first, before 
 	// the preference initializer have had the chance to run. So we ensure 
 	// that there always is a database up and running. If the user changes
 	// the database URL a restart is required.
@@ -138,17 +146,18 @@ public class TimekeeperPlugin extends Plugin {
 				String jdbc_url = "jdbc:h2:~/.timekeeper/h2db";
 				try {
 					
-					String location = Platform.getPreferencesService().getString(BUNDLE_ID, DATABASE_LOCATION, DATABASE_LOCATION_SHARED,new IScopeContext[] { InstanceScope.INSTANCE });
+					String location = Platform.getPreferencesService().getString(BUNDLE_ID, PREF_DATABASE_LOCATION,
+							PREF_DATABASE_LOCATION_SHARED, new IScopeContext[] { InstanceScope.INSTANCE });
 					switch (location){
-						case DATABASE_LOCATION_SHARED:
+						case PREF_DATABASE_LOCATION_SHARED:
 							jdbc_url = getSharedLocation();
 							// Fix https://github.com/turesheim/eclipse-timekeeper/issues/107
 							System.setProperty("h2.bindAddress", "localhost");
 						break;
-						case DATABASE_LOCATION_WORKSPACE:
+						case PREF_DATABASE_LOCATION_WORKSPACE:
 							jdbc_url = getWorkspaceLocation();
 						break;
-						case DATABASE_LOCATION_URL:
+						case PREF_DATABASE_LOCATION_URL:
 						jdbc_url = getSpecifiedLocation();
 						break;
 					}					
@@ -351,7 +360,7 @@ public class TimekeeperPlugin extends Plugin {
 		int activitiesExported = entityManager
 				.createNativeQuery("CALL CSVWRITE('"+activities+"', 'SELECT * FROM ACTIVITY');")
 				.executeUpdate();
-		// relations are not autmatically created, so we do this the easy way
+		// relations are not automatically created, so we do this the easy way
 		entityManager
 			.createNativeQuery("CALL CSVWRITE('"+relations+"', 'SELECT * FROM TRACKEDTASK_ACTIVITY');")
 			.executeUpdate();
@@ -359,6 +368,13 @@ public class TimekeeperPlugin extends Plugin {
 		return tasksExported + activitiesExported;
 	}
 
+	/**
+	 * Import and merge records from the specified location.
+	 * 
+	 * @param path root location of the 
+	 * @return
+	 * @throws IOException
+	 */
 	public int importFrom(Path path) throws IOException {
 		Path tasks = path.resolve("trackedtask.csv");
 		Path activities = path.resolve("activitiy.csv");
@@ -442,7 +458,7 @@ public class TimekeeperPlugin extends Plugin {
 
 	public String getSpecifiedLocation() {
 		String jdbc_url;
-		jdbc_url = Platform.getPreferencesService().getString(BUNDLE_ID, DATABASE_URL, 
+		jdbc_url = Platform.getPreferencesService().getString(BUNDLE_ID, PREF_DATABASE_URL, 
 				"jdbc:h2:tcp://localhost/~/.timekeeper/h2db", // note use server location per default
 				new IScopeContext[] { InstanceScope.INSTANCE });
 		return jdbc_url;
@@ -547,6 +563,30 @@ public class TimekeeperPlugin extends Plugin {
 	 */
 	public static void setEntityManager(EntityManager entityManager) {
 		TimekeeperPlugin.entityManager = entityManager;
+	}
+	
+	/**
+	 * Returns a list of all report templates stored in the preferences.
+	 *
+	 * @return a list of templates
+	 */
+	public static Map<String, ReportTemplate> getTemplates() {
+		Map<String, ReportTemplate> templates = new HashMap<>();
+		// and load the contents from the current preferences
+		IPreferenceStore store = new ScopedPreferenceStore(InstanceScope.INSTANCE, TimekeeperPlugin.BUNDLE_ID);
+		// defaultTemplate = store.getString(TimekeeperPlugin.PREF_DEFAULT_TEMPLATE);
+		byte[] decoded = Base64.getDecoder().decode(store.getString(TimekeeperPlugin.PREF_REPORT_TEMPLATES));
+		ByteArrayInputStream bis = new ByteArrayInputStream(decoded);
+		try {
+			ObjectInputStream ois = new ObjectInputStream(bis);
+			java.util.List<ReportTemplate> rt = (java.util.List<ReportTemplate>) ois.readObject();
+			for (ReportTemplate t : rt) {
+				templates.put(t.getName(), t);
+			}
+		} catch (IOException | ClassNotFoundException e) {
+			e.printStackTrace();
+		}
+		return templates;
 	}
 
 }

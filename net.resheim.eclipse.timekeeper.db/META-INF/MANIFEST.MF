@@ -4,8 +4,7 @@ Bundle-Name: Timekeeper database
 Bundle-SymbolicName: net.resheim.eclipse.timekeeper.db;singleton:=true
 Automatic-Module-Name: net.resheim.eclipse.timekeeper.db
 Bundle-Version: 2.0.0.qualifier
-Export-Package: freemarker.template,
- net.resheim.eclipse.timekeeper.db,
+Export-Package: net.resheim.eclipse.timekeeper.db,
  net.resheim.eclipse.timekeeper.db.report
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Require-Bundle: org.eclipse.mylyn.tasks.core;bundle-version="3.21.0",
