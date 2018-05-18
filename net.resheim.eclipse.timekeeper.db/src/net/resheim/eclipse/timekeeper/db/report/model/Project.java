@@ -8,10 +8,16 @@
  * Contributors:
  *     Torkild U. Resheim - initial API and implementation
  *******************************************************************************/
-package net.resheim.eclipse.timekeeper.db;
+package net.resheim.eclipse.timekeeper.db.report.model;
 
-public interface DatabaseChangeListener {
+import java.util.List;
 
-	public void databaseStateChanged();
+import org.eclipse.mylyn.tasks.core.ITask;
+
+public class Project {
+	String title;
+	
+	List<ITask> tasks;
+	
 	
 }

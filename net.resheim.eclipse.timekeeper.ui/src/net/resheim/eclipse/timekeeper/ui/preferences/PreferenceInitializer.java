@@ -6,7 +6,7 @@ import org.eclipse.jface.preference.IPreferenceStore;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 /**
- * Class used to initialize default preference values.
+ * Class used to initialize default preference values for the UI.
  */
 public class PreferenceInitializer extends AbstractPreferenceInitializer {
 

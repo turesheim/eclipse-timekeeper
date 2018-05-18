@@ -23,10 +23,12 @@ import org.eclipse.mylyn.tasks.core.ITask;
 import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.report.AbstractExporter;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 import net.resheim.eclipse.timekeeper.ui.views.WeekViewContentProvider;
 import net.resheim.eclipse.timekeeper.ui.views.WeeklySummary;
 
+@Deprecated
 @SuppressWarnings("restriction")
 public class HTMLExporter extends AbstractExporter {
 	private static final DateTimeFormatter weekFormat = DateTimeFormatter.ofPattern("w - YYYY");

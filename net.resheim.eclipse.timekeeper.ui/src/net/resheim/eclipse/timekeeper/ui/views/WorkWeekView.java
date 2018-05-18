@@ -560,7 +560,7 @@ public class WorkWeekView extends ViewPart {
 		return filtered
 				.stream()
 				.filter(t -> TimekeeperPlugin.getDefault().getTask(t) != null)
-				.filter(t -> project.equals(TimekeeperUiPlugin.getProjectName(t)))
+				.filter(t -> project.equals(TimekeeperPlugin.getProjectName(t)))
 				.mapToLong(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date).getSeconds())
 				.sum();
 	}

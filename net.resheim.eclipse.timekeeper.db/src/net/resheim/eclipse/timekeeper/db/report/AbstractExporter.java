@@ -9,7 +9,7 @@
  *     Torkild U. Resheim - initial API and implementation
  *******************************************************************************/
 
-package net.resheim.eclipse.timekeeper.ui.export;
+package net.resheim.eclipse.timekeeper.db.report;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -17,7 +17,6 @@ import java.util.List;
 import org.eclipse.mylyn.tasks.core.ITask;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 /**
  * This type contains common features for the various exporters.
@@ -41,7 +40,7 @@ public abstract class AbstractExporter {
 	protected long getSum(List<ITask> tasks, LocalDate date, String project) {
 		return tasks
 				.stream()
-				.filter(t -> project.equals(TimekeeperUiPlugin.getProjectName(t)))
+				.filter(t -> project.equals(TimekeeperPlugin.getProjectName(t)))
 				.map(t -> TimekeeperPlugin.getDefault().getTask(t))
 				.mapToLong(t -> t.getDuration(date).getSeconds())
 				.sum();

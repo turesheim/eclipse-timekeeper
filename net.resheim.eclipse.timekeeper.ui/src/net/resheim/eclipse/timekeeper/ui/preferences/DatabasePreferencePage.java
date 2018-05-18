@@ -41,23 +41,23 @@ import org.eclipse.ui.preferences.ScopedPreferenceStore;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
-public class DatabasePreferences extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
+public class DatabasePreferencePage extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
 
-	public DatabasePreferences() {
+	public DatabasePreferencePage() {
 		super(FieldEditorPreferencePage.GRID);
 	}
 
 	@Override
 	protected void createFieldEditors() {
 
-		addField(new RadioGroupFieldEditor(TimekeeperPlugin.DATABASE_LOCATION, "Database location", 1,
+		addField(new RadioGroupFieldEditor(TimekeeperPlugin.PREF_DATABASE_LOCATION, "Database location", 1,
 				new String[][] {
-			{ "Shared (in ~/.timekeeper/)", TimekeeperPlugin.DATABASE_LOCATION_SHARED },
-			{ "Relative to workspace (in .timekeeper/)", TimekeeperPlugin.DATABASE_LOCATION_WORKSPACE },
-			{ "Specified by JDBC URL", TimekeeperPlugin.DATABASE_LOCATION_URL },
+			{ "Shared (in ~/.timekeeper/)", TimekeeperPlugin.PREF_DATABASE_LOCATION_SHARED },
+			{ "Relative to workspace (in .timekeeper/)", TimekeeperPlugin.PREF_DATABASE_LOCATION_WORKSPACE },
+			{ "Specified by JDBC URL", TimekeeperPlugin.PREF_DATABASE_LOCATION_URL },
 				}, getFieldEditorParent(), true));
 
-		addField(new StringFieldEditor(TimekeeperPlugin.DATABASE_URL, Messages.DatabasePreferences_URL,
+		addField(new StringFieldEditor(TimekeeperPlugin.PREF_DATABASE_URL, Messages.DatabasePreferences_URL,
 				getFieldEditorParent()));
 
 		Group g2 = new Group(getFieldEditorParent(), SWT.SHADOW_ETCHED_IN);
@@ -96,7 +96,7 @@ public class DatabasePreferences extends FieldEditorPreferencePage implements IW
 
 	@Override
 	public void propertyChange(PropertyChangeEvent event) {
-		if (event.getProperty().equals(TimekeeperPlugin.DATABASE_LOCATION)) {
+		if (event.getProperty().equals(TimekeeperPlugin.PREF_DATABASE_LOCATION)) {
 			MessageDialog.openInformation(Display.getCurrent().getActiveShell(), Messages.DatabasePreferences_RestartRequired,
 					Messages.DatabasePreferences_ChangeMessage);
 		}

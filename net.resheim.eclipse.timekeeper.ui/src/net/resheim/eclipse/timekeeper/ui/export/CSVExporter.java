@@ -20,8 +20,10 @@ import org.eclipse.mylyn.tasks.core.ITask;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.report.AbstractExporter;
 import net.resheim.eclipse.timekeeper.ui.views.WeekViewContentProvider;
 
+@Deprecated
 @SuppressWarnings("restriction")
 public class CSVExporter extends AbstractExporter {
 

@@ -1,0 +1,72 @@
+<html>
+	<head>
+		<style>
+			body { font-family: "Helvetica Neue", sans-serif; font-size: 1em; color: #444; }
+			div { border: 1px solid #c2d2e8; display: inline-block; }
+			table { border-collapse: collapse; font-size: 0.9em; }
+			td { padding-left: 0.5em; padding-right: 0.5em; }
+			.header-row { background: #eff5fb; border-bottom: 1px solid #c2d2e8; }
+			.header-th { text-align: center; padding: 0.5em }
+			.project-row { background: #eee; font-weight: bold;}
+			.project-td { text-align: right; border-left: 1px solid #fff }
+			.task-row { background: #f6f8fa; }
+			.activity-td { text-align: right; border-left: 1px solid #eee; }
+			.sum-td { text-align: right; font-weight: bold; border-left: 1px solid #fff; }
+			.summary-row { background: #eee; font-weight: bold; }
+			.summary-td { padding: 0.25em; text-align: right; border-left: 1px solid #fff;}
+		</style>
+		<meta charset="UTF-8">
+		<link href="https://use.fontawesome.com/releases/v5.0.8/css/all.css" rel="stylesheet">
+	</head>
+	<h1>Timesheet</h1>
+	<#list weeks as week>
+	<!-- create one table for each week -->
+	<div>
+	<table>
+		<tr class="header-row">
+			<!-- first header column -->
+			<th>Week ${formatDateTime(week.firstDayOfWeek, 'w - YYYY')}</th>
+			<!-- weekday columns -->
+			<#list week.dates as date>
+			<th width="50em" class="header-th">${formatDateTime(date, 'EEE d')}</th>
+			</#list>
+			<th width="50em" class="header-th">Sum</th>
+		</tr>
+		<!-- group per project -->
+		<#list week.projects as project, tasks>
+		<tr class="project-row">
+			<td>${project}</td>
+			<#list week.dates as date>							
+			<td class="project-td">${formatDuration(week.getSum(project, date))}</td>
+			</#list>
+			<td class="sum-td">${formatDuration(week.getSum(project))}</td>
+		</tr>
+		<#list tasks as task>		
+		<tr class="task-row">
+			<td><i class="far fa-clipboard" style="color: #aaa"></i>&nbsp;<#if task.url??><a href="${task.url}">${task.taskId}</a><#else>${task.taskId}</#if> :${task.summary}</td>
+			<#list week.dates as date><td class="project-td">${formatDuration(date, task)}</td></#list>
+			<td class="sum-td">${formatDuration(week.getSum(task))}</td>
+		</tr>
+		<#list week.dates as date>							
+		<#list getActivities(date, task) as activity>
+		<tr> 
+			<td><i class="far fa-clock" style="margin-left: 1em; color: #aaa"></i>&nbsp;${activity.summary}</td>
+			<#list week.dates as date><td class="activity-td">${formatDuration(date, activity)}</td></#list>
+			<td>&nbsp;</td>
+		</tr>
+		</#list>
+		</#list>
+		</#list>
+		</#list>
+		<!-- summary -->
+		<tr class="summary-row">
+			<td>Daily total</td>
+			<#list week.dates as date>							
+			<td class="summary-td">${formatDuration(week.getSum(date))}</td>
+			</#list>
+			<td class="summary-td">${formatDuration(week.getSum())}</td>
+		</tr>
+	</table>
+	</div>
+	</#list>
+</html>

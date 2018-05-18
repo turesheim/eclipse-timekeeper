@@ -18,9 +18,9 @@ import org.eclipse.ui.IWorkbenchPreferencePage;
 
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
-public class TimekeeperPreferences extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
+public class TimekeeperPreferencePage extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
 
-	public TimekeeperPreferences() {
+	public TimekeeperPreferencePage() {
 		super(GRID);
 		setPreferenceStore(TimekeeperUiPlugin.getDefault().getPreferenceStore());
 	}

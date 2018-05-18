@@ -49,7 +49,7 @@
             name="CSV Export">
       </command>
       <command
-            defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.HTMLToClipboardHandler"
+            defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.DefaultTemplateToClipboardHandler"
             id="net.resheim.eclipse.timekeeper.ui.HTMLClipboard"
             name="HTML to Clipboard">
       </command>
@@ -96,15 +96,21 @@
    <extension
          point="org.eclipse.ui.preferencePages">
       <page
-            class="net.resheim.eclipse.timekeeper.ui.preferences.TimekeeperPreferences"
+            class="net.resheim.eclipse.timekeeper.ui.preferences.TimekeeperPreferencePage"
             id="net.resheim.eclipse.timekeeper.ui.preferences.TimekeeperPreferences"
             name="Timekeeper">
       </page>
       <page
             category="net.resheim.eclipse.timekeeper.ui.preferences.TimekeeperPreferences"
-            class="net.resheim.eclipse.timekeeper.ui.preferences.DatabasePreferences"
+            class="net.resheim.eclipse.timekeeper.ui.preferences.DatabasePreferencePage"
             id="net.resheim.eclipse.timekeeper.ui.preferences.DatabasePreferences"
             name="Database">
+      </page>
+      <page
+            category="net.resheim.eclipse.timekeeper.ui.preferences.TimekeeperPreferences"
+            class="net.resheim.eclipse.timekeeper.ui.preferences.TemplatePreferencePage"
+            id="net.resheim.eclipse.timekeeper.ui.preferences.TemplatePreferences"
+            name="Report Templates">
       </page>
    </extension>
    <extension
