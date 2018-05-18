@@ -112,9 +112,9 @@ public class TrackedTask implements Serializable {
 	 * @see #endActivity(LocalDateTime)
 	 */
 	public void endActivity() {
-		if (currentActivity !=null) {
+		if (currentActivity != null) {
 			synchronized (currentActivity) {
-				if (currentActivity.getEnd()==null){
+				if (currentActivity.getEnd() == null) {
 					currentActivity.setEnd(LocalDateTime.now());
 				}
 				currentActivity = null;
@@ -302,7 +302,7 @@ public class TrackedTask implements Serializable {
 	 */
 	public String getRepositoryUrl() {
 		if (repositoryUrl.startsWith("local-")) {
-			return "local";
+			return TimekeeperPlugin.KIND_LOCAL;
 		}
 		return repositoryUrl;
 	}
