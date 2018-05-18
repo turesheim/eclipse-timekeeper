@@ -570,11 +570,11 @@ public class TimekeeperPlugin extends Plugin {
 	 *
 	 * @return a list of templates
 	 */
+	@SuppressWarnings("unchecked")
 	public static Map<String, ReportTemplate> getTemplates() {
 		Map<String, ReportTemplate> templates = new HashMap<>();
 		// and load the contents from the current preferences
 		IPreferenceStore store = new ScopedPreferenceStore(InstanceScope.INSTANCE, TimekeeperPlugin.BUNDLE_ID);
-		// defaultTemplate = store.getString(TimekeeperPlugin.PREF_DEFAULT_TEMPLATE);
 		byte[] decoded = Base64.getDecoder().decode(store.getString(TimekeeperPlugin.PREF_REPORT_TEMPLATES));
 		ByteArrayInputStream bis = new ByteArrayInputStream(decoded);
 		try {

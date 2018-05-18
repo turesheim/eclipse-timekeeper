@@ -491,15 +491,16 @@ public class WorkWeekView extends ViewPart {
 			manager.add(new Separator("task"));
 			if (((ITask) obj).isActive()) {
 				manager.add(deactivateAction);
-				manager.add(newActivityAction);
 			} else {
 				manager.add(activateAction);
 			}
+			manager.add(newActivityAction);
 			manager.add(new Separator());
 			manager.add(projectFieldMenu);
 		}
 		if (obj instanceof Activity) {
 			Optional<Activity> currentActivity = ((Activity) obj).getTrackedTask().getCurrentActivity();
+			// do not allow deleting an activity that is currently active
 			if (!(currentActivity.isPresent() && currentActivity.get().equals(obj))) {
 				manager.add(deleteAction);
 			}
@@ -649,7 +650,7 @@ public class WorkWeekView extends ViewPart {
 		};
 
 		// deactivate task
-		deactivateAction = new Action("Deactivate") {
+		deactivateAction = new Action("Deactivate Task") {
 			@Override
 			public void run() {
 				ISelection selection = viewer.getSelection();
@@ -661,7 +662,7 @@ public class WorkWeekView extends ViewPart {
 		};
 
 		// activate task
-		activateAction = new Action("Activate") {
+		activateAction = new Action("Activate Task") {
 			@Override
 			public void run() {
 				ISelection selection = viewer.getSelection();
@@ -679,11 +680,10 @@ public class WorkWeekView extends ViewPart {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
 				if (obj instanceof ITask) {
-					if (((ITask) obj).isActive()) {
-						TrackedTask task = TimekeeperPlugin.getDefault().getTask((ITask) obj);
-						task.endActivity();
-						task.startActivity();
-					}
+					TrackedTask task = TimekeeperPlugin.getDefault().getTask((ITask) obj);
+					task.endActivity();
+					task.startActivity();
+					refresh();
 				}
 			}
 		};
