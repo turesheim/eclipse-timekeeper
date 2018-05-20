@@ -8,7 +8,7 @@ Whenever a task is *activated* in Mylyn it will automatically show up in the **W
 
 When the task is *deactivated* the end time is registered on the activity and the active time is added to the toal for the task on the particular day. It is also possible to manually edit the start and stop times by clicking into the cell.
 
-The context menu and toolbar buttons can be used to browse back and forward by one week. The current locale is used to determine week numbers. Left of the navigation buttons there is a button for copying the workweek in HTML format to the clipboard or exporting to file as CSV or HTML.
+The context menu and toolbar buttons can be used to browse back and forward by one week. The current locale is used to determine week numbers. Left of the navigation buttons there is a button for copying and exporting the displayed workweek in various formats. The export definitions can be modified or new ones can be added using [Freemarker](https://freemarker.apache.org) templates found in the preference settings. 
 
 See the <a href="../../wiki">wiki</a>  for more about usage.
 
@@ -19,7 +19,7 @@ You can install from the <a href="http://marketplace.eclipse.org/content/timekee
 
 ### Database configuration
 
-Since version 2.0, data are stored in a embedded [h2 database](http://www.h2database.com/html/main.html) under **~/.timekeeper/**. Timekeeper utilizes a H2 feature known as [*mixed mode*](http://h2database.com/html/features.html#auto_mixed_mode) to automatically start on port 9090 if more connections are required. The location of the database can be changed using the preferences dialog.
+Since version 2.0, data are stored in a embedded SQL database ([H2](http://www.h2database.com/html/main.html)) under **~/.timekeeper/**. Timekeeper utilizes a H2 feature known as [*mixed mode*](http://h2database.com/html/features.html#auto_mixed_mode) to automatically start on port 9090 if more connections are required. This will happen when more instances of Eclipse with Timekeeper is started. The location of the database can be changed using the preferences dialog.
 
 ### Database upgrades
 
@@ -41,4 +41,4 @@ This project started out as an experiment, attempting to make use of the *Java 8
 
 ## License
 
-Copyright © 2014-2017 Torkild Ulvøy Resheim. All rights reserved. This program and the accompanying materials are made available under the terms of the Eclipse Public License v1.0 which accompanies this distribution, and is available at http://www.eclipse.org/legal/epl-v10.html
+Copyright © 2014-2018 Torkild Ulvøy Resheim. All rights reserved. This program and the accompanying materials are made available under the terms of the Eclipse Public License v1.0 which accompanies this distribution, and is available at http://www.eclipse.org/legal/epl-v10.html

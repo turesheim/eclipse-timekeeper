@@ -321,7 +321,7 @@ public class TimekeeperPlugin extends Plugin {
 	 *            the time tracked task
 	 * @return a Mylyn task or <code>null</code>
 	 */
-	public ITask getTask(TrackedTask task) {
+	public ITask getTask(TrackedTask task) {		
 		// get the repository then find the task. Seems like the Mylyn API is
 		// a bit limited in this area as I could not find something more usable
 		Optional<TaskRepository> tr = TasksUi.getRepositoryManager().getAllRepositories()
@@ -333,7 +333,7 @@ public class TimekeeperPlugin extends Plugin {
 		}
 		return null;		
 	}
-
+	
 	/**
 	 * Exports Timekeeper related data to two separate CSV files. One for
 	 * {@link TrackedTask}, another for {@link Activity} instances and yet
@@ -570,11 +570,11 @@ public class TimekeeperPlugin extends Plugin {
 	 *
 	 * @return a list of templates
 	 */
+	@SuppressWarnings("unchecked")
 	public static Map<String, ReportTemplate> getTemplates() {
 		Map<String, ReportTemplate> templates = new HashMap<>();
 		// and load the contents from the current preferences
 		IPreferenceStore store = new ScopedPreferenceStore(InstanceScope.INSTANCE, TimekeeperPlugin.BUNDLE_ID);
-		// defaultTemplate = store.getString(TimekeeperPlugin.PREF_DEFAULT_TEMPLATE);
 		byte[] decoded = Base64.getDecoder().decode(store.getString(TimekeeperPlugin.PREF_REPORT_TEMPLATES));
 		ByteArrayInputStream bis = new ByteArrayInputStream(decoded);
 		try {

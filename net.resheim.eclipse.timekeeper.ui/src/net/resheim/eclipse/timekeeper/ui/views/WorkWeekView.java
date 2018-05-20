@@ -491,15 +491,16 @@ public class WorkWeekView extends ViewPart {
 			manager.add(new Separator("task"));
 			if (((ITask) obj).isActive()) {
 				manager.add(deactivateAction);
-				manager.add(newActivityAction);
 			} else {
 				manager.add(activateAction);
 			}
+			manager.add(newActivityAction);
 			manager.add(new Separator());
 			manager.add(projectFieldMenu);
 		}
 		if (obj instanceof Activity) {
 			Optional<Activity> currentActivity = ((Activity) obj).getTrackedTask().getCurrentActivity();
+			// do not allow deleting an activity that is currently active
 			if (!(currentActivity.isPresent() && currentActivity.get().equals(obj))) {
 				manager.add(deleteAction);
 			}
@@ -603,7 +604,7 @@ public class WorkWeekView extends ViewPart {
 				viewer.setInput(getViewSite());
 			}
 		};
-		previousWeekAction.setText("Previous Week");
+		previousWeekAction.setText("Previous week");
 		previousWeekAction.setToolTipText("Show previous week");
 		previousWeekAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
 				.getImageDescriptor(ISharedImages.IMG_TOOL_BACK));
@@ -616,7 +617,7 @@ public class WorkWeekView extends ViewPart {
 				viewer.setInput(getViewSite());
 			}
 		};
-		currentWeekAction.setText("Current Week");
+		currentWeekAction.setText("Current week");
 		currentWeekAction.setToolTipText("Show current week");
 		currentWeekAction
 		.setImageDescriptor(TimekeeperUiPlugin.getDefault()
@@ -631,7 +632,7 @@ public class WorkWeekView extends ViewPart {
 				viewer.setInput(getViewSite());
 			}
 		};
-		nextWeekAction.setText("Next Week");
+		nextWeekAction.setText("Next week");
 		nextWeekAction.setToolTipText("Show next week");
 		nextWeekAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
 				.getImageDescriptor(ISharedImages.IMG_TOOL_FORWARD));
@@ -649,7 +650,7 @@ public class WorkWeekView extends ViewPart {
 		};
 
 		// deactivate task
-		deactivateAction = new Action("Deactivate") {
+		deactivateAction = new Action("Deactivate task") {
 			@Override
 			public void run() {
 				ISelection selection = viewer.getSelection();
@@ -661,7 +662,7 @@ public class WorkWeekView extends ViewPart {
 		};
 
 		// activate task
-		activateAction = new Action("Activate") {
+		activateAction = new Action("Activate task") {
 			@Override
 			public void run() {
 				ISelection selection = viewer.getSelection();
@@ -679,17 +680,21 @@ public class WorkWeekView extends ViewPart {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
 				if (obj instanceof ITask) {
-					if (((ITask) obj).isActive()) {
-						TrackedTask task = TimekeeperPlugin.getDefault().getTask((ITask) obj);
+					TrackedTask task = TimekeeperPlugin.getDefault().getTask((ITask) obj);
+					task.endActivity();
+					task.startActivity();
+					// the user created a new activity on an inactive task, so we assume that we
+					// should not continue to track the time.
+					if (!((ITask) obj).isActive()) {
 						task.endActivity();
-						task.startActivity();
 					}
+					refresh();
 				}
 			}
 		};
 
 		// delete activity
-		deleteAction = new Action("Delete") {
+		deleteAction = new Action("Delete activity") {
 			@Override
 			public void run() {
 				ISelection selection = viewer.getSelection();
@@ -706,7 +711,7 @@ public class WorkWeekView extends ViewPart {
 		deleteAction.setImageDescriptor(
 				PlatformUI.getWorkbench().getSharedImages().getImageDescriptor(ISharedImages.IMG_TOOL_DELETE));
 
-		projectFieldMenu = new MenuManager("Set Grouping Field", null);
+		projectFieldMenu = new MenuManager("Set grouping field", null);
 		projectFieldMenu.setRemoveAllWhenShown(true);
 		projectFieldMenu.addMenuListener(new IMenuListener() {
 

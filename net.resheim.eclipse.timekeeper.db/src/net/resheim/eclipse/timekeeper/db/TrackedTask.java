@@ -32,6 +32,7 @@ import javax.persistence.OneToOne;
 import javax.persistence.Transient;
 
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
+import org.eclipse.mylyn.internal.tasks.core.TaskRepositoryManager;
 import org.eclipse.mylyn.tasks.core.IRepositoryManager;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.core.TaskRepository;
@@ -111,9 +112,9 @@ public class TrackedTask implements Serializable {
 	 * @see #endActivity(LocalDateTime)
 	 */
 	public void endActivity() {
-		if (currentActivity !=null) {
+		if (currentActivity != null) {
 			synchronized (currentActivity) {
-				if (currentActivity.getEnd()==null){
+				if (currentActivity.getEnd() == null) {
 					currentActivity.setEnd(LocalDateTime.now());
 				}
 				currentActivity = null;
@@ -258,7 +259,7 @@ public class TrackedTask implements Serializable {
 			TaskRepository repository = repositoryManager.getRepository(task.getConnectorKind(), task.getRepositoryUrl());
 			String id = repository.getProperty(LOCAL_REPO_KEY_ID);
 			if (id == null) {
-				id = LOCAL_REPO_ID+"-"+UUID.randomUUID().toString();
+				id = TaskRepositoryManager.PREFIX_LOCAL+UUID.randomUUID().toString();
 				repository.setProperty(LOCAL_REPO_KEY_ID, id);
 			}
 			url = id;
@@ -292,10 +293,27 @@ public class TrackedTask implements Serializable {
 		return currentActivity;
 	}
 
+	/**
+	 * Returns the <i>Mylyn</i> repository URL. Internally an UUID for each Eclipse
+	 * workspace is postfixed the local repository URL in order to keep them apart.
+	 * This method will only return "local" for local repositories.
+	 * 
+	 * @return the repository URL or "local"
+	 */
 	public String getRepositoryUrl() {
+		if (repositoryUrl.startsWith("local-")) {
+			return TimekeeperPlugin.KIND_LOCAL;
+		}
 		return repositoryUrl;
 	}
 
+	/**
+	 * Returns the Mylyn Tasks identifier associated with this tracked task. If it's
+	 * a local task, only the number will be returned and one would have to use the
+	 * repository to correctly identify the {@link ITask} instance.
+	 * 
+	 * @return the task identifier
+	 */
 	public String getTaskId() {
 		return taskId;
 	}

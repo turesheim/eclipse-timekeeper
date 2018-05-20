@@ -2,8 +2,21 @@
 
 ### Version 2.0.0 (Next release)
 
-The 2.0 version is a major update from the 1.0 version. The most significant change is that all date are now stored in an SQL database instead of in the Mylyn database. The SQL database is shared between _Timekeeper_ instances, so that only one instance is required. This means that all the time tracking data are stored in the same database. Additionally, when an Mylyn database is repopulated after creating a fresh workspace, the connections to the timekeeper data will be remade.
+The main goal of this release was to make sure records were not lost if your workspace got wiped. To do this a shared SQL database ([H2](http://www.h2database.com)) containing all Timekeeper data from all workspaces is used. Old data should be automatically converted to an old workspace once you upgrade.
+
+Additionally, the data structure has been reworked so no references are kept in the Mylyn Task metadata, but rather stored in the database. When creating a new Eclipse Workspace with a fresh Mylyn Tasks database, the Timekeeper connections to Mylyn will be remade. Note that the connection to any _local_ tasks will be lost.
+
+A preference setting allows you to change the database URL in case you don't want the default location. And lastly, there is a CSV export/import mechanism along with configurable templates for reporting.
+
+Another issue with the 1.x releases was that the mechanism keeping track of passed time would sometimes create a large umber of UI events that could not catch up and cause a "spinning beachball of death" on macOS, similarly on other operating systems. This has been resolved by introducing the concept of an "activity". This basically has a start time, end time and a comment. So you can have multiple activities for each task, each with a period of time being summed up on each task. The times of the activity can be manually changed, but it is no longer possible to just specify the amount of time. The time tracker no longer needs to continously update its data.
+
+* Added _activities_ to tasks to help track time
+* Added improved export to CSV, added import from CSV
+* Improved tracking of passed time
+* The *workweek* view will no longer lose focus while editing when tasks are refreshed
+* Added high-resolution icons for HighDPI displays
+* Added configurable templates for reporting and exporting
 
 #### Known issues
 
-Timekeeper may be unable to connect to the database when restarting after installing a new plug-in or feature. The solution is to do a normal restart. 
+Timekeeper will be unable to connect to the database when restarting Eclipse after installing a new plug-in or feature. The solution is to simply close your Eclipse instance and start it again. 
