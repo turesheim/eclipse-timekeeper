@@ -33,6 +33,12 @@ import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.TrackedTask;
 import net.resheim.eclipse.timekeeper.db.report.model.WorkWeek;
 
+/**
+ * This type us used to export timekeeper data. The format is specified by a
+ * FreeMarker template.
+ * 
+ * @author Torkild Ulvøy Resheim
+ */
 @SuppressWarnings("restriction")
 public class TemplateExporter extends AbstractExporter {
 
