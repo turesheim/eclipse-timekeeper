@@ -29,6 +29,9 @@ import org.eclipse.ui.handlers.HandlerUtil;
 import net.resheim.eclipse.timekeeper.ui.export.CSVExporter;
 import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
+/**
+ * @deprecated use the {@link DefaultTemplateToClipboardHandler} instead
+ */
 @Deprecated
 public class ExportToCSVHandler extends AbstractHandler {
 
