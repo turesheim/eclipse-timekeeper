@@ -22,3 +22,5 @@ Another issue with the 1.x releases was that the mechanism keeping track of pass
 #### Known issues
 
 Timekeeper will be unable to connect to the database when restarting an Eclipse instance after installing a new plug-in or feature. The solution is to simply close your Eclipse instance and start it again.
+
+Exporting a week task list to HTML and pasting it into an Eclipse editor won't work. This appears to be due to the fact that the _type_ is HTML and not _plain text_ and that the editors for some reason does not accept the prior.
