@@ -42,6 +42,7 @@ import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Label;
@@ -52,6 +53,7 @@ import org.eclipse.ui.preferences.ScopedPreferenceStore;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
+import net.resheim.eclipse.timekeeper.db.report.ReportTemplate.Type;
 
 /**
  * This preference page allows for setting up various report templates.
@@ -70,6 +72,7 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 	/** Name of the default template */
 	private String defaultTemplate;
 	private Button defaultTemplateButton;
+	private Combo templateTypeButton;
 
 	public TemplatePreferencePage() {
 	}
@@ -78,10 +81,10 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 	@Override
 	public Control createContents(Composite parent) {
 		Composite container = new Composite(parent, SWT.NULL);
-		container.setLayout(new GridLayout(2, false));
+		container.setLayout(new GridLayout(4, false));
 
 		list = new List(container, SWT.BORDER);
-		list.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 3));
+		list.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 3, 3));
 		list.addSelectionListener(new SelectionAdapter() {
 
 			@Override
@@ -130,23 +133,14 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 		});
 
 		Button duplicateButton = new Button(container, SWT.NONE);
-		duplicateButton.setLayoutData(new GridData(SWT.LEFT, SWT.TOP, false, false, 1, 1));
+		duplicateButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false, 1, 1));
 		duplicateButton.setText("Duplicate");
-
-		defaultTemplateButton = new Button(container, SWT.CHECK);
-		defaultTemplateButton.setText("Use as default template");
-		new Label(container, SWT.NONE);
-		defaultTemplateButton.addSelectionListener(new SelectionAdapter() {
-
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				defaultTemplate = selectedTemplate.getName();
-			}
-
-		});
 
 		Label lblNewLabel = new Label(container, SWT.NONE);
 		lblNewLabel.setText("Template code:");
+		// spacers
+		new Label(container, SWT.NONE);
+		new Label(container, SWT.NONE);
 		new Label(container, SWT.NONE);
 
 		int styles = SWT.V_SCROLL | SWT.H_SCROLL | SWT.MULTI | SWT.BORDER | SWT.FULL_SELECTION;
@@ -155,8 +149,8 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 		cr.addDecorator(0, lnrc);
 		sourceViewer = new SourceViewer(container, cr, styles);
 		StyledText styledText = sourceViewer.getTextWidget();
-		styledText.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, true, 1, 1));
-		sourceViewer.getControl().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
+		styledText.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, true, 3, 1));
+		sourceViewer.getControl().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 3, 1));
 		Document document = new Document();
 		sourceViewer.setDocument(document);
 		sourceViewer.configure(new SourceViewerConfiguration());
@@ -177,13 +171,54 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 
 		});
 
+		// spacer
 		new Label(container, SWT.NONE);
 
-		// clear out all the templates
+		Label label = new Label(container, SWT.NONE);
+		label.setText("Content type:");
+		templateTypeButton = new Combo(container, SWT.READ_ONLY);
+		templateTypeButton.setLayoutData(new GridData(SWT.LEFT, SWT.TOP, false, false, 1, 1));
+		templateTypeButton.setText("Type");
+		templateTypeButton.setItems("HTML", "Plain Text", "Rich Text Format");
+		templateTypeButton.select(0);
+		templateTypeButton.addSelectionListener(new SelectionAdapter() {
+
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				switch (templateTypeButton.getSelectionIndex()) {
+				case 0:
+					selectedTemplate.setType(Type.HTML);
+					break;
+				case 1:
+					selectedTemplate.setType(Type.TEXT);
+					break;
+				case 2:
+					selectedTemplate.setType(Type.RTF);
+					break;
+				}
+			}
+
+		});
+
+		defaultTemplateButton = new Button(container, SWT.CHECK);
+		defaultTemplateButton.setText("Use as default template");
+		defaultTemplateButton.addSelectionListener(new SelectionAdapter() {
+
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				defaultTemplate = selectedTemplate.getName();
+			}
+
+		});
+		// spacer
+		new Label(container, SWT.NONE);
+
+		// clear out all the privately kept templates
 		templates = new HashMap<>();
 		// and load the contents from the current preferences
 		IPreferenceStore store = new ScopedPreferenceStore(InstanceScope.INSTANCE, TimekeeperPlugin.BUNDLE_ID);
 		defaultTemplate = store.getString(TimekeeperPlugin.PREF_DEFAULT_TEMPLATE);
+		// not exactly the most future-proof method, but it will suffice
 		byte[] decoded = Base64.getDecoder().decode(store.getString(TimekeeperPlugin.PREF_REPORT_TEMPLATES));
 		ByteArrayInputStream bis = new ByteArrayInputStream(decoded);
 		try {
@@ -218,9 +253,9 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 		try {
 			ObjectInputStream ois = new ObjectInputStream(bis);
 			java.util.List<ReportTemplate> defaults = (java.util.List<ReportTemplate>) ois.readObject();
-			// remove all templates
+			// remove all privately kept templates
 			templates.clear();
-			// and add the default ones
+			// and add the default ones to the list
 			for (ReportTemplate t : defaults) {
 				templates.put(t.getName(), t);
 			}
@@ -285,6 +320,17 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 					sourceViewer.moveFocusToWidgetToken();
 					if (name.equals(defaultTemplate)) {
 						defaultTemplateButton.setSelection(true);
+					}
+					switch (selectedTemplate.getType()) {
+					case HTML:
+						templateTypeButton.select(0);
+						break;
+					case TEXT:
+						templateTypeButton.select(1);
+						break;
+					case RTF:
+						templateTypeButton.select(3);
+						break;
 					}
 				}
 			}
