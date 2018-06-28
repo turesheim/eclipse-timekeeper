@@ -189,13 +189,13 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 						// considered away, the idle time will be ignored
 						// TODO: Control by preference
 						ttask.endActivity(ticked);
-						String time = DurationFormatUtils.formatDuration(lastIdleTimeMillis, "H:mm:ss", true);
+						String duration = DurationFormatUtils.formatDuration(lastIdleTimeMillis, "H:mm:ss", true);
 						TasksUi.getTaskActivityManager().deactivateTask(ttask.getTask());
 						MessageDialog.openInformation(Display.getCurrent().getActiveShell(),
-								"Task automatically deactivated",
+								"Activity automatically stopped",
 								MessageFormat.format(
-										"You have been away for too long (since {0}) and the currently activity was automatically ended at {1}.",
-										time,
+										"You have been away for too long ({0}) and tracking of the current activity was automatically ended on {1}.",
+										duration,
 										ticked.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US))));
 					}
 				}
