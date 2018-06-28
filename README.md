@@ -1,4 +1,4 @@
-# Eclipse Timekeeper [![Build Status](https://travis-ci.org/turesheim/eclipse-timekeeper.svg?branch=master)](https://travis-ci.org/turesheim/eclipse-timekeeper)
+# Timekeeper for Eclipse [![Build Status](https://travis-ci.org/turesheim/eclipse-timekeeper.svg?branch=master)](https://travis-ci.org/turesheim/eclipse-timekeeper)
 
 This is a simple time-tracking plug-in integrating with [Eclipse Mylyn](http://eclipse.org/mylyn/) Tasks.
 
@@ -16,16 +16,6 @@ See the <a href="../../wiki">wiki</a>  for more about usage.
 
 You can install from the <a href="http://marketplace.eclipse.org/content/timekeeper-eclipse">Eclipse Marketplace</a> or drag <a href="http://marketplace.eclipse.org/marketplace-client-intro?mpc_install=2196325" title="Drag and drop into a running Eclipse Indigo workspace to install Eclipse Timekeeper"><img src="https://marketplace.eclipse.org/sites/all/modules/custom/marketplace/images/installbutton.png" style="border: 0px; margin:0px; padding:0px; vertical-align:bottom;"/>
 </a> into an running Eclipse instance.
-
-### Database configuration
-
-Since version 2.0, data are stored in a embedded SQL database ([H2](http://www.h2database.com/html/main.html)) under **~/.timekeeper/**. Timekeeper utilizes a H2 feature known as [*mixed mode*](http://h2database.com/html/features.html#auto_mixed_mode) to automatically start on port 9090 if more connections are required. This will happen when more instances of Eclipse with Timekeeper is started. The location of the database can be changed using the preferences dialog.
-
-### Database upgrades
-
-Data should be automatically copied over to the H2 database when upgrading from 1.0, however this has not been extensively tested. Make a copy of your workspace(s) before upgrading in case something goes wrong. In the worst case scenario; historical data will be lost.
-
-Timekeeper is using [Flyway](https://flywaydb.org) to automatically upgrade the database on post-2.0 relases.
 
 ## Building
 

@@ -1,5 +1,6 @@
 /*******************************************************************************
- * Copyright (c) 2018 Torkild U. Resheim
+ * Copyright © 2018 Torkild U. Resheim
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -16,6 +17,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -24,6 +27,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.eclipse.core.runtime.preferences.InstanceScope;
+import org.eclipse.jface.dialogs.InputDialog;
 import org.eclipse.jface.preference.IPreferenceStore;
 import org.eclipse.jface.preference.PreferencePage;
 import org.eclipse.jface.resource.JFaceResources;
@@ -33,22 +37,25 @@ import org.eclipse.jface.text.IDocumentListener;
 import org.eclipse.jface.text.source.CompositeRuler;
 import org.eclipse.jface.text.source.LineNumberRulerColumn;
 import org.eclipse.jface.text.source.SourceViewer;
-import org.eclipse.jface.text.source.SourceViewerConfiguration;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.custom.StyledText;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.graphics.Font;
+import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
+import org.eclipse.swt.layout.RowLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Link;
 import org.eclipse.swt.widgets.List;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchPreferencePage;
+import org.eclipse.ui.PartInitException;
+import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.preferences.ScopedPreferenceStore;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
@@ -72,6 +79,7 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 	/** Name of the default template */
 	private String defaultTemplate;
 	private Button defaultTemplateButton;
+	/** The combo for selecting template content type */
 	private Combo templateTypeButton;
 
 	public TemplatePreferencePage() {
@@ -81,10 +89,10 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 	@Override
 	public Control createContents(Composite parent) {
 		Composite container = new Composite(parent, SWT.NULL);
-		container.setLayout(new GridLayout(4, false));
+		container.setLayout(new GridLayout(2, false));
 
 		list = new List(container, SWT.BORDER);
-		list.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 3, 3));
+		list.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 1, 3));
 		list.addSelectionListener(new SelectionAdapter() {
 
 			@Override
@@ -109,8 +117,11 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 
 			@Override
 			public void widgetSelected(SelectionEvent e) {
-				ReportTemplate template = new ReportTemplate("Template #" + (templates.size() + 1),
-						ReportTemplate.Type.TEXT, "");
+				String name = "Template #" + (templates.size() + 1);
+				InputDialog inputDialog = new InputDialog(container.getShell(), "New template", "Please choose a name for the new template", name, null);
+				inputDialog.setBlockOnOpen(true);
+				inputDialog.open();
+				ReportTemplate template = new ReportTemplate(inputDialog.getValue(), ReportTemplate.Type.TEXT, "");
 				templates.put(template.getName(),template);
 				updateListAndSelect(template);
 			}
@@ -135,25 +146,54 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 		Button duplicateButton = new Button(container, SWT.NONE);
 		duplicateButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false, 1, 1));
 		duplicateButton.setText("Duplicate");
+		duplicateButton.addSelectionListener(new SelectionAdapter() {
 
-		Label lblNewLabel = new Label(container, SWT.NONE);
-		lblNewLabel.setText("Template code:");
-		// spacers
-		new Label(container, SWT.NONE);
-		new Label(container, SWT.NONE);
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				if (selectedTemplate != null) {
+					String name = "Copy of " + selectedTemplate.getName();
+					InputDialog inputDialog = new InputDialog(container.getShell(), "New template",
+							"Please choose a name for the new template", name, null);
+					inputDialog.setBlockOnOpen(true);
+					inputDialog.open();
+					ReportTemplate template = new ReportTemplate(inputDialog.getValue(), selectedTemplate.getType(),
+							selectedTemplate.getCode());
+					templates.put(template.getName(), template);
+					updateListAndSelect(template);
+				}
+			}
+
+		});
+
+		Link link = new Link(container, SWT.NONE);
+		link.setText("Template code (use <a>Apache FreeMarker</a> syntax):");
+		link.addSelectionListener(new SelectionAdapter() {
+
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				try {
+					PlatformUI.getWorkbench().getBrowserSupport().getExternalBrowser()
+					.openURL(new URL("https://freemarker.apache.org/docs/index.html"));
+				} catch (PartInitException | MalformedURLException e1) {
+					// don't care
+				}
+			}
+
+		});
+		// spacer
 		new Label(container, SWT.NONE);
 
+		Composite editorComposite = new Composite(container, SWT.BORDER);
+		editorComposite.setLayout(new FillLayout());
+		editorComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
 		int styles = SWT.V_SCROLL | SWT.H_SCROLL | SWT.MULTI | SWT.BORDER | SWT.FULL_SELECTION;
 		CompositeRuler cr = new CompositeRuler();
 		LineNumberRulerColumn lnrc = new LineNumberRulerColumn();
 		cr.addDecorator(0, lnrc);
-		sourceViewer = new SourceViewer(container, cr, styles);
-		StyledText styledText = sourceViewer.getTextWidget();
-		styledText.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, true, 3, 1));
-		sourceViewer.getControl().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 3, 1));
+		sourceViewer = new SourceViewer(editorComposite, cr, styles);
 		Document document = new Document();
 		sourceViewer.setDocument(document);
-		sourceViewer.configure(new SourceViewerConfiguration());
+		sourceViewer.configure(new FreeMarkerConfiguration());
 		Font font = JFaceResources.getFont(JFaceResources.TEXT_FONT);
 		sourceViewer.getTextWidget().setFont(font);
 		document.addDocumentListener(new IDocumentListener() {
@@ -174,11 +214,14 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 		// spacer
 		new Label(container, SWT.NONE);
 
-		Label label = new Label(container, SWT.NONE);
+		Composite labelComposite = new Composite(container, SWT.NONE);
+		labelComposite.setLayout(new RowLayout());
+		labelComposite.setLayoutData(new GridData(SWT.LEFT, SWT.TOP, false, false, 1, 1));
+
+		Label label = new Label(labelComposite, SWT.NONE);
 		label.setText("Content type:");
-		templateTypeButton = new Combo(container, SWT.READ_ONLY);
-		templateTypeButton.setLayoutData(new GridData(SWT.LEFT, SWT.TOP, false, false, 1, 1));
-		templateTypeButton.setText("Type");
+
+		templateTypeButton = new Combo(labelComposite, SWT.READ_ONLY);
 		templateTypeButton.setItems("HTML", "Plain Text", "Rich Text Format");
 		templateTypeButton.select(0);
 		templateTypeButton.addSelectionListener(new SelectionAdapter() {
@@ -200,7 +243,7 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 
 		});
 
-		defaultTemplateButton = new Button(container, SWT.CHECK);
+		defaultTemplateButton = new Button(labelComposite, SWT.CHECK);
 		defaultTemplateButton.setText("Use as default template");
 		defaultTemplateButton.addSelectionListener(new SelectionAdapter() {
 
