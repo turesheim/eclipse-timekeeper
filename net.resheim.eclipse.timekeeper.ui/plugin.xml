@@ -39,19 +39,24 @@
             name="Copy Details to HTML">
       </command>
       <command
-            defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.ExportToHTMLHandler"
-            id="net.resheim.eclipse.timekeeper.ui.HTMLExport"
-            name="HTML Export">
-      </command>
-      <command
-            defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.ExportToCSVHandler"
-            id="net.resheim.eclipse.timekeeper.ui.CSVExport"
-            name="CSV Export">
-      </command>
-      <command
             defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.DefaultTemplateToClipboardHandler"
-            id="net.resheim.eclipse.timekeeper.ui.HTMLClipboard"
-            name="HTML to Clipboard">
+            id="net.resheim.eclipse.timekeeper.ui.Template2Clipboard"
+            name="Selected week to Clipboard">
+      </command>
+      <command
+            defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.TemplateExportHandler"
+            id="net.resheim.eclipse.timekeeper.ui.templateExportCommand"
+            name="Template Export Command">
+         <commandParameter
+               id="net.resheim.eclipse.timekeeper.ui.templateExportCommand_name"
+               name="name"
+               optional="true">
+         </commandParameter>
+         <commandParameter
+               id="net.resheim.eclipse.timekeeper.ui.templateExportCommand_file"
+               name="file"
+               optional="true">
+         </commandParameter>
       </command>
    </extension>
    <extension
@@ -69,28 +74,19 @@
             allPopups="false"
             locationURI="toolbar:net.resheim.eclipse.timekeeper.ui.views.workWeek?before=navigation">
          <command
-               commandId="net.resheim.eclipse.timekeeper.ui.HTMLClipboard"
+               commandId="net.resheim.eclipse.timekeeper.ui.Template2Clipboard"
                icon="icons/full/elcl/export.png"
                disabledIcon="icons/full/dlcl/export.png"
                id="export"
                label="Export"
                style="pulldown"
-               tooltip="Copy week as HTML to clipboard">
+               tooltip="Export selected week to clipboard">
          </command>
       </menuContribution>
       <menuContribution
             allPopups="false"
+            class="net.resheim.eclipse.timekeeper.ui.export.TemplateExportMenu"
             locationURI="menu:export">
-         <command
-               commandId="net.resheim.eclipse.timekeeper.ui.CSVExport"
-               label="Save week as CSV"
-               style="push">
-         </command>
-         <command
-               commandId="net.resheim.eclipse.timekeeper.ui.HTMLExport"
-               label="Save week as HTML"
-               style="push">
-         </command>
       </menuContribution>
    </extension>
    <extension
