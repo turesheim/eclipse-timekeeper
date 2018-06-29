@@ -11,6 +11,7 @@
  *******************************************************************************/
 package net.resheim.eclipse.timekeeper.ui.preferences;
 
+import org.eclipse.jface.preference.BooleanFieldEditor;
 import org.eclipse.jface.preference.FieldEditorPreferencePage;
 import org.eclipse.jface.preference.IntegerFieldEditor;
 import org.eclipse.ui.IWorkbench;
@@ -32,6 +33,8 @@ public class TimekeeperPreferencePage extends FieldEditorPreferencePage implemen
 				"Number of minutes before user is considered &idle", getFieldEditorParent()));
 		addField(new IntegerFieldEditor(PreferenceConstants.MINUTES_AWAY,
 				"Number of minutes before user is considered &away", getFieldEditorParent()));
+		addField(new BooleanFieldEditor(PreferenceConstants.DEACTIVATE_WHEN_AWAY,
+				"Automatically &deactivate task when away", getFieldEditorParent()));
 
 	}
 

@@ -15,6 +15,7 @@ public class PreferenceInitializer extends AbstractPreferenceInitializer {
 		IPreferenceStore store = TimekeeperUiPlugin.getDefault().getPreferenceStore();
 		store.setDefault(PreferenceConstants.MINUTES_IDLE, 5);
 		store.setDefault(PreferenceConstants.MINUTES_AWAY, 30);
+		store.setDefault(PreferenceConstants.DEACTIVATE_WHEN_AWAY, true);
 	}
 
 }

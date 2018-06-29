@@ -20,4 +20,6 @@ public class PreferenceConstants {
 
 	public static final String MINUTES_AWAY = "minutes_idle";
 
+	public static final String DEACTIVATE_WHEN_AWAY = "deactivate_when_away";
+
 }
