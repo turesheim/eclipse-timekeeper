@@ -113,6 +113,12 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	 */
 	private static long afkInterval;
 
+	/**
+	 * Deactivate active Mylyn task when the user is considered away. Controlled
+	 * by a preference setting.
+	 */
+	private static boolean afkDeactivate;
+
 	public TimekeeperUiPlugin() {
 	}
 
@@ -157,7 +163,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 				// and we have recorded a starting point
 				if (task != null && ttask.getCurrentActivity().isPresent()) {
 					dialogIsOpen = true;
-					LocalDateTime ticked = ttask.getTick();
+					LocalDateTime lastActive = ttask.getTick();
 
 					// If the user have been idle, but not long enough to be
 					// considered AFK we will ask whether or not to add the
@@ -174,29 +180,30 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 								"Disregard idle time?", null,
 								MessageFormat.format(
 										"The computer has been idle since {0}, more than {1}. Stop current activity and set end time to last active time? A new activity will be started from now.",
-										ticked.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US)), time),
+										lastActive.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US)), time),
 								MessageDialog.QUESTION, new String[] { "No", "Yes" }, 1);
 						int open = md.open();
 						dialogIsOpen = false;
 						if (open == 1) {
 							// set time to the last activity detected
-							ttask.endActivity(ticked);
+							ttask.endActivity(lastActive);
 							// and create a new activity
 							ttask.startActivity();
 						}
 					} else {
 						// If the user has been idle long enough to be
 						// considered away, the idle time will be ignored
-						// TODO: Control by preference
-						ttask.endActivity(ticked);
+						ttask.endActivity(lastActive);
 						String duration = DurationFormatUtils.formatDuration(lastIdleTimeMillis, "H:mm:ss", true);
-						TasksUi.getTaskActivityManager().deactivateTask(ttask.getTask());
-						MessageDialog.openInformation(Display.getCurrent().getActiveShell(),
-								"Activity automatically stopped",
-								MessageFormat.format(
-										"You have been away for too long ({0}) and tracking of the current activity was automatically ended on {1}.",
-										duration,
-										ticked.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US))));
+						if (afkDeactivate) {
+							TasksUi.getTaskActivityManager().deactivateTask(ttask.getTask());
+							MessageDialog.openInformation(Display.getCurrent().getActiveShell(),
+									"Activity automatically stopped",
+									MessageFormat.format(
+											"You have been away for too long ({0}) and tracking of the current activity was automatically ended on {1}.",
+											duration,
+											lastActive.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US))));
+						}
 					}
 				}
 			}
@@ -293,8 +300,8 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 			}
 		}, SHORT_INTERVAL, SHORT_INTERVAL);
 
-		// Immediately run the idle handler if the system has been idle and
-		// the user has pressed a key or mouse button _inside_ the running
+		// Immediately run the reactivation handler if the system has been idle
+		// and the user has pressed a key or mouse button _inside_ the running
 		// application.
 		reactivationListener = new Listener() {
 			public void handleEvent(Event event) {
@@ -321,6 +328,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 		plugin = this;
 		consideredIdleThreshold = getPreferenceStore().getInt(PreferenceConstants.MINUTES_IDLE) * 60_000;
 		afkInterval = getPreferenceStore().getInt(PreferenceConstants.MINUTES_AWAY) * 60_000;
+		afkDeactivate = getPreferenceStore().getBoolean(PreferenceConstants.DEACTIVATE_WHEN_AWAY);
 		getPreferenceStore().addPropertyChangeListener(this);
 		installTaxameter();
 	}
@@ -339,6 +347,9 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 		}
 		if (event.getProperty().equals(PreferenceConstants.MINUTES_AWAY)) {
 			afkInterval = Integer.parseInt(event.getNewValue().toString()) * 60_000;
+		}
+		if (event.getProperty().equals(PreferenceConstants.DEACTIVATE_WHEN_AWAY)) {
+			afkDeactivate = Boolean.parseBoolean(event.getNewValue().toString());
 		}
 	}
 
