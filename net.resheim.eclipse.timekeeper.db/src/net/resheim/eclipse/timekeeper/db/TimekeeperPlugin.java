@@ -131,11 +131,6 @@ public class TimekeeperPlugin extends Plugin {
 		}
 	}
 	
-	// Database configuration:
-	// Since we need a database pretty early, this method starts first, before 
-	// the preference initializer have had the chance to run. So we ensure 
-	// that there always is a database up and running. If the user changes
-	// the database URL a restart is required.
 	private void connectToDatabase() {
 		Job connectDatabaseJob = new Job("Connecting to Timekeeper database") {
 
@@ -146,8 +141,9 @@ public class TimekeeperPlugin extends Plugin {
 				String jdbc_url = "jdbc:h2:~/.timekeeper/h2db";
 				try {
 					
-					String location = Platform.getPreferencesService().getString(BUNDLE_ID, PREF_DATABASE_LOCATION,
-							PREF_DATABASE_LOCATION_SHARED, new IScopeContext[] { InstanceScope.INSTANCE });
+					String location = Platform.getPreferencesService()
+							.getString(BUNDLE_ID, PREF_DATABASE_LOCATION, PREF_DATABASE_LOCATION_SHARED, new 
+									IScopeContext[] { InstanceScope.INSTANCE });
 					switch (location){
 						case PREF_DATABASE_LOCATION_SHARED:
 							jdbc_url = getSharedLocation();
@@ -160,7 +156,13 @@ public class TimekeeperPlugin extends Plugin {
 						case PREF_DATABASE_LOCATION_URL:
 						jdbc_url = getSpecifiedLocation();
 						break;
-					}					
+					}
+					// ensure only a in-memory database is used when testing
+					if (Thread.currentThread().getName().equals("WorkbenchTestable")) {
+						jdbc_url = "jdbc:h2:mem:test_mem";
+					}
+					monitor.subTask(String.format("Using database at %1$s", jdbc_url));
+
 					// baseline the database
 			        Flyway flyway = new Flyway();
 			        flyway.setDataSource(jdbc_url, "sa", "");
@@ -170,10 +172,6 @@ public class TimekeeperPlugin extends Plugin {
 					// https://www.eclipse.org/forums/index.php?t=msg&goto=541155&
 					props.put(PersistenceUnitProperties.CLASSLOADER, TimekeeperPlugin.class.getClassLoader());
 					
-					// ensure only a in-memory database is used when testing
-					if (Thread.currentThread().getName().equals("WorkbenchTestable")) {
-						jdbc_url = "jdbc:h2:mem:test_mem";
-					}
 					props.put(PersistenceUnitProperties.JDBC_URL, jdbc_url);
 					props.put(PersistenceUnitProperties.JDBC_DRIVER, "org.h2.Driver");
 					props.put(PersistenceUnitProperties.JDBC_USER, "sa");
@@ -487,13 +485,6 @@ public class TimekeeperPlugin extends Plugin {
 		};
 	}
 	
-	public void saveDatabase(){
-		if (saveDatabaseJob != null){
-			saveDatabaseJob.setUser(true);
-			saveDatabaseJob.schedule();
-		}
-	}
-
 	/**
 	 * Returns the name of the container holding the supplied task.
 	 *
@@ -561,7 +552,7 @@ public class TimekeeperPlugin extends Plugin {
 	 * @see #start(BundleContext)
 	 * @see #connectToDatabase()
 	 */
-	public static void setEntityManager(EntityManager entityManager) {
+	 static void setEntityManager(EntityManager entityManager) {
 		TimekeeperPlugin.entityManager = entityManager;
 	}
 	
