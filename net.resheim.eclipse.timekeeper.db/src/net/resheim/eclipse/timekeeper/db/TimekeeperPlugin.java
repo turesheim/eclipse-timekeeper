@@ -375,7 +375,7 @@ public class TimekeeperPlugin extends Plugin {
 	 */
 	public int importFrom(Path path) throws IOException {
 		Path tasks = path.resolve("trackedtask.csv");
-		Path activities = path.resolve("activitiy.csv");
+		Path activities = path.resolve("activity.csv");
 		Path relations = path.resolve("trackedtask_activity.csv");
 		if (!tasks.toFile().exists()){
 			throw new IOException("'trackedtask.csv' does not exist in the specified location.");
