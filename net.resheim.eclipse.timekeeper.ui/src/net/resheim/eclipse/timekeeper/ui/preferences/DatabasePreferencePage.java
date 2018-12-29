@@ -15,6 +15,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import org.eclipse.core.runtime.ICoreRunnable;
+import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.preference.FieldEditorPreferencePage;
@@ -32,6 +34,7 @@ import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Group;
+import org.eclipse.swt.widgets.Shell;
 import org.eclipse.ui.IViewPart;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchPreferencePage;
@@ -55,7 +58,7 @@ public class DatabasePreferencePage extends FieldEditorPreferencePage implements
 			{ "Shared (in ~/.timekeeper/)", TimekeeperPlugin.PREF_DATABASE_LOCATION_SHARED },
 			{ "Relative to workspace (in .timekeeper/)", TimekeeperPlugin.PREF_DATABASE_LOCATION_WORKSPACE },
 			{ "Specified by JDBC URL", TimekeeperPlugin.PREF_DATABASE_LOCATION_URL },
-				}, getFieldEditorParent(), true));
+		}, getFieldEditorParent(), true));
 
 		addField(new StringFieldEditor(TimekeeperPlugin.PREF_DATABASE_URL, Messages.DatabasePreferences_URL,
 				getFieldEditorParent()));
@@ -82,13 +85,20 @@ public class DatabasePreferencePage extends FieldEditorPreferencePage implements
 				String open = dialog.open();
 				if (open!=null){
 					Path location = Paths.get(open);
-					try {
-						int count = TimekeeperPlugin.getDefault().exportTo(location);
-						MessageDialog.openInformation(g.getShell(), Messages.DatabasePreferences_DataExported, String
-								.format(Messages.DatabasePreferences_ExportMessage, count));
-					} catch (IOException e1) {
-						MessageDialog.openError(g.getShell(), Messages.DatabasePreferences_ExportError, e1.getMessage());
-					}
+					Shell shell = g.getShell();
+					Job job = Job.create("Export Timekeeper database", (ICoreRunnable) monitor -> {
+						try {
+							int count = TimekeeperPlugin.getDefault().exportTo(location);
+							shell.getDisplay().asyncExec(() -> {
+								MessageDialog.openInformation(shell, Messages.DatabasePreferences_DataExported,
+										String.format(Messages.DatabasePreferences_ExportMessage, count));
+							});
+						} catch (IOException e1) {
+							MessageDialog.openError(shell, Messages.DatabasePreferences_ExportError,
+									e1.getMessage());
+						}
+					});
+					job.schedule();
 				}
 			}
 		});
@@ -109,8 +119,8 @@ public class DatabasePreferencePage extends FieldEditorPreferencePage implements
 		super.dispose();
 	}
 
-	private void addImportButton(Composite g) {
-		Button button = new Button(g, SWT.PUSH);
+	private void addImportButton(Composite composite) {
+		Button button = new Button(composite, SWT.PUSH);
 		button.setText(Messages.DatabasePreferences_Import);
 		button.setLayoutData(new GridData());
 		button.addSelectionListener(new SelectionAdapter() {
@@ -122,18 +132,31 @@ public class DatabasePreferencePage extends FieldEditorPreferencePage implements
 				String open = dialog.open();
 				if (open != null) {
 					Path location = Paths.get(open);
-					try {
-						int i = TimekeeperPlugin.getDefault().importFrom(location);
-						IViewPart showView = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage()
-								.findView(WorkWeekView.VIEW_ID);
-						((WorkWeekView) showView).refresh();
-						MessageDialog.openInformation(g.getShell(), Messages.DatabasePreferences_DataImported,
-								String.format(Messages.DatabasePreferences_CreatedMessage, i));
-					} catch (IOException e1) {
-						MessageDialog.openError(g.getShell(), Messages.DatabasePreferences_ImportError, e1.getMessage());
-					}
-				}
-			}
+					Shell shell = composite.getShell();
+					IViewPart showView = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage()
+							.findView(WorkWeekView.VIEW_ID);
+					Job job = Job.create("Import Timekeeper database", (ICoreRunnable) monitor -> {
+						try {
+							int i = TimekeeperPlugin.getDefault().importFrom(location);
+							shell.getDisplay().asyncExec(() -> {
+								// the view may not be open
+								if (showView != null) {
+									((WorkWeekView) showView).refresh();
+								}
+								MessageDialog.openInformation(shell,
+										Messages.DatabasePreferences_DataImported,
+										String.format(Messages.DatabasePreferences_CreatedMessage, i));
+							}); // async
+						} catch (IOException e1) {
+							shell.getDisplay().asyncExec(() -> {
+								MessageDialog.openError(shell, Messages.DatabasePreferences_ImportError,
+										e1.getMessage());
+							}); // async
+						}
+					}); // job
+					job.schedule();
+				}; // open
+			};
 		});
 	}
 
