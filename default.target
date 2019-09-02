@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <?pde?>
 <!-- generated with https://github.com/mbarbero/fr.obeo.releng.targetplatform -->
-<target name="Eclipse Timekeeper Target Platform" sequenceNumber="1538988152">
+<target name="Eclipse Timekeeper Target Platform" sequenceNumber="1567429564">
   <locations>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
       <unit id="org.eclipse.equinox.p2.sdk.feature.group" version="3.11.0.v20180515-1348"/>
@@ -16,20 +16,20 @@
       <repository location="http://download.eclipse.org/releases/photon/"/>
     </location>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
-      <unit id="org.eclipse.swtbot.forms.source.feature.group" version="2.7.0.201806111355"/>
-      <unit id="org.eclipse.swtbot.eclipse.source.feature.group" version="2.7.0.201806111355"/>
-      <unit id="org.eclipse.swtbot.source.feature.group" version="2.7.0.201806111355"/>
+      <unit id="org.eclipse.swtbot.forms.source.feature.group" version="2.8.0.201906121535"/>
+      <unit id="org.eclipse.swtbot.eclipse.source.feature.group" version="2.8.0.201906121535"/>
+      <unit id="org.eclipse.swtbot.source.feature.group" version="2.8.0.201906121535"/>
       <unit id="org.hamcrest.library" version="1.3.0.v20180524-2246"/>
       <unit id="org.hamcrest.core" version="1.3.0.v20180420-1519"/>
       <repository location="http://download.eclipse.org/technology/swtbot/releases/latest/"/>
     </location>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
-      <unit id="org.eclipse.mylyn.tasks.core" version="3.24.2.v20180905-0003"/>
-      <unit id="org.eclipse.mylyn.tasks.ui" version="3.24.2.v20180905-0003"/>
+      <unit id="org.eclipse.mylyn.tasks.core" version="3.25.0.v20190128-2356"/>
+      <unit id="org.eclipse.mylyn.tasks.ui" version="3.25.0.v20190128-2356"/>
       <unit id="org.apache.commons.lang" version="2.6.0.v201404270220"/>
-      <unit id="org.eclipse.mylyn.bugzilla.core" version="3.24.2.v20180905-0003"/>
-      <unit id="org.eclipse.mylyn.commons.ui" version="3.24.2.v20180904-2231"/>
-      <unit id="org.eclipse.mylyn.bugzilla_feature.feature.group" version="3.24.2.v20180905-0003"/>
+      <unit id="org.eclipse.mylyn.bugzilla.core" version="3.25.0.v20190128-2356"/>
+      <unit id="org.eclipse.mylyn.commons.ui" version="3.25.0.v20180706-1510"/>
+      <unit id="org.eclipse.mylyn.bugzilla_feature.feature.group" version="3.25.0.v20190128-2356"/>
       <repository location="http://download.eclipse.org/mylyn/releases/latest"/>
     </location>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
