@@ -22,8 +22,8 @@ location "http://download.eclipse.org/technology/swtbot/releases/2.8.0/" {
     org.hamcrest.core
 }
 
-// Mylyn bits
-location "http://download.eclipse.org/mylyn/releases/photon" {
+// Mylyn bits, 2019-6-28 release for Eclipse 4.11 and 4.12
+location "https://download.eclipse.org/mylyn/releases/3.25/" {
     org.eclipse.mylyn.tasks.core
     org.eclipse.mylyn.tasks.ui
     org.apache.commons.lang

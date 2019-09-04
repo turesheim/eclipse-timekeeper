@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <?pde?>
 <!-- generated with https://github.com/mbarbero/fr.obeo.releng.targetplatform -->
-<target name="Eclipse Timekeeper Target Platform" sequenceNumber="1567619029">
+<target name="Eclipse Timekeeper Target Platform" sequenceNumber="1567631574">
   <locations>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
       <unit id="org.eclipse.equinox.p2.sdk.feature.group" version="3.11.400.v20190516-1504"/>
@@ -24,13 +24,13 @@
       <repository location="http://download.eclipse.org/technology/swtbot/releases/2.8.0/"/>
     </location>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
-      <unit id="org.eclipse.mylyn.tasks.core" version="3.24.2.v20180905-0003"/>
-      <unit id="org.eclipse.mylyn.tasks.ui" version="3.24.2.v20180905-0003"/>
+      <unit id="org.eclipse.mylyn.tasks.core" version="3.25.0.v20190128-2356"/>
+      <unit id="org.eclipse.mylyn.tasks.ui" version="3.25.0.v20190128-2356"/>
       <unit id="org.apache.commons.lang" version="2.6.0.v201404270220"/>
-      <unit id="org.eclipse.mylyn.bugzilla.core" version="3.24.2.v20180905-0003"/>
-      <unit id="org.eclipse.mylyn.commons.ui" version="3.24.2.v20180904-2231"/>
-      <unit id="org.eclipse.mylyn.bugzilla_feature.feature.group" version="3.24.2.v20180905-0003"/>
-      <repository location="http://download.eclipse.org/mylyn/releases/photon"/>
+      <unit id="org.eclipse.mylyn.bugzilla.core" version="3.25.0.v20190128-2356"/>
+      <unit id="org.eclipse.mylyn.commons.ui" version="3.25.0.v20180706-1510"/>
+      <unit id="org.eclipse.mylyn.bugzilla_feature.feature.group" version="3.25.0.v20190128-2356"/>
+      <repository location="https://download.eclipse.org/mylyn/releases/3.25/"/>
     </location>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
       <unit id="com.atlassian.connector.eclipse.feature.group" version="3.2.5.v20150427"/>
