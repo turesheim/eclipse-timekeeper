@@ -27,5 +27,7 @@ Export-Package: net.resheim.eclipse.timekeeper.internal;x-friends:="net.resheim.
  net.resheim.eclipse.timekeeper.internal.idle;x-friends:="net.resheim.eclipse.timekeeper.tests",
  net.resheim.eclipse.timekeeper.ui,
  net.resheim.eclipse.timekeeper.ui.commands,
+ net.resheim.eclipse.timekeeper.ui.export,
+ net.resheim.eclipse.timekeeper.ui.preferences,
  net.resheim.eclipse.timekeeper.ui.views
 Automatic-Module-Name: net.resheim.eclipse.timekeeper.ui
