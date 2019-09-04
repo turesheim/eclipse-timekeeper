@@ -1,7 +1,7 @@
 target "Eclipse Timekeeper Target Platform" with source requirements
 
 // Base dependencies
-location "http://download.eclipse.org/releases/photon/" {
+location "http://download.eclipse.org/releases/2019-06/" {
     org.eclipse.equinox.p2.sdk.feature.group
     org.eclipse.sdk.feature.group
     org.eclipse.pde.core
@@ -14,7 +14,7 @@ location "http://download.eclipse.org/releases/photon/" {
 }
 
 // UI Testing
-location "http://download.eclipse.org/technology/swtbot/releases/latest/" {
+location "http://download.eclipse.org/technology/swtbot/releases/2.8.0/" {
     org.eclipse.swtbot.forms.source.feature.group
     org.eclipse.swtbot.eclipse.source.feature.group
     org.eclipse.swtbot.source.feature.group
@@ -23,7 +23,7 @@ location "http://download.eclipse.org/technology/swtbot/releases/latest/" {
 }
 
 // Mylyn bits
-location "http://download.eclipse.org/mylyn/releases/latest" {
+location "http://download.eclipse.org/mylyn/releases/photon" {
     org.eclipse.mylyn.tasks.core
     org.eclipse.mylyn.tasks.ui
     org.apache.commons.lang
@@ -39,19 +39,22 @@ location "http://update.atlassian.com/atlassian-eclipse-plugin/rest/e3.7/" {
 }
 
 // EclipseLink for persistence
-location "http://download.eclipse.org/rt/eclipselink/updates/" {
+// 2.7.3 appears to be broken, 
+location "https://download.eclipse.org/rt/eclipselink/nightly-updates/" {
 	javax.persistence
 	javax.activation
 	javax.xml.bind
-	org.eclipse.persistence.core
-	org.eclipse.persistence.jpa
+	org.eclipse.persistence.core [2.7.4, 2.8.0)
+	org.eclipse.persistence.jpa [2.7.4, 2.8.0)
+	org.eclipse.persistence.jpa.jpql [2.7.4, 2.8.0)
+	org.eclipse.persistence.asm [6.2.0,7.0.0)
 }
 
-location "http://download.eclipse.org/gemini/jpa/updates/" {
+location "https://download.eclipse.org/gemini/jpa/updates/1.2.0-M1" {
     org.eclipse.gemini.jpa
 }
 
-location "http://download.eclipse.org/tools/orbit/downloads/drops/R20180606145124/repository" {
+location "http://download.eclipse.org/tools/orbit/downloads/drops/I20190602181010/repository" {
 	org.slf4j.api
 	ch.qos.logback.slf4j
 	ch.qos.logback.classic
