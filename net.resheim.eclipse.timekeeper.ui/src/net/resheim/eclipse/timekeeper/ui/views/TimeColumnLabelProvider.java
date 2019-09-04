@@ -14,13 +14,14 @@ package net.resheim.eclipse.timekeeper.ui.views;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
+import org.eclipse.jface.preference.JFacePreferences;
 import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
 import org.eclipse.mylyn.tasks.core.ITask;
-import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Font;
-import org.eclipse.swt.widgets.Display;
+import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.themes.IThemeManager;
 
 import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
@@ -34,6 +35,8 @@ abstract class TimeColumnLabelProvider extends ColumnLabelProvider {
 
 	private final WeekViewContentProvider contentProvider;
 
+	private final IThemeManager themeManager = PlatformUI.getWorkbench().getThemeManager();
+
 	public TimeColumnLabelProvider(WeekViewContentProvider contentProvider) {
 		this.contentProvider = contentProvider;
 	}
@@ -41,7 +44,7 @@ abstract class TimeColumnLabelProvider extends ColumnLabelProvider {
 	@Override
 	public Color getBackground(Object element) {
 		if (element instanceof WeeklySummary) {
-			return Display.getCurrent().getSystemColor(SWT.COLOR_INFO_BACKGROUND);
+			return themeManager.getCurrentTheme().getColorRegistry().get(JFacePreferences.INFORMATION_BACKGROUND_COLOR);
 		}
 		return super.getBackground(element);
 	}
@@ -55,14 +58,14 @@ abstract class TimeColumnLabelProvider extends ColumnLabelProvider {
 		}
 		if (element instanceof Activity) {
 			TrackedTask trackedTask = ((Activity) element).getTrackedTask();
-			ITask task =  trackedTask.getTask() == null ? 
+			ITask task =  trackedTask.getTask() == null ?
 					TimekeeperPlugin.getDefault().getTask(trackedTask) : trackedTask.getTask();
-			if (task != null && task.isActive()) {
-				if (trackedTask.getCurrentActivity().isPresent()
-						&& trackedTask.getCurrentActivity().get().equals(element)) {
-					return JFaceResources.getFontRegistry().getBold(JFaceResources.DIALOG_FONT);
-				}
-			}
+					if (task != null && task.isActive()) {
+						if (trackedTask.getCurrentActivity().isPresent()
+								&& trackedTask.getCurrentActivity().get().equals(element)) {
+							return JFaceResources.getFontRegistry().getBold(JFaceResources.DIALOG_FONT);
+						}
+					}
 		}
 		if (element instanceof String) {
 			String p = (String) element;

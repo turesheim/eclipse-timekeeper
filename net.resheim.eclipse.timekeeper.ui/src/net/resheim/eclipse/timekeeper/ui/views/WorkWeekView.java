@@ -32,6 +32,7 @@ import org.eclipse.jface.action.IMenuManager;
 import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.action.Separator;
+import org.eclipse.jface.layout.GridLayoutFactory;
 import org.eclipse.jface.viewers.AbstractTreeViewer;
 import org.eclipse.jface.viewers.ColumnViewerToolTipSupport;
 import org.eclipse.jface.viewers.DoubleClickEvent;
@@ -57,7 +58,6 @@ import org.eclipse.mylyn.tasks.core.data.TaskData;
 import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.mylyn.tasks.ui.TasksUiUtil;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.custom.ScrolledComposite;
 import org.eclipse.swt.events.ControlAdapter;
 import org.eclipse.swt.events.ControlEvent;
 import org.eclipse.swt.events.SelectionAdapter;
@@ -69,15 +69,14 @@ import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.DateTime;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Menu;
-import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.Tree;
 import org.eclipse.swt.widgets.TreeColumn;
 import org.eclipse.ui.IActionBars;
 import org.eclipse.ui.ISharedImages;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.contexts.IContextService;
-import org.eclipse.ui.forms.widgets.FormToolkit;
 import org.eclipse.ui.part.ViewPart;
 
 import net.resheim.eclipse.timekeeper.db.Activity;
@@ -278,7 +277,7 @@ public class WorkWeekView extends ViewPart {
 
 	private TreeViewer viewer;
 
-	private Text dateTimeLabel;
+	private Label dateTimeLabel;
 
 	private DateTime dateChooser;
 
@@ -288,7 +287,7 @@ public class WorkWeekView extends ViewPart {
 
 	private WeekViewContentProvider contentProvider;
 
-	private Text statusLabel;
+	private Label statusLabel;
 
 	/**
 	 * The constructor.
@@ -311,32 +310,28 @@ public class WorkWeekView extends ViewPart {
 
 	@Override
 	public void createPartControl(Composite parent) {
-		FormToolkit ft = new FormToolkit(parent.getDisplay());
-		ScrolledComposite rootComposite = new ScrolledComposite(parent, SWT.V_SCROLL);
-		ft.adapt(rootComposite);
-		GridLayout layout = new GridLayout();
-		rootComposite.setLayout(layout);
-		rootComposite.setExpandHorizontal(true);
-		rootComposite.setExpandVertical(true);
-
-		Composite main = ft.createComposite(rootComposite);
-		ft.adapt(main);
-		rootComposite.setContent(main);
-		GridLayout layout2 = new GridLayout(3, false);
-		layout2.horizontalSpacing = 0;
+		Composite main = new Composite(parent, SWT.NONE);
+		main.setBackgroundMode(SWT.INHERIT_FORCE);
+		GridLayout layout2 = GridLayoutFactory.fillDefaults().numColumns(3).equalWidth(false).create();
 		main.setLayout(layout2);
 
-		dateTimeLabel = new Text(main, SWT.NONE);
+		// text before the date chooser
+		dateTimeLabel = new Label(main, SWT.NONE);
 		GridData gdLabel = new GridData();
 		gdLabel.verticalIndent = 3;
 		gdLabel.verticalAlignment = SWT.BEGINNING;
 		dateTimeLabel.setLayoutData(gdLabel);
 
 		dateChooser = new DateTime(main, SWT.DROP_DOWN | SWT.DATE | SWT.LONG);
+		// the DateTime background color is misbehaving, but this is not too bad
+		// although it does not stand out but rather have the same background
+		// color as the labels.
+		dateChooser.setBackgroundMode(SWT.INHERIT_DEFAULT);
+		dateChooser.setFont(dateTimeLabel.getFont());
+
 		GridData gdChooser = new GridData();
 		gdChooser.verticalAlignment = SWT.BEGINNING;
 		dateChooser.setLayoutData(gdChooser);
-		ft.adapt(dateChooser);
 		dateChooser.addSelectionListener(new SelectionAdapter() {
 
 			@Override
@@ -348,7 +343,8 @@ public class WorkWeekView extends ViewPart {
 			}
 		});
 
-		statusLabel = new Text(main, SWT.NONE);
+		// text after the date chooser
+		statusLabel = new Label(main, SWT.NONE);
 		GridData gdStatusLabel = new GridData();
 		gdStatusLabel.grabExcessHorizontalSpace = true;
 		gdStatusLabel.horizontalAlignment = SWT.FILL;
@@ -366,6 +362,7 @@ public class WorkWeekView extends ViewPart {
 		layoutData.horizontalSpan = 3;
 		viewer.getControl().setLayoutData(layoutData);
 
+		// create the columns
 		createTitleColumn();
 		for (int i = 0; i < 7; i++) {
 			createTimeColumn(i);
@@ -378,12 +375,12 @@ public class WorkWeekView extends ViewPart {
 		tree.setHeaderVisible(true);
 		tree.setLinesVisible(true);
 
-		// adjust column width when view is resized
-		rootComposite.addControlListener(new ControlAdapter() {
+		// adjust column widths when view is resized
+		main.addControlListener(new ControlAdapter() {
 			@Override
 			public void controlResized(ControlEvent e) {
-				Rectangle area = rootComposite.getClientArea();
-				int width = area.width - 2 * tree.getBorderWidth() - 8 /* figure out the correct way to obtain this value */;
+				Rectangle area = main.getClientArea();
+				int width = area.width - 2 * tree.getBorderWidth() - 18 /* figure out the correct way to obtain this value */;
 				Point vBarSize = tree.getVerticalBar().getSize();
 				width -= vBarSize.x * 2;
 				TreeColumn[] columns = tree.getColumns();
@@ -396,7 +393,7 @@ public class WorkWeekView extends ViewPart {
 					cwidth += columns[i].getWidth();
 				}
 				// set the width of the first column
-				columns[0].setWidth(width - cwidth);
+				columns[0].setWidth(width - cwidth + TIME_COLUMN_WIDTH);
 			}
 		});
 
@@ -415,7 +412,7 @@ public class WorkWeekView extends ViewPart {
 		TasksUiPlugin.getTaskList().addChangeListener(taskListener);
 		viewer.setInput(getViewSite());
 		// Force a redraw so content is visible
-		rootComposite.pack();
+		main.pack();
 		installStatusUpdater();
 	}
 
