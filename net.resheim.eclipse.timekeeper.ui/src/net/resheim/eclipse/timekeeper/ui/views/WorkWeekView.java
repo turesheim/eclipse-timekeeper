@@ -32,6 +32,7 @@ import org.eclipse.jface.action.IMenuManager;
 import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.action.Separator;
+import org.eclipse.jface.layout.GridDataFactory;
 import org.eclipse.jface.layout.GridLayoutFactory;
 import org.eclipse.jface.viewers.AbstractTreeViewer;
 import org.eclipse.jface.viewers.ColumnViewerToolTipSupport;
@@ -62,7 +63,6 @@ import org.eclipse.swt.events.ControlAdapter;
 import org.eclipse.swt.events.ControlEvent;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
-import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -358,8 +358,7 @@ public class WorkWeekView extends ViewPart {
 		contentProvider = new ContentProvider();
 		TimekeeperPlugin.getDefault().addListener(contentProvider);
 		viewer.setContentProvider(contentProvider);
-		GridData layoutData = new GridData(SWT.FILL, SWT.FILL, true, true);
-		layoutData.horizontalSpan = 3;
+		GridData layoutData = GridDataFactory.fillDefaults().grab(true, true).span(3, 1).create();
 		viewer.getControl().setLayoutData(layoutData);
 
 		// create the columns
@@ -377,23 +376,26 @@ public class WorkWeekView extends ViewPart {
 
 		// adjust column widths when view is resized
 		main.addControlListener(new ControlAdapter() {
+			int previous;
+
 			@Override
 			public void controlResized(ControlEvent e) {
-				Rectangle area = main.getClientArea();
-				int width = area.width - 2 * tree.getBorderWidth() - 18 /* figure out the correct way to obtain this value */;
-				Point vBarSize = tree.getVerticalBar().getSize();
-				width -= vBarSize.x * 2;
-				TreeColumn[] columns = tree.getColumns();
-				int cwidth = 0;
-				for (int i = 1; i < columns.length; i++) {
-					columns[i].pack();
-					if (columns[i].getWidth() < TIME_COLUMN_WIDTH) {
-						columns[i].setWidth(TIME_COLUMN_WIDTH);
+				Rectangle area = main.getBounds();
+				int width = area.width;
+				if (width != previous) {
+					TreeColumn[] columns = tree.getColumns();
+					int cwidth = 0;
+					for (int i = 1; i < columns.length; i++) {
+						columns[i].pack();
+						if (columns[i].getWidth() < TIME_COLUMN_WIDTH) {
+							columns[i].setWidth(TIME_COLUMN_WIDTH);
+						}
+						cwidth += columns[i].getWidth();
 					}
-					cwidth += columns[i].getWidth();
+					// set the width of the first column
+					columns[0].setWidth(width - cwidth);
+					previous = width;
 				}
-				// set the width of the first column
-				columns[0].setWidth(width - cwidth + TIME_COLUMN_WIDTH);
 			}
 		});
 
