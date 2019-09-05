@@ -7,6 +7,7 @@ cache:
   directories:
     - $HOME/.m2
 deploy:
+  # Deploy to GitHub releases if the master branch has been tagged
   provider: releases
   skip_cleanup: true
   file_glob: true
@@ -17,4 +18,4 @@ deploy:
   on:
     repo: turesheim/eclipse-timekeeper
     tags: true
-    all_branches: true
+    branch: master
