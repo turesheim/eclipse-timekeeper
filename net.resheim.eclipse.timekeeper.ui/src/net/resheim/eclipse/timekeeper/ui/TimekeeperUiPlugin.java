@@ -82,10 +82,10 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 
 	@Override
 	protected void initializeImageRegistry(ImageRegistry reg) {
-		reg.put(OBJ_ACTIVITY, ImageDescriptor
-				.createFromURL(BundleUtility.find(getBundle(), "icons/full/eview/activity_obj.png")));
-		reg.put(IMG_TOOL_CURRENT, ImageDescriptor
-				.createFromURL(BundleUtility.find(getBundle(), "icons/full/elcl/cur_nav.png")));
+		reg.put(OBJ_ACTIVITY,
+				ImageDescriptor.createFromURL(BundleUtility.find(getBundle(), "icons/full/eview/activity_obj.png")));
+		reg.put(IMG_TOOL_CURRENT,
+				ImageDescriptor.createFromURL(BundleUtility.find(getBundle(), "icons/full/elcl/cur_nav.png")));
 	}
 
 	/** Platform specific idle time detector. */
@@ -180,7 +180,8 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 								"Disregard idle time?", null,
 								MessageFormat.format(
 										"The computer has been idle since {0}, more than {1}. Stop current activity and set end time to last active time? A new activity will be started from now.",
-										lastActive.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US)), time),
+										lastActive.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US)),
+										time),
 								MessageDialog.QUESTION, new String[] { "No", "Yes" }, 1);
 						int open = md.open();
 						dialogIsOpen = false;
@@ -201,8 +202,8 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 									"Activity automatically stopped",
 									MessageFormat.format(
 											"You have been away for too long ({0}) and tracking of the current activity was automatically ended on {1}.",
-											duration,
-											lastActive.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US))));
+											duration, lastActive.format(
+													DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US))));
 						}
 					}
 				}

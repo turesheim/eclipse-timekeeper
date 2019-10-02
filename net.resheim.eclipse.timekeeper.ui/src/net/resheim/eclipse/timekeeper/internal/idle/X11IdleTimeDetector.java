@@ -37,13 +37,11 @@ import com.sun.jna.platform.unix.X11.Window;
  * @author Laurent Cohen
  * @author Torkild U. Resheim - minor adjustments to suit Eclipse Timekeeper
  */
-public class X11IdleTimeDetector implements IdleTimeDetector
-{
+public class X11IdleTimeDetector implements IdleTimeDetector {
 	/**
 	 * Structure providing info on the XScreensaver.
 	 */
-	public static class XScreenSaverInfo extends Structure
-	{
+	public static class XScreenSaverInfo extends Structure {
 		/**
 		 * screen saver window
 		 */
@@ -79,8 +77,7 @@ public class X11IdleTimeDetector implements IdleTimeDetector
 	/**
 	 * Definition (incomplete) of the Xext library.
 	 */
-	public interface Xss extends Library
-	{
+	public interface Xss extends Library {
 		/**
 		 * Instance of the Xext library bindings.
 		 */
@@ -88,30 +85,33 @@ public class X11IdleTimeDetector implements IdleTimeDetector
 
 		/**
 		 * Allocate a XScreensaver information structure.
+		 *
 		 * @return a {@link XScreenSaverInfo} instance.
 		 */
 		XScreenSaverInfo XScreenSaverAllocInfo();
 
 		/**
 		 * Query the XScreensaver.
-		 * @param display the display.
-		 * @param drawable a {@link Drawable} structure.
-		 * @param saver_info a previously allocated {@link XScreenSaverInfo} instance.
+		 *
+		 * @param display
+		 *            the display.
+		 * @param drawable
+		 *            a {@link Drawable} structure.
+		 * @param saver_info
+		 *            a previously allocated {@link XScreenSaverInfo} instance.
 		 * @return an int return code.
 		 */
 		int XScreenSaverQueryInfo(Display display, Drawable drawable, XScreenSaverInfo saver_info);
 	}
 
 	@Override
-	public long getIdleTimeMillis()
-	{
+	public long getIdleTimeMillis() {
 		X11.Window window = null;
 		XScreenSaverInfo info = null;
 		Display display = null;
 
 		long idleMillis = 0L;
-		try
-		{
+		try {
 			display = X11.INSTANCE.XOpenDisplay(null);
 			if (display == null) {
 				display = X11.INSTANCE.XOpenDisplay(":0.0");
@@ -123,13 +123,9 @@ public class X11IdleTimeDetector implements IdleTimeDetector
 			info = new XScreenSaverInfo();
 			Xss.INSTANCE.XScreenSaverQueryInfo(display, window, info);
 			idleMillis = info.idle.longValue();
-		}
-		catch(UnsatisfiedLinkError e)
-		{
+		} catch (UnsatisfiedLinkError e) {
 			throw new RuntimeException(e.getMessage(), e);
-		}
-		finally
-		{
+		} finally {
 			info = null;
 			if (display != null) {
 				X11.INSTANCE.XCloseDisplay(display);

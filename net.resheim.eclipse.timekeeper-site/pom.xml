@@ -11,7 +11,7 @@
 	</parent>
 
 	<artifactId>net.resheim.eclipse.timekeeper-site</artifactId>
-	<name>Eclipse Timekeeper p2 Repository</name>
+	<name>Timekeeper for Eclipse p2 Repository</name>
 	<packaging>eclipse-repository</packaging>
 	<build>
 		<plugins>

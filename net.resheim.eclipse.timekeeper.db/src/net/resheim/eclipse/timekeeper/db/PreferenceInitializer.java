@@ -31,7 +31,7 @@ import org.osgi.framework.Bundle;
 import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
 
 /**
- * Specifies default values for the core Timekeeper preferences. 
+ * Specifies default values for the core Timekeeper preferences.
  */
 public class PreferenceInitializer extends AbstractPreferenceInitializer {
 
@@ -40,15 +40,18 @@ public class PreferenceInitializer extends AbstractPreferenceInitializer {
 		IPreferenceStore store = new ScopedPreferenceStore(InstanceScope.INSTANCE, TimekeeperPlugin.BUNDLE_ID);
 		try {
 			store.setDefault(TimekeeperPlugin.PREF_DATABASE_LOCATION, TimekeeperPlugin.PREF_DATABASE_LOCATION_SHARED);
-			store.setDefault(TimekeeperPlugin.PREF_DATABASE_LOCATION_URL, TimekeeperPlugin.getDefault().getSharedLocation());
-			// read from the "templates" directory and create a list of templates – all files stored there 
-			// will be registered. 
+			store.setDefault(TimekeeperPlugin.PREF_DATABASE_LOCATION_URL,
+					TimekeeperPlugin.getDefault().getSharedLocation());
+			// read from the "templates" directory and create a list of templates – all
+			// files stored there
+			// will be registered.
 			Bundle bundle = TimekeeperPlugin.getDefault().getBundle();
 			Enumeration<URL> findEntries = bundle.findEntries("templates", "*", true);
 			List<ReportTemplate> templates = new ArrayList<>();
 			while (findEntries.hasMoreElements()) {
 				URL url = findEntries.nextElement();
-				// open stream directly instead of resolving the URI, which would barf on spaces in path
+				// open stream directly instead of resolving the URI, which would barf on spaces
+				// in path
 				InputStream is = url.openStream();
 				BufferedReader br = new BufferedReader(new InputStreamReader(is, Charset.forName("utf-8")));
 				StringBuilder sb = new StringBuilder();
@@ -67,10 +70,11 @@ public class PreferenceInitializer extends AbstractPreferenceInitializer {
 				} else if (url.getFile().endsWith(".rtf")) {
 					type = ReportTemplate.Type.RTF;
 				}
-				templates.add(new ReportTemplate(name,type, sb.toString()));
+				templates.add(new ReportTemplate(name, type, sb.toString()));
 			}
 			// serialize the list of templates to a string and store it in the preferences
-			try (ByteArrayOutputStream out = new ByteArrayOutputStream(); ObjectOutputStream oos = new ObjectOutputStream(out)){
+			try (ByteArrayOutputStream out = new ByteArrayOutputStream();
+					ObjectOutputStream oos = new ObjectOutputStream(out)) {
 				oos.writeObject(templates);
 				String encoded = Base64.getEncoder().encodeToString(out.toByteArray());
 				store.setDefault(TimekeeperPlugin.PREF_REPORT_TEMPLATES, encoded);

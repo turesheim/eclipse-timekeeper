@@ -1,11 +1,21 @@
 language: java
-sudo: false
-script: mvn clean verify -Pskip-ui-tests
+dist: trusty
+sudo: required
+
+# UI-tests will only run on macOS, so we skip these here
+script: 
+  - mvn clean org.jacoco:jacoco-maven-plugin:prepare-agent verify -Pskip-ui-tests -Dtycho.localArtifacts=ignore
+  - sonar-scanner
 jdk:
   - openjdk8
 cache:
   directories:
     - $HOME/.m2
+addons:
+  sonarcloud:
+    organization: "turesheim-github"
+    token:
+      secure: "ASUilEjJT5fYjMN6Cy5gVeY1fuKiIwEKLX9sxPltAowFABpzzimgLy+Ytbvh1GLsqnCXtVOYSkcClpNHezkuJwVMopj/IQiVl3cB9Qm3BySCgsQVPWHy2+DZ/sMMVMoVdtiQaycP3a8GY3tbi6Wofbb090vmPHNcn13AWEWXOBA="
 deploy:
   # Deploy to GitHub releases if the master branch has been tagged
   provider: releases

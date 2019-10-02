@@ -71,7 +71,7 @@ public class DefaultTemplateToClipboardHandler extends AbstractHandler {
 	 * {@link TextTransfer}.
 	 *
 	 * @param template
-	 *                     the report template
+	 *            the report template
 	 * @return the transfer type
 	 */
 	private ByteArrayTransfer getTransfer(ReportTemplate template) {

@@ -66,3 +66,4 @@ Bundle-ClassPath: lib/h2-1.4.194.jar,
  .
 Bundle-ActivationPolicy: lazy
 Bundle-Activator: net.resheim.eclipse.timekeeper.db.TimekeeperPlugin
+Bundle-Vendor: Torkild U. Resheim

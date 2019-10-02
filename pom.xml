@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-    Copyright (c) 2017 Torkild U. Resheim
+    Copyright (c) 2015-2019 Torkild U. Resheim
     All rights reserved. This program and the accompanying materials
     are made available under the terms of the Eclipse Public License v1.0
     which accompanies this distribution, and is available at
@@ -24,7 +24,7 @@
 	<version>2.0.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
-	<name>Eclipse Timekeeper</name>
+	<name>Timekeeper for Eclipse</name>
 
 	<issueManagement>
 		<system>GitHub</system>
@@ -53,7 +53,7 @@
 	</licenses>
 
 	<properties>
-		<tycho.version>1.1.0</tycho.version>
+		<tycho.version>1.4.0</tycho.version>
 		<tycho.scmUrl>scm:git:git://github.com/turesheim/eclipse-timekeeper.git</tycho.scmUrl>
 	    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	    <maven.compiler.source>1.8</maven.compiler.source>
