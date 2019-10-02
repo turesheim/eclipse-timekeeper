@@ -253,17 +253,17 @@ public class TimekeeperPlugin extends Plugin {
 		List<TrackedTask> resultList = createQuery.getResultList();
 		for (TrackedTask trackedTask : resultList) {
 			if (trackedTask.getCurrentActivity().isPresent()) {
+				Activity activity = trackedTask.getCurrentActivity().get();
 				ITask task = trackedTask.getTask() == null ? TimekeeperPlugin.getDefault().getTask(trackedTask)
 						: trackedTask.getTask();
 				// note that the ITask may not exist in this workspace
 				if (task != null && !task.isActive()) {
 					// try to figure out when it was last active
-					Activity activity = trackedTask.getCurrentActivity().get();
 					ZonedDateTime start = activity.getStart().atZone(ZoneId.systemDefault());
 					ZonedDateTime end = start.plusMinutes(30);
+					Calendar s = Calendar.getInstance();
+					Calendar e = Calendar.getInstance();
 					while (true) {
-						Calendar s = Calendar.getInstance();
-						Calendar e = Calendar.getInstance();
 						s.setTime(Date.from(start.toInstant()));
 						e.setTime(Date.from(end.toInstant()));
 						long elapsedTime = TasksUi.getTaskActivityManager().getElapsedTime(task, s, e);
@@ -273,8 +273,8 @@ public class TimekeeperPlugin extends Plugin {
 							trackedTask.endActivity();
 							break;
 						}
-						start.plusMinutes(30);
-						end.plusMinutes(30);
+						start = start.plusMinutes(30);
+						end = end.plusMinutes(30);
 					}
 				}
 			}
