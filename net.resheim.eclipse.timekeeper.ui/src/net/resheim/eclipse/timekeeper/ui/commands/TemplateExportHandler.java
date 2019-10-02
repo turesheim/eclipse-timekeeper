@@ -69,10 +69,10 @@ public class TemplateExportHandler extends AbstractHandler implements IHandler {
 						fd.setFileName(fileNameFormat.format(firstDayOfWeek));
 						String filename = fd.open();
 						if (filename != null) {
-							FileWriter fw = new FileWriter(new File(filename));
-							BufferedWriter bw = new BufferedWriter(fw);
-							bw.write(result);
-							bw.close();
+							try (BufferedWriter bw = new BufferedWriter(new FileWriter(new File(filename)))) {
+								bw.write(result);
+								bw.close();
+							}
 						}
 					} catch (IOException e) {
 						e.printStackTrace();
