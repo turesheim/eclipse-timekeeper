@@ -16,7 +16,7 @@
 	
 	<properties>
 		<!-- We currently have no UI tests and no plans to add any -->
-		<sonar.coverage.exclusions>**/*.java</sonar.coverage.exclusions>
+		<sonar.coverage.exclusions>file:**/*.java</sonar.coverage.exclusions>
 	</properties>
 
     <dependencies>
