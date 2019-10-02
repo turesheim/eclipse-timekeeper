@@ -237,7 +237,7 @@ public class WorkWeekView extends ViewPart {
 			TreeColumn[] columns = viewer.getTree().getColumns();
 			String[] headings = TimekeeperUiPlugin.getDefault().getHeadings(getFirstDayOfWeek());
 			for (int i = 1; i < columns.length; i++) {
-				LocalDate date = getFirstDayOfWeek().plusDays(i - 1);
+				LocalDate date = getFirstDayOfWeek().plusDays((long) i - 1);
 				columns[i].setText(headings[i - 1]);
 				columns[i].setToolTipText(getFormattedPeriod(getSum(filtered, date)));
 			}
@@ -297,7 +297,7 @@ public class WorkWeekView extends ViewPart {
 
 	private LocalDate calculateFirstDayOfWeek(LocalDate date) {
 		WeekFields weekFields = WeekFields.of(Locale.getDefault());
-		int day = date.get(weekFields.dayOfWeek());
+		long day = date.get(weekFields.dayOfWeek());
 		LocalDate firstDayOfWeek = date.minusDays(day - 1);
 		return firstDayOfWeek;
 	}
@@ -402,7 +402,7 @@ public class WorkWeekView extends ViewPart {
 		// Determine the first date of the week
 		LocalDate date = LocalDate.now();
 		WeekFields weekFields = WeekFields.of(Locale.getDefault());
-		int day = date.get(weekFields.dayOfWeek());
+		long day = date.get(weekFields.dayOfWeek());
 		contentProvider.setFirstDayOfWeek(date.minusDays(day - 1));
 
 		makeActions();
