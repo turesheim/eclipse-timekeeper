@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BinaryOperator;
 
 import javax.persistence.Column;
@@ -60,6 +62,8 @@ public class TrackedTask implements Serializable {
 	private static final String LOCAL_REPO_KEY_ID = "net.resheim.eclipse.timekeeper.repo-id"; //$NON-NLS-1$
 
 	private static final long serialVersionUID = 2025738836825780128L;
+	
+	private Lock lock = new ReentrantLock();
 
 	@Id
 	@Column(name = "REPOSITORY_URL")
@@ -112,12 +116,12 @@ public class TrackedTask implements Serializable {
 	 */
 	public void endActivity() {
 		if (currentActivity != null) {
-			synchronized (currentActivity) {
-				if (currentActivity.getEnd() == null) {
-					currentActivity.setEnd(LocalDateTime.now());
-				}
-				currentActivity = null;
+			lock.lock();
+			if (currentActivity.getEnd() == null) {
+				currentActivity.setEnd(LocalDateTime.now());
 			}
+			currentActivity = null;
+			lock.unlock();
 		}
 	}
 
@@ -131,10 +135,10 @@ public class TrackedTask implements Serializable {
 	 */
 	public void endActivity(LocalDateTime time) {
 		if (currentActivity != null) {
-			synchronized (currentActivity) {
-				currentActivity.setEnd(LocalDateTime.now());
-				currentActivity = null;
-			}
+			lock.lock();
+			currentActivity.setEnd(LocalDateTime.now());
+			currentActivity = null;
+			lock.unlock();
 		}
 	}
 
@@ -279,8 +283,10 @@ public class TrackedTask implements Serializable {
 	 */
 	public Activity startActivity() {
 		if (currentActivity == null) {
+			lock.lock();
 			currentActivity = new Activity(this, LocalDateTime.now());
 			addActivity(currentActivity);
+			lock.unlock();
 			return currentActivity;
 		}
 		return currentActivity;
