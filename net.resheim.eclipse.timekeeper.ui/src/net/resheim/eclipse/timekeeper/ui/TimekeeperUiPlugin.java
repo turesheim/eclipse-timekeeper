@@ -134,9 +134,9 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 		String[] headings = new String[7];
 		WeekFields weekFields = WeekFields.of(Locale.getDefault());
 		// Current day in the week
-		int day = date.get(weekFields.dayOfWeek());
+		long day = date.get(weekFields.dayOfWeek());
 		// First date of the week
-		LocalDate first = date.minusDays(day - 1);
+		LocalDate first = date.minusDays(day - 1l);
 		for (int i = 0; i < 7; i++) {
 			headings[i] = formatter.format(first);
 			first = first.plusDays(1);

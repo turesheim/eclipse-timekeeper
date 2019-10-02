@@ -159,9 +159,9 @@ public class WorkWeek {
 		dates = new LocalDate[7];
 		WeekFields weekFields = WeekFields.of(Locale.getDefault());
 		// Current day in the week
-		int day = firstDayOfWeek.get(weekFields.dayOfWeek());
+		long day = firstDayOfWeek.get(weekFields.dayOfWeek());
 		// First date of the week
-		LocalDate first = firstDayOfWeek.minusDays(day - 1);
+		LocalDate first = firstDayOfWeek.minusDays(day - 1l);
 		for (int i = 0; i < 7; i++) {
 			dates[i] = first;
 			first = first.plusDays(1);
