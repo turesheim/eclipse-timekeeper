@@ -315,7 +315,7 @@ public class TemplatePreferencePage extends PreferencePage implements IWorkbench
 		// serialize the list of templates to a string and store it in the preferences
 		try (ByteArrayOutputStream out = new ByteArrayOutputStream();
 				ObjectOutputStream oos = new ObjectOutputStream(out)) {
-			java.util.List<ReportTemplate> saveTemplates = new ArrayList<>();
+			ArrayList<ReportTemplate> saveTemplates = new ArrayList<>();
 			templates.values().forEach(t -> saveTemplates.add(t));
 			oos.writeObject(saveTemplates);
 			String encoded = Base64.getEncoder().encodeToString(out.toByteArray());
