@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <?pde?>
-<!-- generated with https://github.com/mbarbero/fr.obeo.releng.targetplatform -->
-<target name="Eclipse Timekeeper Target Platform" sequenceNumber="1567631574">
+<!-- generated with https://github.com/eclipse-cbi/targetplatform-dsl -->
+<target name="Eclipse Timekeeper Target Platform" sequenceNumber="1570022577">
   <locations>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
-      <unit id="org.eclipse.equinox.p2.sdk.feature.group" version="3.11.400.v20190516-1504"/>
-      <unit id="org.eclipse.sdk.feature.group" version="4.12.0.v20190605-1801"/>
-      <unit id="org.eclipse.pde.core" version="3.13.0.v20190513-1223"/>
-      <unit id="org.eclipse.emf.ecore" version="2.18.0.v20190528-0845"/>
+      <unit id="org.eclipse.equinox.p2.sdk.feature.group" version="3.11.500.v20190903-0934"/>
+      <unit id="org.eclipse.sdk.feature.group" version="4.13.0.v20190916-1323"/>
+      <unit id="org.eclipse.pde.core" version="3.13.100.v20190830-1158"/>
+      <unit id="org.eclipse.emf.ecore" version="2.19.0.v20190822-1451"/>
       <unit id="org.eclipse.emf.ecore.xmi" version="2.16.0.v20190528-0725"/>
       <unit id="org.eclipse.emf.ecore.change" version="2.14.0.v20190528-0725"/>
-      <unit id="org.eclipse.emf.common" version="2.16.0.v20190528-0845"/>
+      <unit id="org.eclipse.emf.common" version="2.16.0.v20190625-1131"/>
       <unit id="org.apache.log4j" version="1.2.15.v201012070815"/>
       <unit id="org.apache.commons.collections" version="3.2.2.v201511171945"/>
-      <repository location="http://download.eclipse.org/releases/2019-06/"/>
+      <repository location="http://download.eclipse.org/releases/2019-09/"/>
     </location>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
       <unit id="org.eclipse.swtbot.forms.source.feature.group" version="2.8.0.201906121535"/>
@@ -30,7 +30,7 @@
       <unit id="org.eclipse.mylyn.bugzilla.core" version="3.25.0.v20190128-2356"/>
       <unit id="org.eclipse.mylyn.commons.ui" version="3.25.0.v20180706-1510"/>
       <unit id="org.eclipse.mylyn.bugzilla_feature.feature.group" version="3.25.0.v20190128-2356"/>
-      <repository location="https://download.eclipse.org/mylyn/releases/3.25/"/>
+      <repository location="https://download.eclipse.org/mylyn/releases/latest/"/>
     </location>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
       <unit id="com.atlassian.connector.eclipse.feature.group" version="3.2.5.v20150427"/>
@@ -40,22 +40,22 @@
       <unit id="javax.persistence" version="2.2.1.v201807122140"/>
       <unit id="javax.activation" version="1.1.0.v201108011116"/>
       <unit id="javax.xml.bind" version="2.2.12.v201410011542"/>
-      <unit id="org.eclipse.persistence.core" version="2.7.5.v20190826-74490fb827"/>
-      <unit id="org.eclipse.persistence.jpa" version="2.7.5.v20190826-74490fb827"/>
-      <unit id="org.eclipse.persistence.jpa.jpql" version="2.7.5.v20190826-74490fb827"/>
+      <unit id="org.eclipse.persistence.core" version="2.7.5.v20191001-428561e69a"/>
+      <unit id="org.eclipse.persistence.jpa" version="2.7.5.v20191001-428561e69a"/>
+      <unit id="org.eclipse.persistence.jpa.jpql" version="2.7.5.v20191001-428561e69a"/>
       <unit id="org.eclipse.persistence.asm" version="6.2.0.v201808041654"/>
       <repository location="https://download.eclipse.org/rt/eclipselink/nightly-updates/"/>
     </location>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
       <unit id="org.eclipse.gemini.jpa" version="1.2.0.M1"/>
-      <repository location="https://download.eclipse.org/gemini/jpa/updates/1.2.0-M1"/>
+      <repository location="https://download.eclipse.org/gemini/jpa/updates/"/>
     </location>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
       <unit id="org.slf4j.api" version="1.7.10.v20170428-1633"/>
       <unit id="ch.qos.logback.slf4j" version="1.1.2.v20160301-0943"/>
       <unit id="ch.qos.logback.classic" version="1.1.2.v20171220-1825"/>
       <unit id="ch.qos.logback.core" version="1.1.2.v20160208-0839"/>
-      <repository location="http://download.eclipse.org/tools/orbit/downloads/drops/I20190602181010/repository"/>
+      <repository location="https://download.eclipse.org/tools/orbit/downloads/drops/R20190827152740/repository"/>
     </location>
   </locations>
 </target>

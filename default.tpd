@@ -1,7 +1,7 @@
 target "Eclipse Timekeeper Target Platform" with source requirements
 
 // Base dependencies
-location "http://download.eclipse.org/releases/2019-06/" {
+location "http://download.eclipse.org/releases/2019-09/" {
     org.eclipse.equinox.p2.sdk.feature.group
     org.eclipse.sdk.feature.group
     org.eclipse.pde.core
@@ -22,8 +22,8 @@ location "http://download.eclipse.org/technology/swtbot/releases/2.8.0/" {
     org.hamcrest.core
 }
 
-// Mylyn bits, 2019-6-28 release for Eclipse 4.11 and 4.12
-location "https://download.eclipse.org/mylyn/releases/3.25/" {
+// Mylyn bits
+location "https://download.eclipse.org/mylyn/releases/latest/" {
     org.eclipse.mylyn.tasks.core
     org.eclipse.mylyn.tasks.ui
     org.apache.commons.lang
@@ -39,7 +39,7 @@ location "http://update.atlassian.com/atlassian-eclipse-plugin/rest/e3.7/" {
 }
 
 // EclipseLink for persistence
-// 2.7.3 appears to be broken, 
+// 2.7.3 appears to be broken so the nightly builds are used
 location "https://download.eclipse.org/rt/eclipselink/nightly-updates/" {
 	javax.persistence
 	javax.activation
@@ -50,11 +50,11 @@ location "https://download.eclipse.org/rt/eclipselink/nightly-updates/" {
 	org.eclipse.persistence.asm [6.2.0,7.0.0)
 }
 
-location "https://download.eclipse.org/gemini/jpa/updates/1.2.0-M1" {
-    org.eclipse.gemini.jpa
+location "https://download.eclipse.org/gemini/jpa/updates/" {
+    org.eclipse.gemini.jpa [1.2.0,2.0.0)
 }
 
-location "http://download.eclipse.org/tools/orbit/downloads/drops/I20190602181010/repository" {
+location "https://download.eclipse.org/tools/orbit/downloads/drops/R20190827152740/repository" {
 	org.slf4j.api
 	ch.qos.logback.slf4j
 	ch.qos.logback.classic
