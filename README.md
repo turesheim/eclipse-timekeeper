@@ -1,4 +1,4 @@
-# Timekeeper for Eclipse [![Build Status](https://travis-ci.org/turesheim/eclipse-timekeeper.svg?branch=master)](https://travis-ci.org/turesheim/eclipse-timekeeper)
+# Timekeeper for Eclipse [![Build Status](https://travis-ci.org/turesheim/eclipse-timekeeper.svg?branch=master)](https://travis-ci.org/turesheim/eclipse-timekeeper) [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=turesheim_eclipse-timekeeper&metric=alert_status)](https://sonarcloud.io/dashboard/index/turesheim_eclipse-timekeeper)
 
 This is a simple time-tracking plug-in integrating with [Eclipse Mylyn](http://eclipse.org/mylyn/) Tasks.
 
