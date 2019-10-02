@@ -62,7 +62,8 @@ public class TrackedTask implements Serializable {
 	private static final String LOCAL_REPO_KEY_ID = "net.resheim.eclipse.timekeeper.repo-id"; //$NON-NLS-1$
 
 	private static final long serialVersionUID = 2025738836825780128L;
-	
+
+	@Transient
 	private Lock lock = new ReentrantLock();
 
 	@Id
