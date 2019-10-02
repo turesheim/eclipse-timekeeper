@@ -13,6 +13,11 @@
 
 	<artifactId>net.resheim.eclipse.timekeeper.ui</artifactId>
 	<packaging>eclipse-plugin</packaging>
+	
+	<properties>
+		<!-- We currently have no UI tests and no plans to add any -->
+		<sonar.coverage.exclusions>**/*.java</sonar.coverage.exclusions>
+	</properties>
 
     <dependencies>
         <dependency>
