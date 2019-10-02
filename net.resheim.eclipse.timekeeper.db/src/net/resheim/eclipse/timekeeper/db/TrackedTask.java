@@ -77,23 +77,22 @@ public class TrackedTask implements Serializable {
 	@Convert(converter = LocalDateTimeAttributeConverter.class)
 	@Column(name = "TICK")
 	private LocalDateTime tick;
-	
+
 	@OneToMany(cascade = javax.persistence.CascadeType.ALL)
 	private List<Activity> activities;
-		
+
 	@Transient
 	private ITask task;
-		
+
 	protected TrackedTask() {
 		activities = new ArrayList<>();
 	}
 
 	/**
-	 * Creates a new tracked task and associates the instance with the given
-	 * Mylyn task.
+	 * Creates a new tracked task and associates the instance with the given Mylyn
+	 * task.
 	 * 
-	 * @param task
-	 *            the associated Mylyn task
+	 * @param task the associated Mylyn task
 	 */
 	public TrackedTask(ITask task) {
 		this();
@@ -125,23 +124,23 @@ public class TrackedTask implements Serializable {
 	/**
 	 * Ends the current activity.
 	 * 
-	 * @param time
-	 *            the date and time the activity was ended
+	 * @param time the date and time the activity was ended
 	 * @return the current activity
 	 * @see #startActivity()
 	 * @see #endActivity()
 	 */
 	public void endActivity(LocalDateTime time) {
-		if (currentActivity !=null) {
+		if (currentActivity != null) {
 			synchronized (currentActivity) {
 				currentActivity.setEnd(LocalDateTime.now());
 				currentActivity = null;
 			}
 		}
 	}
+
 	/**
-	 * Returns a list of all activities associated with this task. These may
-	 * span over several days, months or be concentrated to one single day.
+	 * Returns a list of all activities associated with this task. These may span
+	 * over several days, months or be concentrated to one single day.
 	 * 
 	 * @return
 	 */
@@ -160,27 +159,23 @@ public class TrackedTask implements Serializable {
 
 	/**
 	 * Returns the duration of work on this task at the given date. This is
-	 * accumulated from all the recorded activities between 00:00 and 23:59 on
-	 * that day.
+	 * accumulated from all the recorded activities between 00:00 and 23:59 on that
+	 * day.
 	 * 
-	 * @param date
-	 *            the date to get duration for
+	 * @param date the date to get duration for
 	 * @return the total duration of work on the date
 	 */
 	public Duration getDuration(LocalDate date) {
 		Duration total = Duration.ZERO;
 		// sum up the duration
-		return getActivities()
-				.stream()
-				.map(a -> a.getDuration(date))
-				.reduce(total, new BinaryOperator<Duration>() {
-					@Override
-					public Duration apply(Duration t, Duration u) {
-						return t.plus(u);
-					}
+		return getActivities().stream().map(a -> a.getDuration(date)).reduce(total, new BinaryOperator<Duration>() {
+			@Override
+			public Duration apply(Duration t, Duration u) {
+				return t.plus(u);
+			}
 		});
 	}
-	
+
 	/**
 	 * Returns the last time the task was active and not idle
 	 * 
@@ -191,9 +186,9 @@ public class TrackedTask implements Serializable {
 	}
 
 	/**
-	 * Migrates time tracking data from the Mylyn key-value store to the
-	 * database. A new {@link TrackedTask} will be created and {@link Activity}
-	 * instances for each of the days work has been done on the task.
+	 * Migrates time tracking data from the Mylyn key-value store to the database. A
+	 * new {@link TrackedTask} will be created and {@link Activity} instances for
+	 * each of the days work has been done on the task.
 	 */
 	public void migrate() {
 		ITask task = (this.task) == null ? TimekeeperPlugin.getDefault().getTask(this) : this.task;
@@ -220,8 +215,7 @@ public class TrackedTask implements Serializable {
 	/**
 	 * Associates given Mylyn Task with this instance.
 	 * 
-	 * @param task
-	 *            the Mylyn task
+	 * @param task the Mylyn task
 	 */
 	void setTask(ITask task) {
 		// associate this tracked task with the Mylyn task
@@ -229,7 +223,7 @@ public class TrackedTask implements Serializable {
 		taskId = task.getTaskId();
 		repositoryUrl = getRepositoryUrl(task);
 
-		// we have an old fashioned value here. migrate the old data 
+		// we have an old fashioned value here. migrate the old data
 		if (task.getAttribute(TimekeeperPlugin.KEY_VALUELIST_ID) != null) {
 			try {
 				migrate();
@@ -240,37 +234,36 @@ public class TrackedTask implements Serializable {
 	}
 
 	/**
-	 * This method will return the repository URL for tasks in repositories that
-	 * are not local. If the task is in a local repository, the Timekeeper
-	 * repository identifier is returned if it exists. If it does not exist, it
-	 * will be created, associated with the repository and returned.
+	 * This method will return the repository URL for tasks in repositories that are
+	 * not local. If the task is in a local repository, the Timekeeper repository
+	 * identifier is returned if it exists. If it does not exist, it will be
+	 * created, associated with the repository and returned.
 	 * 
-	 * @param task
-	 *            the task to get the repository URL for
+	 * @param task the task to get the repository URL for
 	 * @return the repository URL or {@link UUID}
 	 */
 	public static String getRepositoryUrl(ITask task) {
 		String url = task.getRepositoryUrl();
-		if (LOCAL_REPO_ID.equals(task.getRepositoryUrl())){
+		if (LOCAL_REPO_ID.equals(task.getRepositoryUrl())) {
 			IRepositoryManager repositoryManager = TasksUi.getRepositoryManager();
 			if (repositoryManager == null) { // may happen during testing
 				return LOCAL_REPO_ID;
-			}			
-			TaskRepository repository = repositoryManager.getRepository(task.getConnectorKind(), task.getRepositoryUrl());
+			}
+			TaskRepository repository = repositoryManager.getRepository(task.getConnectorKind(),
+					task.getRepositoryUrl());
 			String id = repository.getProperty(LOCAL_REPO_KEY_ID);
 			if (id == null) {
-				id = TaskRepositoryManager.PREFIX_LOCAL+UUID.randomUUID().toString();
+				id = TaskRepositoryManager.PREFIX_LOCAL + UUID.randomUUID().toString();
 				repository.setProperty(LOCAL_REPO_KEY_ID, id);
 			}
 			url = id;
 		}
 		return url;
 	}
-	
 
 	/**
 	 * Sets the last time the task was active while the user was not idle.
-
+	 * 
 	 * @param tick the tick time
 	 */
 	public void setTick(LocalDateTime tick) {
@@ -319,9 +312,9 @@ public class TrackedTask implements Serializable {
 	}
 
 	/**
-	 * Returns the referenced {@link ITask} if available. If not, it can be
-	 * obtained from {@link TimekeeperPlugin#getTask(TrackedTask)} which will
-	 * examine the Mylyn task repository.
+	 * Returns the referenced {@link ITask} if available. If not, it can be obtained
+	 * from {@link TimekeeperPlugin#getTask(TrackedTask)} which will examine the
+	 * Mylyn task repository.
 	 * 
 	 * @return the {@link ITask} or <code>null</code>
 	 */

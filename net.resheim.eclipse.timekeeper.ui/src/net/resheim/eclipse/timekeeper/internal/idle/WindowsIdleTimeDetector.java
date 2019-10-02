@@ -27,15 +27,14 @@ import com.sun.jna.Structure;
 
 /**
  * Instances of this class provide the computer idle time on a Windows system.
+ *
  * @author Laurent Cohen
  */
-public class WindowsIdleTimeDetector implements IdleTimeDetector
-{
+public class WindowsIdleTimeDetector implements IdleTimeDetector {
 	/**
 	 * LastInputInfo structure definition.
 	 */
-	public static class LastInputInfo extends Structure
-	{
+	public static class LastInputInfo extends Structure {
 		/**
 		 * The size of this structure.
 		 */
@@ -55,15 +54,17 @@ public class WindowsIdleTimeDetector implements IdleTimeDetector
 	/**
 	 * Wrapper for JNI calls to the user32 Windows library.
 	 */
-	public interface User32 extends Library
-	{
+	public interface User32 extends Library {
 		/**
 		 * Instance of the User32 library bindings.
 		 */
 		User32 INSTANCE = (User32) Native.loadLibrary("user32", User32.class);
+
 		/**
 		 * Query the time of last activity.
-		 * @param info the structure in which the last activity time is stored.
+		 *
+		 * @param info
+		 *            the structure in which the last activity time is stored.
 		 * @return BOOL return code.
 		 */
 		int GetLastInputInfo(LastInputInfo info);
@@ -72,17 +73,19 @@ public class WindowsIdleTimeDetector implements IdleTimeDetector
 	/**
 	 * Wrapper for JNI calls to the kernel32 Windows library.
 	 */
-	public interface Kernel32 extends Library
-	{
+	public interface Kernel32 extends Library {
 		/**
 		 * Wrapper for the native library.
 		 */
 		Kernel32 INSTANCE = (Kernel32) Native.loadLibrary("kernel32", Kernel32.class);
 
 		/**
-		 * Retrieves the number of milliseconds that have elapsed since the system was started.
+		 * Retrieves the number of milliseconds that have elapsed since the
+		 * system was started.
+		 *
 		 * @see http://msdn2.microsoft.com/en-us/library/ms724408.aspx
-		 * @return number of milliseconds that have elapsed since the system was started.
+		 * @return number of milliseconds that have elapsed since the system was
+		 *         started.
 		 */
 		int GetTickCount();
 	}
@@ -91,8 +94,7 @@ public class WindowsIdleTimeDetector implements IdleTimeDetector
 	 * {@inheritDoc}
 	 */
 	@Override
-	public long getIdleTimeMillis()
-	{
+	public long getIdleTimeMillis() {
 		LastInputInfo lastInputInfo = new LastInputInfo();
 		User32.INSTANCE.GetLastInputInfo(lastInputInfo);
 		return Kernel32.INSTANCE.GetTickCount() - lastInputInfo.dwTime;

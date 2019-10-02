@@ -23,19 +23,19 @@ import com.sun.jna.Native;
 
 /**
  * Instances of this class provide the computer idle time on a Mac system.
+ *
  * @author Laurent Cohen
  */
-public class MacIdleTimeDetector implements IdleTimeDetector
-{
+public class MacIdleTimeDetector implements IdleTimeDetector {
 	/**
 	 * Wraps the interactions with the native library.
 	 */
-	public interface ApplicationServices extends Library
-	{
+	public interface ApplicationServices extends Library {
 		/**
 		 * Wrapper for the native library.
 		 */
-		ApplicationServices INSTANCE = (ApplicationServices) Native.loadLibrary("ApplicationServices", ApplicationServices.class);
+		ApplicationServices INSTANCE = (ApplicationServices) Native.loadLibrary("ApplicationServices",
+				ApplicationServices.class);
 		/**
 		 * The type for any mouse or keyboard input event.
 		 */
@@ -54,9 +54,15 @@ public class MacIdleTimeDetector implements IdleTimeDetector
 		int KCG_EVENT_SOURCE_STATE_COMBINED_SESSION_STATE = 0;
 
 		/**
-		 * Returns the elapsed time since the last event for a Quartz event source.
-		 * @param sourceStateId the source state to access.
-		 * @param eventType the event type to access. To get the elapsed time since the previous input event: keyboard, mouse, or tablet, specify KCG_ANY_INPUT_EVENT_TYPE.
+		 * Returns the elapsed time since the last event for a Quartz event
+		 * source.
+		 *
+		 * @param sourceStateId
+		 *            the source state to access.
+		 * @param eventType
+		 *            the event type to access. To get the elapsed time since
+		 *            the previous input event: keyboard, mouse, or tablet,
+		 *            specify KCG_ANY_INPUT_EVENT_TYPE.
 		 * @return the elapsed seconds since the last input event.
 		 * @see http://developer.apple.com/mac/library/documentation/Carbon/Reference/QuartzEventServicesRef/Reference/reference.html#//apple_ref/c/func/CGEventSourceSecondsSinceLastEventType
 		 */
@@ -67,10 +73,10 @@ public class MacIdleTimeDetector implements IdleTimeDetector
 	 * {@inheritDoc}
 	 */
 	@Override
-	public long getIdleTimeMillis()
-	{
+	public long getIdleTimeMillis() {
 		double idleTimeSeconds = ApplicationServices.INSTANCE.CGEventSourceSecondsSinceLastEventType(
-				ApplicationServices.KCG_EVENT_SOURCE_STATE_COMBINED_SESSION_STATE, ApplicationServices.KCG_ANY_INPUT_EVENT_TYPE);
+				ApplicationServices.KCG_EVENT_SOURCE_STATE_COMBINED_SESSION_STATE,
+				ApplicationServices.KCG_ANY_INPUT_EVENT_TYPE);
 		return (long) (idleTimeSeconds * 1000);
 	}
 }

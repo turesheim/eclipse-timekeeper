@@ -25,8 +25,9 @@ public class TrackedTaskId implements Serializable {
 
 	@Column(name = "TASK_ID")
 	private String taskId;
-	
-	public TrackedTaskId(){}
+
+	public TrackedTaskId() {
+	}
 
 	public TrackedTaskId(String repositoryUrl, String taskId) {
 		super();
@@ -40,14 +41,14 @@ public class TrackedTaskId implements Serializable {
 		int result = 1;
 		result = result * prime + repositoryUrl.hashCode();
 		result = result * prime + taskId.hashCode();
-		return result;	
+		return result;
 	}
 
 	@Override
 	public boolean equals(Object obj) {
-		if (obj instanceof TrackedTaskId){
-			TrackedTaskId other = (TrackedTaskId)obj;
-			return other.getRepositoryUrl().equals(getRepositoryUrl()) && other.getTaskId().equals(getTaskId());				
+		if (obj instanceof TrackedTaskId) {
+			TrackedTaskId other = (TrackedTaskId) obj;
+			return other.getRepositoryUrl().equals(getRepositoryUrl()) && other.getTaskId().equals(getTaskId());
 		}
 		return false;
 	}
@@ -55,7 +56,6 @@ public class TrackedTaskId implements Serializable {
 	public String getRepositoryUrl() {
 		return repositoryUrl;
 	}
-
 
 	public String getTaskId() {
 		return taskId;

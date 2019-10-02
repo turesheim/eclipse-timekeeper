@@ -30,7 +30,7 @@ import net.resheim.eclipse.timekeeper.ui.commands.TemplateExportHandler;
  * Creates a menu for exporting data from the currently week to various formats
  * determined by the actual templates available. There are two sub-menus, one
  * for saving to a file and another for copying to the paste buffer.
- * 
+ *
  * @author Torkild U. Resheim
  */
 public class TemplateExportMenu extends ExtensionContributionFactory {
@@ -58,11 +58,9 @@ public class TemplateExportMenu extends ExtensionContributionFactory {
 		Map<String, String> parameters = new HashMap<>();
 		parameters.put(TemplateExportHandler.COMMAND_PARAMETER_TEMPLATE_NAME, name);
 		parameters.put(TemplateExportHandler.COMMAND_PARAMETER_FILE, Boolean.toString(file));
-		CommandContributionItemParameter contributionParameters =
-				new CommandContributionItemParameter(serviceLocator, null,
-						COMMAND_ID,
-						parameters, null, null, null, name, null, null,
-						CommandContributionItem.STYLE_PUSH, null, false);
+		CommandContributionItemParameter contributionParameters = new CommandContributionItemParameter(serviceLocator,
+				null, COMMAND_ID, parameters, null, null, null, name, null, null, CommandContributionItem.STYLE_PUSH,
+				null, false);
 		menu.add(new CommandContributionItem(contributionParameters));
 	}
 
