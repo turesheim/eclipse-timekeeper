@@ -252,8 +252,7 @@ public class TimekeeperPlugin extends Plugin {
 				TrackedTask.class);
 		List<TrackedTask> resultList = createQuery.getResultList();
 		for (TrackedTask trackedTask : resultList) {
-			if (trackedTask.getCurrentActivity().isPresent()) {
-				Activity activity = trackedTask.getCurrentActivity().get();
+			trackedTask.getCurrentActivity().ifPresent(activity -> {
 				ITask task = trackedTask.getTask() == null ? TimekeeperPlugin.getDefault().getTask(trackedTask)
 						: trackedTask.getTask();
 				// note that the ITask may not exist in this workspace
@@ -277,7 +276,7 @@ public class TimekeeperPlugin extends Plugin {
 						end = end.plusMinutes(30);
 					}
 				}
-			}
+			});
 		}
 	}
 

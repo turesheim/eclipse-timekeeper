@@ -97,6 +97,6 @@ public class WindowsIdleTimeDetector implements IdleTimeDetector {
 	public long getIdleTimeMillis() {
 		LastInputInfo lastInputInfo = new LastInputInfo();
 		User32.INSTANCE.GetLastInputInfo(lastInputInfo);
-		return Kernel32.INSTANCE.GetTickCount() - lastInputInfo.dwTime;
+		return (long) Kernel32.INSTANCE.GetTickCount() - (long) lastInputInfo.dwTime;
 	}
 }
