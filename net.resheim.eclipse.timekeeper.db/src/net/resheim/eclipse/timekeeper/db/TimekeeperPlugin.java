@@ -63,6 +63,8 @@ import org.eclipse.persistence.jpa.PersistenceProvider;
 import org.eclipse.ui.preferences.ScopedPreferenceStore;
 import org.flywaydb.core.Flyway;
 import org.osgi.framework.BundleContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
 
@@ -74,6 +76,8 @@ import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
  */
 @SuppressWarnings("restriction")
 public class TimekeeperPlugin extends Plugin {
+	
+	Logger log = LoggerFactory.getLogger(TimekeeperPlugin.class);
 
 	public static final String BUNDLE_ID = "net.resheim.eclipse.timekeeper.db"; //$NON-NLS-1$
 
@@ -163,6 +167,11 @@ public class TimekeeperPlugin extends Plugin {
 					if (Thread.currentThread().getName().equals("WorkbenchTestable")) {
 						jdbc_url = "jdbc:h2:mem:test_mem";
 					}
+					if (System.getProperty("net.resheim.eclipse.timekeeper.db.url") != null) {
+						jdbc_url = System.getProperty("net.resheim.eclipse.timekeeper.db.url");
+						jdbc_url = getWorkspaceLocation();
+					}
+					log.info("Using database at "+jdbc_url);
 					monitor.subTask(String.format("Using database at %1$s", jdbc_url));
 
 					// baseline the database
@@ -178,7 +187,7 @@ public class TimekeeperPlugin extends Plugin {
 					props.put(PersistenceUnitProperties.JDBC_DRIVER, "org.h2.Driver");
 					props.put(PersistenceUnitProperties.JDBC_USER, "sa");
 					props.put(PersistenceUnitProperties.JDBC_PASSWORD, "");
-					props.put(PersistenceUnitProperties.LOGGING_LEVEL, "fine");
+					props.put(PersistenceUnitProperties.LOGGING_LEVEL, "info"); // fine
 					// we want Flyway to create the database, it gives us better control over
 					// migrating
 					props.put(PersistenceUnitProperties.DDL_GENERATION, "none");
@@ -230,6 +239,10 @@ public class TimekeeperPlugin extends Plugin {
 			instance = new TimekeeperPlugin();
 		}
 		return instance;
+	}
+	
+	public EntityManager getEntityManager() {
+		return entityManager;
 	}
 
 	@Override
