@@ -18,3 +18,4 @@ target/
 
 # OSX Metadata
 .DS_Store
+/images/

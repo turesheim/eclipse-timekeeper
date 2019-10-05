@@ -1,10 +1,15 @@
 language: java
 dist: trusty
-sudo: required
+sudo: false
 
-# UI-tests will only run on macOS, so we skip these here
+env:
+  global:  
+    - DISPLAY=:99.0  
+before_install:  
+  - sh -e /etc/init.d/xvfb start - sleep 10 
+
 script: 
-  - mvn clean org.jacoco:jacoco-maven-plugin:prepare-agent verify -Pskip-ui-tests -Dtycho.localArtifacts=ignore
+  - mvn clean org.jacoco:jacoco-maven-plugin:prepare-agent verify -Pother-os -Dtycho.localArtifacts=ignore
   - sonar-scanner
 jdk:
   - openjdk8
