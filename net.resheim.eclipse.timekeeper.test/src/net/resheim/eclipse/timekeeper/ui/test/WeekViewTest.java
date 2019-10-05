@@ -55,6 +55,7 @@ import org.eclipse.swtbot.swt.finder.SWTBot;
 import org.eclipse.swtbot.swt.finder.finders.UIThreadRunnable;
 import org.eclipse.swtbot.swt.finder.junit.SWTBotJunit4ClassRunner;
 import org.eclipse.swtbot.swt.finder.waits.DefaultCondition;
+import org.eclipse.swtbot.swt.finder.widgets.SWTBotMenu;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotShell;
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PartInitException;
@@ -170,7 +171,11 @@ public class WeekViewTest {
 		bot.toolbarButtonWithTooltip("Show previous week").click();
 		bot.toolbarButtonWithTooltip("Show next week").click();
 		bot.toolbarButtonWithTooltip("Show current week").click();
-		bot.toolbarDropDownButtonWithTooltip("Export selected week to clipboard").click();		
+		// copy to the clipboard using the default template
+		bot.toolbarDropDownButtonWithTooltip("Export selected week to clipboard").click();
+		// copy to the clipboard using the basic HTML template
+		bot.toolbarDropDownButtonWithTooltip("Export selected week to clipboard")
+				.menuItem("Copy as").click().menu("Basic HTML").click();
 		// Take a screenshot for documentation
 		//bot.viewByTitle(MAIN_VIEW_NAME).setFocus();
 		bot.sleep(5000);
