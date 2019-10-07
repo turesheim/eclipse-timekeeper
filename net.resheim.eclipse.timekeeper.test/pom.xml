@@ -60,32 +60,6 @@
 	<build>
 		<plugins>
 			<plugin>
-				<groupId>org.jacoco</groupId>				
-				<artifactId>jacoco-maven-plugin</artifactId>
-				<version>${jacoco.version}</version>
-				<configuration>
-					<dataFile>${project.basedir}/../target/jacoco.exec</dataFile>
-					<destFile>${project.basedir}/../target/jacoco.exec</destFile>
-					<outputDirectory>${project.basedir}/../target/</outputDirectory>
-					<append>true</append>
-				</configuration>
-				<executions>
-					<execution>
-						<id>agent</id>
-						<goals>
-							<goal>prepare-agent</goal>
-						</goals>
-					</execution>
-               		<execution>
-                    	<id>report</id>
-                    	<phase>post-integration-test</phase>
-	                    <goals>
-	                        <goal>report</goal>
-	                    </goals>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
 				<groupId>org.eclipse.tycho</groupId>
 				<artifactId>tycho-surefire-plugin</artifactId>
 				<version>${tycho.version}</version>
