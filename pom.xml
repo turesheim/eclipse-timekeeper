@@ -56,6 +56,7 @@
 		<tycho.version>1.4.0</tycho.version>
 		<tycho.scmUrl>scm:git:git://github.com/turesheim/eclipse-timekeeper.git</tycho.scmUrl>
 		<jacoco.version>0.8.4</jacoco.version>
+		<sonar.jacoco.reportPath>${project.basedir}/../target/jacoco.exec</sonar.jacoco.reportPath>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>		
@@ -138,6 +139,30 @@
 						<version>${tycho.version}</version>
 					</dependency>
 				</dependencies>
+			</plugin>
+			<plugin>
+	            <groupId>org.jacoco</groupId>
+	            <artifactId>jacoco-maven-plugin</artifactId>
+	            <version>${jacoco.version}</version>
+	            <configuration>
+	                <destFile>${sonar.jacoco.reportPath}</destFile>
+	                <append>true</append>
+	            </configuration>
+	            <inherited>true</inherited>
+	            <executions>
+	                <execution>
+	                    <goals>
+	                        <goal>prepare-agent</goal>
+	                    </goals>
+	                </execution>
+         			<execution>
+            			<id>integration-test-report</id>
+            			<phase>verify</phase>
+            			<goals>
+              				<goal>report-aggregate</goal>
+            			</goals>
+					</execution>
+          		</executions>
 			</plugin>
 		</plugins>
 	</build>

@@ -86,32 +86,6 @@
 					</execution>
 				</executions>
 			</plugin>
-			<plugin>
-				<groupId>org.jacoco</groupId>				
-				<artifactId>jacoco-maven-plugin</artifactId>
-				<version>${jacoco.version}</version>
-				<configuration>
-					<dataFile>${project.build.directory}/jacoco.exec</dataFile>
-					<destFile>${project.build.directory}/jacoco.exec</destFile>
-					<outputDirectory>${project.build.directory}/jacoco</outputDirectory>
-					<append>true</append>
-				</configuration>
-				<executions>
-					<execution>
-						<id>agent</id>
-						<goals>
-							<goal>prepare-agent</goal>
-						</goals>
-					</execution>
-               		<execution>
-                    	<id>report</id>
-                    	<phase>post-integration-test</phase>
-	                    <goals>
-	                        <goal>report</goal>
-	                    </goals>
-					</execution>
-				</executions>
-			</plugin>
 		</plugins>
 	</build>
 </project>
