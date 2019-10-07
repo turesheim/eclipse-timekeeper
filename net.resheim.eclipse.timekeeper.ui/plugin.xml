@@ -85,8 +85,11 @@
       </menuContribution>
       <menuContribution
             allPopups="false"
-            class="net.resheim.eclipse.timekeeper.ui.export.TemplateExportMenu"
             locationURI="menu:export">
+         <dynamic
+               class="net.resheim.eclipse.timekeeper.ui.export.TemplateExportMenu"
+               id="net.resheim.eclipse.timekeeper.ui.dynamicTemplateMenu">
+         </dynamic>
       </menuContribution>
    </extension>
    <extension
