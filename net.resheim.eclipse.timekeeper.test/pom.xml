@@ -63,11 +63,11 @@
 				<groupId>org.jacoco</groupId>				
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>${jacoco.version}</version>
+				<!-- Generate coverage for the integration tests -->
 				<configuration>
-					<dataFile>${project.basedir}/../target/jacoco.exec</dataFile>
-					<destFile>${project.basedir}/../target/jacoco.exec</destFile>
-					<outputDirectory>${project.basedir}/../target/</outputDirectory>
-					<append>true</append>
+					<dataFile>${project.build.directory}/jacoco-it.exec</dataFile>
+					<destFile>${project.build.directory}/jacoco-it.exec</destFile>
+					<outputDirectory>${project.build.directory}/jacoco</outputDirectory>
 				</configuration>
 				<executions>
 					<execution>
@@ -76,14 +76,19 @@
 							<goal>prepare-agent</goal>
 						</goals>
 					</execution>
-               		<execution>
-                    	<id>report</id>
-                    	<phase>post-integration-test</phase>
-	                    <goals>
-	                        <goal>report</goal>
-	                    </goals>
-					</execution>
-				</executions>
+					<!-- Generate the aggregate report -->
+         			<execution>
+            			<id>it-report</id>
+            			<phase>verify</phase>
+            			<goals>
+              				<goal>report-aggregate</goal>
+            			</goals>
+            			<configuration>
+              				<dataFileIncludes>**/jacoco-it.exec</dataFileIncludes>
+              				<outputDirectory>${project.build.directory}/jacoco</outputDirectory>
+            			</configuration>
+					</execution>				
+          		</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.eclipse.tycho</groupId>
