@@ -13,6 +13,7 @@ package net.resheim.eclipse.timekeeper.ui.views;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -108,46 +109,46 @@ class TimeEditingSupport extends EditingSupport {
 		if (element instanceof Activity) {
 			if (value instanceof String) {
 				TrackedTask trackedTask = ((Activity) element).getTrackedTask();
-				ITask task =  trackedTask.getTask() == null ? 
+				ITask task =  trackedTask.getTask() == null ?
 						TimekeeperPlugin.getDefault().getTask(trackedTask) : trackedTask.getTask();
-				LocalDateTime start = ((Activity) element).getStart();
-				// has time point or range been specified...
-				Matcher range = Pattern.compile(TIME_RANGE).matcher((String) value);
-				Matcher point = Pattern.compile(TIME_POINT).matcher((String) value);
+						LocalDateTime start = ((Activity) element).getStart();
+						// has time point or range been specified...
+						Matcher range = Pattern.compile(TIME_RANGE).matcher((String) value);
+						Matcher point = Pattern.compile(TIME_POINT).matcher((String) value);
 
-				if (range.matches()) {
-					start = start.withHour(Integer.parseInt(range.group(1)));
-					start = start.withMinute(Integer.parseInt(range.group(2)));
-					start = start.withSecond(0);
-					start = start.withNano(0);
-					((Activity) element).setStart(start);
+						if (range.matches()) {
+							start = start.withHour(Integer.parseInt(range.group(1)));
+							start = start.withMinute(Integer.parseInt(range.group(2)));
+							start = start.withSecond(0);
+							start = start.withNano(0);
+							((Activity) element).setStart(start);
 
-					// only set the end time if the task is not active,
-					// otherwise it will be reset
-					if (!trackedTask.getCurrentActivity().isPresent()
-							|| !element.equals(trackedTask.getCurrentActivity().get())) {
-						LocalDateTime end = ((Activity) element).getEnd();
-						if (end == null) {
-							end = start;
+							// only set the end time if the task is not active,
+							// otherwise it will be reset
+							if (!trackedTask.getCurrentActivity().isPresent()
+							|| !trackedTask.getCurrentActivity().equals(Optional.of(element))) {
+								LocalDateTime end = ((Activity) element).getEnd();
+								if (end == null) {
+									end = start;
+								}
+								end = end.withHour(Integer.parseInt(range.group(3)));
+								end = end.withMinute(Integer.parseInt(range.group(4)));
+								end = end.withSecond(0);
+								end = end.withNano(0);
+								// also reset the end date in want of a better solution
+								end = end.withYear(start.getYear());
+								end = end.withDayOfYear(start.getDayOfYear());
+								((Activity) element).setEnd(end);
+							}
+							update(element, task);
+
+						} else if (point.matches()) {
+							Assert.isNotNull(start);
+							start = start.withHour(Integer.parseInt(point.group(1)));
+							start = start.withMinute(Integer.parseInt(point.group(2)));
+							((Activity) element).setStart(start);
+							update(element, task);
 						}
-						end = end.withHour(Integer.parseInt(range.group(3)));
-						end = end.withMinute(Integer.parseInt(range.group(4)));
-						end = end.withSecond(0);
-						end = end.withNano(0);
-						// also reset the end date in want of a better solution
-						end = end.withYear(start.getYear());
-						end = end.withDayOfYear(start.getDayOfYear());
-						((Activity) element).setEnd(end);
-					}
-					update(element, task);
-
-				} else if (point.matches()) {
-					Assert.isNotNull(start);
-					start = start.withHour(Integer.parseInt(point.group(1)));
-					start = start.withMinute(Integer.parseInt(point.group(2)));
-					((Activity) element).setStart(start);
-					update(element, task);
-				}
 			}
 		}
 	}

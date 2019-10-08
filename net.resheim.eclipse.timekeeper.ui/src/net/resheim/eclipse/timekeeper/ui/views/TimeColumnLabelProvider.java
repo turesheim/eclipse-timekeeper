@@ -13,6 +13,7 @@ package net.resheim.eclipse.timekeeper.ui.views;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Optional;
 
 import org.eclipse.jface.preference.JFacePreferences;
 import org.eclipse.jface.resource.JFaceResources;
@@ -58,14 +59,13 @@ abstract class TimeColumnLabelProvider extends ColumnLabelProvider {
 		}
 		if (element instanceof Activity) {
 			TrackedTask trackedTask = ((Activity) element).getTrackedTask();
-			ITask task =  trackedTask.getTask() == null ?
-					TimekeeperPlugin.getDefault().getTask(trackedTask) : trackedTask.getTask();
-					if (task != null && task.isActive()) {
-						if (trackedTask.getCurrentActivity().isPresent()
-								&& trackedTask.getCurrentActivity().get().equals(element)) {
-							return JFaceResources.getFontRegistry().getBold(JFaceResources.DIALOG_FONT);
-						}
-					}
+			ITask task = trackedTask.getTask() == null ? TimekeeperPlugin.getDefault().getTask(trackedTask)
+					: trackedTask.getTask();
+			if (task != null && task.isActive()) {
+				if (trackedTask.getCurrentActivity().equals(Optional.of(element))) {
+					return JFaceResources.getFontRegistry().getBold(JFaceResources.DIALOG_FONT);
+				}
+			}
 		}
 		if (element instanceof String) {
 			String p = (String) element;

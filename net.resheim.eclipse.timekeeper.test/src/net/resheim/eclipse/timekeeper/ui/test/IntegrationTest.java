@@ -11,6 +11,7 @@
 
 package net.resheim.eclipse.timekeeper.ui.test;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -18,35 +19,16 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.util.Optional;
-
-import javax.persistence.EntityTransaction;
+import java.util.List;
 
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Logger;
-import org.eclipse.core.resources.ResourcesPlugin;
-import org.eclipse.core.runtime.NullProgressMonitor;
-import org.eclipse.mylyn.internal.tasks.core.AbstractTaskCategory;
-import org.eclipse.mylyn.internal.tasks.core.LocalTask;
-import org.eclipse.mylyn.internal.tasks.core.TaskCategory;
+import org.eclipse.jface.bindings.keys.KeyStroke;
 import org.eclipse.mylyn.internal.tasks.core.TaskList;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
-import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.SWTException;
-import org.eclipse.swt.graphics.GC;
-import org.eclipse.swt.graphics.Image;
-import org.eclipse.swt.graphics.ImageData;
-import org.eclipse.swt.graphics.ImageLoader;
-import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Control;
-import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swtbot.eclipse.finder.SWTWorkbenchBot;
 import org.eclipse.swtbot.eclipse.finder.waits.Conditions;
@@ -54,36 +36,41 @@ import org.eclipse.swtbot.eclipse.finder.widgets.SWTBotView;
 import org.eclipse.swtbot.swt.finder.SWTBot;
 import org.eclipse.swtbot.swt.finder.finders.UIThreadRunnable;
 import org.eclipse.swtbot.swt.finder.junit.SWTBotJunit4ClassRunner;
+import org.eclipse.swtbot.swt.finder.utils.SWTBotPreferences;
 import org.eclipse.swtbot.swt.finder.waits.DefaultCondition;
-import org.eclipse.swtbot.swt.finder.widgets.SWTBotMenu;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotShell;
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PartInitException;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.actions.ActionFactory;
 import org.eclipse.ui.dialogs.PreferencesUtil;
+import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 
-import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.DatabaseChangeListener;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.TrackedTask;
-import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 @SuppressWarnings("restriction")
 @RunWith(SWTBotJunit4ClassRunner.class)
-public class WeekViewTest {
+public class IntegrationTest {
 	
-	private static final Logger log = Logger.getLogger(WeekViewTest.class);
+	private static final Logger log = Logger.getLogger(IntegrationTest.class);
 	static {
 		BasicConfigurator.configure();
 	}
-	
-	private static final String MAIN_VIEW_CATEGORY = "Timekeeper";
+
+	@Rule
+	public TemporaryFolder folder = new TemporaryFolder();
+
+	private static final String TEST_MAIN_CATEGORY = "Timekeeper for Eclipse";
+	private static final String TEST_MAIN_TASK = "152: Set up test rig for user interface tests";
+	private static final String TEST_MAIN_ACTIVITY = "Add tests for the 'Workweek' view";
 	private static final String MAIN_VIEW_NAME = "Workweek";
-	private static final int RADIUS = 32;
 	private static SWTWorkbenchBot bot;
 
 	/** Location for documentation screenshots */
@@ -109,7 +96,11 @@ public class WeekViewTest {
 		
 	@BeforeClass
 	public static void beforeClass() {
+		// make sure we have a supported keyboard
+		SWTBotPreferences.KEYBOARD_LAYOUT = "EN_US";
+		
 		bot = new SWTWorkbenchBot();
+		
 		String screenshots = System.getProperty("screenshots");
 		if (screenshots == null) {
 			screenshots = "../resources/screenshots";
@@ -140,32 +131,28 @@ public class WeekViewTest {
 		log.info("Database is ready, proceeding with tests.");
 		tl = TasksUiPlugin.getTaskList();
 		closeWelcome();
+		bot.getDisplay().syncExec(() ->  {
+			// TODO: why is this required?
+			//TasksUi.getTaskActivityManager().activateTask(ttask_1.getTask());
+			TrackedTask ttask = TestUtility.createTask(tl, "Timekeeper for Eclipse", "152", "Set up test rig for user interface tests");
+			TestUtility.createActivity(1, ttask, "Rig test plug-in and make it take screenshots");
+			TestUtility.createActivity(1, ttask, "Add tests for the 'Workweek' view");
+			TestUtility.createActivity(3, ttask, "Add test for the preferences dialog");
+			TasksUi.getTaskActivityManager().activateTask(ttask.getTask());
+			bot.sleep(500);
+			TrackedTask ttask_1 = TestUtility.createTask(tl, "Eclipse Science", "1", "Eclipse Science web site");
+			TestUtility.createActivity(3, ttask_1, "Send out e-mail about GitHub repo");
+			//TimekeeperUiPlugin.getActiveTrackedTask().getCurrentActivity().get().setSummary("Add some sensible data for the screenshot");
+		});
+		// force a save of the workspace so that our save participant is triggered
+//		ResourcesPlugin.getWorkspace().save(true, new NullProgressMonitor());
+		
 	}
 		
 	@Test
-	public void testOpenWorkweekView() throws Exception {
-		log.info("Resizing shell");
-		bot.getDisplay().asyncExec(() -> bot.getDisplay().getActiveShell().setSize(1024, 400));
-		// open view
-		log.info("Opening Workweek view");
-		openViewById("net.resheim.eclipse.timekeeper.ui.views.workWeek");
+	public void testNavigateWorkweekView() throws Exception {
+		prepareWorkweekView();
 		assertTrue(bot.viewByTitle(MAIN_VIEW_NAME).isActive());
-		ActionFactory.IWorkbenchAction maximizeAction = ActionFactory.MAXIMIZE
-				.create(bot.viewByTitle(MAIN_VIEW_NAME).getViewReference().getPage().getWorkbenchWindow());
-		maximizeAction.run();
-		bot.getDisplay().syncExec(() ->  {
-			TrackedTask ttask_1 = createTask("Eclipse Science", "1", "Eclipse Science web site");
-			createActivity(ttask_1, "Send out e-mail about GitHub repo");
-			// TODO: why is this required?
-			//TasksUi.getTaskActivityManager().activateTask(ttask_1.getTask());
-			TrackedTask ttask = createTask("Timekeeper for Eclipse", "152", "Set up test rig for user interface tests");
-			createActivity(ttask, "Rig test plug-in and make it take screenshots");
-			createActivity(ttask, "Mess around for a cross-platform method for opening the preferences dialog");
-			TasksUi.getTaskActivityManager().activateTask(ttask.getTask());
-			TimekeeperUiPlugin.getActiveTrackedTask().getCurrentActivity().get().setSummary("Add some sensible data for the screenshot");
-		});
-		// force a save of the workspace so that our save participant is triggered
-		ResourcesPlugin.getWorkspace().save(true, new NullProgressMonitor());
 		// try the various toolbar buttons
 		bot.toolbarButtonWithTooltip("Show previous week").click();
 		bot.toolbarButtonWithTooltip("Show previous week").click();
@@ -175,16 +162,34 @@ public class WeekViewTest {
 		bot.toolbarDropDownButtonWithTooltip("Export selected week to clipboard").click();
 		// copy to the clipboard using the basic HTML template
 		bot.toolbarDropDownButtonWithTooltip("Export selected week to clipboard")
-				.menuItem("Copy as").click().menu("Basic HTML").click();
+				.menuItem("Copy as").click().menu("Basic HTML").click();		
 		// Take a screenshot for documentation
-		//bot.viewByTitle(MAIN_VIEW_NAME).setFocus();
-		bot.sleep(5000);
-		bot.getDisplay().syncExec(() -> takeScreenshot(bot.cTabItem(MAIN_VIEW_NAME).widget.getParent().getParent(),"workweek-view.png"));
+		bot.getDisplay().syncExec(() -> TestUtility.takeScreenshot(screenshotsDir,
+				bot.cTabItem(MAIN_VIEW_NAME).widget.getParent().getParent(), "workweek-view.png"));
+	}
+	
+	@Test
+	public void testEditTimeRange() {
+		SWTBotView view = prepareWorkweekView();
+		assertEquals(MAIN_VIEW_NAME,view.getTitle());
+		assertTrue(bot.viewByTitle(MAIN_VIEW_NAME).isActive());
+		// verify that a text field can be edited, first day of week
+		bot.tree().getTreeItem(TEST_MAIN_CATEGORY)
+			.getNode(TEST_MAIN_TASK)
+				.getNode(TEST_MAIN_ACTIVITY).select().click(1);
+		bot.text().setText("17:00-20:12");
+		bot.getDisplay().syncExec(() -> {
+			bot.text().pressShortcut(KeyStroke.getInstance(SWT.LF));	
+		});
+		String value = bot.tree().getTreeItem(TEST_MAIN_CATEGORY)
+			.getNode(TEST_MAIN_TASK)
+				.getNode(TEST_MAIN_ACTIVITY).select().cell(1);
+		assertEquals("Time range is not correctly updated", "3:12", value);
 	}
 	
 	@Test
 	public void testOpenPreferences() {
-		bot.sleep(1000);
+		prepareWorkweekView();
 		log.info("Opening preferences dialog");		
 		// WTF: Creates InvalidThreadException
 		// bot.getDisplay().syncExec(PreferencesUtil.createPreferenceDialogOn(bot.getDisplay().getActiveShell(), null, null, null)::open);
@@ -194,127 +199,49 @@ public class WeekViewTest {
 		bot.tree().getTreeItem("Timekeeper").select();
 		bot.getDisplay().syncExec(() -> {
 			Composite main = (Composite)((Composite)bot.activeShell().widget.getChildren()[0]).getChildren()[0];			
-			takeScreenshot(main.getChildren()[3], "preferences-timekeeper.png");
+			TestUtility.takeScreenshot(screenshotsDir, main.getChildren()[3], "preferences-timekeeper.png");
 		});
 		bot.tree().getTreeItem("Timekeeper").expand().getNode("Database").select();
 		bot.getDisplay().syncExec(() -> {
 			Composite main = (Composite)((Composite)bot.activeShell().widget.getChildren()[0]).getChildren()[0];
-			takeScreenshot(main.getChildren()[3], "preferences-database.png");
+			TestUtility.takeScreenshot(screenshotsDir, main.getChildren()[3], "preferences-database.png");
 		});
 		bot.tree().getTreeItem("Timekeeper").expand().getNode("Report Templates").select();
-		bot.getDisplay().syncExec(() -> {
-			bot.list().select("Default HTML");
+		bot.list().select("Default HTML");
+		bot.sleep(200);
+		bot.styledText().navigateTo(50, 10);
+		bot.sleep(100);
+		bot.getDisplay().syncExec(() -> {			
 			Composite main = (Composite)((Composite)bot.activeShell().widget.getChildren()[0]).getChildren()[0];
-			takeScreenshot(main.getChildren()[3], "preferences-templates.png");
+			TestUtility.takeScreenshot(screenshotsDir, main.getChildren()[3], "preferences-templates.png");
 		});
 		SWTBotShell activeShell = bot.activeShell();
 		activeShell.close();
 		waitUntilShellIsClosed(bot, activeShell);
 	}
-
-	private static void createActivity(TrackedTask ttask,String text) {
-		LocalDateTime now = LocalDateTime.now();
-		Activity a = new Activity(ttask,now);
-		a.setSummary(text);
-		ttask.addActivity(a);
-		a.setStart(now.minus(Duration.ofHours(1)));
-		a.setEnd(now);
-		// save the new task (do we really need to)?
-		EntityTransaction transaction = TimekeeperPlugin.getDefault().getEntityManager().getTransaction();
-		transaction.begin();
-		TimekeeperPlugin.getDefault().getEntityManager().persist(ttask);
-		transaction.commit();
-	}
-
-	private static TrackedTask createTask(String category, String id, String text) {
-		Optional<AbstractTaskCategory> o = tl.getCategories().stream().filter(c -> c.getHandleIdentifier().equals(category)).findFirst();
-		AbstractTaskCategory c = o.orElseGet(() -> {
-			TaskCategory tc = new TaskCategory(category, category);
-			tl.addCategory(tc);
-			return tc;
-		});
-		ITask task = new LocalTask(id, text);
-		tl.addTask(task, c);
-		return new TrackedTask(task);
-	}
-
-	  /**
-	 * Utility method for capturing a screenshot of a dialog or wizard window into a
-	 * file.
-	 * 
-	 * @param shell the dialog shell
-	 * @param file  the file to save the image to
+	
+	/*
+	 * This is not a UI test but we put it here as everything is nicely rigged
 	 */
-	private void takeScreenshot(final Control widget, String filename) {
-		// Grab a screenshot of the dialog shell
-		final Rectangle b = widget.getBounds();
-		int width = b.width;
-		int height = b.height;
-		
-		Rectangle m = widget.getDisplay().map(widget.getParent(), null, b);
-		final Image screenshot = new Image(widget.getDisplay(), width, height);
-		
-		GC gc = new GC(widget.getDisplay());
-		gc.copyArea(screenshot, m.x, m.y);
-		gc.dispose();
-
-		// Create drop shadow image
-		final Image image = new Image(widget.getDisplay(), width * 2, height * 2);
-		GC gc2 = new GC(image);
-		gc2.setInterpolation(SWT.HIGH);
-		gc2.setAntialias(SWT.ON);
-		int border = RADIUS / 2;
-		fillRoundRectangleDropShadow(gc2, image.getBounds(), RADIUS);
-		gc2.drawImage(screenshot, 0, 0, width, height, border, border, width * 2 - RADIUS, height * 2 - RADIUS);
-		screenshot.dispose();
-		gc2.dispose();
-		Path path = Paths.get(screenshotsDir.getAbsolutePath(), filename);
-		ImageLoader loader = new ImageLoader();
+	@Test
+	public void testExport() {
 		try {
-			// overwrite the existing file if different
-			if (path.toFile().exists()) {
-				compareImages(widget, image, path, loader);
-				screenshot.dispose();
-				return;
-			}
-			loader.data = new ImageData[] { image.getImageData() };
-			loader.save(Files.newOutputStream(path, StandardOpenOption.CREATE), SWT.IMAGE_PNG);
-			image.dispose();
+			File newFolder = folder.newFolder();
+			Path path = newFolder.toPath();
+			TimekeeperPlugin.getDefault().exportTo(path);
+			// probably don't have to verify that the content is correct as this is actually
+			// done by H2
+			Assert.assertEquals("\"TASK_ID\",\"REPOSITORY_URL\",\"TICK\",\"CURRENTACTIVITY_ID\"",
+					Files.readAllLines(path.resolve("trackedtask.csv")).get(0));
+			Assert.assertEquals(
+					"\"ID\",\"END_TIME\",\"ADJUSTED\",\"START_TIME\",\"SUMMARY\",\"TASK_ID\",\"REPOSITORY_URL\"",
+					Files.readAllLines(path.resolve("activity.csv")).get(0));
+			Assert.assertEquals("\"TASK_ID\",\"REPOSITORY_URL\",\"ACTIVITIES_ID\"",
+					Files.readAllLines(path.resolve("trackedtask_activity.csv")).get(0));
 		} catch (IOException e) {
-			log.error("Could not save image file", e);
+			throw new RuntimeException(e);
 		}
-	}
-
-	private void compareImages(final Control widget, final Image image, Path path, ImageLoader loader)
-			throws IOException {
-		try {
-			loader.load(Files.newInputStream(path, StandardOpenOption.READ));
-			Image original = new Image(widget.getDisplay(), loader.data[0]);
-
-			if (!original.getImageData().equals(image.getImageData())) {
-				loader.data = new ImageData[] { image.getImageData() };
-				loader.save(Files.newOutputStream(path, StandardOpenOption.WRITE), SWT.IMAGE_PNG);
-			}
-			original.dispose();
-		} catch (SWTException e) {
-			// probably broken image file, just continue and
-			// overwrite it
-		}
-	}
-
-	private static void fillRoundRectangleDropShadow(GC gc, Rectangle bounds, int radius) {
-		gc.setAdvanced(true);
-		gc.setAntialias(SWT.ON);
-		gc.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_BLACK));
-		gc.setAlpha(0x8f / radius);
-		for (int i = 0; i < radius; i++) {
-			Rectangle shadowBounds = new Rectangle(bounds.x + i, bounds.y + i, bounds.width - (i * 2),
-					bounds.height - (i * 2));
-			gc.fillRoundRectangle(shadowBounds.x, shadowBounds.y, shadowBounds.width, shadowBounds.height, radius * 2,
-					radius * 2);
-		}
-		gc.setAlpha(0xff);
-	}
+	}	
 
 	public static void waitUntilShellIsClosed(SWTBot bot, SWTBotShell shell) {
 		bot.waitUntil(new DefaultCondition() {
@@ -349,6 +276,20 @@ public class WeekViewTest {
 			}
 		});
 		return bot.viewById(viewId);
+	}
+
+	@SuppressWarnings("deprecation")
+	private SWTBotView prepareWorkweekView() {
+		bot.resetWorkbench();
+		bot.getDisplay().syncExec(() -> bot.getDisplay().getActiveShell().setSize(1024, 400));
+		SWTBotView view = openViewById("net.resheim.eclipse.timekeeper.ui.views.workWeek");
+		UIThreadRunnable.syncExec(bot.getDisplay(), () -> {
+			ActionFactory.IWorkbenchAction maximizeAction = ActionFactory.MAXIMIZE
+					.create(bot.viewByTitle(MAIN_VIEW_NAME).getViewReference().getPage().getWorkbenchWindow());
+			maximizeAction.run();			
+		});
+		view.setFocus();
+		return view;
 	}
 	
 }

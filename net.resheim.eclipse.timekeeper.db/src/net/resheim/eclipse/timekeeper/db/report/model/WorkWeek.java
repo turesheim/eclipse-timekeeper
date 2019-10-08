@@ -140,7 +140,7 @@ public class WorkWeek {
 			total = total.plus(tasks.stream()
 					.filter(t -> project.equals(TimekeeperPlugin.getProjectName(t)))
 					.map(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date))
-					.reduce(Duration::plus).get());			
+					.reduce(Duration::plus).orElse(Duration.ZERO));			
 		}
 		return total;
 	}
@@ -152,7 +152,7 @@ public class WorkWeek {
 		return tasks.stream()
 			.filter(t -> project.equals(TimekeeperPlugin.getProjectName(t)))
 			.map(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date))
-			.reduce(Duration::plus).get();
+			.reduce(Duration::plus).orElse(Duration.ZERO);
 	}
 
 	private void update() {

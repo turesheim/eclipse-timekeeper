@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2014-2017 Torkild U. Resheim.
+ * Copyright (c) 2014-2019 Torkild U. Resheim.
  *
  * All rights reserved. This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License v1.0 which
@@ -327,8 +327,8 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	public void start(BundleContext context) throws Exception {
 		super.start(context);
 		plugin = this;
-		consideredIdleThreshold = getPreferenceStore().getInt(PreferenceConstants.MINUTES_IDLE) * 60_000;
-		afkInterval = getPreferenceStore().getInt(PreferenceConstants.MINUTES_AWAY) * 60_000;
+		consideredIdleThreshold = getPreferenceStore().getLong(PreferenceConstants.MINUTES_IDLE) * 60_000l;
+		afkInterval = getPreferenceStore().getLong(PreferenceConstants.MINUTES_AWAY) * 60_000l;
 		afkDeactivate = getPreferenceStore().getBoolean(PreferenceConstants.DEACTIVATE_WHEN_AWAY);
 		getPreferenceStore().addPropertyChangeListener(this);
 		installTaxameter();
@@ -344,10 +344,10 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	@Override
 	public void propertyChange(PropertyChangeEvent event) {
 		if (event.getProperty().equals(PreferenceConstants.MINUTES_IDLE)) {
-			consideredIdleThreshold = Integer.parseInt(event.getNewValue().toString()) * 60_000;
+			consideredIdleThreshold = Long.parseLong(event.getNewValue().toString()) * 60_000l;
 		}
 		if (event.getProperty().equals(PreferenceConstants.MINUTES_AWAY)) {
-			afkInterval = Integer.parseInt(event.getNewValue().toString()) * 60_000;
+			afkInterval = Long.parseLong(event.getNewValue().toString()) * 60_000l;
 		}
 		if (event.getProperty().equals(PreferenceConstants.DEACTIVATE_WHEN_AWAY)) {
 			afkDeactivate = Boolean.parseBoolean(event.getNewValue().toString());
