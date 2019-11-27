@@ -310,7 +310,7 @@ public class TimekeeperPlugin extends Plugin {
 	 */
 	public TrackedTask getTask(ITask task) {
 		// this may happen if the UI asks for task details before the database is ready
-		if (entityManager == null) {
+		if (entityManager == null || !entityManager.isOpen()) {
 			return null;
 		}
 		TrackedTaskId id = new TrackedTaskId(TrackedTask.getRepositoryUrl(task), task.getTaskId());
