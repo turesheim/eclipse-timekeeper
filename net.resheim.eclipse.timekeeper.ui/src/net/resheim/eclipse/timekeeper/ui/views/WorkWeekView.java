@@ -163,6 +163,7 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void installStatusUpdater() {
+		// use Flowable here?
 		final Display display = PlatformUI.getWorkbench().getDisplay();
 		Runnable handler = new Runnable() {
 			public void run() {
@@ -353,6 +354,7 @@ public class WorkWeekView extends ViewPart {
 		statusLabel.setLayoutData(gdStatusLabel);
 
 		viewer = new TreeViewer(main, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION);
+
 		// Make the tree view provide selections
 		getSite().setSelectionProvider(viewer);
 		contentProvider = new ContentProvider();
@@ -373,6 +375,7 @@ public class WorkWeekView extends ViewPart {
 		ColumnViewerToolTipSupport.enableFor(viewer, ToolTip.NO_RECREATE);
 		tree.setHeaderVisible(true);
 		tree.setLinesVisible(true);
+		tree.setData("org.eclipse.swtbot.widget.key", "workweek-editor-tree");
 
 		// adjust column widths when view is resized
 		main.addControlListener(new ControlAdapter() {

@@ -19,11 +19,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Logger;
-import org.eclipse.jface.bindings.keys.KeyStroke;
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.mylyn.internal.tasks.core.TaskList;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.ui.TasksUi;
@@ -59,9 +58,11 @@ import net.resheim.eclipse.timekeeper.db.TrackedTask;
 @RunWith(SWTBotJunit4ClassRunner.class)
 public class IntegrationTest {
 	
+	
 	private static final Logger log = Logger.getLogger(IntegrationTest.class);
 	static {
 		BasicConfigurator.configure();
+		SWTBotPreferences.TIMEOUT = 20000;
 	}
 
 	@Rule
@@ -75,7 +76,7 @@ public class IntegrationTest {
 
 	/** Location for documentation screenshots */
 	private static File screenshotsDir;
-
+	
 	private static TaskList tl;
 	
 	// TODO: Put this to work
@@ -103,7 +104,7 @@ public class IntegrationTest {
 		
 		String screenshots = System.getProperty("screenshots");
 		if (screenshots == null) {
-			screenshots = "../resources/screenshots";
+			screenshots = "../docs/screenshots";
 		}
 		screenshotsDir = new File(screenshots);
 		if (!screenshotsDir.exists()) {
@@ -170,23 +171,26 @@ public class IntegrationTest {
 	
 	//@Test
 	public void testEditTimeRange() {
-		SWTBotView view = prepareWorkweekView();
-		assertEquals(MAIN_VIEW_NAME,view.getTitle());
-		assertTrue(bot.viewByTitle(MAIN_VIEW_NAME).isActive());
-		// verify that a text field can be edited, first day of week
-		bot.tree().getTreeItem(TEST_MAIN_CATEGORY)
-			.getNode(TEST_MAIN_TASK)
-				.getNode(TEST_MAIN_ACTIVITY).select().click(1);
-		bot.text().setText("17:00-20:12");
-		bot.getDisplay().syncExec(() -> {
-			bot.text().pressShortcut(KeyStroke.getInstance(SWT.LF));	
-		});
-		// may need a small pause here
-		bot.sleep(100);
-		String value = bot.tree().getTreeItem(TEST_MAIN_CATEGORY)
-			.getNode(TEST_MAIN_TASK)
-				.getNode(TEST_MAIN_ACTIVITY).select().cell(1);
-		assertEquals("Time range is not correctly updated", "3:12", value);
+		// ignore this test as it always fails on Travis-CI due to the bot not being able to locate the tree and gets
+		// stuck on the "Find Actions" text editor instead.
+		if (!Platform.getOS().equals(Platform.OS_LINUX)) {
+			prepareWorkweekView();
+			assertTrue(bot.viewByTitle(MAIN_VIEW_NAME).isActive());
+			// verify that a text field can be edited, first day of week
+			bot.treeWithId("workweek-editor-tree").getTreeItem(TEST_MAIN_CATEGORY)
+				.getNode(TEST_MAIN_TASK)
+					.getNode(TEST_MAIN_ACTIVITY).select().click(1);
+			bot.text().setText("17:00-20:12");
+			bot.getDisplay().syncExec(() -> {
+				//bot.text().pressShortcut(KeyStroke.getInstance(SWT.LF));
+				bot.text().pressShortcut(SWT.CR, SWT.LF);
+			});
+			log.info("Verify changed value");
+			String value = bot.treeWithId("workweek-editor-tree").getTreeItem(TEST_MAIN_CATEGORY)
+				.getNode(TEST_MAIN_TASK)
+					.getNode(TEST_MAIN_ACTIVITY).select().cell(1);
+			assertEquals("Time range is not correctly updated", "3:12", value);
+		}
 	}
 	
 	@Test
