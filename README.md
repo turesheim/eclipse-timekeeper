@@ -1,4 +1,4 @@
-# Timekeeper for Eclipse [![Build Status]
+# Timekeeper for Eclipse
 
 This is a simple time-tracking plug-in integrating with [Eclipse Mylyn](http://eclipse.org/mylyn/) Tasks.
 
