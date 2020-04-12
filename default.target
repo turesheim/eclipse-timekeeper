@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <?pde?>
 <!-- generated with https://github.com/eclipse-cbi/targetplatform-dsl -->
-<target name="Eclipse Timekeeper Target Platform" sequenceNumber="1570203852">
+<target name="Eclipse Timekeeper Target Platform" sequenceNumber="1586703377">
   <locations>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
-      <unit id="org.eclipse.equinox.p2.sdk.feature.group" version="3.11.500.v20190903-0934"/>
-      <unit id="org.eclipse.sdk.feature.group" version="4.13.0.v20190916-1323"/>
-      <unit id="org.eclipse.pde.core" version="3.13.100.v20190830-1158"/>
-      <unit id="org.eclipse.emf.ecore" version="2.19.0.v20190822-1451"/>
+      <unit id="org.eclipse.equinox.p2.sdk.feature.group" version="3.11.700.v20200222-1600"/>
+      <unit id="org.eclipse.sdk.feature.group" version="4.15.0.v20200305-0155"/>
+      <unit id="org.eclipse.pde.core" version="3.13.300.v20200217-1517"/>
+      <unit id="org.eclipse.emf.ecore" version="2.21.0.v20200127-1342"/>
       <unit id="org.eclipse.emf.ecore.xmi" version="2.16.0.v20190528-0725"/>
       <unit id="org.eclipse.emf.ecore.change" version="2.14.0.v20190528-0725"/>
-      <unit id="org.eclipse.emf.common" version="2.16.0.v20190625-1131"/>
+      <unit id="org.eclipse.emf.common" version="2.18.0.v20191225-1014"/>
       <unit id="org.apache.log4j" version="1.2.15.v201012070815"/>
       <unit id="org.apache.commons.collections" version="3.2.2.v201511171945"/>
       <unit id="javax.persistence" version="2.2.1.v201807122140"/>
@@ -20,10 +20,10 @@
       <unit id="org.eclipse.persistence.jpa" version="2.7.3.v20180807-4be1041"/>
       <unit id="org.eclipse.persistence.jpa.jpql" version="2.7.3.v20180807-4be1041"/>
       <unit id="org.eclipse.persistence.asm" version="6.2.0.v201808041549"/>
-      <unit id="org.eclipse.sdk" version="4.13.0.v20190916-1045"/>
-      <unit id="org.eclipse.platform" version="4.13.0.v20190916-1045"/>
-      <unit id="org.eclipse.equinox.executable.feature.group" version="3.8.500.v20190907-0428"/>
-      <repository location="http://download.eclipse.org/releases/2019-09/"/>
+      <unit id="org.eclipse.sdk" version="4.15.0.v20200305-0155"/>
+      <unit id="org.eclipse.platform" version="4.15.0.v20200305-0155"/>
+      <unit id="org.eclipse.equinox.executable.feature.group" version="3.8.700.v20200207-2156"/>
+      <repository location="http://download.eclipse.org/releases/2020-03/"/>
     </location>
     <location includeMode="planner" includeAllPlatforms="false" includeSource="true" includeConfigurePhase="false" type="InstallableUnit">
       <unit id="org.eclipse.swtbot.eclipse.gef.source.feature.group" version="2.8.0.201906121535"/>
