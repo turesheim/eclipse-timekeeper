@@ -12,9 +12,21 @@ The context menu and toolbar buttons can be used to browse back and forward by o
 
 See the <a href="../../wiki">wiki</a>  for more about usage.
 
+The data is now stored in a H2 SQL database, mapped to POJOs using the Java Persistence API with EclipseLink. Establishing the baseline and migration to a new version of the database is handled using Flyway, and finally; reports are generated using Apache FreeMarker.
+
+## Database configuration
+
+The Database configuration page in preferences (**Timekeeper > Database**) allows you to configure where the database for the running Eclipse instance should be kept. The default is to place it in the shared location, under `.timekeeper` in your home folder. But you can also use a workspace relative path, or even a H2 server if you have one running.
+
+<img src="https://github.com/turesheim/eclipse-timekeeper/raw/master/resources/screenshots/preferences-database.png" width="50%"/>
+
+Multiple instances of the Timekeeper can share the database as it utilizes a H2 feature called mixed mode. This will automatically start a server instance on port 9090 if more connections are needed.
+
+The Export and Import buttons are used for exactly that. CSV files, one for each table, are created once a destination folder has been selected. Note that when importing, the data is merged with what’s already in the database. So if you at some time want to start with a clean sheet, it you will have to delete the database files while no Timekeeper instance is  running.
+
 ## Installing
 
-You can install the latest * public release** from the <a href="http://marketplace.eclipse.org/content/timekeeper-eclipse">Eclipse Marketplace</a> or drag <a href="http://marketplace.eclipse.org/marketplace-client-intro?mpc_install=2196325" title="Drag and drop into a running Eclipse workspace to install Eclipse Timekeeper"><img src="https://marketplace.eclipse.org/sites/all/themes/solstice/public/images/marketplace/btn-install.png"/>
+You can install the latest **public release** from the <a href="http://marketplace.eclipse.org/content/timekeeper-eclipse">Eclipse Marketplace</a> or drag <a href="http://marketplace.eclipse.org/marketplace-client-intro?mpc_install=2196325" title="Drag and drop into a running Eclipse workspace to install Eclipse Timekeeper"><img src="https://marketplace.eclipse.org/sites/all/themes/solstice/public/images/marketplace/btn-install.png"/>
 </a> into an running Eclipse instance. The latest CI build artifacts can be found under [GitHub Actions](https://github.com/turesheim/eclipse-timekeeper/actions?query=workflow%3ABuild). In order to install from there you must download the _p2-repository_ zip file and point your Eclipse instance to that. 
 
 ## Building
@@ -33,4 +45,4 @@ This project is using [JProfiler](https://www.ej-technologies.com/products/jprof
 
 ## License
 
-Copyright © 2014-2019 Torkild Ulvøy Resheim. All rights reserved. This program and the accompanying materials are made available under the terms of the Eclipse Public License v1.0 which accompanies this distribution, and is available at http://www.eclipse.org/legal/epl-v10.html
+Copyright © 2014-2020 Torkild Ulvøy Resheim. All rights reserved. This program and the accompanying materials are made available under the terms of the Eclipse Public License v1.0 which accompanies this distribution, and is available at http://www.eclipse.org/legal/epl-v10.html
