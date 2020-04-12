@@ -37,16 +37,19 @@ public class TaskActivationListener implements ITaskActivationListener {
 
 	@Override
 	public void preTaskDeactivated(ITask task) {
+		TrackedTask ttask = TimekeeperPlugin.getDefault().getTask(task);
+		if (ttask != null) {
+			ttask.endActivity();
+		}
 	}
 
 	@Override
 	public void taskActivated(ITask task) {
-		// Do nothing
+		// no need to do anything here
 	}
 
 	@Override
 	public void taskDeactivated(ITask task) {
-		TrackedTask ttask = TimekeeperPlugin.getDefault().getTask(task);
-		ttask.endActivity();
+		// no need to do anything here
 	}
 }
