@@ -25,3 +25,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}      
+    - name: Upload p2 repository
+      uses: actions/upload-artifact@v1
+      with:
+        name: p2-repository
+        path: net.resheim.eclipse.timekeeper-site/target/repository
