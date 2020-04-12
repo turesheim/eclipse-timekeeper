@@ -1,4 +1,4 @@
-# Timekeeper for Eclipse ![https://github.com/turesheim/eclipse-timekeeper/actions?query=workflow%3ABuild](https://github.com/turesheim/eclipse-timekeeper/workflows/Build/badge.svg)
+# Timekeeper for Eclipse <a href="https://github.com/turesheim/eclipse-timekeeper/actions?query=workflow%3ABuild"><img src="https://github.com/turesheim/eclipse-timekeeper/workflows/Build/badge.svg"/>
 
 This is a simple time-tracking plug-in integrating with [Eclipse Mylyn](http://eclipse.org/mylyn/) Tasks.
 
@@ -14,8 +14,8 @@ See the <a href="../../wiki">wiki</a>  for more about usage.
 
 ## Installing
 
-You can install from the <a href="http://marketplace.eclipse.org/content/timekeeper-eclipse">Eclipse Marketplace</a> or drag <a href="http://marketplace.eclipse.org/marketplace-client-intro?mpc_install=2196325" title="Drag and drop into a running Eclipse Indigo workspace to install Eclipse Timekeeper"><img src="https://marketplace.eclipse.org/sites/all/modules/custom/marketplace/images/installbutton.png" style="border: 0px; margin:0px; padding:0px; vertical-align:bottom;"/>
-</a> into an running Eclipse instance.
+You can install the latest * public release** from the <a href="http://marketplace.eclipse.org/content/timekeeper-eclipse">Eclipse Marketplace</a> or drag <a href="http://marketplace.eclipse.org/marketplace-client-intro?mpc_install=2196325" title="Drag and drop into a running Eclipse workspace to install Eclipse Timekeeper"><img src="https://marketplace.eclipse.org/sites/all/themes/solstice/public/images/marketplace/btn-install.png"/>
+</a> into an running Eclipse instance. The latest CI build artifacts can be found under [GitHub Actions](https://github.com/turesheim/eclipse-timekeeper/actions?query=workflow%3ABuild). In order to install from there you must download the _p2-repository_ zip file and point your Eclipse instance to that. 
 
 ## Building
 
