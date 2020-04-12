@@ -151,6 +151,7 @@ public class TimekeeperPlugin extends Plugin {
 					String location = Platform.getPreferencesService().getString(BUNDLE_ID, PREF_DATABASE_LOCATION,
 							PREF_DATABASE_LOCATION_SHARED, new IScopeContext[] { InstanceScope.INSTANCE });
 					switch (location) {
+					default:
 					case PREF_DATABASE_LOCATION_SHARED:
 						jdbc_url = getSharedLocation();
 						// Fix https://github.com/turesheim/eclipse-timekeeper/issues/107
