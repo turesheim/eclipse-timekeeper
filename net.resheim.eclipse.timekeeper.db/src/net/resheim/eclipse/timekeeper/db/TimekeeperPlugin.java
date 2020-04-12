@@ -172,14 +172,14 @@ public class TimekeeperPlugin extends Plugin {
 						jdbc_url = System.getProperty("net.resheim.eclipse.timekeeper.db.url");
 						jdbc_url = getWorkspaceLocation();
 					}
-					log.info("Using database at "+jdbc_url);
+					log.info("Using database at {}",jdbc_url);
 					monitor.subTask(String.format("Using database at %1$s", jdbc_url));
 
 					// baseline the database
-					Flyway flyway = new Flyway();
-					flyway.setDataSource(jdbc_url, "sa", "");
-					flyway.setLocations("classpath:/db/");
-					flyway.setBaselineOnMigrate(true);
+					Flyway flyway = Flyway.configure()
+							.dataSource(jdbc_url, "sa", "")
+							.baselineOnMigrate(true)
+							.locations("classpath:/db/").load();
 					flyway.migrate();
 					// https://www.eclipse.org/forums/index.php?t=msg&goto=541155&
 					props.put(PersistenceUnitProperties.CLASSLOADER, TimekeeperPlugin.class.getClassLoader());
@@ -192,9 +192,7 @@ public class TimekeeperPlugin extends Plugin {
 					// we want Flyway to create the database, it gives us better control over
 					// migrating
 					props.put(PersistenceUnitProperties.DDL_GENERATION, "none");
-					entityManager = new PersistenceProvider()
-							.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
-							.createEntityManager();
+					createEntityManager(props);
 				} catch (Exception e) {
 					return new Status(IStatus.ERROR, BUNDLE_ID,
 							"Could not connect to Timekeeper database at " + jdbc_url, e);
@@ -204,23 +202,33 @@ public class TimekeeperPlugin extends Plugin {
 				return Status.OK_STATUS;
 			}
 
+
 		};
 		connectDatabaseJob.setSystem(false);
 		connectDatabaseJob.schedule();
+	}
+
+	private static synchronized void createEntityManager(Map<String, Object> props) {
+		entityManager = new PersistenceProvider()
+				.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
+				.createEntityManager();
 	}
 
 	public class WorkspaceSaveParticipant implements ISaveParticipant {
 
 		@Override
 		public void doneSaving(ISaveContext context) {
+			// nothing to do here
 		}
 
 		@Override
 		public void prepareToSave(ISaveContext context) throws CoreException {
+			// nothing to do here
 		}
 
 		@Override
 		public void rollback(ISaveContext context) {
+			// nothing to do here
 		}
 
 		@Override

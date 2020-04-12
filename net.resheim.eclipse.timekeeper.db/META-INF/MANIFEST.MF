@@ -63,7 +63,7 @@ Import-Package: net.resheim.eclipse.timekeeper.db,
  org.eclipse.osgi.service.datalocation
 Bundle-ClassPath: lib/h2-1.4.194.jar,
  lib/freemarker-2.3.27.jar,
- lib/flyway-core-5.0.7.jar,
+ lib/flyway-core-6.3.3.jar,
  .
 Bundle-ActivationPolicy: lazy
 Bundle-Activator: net.resheim.eclipse.timekeeper.db.TimekeeperPlugin
