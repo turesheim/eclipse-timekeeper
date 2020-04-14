@@ -58,7 +58,7 @@ public class WindowsIdleTimeDetector implements IdleTimeDetector {
 		/**
 		 * Instance of the User32 library bindings.
 		 */
-		User32 INSTANCE = (User32) Native.loadLibrary("user32", User32.class);
+		User32 INSTANCE = Native.load("user32", User32.class);
 
 		/**
 		 * Query the time of last activity.
@@ -77,7 +77,7 @@ public class WindowsIdleTimeDetector implements IdleTimeDetector {
 		/**
 		 * Wrapper for the native library.
 		 */
-		Kernel32 INSTANCE = (Kernel32) Native.loadLibrary("kernel32", Kernel32.class);
+		Kernel32 INSTANCE = Native.load("kernel32", Kernel32.class);
 
 		/**
 		 * Retrieves the number of milliseconds that have elapsed since the

@@ -20,8 +20,8 @@ Require-Bundle: org.eclipse.ui;bundle-version="3.109.100",
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Bundle-ActivationPolicy: lazy
 Bundle-ClassPath: .,
- lib/jna-4.1.0.jar,
- lib/jna-platform-4.1.0.jar
+ lib/jna-5.5.0.jar,
+ lib/jna-platform-5.5.0.jar
 Bundle-Vendor: Torkild U. Resheim
 Export-Package: net.resheim.eclipse.timekeeper.internal;x-friends:="net.resheim.eclipse.timekeeper.tests",
  net.resheim.eclipse.timekeeper.internal.idle;x-friends:="net.resheim.eclipse.timekeeper.tests",

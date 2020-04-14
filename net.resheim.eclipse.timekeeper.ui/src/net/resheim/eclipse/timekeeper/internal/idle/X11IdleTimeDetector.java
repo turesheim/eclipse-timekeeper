@@ -81,7 +81,7 @@ public class X11IdleTimeDetector implements IdleTimeDetector {
 		/**
 		 * Instance of the Xext library bindings.
 		 */
-		Xss INSTANCE = (Xss) Native.loadLibrary("Xss", Xss.class);
+		Xss INSTANCE = Native.load("Xss", Xss.class);
 
 		/**
 		 * Allocate a XScreensaver information structure.
