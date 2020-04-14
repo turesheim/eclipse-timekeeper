@@ -34,7 +34,7 @@ public class MacIdleTimeDetector implements IdleTimeDetector {
 		/**
 		 * Wrapper for the native library.
 		 */
-		ApplicationServices INSTANCE = (ApplicationServices) Native.loadLibrary("ApplicationServices",
+		ApplicationServices INSTANCE = Native.load("ApplicationServices",
 				ApplicationServices.class);
 		/**
 		 * The type for any mouse or keyboard input event.
