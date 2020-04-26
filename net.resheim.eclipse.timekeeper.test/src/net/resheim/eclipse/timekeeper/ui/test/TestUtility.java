@@ -31,9 +31,9 @@ import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 
-import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Activity;
+import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
 
 @SuppressWarnings("restriction")
 public class TestUtility {

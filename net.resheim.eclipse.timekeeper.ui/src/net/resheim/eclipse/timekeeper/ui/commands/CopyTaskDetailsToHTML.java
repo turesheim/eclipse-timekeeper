@@ -17,7 +17,6 @@ import org.eclipse.core.commands.ExecutionException;
 import org.eclipse.core.commands.IHandler;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
-import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.swt.dnd.Clipboard;
 import org.eclipse.swt.dnd.HTMLTransfer;
 import org.eclipse.swt.dnd.TextTransfer;
@@ -25,28 +24,30 @@ import org.eclipse.swt.dnd.Transfer;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.handlers.HandlerUtil;
 
+import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+
 public class CopyTaskDetailsToHTML extends AbstractHandler implements IHandler {
 
 	@Override
 	public Object execute(ExecutionEvent event) throws ExecutionException {
 		ISelection selection = HandlerUtil.getCurrentSelection(event);
 		Object obj = ((IStructuredSelection) selection).getFirstElement();
-		if (obj instanceof ITask) {
-			copyTaskAsHTML((ITask) obj);
+		if (obj instanceof TrackedTask) {
+			copyTaskAsHTML((TrackedTask) obj);
 		}
 		return null;
 	}
 
-	public void copyTaskAsHTML(ITask task) {
+	public void copyTaskAsHTML(TrackedTask task) {
 		StringBuilder sb = new StringBuilder();
 		String taskKey = task.getTaskId();
 		if (taskKey != null) {
-			sb.append("<a href=\"" + task.getUrl() + "\">");
+			sb.append("<a href=\"" + task.getTaskUrl() + "\">");
 			sb.append(taskKey);
 			sb.append("</a>");
 			sb.append(": ");
 		}
-		sb.append(task.getSummary());
+		sb.append(task.getTaskSummary());
 		HTMLTransfer textTransfer = HTMLTransfer.getInstance();
 		TextTransfer tt = TextTransfer.getInstance();
 		Clipboard clipboard = new Clipboard(Display.getCurrent());

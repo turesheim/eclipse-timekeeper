@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright © 2018 Torkild U. Resheim
+ * Copyright © 2018-2020 Torkild U. Resheim
  * 
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -14,33 +14,27 @@ package net.resheim.eclipse.timekeeper.db.report;
 
 import java.io.IOException;
 import java.io.StringWriter;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
-import org.eclipse.mylyn.tasks.core.ITask;
 
 import freemarker.cache.StringTemplateLoader;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
-import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
 import net.resheim.eclipse.timekeeper.db.report.model.WorkWeek;
 
 /**
- * This type us used to export timekeeper data. The format is specified by a
+ * This type us used to export Timekeeper data. The format is specified by a
  * FreeMarker template.
  * 
  * @author Torkild Ulvøy Resheim
  */
-@SuppressWarnings("restriction")
 public class TemplateExporter extends AbstractExporter {
 
 	static Configuration configuration;
@@ -56,27 +50,15 @@ public class TemplateExporter extends AbstractExporter {
 		this.reportTemplate = template;
 	}
 
-	private boolean hasData/* this week */(ITask task, LocalDate startDate) {
-		LocalDate endDate = startDate.plusDays(7);
-		TrackedTask ttask = TimekeeperPlugin.getDefault().getTask(task);
-		// this will typically only be NULL if the database has not started yet.
-		// See databaseStateChanged()
-		if (ttask == null) {
-			return false;
-		}
-		Stream<Activity> filter = ttask.getActivities().stream()
-				.filter(a -> a.getDuration(startDate, endDate) != Duration.ZERO);
-		return filter.count() > 0;
-	}
-
 	@Override
 	public String getData(LocalDate firstDateOfWeek) {
 		try {
 			Template template = configuration.getTemplate(reportTemplate.getName());
 			StringWriter out = new StringWriter();
 
-			List<ITask> filtered = TasksUiPlugin.getTaskList().getAllTasks().stream()
-					.filter(t -> hasData(t, firstDateOfWeek) || t.isActive()).collect(Collectors.toList());
+			Set<TrackedTask>filtered = TimekeeperPlugin
+					.getTasks(firstDateOfWeek)
+					.collect(Collectors.toSet());
 
 			// create the objects we're reporting on
 			List<WorkWeek> weeks = new ArrayList<>();

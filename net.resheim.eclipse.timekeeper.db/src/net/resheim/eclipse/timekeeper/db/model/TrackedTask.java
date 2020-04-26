@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright © 2016-2018 Torkild U. Resheim
+ * Copyright © 2016-2020 Torkild U. Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -8,20 +8,18 @@
  * Contributors:
  *     Torkild U. Resheim - initial API and implementation
  *******************************************************************************/
-package net.resheim.eclipse.timekeeper.db;
+package net.resheim.eclipse.timekeeper.db.model;
 
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.BinaryOperator;
 
 import javax.persistence.Column;
 import javax.persistence.Convert;
@@ -29,17 +27,19 @@ import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.IdClass;
 import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
+import javax.persistence.NamedQuery;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
 import javax.persistence.Transient;
 
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
-import org.eclipse.mylyn.internal.tasks.core.TaskRepositoryManager;
-import org.eclipse.mylyn.tasks.core.IRepositoryManager;
+import org.eclipse.mylyn.internal.tasks.core.AbstractTaskCategory;
+import org.eclipse.mylyn.internal.tasks.core.AbstractTaskContainer;
+import org.eclipse.mylyn.internal.tasks.core.RepositoryQuery;
 import org.eclipse.mylyn.tasks.core.ITask;
-import org.eclipse.mylyn.tasks.core.TaskRepository;
-import org.eclipse.mylyn.tasks.ui.TasksUi;
 
+import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConverter;
 
 /**
@@ -56,15 +56,13 @@ import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConver
 @SuppressWarnings("restriction")
 @Entity(name = "TRACKEDTASK")
 @IdClass(value = TrackedTaskId.class)
+@NamedQuery(name="TrackedTask.findAll", query="SELECT t FROM TRACKEDTASK t")
 public class TrackedTask implements Serializable {
-
-	private static final String LOCAL_REPO_ID = "local";
-	private static final String LOCAL_REPO_KEY_ID = "net.resheim.eclipse.timekeeper.repo-id"; //$NON-NLS-1$
 
 	private static final long serialVersionUID = 2025738836825780128L;
 
 	@Transient
-	private Lock lock = new ReentrantLock();
+	private transient Lock lock = new ReentrantLock();
 
 	@Id
 	@Column(name = "REPOSITORY_URL")
@@ -73,6 +71,16 @@ public class TrackedTask implements Serializable {
 	@Id
 	@Column(name = "TASK_ID")
 	private String taskId;
+
+	@ManyToOne
+	@JoinColumn(name = "PROJECT")
+	private Project project;
+	
+	@Column(name = "TASK_URL")
+	private String taskUrl;
+
+	@Column(name = "TASK_SUMMARY")
+	private String taskSummary;
 
 	@OneToOne
 	@JoinColumn(name = "CURRENTACTIVITY_ID")
@@ -85,11 +93,11 @@ public class TrackedTask implements Serializable {
 
 	@OneToMany(cascade = javax.persistence.CascadeType.ALL)
 	private List<Activity> activities;
-
+	
 	@Transient
-	private ITask task;
+	private transient ITask task;
 
-	protected TrackedTask() {
+	public TrackedTask() {
 		activities = new ArrayList<>();
 	}
 
@@ -101,7 +109,10 @@ public class TrackedTask implements Serializable {
 	 */
 	public TrackedTask(ITask task) {
 		this();
-		setTask(task);
+		setMylynTask(task);
+		if (project != null) {
+			project.addTask(this);
+		}
 	}
 
 	public void addActivity(Activity activity) {
@@ -115,15 +126,18 @@ public class TrackedTask implements Serializable {
 	 * @see #startActivity()
 	 * @see #endActivity(LocalDateTime)
 	 */
-	public void endActivity() {
+	public Activity endActivity() {
+		Activity returnActivity = null;
 		if (currentActivity != null) {
 			lock.lock();
 			if (currentActivity.getEnd() == null) {
 				currentActivity.setEnd(LocalDateTime.now());
 			}
+			returnActivity = currentActivity;
 			currentActivity = null;
 			lock.unlock();
 		}
+		return returnActivity;
 	}
 
 	/**
@@ -173,12 +187,26 @@ public class TrackedTask implements Serializable {
 	public Duration getDuration(LocalDate date) {
 		Duration total = Duration.ZERO;
 		// sum up the duration
-		return getActivities().stream().map(a -> a.getDuration(date)).reduce(total, new BinaryOperator<Duration>() {
-			@Override
-			public Duration apply(Duration t, Duration u) {
-				return t.plus(u);
-			}
-		});
+		return getActivities()
+				.stream()
+				.map(a -> a.getDuration(date))
+				.reduce(total, (t, u) -> t.plus(u));
+	}
+
+	public String getTaskUrl() {
+		return taskUrl;
+	}
+
+	public void setTaskUrl(String taskUrl) {
+		this.taskUrl = taskUrl;
+	}
+
+	public String getTaskSummary() {
+		return taskSummary;
+	}
+
+	public void setTaskSummary(String taskSummary) {
+		this.taskSummary = taskSummary;
 	}
 
 	/**
@@ -191,79 +219,36 @@ public class TrackedTask implements Serializable {
 	}
 
 	/**
-	 * Migrates time tracking data from the Mylyn key-value store to the database. A
-	 * new {@link TrackedTask} will be created and {@link Activity} instances for
-	 * each of the days work has been done on the task.
-	 */
-	public void migrate() {
-		ITask task = (this.task) == null ? TimekeeperPlugin.getDefault().getTask(this) : this.task;
-		String attribute = task.getAttribute(TimekeeperPlugin.KEY_VALUELIST_ID);
-		if (attribute == null) {
-			// nothing to migrate
-			return;
-		}
-		String[] split = attribute.split(";");
-		for (String string : split) {
-			if (string.length() > 0) {
-				String[] kv = string.split("=");
-				LocalDate parsed = LocalDate.parse(kv[0]);
-				Activity recordedActivity = new Activity(this, parsed.atStartOfDay());
-				recordedActivity.setEnd(parsed.atStartOfDay().plus(Long.parseLong(kv[1]), ChronoUnit.SECONDS));
-				addActivity(recordedActivity);
-			}
-		}
-		// clear values we won't need any longer
-		task.setAttribute(TimekeeperPlugin.KEY_VALUELIST_ID, null);
-		task.setAttribute("start", null);
-	}
-
-	/**
 	 * Associates given Mylyn Task with this instance.
 	 * 
 	 * @param task the Mylyn task
 	 */
-	void setTask(ITask task) {
+	public void setMylynTask(ITask task) {
 		// associate this tracked task with the Mylyn task
 		this.task = task;
 		taskId = task.getTaskId();
-		repositoryUrl = getRepositoryUrl(task);
+		repositoryUrl = TimekeeperPlugin.getRepositoryUrl(task);
+		taskUrl = task.getUrl();
+		taskSummary = task.getSummary();
 
-		// we have an old fashioned value here. migrate the old data
-		if (task.getAttribute(TimekeeperPlugin.KEY_VALUELIST_ID) != null) {
-			try {
-				migrate();
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+		// figure out the project name and set this
+		if (task instanceof AbstractTask) {
+			Set<AbstractTaskContainer> parentContainers = ((AbstractTask) task).getParentContainers();
+			parentContainers.forEach(p -> {
+				String projectName = null;
+				// it's a remote task
+				if (p instanceof RepositoryQuery) {
+					projectName = TimekeeperPlugin.getMylynProjectName(task);
+				}
+				// it's a local task
+				if (p instanceof AbstractTaskCategory) {
+					projectName = p.getSummary();
+				}
+				// the project is probably already in the database
+				this.setProject(TimekeeperPlugin.getProject(projectName));
+			});
 		}
-	}
 
-	/**
-	 * This method will return the repository URL for tasks in repositories that are
-	 * not local. If the task is in a local repository, the Timekeeper repository
-	 * identifier is returned if it exists. If it does not exist, it will be
-	 * created, associated with the repository and returned.
-	 * 
-	 * @param task the task to get the repository URL for
-	 * @return the repository URL or {@link UUID}
-	 */
-	public static String getRepositoryUrl(ITask task) {
-		String url = task.getRepositoryUrl();
-		if (LOCAL_REPO_ID.equals(task.getRepositoryUrl())) {
-			IRepositoryManager repositoryManager = TasksUi.getRepositoryManager();
-			if (repositoryManager == null) { // may happen during testing
-				return LOCAL_REPO_ID;
-			}
-			TaskRepository repository = repositoryManager.getRepository(task.getConnectorKind(),
-					task.getRepositoryUrl());
-			String id = repository.getProperty(LOCAL_REPO_KEY_ID);
-			if (id == null) {
-				id = TaskRepositoryManager.PREFIX_LOCAL + UUID.randomUUID().toString();
-				repository.setProperty(LOCAL_REPO_KEY_ID, id);
-			}
-			url = id;
-		}
-		return url;
 	}
 
 	/**
@@ -308,9 +293,10 @@ public class TrackedTask implements Serializable {
 	}
 
 	/**
-	 * Returns the Mylyn Tasks identifier associated with this tracked task. If it's
-	 * a local task, only the number will be returned and one would have to use the
-	 * repository to correctly identify the {@link ITask} instance.
+	 * Returns the tasks identifier associated with this tracked task. If it's a
+	 * local task, only the number will be returned and one would have to use the
+	 * repository to correctly identify the {@link ITask} instance. If the task is
+	 * linked to a Mylyn task, this task's identifier will be returned.
 	 * 
 	 * @return the task identifier
 	 */
@@ -320,13 +306,30 @@ public class TrackedTask implements Serializable {
 
 	/**
 	 * Returns the referenced {@link ITask} if available. If not, it can be obtained
-	 * from {@link TimekeeperPlugin#getTask(TrackedTask)} which will examine the
+	 * from {@link TimekeeperPlugin#getMylynTask(TrackedTask)} which will examine the
 	 * Mylyn task repository.
 	 * 
 	 * @return the {@link ITask} or <code>null</code>
 	 */
-	public ITask getTask() {
+	public ITask getMylynTask() {
 		return task;
+	}
+
+	public Project getProject() {
+		return project;
+	}
+
+	public void setProject(Project project) {
+		this.project = project;
+		this.project.addTask(this);
+	}
+	
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(taskId);
+		sb.append(": ");
+		sb.append(getTaskSummary());
+		return sb.toString();
 	}
 
 }

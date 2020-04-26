@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2014-2017 Torkild U. Resheim
+ * Copyright (c) 2014-2020 Torkild U. Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -14,9 +14,12 @@ package net.resheim.eclipse.timekeeper.ui.views;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Collections;
-import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.eclipse.jface.viewers.AbstractTreeViewer;
 import org.eclipse.jface.viewers.ITreeContentProvider;
@@ -25,10 +28,11 @@ import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.core.ITask;
 
-import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.DatabaseChangeListener;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Activity;
+import net.resheim.eclipse.timekeeper.db.model.Project;
+import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
 
 @SuppressWarnings("restriction")
 public abstract class WeekViewContentProvider implements ITreeContentProvider, DatabaseChangeListener {
@@ -37,36 +41,37 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 
 	private LocalDate firstDayOfWeek;
 
-	protected List<ITask> filtered = Collections.emptyList();
+	protected Set<TrackedTask> filtered = Collections.emptySet();
 
 	private Viewer viewer;
 
-	public List<ITask> getFiltered() {
+	public Set<TrackedTask> getFiltered() {
 		return filtered;
 	}
 
+	@Override
 	public void dispose() {
 		TimekeeperPlugin.getDefault().removeListener(this);
 	}
 
+	@Override
 	public void inputChanged(Viewer v, Object oldInput, Object newInput) {
 		this.viewer = v;
 	}
 
 	@Override
 	public Object[] getChildren(Object parentElement) {
-		if (parentElement instanceof String) {
-			String p = (String) parentElement;
-			Object[] tasks = filtered
+		if (parentElement instanceof Project) {
+			Project p = (Project) parentElement;
+			return filtered
 					.stream()
-					.filter(t -> p.equals(TimekeeperPlugin.getProjectName(t)))
-					.toArray(size -> new ITask[size]);
-			return tasks;
-		} else if (parentElement instanceof ITask) {
-			TrackedTask task = TimekeeperPlugin.getDefault().getTask((ITask) parentElement);
-			return task.getActivities()
+					.filter(t -> p.equals(t.getProject()))
+					.toArray(size -> new TrackedTask[size]);
+		}
+		if (parentElement instanceof TrackedTask) {
+			return ((TrackedTask) parentElement).getActivities()
 					.stream()
-					.filter(a -> hasData(a))
+					.filter(this::hasData)
 					.toArray();
 		}
 		return new Object[0];
@@ -75,7 +80,8 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	public Object[] getElements(Object parent) {
 		Object[] projects = filtered
 				.stream()
-				.collect(Collectors.groupingBy(t -> TimekeeperPlugin.getProjectName(t))).keySet()
+				.map(TrackedTask::getProject)
+				.filter(distinctByKey(Project::getName))
 				.toArray();
 		if (projects.length == 0) {
 			return new Object[0];
@@ -86,40 +92,28 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 		return elements;
 	}
 
+	private static <T> Predicate<T> distinctByKey(Function<? super T, Object> keyExtractor) {
+		Map<Object, Boolean> map = new ConcurrentHashMap<>();
+		return t -> map.putIfAbsent(keyExtractor.apply(t), Boolean.TRUE) == null;
+	}
+
 	@Override
 	public Object getParent(Object element) {
 		if (element instanceof ITask) {
-			return TimekeeperPlugin.getProjectName((ITask) element);
+			return TimekeeperPlugin.getMylynProjectName((ITask) element);
 		}
 		return null;
 	}
 
 	@Override
 	public boolean hasChildren(Object element) {
-		// projects are guaranteed to have tasks as children
-		if (element instanceof String) {
+		if (element instanceof TrackedTask) {
 			return true;
 		}
-		// only list tasks that has any data
-		if (element instanceof ITask) {
-			return hasData((ITask) element, firstDayOfWeek);
+		if (element instanceof Project) {
+			return true;
 		}
 		return false;
-	}
-
-	private boolean hasData/* this week */(ITask task, LocalDate startDate) {
-		LocalDate endDate = startDate.plusDays(7);
-		TrackedTask ttask = TimekeeperPlugin.getDefault().getTask(task);
-		// this will typically only be NULL if the database has not started yet.
-		// See databaseStateChanged()
-		if (ttask == null) {
-			return false;
-		}
-		Stream<Activity> filter = ttask
-				.getActivities()
-				.stream()
-				.filter(a -> a.getDuration(startDate, endDate) != Duration.ZERO);
-		return filter.count() > 0;
 	}
 
 	private boolean hasData(Activity activity) {
@@ -128,10 +122,9 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	}
 
 	protected void filter() {
-		filtered = TasksUiPlugin.getTaskList().getAllTasks()
-				.stream()
-				.filter(t -> hasData(t, getFirstDayOfWeek()) || t.isActive())
-				.collect(Collectors.toList());
+		filtered = TimekeeperPlugin
+				.getTasks(getFirstDayOfWeek())
+				.collect(Collectors.toSet());
 	}
 
 	public LocalDate getFirstDayOfWeek() {
@@ -153,6 +146,10 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 			viewer.getControl().getDisplay().asyncExec(new Runnable() {
 				@Override
 				public void run() {
+					ITask activeTask = TasksUiPlugin.getTaskActivityManager().getActiveTask();
+					if (activeTask != null) {
+						filtered.add(TimekeeperPlugin.getDefault().getTask(activeTask));
+					}
 					viewer.refresh();
 					if (viewer instanceof TreeViewer) {
 						((AbstractTreeViewer) viewer).expandAll();

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright © 2018 Torkild U. Resheim
+ * Copyright © 2018-2020 Torkild U. Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -8,7 +8,7 @@
  * Contributors:
  *     Torkild U. Resheim - initial API and implementation
  *******************************************************************************/
-package net.resheim.eclipse.timekeeper.db;
+package net.resheim.eclipse.timekeeper.db.model;
 
 import java.io.Serializable;
 
@@ -29,6 +29,13 @@ public class TrackedTaskId implements Serializable {
 	public TrackedTaskId() {
 	}
 
+	/**
+	 * Create a new primary key based on the URL and the task identifier. This
+	 * identifiers will be unique across all repositories.
+	 * 
+	 * @param repositoryUrl the task repository URL
+	 * @param taskId        the task identifier within the repository
+	 */
 	public TrackedTaskId(String repositoryUrl, String taskId) {
 		super();
 		this.repositoryUrl = repositoryUrl;

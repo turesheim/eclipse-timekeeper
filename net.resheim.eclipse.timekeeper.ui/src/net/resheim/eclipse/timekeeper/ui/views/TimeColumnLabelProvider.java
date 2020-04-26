@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2015-2017 Torkild U. Resheim
+ * Copyright (c) 2015-2020 Torkild U. Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -24,9 +24,10 @@ import org.eclipse.swt.graphics.Font;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.themes.IThemeManager;
 
-import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Activity;
+import net.resheim.eclipse.timekeeper.db.model.Project;
+import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
 
 /**
  * Provides label decorations for the columns containing time spent on each
@@ -52,28 +53,28 @@ abstract class TimeColumnLabelProvider extends ColumnLabelProvider {
 
 	@Override
 	public Font getFont(Object element) {
-		if (element instanceof ITask) {
-			if (((ITask) element).isActive()) {
+		if (element instanceof TrackedTask) {
+			if (((TrackedTask) element).getMylynTask() != null && ((TrackedTask) element).getMylynTask().isActive()) {
 				return JFaceResources.getFontRegistry().getBold(JFaceResources.DIALOG_FONT);
 			}
 		}
 		if (element instanceof Activity) {
 			TrackedTask trackedTask = ((Activity) element).getTrackedTask();
-			ITask task = trackedTask.getTask() == null ? TimekeeperPlugin.getDefault().getTask(trackedTask)
-					: trackedTask.getTask();
+			TimekeeperPlugin.getDefault();
+			ITask task = trackedTask.getMylynTask();
 			if (task != null && task.isActive()) {
 				if (trackedTask.getCurrentActivity().equals(Optional.of(element))) {
 					return JFaceResources.getFontRegistry().getBold(JFaceResources.DIALOG_FONT);
 				}
 			}
 		}
-		if (element instanceof String) {
-			String p = (String) element;
+		if (element instanceof Project) {
+			Project p = (Project) element;
 			if (contentProvider
 					.getFiltered()
 					.stream()
-					.filter(t -> p.equals(TimekeeperPlugin.getProjectName(t)))
-					.anyMatch(t -> t.isActive())) {
+					.filter(t -> p.equals(t.getProject()))
+					.anyMatch(t -> t.getMylynTask().isActive())) {
 				return JFaceResources.getFontRegistry().getBold(JFaceResources.DIALOG_FONT);
 			}
 
