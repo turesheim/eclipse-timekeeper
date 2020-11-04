@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2016-2018 Torkild Ulvøy Resheim
+ * Copyright (c) 2016-2020 Torkild Ulvøy Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -13,7 +13,6 @@ package net.resheim.eclipse.timekeeper.db;
 import static org.junit.Assert.fail;
 
 import java.time.Duration;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -27,6 +26,10 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+
+import net.resheim.eclipse.timekeeper.db.model.Activity;
+import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.TrackedTaskId;
 
 @SuppressWarnings("restriction")
 public class SharedStorageTest {
@@ -88,7 +91,7 @@ public class SharedStorageTest {
 		}
 		return null;
 	}
-	
+
 	/**
 	 * Sets a value in the Mylyn database for the specified task.
 	 *
@@ -164,43 +167,6 @@ public class SharedStorageTest {
 		transaction.commit();
 	}
 
-	/**
-	 * Creates an "old style" entry in the Mylyn store and migrates this to the new SQL database. 
-	 */
-	@Test
-	public void testMigrateFromMylynKVStore() {
-		LocalDate now = LocalDate.now();
-		accumulateTime(mylynTask, now.toString(), 3600*10);
-		accumulateTime(mylynTask, now.toString(), 3600*10); // 72 seconds today
-		accumulateTime(mylynTask, now.minusDays(1).toString(), 3600*30); // 108 seconds yesterday 
-		accumulateTime(mylynTask, now.minusMonths(1).toString(), 3600*60); // 216 seconds a month ago
-		
-		TrackedTask ttask = new TrackedTask(mylynTask);
-
-		// do the migration
-		ttask.migrate();
-
-		// store the newly created entity
-		EntityTransaction transaction = entityManager.getTransaction();
-		transaction.begin();
-		entityManager.persist(ttask);
-		transaction.commit();
-
-		// ensure that we have the correct values after migrating
-		TrackedTaskId id = new TrackedTaskId(ttask.getRepositoryUrl(), ttask.getTaskId());
-		TrackedTask dbTask = entityManager.find(TrackedTask.class, id);
-
-		if (dbTask instanceof TrackedTask) {
-			List<Activity> activities = ((TrackedTask) dbTask).getActivities();
-			Assert.assertEquals(3, activities.size());
-			TrackedTask loaded = (TrackedTask) dbTask;
-			Assert.assertEquals(72, loaded.getDuration(now).getSeconds());
-			Assert.assertEquals(108, loaded.getDuration(now.minusDays(1)).getSeconds());
-			Assert.assertEquals(216, loaded.getDuration(now.minusMonths(1)).getSeconds());
-		}
-		Assert.assertEquals(null, mylynTask.getAttribute(TimekeeperPlugin.KEY_VALUELIST_ID));
-	}
-	
 	@Test
 	public void testSimpleTaskPersistence() {
 		TrackedTask ttask = new TrackedTask(mylynTask);
@@ -223,7 +189,7 @@ public class SharedStorageTest {
 			Assert.assertEquals(Duration.ofHours(1), activity.getDuration());
 		}
 	}
-	
+
 	/**
 	 * Verifies that the duration of several activities is calculated correctly
 	 * after de-serializing from the persisted storage.

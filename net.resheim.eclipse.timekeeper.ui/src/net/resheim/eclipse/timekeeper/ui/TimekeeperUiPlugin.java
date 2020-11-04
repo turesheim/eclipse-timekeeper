@@ -40,9 +40,9 @@ import org.eclipse.ui.internal.util.BundleUtility;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
 import org.osgi.framework.BundleContext;
 
-import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Activity;
+import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
 import net.resheim.eclipse.timekeeper.internal.idle.GenericIdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.IdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.MacIdleTimeDetector;
@@ -197,7 +197,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 						ttask.endActivity(lastActive);
 						String duration = DurationFormatUtils.formatDuration(lastIdleTimeMillis, "H:mm:ss", true);
 						if (afkDeactivate) {
-							TasksUi.getTaskActivityManager().deactivateTask(ttask.getTask());
+							TasksUi.getTaskActivityManager().deactivateTask(ttask.getMylynTask());
 							MessageDialog.openInformation(Display.getCurrent().getActiveShell(),
 									"Activity automatically stopped",
 									MessageFormat.format(

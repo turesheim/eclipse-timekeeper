@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright © 2017 Torkild U. Resheim
+ * Copyright © 2017-2020 Torkild U. Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -21,8 +21,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import javax.persistence.EntityManager;
@@ -33,7 +35,6 @@ import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.LocalTask;
 import org.eclipse.mylyn.internal.tasks.core.TaskCategory;
 import org.eclipse.mylyn.internal.tasks.core.TaskList;
-import org.eclipse.mylyn.tasks.core.ITask;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -46,6 +47,8 @@ import freemarker.template.MalformedTemplateNameException;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
 import freemarker.template.TemplateNotFoundException;
+import net.resheim.eclipse.timekeeper.db.model.Activity;
+import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
 import net.resheim.eclipse.timekeeper.db.report.FormatDateTimeMethodModel;
 import net.resheim.eclipse.timekeeper.db.report.FormatDurationMethodModel;
 import net.resheim.eclipse.timekeeper.db.report.GetActivitiesMethodModel;
@@ -135,7 +138,7 @@ public class TemplateTest {
 	/**
 	 * Creates a number of tasks for use in the template test.
 	 */
-	private List<ITask> createTestTasks() {
+	private Set<TrackedTask> createTestTasks() {
 		int vi = 0;
 		int si = 0;
 		TaskList tl = new TaskList();
@@ -145,13 +148,13 @@ public class TemplateTest {
 		};
 		tl.addCategory(projects[0]);
 		tl.addCategory(projects[1]);
-		List<ITask> tasks = new ArrayList<>();
+		Set<TrackedTask> tasks = new HashSet<>();
 		// for each day of the week, create one task
 		for (int i = 1; i < 7; i++) {
 			AbstractTask mylynTask = new LocalTask(String.valueOf(i), "Task #" + i);
-			tasks.add(mylynTask);
+//			tasks.add(mylynTask);
 			tl.addTask(mylynTask, projects[i%2]);
-			TrackedTask task = new TrackedTask(mylynTask);
+			TrackedTask task = new TrackedTask();
 			// for each task, create one activity 
 			for (int d = 1; d < 3 + (d%i); d++) {
 				int offset = d + i - 2;
@@ -167,6 +170,7 @@ public class TemplateTest {
 				if (si==VERBS.length)si=0;
 			}
 			persist(task);
+			tasks.add(task);
 		}
 		return tasks;
 	}

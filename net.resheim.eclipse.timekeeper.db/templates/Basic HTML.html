@@ -43,7 +43,7 @@
 		<!-- group per project -->
 		<#list week.projects as project, tasks>
 		<tr class="project-row">
-			<td>${project}</td>
+			<td>${project.name}</td>
 			<#list week.dates as date>							
 			<td class="project-td">${formatDuration(week.getSum(project, date))}</td>
 			</#list>
@@ -51,7 +51,7 @@
 		</tr>
 		<#list tasks as task>		
 		<tr class="task-row">
-			<td>&nbsp;<#if task.url??><a href="${task.url}">${task.taskId}</a><#else>${task.taskId}</#if> :${task.summary}</td>
+			<td>&nbsp;<#if task.url??><a href="${task.url}">${task.taskId}</a><#else>${task.taskId}</#if> :${task.taskSummary}</td>
 			<#list week.dates as date><td class="project-td">${formatDuration(date, task)}</td></#list>
 			<td class="sum-td">${formatDuration(week.getSum(task))}</td>
 		</tr>

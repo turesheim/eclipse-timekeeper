@@ -6,6 +6,7 @@ Automatic-Module-Name: net.resheim.eclipse.timekeeper.db
 Bundle-Version: 2.0.0.qualifier
 Export-Package: net.resheim.eclipse.timekeeper.db,
  net.resheim.eclipse.timekeeper.db.converters,
+ net.resheim.eclipse.timekeeper.db.model,
  net.resheim.eclipse.timekeeper.db.report,
  net.resheim.eclipse.timekeeper.db.report.model,
  org.h2;x-internal:=true,

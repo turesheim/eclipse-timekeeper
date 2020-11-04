@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2014-2015 Torkild U. Resheim.
+ * Copyright (c) 2014-2020 Torkild U. Resheim.
  *
  * All rights reserved. This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License v1.0 which
@@ -17,7 +17,6 @@ import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.core.ITaskActivationListener;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.TrackedTask;
 
 public class TaskActivationListener implements ITaskActivationListener {
 
@@ -29,18 +28,12 @@ public class TaskActivationListener implements ITaskActivationListener {
 
 	@Override
 	public void preTaskActivated(ITask task) {
-		TrackedTask ttask = TimekeeperPlugin.getDefault().getTask(task);
-		if (ttask != null) {
-			ttask.startActivity();
-		}
+		TimekeeperPlugin.getDefault().startMylynTask(task);
 	}
 
 	@Override
 	public void preTaskDeactivated(ITask task) {
-		TrackedTask ttask = TimekeeperPlugin.getDefault().getTask(task);
-		if (ttask != null) {
-			ttask.endActivity();
-		}
+		TimekeeperPlugin.getDefault().endMylynTask(task);
 	}
 
 	@Override

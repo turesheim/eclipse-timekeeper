@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2014-2018 Torkild U. Resheim.
+ * Copyright (c) 2014-2020 Torkild U. Resheim.
  *
  * All rights reserved. This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License v1.0 which
@@ -19,13 +19,11 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.WeekFields;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 
 import org.apache.commons.lang.time.DurationFormatUtils;
-import org.eclipse.core.runtime.CoreException;
 import org.eclipse.jface.action.Action;
 import org.eclipse.jface.action.IMenuListener;
 import org.eclipse.jface.action.IMenuManager;
@@ -48,14 +46,10 @@ import org.eclipse.jface.viewers.ViewerComparator;
 import org.eclipse.jface.window.ToolTip;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.ITaskListChangeListener;
-import org.eclipse.mylyn.internal.tasks.core.LocalTask;
 import org.eclipse.mylyn.internal.tasks.core.TaskContainerDelta;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.core.ITaskActivationListener;
-import org.eclipse.mylyn.tasks.core.TaskRepository;
-import org.eclipse.mylyn.tasks.core.data.TaskAttribute;
-import org.eclipse.mylyn.tasks.core.data.TaskData;
 import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.mylyn.tasks.ui.TasksUiUtil;
 import org.eclipse.swt.SWT;
@@ -79,9 +73,10 @@ import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.contexts.IContextService;
 import org.eclipse.ui.part.ViewPart;
 
-import net.resheim.eclipse.timekeeper.db.Activity;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Activity;
+import net.resheim.eclipse.timekeeper.db.model.Project;
+import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 @SuppressWarnings("restriction")
@@ -247,8 +242,8 @@ public class WorkWeekView extends ViewPart {
 		private void updateWeekLabel() {
 			StringBuilder sb = new StringBuilder();
 			sb.append("Showing week ");
-			sb.append(getFirstDayOfWeek().format(weekFormat));
-			sb.append(" starting at");
+			sb.append(super.getFirstDayOfWeek().format(weekFormat));
+			sb.append(" starting on");
 			dateTimeLabel.setText(sb.toString());
 			dateChooser.setDate(getFirstDayOfWeek().getYear(), getFirstDayOfWeek().getMonthValue() - 1,
 					getFirstDayOfWeek().getDayOfMonth());
@@ -271,8 +266,6 @@ public class WorkWeekView extends ViewPart {
 	private Action doubleClickAction;
 
 	private Action deleteAction;
-
-	private MenuManager projectFieldMenu;
 
 	private TaskListener taskListener;
 
@@ -449,7 +442,7 @@ public class WorkWeekView extends ViewPart {
 				long seconds = 0;
 				LocalDate date = contentProvider.getFirstDayOfWeek().plusDays(weekday);
 				if (element instanceof String) {
-					seconds = getSum(contentProvider.getFiltered(), date, (String) element);
+					seconds = getSum(contentProvider.getFiltered(), date, (Project) element);
 				} else if (element instanceof ITask) {
 					AbstractTask task = (AbstractTask) element;
 					TrackedTask trackedTask = TimekeeperPlugin.getDefault().getTask(task);
@@ -489,16 +482,14 @@ public class WorkWeekView extends ViewPart {
 		manager.add(nextWeekAction);
 		ISelection selection = viewer.getSelection();
 		Object obj = ((IStructuredSelection) selection).getFirstElement();
-		if (obj instanceof ITask) {
+		if (obj instanceof TrackedTask) {
 			manager.add(new Separator("task"));
-			if (((ITask) obj).isActive()) {
+			if (((TrackedTask) obj).getMylynTask().isActive()) {
 				manager.add(deactivateAction);
 			} else {
 				manager.add(activateAction);
 			}
 			manager.add(newActivityAction);
-			manager.add(new Separator());
-			manager.add(projectFieldMenu);
 		}
 		if (obj instanceof Activity) {
 			Optional<Activity> currentActivity = ((Activity) obj).getTrackedTask().getCurrentActivity();
@@ -510,9 +501,7 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void fillLocalPullDown(IMenuManager manager) {
-		// manager.add(action1);
-		// manager.add(new Separator());
-		// manager.add(action2);
+		// Use to populate the local pulldown menu
 	}
 
 	private void fillLocalToolBar(IToolBarManager manager) {
@@ -538,14 +527,15 @@ public class WorkWeekView extends ViewPart {
 	 *            the date to calculate for
 	 * @return the total amount of seconds accumulated
 	 */
-	private long getSum(List<ITask> filtered, LocalDate date) {
+	private long getSum(Set<TrackedTask> filtered, LocalDate date) {
 		// May not have been initialised when first called.
 		if (filtered == null) {
 			return 0;
 		}
 		return filtered
-				.stream().filter(t -> TimekeeperPlugin.getDefault().getTask(t) != null)
-				.mapToLong(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date).getSeconds())
+				.stream()
+				//.filter(t -> TimekeeperPlugin.getDefault().getTask(t) != null)
+				.mapToLong(t -> t.getDuration(date).getSeconds())
 				.sum();
 	}
 
@@ -559,12 +549,12 @@ public class WorkWeekView extends ViewPart {
 	 *            the project to calculate for
 	 * @return the total amount of seconds accumulated
 	 */
-	private long getSum(List<ITask> filtered, LocalDate date, String project) {
+	private long getSum(Set<TrackedTask> filtered, LocalDate date, Project project) {
 		return filtered
 				.stream()
-				.filter(t -> TimekeeperPlugin.getDefault().getTask(t) != null)
-				.filter(t -> project.equals(TimekeeperPlugin.getProjectName(t)))
-				.mapToLong(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date).getSeconds())
+				.filter(t -> t != null)
+				.filter(t -> project.equals(t.getProject()))
+				.mapToLong(t -> t.getDuration(date).getSeconds())
 				.sum();
 	}
 
@@ -645,8 +635,8 @@ public class WorkWeekView extends ViewPart {
 			public void run() {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
-				if (obj instanceof ITask) {
-					TasksUiUtil.openTask((ITask) obj);
+				if (obj instanceof TrackedTask) {
+					TasksUiUtil.openTask(((TrackedTask) obj).getMylynTask());
 				}
 			}
 		};
@@ -657,8 +647,8 @@ public class WorkWeekView extends ViewPart {
 			public void run() {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
-				if (obj instanceof ITask) {
-					TasksUi.getTaskActivityManager().deactivateTask((ITask) obj);
+				if (obj instanceof TrackedTask) {
+					TasksUi.getTaskActivityManager().deactivateTask(((TrackedTask) obj).getMylynTask());
 				}
 			}
 		};
@@ -669,8 +659,8 @@ public class WorkWeekView extends ViewPart {
 			public void run() {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
-				if (obj instanceof ITask) {
-					TasksUi.getTaskActivityManager().activateTask((ITask) obj);
+				if (obj instanceof TrackedTask) {
+					TasksUi.getTaskActivityManager().activateTask(((TrackedTask) obj).getMylynTask());
 				}
 			}
 		};
@@ -681,15 +671,9 @@ public class WorkWeekView extends ViewPart {
 			public void run() {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
-				if (obj instanceof ITask) {
-					TrackedTask task = TimekeeperPlugin.getDefault().getTask((ITask) obj);
-					task.endActivity();
-					task.startActivity();
-					// the user created a new activity on an inactive task, so we assume that we
-					// should not continue to track the time.
-					if (!((ITask) obj).isActive()) {
-						task.endActivity();
-					}
+				if (obj instanceof TrackedTask) {
+					((TrackedTask) obj).endActivity();
+					((TrackedTask) obj).startActivity();
 					refresh();
 				}
 			}
@@ -713,57 +697,6 @@ public class WorkWeekView extends ViewPart {
 		deleteAction.setImageDescriptor(
 				PlatformUI.getWorkbench().getSharedImages().getImageDescriptor(ISharedImages.IMG_TOOL_DELETE));
 
-		projectFieldMenu = new MenuManager("Set grouping field", null);
-		projectFieldMenu.setRemoveAllWhenShown(true);
-		projectFieldMenu.addMenuListener(new IMenuListener() {
-
-			public void menuAboutToShow(IMenuManager manager) {
-
-				ISelection selection = viewer.getSelection();
-				if (selection instanceof IStructuredSelection) {
-					Object firstElement = ((IStructuredSelection) selection).getFirstElement();
-					if (firstElement instanceof AbstractTask) {
-						AbstractTask task = (AbstractTask) firstElement;
-						// No way to change project on local tasks
-						if (task instanceof LocalTask) {
-							return;
-						}
-						String url = task.getRepositoryUrl();
-						TaskRepository repository = TasksUiPlugin.getRepositoryManager().getRepository(url);
-						try {
-							TaskData taskData = TasksUi.getTaskDataManager().getTaskData(task);
-							List<TaskAttribute> attributesByType = taskData.getAttributeMapper().getAttributesByType(
-									taskData, TaskAttribute.TYPE_SINGLE_SELECT);
-							// customfield_10410 = subproject
-							for (TaskAttribute taskAttribute : attributesByType) {
-								final String label = taskAttribute.getMetaData().getLabel();
-								if (label != null) {
-									final String id = taskAttribute.getId();
-									Action a = new Action(label.replaceAll(":", "")) {
-										@Override
-										public void run() {
-											setProjectField(repository, id);
-										}
-
-									};
-									manager.add(a);
-								}
-							}
-							manager.add(new Separator());
-							Action a = new Action("Default") {
-								@Override
-								public void run() {
-									setProjectField(repository, null);
-								}
-							};
-							manager.add(a);
-						} catch (CoreException e) {
-							e.printStackTrace();
-						}
-					} // abstract task menu
-				}
-			}
-		});
 	}
 
 	/**
@@ -774,14 +707,6 @@ public class WorkWeekView extends ViewPart {
 		viewer.getControl().setFocus();
 		IContextService contextService = PlatformUI.getWorkbench().getService(IContextService.class);
 		contextService.activateContext("net.resheim.eclipse.timekeeper.ui.workweek");
-	}
-
-	private void setProjectField(TaskRepository repository, String string) {
-		if (null == string) {
-			repository.removeProperty(TimekeeperPlugin.KEY_VALUELIST_ID + ".grouping");
-		}
-		repository.setProperty(TimekeeperPlugin.KEY_VALUELIST_ID + ".grouping", string);
-		viewer.refresh();
 	}
 
 	/**

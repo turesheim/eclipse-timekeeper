@@ -16,7 +16,7 @@ import org.eclipse.jface.viewers.EditingSupport;
 import org.eclipse.jface.viewers.TextCellEditor;
 import org.eclipse.jface.viewers.TreeViewer;
 
-import net.resheim.eclipse.timekeeper.db.Activity;
+import net.resheim.eclipse.timekeeper.db.model.Activity;
 
 /**
  * Enables editing of the activity summary.

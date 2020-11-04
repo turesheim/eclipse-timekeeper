@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright © 2017 Torkild U. Resheim
+ * Copyright © 2017-2020 Torkild U. Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -18,11 +18,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.eclipse.mylyn.tasks.core.ITask;
-
-import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
+import net.resheim.eclipse.timekeeper.db.model.Project;
+import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
 
 /**
  * Work week representation for use in reporting. It has utility methods that
@@ -39,7 +39,7 @@ public class WorkWeek {
 	private LocalDate firstDayOfWeek;
 
 	/** All tasks that have been active this week */
-	protected List<ITask> tasks = Collections.emptyList();
+	protected Set<TrackedTask> tasks = Collections.emptySet();
 	
 	/**
 	 * Creates a new {@link WorkWeek} instance
@@ -49,7 +49,7 @@ public class WorkWeek {
 	 * @param tasks
 	 *            a list of tasks being active this week
 	 */
-	public WorkWeek(LocalDate firstDayOfWeek, List<ITask> tasks) {
+	public WorkWeek(LocalDate firstDayOfWeek, Set<TrackedTask> tasks) {
 		super();
 		this.firstDayOfWeek = firstDayOfWeek;
 		this.tasks = tasks;
@@ -77,10 +77,10 @@ public class WorkWeek {
 	/**
 	 * Returns a list of all projects names.
 	 */
-	public Map<Object, List<ITask>> getProjects() {
+	public Map<Project, List<TrackedTask>> getProjects() {
 		return tasks
 				.stream()
-				.collect(Collectors.groupingBy(t -> TimekeeperPlugin.getProjectName(t)));
+				.collect(Collectors.groupingBy(TrackedTask::getProject));
 	}
 	
 	/**
@@ -90,7 +90,7 @@ public class WorkWeek {
 		Duration total = Duration.ZERO;
 		for (LocalDate date : dates) {
 			Optional<Duration> d = tasks.stream()
-				.map(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date))
+				.map(t -> t.getDuration(date))
 				.reduce(Duration::plus);	
 			if (d.isPresent()) {
 				total = total.plus(d.get());
@@ -102,10 +102,10 @@ public class WorkWeek {
 	/**
 	 * Returns the total amount of hours spent at the given task.
 	 */
-	public Duration getSum(ITask task) {
+	public Duration getSum(TrackedTask task) {
 		Duration total = Duration.ZERO;
 		for (LocalDate date : dates) {
-			total = total.plus(TimekeeperPlugin.getDefault().getTask(task).getDuration(date));								
+			total = total.plus(task.getDuration(date));								
 		}
 		return total;
 	}
@@ -118,7 +118,7 @@ public class WorkWeek {
 	 */
 	public Duration getSum(LocalDate date) {
 		Optional<Duration> d = tasks.stream()
-			.map(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date))
+			.map(t -> t.getDuration(date))
 			.reduce(Duration::plus);
 		if (d.isPresent()) {
 			return d.get();
@@ -134,12 +134,12 @@ public class WorkWeek {
 	 * @param project
 	 *            the project name and identifier
 	 */
-	public Duration getSum(String project) {
+	public Duration getSum(Project project) {
 		Duration total = Duration.ZERO;
 		for (LocalDate date : dates) {
 			total = total.plus(tasks.stream()
-					.filter(t -> project.equals(TimekeeperPlugin.getProjectName(t)))
-					.map(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date))
+					.filter(t -> project.equals(t.getProject()))
+					.map(t -> t.getDuration(date))
 					.reduce(Duration::plus).orElse(Duration.ZERO));			
 		}
 		return total;
@@ -148,10 +148,10 @@ public class WorkWeek {
 	/**
 	 * Returns the total amount of hours spent on the given project at the given date.
 	 */
-	public Duration getSum(String project, LocalDate date) {
+	public Duration getSum(Project project, LocalDate date) {
 		return tasks.stream()
-			.filter(t -> project.equals(TimekeeperPlugin.getProjectName(t)))
-			.map(t -> TimekeeperPlugin.getDefault().getTask(t).getDuration(date))
+			.filter(t -> project.equals(t.getProject()))
+			.map(t -> t.getDuration(date))
 			.reduce(Duration::plus).orElse(Duration.ZERO);
 	}
 

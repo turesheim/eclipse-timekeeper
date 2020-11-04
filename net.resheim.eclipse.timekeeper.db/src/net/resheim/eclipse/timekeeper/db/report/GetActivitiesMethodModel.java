@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright © 2018 Torkild U. Resheim
+ * Copyright © 2018-2020 Torkild U. Resheim
  * 
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -15,14 +15,11 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 
-import org.eclipse.mylyn.tasks.core.ITask;
-
 import freemarker.ext.beans.StringModel;
 import freemarker.template.TemplateMethodModelEx;
 import freemarker.template.TemplateModelException;
-import net.resheim.eclipse.timekeeper.db.Activity;
-import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Activity;
+import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
 
 /**
  * FreeMarker template model for getting retrieving activities from a task.
@@ -41,9 +38,8 @@ public class GetActivitiesMethodModel implements TemplateMethodModelEx {
 			throw new TemplateModelException("Wrong number of arguments, was expecting (LocalDate, ITask)");
 		}
 		LocalDate date = (LocalDate) ((StringModel) args.get(0)).getWrappedObject();
-		ITask task = (ITask) ((StringModel) args.get(1)).getWrappedObject();
-		TrackedTask ttask = TimekeeperPlugin.getDefault().getTask((ITask) task);
-		return ttask.getActivities()
+		TrackedTask task = (TrackedTask) ((StringModel) args.get(1)).getWrappedObject();
+		return task.getActivities()
 				.stream()
 				.filter(a -> hasData(a, date))
 				.toArray();

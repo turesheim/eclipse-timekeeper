@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright © 2016-2018 Torkild U. Resheim
+ * Copyright © 2016-2020 Torkild U. Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -17,16 +17,19 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Date;
+import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Base64;
 import java.util.Calendar;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Stream;
 
 import javax.persistence.EntityManager;
 import javax.persistence.EntityTransaction;
@@ -51,7 +54,8 @@ import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.jface.preference.IPreferenceStore;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTaskContainer;
-import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
+import org.eclipse.mylyn.internal.tasks.core.TaskRepositoryManager;
+import org.eclipse.mylyn.tasks.core.IRepositoryManager;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.core.TaskRepository;
 import org.eclipse.mylyn.tasks.core.data.TaskAttribute;
@@ -66,6 +70,10 @@ import org.osgi.framework.BundleContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import net.resheim.eclipse.timekeeper.db.model.Activity;
+import net.resheim.eclipse.timekeeper.db.model.Project;
+import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.TrackedTaskId;
 import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
 
 /**
@@ -77,7 +85,7 @@ import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
 @SuppressWarnings("restriction")
 public class TimekeeperPlugin extends Plugin {
 	
-	Logger log = LoggerFactory.getLogger(TimekeeperPlugin.class);
+	private static final Logger log = LoggerFactory.getLogger(TimekeeperPlugin.class);
 
 	public static final String BUNDLE_ID = "net.resheim.eclipse.timekeeper.db"; //$NON-NLS-1$
 
@@ -112,8 +120,13 @@ public class TimekeeperPlugin extends Plugin {
 	/** Repository attribute ID for custom grouping field. */
 	public static final String ATTR_GROUPING = KEY_VALUELIST_ID + ".grouping"; //$NON-NLS-1$
 
+	private static final String LOCAL_REPO_ID = "local";
+
+	private static final String LOCAL_REPO_KEY_ID = "net.resheim.eclipse.timekeeper.repo-id"; //$NON-NLS-1$
+
 	public void addListener(DatabaseChangeListener listener) {
 		listeners.add(listener);
+		log.info("Added new DatabaseChangeListener {}", listener);
 	}
 
 	public void removeListener(DatabaseChangeListener listener) {
@@ -121,6 +134,7 @@ public class TimekeeperPlugin extends Plugin {
 	}
 
 	private void notifyListeners() {
+		log.info("Database state changed");
 		for (DatabaseChangeListener databaseChangeListener : listeners) {
 			SafeRunner.run(new ISafeRunnable() {
 				@Override
@@ -136,18 +150,16 @@ public class TimekeeperPlugin extends Plugin {
 		}
 	}
 
-	// synchronized appears to fix issue with this method being called out of
-	// order for some strange reason.
 	private void connectToDatabase() {
 		Job connectDatabaseJob = new Job("Connecting to Timekeeper database") {
 
 			@Override
 			protected IStatus run(IProgressMonitor monitor) {
+				log.info("Connecting to Timekeeper database");
 				Map<String, Object> props = new HashMap<String, Object>();
 				// default, default location
 				String jdbc_url = "jdbc:h2:~/.timekeeper/h2db";
 				try {
-
 					String location = Platform.getPreferencesService().getString(BUNDLE_ID, PREF_DATABASE_LOCATION,
 							PREF_DATABASE_LOCATION_SHARED, new IScopeContext[] { InstanceScope.INSTANCE });
 					switch (location) {
@@ -164,26 +176,21 @@ public class TimekeeperPlugin extends Plugin {
 						jdbc_url = getSpecifiedLocation();
 						break;
 					}
-					// ensure only a in-memory database is used when testing
-					if (Thread.currentThread().getName().equals("WorkbenchTestable")) {
-						jdbc_url = "jdbc:h2:mem:test_mem";
-					}
+					// if this property has been specified it will override all other settings
 					if (System.getProperty("net.resheim.eclipse.timekeeper.db.url") != null) {
+						log.info("Database URL was specified using property 'net.resheim.eclipse.timekeeper.db.url'");
 						jdbc_url = System.getProperty("net.resheim.eclipse.timekeeper.db.url");
-						jdbc_url = getWorkspaceLocation();
 					}
-					log.info("Using database at {}",jdbc_url);
-					monitor.subTask(String.format("Using database at %1$s", jdbc_url));
+					log.info("Using database at '{}'", jdbc_url);
 
 					// baseline the database
 					Flyway flyway = Flyway.configure()
 							.dataSource(jdbc_url, "sa", "")
-							.baselineOnMigrate(true)
+							.baselineOnMigrate(false)
 							.locations("classpath:/db/").load();
 					flyway.migrate();
 					// https://www.eclipse.org/forums/index.php?t=msg&goto=541155&
 					props.put(PersistenceUnitProperties.CLASSLOADER, TimekeeperPlugin.class.getClassLoader());
-
 					props.put(PersistenceUnitProperties.JDBC_URL, jdbc_url);
 					props.put(PersistenceUnitProperties.JDBC_DRIVER, "org.h2.Driver");
 					props.put(PersistenceUnitProperties.JDBC_USER, "sa");
@@ -194,21 +201,18 @@ public class TimekeeperPlugin extends Plugin {
 					props.put(PersistenceUnitProperties.DDL_GENERATION, "none");
 					createEntityManager(props);
 				} catch (Exception e) {
-					return new Status(IStatus.ERROR, BUNDLE_ID,
-							"Could not connect to Timekeeper database at " + jdbc_url, e);
+					throw new RuntimeException("Could not connect to Timekeeper database at " + jdbc_url, e);
 				}
 				cleanTaskActivities();
 				notifyListeners();
 				return Status.OK_STATUS;
 			}
-
-
 		};
-		connectDatabaseJob.setSystem(false);
+		connectDatabaseJob.setPriority(Job.INTERACTIVE);
 		connectDatabaseJob.schedule();
 	}
 
-	private static synchronized void createEntityManager(Map<String, Object> props) {
+	private static void createEntityManager(Map<String, Object> props) {
 		entityManager = new PersistenceProvider()
 				.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
 				.createEntityManager();
@@ -257,6 +261,7 @@ public class TimekeeperPlugin extends Plugin {
 	@Override
 	public void start(BundleContext context) throws Exception {
 		super.start(context);
+		log.info("Starting TimekeeperPlugin");
 		connectToDatabase();
 		createSaveJob();
 		ISaveParticipant saveParticipant = new WorkspaceSaveParticipant();
@@ -275,8 +280,8 @@ public class TimekeeperPlugin extends Plugin {
 		List<TrackedTask> resultList = createQuery.getResultList();
 		for (TrackedTask trackedTask : resultList) {
 			trackedTask.getCurrentActivity().ifPresent(activity -> {
-				ITask task = trackedTask.getTask() == null ? TimekeeperPlugin.getDefault().getTask(trackedTask)
-						: trackedTask.getTask();
+				ITask task = trackedTask.getMylynTask() == null ? getMylynTask(trackedTask)
+						: trackedTask.getMylynTask();
 				// note that the ITask may not exist in this workspace
 				if (task != null && !task.isActive()) {
 					// try to figure out when it was last active
@@ -311,18 +316,21 @@ public class TimekeeperPlugin extends Plugin {
 	}
 
 	/**
-	 * Returns the {@link TrackedTask} associated with the given Mylyn task. If no
-	 * such task exists it will be created.
+	 * Returns the Timekeeper {@link TrackedTask} associated with the given Mylyn
+	 * task. If no such task exists it will be created. Note at this method call
+	 * should be wrapped in a transaction to make sure the new entity will be
+	 * created.
 	 * 
 	 * @param task the Mylyn task
 	 * @return a {@link TrackedTask} associated with the Mylyn task
+	 * @throws InterruptedException
 	 */
 	public TrackedTask getTask(ITask task) {
-		// this may happen if the UI asks for task details before the database is ready
-		if (entityManager == null || !entityManager.isOpen()) {
+		// the UI will typically attempt to get some task details before the database is ready 
+		if (entityManager == null) {
 			return null;
 		}
-		TrackedTaskId id = new TrackedTaskId(TrackedTask.getRepositoryUrl(task), task.getTaskId());
+		TrackedTaskId id = new TrackedTaskId(TimekeeperPlugin.getRepositoryUrl(task), task.getTaskId());
 		TrackedTask found = entityManager.find(TrackedTask.class, id);
 		if (found == null) {
 			// no such tracked task exists, create one
@@ -330,21 +338,30 @@ public class TimekeeperPlugin extends Plugin {
 			entityManager.persist(tt);
 			return tt;
 		} else {
+			// make sure there is a link between the two tasks, this would be the case if the tracked task was just
+			// loaded from the database
+			if (found.getMylynTask() == null) { 
+				found.setMylynTask(task);
+				entityManager.persist(found);
+			}
 			return found;
 		}
 	}
 
 	/**
-	 * Returns the {@link ITask} associated with the given {@link TrackedTask} task.
-	 * If no such task exists <code>null</code> will be returned
+	 * Returns the Mylyn {@link ITask} associated with the given {@link TrackedTask}
+	 * task. If no such task exists <code>null</code> will be returned.
 	 * 
 	 * @param task the time tracked task
 	 * @return a Mylyn task or <code>null</code>
 	 */
-	public ITask getTask(TrackedTask task) {
+	public static ITask getMylynTask(TrackedTask task) {
 		// get the repository then find the task. Seems like the Mylyn API is
 		// a bit limited in this area as I could not find something more usable
-		Optional<TaskRepository> tr = TasksUi.getRepositoryManager().getAllRepositories().stream()
+		Optional<TaskRepository> tr = TasksUi
+				.getRepositoryManager()
+				.getAllRepositories()
+				.stream()
 				.filter(r -> r.getRepositoryUrl().equals(task.getRepositoryUrl())).findFirst();
 		if (tr.isPresent()) {
 			return TasksUi.getRepositoryModel().getTask(tr.get(), task.getTaskId());
@@ -475,18 +492,18 @@ public class TimekeeperPlugin extends Plugin {
 		return jdbc_url;
 	}
 
-	private void createSaveJob() {
+	private static void createSaveJob() {
 		saveDatabaseJob = new Job("Saving Timekeeper database") {
 
 			@Override
 			protected IStatus run(IProgressMonitor monitor) {
 				if (entityManager != null && entityManager.isOpen()) {
-					Collection<AbstractTask> allTasks = TasksUiPlugin.getTaskList().getAllTasks();
+					List<Project> resultList = entityManager.createNamedQuery("Project.findAll", Project.class).getResultList();
 					EntityTransaction transaction = entityManager.getTransaction();
 					transaction.begin();
-					for (AbstractTask abstractTask : allTasks) {
-						TrackedTask task = getTask(abstractTask);
-						entityManager.persist(task);
+					for (Object object : resultList) {
+						entityManager.persist(object);
+						log.debug("Storing project {}",object);
 					}
 					transaction.commit();
 					return Status.OK_STATUS;
@@ -505,7 +522,7 @@ public class TimekeeperPlugin extends Plugin {
 	 * @return the name of the task
 	 */
 	public static String getParentContainerSummary(AbstractTask task) {
-		if (task.getParentContainers().size() > 0) {
+		if (!task.getParentContainers().isEmpty()) {
 			AbstractTaskContainer next = task.getParentContainers().iterator().next();
 			return next.getSummary();
 		}
@@ -519,7 +536,7 @@ public class TimekeeperPlugin extends Plugin {
 	 * @param task the task to get the project name for
 	 * @return the project name or "&lt;undetermined&gt;"
 	 */
-	public static String getProjectName(ITask task) {
+	public static String getMylynProjectName(ITask task) {
 		String c = task.getConnectorKind();
 		try {
 			switch (c) {
@@ -546,13 +563,72 @@ public class TimekeeperPlugin extends Plugin {
 						return getParentContainerSummary((AbstractTask) task);
 					}
 				}
+				break;
 			default:
 				break;
 			}
 		} catch (CoreException e) {
-			e.printStackTrace();
+			log.error("Could not obtain project name", e);
 		}
 		return "<undetermined>";
+	}
+	
+	public static Project getProject(String title) {
+		Project found = entityManager.find(Project.class, title);
+		if (found == null) {
+			Project project = new Project(title);
+			EntityTransaction transaction = entityManager.getTransaction();
+			transaction.begin();
+			entityManager.persist(project);
+			transaction.commit();
+			return project;
+		}
+		return found;
+	}
+
+	/**
+	 * Return all tracked tasks, those that are associated with a Mylyn task will have the proper assignment.
+	 * 
+	 * @return a stream of tasks
+	 */
+	public static Stream<TrackedTask> getTasks(LocalDate startDate) {
+		if (entityManager == null) {
+			return Stream.empty();
+		}
+		return entityManager.createNamedQuery("TrackedTask.findAll", TrackedTask.class)
+				.getResultStream()
+				// TODO: Move filtering to database
+				.filter(tt -> hasData(tt, startDate))
+				.map(TimekeeperPlugin::assignMylynTask);
+	}
+	
+	private static boolean hasData/* this week */(TrackedTask task, LocalDate startDate) {
+		// this should only be NULL if the database has not started yet. See databaseStateChanged()
+		if (task == null) {
+			return false;
+		}
+		LocalDate endDate = startDate.plusDays(7);
+		Stream<Activity> filter = task
+				.getActivities()
+				.stream()
+				.filter(a -> a.getDuration(startDate, endDate) != Duration.ZERO);
+		return filter.count() > 0;
+	}
+
+	/**
+	 * Using the URL and identifier of
+	 * @param tt
+	 * @return
+	 */
+	private static TrackedTask assignMylynTask(TrackedTask tt) {
+		Optional<TaskRepository> tr = TasksUi.getRepositoryManager()
+				.getAllRepositories()
+				.stream()
+				.filter(r -> r.getRepositoryUrl().equals(tt.getRepositoryUrl())).findFirst();
+		if (tr.isPresent()) {
+			tt.setMylynTask(TasksUi.getRepositoryModel().getTask(tr.get(), tt.getTaskId()));
+		}
+		return (TrackedTask)tt;
 	}
 
 	/**
@@ -586,9 +662,76 @@ public class TimekeeperPlugin extends Plugin {
 				templates.put(t.getName(), t);
 			}
 		} catch (IOException | ClassNotFoundException e) {
-			e.printStackTrace();
+			log.error("Could not load report templates",e);
 		}
 		return templates;
+	}
+
+	/**
+	 * Creates a new tracked task associated with the Mylyn task if the prior is not
+	 * present, and starts a new activity.
+	 * 
+	 * @param task the Mylyn task to start
+	 */
+	public void startMylynTask(ITask task) {
+		if (entityManager == null) {
+			return;
+		}
+		EntityTransaction transaction = entityManager.getTransaction();
+		transaction.begin();
+		TrackedTask ttask = getTask(task);
+		if (ttask != null) {
+			Activity activity = ttask.startActivity();
+			entityManager.persist(activity);
+			log.debug("Activating task '{}'", task);
+			notifyListeners();
+		}
+		transaction.commit();
+	}
+
+	/**
+	 * Ends the activity currently active on the given Mylyn task.
+	 * 
+	 * @param task the Mylyn task to start
+	 */
+	public void endMylynTask(ITask task) {
+		TrackedTask ttask = getTask(task);
+		if (ttask != null) {
+			Activity activity = ttask.endActivity();
+			EntityTransaction transaction = entityManager.getTransaction();
+			transaction.begin();
+			entityManager.persist(activity);
+			transaction.commit();
+			log.debug("Dectivating task '{}'", task);
+		}
+	}
+
+	/**
+	 * This method will return the repository URL for tasks in repositories that are
+	 * not local. If the task is in a local repository, the Timekeeper repository
+	 * identifier is returned if it exists. If it does not exist, it will be
+	 * created, associated with the repository and returned.
+	 * 
+	 * @param task the task to get the repository URL for
+	 * @return the repository URL or {@link UUID}
+	 */
+	public static String getRepositoryUrl(ITask task) {
+		String url = task.getRepositoryUrl();
+		if (TimekeeperPlugin.LOCAL_REPO_ID.equals(task.getRepositoryUrl())) {
+			IRepositoryManager repositoryManager = TasksUi.getRepositoryManager();
+			if (repositoryManager == null) { // may happen during testing
+				return TimekeeperPlugin.LOCAL_REPO_ID;
+			}
+			TaskRepository repository = repositoryManager.getRepository(task.getConnectorKind(),
+					task.getRepositoryUrl());
+			String id = repository.getProperty(TimekeeperPlugin.LOCAL_REPO_KEY_ID);
+			if (id == null) {
+				id = TaskRepositoryManager.PREFIX_LOCAL + UUID.randomUUID().toString();
+				repository.setProperty(TimekeeperPlugin.LOCAL_REPO_KEY_ID, id);
+			}
+			url = id;
+		}
+		return url;
 	}
 
 }

@@ -16,14 +16,12 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.apache.commons.lang.time.DurationFormatUtils;
-import org.eclipse.mylyn.tasks.core.ITask;
 
 import freemarker.ext.beans.StringModel;
 import freemarker.template.TemplateMethodModelEx;
 import freemarker.template.TemplateModelException;
-import net.resheim.eclipse.timekeeper.db.Activity;
-import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Activity;
+import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
 
 /**
  * FreeMarker template model for formatting {@link Duration} instances. 
@@ -45,10 +43,9 @@ public class FormatDurationMethodModel implements TemplateMethodModelEx {
 		}
 		LocalDate day = (LocalDate) ((StringModel) args.get(0)).getWrappedObject();
 		long seconds = 0;
-		if ((((StringModel) args.get(1)).getWrappedObject()) instanceof ITask) {
-			ITask task = (ITask) ((StringModel) args.get(1)).getWrappedObject();
-			TrackedTask ttask = TimekeeperPlugin.getDefault().getTask(task);
-			seconds = ttask.getDuration(day).getSeconds();
+		if ((((StringModel) args.get(1)).getWrappedObject()) instanceof TrackedTask) {
+			TrackedTask task = (TrackedTask) ((StringModel) args.get(1)).getWrappedObject();
+			seconds = task.getDuration(day).getSeconds();
 		}
 		if ((((StringModel) args.get(1)).getWrappedObject()) instanceof Activity) {
 			Activity task = (Activity) ((StringModel) args.get(1)).getWrappedObject();

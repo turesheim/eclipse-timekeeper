@@ -16,7 +16,7 @@
 	<packaging>eclipse-test-plugin</packaging>
 
 	<properties>
-		<uitest.vmparams>-Dorg.eclipse.swtbot.search.timeout=10000 -Xmx1024m -Dscreenshots=${project.build.directory}/../../images -Dnet.resheim.eclipse.timekeeper.db.url=jdbc:h2:mem:test_mem</uitest.vmparams>
+		<uitest.vmparams>-Dorg.eclipse.swtbot.search.timeout=10000 -Xmx1024m -Dscreenshots=${project.build.directory}/../../images -Dnet.resheim.eclipse.timekeeper.db.url=jdbc:h2:mem:timekeeper_db;DB_CLOSE_DELAY=-1</uitest.vmparams>
 	</properties>
 
 	<profiles>

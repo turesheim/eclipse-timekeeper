@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright © 2016-2018 Torkild U. Resheim
+ * Copyright © 2016-2020 Torkild U. Resheim
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -8,8 +8,9 @@
  * Contributors:
  *     Torkild U. Resheim - initial API and implementation
  *******************************************************************************/
-package net.resheim.eclipse.timekeeper.db;
+package net.resheim.eclipse.timekeeper.db.model;
 
+import java.io.Serializable;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -21,6 +22,7 @@ import javax.persistence.Convert;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 
 import org.eclipse.persistence.annotations.UuidGenerator;
@@ -40,7 +42,9 @@ import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConver
  */
 @Entity(name = "ACTIVITY")
 @UuidGenerator(name = "uuid")
-public class Activity implements Comparable<Activity> {
+public class Activity implements Comparable<Activity>, Serializable {
+
+	private static final long serialVersionUID = 7770745026684660897L;
 
 	@Id
 	@GeneratedValue(generator = "uuid")
@@ -65,11 +69,16 @@ public class Activity implements Comparable<Activity> {
 	@ManyToOne
 	private TrackedTask trackedtask;
 
+	/** The project this activity is associated with, if not associated with a tracked task */
+	@ManyToOne
+	@JoinColumn(name = "PROJECT")
+	private Project project;
+
 	/** A short summary of the activity */
 	@Column
 	private String summary;
 
-	protected Activity() {
+	public Activity() {
 	}
 
 	public Activity(TrackedTask trackedtask, LocalDateTime start) {
@@ -185,4 +194,56 @@ public class Activity implements Comparable<Activity> {
 		return this.getStart().compareTo(o.getStart());
 	}
 
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((end == null) ? 0 : end.hashCode());
+		result = prime * result + ((id == null) ? 0 : id.hashCode());
+		result = prime * result + (manual ? 1231 : 1237);
+		result = prime * result + ((start == null) ? 0 : start.hashCode());
+		result = prime * result + ((summary == null) ? 0 : summary.hashCode());
+		result = prime * result + ((trackedtask == null) ? 0 : trackedtask.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Activity other = (Activity) obj;
+		if (end == null) {
+			if (other.end != null)
+				return false;
+		} else if (!end.equals(other.end))
+			return false;
+		if (id == null) {
+			if (other.id != null)
+				return false;
+		} else if (!id.equals(other.id))
+			return false;
+		if (manual != other.manual)
+			return false;
+		if (start == null) {
+			if (other.start != null)
+				return false;
+		} else if (!start.equals(other.start))
+			return false;
+		if (summary == null) {
+			if (other.summary != null)
+				return false;
+		} else if (!summary.equals(other.summary))
+			return false;
+		if (trackedtask == null) {
+			if (other.trackedtask != null)
+				return false;
+		} else if (!trackedtask.equals(other.trackedtask))
+			return false;
+		return true;
+	}
+	
 }
