@@ -5,7 +5,7 @@ Bundle-SymbolicName: net.resheim.eclipse.timekeeper.test;singleton:=true
 Bundle-Version: 2.0.0.qualifier
 Bundle-ActivationPolicy: lazy
 Bundle-Vendor: 
-Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Bundle-RequiredExecutionEnvironment: JavaSE-11
 Require-Bundle: org.eclipse.swtbot.go,
  org.eclipse.mylyn.tasks.core,
  net.resheim.eclipse.timekeeper.db,

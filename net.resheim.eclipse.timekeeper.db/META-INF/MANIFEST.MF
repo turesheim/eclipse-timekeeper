@@ -44,7 +44,7 @@ Export-Package: net.resheim.eclipse.timekeeper.db,
  org.h2.upgrade;x-internal:=true,
  org.h2.util;x-internal:=true,
  org.h2.value;x-internal:=true
-Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Bundle-RequiredExecutionEnvironment: JavaSE-11
 Require-Bundle: org.eclipse.mylyn.tasks.core;bundle-version="3.24.2",
  org.eclipse.mylyn.tasks.ui;bundle-version="3.24.2",
  org.eclipse.mylyn.commons.notifications.core;bundle-version="1.16.0",
