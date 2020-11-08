@@ -21,7 +21,7 @@ jobs:
         java-version: 11
     - run: sudo apt-get install xvfb
     - name: Build with Maven
-      run: xvfb-run --auto-servernum mvn clean org.jacoco:jacoco-maven-plugin:prepare-agent verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Pother-os -Dtycho.localArtifacts=ignore -Dsonar.host.url=https://sonarcloud.io -Dsonar.projectKey=turesheim_eclipse-timekeeper -Dsonar.organization=turesheim-github
+      run: xvfb-run --auto-servernum mvn clean verify sonar:sonar -Pother-os -Dtycho.localArtifacts=ignore -Dsonar.host.url=https://sonarcloud.io -Dsonar.projectKey=turesheim_eclipse-timekeeper -Dsonar.organization=turesheim-github
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}      

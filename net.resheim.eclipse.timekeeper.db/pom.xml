@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
-	xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
@@ -13,6 +14,11 @@
 
 	<artifactId>net.resheim.eclipse.timekeeper.db</artifactId>
 	<packaging>eclipse-plugin</packaging>
+	
+	<properties>
+		<sonar.coverage.jacoco.xmlReportPaths>${project.basedir}/../net.resheim.eclipse.timekeeper.test/target/site/jacoco-it/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+	</properties>
+
 	<dependencies>
 		<dependency>
 			<groupId>junit</groupId>
@@ -35,10 +41,10 @@
 	</dependencies>
 
 	<build>
-		<testSourceDirectory>${project.basedir}/src-test</testSourceDirectory>
+		<testSourceDirectory>${project.basedir}/src/test/java</testSourceDirectory>
 		<testResources>
 			<testResource>
-				<directory>${project.basedir}/src-test</directory>
+				<directory>${project.basedir}/src/test/java</directory>
 			</testResource>
 		</testResources>
 		<plugins>
@@ -82,6 +88,19 @@
 						<phase>test-compile</phase>
 						<goals>
 							<goal>testCompile</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.6</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>prepare-agent</goal>
+							<goal>report</goal>
 						</goals>
 					</execution>
 				</executions>

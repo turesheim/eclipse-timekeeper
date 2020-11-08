@@ -15,6 +15,10 @@
 	<artifactId>net.resheim.eclipse.timekeeper.ui</artifactId>
 	<packaging>eclipse-plugin</packaging>
 
+	<properties>
+		<sonar.coverage.jacoco.xmlReportPaths>${project.basedir}/../net.resheim.eclipse.timekeeper.test/target/site/jacoco-it/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+	</properties>
+
 	<dependencies>
 		<dependency>
 			<groupId>junit</groupId>
@@ -36,6 +40,19 @@
 				<groupId>org.eclipse.tycho</groupId>
 				<artifactId>target-platform-configuration</artifactId>
 				<version>${tycho.version}</version>
+			</plugin>
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.6</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>prepare-agent</goal>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>

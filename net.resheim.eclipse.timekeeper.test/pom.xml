@@ -17,6 +17,7 @@
 
 	<properties>
 		<uitest.vmparams>-Dorg.eclipse.swtbot.search.timeout=10000 -Xmx1024m -Dscreenshots=${project.build.directory}/../../images -Dnet.resheim.eclipse.timekeeper.db.url=jdbc:h2:mem:timekeeper_db;DB_CLOSE_DELAY=-1</uitest.vmparams>
+		<sonar.coverage.jacoco.xmlReportPaths>${project.basedir}/../net.resheim.eclipse.timekeeper.test/target/site/jacoco-it/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
 	</properties>
 
 	<profiles>
@@ -67,13 +68,39 @@
 					<includes>
 						<include>**/*Test.java</include>
 					</includes>
-					<argLine>${ui.test.vmargs} ${tycho.testArgLine}</argLine>
+					<argLine>${tycho.testArgLine} ${ui.test.vmargs}</argLine>
 					<useUIHarness>true</useUIHarness>
 					<useUIThread>false</useUIThread>
 					<product>org.eclipse.sdk.ide</product>
 					<application>org.eclipse.ui.ide.workbench</application>
 				</configuration>
 			</plugin>
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.6</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+						<configuration>
+							<destFile>${project.build.directory}/jacoco-it.exec</destFile>
+						</configuration>
+					</execution>
+					<execution>
+						<id>it-report</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>report-aggregate</goal>
+						</goals>
+						<configuration>
+							<dataFileIncludes>**/jacoco-it.exec</dataFileIncludes>
+							<outputDirectory>${project.reporting.outputDirectory}/jacoco-it</outputDirectory>
+						</configuration>
+					</execution>
+				</executions>
+ 			</plugin>
 		</plugins>
 	</build>
 </project>

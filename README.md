@@ -26,14 +26,14 @@ The Export and Import buttons are used for exactly that. CSV files, one for each
 
 ## Installing
 
-You can install the latest **public release** from the <a href="http://marketplace.eclipse.org/content/timekeeper-eclipse">Eclipse Marketplace</a> or drag <a href="http://marketplace.eclipse.org/marketplace-client-intro?mpc_install=2196325" title="Drag and drop into a running Eclipse workspace to install Eclipse Timekeeper"><img src="https://marketplace.eclipse.org/sites/all/themes/solstice/public/images/marketplace/btn-install.png"/>
+You can install the latest **public release** from the <a href="http://marketplace.eclipse.org/content/timekeeper-eclipse">Eclipse Marketplace</a> or drag <a href="http://marketplace.eclipse.org/marketplace-client-intro?mpc_install=2196325" title="Drag and drop into a running Eclipse workspace to install Eclipse Timekeeper"><img src="https://marketplace.eclipse.org/sites/all/themes/solstice/public/images/marketplace/btn-install.png" height="28px"/>
 </a> into an running Eclipse instance. The latest CI build artifacts can be found under [GitHub Actions](https://github.com/turesheim/eclipse-timekeeper/actions?query=workflow%3ABuild). In order to install from there you must download the _p2-repository_ zip file and point your Eclipse instance to that. 
 
 ## Building
 
 Clone the project and from the root execute:
 
-    mvn clean verify
+    mvn clean org.jacoco:jacoco-maven-plugin:prepare-agent verify
 
 When the build completes successfully there will be a Eclipse p2 repository at *net.resheim.eclipse.timekeeper-site/target/repository* which you can install from.
 

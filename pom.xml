@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 
-	Copyright (c) 2015-2019 Torkild U. Resheim All rights reserved. This 
+<!-- Copyright (c) 2015-2019 Torkild U. Resheim All rights reserved. This 
 	program and the accompanying materials are made available under the terms 
 	of the Eclipse Public License v1.0 which accompanies this distribution, and 
 	is available at http://www.eclipse.org/legal/epl-v10.html Contributors: Torkild 
-	U. Resheim - initial API and implementation
--->
+	U. Resheim - initial API and implementation -->
 
 <project
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
@@ -51,10 +49,8 @@
 	</licenses>
 
 	<properties>
-		<tycho.version>1.4.0</tycho.version>
+		<tycho.version>2.1.0</tycho.version>
 		<tycho.scmUrl>scm:git:git://github.com/turesheim/eclipse-timekeeper.git</tycho.scmUrl>
-		<jacoco.version>0.8.4</jacoco.version>
-		<sonar.jacoco.reportPath>${project.basedir}/../target/jacoco.exec</sonar.jacoco.reportPath>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.source>11</maven.compiler.source>
 		<maven.compiler.target>11</maven.compiler.target>
@@ -137,30 +133,6 @@
 						<version>${tycho.version}</version>
 					</dependency>
 				</dependencies>
-			</plugin>
-			<plugin>
-				<groupId>org.jacoco</groupId>
-				<artifactId>jacoco-maven-plugin</artifactId>
-				<version>${jacoco.version}</version>
-				<configuration>
-					<destFile>${sonar.jacoco.reportPath}</destFile>
-					<append>true</append>
-				</configuration>
-				<inherited>true</inherited>
-				<executions>
-					<execution>
-						<goals>
-							<goal>prepare-agent</goal>
-						</goals>
-					</execution>
-					<execution>
-						<id>integration-test-report</id>
-						<phase>verify</phase>
-						<goals>
-							<goal>report-aggregate</goal>
-						</goals>
-					</execution>
-				</executions>
 			</plugin>
 		</plugins>
 	</build>
