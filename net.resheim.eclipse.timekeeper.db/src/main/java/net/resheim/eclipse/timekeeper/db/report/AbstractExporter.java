@@ -16,7 +16,7 @@ import java.time.LocalDate;
 import java.util.Set;
 
 import net.resheim.eclipse.timekeeper.db.model.Project;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Task;
 
 /**
  * This type contains common features for the various exporters.
@@ -37,7 +37,7 @@ public abstract class AbstractExporter {
 	 *            the project to calculate for
 	 * @return the total amount of seconds accumulated
 	 */
-	protected long getSum(Set<TrackedTask> tasks, LocalDate date, Project project) {
+	protected long getSum(Set<Task> tasks, LocalDate date, Project project) {
 		return tasks
 				.stream()
 				.filter(t -> project.equals(t.getProject()))
@@ -54,7 +54,7 @@ public abstract class AbstractExporter {
 	 *            the date to calculate for
 	 * @return the total amount of seconds accumulated
 	 */
-	protected long getSum(Set<TrackedTask> tasks, LocalDate date) {
+	protected long getSum(Set<Task> tasks, LocalDate date) {
 		return tasks
 				.stream()
 				.mapToLong(t -> t.getDuration(date).getSeconds())

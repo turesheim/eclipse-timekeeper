@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import net.resheim.eclipse.timekeeper.db.model.Project;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Task;
 
 /**
  * Work week representation for use in reporting. It has utility methods that
@@ -39,7 +39,7 @@ public class WorkWeek {
 	private LocalDate firstDayOfWeek;
 
 	/** All tasks that have been active this week */
-	protected Set<TrackedTask> tasks = Collections.emptySet();
+	protected Set<Task> tasks = Collections.emptySet();
 	
 	/**
 	 * Creates a new {@link WorkWeek} instance
@@ -49,7 +49,7 @@ public class WorkWeek {
 	 * @param tasks
 	 *            a list of tasks being active this week
 	 */
-	public WorkWeek(LocalDate firstDayOfWeek, Set<TrackedTask> tasks) {
+	public WorkWeek(LocalDate firstDayOfWeek, Set<Task> tasks) {
 		super();
 		this.firstDayOfWeek = firstDayOfWeek;
 		this.tasks = tasks;
@@ -77,10 +77,10 @@ public class WorkWeek {
 	/**
 	 * Returns a list of all projects names.
 	 */
-	public Map<Project, List<TrackedTask>> getProjects() {
+	public Map<Project, List<Task>> getProjects() {
 		return tasks
 				.stream()
-				.collect(Collectors.groupingBy(TrackedTask::getProject));
+				.collect(Collectors.groupingBy(Task::getProject));
 	}
 	
 	/**
@@ -102,7 +102,7 @@ public class WorkWeek {
 	/**
 	 * Returns the total amount of hours spent at the given task.
 	 */
-	public Duration getSum(TrackedTask task) {
+	public Duration getSum(Task task) {
 		Duration total = Duration.ZERO;
 		for (LocalDate date : dates) {
 			total = total.plus(task.getDuration(date));								

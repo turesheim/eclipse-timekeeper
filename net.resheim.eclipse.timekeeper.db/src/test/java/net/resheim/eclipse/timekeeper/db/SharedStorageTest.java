@@ -28,8 +28,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import net.resheim.eclipse.timekeeper.db.model.Activity;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTaskId;
+import net.resheim.eclipse.timekeeper.db.model.Task;
+import net.resheim.eclipse.timekeeper.db.model.GlobalTaskId;
 
 @SuppressWarnings("restriction")
 public class SharedStorageTest {
@@ -155,12 +155,12 @@ public class SharedStorageTest {
 		}
 		// clean up after running tests
 		transaction.begin();
-		Query createQuery = entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE;TRUNCATE TABLE ACTIVITY;TRUNCATE TABLE TRACKEDTASK;SET REFERENTIAL_INTEGRITY TRUE");
+		Query createQuery = entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE;TRUNCATE TABLE ACTIVITY;TRUNCATE TABLE TASK;SET REFERENTIAL_INTEGRITY TRUE");
 		createQuery.executeUpdate();
 		transaction.commit();
 	}
 
-	private void persist(TrackedTask ttask) {
+	private void persist(Task ttask) {
 		EntityTransaction transaction = entityManager.getTransaction();
 		transaction.begin();
 		entityManager.persist(ttask);
@@ -169,7 +169,7 @@ public class SharedStorageTest {
 
 	@Test
 	public void testSimpleTaskPersistence() {
-		TrackedTask ttask = new TrackedTask(mylynTask);
+		Task ttask = new Task(mylynTask);
 		LocalDateTime now = LocalDateTime.now();
 		Activity a = new Activity(ttask,now);
 		ttask.addActivity(a);
@@ -178,11 +178,11 @@ public class SharedStorageTest {
 		persist(ttask);
 
 		// now attempt to load the task from the persistent storage
-		TrackedTaskId id = new TrackedTaskId(ttask.getRepositoryUrl(), ttask.getTaskId());
-		TrackedTask dbTask = entityManager.find(TrackedTask.class, id);
+		GlobalTaskId id = new GlobalTaskId(ttask.getRepositoryUrl(), ttask.getTaskId());
+		Task dbTask = entityManager.find(Task.class, id);
 		// Test the single task
-		if (dbTask instanceof TrackedTask) {
-			List<Activity> activities = ((TrackedTask) dbTask).getActivities();
+		if (dbTask instanceof Task) {
+			List<Activity> activities = ((Task) dbTask).getActivities();
 			Assert.assertEquals(1, activities.size());
 			Activity activity = activities.get(0);
 			// duration should be one day
@@ -196,7 +196,7 @@ public class SharedStorageTest {
 	 */
 	@Test
 	public void testTrackedTask_getDuration() {
-		TrackedTask task = new TrackedTask(mylynTask);
+		Task task = new Task(mylynTask);
 
 		LocalDateTime start = LocalDateTime.of(2016, 3, 14, 22, 0);
 		LocalDateTime start2 = LocalDateTime.of(2016, 3, 16, 0, 0);
@@ -221,12 +221,12 @@ public class SharedStorageTest {
 		persist(task);
 
 		// now attempt to load the task from the persistent storage
-		TrackedTaskId id = new TrackedTaskId(task.getRepositoryUrl(), task.getTaskId());
-		TrackedTask dbTask = entityManager.find(TrackedTask.class, id);
+		GlobalTaskId id = new GlobalTaskId(task.getRepositoryUrl(), task.getTaskId());
+		Task dbTask = entityManager.find(Task.class, id);
 
 		// verify that the accumulated duration is correct
-		if (dbTask instanceof TrackedTask) {
-			TrackedTask trackedTask = (TrackedTask) dbTask;
+		if (dbTask instanceof Task) {
+			Task trackedTask = (Task) dbTask;
 			// total work on the 14th of March should be 4 hours
 			Assert.assertEquals(Duration.ofHours(4), trackedTask.getDuration(start.toLocalDate()));
 			// total work on the 16th of March should be 24 hours

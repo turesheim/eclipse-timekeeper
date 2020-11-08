@@ -12,7 +12,7 @@ location "http://download.eclipse.org/releases/2020-09/" {
 	org.apache.log4j
 	org.apache.commons.collections
 	org.apache.commons.lang
-	javax.persistence
+	javax.persistence [2.2.1,3.0.0)
 	javax.activation
 	javax.xml.bind
 	org.eclipse.persistence.core
