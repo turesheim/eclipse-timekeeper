@@ -42,7 +42,7 @@ import org.osgi.framework.BundleContext;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.internal.idle.GenericIdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.IdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.MacIdleTimeDetector;
@@ -159,7 +159,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 			if (idleTimeMillis < lastIdleTimeMillis && lastIdleTimeMillis > consideredIdleThreshold) {
 				// If we have an active task
 				ITask task = TasksUi.getTaskActivityManager().getActiveTask();
-				TrackedTask ttask = TimekeeperPlugin.getDefault().getTask(task);
+				Task ttask = TimekeeperPlugin.getDefault().getTask(task);
 				// and we have recorded a starting point
 				if (task != null && ttask.getCurrentActivity().isPresent()) {
 					dialogIsOpen = true;
@@ -234,7 +234,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	public LocalDateTime getActiveSince() {
 		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
 		if (task != null) {
-			TrackedTask trackedTask = TimekeeperPlugin.getDefault().getTask(task);
+			Task trackedTask = TimekeeperPlugin.getDefault().getTask(task);
 			if (trackedTask != null) {
 				Optional<Activity> currentActivity = trackedTask.getCurrentActivity();
 				if (currentActivity.isPresent()) {
@@ -290,7 +290,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 							Display.getDefault().syncExec(() -> handleReactivation(idleTimeMillis));
 						} else if (lastIdleTimeMillis < consideredIdleThreshold) {
 							lastActiveTime = LocalDateTime.now();
-							TrackedTask trtask = TimekeeperPlugin.getDefault().getTask(task);
+							Task trtask = TimekeeperPlugin.getDefault().getTask(task);
 							if (trtask != null) {
 								trtask.setTick(lastActiveTime);
 							}
@@ -354,7 +354,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 		}
 	}
 
-	public static TrackedTask getActiveTrackedTask() {
+	public static Task getActiveTrackedTask() {
 		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
 		if (task != null) {
 			return TimekeeperPlugin.getDefault().getTask(task);

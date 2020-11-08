@@ -28,7 +28,7 @@ import org.eclipse.swt.graphics.Image;
 
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.Project;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 /**
@@ -79,8 +79,8 @@ class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 			compositeDescriptor.icon = CommonImages.GROUPING;
 		}
 
-		if (object instanceof TrackedTask) {
-			ITask task = ((TrackedTask) object).getMylynTask();
+		if (object instanceof Task) {
+			ITask task = ((Task) object).getMylynTask();
 			if (task == null) {
 				compositeDescriptor.icon = TasksUiImages.TASK;
 				return compositeDescriptor;
@@ -118,9 +118,9 @@ class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 		if (element instanceof Project) {
 			return ((Project) element).getName();
 		}
-		if (element instanceof TrackedTask) {
-			ITask itask = ((TrackedTask) element).getMylynTask();
-			TrackedTask task = (TrackedTask) element;
+		if (element instanceof Task) {
+			ITask itask = ((Task) element).getMylynTask();
+			Task task = (Task) element;
 			StringBuilder sb = new StringBuilder();
 			if (itask != null && itask.getTaskId() != null) {
 				sb.append(itask.getTaskId());

@@ -19,7 +19,7 @@ import freemarker.ext.beans.StringModel;
 import freemarker.template.TemplateMethodModelEx;
 import freemarker.template.TemplateModelException;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Task;
 
 /**
  * FreeMarker template model for getting retrieving activities from a task.
@@ -38,7 +38,7 @@ public class GetActivitiesMethodModel implements TemplateMethodModelEx {
 			throw new TemplateModelException("Wrong number of arguments, was expecting (LocalDate, ITask)");
 		}
 		LocalDate date = (LocalDate) ((StringModel) args.get(0)).getWrappedObject();
-		TrackedTask task = (TrackedTask) ((StringModel) args.get(1)).getWrappedObject();
+		Task task = (Task) ((StringModel) args.get(1)).getWrappedObject();
 		return task.getActivities()
 				.stream()
 				.filter(a -> hasData(a, date))

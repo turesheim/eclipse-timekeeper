@@ -24,6 +24,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
+import javax.persistence.Table;
 
 import org.eclipse.persistence.annotations.UuidGenerator;
 
@@ -33,14 +34,12 @@ import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConver
  * The {@link Activity} type represents a period of work on a task. It holds the
  * start time, and the stop time. An activity can stretch over several days,
  * however that should typically not be the case. Multiple activities can be
- * assign to the same {@link TrackedTask}, on the same day.
- * 
- * TODO: Consolidate activities so they never span dates. It will make several
- * operations much easier.
+ * assign to the same {@link Task}, on the same day.
  * 
  * @author Torkild U. Resheim
  */
-@Entity(name = "ACTIVITY")
+@Entity
+@Table(name = "ACTIVITY")
 @UuidGenerator(name = "uuid")
 public class Activity implements Comparable<Activity>, Serializable {
 
@@ -67,22 +66,24 @@ public class Activity implements Comparable<Activity>, Serializable {
 
 	/** The task the activity is associated with */
 	@ManyToOne
-	private TrackedTask trackedtask;
+	@JoinColumn(name = "TASK_ID", referencedColumnName = "TASK_ID")
+	@JoinColumn(name = "REPOSITORY_URL", referencedColumnName = "REPOSITORY_URL")
+	private Task task;
 
 	/** The project this activity is associated with, if not associated with a tracked task */
 	@ManyToOne
-	@JoinColumn(name = "PROJECT")
+	@JoinColumn(name = "ACTIVITY_PROJECT")
 	private Project project;
 
 	/** A short summary of the activity */
-	@Column
+	@Column(name = "SUMMARY")
 	private String summary;
 
 	public Activity() {
 	}
 
-	public Activity(TrackedTask trackedtask, LocalDateTime start) {
-		this.trackedtask = trackedtask;
+	public Activity(Task task, LocalDateTime start) {
+		this.task = task;
 		this.start = start;
 		StringBuilder sb = new StringBuilder();
 		sb.append("Activity started on ");
@@ -177,8 +178,8 @@ public class Activity implements Comparable<Activity>, Serializable {
 		return manual;
 	}
 
-	public TrackedTask getTrackedTask() {
-		return trackedtask;
+	public Task getTrackedTask() {
+		return task;
 	}
 
 	public String getSummary() {
@@ -203,7 +204,7 @@ public class Activity implements Comparable<Activity>, Serializable {
 		result = prime * result + (manual ? 1231 : 1237);
 		result = prime * result + ((start == null) ? 0 : start.hashCode());
 		result = prime * result + ((summary == null) ? 0 : summary.hashCode());
-		result = prime * result + ((trackedtask == null) ? 0 : trackedtask.hashCode());
+		result = prime * result + ((task == null) ? 0 : task.hashCode());
 		return result;
 	}
 
@@ -238,10 +239,10 @@ public class Activity implements Comparable<Activity>, Serializable {
 				return false;
 		} else if (!summary.equals(other.summary))
 			return false;
-		if (trackedtask == null) {
-			if (other.trackedtask != null)
+		if (task == null) {
+			if (other.task != null)
 				return false;
-		} else if (!trackedtask.equals(other.trackedtask))
+		} else if (!task.equals(other.task))
 			return false;
 		return true;
 	}

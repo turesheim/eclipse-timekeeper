@@ -27,7 +27,7 @@ import org.eclipse.ui.themes.IThemeManager;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.Project;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Task;
 
 /**
  * Provides label decorations for the columns containing time spent on each
@@ -53,13 +53,13 @@ abstract class TimeColumnLabelProvider extends ColumnLabelProvider {
 
 	@Override
 	public Font getFont(Object element) {
-		if (element instanceof TrackedTask) {
-			if (((TrackedTask) element).getMylynTask() != null && ((TrackedTask) element).getMylynTask().isActive()) {
+		if (element instanceof Task) {
+			if (((Task) element).getMylynTask() != null && ((Task) element).getMylynTask().isActive()) {
 				return JFaceResources.getFontRegistry().getBold(JFaceResources.DIALOG_FONT);
 			}
 		}
 		if (element instanceof Activity) {
-			TrackedTask trackedTask = ((Activity) element).getTrackedTask();
+			Task trackedTask = ((Activity) element).getTrackedTask();
 			TimekeeperPlugin.getDefault();
 			ITask task = trackedTask.getMylynTask();
 			if (task != null && task.isActive()) {

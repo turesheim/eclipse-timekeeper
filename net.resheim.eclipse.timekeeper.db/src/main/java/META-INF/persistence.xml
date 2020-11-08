@@ -4,11 +4,13 @@
 	xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/persistence http://xmlns.jcp.org/xml/ns/persistence/persistence_2_1.xsd">
 	<persistence-unit name="net.resheim.eclipse.timekeeper.db" transaction-type="RESOURCE_LOCAL">
 		<provider>org.eclipse.persistence.jpa.PersistenceProvider</provider>
-		<class>net.resheim.eclipse.timekeeper.db.model.Activity</class>
-		<class>net.resheim.eclipse.timekeeper.db.model.TrackedTask</class>
 		<class>net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConverter</class>
-		<class>net.resheim.eclipse.timekeeper.db.model.TrackedTaskId</class>
+		<class>net.resheim.eclipse.timekeeper.db.model.Activity</class>
+		<class>net.resheim.eclipse.timekeeper.db.model.GlobalTaskId</class>
+		<class>net.resheim.eclipse.timekeeper.db.model.Label</class>
 		<class>net.resheim.eclipse.timekeeper.db.model.Project</class>
+		<class>net.resheim.eclipse.timekeeper.db.model.ProjectType</class>
+		<class>net.resheim.eclipse.timekeeper.db.model.Task</class>
 		<exclude-unlisted-classes>false</exclude-unlisted-classes>
 		<properties>
 			<property name="eclipselink.ddl-generation" value="create-tables" />

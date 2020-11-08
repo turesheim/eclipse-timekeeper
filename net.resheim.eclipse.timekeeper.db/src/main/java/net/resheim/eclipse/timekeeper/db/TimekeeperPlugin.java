@@ -72,8 +72,10 @@ import org.slf4j.LoggerFactory;
 
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.Project;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTaskId;
+import net.resheim.eclipse.timekeeper.db.model.ProjectType;
+import net.resheim.eclipse.timekeeper.db.model.Task;
+import net.resheim.eclipse.timekeeper.db.model.TaskLinkStatus;
+import net.resheim.eclipse.timekeeper.db.model.GlobalTaskId;
 import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
 
 /**
@@ -123,6 +125,12 @@ public class TimekeeperPlugin extends Plugin {
 	private static final String LOCAL_REPO_ID = "local";
 
 	private static final String LOCAL_REPO_KEY_ID = "net.resheim.eclipse.timekeeper.repo-id"; //$NON-NLS-1$
+	
+	/**
+	 * Some features connected to Mylyn has no knowledge of Timekeeper tasks and in
+	 * order to avoid excessive lookups in the database, we utilise a simple cache.
+	 */
+	private static Map<ITask, Task> linkCache = new HashMap<>();
 
 	public void addListener(DatabaseChangeListener listener) {
 		listeners.add(listener);
@@ -184,21 +192,21 @@ public class TimekeeperPlugin extends Plugin {
 					log.info("Using database at '{}'", jdbc_url);
 
 					// baseline the database
-					Flyway flyway = Flyway.configure()
-							.dataSource(jdbc_url, "sa", "")
-							.baselineOnMigrate(false)
-							.locations("classpath:/db/").load();
-					flyway.migrate();
+//					Flyway flyway = Flyway.configure()
+//							.dataSource(jdbc_url, "sa", "")
+//							.baselineOnMigrate(false)
+//							.locations("classpath:/db/").load();
+//					flyway.migrate();
 					// https://www.eclipse.org/forums/index.php?t=msg&goto=541155&
 					props.put(PersistenceUnitProperties.CLASSLOADER, TimekeeperPlugin.class.getClassLoader());
 					props.put(PersistenceUnitProperties.JDBC_URL, jdbc_url);
 					props.put(PersistenceUnitProperties.JDBC_DRIVER, "org.h2.Driver");
 					props.put(PersistenceUnitProperties.JDBC_USER, "sa");
 					props.put(PersistenceUnitProperties.JDBC_PASSWORD, "");
-					props.put(PersistenceUnitProperties.LOGGING_LEVEL, "info"); // fine
-					// we want Flyway to create the database, it gives us better control over
-					// migrating
-					props.put(PersistenceUnitProperties.DDL_GENERATION, "none");
+					props.put(PersistenceUnitProperties.LOGGING_LEVEL, "fine"); // fine / fine
+					// we want Flyway to create the database, it gives us better control over migrating?
+//					props.put(PersistenceUnitProperties.DDL_GENERATION, "create-tables");
+//					props.put(PersistenceUnitProperties.JAVASE_DB_INTERACTION, "true");
 					createEntityManager(props);
 				} catch (Exception e) {
 					throw new RuntimeException("Could not connect to Timekeeper database at " + jdbc_url, e);
@@ -215,7 +223,7 @@ public class TimekeeperPlugin extends Plugin {
 	private static void createEntityManager(Map<String, Object> props) {
 		entityManager = new PersistenceProvider()
 				.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
-				.createEntityManager();
+				.createEntityManager(props);
 	}
 
 	public class WorkspaceSaveParticipant implements ISaveParticipant {
@@ -275,10 +283,10 @@ public class TimekeeperPlugin extends Plugin {
 	 * applied using data from Mylyn.
 	 */
 	private void cleanTaskActivities() {
-		TypedQuery<TrackedTask> createQuery = entityManager.createQuery("SELECT tt FROM TRACKEDTASK tt",
-				TrackedTask.class);
-		List<TrackedTask> resultList = createQuery.getResultList();
-		for (TrackedTask trackedTask : resultList) {
+		TypedQuery<Task> createQuery = entityManager.createQuery("SELECT t FROM Task t",
+				Task.class);
+		List<Task> resultList = createQuery.getResultList();
+		for (Task trackedTask : resultList) {
 			trackedTask.getCurrentActivity().ifPresent(activity -> {
 				ITask task = trackedTask.getMylynTask() == null ? getMylynTask(trackedTask)
 						: trackedTask.getMylynTask();
@@ -316,46 +324,50 @@ public class TimekeeperPlugin extends Plugin {
 	}
 
 	/**
-	 * Returns the Timekeeper {@link TrackedTask} associated with the given Mylyn
-	 * task. If no such task exists it will be created. Note at this method call
-	 * should be wrapped in a transaction to make sure the new entity will be
-	 * created.
+	 * Returns the Timekeeper {@link Task} associated with the given Mylyn
+	 * task. If no such task exists it will be created.
 	 * 
 	 * @param task the Mylyn task
-	 * @return a {@link TrackedTask} associated with the Mylyn task
+	 * @return a {@link Task} associated with the Mylyn task
 	 * @throws InterruptedException
 	 */
-	public TrackedTask getTask(ITask task) {
+	public Task getTask(ITask task) {
 		// the UI will typically attempt to get some task details before the database is ready 
 		if (entityManager == null) {
 			return null;
 		}
-		TrackedTaskId id = new TrackedTaskId(TimekeeperPlugin.getRepositoryUrl(task), task.getTaskId());
-		TrackedTask found = entityManager.find(TrackedTask.class, id);
+		if (linkCache.containsKey(task)) {
+			return linkCache.get(task);
+		}
+		GlobalTaskId id = new GlobalTaskId(TimekeeperPlugin.getRepositoryUrl(task), task.getTaskId());
+		Task found = entityManager.find(Task.class, id);
 		if (found == null) {
 			// no such tracked task exists, create one
-			TrackedTask tt = new TrackedTask(task);
+			Task tt = new Task(task);
 			entityManager.persist(tt);
+			linkCache.put(task, tt);
 			return tt;
 		} else {
+			log.info("Task '{}' was not linked with Mylyn task", found);
 			// make sure there is a link between the two tasks, this would be the case if the tracked task was just
 			// loaded from the database
-			if (found.getMylynTask() == null) { 
-				found.setMylynTask(task);
+			if (found.getTaskLinkStatus().equals(TaskLinkStatus.UNDETERMINED)) { 
+				found.linkWithMylynTask(task);
 				entityManager.persist(found);
 			}
+			linkCache.put(task, found);
 			return found;
 		}
 	}
 
 	/**
-	 * Returns the Mylyn {@link ITask} associated with the given {@link TrackedTask}
+	 * Returns the Mylyn {@link ITask} associated with the given {@link Task}
 	 * task. If no such task exists <code>null</code> will be returned.
 	 * 
 	 * @param task the time tracked task
 	 * @return a Mylyn task or <code>null</code>
 	 */
-	public static ITask getMylynTask(TrackedTask task) {
+	public static ITask getMylynTask(Task task) {
 		// get the repository then find the task. Seems like the Mylyn API is
 		// a bit limited in this area as I could not find something more usable
 		Optional<TaskRepository> tr = TasksUi
@@ -371,7 +383,7 @@ public class TimekeeperPlugin extends Plugin {
 
 	/**
 	 * Exports Timekeeper related data to two separate CSV files. One for
-	 * {@link TrackedTask}, another for {@link Activity} instances and yet another
+	 * {@link Task}, another for {@link Activity} instances and yet another
 	 * for the relations between these two.
 	 * 
 	 * TODO: Compress into zip
@@ -435,10 +447,10 @@ public class TimekeeperPlugin extends Plugin {
 			entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE;").executeUpdate();
 			transaction.commit();
 			// update all instances with potentially new content
-			TypedQuery<TrackedTask> createQuery = entityManager.createQuery("SELECT tt FROM TRACKEDTASK tt",
-					TrackedTask.class);
-			List<TrackedTask> resultList = createQuery.getResultList();
-			for (TrackedTask trackedTask : resultList) {
+			TypedQuery<Task> createQuery = entityManager.createQuery("SELECT t FROM Task t",
+					Task.class);
+			List<Task> resultList = createQuery.getResultList();
+			for (Task trackedTask : resultList) {
 				entityManager.refresh(trackedTask);
 			}
 			return tasksImported + activitiesImported;
@@ -574,16 +586,36 @@ public class TimekeeperPlugin extends Plugin {
 	}
 	
 	public static Project getProject(String title) {
-		Project found = entityManager.find(Project.class, title);
-		if (found == null) {
-			Project project = new Project(title);
-			EntityTransaction transaction = entityManager.getTransaction();
+		return entityManager.find(Project.class, title);
+	}
+	
+	/**
+	 * Creates a new {@link Project} based on information obtained from the Mylyn task. A {@link ProjectType} will also
+	 * be created if it does not already exist.
+	 *  
+	 * @param task
+	 * @return
+	 */
+	public static Project createAndSaveProject(ITask task) {
+		EntityTransaction transaction = entityManager.getTransaction();
+		boolean activeTransaction = transaction.isActive();
+		String name = getMylynProjectName(task);
+		String typeId = task.getConnectorKind();
+		ProjectType type = entityManager.find(ProjectType.class, typeId);
+		if (!activeTransaction) {
 			transaction.begin();
-			entityManager.persist(project);
-			transaction.commit();
-			return project;
 		}
-		return found;
+		if (type == null) {
+			type = new ProjectType(typeId);
+			entityManager.persist(type);
+		}
+		Project project = new Project(type, name);
+		entityManager.persist(project);
+		if (!activeTransaction) {
+			transaction.commit();
+		}
+		return project;
+		
 	}
 
 	/**
@@ -591,18 +623,18 @@ public class TimekeeperPlugin extends Plugin {
 	 * 
 	 * @return a stream of tasks
 	 */
-	public static Stream<TrackedTask> getTasks(LocalDate startDate) {
+	public static Stream<Task> getTasks(LocalDate startDate) {
 		if (entityManager == null) {
 			return Stream.empty();
 		}
-		return entityManager.createNamedQuery("TrackedTask.findAll", TrackedTask.class)
+		return entityManager.createNamedQuery("Task.findAll", Task.class)
 				.getResultStream()
 				// TODO: Move filtering to database
 				.filter(tt -> hasData(tt, startDate))
-				.map(TimekeeperPlugin::assignMylynTask);
+				.map(TimekeeperPlugin::linkWithMylynTask);
 	}
 	
-	private static boolean hasData/* this week */(TrackedTask task, LocalDate startDate) {
+	private static boolean hasData/* this week */(Task task, LocalDate startDate) {
 		// this should only be NULL if the database has not started yet. See databaseStateChanged()
 		if (task == null) {
 			return false;
@@ -616,19 +648,25 @@ public class TimekeeperPlugin extends Plugin {
 	}
 
 	/**
-	 * Using the URL and identifier of
-	 * @param tt
-	 * @return
+	 * Links the given task with a Mylyn task if found in any of the workspace task
+	 * repositories. If a local task could not be found the tracked task will be
+	 * flagged as unlinked for the current workspace.
+	 * 
+	 * @param tt the tracked task
+	 * @return the modified tracked task
 	 */
-	private static TrackedTask assignMylynTask(TrackedTask tt) {
+	private static Task linkWithMylynTask(Task tt) {
 		Optional<TaskRepository> tr = TasksUi.getRepositoryManager()
 				.getAllRepositories()
 				.stream()
 				.filter(r -> r.getRepositoryUrl().equals(tt.getRepositoryUrl())).findFirst();
 		if (tr.isPresent()) {
-			tt.setMylynTask(TasksUi.getRepositoryModel().getTask(tr.get(), tt.getTaskId()));
+			tt.linkWithMylynTask(TasksUi.getRepositoryModel().getTask(tr.get(), tt.getTaskId()));
+			tt.setTaskLinkStatus(TaskLinkStatus.LINKED);
+		} else {
+			tt.setTaskLinkStatus(TaskLinkStatus.UNLINKED);
 		}
-		return (TrackedTask)tt;
+		return tt;
 	}
 
 	/**
@@ -678,15 +716,20 @@ public class TimekeeperPlugin extends Plugin {
 			return;
 		}
 		EntityTransaction transaction = entityManager.getTransaction();
-		transaction.begin();
-		TrackedTask ttask = getTask(task);
+		boolean activeTransaction = transaction.isActive();
+		if (!activeTransaction) {
+			transaction.begin();
+		}
+		Task ttask = getTask(task);
 		if (ttask != null) {
 			Activity activity = ttask.startActivity();
 			entityManager.persist(activity);
 			log.debug("Activating task '{}'", task);
 			notifyListeners();
 		}
-		transaction.commit();
+		if (!activeTransaction) {
+			transaction.commit();
+		}
 	}
 
 	/**
@@ -695,13 +738,18 @@ public class TimekeeperPlugin extends Plugin {
 	 * @param task the Mylyn task to start
 	 */
 	public void endMylynTask(ITask task) {
-		TrackedTask ttask = getTask(task);
+		Task ttask = getTask(task);
 		if (ttask != null) {
 			Activity activity = ttask.endActivity();
 			EntityTransaction transaction = entityManager.getTransaction();
-			transaction.begin();
+			boolean activeTransaction = transaction.isActive();
+			if (!activeTransaction) {
+				transaction.begin();
+			}
 			entityManager.persist(activity);
-			transaction.commit();
+			if (!activeTransaction) {
+				transaction.commit();
+			}
 			log.debug("Dectivating task '{}'", task);
 		}
 	}

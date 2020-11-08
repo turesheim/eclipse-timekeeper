@@ -16,7 +16,7 @@ import javax.persistence.Column;
 import javax.persistence.Embeddable;
 
 @Embeddable
-public class TrackedTaskId implements Serializable {
+public class GlobalTaskId implements Serializable {
 
 	private static final long serialVersionUID = 109302590471553755L;
 
@@ -26,7 +26,7 @@ public class TrackedTaskId implements Serializable {
 	@Column(name = "TASK_ID")
 	private String taskId;
 
-	public TrackedTaskId() {
+	public GlobalTaskId() {
 	}
 
 	/**
@@ -36,7 +36,7 @@ public class TrackedTaskId implements Serializable {
 	 * @param repositoryUrl the task repository URL
 	 * @param taskId        the task identifier within the repository
 	 */
-	public TrackedTaskId(String repositoryUrl, String taskId) {
+	public GlobalTaskId(String repositoryUrl, String taskId) {
 		super();
 		this.repositoryUrl = repositoryUrl;
 		this.taskId = taskId;
@@ -53,8 +53,8 @@ public class TrackedTaskId implements Serializable {
 
 	@Override
 	public boolean equals(Object obj) {
-		if (obj instanceof TrackedTaskId) {
-			TrackedTaskId other = (TrackedTaskId) obj;
+		if (obj instanceof GlobalTaskId) {
+			GlobalTaskId other = (GlobalTaskId) obj;
 			return other.getRepositoryUrl().equals(getRepositoryUrl()) && other.getTaskId().equals(getTaskId());
 		}
 		return false;

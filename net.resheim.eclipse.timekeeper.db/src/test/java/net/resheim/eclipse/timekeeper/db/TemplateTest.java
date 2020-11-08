@@ -48,7 +48,7 @@ import freemarker.template.Template;
 import freemarker.template.TemplateException;
 import freemarker.template.TemplateNotFoundException;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.db.report.FormatDateTimeMethodModel;
 import net.resheim.eclipse.timekeeper.db.report.FormatDurationMethodModel;
 import net.resheim.eclipse.timekeeper.db.report.GetActivitiesMethodModel;
@@ -91,7 +91,7 @@ public class TemplateTest {
 		}
 		// clean up after running tests
 		transaction.begin();
-		Query createQuery = entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE;TRUNCATE TABLE ACTIVITY;TRUNCATE TABLE TRACKEDTASK;SET REFERENTIAL_INTEGRITY TRUE");
+		Query createQuery = entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE;TRUNCATE TABLE ACTIVITY;TRUNCATE TABLE TASK;SET REFERENTIAL_INTEGRITY TRUE");
 		createQuery.executeUpdate();
 		transaction.commit();
 	}
@@ -128,7 +128,7 @@ public class TemplateTest {
 		return Files.list(Paths.get("templates")).map(f -> f.getFileName().toString());
 	}
 
-	private void persist(TrackedTask ttask) {
+	private void persist(Task ttask) {
 		EntityTransaction transaction = entityManager.getTransaction();
 		transaction.begin();
 		entityManager.persist(ttask);
@@ -138,7 +138,7 @@ public class TemplateTest {
 	/**
 	 * Creates a number of tasks for use in the template test.
 	 */
-	private Set<TrackedTask> createTestTasks() {
+	private Set<Task> createTestTasks() {
 		int vi = 0;
 		int si = 0;
 		TaskList tl = new TaskList();
@@ -148,13 +148,13 @@ public class TemplateTest {
 		};
 		tl.addCategory(projects[0]);
 		tl.addCategory(projects[1]);
-		Set<TrackedTask> tasks = new HashSet<>();
+		Set<Task> tasks = new HashSet<>();
 		// for each day of the week, create one task
 		for (int i = 1; i < 7; i++) {
 			AbstractTask mylynTask = new LocalTask(String.valueOf(i), "Task #" + i);
 //			tasks.add(mylynTask);
 			tl.addTask(mylynTask, projects[i%2]);
-			TrackedTask task = new TrackedTask();
+			Task task = new Task();
 			// for each task, create one activity 
 			for (int d = 1; d < 3 + (d%i); d++) {
 				int offset = d + i - 2;

@@ -33,7 +33,7 @@ import org.eclipse.swt.widgets.Display;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Task;
 
 @SuppressWarnings("restriction")
 public class TestUtility {
@@ -42,7 +42,7 @@ public class TestUtility {
 	
 	private static final int RADIUS = 32;
 
-	static void createActivity(int dayOfWeek, TrackedTask ttask, String text) {
+	static void createActivity(int dayOfWeek, Task ttask, String text) {
 		LocalDateTime now = LocalDateTime.now();
 		TemporalField fieldISO = WeekFields.of(Locale.getDefault()).dayOfWeek();
 		LocalDateTime start = now.with(fieldISO, dayOfWeek);
@@ -58,7 +58,7 @@ public class TestUtility {
 		transaction.commit();
 	}
 
-	static TrackedTask createTask(TaskList tl, String category, String id, String text) {
+	static Task createTask(TaskList tl, String category, String id, String text) {
 		Optional<AbstractTaskCategory> o = tl.getCategories().stream().filter(c -> c.getHandleIdentifier().equals(category)).findFirst();
 		AbstractTaskCategory c = o.orElseGet(() -> {
 			TaskCategory tc = new TaskCategory(category, category);
@@ -67,7 +67,7 @@ public class TestUtility {
 		});
 		ITask task = new LocalTask(id, text);
 		tl.addTask(task, c);
-		return new TrackedTask(task);
+		return new Task(task);
 	}
 
 	/**

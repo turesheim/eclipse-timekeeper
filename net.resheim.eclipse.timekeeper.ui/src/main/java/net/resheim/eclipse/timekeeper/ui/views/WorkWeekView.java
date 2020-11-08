@@ -76,7 +76,7 @@ import org.eclipse.ui.part.ViewPart;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.Project;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 @SuppressWarnings("restriction")
@@ -445,7 +445,7 @@ public class WorkWeekView extends ViewPart {
 					seconds = getSum(contentProvider.getFiltered(), date, (Project) element);
 				} else if (element instanceof ITask) {
 					AbstractTask task = (AbstractTask) element;
-					TrackedTask trackedTask = TimekeeperPlugin.getDefault().getTask(task);
+					Task trackedTask = TimekeeperPlugin.getDefault().getTask(task);
 					if (trackedTask != null) {
 						seconds = trackedTask.getDuration(contentProvider.getDate(weekday)).getSeconds();
 					}
@@ -482,9 +482,9 @@ public class WorkWeekView extends ViewPart {
 		manager.add(nextWeekAction);
 		ISelection selection = viewer.getSelection();
 		Object obj = ((IStructuredSelection) selection).getFirstElement();
-		if (obj instanceof TrackedTask) {
+		if (obj instanceof Task) {
 			manager.add(new Separator("task"));
-			if (((TrackedTask) obj).getMylynTask().isActive()) {
+			if (((Task) obj).getMylynTask().isActive()) {
 				manager.add(deactivateAction);
 			} else {
 				manager.add(activateAction);
@@ -527,7 +527,7 @@ public class WorkWeekView extends ViewPart {
 	 *            the date to calculate for
 	 * @return the total amount of seconds accumulated
 	 */
-	private long getSum(Set<TrackedTask> filtered, LocalDate date) {
+	private long getSum(Set<Task> filtered, LocalDate date) {
 		// May not have been initialised when first called.
 		if (filtered == null) {
 			return 0;
@@ -549,7 +549,7 @@ public class WorkWeekView extends ViewPart {
 	 *            the project to calculate for
 	 * @return the total amount of seconds accumulated
 	 */
-	private long getSum(Set<TrackedTask> filtered, LocalDate date, Project project) {
+	private long getSum(Set<Task> filtered, LocalDate date, Project project) {
 		return filtered
 				.stream()
 				.filter(t -> t != null)
@@ -635,8 +635,8 @@ public class WorkWeekView extends ViewPart {
 			public void run() {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
-				if (obj instanceof TrackedTask) {
-					TasksUiUtil.openTask(((TrackedTask) obj).getMylynTask());
+				if (obj instanceof Task) {
+					TasksUiUtil.openTask(((Task) obj).getMylynTask());
 				}
 			}
 		};
@@ -647,8 +647,8 @@ public class WorkWeekView extends ViewPart {
 			public void run() {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
-				if (obj instanceof TrackedTask) {
-					TasksUi.getTaskActivityManager().deactivateTask(((TrackedTask) obj).getMylynTask());
+				if (obj instanceof Task) {
+					TasksUi.getTaskActivityManager().deactivateTask(((Task) obj).getMylynTask());
 				}
 			}
 		};
@@ -659,8 +659,8 @@ public class WorkWeekView extends ViewPart {
 			public void run() {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
-				if (obj instanceof TrackedTask) {
-					TasksUi.getTaskActivityManager().activateTask(((TrackedTask) obj).getMylynTask());
+				if (obj instanceof Task) {
+					TasksUi.getTaskActivityManager().activateTask(((Task) obj).getMylynTask());
 				}
 			}
 		};
@@ -671,9 +671,9 @@ public class WorkWeekView extends ViewPart {
 			public void run() {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
-				if (obj instanceof TrackedTask) {
-					((TrackedTask) obj).endActivity();
-					((TrackedTask) obj).startActivity();
+				if (obj instanceof Task) {
+					((Task) obj).endActivity();
+					((Task) obj).startActivity();
 					refresh();
 				}
 			}

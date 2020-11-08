@@ -26,7 +26,7 @@ import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.db.report.model.WorkWeek;
 
 /**
@@ -56,7 +56,7 @@ public class TemplateExporter extends AbstractExporter {
 			Template template = configuration.getTemplate(reportTemplate.getName());
 			StringWriter out = new StringWriter();
 
-			Set<TrackedTask>filtered = TimekeeperPlugin
+			Set<Task>filtered = TimekeeperPlugin
 					.getTasks(firstDateOfWeek)
 					.collect(Collectors.toSet());
 

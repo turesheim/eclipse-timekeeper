@@ -32,7 +32,7 @@ import net.resheim.eclipse.timekeeper.db.DatabaseChangeListener;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.Project;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Task;
 
 @SuppressWarnings("restriction")
 public abstract class WeekViewContentProvider implements ITreeContentProvider, DatabaseChangeListener {
@@ -41,11 +41,11 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 
 	private LocalDate firstDayOfWeek;
 
-	protected Set<TrackedTask> filtered = Collections.emptySet();
+	protected Set<Task> filtered = Collections.emptySet();
 
 	private Viewer viewer;
 
-	public Set<TrackedTask> getFiltered() {
+	public Set<Task> getFiltered() {
 		return filtered;
 	}
 
@@ -66,10 +66,10 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 			return filtered
 					.stream()
 					.filter(t -> p.equals(t.getProject()))
-					.toArray(size -> new TrackedTask[size]);
+					.toArray(size -> new Task[size]);
 		}
-		if (parentElement instanceof TrackedTask) {
-			return ((TrackedTask) parentElement).getActivities()
+		if (parentElement instanceof Task) {
+			return ((Task) parentElement).getActivities()
 					.stream()
 					.filter(this::hasData)
 					.toArray();
@@ -80,7 +80,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	public Object[] getElements(Object parent) {
 		Object[] projects = filtered
 				.stream()
-				.map(TrackedTask::getProject)
+				.map(Task::getProject)
 				.filter(distinctByKey(Project::getName))
 				.toArray();
 		if (projects.length == 0) {
@@ -107,7 +107,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 
 	@Override
 	public boolean hasChildren(Object element) {
-		if (element instanceof TrackedTask) {
+		if (element instanceof Task) {
 			return true;
 		}
 		if (element instanceof Project) {
