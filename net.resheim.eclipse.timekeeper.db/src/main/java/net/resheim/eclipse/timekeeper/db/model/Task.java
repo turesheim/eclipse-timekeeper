@@ -21,9 +21,11 @@ import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Convert;
 import javax.persistence.Entity;
+import javax.persistence.FetchType;
 import javax.persistence.Id;
 import javax.persistence.IdClass;
 import javax.persistence.JoinColumn;
@@ -31,6 +33,7 @@ import javax.persistence.ManyToOne;
 import javax.persistence.NamedQuery;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
+import javax.persistence.Table;
 import javax.persistence.Transient;
 
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
@@ -43,23 +46,20 @@ import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConverter;
 
 /**
- * A {@link TrackedTask} is the persisted link to an {@link AbstractTask}. It
- * holds a number of {@link Activity} instances which each represent a period of
- * work on the task.
- * <p>
- * Mylyn tasks from the same repository in multiple workspaces must have the ID
- * field updated.
- * </p>
+ * A {@link Task} is the persisted link to an {@link AbstractTask}. It holds a
+ * number of {@link Activity} instances which each represent a period of work on
+ * the task.
  * 
  * @author Torkild U. Resheim
  */
 @SuppressWarnings("restriction")
-@Entity(name = "TRACKEDTASK")
-@IdClass(value = TrackedTaskId.class)
-@NamedQuery(name="TrackedTask.findAll", query="SELECT t FROM TRACKEDTASK t")
-public class TrackedTask implements Serializable {
-
-	private static final long serialVersionUID = 2025738836825780128L;
+@Entity
+@Table(name = "TASK")
+@IdClass(value = GlobalTaskId.class)
+@NamedQuery(name="Task.findAll", query="SELECT t FROM Task t")
+public class Task implements Serializable {
+	
+	private static final long serialVersionUID = -2455754936217658613L;
 
 	@Transient
 	private transient Lock lock = new ReentrantLock();
@@ -73,8 +73,8 @@ public class TrackedTask implements Serializable {
 	private String taskId;
 
 	@ManyToOne
-	@JoinColumn(name = "PROJECT")
-	private Project project;
+	@JoinColumn(name = "TASK_PROJECT")
+	private Project taskProject;
 	
 	@Column(name = "TASK_URL")
 	private String taskUrl;
@@ -91,13 +91,21 @@ public class TrackedTask implements Serializable {
 	@Column(name = "TICK")
 	private LocalDateTime tick;
 
-	@OneToMany(cascade = javax.persistence.CascadeType.ALL)
+	@OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
 	private List<Activity> activities;
 	
+	/** Optional link to a Mylyn task */
 	@Transient
-	private transient ITask task;
+	private transient ITask mylynTask;
+	
+	/**
+	 * Used to determine wheter or not this task has been linked to a corresponding
+	 * Mylyn task or if an attempt has been made.
+	 */
+	@Transient
+	private transient TaskLinkStatus taskLinkStatus = TaskLinkStatus.UNDETERMINED;
 
-	public TrackedTask() {
+	public Task() {
 		activities = new ArrayList<>();
 	}
 
@@ -107,11 +115,11 @@ public class TrackedTask implements Serializable {
 	 * 
 	 * @param task the associated Mylyn task
 	 */
-	public TrackedTask(ITask task) {
+	public Task(ITask task) {
 		this();
-		setMylynTask(task);
-		if (project != null) {
-			project.addTask(this);
+		linkWithMylynTask(task);
+		if (taskProject != null) {
+			taskProject.addTask(this);
 		}
 	}
 
@@ -223,9 +231,9 @@ public class TrackedTask implements Serializable {
 	 * 
 	 * @param task the Mylyn task
 	 */
-	public void setMylynTask(ITask task) {
+	public void linkWithMylynTask(ITask task) {
 		// associate this tracked task with the Mylyn task
-		this.task = task;
+		this.mylynTask = task;
 		taskId = task.getTaskId();
 		repositoryUrl = TimekeeperPlugin.getRepositoryUrl(task);
 		taskUrl = task.getUrl();
@@ -245,10 +253,13 @@ public class TrackedTask implements Serializable {
 					projectName = p.getSummary();
 				}
 				// the project is probably already in the database
-				this.setProject(TimekeeperPlugin.getProject(projectName));
+				Project project = TimekeeperPlugin.getProject(projectName);
+				if (project == null) {
+					project = TimekeeperPlugin.createAndSaveProject(task);
+				}
+				this.setProject(project);
 			});
 		}
-
 	}
 
 	/**
@@ -306,24 +317,32 @@ public class TrackedTask implements Serializable {
 
 	/**
 	 * Returns the referenced {@link ITask} if available. If not, it can be obtained
-	 * from {@link TimekeeperPlugin#getMylynTask(TrackedTask)} which will examine the
+	 * from {@link TimekeeperPlugin#getMylynTask(Task)} which will examine the
 	 * Mylyn task repository.
 	 * 
 	 * @return the {@link ITask} or <code>null</code>
 	 */
 	public ITask getMylynTask() {
-		return task;
+		return mylynTask;
 	}
 
 	public Project getProject() {
-		return project;
+		return taskProject;
 	}
 
 	public void setProject(Project project) {
-		this.project = project;
-		this.project.addTask(this);
+		this.taskProject = project;
+		this.taskProject.addTask(this);
 	}
 	
+	public TaskLinkStatus getTaskLinkStatus() {
+		return taskLinkStatus;
+	}
+
+	public void setTaskLinkStatus(TaskLinkStatus taskLinkStatus) {
+		this.taskLinkStatus = taskLinkStatus;
+	}
+
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
 		sb.append(taskId);

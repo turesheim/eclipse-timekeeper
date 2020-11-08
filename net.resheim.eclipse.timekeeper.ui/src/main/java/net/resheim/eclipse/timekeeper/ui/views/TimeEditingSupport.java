@@ -26,7 +26,7 @@ import org.eclipse.mylyn.tasks.core.ITask;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Task;
 
 /**
  * Allows editing of the period an activity lasts if it starts or ends on the
@@ -108,7 +108,7 @@ class TimeEditingSupport extends EditingSupport {
 	protected void setValue(Object element, Object value) {
 		if (element instanceof Activity) {
 			if (value instanceof String) {
-				TrackedTask trackedTask = ((Activity) element).getTrackedTask();
+				Task trackedTask = ((Activity) element).getTrackedTask();
 				ITask task = trackedTask.getMylynTask();
 				LocalDateTime start = ((Activity) element).getStart();
 				// has time point or range been specified...

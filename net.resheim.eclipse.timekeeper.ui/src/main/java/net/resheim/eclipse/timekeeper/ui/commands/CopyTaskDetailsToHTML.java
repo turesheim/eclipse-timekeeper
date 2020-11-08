@@ -24,7 +24,7 @@ import org.eclipse.swt.dnd.Transfer;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.handlers.HandlerUtil;
 
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Task;
 
 public class CopyTaskDetailsToHTML extends AbstractHandler implements IHandler {
 
@@ -32,13 +32,13 @@ public class CopyTaskDetailsToHTML extends AbstractHandler implements IHandler {
 	public Object execute(ExecutionEvent event) throws ExecutionException {
 		ISelection selection = HandlerUtil.getCurrentSelection(event);
 		Object obj = ((IStructuredSelection) selection).getFirstElement();
-		if (obj instanceof TrackedTask) {
-			copyTaskAsHTML((TrackedTask) obj);
+		if (obj instanceof Task) {
+			copyTaskAsHTML((Task) obj);
 		}
 		return null;
 	}
 
-	public void copyTaskAsHTML(TrackedTask task) {
+	public void copyTaskAsHTML(Task task) {
 		StringBuilder sb = new StringBuilder();
 		String taskKey = task.getTaskId();
 		if (taskKey != null) {

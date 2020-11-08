@@ -53,7 +53,7 @@ import org.junit.runner.RunWith;
 
 import net.resheim.eclipse.timekeeper.db.DatabaseChangeListener;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.model.TrackedTask;
+import net.resheim.eclipse.timekeeper.db.model.Task;
 
 @SuppressWarnings("restriction")
 @RunWith(SWTBotJunit4ClassRunner.class)
@@ -136,13 +136,13 @@ public class IntegrationTest {
 		bot.getDisplay().syncExec(() ->  {
 			// TODO: why is this required?
 			//TasksUi.getTaskActivityManager().activateTask(ttask_1.getTask());
-			TrackedTask ttask = TestUtility.createTask(tl, "Timekeeper for Eclipse", "152", "Set up test rig for user interface tests");
+			Task ttask = TestUtility.createTask(tl, "Timekeeper for Eclipse", "152", "Set up test rig for user interface tests");
 			TestUtility.createActivity(1, ttask, "Rig test plug-in and make it take screenshots");
 			TestUtility.createActivity(1, ttask, "Add tests for the 'Workweek' view");
 			TestUtility.createActivity(3, ttask, "Add test for the preferences dialog");
 			TasksUi.getTaskActivityManager().activateTask(ttask.getMylynTask());
 			bot.sleep(500);
-			TrackedTask ttask_1 = TestUtility.createTask(tl, "Eclipse Science", "1", "Eclipse Science web site");
+			Task ttask_1 = TestUtility.createTask(tl, "Eclipse Science", "1", "Eclipse Science web site");
 			TestUtility.createActivity(3, ttask_1, "Send out e-mail about GitHub repo");
 			//TimekeeperUiPlugin.getActiveTrackedTask().getCurrentActivity().get().setSummary("Add some sensible data for the screenshot");
 		});
