@@ -13,6 +13,8 @@ package net.resheim.eclipse.timekeeper.internal.idle;
 
 public interface IdleTimeDetector {
 
+	public static final long NOT_WORKING = -1000;
+
 	/**
 	 * Get the System Idle Time from the OS.
 	 *
