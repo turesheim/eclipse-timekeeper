@@ -21,6 +21,10 @@ package net.resheim.eclipse.timekeeper.internal.idle;
 import java.util.Arrays;
 import java.util.List;
 
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.ui.statushandlers.StatusManager;
+
 import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Structure;
@@ -44,7 +48,7 @@ public class WindowsIdleTimeDetector implements IdleTimeDetector {
 		 */
 		public int dwTime;
 
-		@SuppressWarnings("rawtypes")
+		@SuppressWarnings({ "rawtypes", "unchecked" })
 		@Override
 		protected List getFieldOrder() {
 			return Arrays.asList("cbSize", "dwTime");
@@ -95,8 +99,14 @@ public class WindowsIdleTimeDetector implements IdleTimeDetector {
 	 */
 	@Override
 	public long getIdleTimeMillis() {
-		LastInputInfo lastInputInfo = new LastInputInfo();
-		User32.INSTANCE.GetLastInputInfo(lastInputInfo);
-		return (long) Kernel32.INSTANCE.GetTickCount() - (long) lastInputInfo.dwTime;
+		try {
+			LastInputInfo lastInputInfo = new LastInputInfo();
+			User32.INSTANCE.GetLastInputInfo(lastInputInfo);
+			return (long) Kernel32.INSTANCE.GetTickCount() - (long) lastInputInfo.dwTime;
+		} catch (Exception e) {
+			IStatus status = new Status(IStatus.ERROR, getClass(), e.getMessage());
+			StatusManager.getManager().handle(status, StatusManager.LOG);
+			return IdleTimeDetector.NOT_WORKING;
+		}
 	}
 }

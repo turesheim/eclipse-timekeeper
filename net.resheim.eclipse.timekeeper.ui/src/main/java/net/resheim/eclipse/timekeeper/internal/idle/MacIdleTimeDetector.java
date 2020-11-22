@@ -18,6 +18,10 @@
 
 package net.resheim.eclipse.timekeeper.internal.idle;
 
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.ui.statushandlers.StatusManager;
+
 import com.sun.jna.Library;
 import com.sun.jna.Native;
 
@@ -74,9 +78,15 @@ public class MacIdleTimeDetector implements IdleTimeDetector {
 	 */
 	@Override
 	public long getIdleTimeMillis() {
-		double idleTimeSeconds = ApplicationServices.INSTANCE.CGEventSourceSecondsSinceLastEventType(
-				ApplicationServices.KCG_EVENT_SOURCE_STATE_COMBINED_SESSION_STATE,
-				ApplicationServices.KCG_ANY_INPUT_EVENT_TYPE);
-		return (long) (idleTimeSeconds * 1000);
+		try {
+			double idleTimeSeconds = ApplicationServices.INSTANCE.CGEventSourceSecondsSinceLastEventType(
+					ApplicationServices.KCG_EVENT_SOURCE_STATE_COMBINED_SESSION_STATE,
+					ApplicationServices.KCG_ANY_INPUT_EVENT_TYPE);
+			return (long) (idleTimeSeconds * 1000);
+		} catch (Exception e) {
+			IStatus status = new Status(IStatus.ERROR, getClass(), e.getMessage());
+			StatusManager.getManager().handle(status, StatusManager.LOG);
+			return NOT_WORKING;
+		}
 	}
 }

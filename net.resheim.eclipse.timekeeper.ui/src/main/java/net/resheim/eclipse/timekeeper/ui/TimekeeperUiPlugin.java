@@ -35,6 +35,7 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
+import org.eclipse.swt.widgets.Shell;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.internal.util.BundleUtility;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
@@ -274,6 +275,14 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 		default:
 			detector = new GenericIdleTimeDetector();
 			break;
+		}
+
+		if (detector.getIdleTimeMillis() == IdleTimeDetector.NOT_WORKING) {
+			Shell shell = PlatformUI.getWorkbench().getModalDialogShellProvider().getShell();
+			MessageDialog.openError(shell, "Idle time detector disabled",
+					"The idle time detector could not be configured due to an error "
+							+ "and will be disabled for this session. See the error log for details.");
+			detector = new GenericIdleTimeDetector();
 		}
 
 		Timer timer = new Timer("Timekeeper", true);

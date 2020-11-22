@@ -21,6 +21,10 @@ package net.resheim.eclipse.timekeeper.internal.idle;
 import java.util.Arrays;
 import java.util.List;
 
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.ui.statushandlers.StatusManager;
+
 import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.NativeLong;
@@ -67,7 +71,7 @@ public class X11IdleTimeDetector implements IdleTimeDetector {
 		 */
 		public NativeLong event_mask;
 
-		@SuppressWarnings("rawtypes")
+		@SuppressWarnings({ "rawtypes", "unchecked" })
 		@Override
 		protected List getFieldOrder() {
 			return Arrays.asList("window", "state", "kind", "til_or_since", "idle", "event_mask");
@@ -124,7 +128,9 @@ public class X11IdleTimeDetector implements IdleTimeDetector {
 			Xss.INSTANCE.XScreenSaverQueryInfo(display, window, info);
 			idleMillis = info.idle.longValue();
 		} catch (UnsatisfiedLinkError e) {
-			throw new RuntimeException(e.getMessage(), e);
+			IStatus status = new Status(IStatus.ERROR, getClass(), e.getMessage());
+			StatusManager.getManager().handle(status, StatusManager.LOG);
+			return IdleTimeDetector.NOT_WORKING;
 		} finally {
 			info = null;
 			if (display != null) {
