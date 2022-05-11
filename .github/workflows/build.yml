@@ -27,7 +27,7 @@ jobs:
       run: sudo apt-get install xvfb
     
     - name: Build with Maven
-      run: xvfb-run --server-args="-screen 0, 1024x768x24" --auto-servernum mvn clean verify -Pother-os -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=10000 -Dscreenshots=${{ github.workspace }}/images  
+      run: xvfb-run --server-args="-screen 0, 1024x768x24" --auto-servernum mvn clean verify -Pother-os -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=20000 -Dscreenshots=${{ github.workspace }}/images  
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
