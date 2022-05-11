@@ -287,7 +287,12 @@ public class IntegrationTest {
 	private SWTBotView prepareWorkweekView() {
 		bot.resetWorkbench();
 		bot.getDisplay().syncExec(() -> bot.getDisplay().getActiveShell().setSize(1024, 400));
+		bot.getDisplay().syncExec(() -> TestUtility.takeScreenshot(screenshotsDir,
+				bot.activeShell().widget, "perspective.png"));
 		SWTBotView view = openViewById("net.resheim.eclipse.timekeeper.ui.views.workWeek");
+		// Take a screenshot for documentation
+		bot.getDisplay().syncExec(() -> TestUtility.takeScreenshot(screenshotsDir,
+				bot.cTabItem(MAIN_VIEW_NAME).widget.getParent().getParent(), "workweek-view-initial.png"));
 		UIThreadRunnable.syncExec(bot.getDisplay(), () -> {
 			ActionFactory.IWorkbenchAction maximizeAction = ActionFactory.MAXIMIZE
 					.create(bot.viewByTitle(MAIN_VIEW_NAME).getViewReference().getPage().getWorkbenchWindow());
