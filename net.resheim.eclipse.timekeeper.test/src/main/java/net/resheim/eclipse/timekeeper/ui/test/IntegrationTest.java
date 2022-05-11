@@ -297,7 +297,7 @@ public class IntegrationTest {
 		view.setFocus();
 		// Take a screenshot for documentation
 		bot.getDisplay().syncExec(() -> TestUtility.takeScreenshot(screenshotsDir,
-				bot.cTabItem(MAIN_VIEW_NAME).widget.getParent().getParent(), "workweek-view.png"));
+				bot.cTabItem(MAIN_VIEW_NAME).widget.getParent(), "workweek-view.png"));
 		return view;
 	}
 	
