@@ -296,8 +296,12 @@ public class IntegrationTest {
 		});
 		view.setFocus();
 		// Take a screenshot for documentation
-		bot.getDisplay().syncExec(() -> TestUtility.takeScreenshot(screenshotsDir,
-				bot.cTabItem(MAIN_VIEW_NAME).widget.getControl().getParent(), "workweek-view.png"));
+		Composite parent = bot.cTabItem(MAIN_VIEW_NAME).widget.getControl().getParent();
+		assertNotNull(parent);
+		bot.getDisplay().syncExec(() -> {
+			TestUtility.takeScreenshot(screenshotsDir,
+					parent, "workweek-view.png");
+		});
 		return view;
 	}
 	
