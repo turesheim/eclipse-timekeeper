@@ -296,7 +296,7 @@ public class IntegrationTest {
 		});
 		view.setFocus();
 		// Take a screenshot for documentation
-		Composite parent = bot.cTabItem(MAIN_VIEW_NAME).widget.getControl().getParent();
+		Composite parent = view.getWidget().getDisplay().getActiveShell();
 		assertNotNull(parent);
 		bot.getDisplay().syncExec(() -> {
 			TestUtility.takeScreenshot(screenshotsDir,
