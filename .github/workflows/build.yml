@@ -32,12 +32,19 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         
-    - name: Upload screenshots repository
+    - name: Upload screenshots
       uses: actions/upload-artifact@v1
       if: always()
       with:
-        name: Test Screenshots
+        name: Screenshots
         path: images
+
+    - name: Upload Failed Tests screenshots
+      uses: actions/upload-artifact@v1
+      if: always()
+      with:
+        name: Failed Tests Screenshots
+        path: net.resheim.eclipse.timekeeper.test/screenshots
 
     - name: Publish Surefire report
       uses: ScaCap/action-surefire-report@v1.0.13
