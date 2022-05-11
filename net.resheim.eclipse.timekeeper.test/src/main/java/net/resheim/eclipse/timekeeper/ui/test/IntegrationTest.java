@@ -161,9 +161,9 @@ public class IntegrationTest {
 		bot.activePart().toolbarButton("Show next week").click();
 		bot.activePart().toolbarButton("Show current week").click();
 		// copy to the clipboard using the default template
-		bot.toolbarDropDownButtonWithTooltip("Export selected week to clipboard").click();
+		bot.activePart().toolbarDropDownButton("Export selected week to clipboard").click();
 		// copy to the clipboard using the basic HTML template
-		bot.toolbarDropDownButtonWithTooltip("Export selected week to clipboard")
+		bot.activePart().toolbarDropDownButton("Export selected week to clipboard")
 				.menuItem("Copy as").click().menu("Basic HTML").click();		
 	}
 	

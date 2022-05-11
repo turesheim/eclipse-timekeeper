@@ -36,14 +36,14 @@ jobs:
       uses: actions/upload-artifact@v1
       if: always()
       with:
-        name: Documentation Screenshots
+        name: Documentation screenshots
         path: images
 
     - name: Upload Failed Tests screenshots
       uses: actions/upload-artifact@v1
       if: always()
       with:
-        name: Failed Tests Screenshots
+        name: Failed tests screenshots
         path: net.resheim.eclipse.timekeeper.test/screenshots
 
     - name: Publish Surefire report
