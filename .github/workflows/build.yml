@@ -7,13 +7,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1          
-    - uses: actions/cache@v1
+    - uses: actions/checkout@v1
+
+    - name: Prepare Maven Cache           
+      uses: actions/cache@v1
       with:
         path: ~/.m2/repository
         key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
         restore-keys: |
           ${{ runner.os }}-maven-
+          
     - name: Set up JDK 11
       uses: actions/setup-java@v2
       with:
@@ -24,11 +27,18 @@ jobs:
       run: sudo apt-get install xvfb
     
     - name: Build with Maven
-      run: xvfb-run --server-args="-screen 0, 1024x768x24" --auto-servernum mvn clean verify -Pother-os -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=10000 
+      run: xvfb-run --server-args="-screen 0, 1024x768x24" --auto-servernum mvn clean verify -Pother-os -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=10000 -Dscreenshots=${project.build.directory}/../../images  
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         
+    - name: Upload screenshots repository
+      uses: actions/upload-artifact@v1
+      if: always()
+      with:
+        name: screenshots
+        path: images
+
     - name: Publish Surefire report
       uses: ScaCap/action-surefire-report@v1.0.13
       if: always()
