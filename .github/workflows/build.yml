@@ -3,28 +3,56 @@ name: Build
 on: [push]
 
 jobs:
-  build:
-
+  Build:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/cache@v1
+
+    - name: Prepare Maven Cache           
+      uses: actions/cache@v1
       with:
         path: ~/.m2/repository
         key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
         restore-keys: |
           ${{ runner.os }}-maven-
+          
     - name: Set up JDK 11
-      uses: actions/setup-java@v1
+      uses: actions/setup-java@v2
       with:
+        distribution: 'temurin'
         java-version: 11
-    - run: sudo apt-get install xvfb
+        
+    - name: Install Xvfb
+      run: sudo apt-get install xvfb
+    
     - name: Build with Maven
-      run: xvfb-run --auto-servernum mvn clean verify sonar:sonar -Pother-os -Dtycho.localArtifacts=ignore -Dsonar.host.url=https://sonarcloud.io -Dsonar.projectKey=turesheim_eclipse-timekeeper -Dsonar.organization=turesheim-github
+      run: xvfb-run --server-args="-screen 0, 1024x768x24" --auto-servernum mvn clean verify -Pother-os -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=20000 -Dscreenshots=${{ github.workspace }}/images  
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}      
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        
+    - name: Upload Failed Tests screenshots
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: Failed tests screenshots
+        path: net.resheim.eclipse.timekeeper.test/screenshots
+
+    - name: Upload screenshots
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: Documentation screenshots
+        path: images
+
+    - name: Publish Surefire report
+      uses: ScaCap/action-surefire-report@v1.0.13
+      if: always()
+      with:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        report_paths: "**/target/surefire-reports/*.xml"
+                
     - name: Upload p2 repository
       uses: actions/upload-artifact@v1
       with:

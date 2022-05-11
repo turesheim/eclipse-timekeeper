@@ -49,7 +49,7 @@
 	</licenses>
 
 	<properties>
-		<tycho.version>2.1.0</tycho.version>
+		<tycho.version>2.7.0</tycho.version>
 		<tycho.scmUrl>scm:git:git://github.com/turesheim/eclipse-timekeeper.git</tycho.scmUrl>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.source>11</maven.compiler.source>
@@ -103,9 +103,19 @@
 							<arch>x86_64</arch>
 						</environment>
 						<environment>
+							<os>linux</os>
+							<ws>gtk</ws>
+							<arch>aarch64</arch>
+						</environment>
+						<environment>
 							<os>macosx</os>
 							<ws>cocoa</ws>
 							<arch>x86_64</arch>
+						</environment>
+						<environment>
+							<os>macosx</os>
+							<ws>cocoa</ws>
+							<arch>aarch64</arch>
 						</environment>
 					</environments>
 					<pomDependencies>consider</pomDependencies>

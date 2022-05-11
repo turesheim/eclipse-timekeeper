@@ -27,7 +27,7 @@
 
 	<!-- don't log matchers, this is very high amount of chatter -->
 	<category name="org.eclipse.swtbot.swt.finder.matchers">
-		<priority value="DEBUG" />
+		<priority value="INFO" />
 	</category>
 
 	<!--
@@ -48,7 +48,7 @@
 	</category>
 
 	<category name="org.eclipse.swtbot">
-		<priority value="ALL" />
+		<priority value="INFO" />
 	</category>
 
 	<root>

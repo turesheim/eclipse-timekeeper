@@ -1,7 +1,7 @@
 target "Eclipse Timekeeper Target Platform" with source requirements
 
 // Base dependencies
-location "http://download.eclipse.org/releases/2020-09/" {
+location "http://download.eclipse.org/releases/2022-03/" {
 	org.eclipse.equinox.p2.sdk.feature.group
 	org.eclipse.sdk.feature.group
 	org.eclipse.pde.core
@@ -23,16 +23,22 @@ location "http://download.eclipse.org/releases/2020-09/" {
 	org.eclipse.sdk [4.13.0,5.0.0)
 	org.eclipse.platform [4.13.0, 5.0.0)
 	org.eclipse.equinox.executable.feature.group
-	// Mylyn bits
-	org.eclipse.mylyn.bugzilla_feature.feature.group
-	org.eclipse.mylyn.commons.feature.group
-	org.eclipse.mylyn.tasks.ide.feature.group
+	// Mylyn GitHub integration
 	org.eclipse.mylyn.github.feature.feature.jar
 	org.eclipse.mylyn.github.feature.feature.group
 }
+// Mylyn bits
+location "http://download.eclipse.org/mylyn/releases/latest" {
+	org.eclipse.mylyn.bugzilla_feature.feature.group
+	org.eclipse.mylyn.commons.feature.group
+	org.eclipse.mylyn.tasks.ide.feature.group
+	org.eclipse.mylyn.commons.notifications.core
+	org.eclipse.mylyn.commons.notifications.feed
+	com.sun.xml.bind
+}
 
 // UI Testing
-location "http://download.eclipse.org/technology/swtbot/releases/3.0.0/" {    
+location "http://download.eclipse.org/technology/swtbot/releases/3.1.0/" {    
 	org.eclipse.swtbot.eclipse.gef.source.feature.group
 	org.eclipse.swtbot.eclipse.gef.feature.group
 	org.eclipse.swtbot.eclipse.source.feature.group
@@ -48,11 +54,6 @@ location "http://download.eclipse.org/technology/swtbot/releases/3.0.0/" {
 	org.eclipse.swtbot.feature.group
 	org.hamcrest.library
 	org.hamcrest.core	
-}
-
-// Atlassian Connector for Eclipse
-location "http://update.atlassian.com/atlassian-eclipse-plugin/rest/e3.7/" {
-	com.atlassian.connector.eclipse.feature.group
 }
 
 location "https://download.eclipse.org/gemini/jpa/updates/" {

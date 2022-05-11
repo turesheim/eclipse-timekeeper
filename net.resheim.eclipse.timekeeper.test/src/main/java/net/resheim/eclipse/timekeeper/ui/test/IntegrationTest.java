@@ -156,24 +156,22 @@ public class IntegrationTest {
 		prepareWorkweekView();
 		assertTrue(bot.viewByTitle(MAIN_VIEW_NAME).isActive());
 		// try the various toolbar buttons
-		bot.toolbarButtonWithTooltip("Show previous week").click();
-		bot.toolbarButtonWithTooltip("Show previous week").click();
-		bot.toolbarButtonWithTooltip("Show next week").click();
-		bot.toolbarButtonWithTooltip("Show current week").click();
+		bot.activePart().toolbarButton("Show previous week").click();
+		bot.activePart().toolbarButton("Show previous week").click();
+		bot.activePart().toolbarButton("Show next week").click();
+		bot.activePart().toolbarButton("Show current week").click();
 		// copy to the clipboard using the default template
-		bot.toolbarDropDownButtonWithTooltip("Export selected week to clipboard").click();
+		bot.activePart().toolbarDropDownButton("Export selected week to clipboard").click();
 		// copy to the clipboard using the basic HTML template
-		bot.toolbarDropDownButtonWithTooltip("Export selected week to clipboard")
+		bot.activePart().toolbarDropDownButton("Export selected week to clipboard")
 				.menuItem("Copy as").click().menu("Basic HTML").click();		
-		// Take a screenshot for documentation
-		bot.getDisplay().syncExec(() -> TestUtility.takeScreenshot(screenshotsDir,
-				bot.cTabItem(MAIN_VIEW_NAME).widget.getParent().getParent(), "workweek-view.png"));
 	}
 	
 	//@Test
 	public void testEditTimeRange() {
-		// ignore this test as it always fails on Travis-CI due to the bot not being able to locate the tree and gets
-		// stuck on the "Find Actions" text editor instead.
+		// ignore this test as it always fails on Travis-CI due to the bot not
+		// being able to locate the tree and gets stuck on the "Find Actions"
+		// text editor instead.
 		if (!Platform.getOS().equals(Platform.OS_LINUX)) {
 			prepareWorkweekView();
 			assertTrue(bot.viewByTitle(MAIN_VIEW_NAME).isActive());
@@ -297,6 +295,11 @@ public class IntegrationTest {
 			maximizeAction.run();			
 		});
 		view.setFocus();
+		// Take a screenshot for documentation
+		bot.getDisplay().syncExec(() -> {
+			TestUtility.takeScreenshot(screenshotsDir,
+					((Composite)bot.activeView().getWidget()).getParent().getParent(), "workweek-view.png");
+		});
 		return view;
 	}
 	
