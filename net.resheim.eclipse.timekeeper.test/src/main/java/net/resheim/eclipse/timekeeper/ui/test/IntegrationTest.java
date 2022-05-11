@@ -296,11 +296,9 @@ public class IntegrationTest {
 		});
 		view.setFocus();
 		// Take a screenshot for documentation
-		Composite parent = view.getWidget().getDisplay().getActiveShell();
-		assertNotNull(parent);
 		bot.getDisplay().syncExec(() -> {
 			TestUtility.takeScreenshot(screenshotsDir,
-					parent, "workweek-view.png");
+					((Composite)bot.activeView().getWidget()).getParent().getParent(), "workweek-view.png");
 		});
 		return view;
 	}
