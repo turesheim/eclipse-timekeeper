@@ -36,7 +36,7 @@ jobs:
       uses: actions/upload-artifact@v1
       if: always()
       with:
-        name: screenshots
+        name: Test Screenshots
         path: images
 
     - name: Publish Surefire report

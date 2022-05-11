@@ -165,9 +165,6 @@ public class IntegrationTest {
 		// copy to the clipboard using the basic HTML template
 		bot.toolbarDropDownButtonWithTooltip("Export selected week to clipboard")
 				.menuItem("Copy as").click().menu("Basic HTML").click();		
-		// Take a screenshot for documentation
-		bot.getDisplay().syncExec(() -> TestUtility.takeScreenshot(screenshotsDir,
-				bot.cTabItem(MAIN_VIEW_NAME).widget.getParent().getParent(), "workweek-view.png"));
 	}
 	
 	//@Test
@@ -297,6 +294,9 @@ public class IntegrationTest {
 			maximizeAction.run();			
 		});
 		view.setFocus();
+		// Take a screenshot for documentation
+		bot.getDisplay().syncExec(() -> TestUtility.takeScreenshot(screenshotsDir,
+				bot.cTabItem(MAIN_VIEW_NAME).widget.getParent().getParent(), "workweek-view.png"));
 		return view;
 	}
 	
