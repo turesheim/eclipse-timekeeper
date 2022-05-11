@@ -156,10 +156,10 @@ public class IntegrationTest {
 		prepareWorkweekView();
 		assertTrue(bot.viewByTitle(MAIN_VIEW_NAME).isActive());
 		// try the various toolbar buttons
-		bot.toolbarButtonWithTooltip("Show previous week").click();
-		bot.toolbarButtonWithTooltip("Show previous week").click();
-		bot.toolbarButtonWithTooltip("Show next week").click();
-		bot.toolbarButtonWithTooltip("Show current week").click();
+		bot.activePart().toolbarButton("Show previous week").click();
+		bot.activePart().toolbarButton("Show previous week").click();
+		bot.activePart().toolbarButton("Show next week").click();
+		bot.activePart().toolbarButton("Show current week").click();
 		// copy to the clipboard using the default template
 		bot.toolbarDropDownButtonWithTooltip("Export selected week to clipboard").click();
 		// copy to the clipboard using the basic HTML template
@@ -169,8 +169,9 @@ public class IntegrationTest {
 	
 	//@Test
 	public void testEditTimeRange() {
-		// ignore this test as it always fails on Travis-CI due to the bot not being able to locate the tree and gets
-		// stuck on the "Find Actions" text editor instead.
+		// ignore this test as it always fails on Travis-CI due to the bot not
+		// being able to locate the tree and gets stuck on the "Find Actions"
+		// text editor instead.
 		if (!Platform.getOS().equals(Platform.OS_LINUX)) {
 			prepareWorkweekView();
 			assertTrue(bot.viewByTitle(MAIN_VIEW_NAME).isActive());
@@ -286,15 +287,8 @@ public class IntegrationTest {
 	@SuppressWarnings("deprecation")
 	private SWTBotView prepareWorkweekView() {
 		bot.resetWorkbench();
-		bot.getDisplay().syncExec(() -> bot.getDisplay().getActiveShell().setSize(1024, 768));
-		bot.getDisplay().syncExec(() -> TestUtility.takeScreenshot(screenshotsDir,
-				bot.activeShell().widget, "perspective.png"));
-		SWTBotView view = openViewById("net.resheim.eclipse.timekeeper.ui.views.workWeek");
-		// Take a screenshot for documentation
-		bot.getDisplay().syncExec(() -> TestUtility.takeScreenshot(screenshotsDir,
-				bot.cTabItem(MAIN_VIEW_NAME).widget.getParent().getParent(), "workweek-view-initial.png"));
-		// Resize for the next screenshot
 		bot.getDisplay().syncExec(() -> bot.getDisplay().getActiveShell().setSize(1024, 400));
+		SWTBotView view = openViewById("net.resheim.eclipse.timekeeper.ui.views.workWeek");
 		UIThreadRunnable.syncExec(bot.getDisplay(), () -> {
 			ActionFactory.IWorkbenchAction maximizeAction = ActionFactory.MAXIMIZE
 					.create(bot.viewByTitle(MAIN_VIEW_NAME).getViewReference().getPage().getWorkbenchWindow());
