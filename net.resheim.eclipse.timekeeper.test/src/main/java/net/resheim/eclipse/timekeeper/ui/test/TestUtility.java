@@ -78,6 +78,7 @@ public class TestUtility {
 	 * @param file  the file to save the image to
 	 */
 	static void takeScreenshot(File screenshotsDir, final Control widget, String filename) {
+		log.info("Taking screenshot of " + widget.getToolTipText());
 		// Grab a screenshot of the dialog shell
 		final Rectangle b = widget.getBounds();
 		int width = b.width;
