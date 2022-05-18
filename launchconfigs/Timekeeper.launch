@@ -14,18 +14,18 @@
     <booleanAttribute key="includeOptional" value="true"/>
     <stringAttribute key="location" value="${workspace_loc}/../runtime-Timekeeper"/>
     <listAttribute key="org.eclipse.debug.ui.favoriteGroups">
-        <listEntry value="org.eclipse.debug.ui.launchGroup.debug"/>
-        <listEntry value="org.eclipse.debug.ui.launchGroup.profile"/>
         <listEntry value="org.eclipse.eclemma.ui.launchGroup.coverage"/>
+        <listEntry value="org.eclipse.debug.ui.launchGroup.debug"/>
         <listEntry value="org.eclipse.debug.ui.launchGroup.run"/>
     </listAttribute>
+    <booleanAttribute key="org.eclipse.jdt.launching.ATTR_ATTR_USE_ARGFILE" value="false"/>
     <booleanAttribute key="org.eclipse.jdt.launching.ATTR_USE_START_ON_FIRST_THREAD" value="true"/>
     <stringAttribute key="org.eclipse.jdt.launching.JRE_CONTAINER" value="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-11"/>
     <stringAttribute key="org.eclipse.jdt.launching.PROGRAM_ARGUMENTS" value="-os ${target.os} -ws ${target.ws} -arch ${target.arch} -nl ${target.nl} -consoleLog -clean"/>
     <stringAttribute key="org.eclipse.jdt.launching.SOURCE_PATH_PROVIDER" value="org.eclipse.pde.ui.workbenchClasspathProvider"/>
     <stringAttribute key="org.eclipse.jdt.launching.VM_ARGUMENTS" value="-Dorg.eclipse.swt.internal.carbon.smallFonts&#10;-Dorg.eclipse.swtbot.generator.enable=true&#10;-Dnet.resheim.eclipse.timekeeper.db.url=&quot;jdbc:h2:${workspace_loc}/../runtime-Timekeeper/.timekeeper/h2db;AUTO_SERVER=TRUE;FILE_LOCK=SOCKET;AUTO_RECONNECT=TRUE;AUTO_SERVER_PORT=9092"/>
     <stringAttribute key="pde.version" value="3.3"/>
-    <stringAttribute key="product" value="org.eclipse.sdk.ide"/>
+    <stringAttribute key="product" value="org.eclipse.platform.ide"/>
     <booleanAttribute key="show_selected_only" value="false"/>
     <stringAttribute key="templateConfig" value="${target_home}/configuration/config.ini"/>
     <booleanAttribute key="tracing" value="false"/>

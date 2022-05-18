@@ -80,7 +80,7 @@ public class Activity implements Comparable<Activity>, Serializable {
 	private Project project;
 
 	@OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-	private List<Label> labels;
+	private List<ActivityLabel> labels;
 
 	/** A short summary of the activity */
 	@Column(name = "SUMMARY")
@@ -254,11 +254,11 @@ public class Activity implements Comparable<Activity>, Serializable {
 		return true;
 	}
 
-	public List<Label> getLabels() {
+	public List<ActivityLabel> getLabels() {
 		return labels;
 	}
 
-	public void setLabels(List<Label> labels) {
+	public void setLabels(List<ActivityLabel> labels) {
 		this.labels = labels;
 	}
 	

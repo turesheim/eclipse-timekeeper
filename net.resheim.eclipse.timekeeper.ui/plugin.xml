@@ -111,6 +111,12 @@
             id="net.resheim.eclipse.timekeeper.ui.preferences.TemplatePreferences"
             name="Report Templates">
       </page>
+      <page
+            category="net.resheim.eclipse.timekeeper.ui.preferences.TimekeeperPreferences"
+            class="net.resheim.eclipse.timekeeper.ui.preferences.LabelPreferencePage"
+            id="net.resheim.eclipse.timekeeper.ui.preferences.LabelPreferences"
+            name="Labels">
+      </page>
    </extension>
    <extension
          point="org.eclipse.core.runtime.preferences">

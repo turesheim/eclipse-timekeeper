@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.stream.Stream;
 
 import javax.persistence.EntityManager;
@@ -52,6 +53,7 @@ import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.core.runtime.preferences.IScopeContext;
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.jface.preference.IPreferenceStore;
+import org.eclipse.jface.resource.StringConverter;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTaskContainer;
 import org.eclipse.mylyn.internal.tasks.core.TaskRepositoryManager;
@@ -64,6 +66,7 @@ import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.osgi.service.datalocation.Location;
 import org.eclipse.persistence.config.PersistenceUnitProperties;
 import org.eclipse.persistence.jpa.PersistenceProvider;
+import org.eclipse.swt.graphics.RGB;
 import org.eclipse.ui.preferences.ScopedPreferenceStore;
 import org.flywaydb.core.Flyway;
 import org.osgi.framework.BundleContext;
@@ -76,6 +79,7 @@ import net.resheim.eclipse.timekeeper.db.model.ProjectType;
 import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.db.model.TaskLinkStatus;
 import net.resheim.eclipse.timekeeper.db.model.GlobalTaskId;
+import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
 import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
 
 /**
@@ -88,6 +92,8 @@ import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
 public class TimekeeperPlugin extends Plugin {
 	
 	private static final Logger log = LoggerFactory.getLogger(TimekeeperPlugin.class);
+	
+	private static final CountDownLatch latch = new CountDownLatch(1);
 
 	public static final String BUNDLE_ID = "net.resheim.eclipse.timekeeper.db"; //$NON-NLS-1$
 
@@ -213,6 +219,7 @@ public class TimekeeperPlugin extends Plugin {
 				}
 				cleanTaskActivities();
 				notifyListeners();
+				latch.countDown();
 				return Status.OK_STATUS;
 			}
 		};
@@ -224,6 +231,10 @@ public class TimekeeperPlugin extends Plugin {
 		entityManager = new PersistenceProvider()
 				.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
 				.createEntityManager(props);
+	}
+	
+	public boolean isReady() {
+		return latch.getCount() == 0;
 	}
 
 	public class WorkspaceSaveParticipant implements ISaveParticipant {
@@ -645,6 +656,28 @@ public class TimekeeperPlugin extends Plugin {
 				.stream()
 				.filter(a -> a.getDuration(startDate, endDate) != Duration.ZERO);
 		return filter.count() > 0;
+	}
+	
+	/**
+	 * Finds and returns all label instances in the database.
+	 * 
+	 * @return a stream of labels
+	 */
+	public static Stream<ActivityLabel> getLabels(){
+		return entityManager.createNamedQuery("ActivityLabel.findAll", ActivityLabel.class)
+				.getResultStream();
+	}
+	
+	public static void setLabel(ActivityLabel label) {
+		EntityTransaction transaction = entityManager.getTransaction();
+		boolean activeTransaction = transaction.isActive();
+		if (!activeTransaction) {
+			transaction.begin();
+		}
+		entityManager.persist(label);
+		if (!activeTransaction) {
+			transaction.commit();
+		}
 	}
 
 	/**
