@@ -67,5 +67,8 @@ public class ActivityLabel implements Serializable{
 		this.color = color;
 	}
 
+	public String getId() {
+		return id;
+	}
 
 }

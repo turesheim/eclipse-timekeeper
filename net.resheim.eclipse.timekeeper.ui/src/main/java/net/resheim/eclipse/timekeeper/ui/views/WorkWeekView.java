@@ -492,6 +492,8 @@ public class WorkWeekView extends ViewPart {
 			manager.add(newActivityAction);
 		}
 		if (obj instanceof Activity) {
+			manager.add(new Separator("labels"));
+			manager.add(new Separator("activity"));
 			Optional<Activity> currentActivity = ((Activity) obj).getTrackedTask().getCurrentActivity();
 			// do not allow deleting an activity that is currently active
 			if (!(currentActivity.isPresent() && currentActivity.get().equals(obj))) {

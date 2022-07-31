@@ -162,10 +162,11 @@ public class TimekeeperPlugin extends Plugin {
 	}
 
 	private void connectToDatabase() {
-		Job connectDatabaseJob = new Job("Connecting to Timekeeper database") {
-
-			@Override
-			protected IStatus run(IProgressMonitor monitor) {
+//		Job connectDatabaseJob = new Job("Connecting to Timekeeper database") {
+//
+//			@Override
+//			protected IStatus run(IProgressMonitor monitor) {
+		Runnable runnable = () -> {
 				log.info("Connecting to Timekeeper database");
 				Map<String, Object> props = new HashMap<String, Object>();
 				// default, default location
@@ -217,11 +218,15 @@ public class TimekeeperPlugin extends Plugin {
 				cleanTaskActivities();
 				notifyListeners();
 				latch.countDown();
-				return Status.OK_STATUS;
-			}
 		};
-		connectDatabaseJob.setPriority(Job.INTERACTIVE);
-		connectDatabaseJob.schedule();
+		Thread thread = new Thread(runnable);
+        thread.start();
+//				return Status.OK_STATUS;
+//			}
+//		};
+//		log.info("Starting connection job");
+//		connectDatabaseJob.setPriority(Job.LONG);
+//		connectDatabaseJob.schedule();
 	}
 
 	private static void createEntityManager(Map<String, Object> props) {
@@ -656,7 +661,7 @@ public class TimekeeperPlugin extends Plugin {
 	}
 	
 	/**
-	 * Finds and returns all label instances in the database.
+	 * Finds and returns all activity label instances in the database.
 	 * 
 	 * @return a stream of labels
 	 */
@@ -665,6 +670,10 @@ public class TimekeeperPlugin extends Plugin {
 				.getResultStream();
 	}
 	
+	/**
+	 * 
+	 * @param label
+	 */
 	public static void setLabel(ActivityLabel label) {
 		EntityTransaction transaction = entityManager.getTransaction();
 		boolean activeTransaction = transaction.isActive();

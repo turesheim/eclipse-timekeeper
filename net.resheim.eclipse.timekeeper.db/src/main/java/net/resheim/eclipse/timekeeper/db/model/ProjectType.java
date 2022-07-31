@@ -18,7 +18,7 @@ import javax.persistence.Id;
 import javax.persistence.Table;
 
 /**
- * A project type is loosely connected to the Mylyn repository type.
+ * A project type is loosely connected to the Mylyn repository type. Typically "bugzilla", "
  * 
  * @author Torkild Ulvøy Resheim, Itema AS
  */
