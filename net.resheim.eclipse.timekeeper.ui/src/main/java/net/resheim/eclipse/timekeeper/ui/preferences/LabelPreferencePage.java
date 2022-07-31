@@ -12,10 +12,6 @@
 
 package net.resheim.eclipse.timekeeper.ui.preferences;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.layout.PixelConverter;
 import org.eclipse.jface.layout.TableColumnLayout;
@@ -33,10 +29,7 @@ import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
-import org.eclipse.swt.graphics.Color;
-import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
-import org.eclipse.swt.graphics.ImageData;
 import org.eclipse.swt.graphics.RGB;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -52,12 +45,13 @@ import org.eclipse.ui.IWorkbenchPreferencePage;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
+import net.resheim.eclipse.timekeeper.ui.ActivityLabelPainter;
 
 public class LabelPreferencePage extends PreferencePage implements IWorkbenchPreferencePage {
 
-	private List<Image> colorPreviewImages;
 	private ColorSelector fAppearanceColorEditor;
 	private TableViewer fAppearanceColorTableViewer;
+	private ActivityLabelPainter painter;
 
 	public LabelPreferencePage() {
 	}
@@ -168,46 +162,13 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 		fAppearanceColorTableViewer
 		.addSelectionChangedListener((SelectionChangedEvent event)
 				-> handleAppearanceColorListSelection());
-		colorPreviewImages = new ArrayList<>();
+		painter = new ActivityLabelPainter();
 
 		fAppearanceColorTableViewer.setLabelProvider(new LabelProvider() {
 			@Override
 			public Image getImage(Object element) {
-				// determine the fill color
-				ActivityLabel colorEntry = ((ActivityLabel) element);
-				RGB rgb = StringConverter.asRGB(colorEntry.getColor());
-				Color color = new Color(tableComposite.getParent().getDisplay(), rgb.red, rgb.green, rgb.blue);
-
-				// determine dimensions – this can probably be much improved
-				int x_offset = 0;
-				int y_offset = 4;
-				int height = fAppearanceColorTableViewer.getTable().getItemHeight();
-				int diameter = height - 6;
-
-				// create transparent base image
-				Image base = new Image(tableComposite.getParent().getDisplay(), height, height);
-				ImageData imageData = base.getImageData();
-				imageData.setAlpha(0, 0, 0);
-				Arrays.fill(imageData.alphaData, (byte) 0);
-				base.dispose();
-
-				// create the label image
-				Image image = new Image(tableComposite.getParent().getDisplay(), imageData);
-				GC gc = new GC(image);
-				gc.setAdvanced(true);
-
-				// fill a circle with the label color
-				gc.setBackground(color);
-				gc.fillOval(x_offset, y_offset, diameter, diameter);
-
-				// draw outline around the label circle
-				gc.setForeground(new Color(tableComposite.getParent().getDisplay(), darken(rgb, 0.6f)));
-				gc.setLineWidth(1);
-				gc.drawOval(x_offset, y_offset, diameter, diameter);
-				gc.dispose();
-				color.dispose();
-				colorPreviewImages.add(image);
-				return image;
+				return painter.getLabelImage((ActivityLabel) element,
+						fAppearanceColorTableViewer.getTable().getItemHeight());
 			}
 
 			@Override
@@ -225,11 +186,6 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 		Table fAppearanceColorTable = fAppearanceColorTableViewer.getTable();
 		gd.heightHint = fAppearanceColorTable.getItemHeight() * 8;
 		fAppearanceColorTable.setLayoutData(gd);
-	}
-
-	private RGB darken(RGB color, float factor) {
-		float[] hsb = color.getHSB();
-		return new RGB(hsb[0], hsb[1], Math.min(hsb[2] * factor, 1));
 	}
 
 }
