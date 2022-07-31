@@ -99,7 +99,7 @@ public class Task implements Serializable {
 	private transient ITask mylynTask;
 	
 	/**
-	 * Used to determine wheter or not this task has been linked to a corresponding
+	 * Used to determine whether or not this task has been linked to a corresponding
 	 * Mylyn task or if an attempt has been made.
 	 */
 	@Transient

@@ -13,6 +13,7 @@
 package net.resheim.eclipse.timekeeper.ui.preferences;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.eclipse.jface.dialogs.Dialog;
@@ -35,6 +36,7 @@ import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.graphics.ImageData;
 import org.eclipse.swt.graphics.RGB;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -69,12 +71,11 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 
 		appearanceComposite.setLayout(layout);
 
-		// Set up Appearance Color Options Table
 		Composite tableComposite = new Composite(appearanceComposite, SWT.NONE);
 		GridData tableGD = new GridData(GridData.FILL_VERTICAL);
 		tableComposite.setLayoutData(tableGD);
 		fAppearanceColorTableViewer = new TableViewer(tableComposite, SWT.SINGLE | SWT.V_SCROLL | SWT.BORDER);
-		initializeAppearColorTable(tableComposite);
+		initializeLabelList(tableComposite);
 
 		Composite stylesComposite = new Composite(appearanceComposite, SWT.NONE);
 		layout = new GridLayout();
@@ -112,19 +113,19 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 			@Override
 			public void modifyText(ModifyEvent e) {
 				// ignore
-
 			}
+
 		});
 
 		foregroundColorButton.addSelectionListener(new SelectionAdapter() {
 			@Override
 			public void widgetSelected(SelectionEvent e) {
-				ActivityLabel selectedColor = getSelectedAppearanceColorOption();
-				text.setText(selectedColor.getName());
-				selectedColor.setColor(StringConverter.asString(fAppearanceColorEditor.getColorValue()));
+				ActivityLabel selectedLabel = getSelectedAppearanceColorOption();
+				text.setText(selectedLabel.getName());
+				selectedLabel.setColor(StringConverter.asString(fAppearanceColorEditor.getColorValue()));
 				// Make the newly selected color display in the table
-				fAppearanceColorTableViewer.update(selectedColor, null);
-				text.setText(selectedColor.getName());
+				fAppearanceColorTableViewer.update(selectedLabel, null);
+				text.setText(selectedLabel.getName());
 			}
 		});
 
@@ -145,9 +146,10 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 	}
 
 	private void handleAppearanceColorListSelection() {
-		ActivityLabel selectedColor = getSelectedAppearanceColorOption();
-		RGB rgb = StringConverter.asRGB(selectedColor.getColor());
+		ActivityLabel selectedLabel = getSelectedAppearanceColorOption();
+		RGB rgb = StringConverter.asRGB(selectedLabel.getColor());
 		fAppearanceColorEditor.setColorValue(rgb);
+		fAppearanceColorTableViewer.update(selectedLabel, null);
 	}
 
 	@Override
@@ -162,7 +164,7 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 				true);
 	}
 
-	private void initializeAppearColorTable(Composite tableComposite) {
+	private void initializeLabelList(Composite tableComposite) {
 		fAppearanceColorTableViewer
 		.addSelectionChangedListener((SelectionChangedEvent event)
 				-> handleAppearanceColorListSelection());
@@ -171,25 +173,37 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 		fAppearanceColorTableViewer.setLabelProvider(new LabelProvider() {
 			@Override
 			public Image getImage(Object element) {
+				// determine the fill color
 				ActivityLabel colorEntry = ((ActivityLabel) element);
-				System.out.println(colorEntry.getName() + "=" + colorEntry.getColor());
 				RGB rgb = StringConverter.asRGB(colorEntry.getColor());
 				Color color = new Color(tableComposite.getParent().getDisplay(), rgb.red, rgb.green, rgb.blue);
-				int dimensions = 13;
-				Image image = new Image(tableComposite.getParent().getDisplay(), 15, 15);
+
+				// determine dimensions – this can probably be much improved
+				int x_offset = 0;
+				int y_offset = 4;
+				int height = fAppearanceColorTableViewer.getTable().getItemHeight();
+				int diameter = height - 6;
+
+				// create transparent base image
+				Image base = new Image(tableComposite.getParent().getDisplay(), height, height);
+				ImageData imageData = base.getImageData();
+				imageData.setAlpha(0, 0, 0);
+				Arrays.fill(imageData.alphaData, (byte) 0);
+				base.dispose();
+
+				// create the label image
+				Image image = new Image(tableComposite.getParent().getDisplay(), imageData);
 				GC gc = new GC(image);
 				gc.setAdvanced(true);
-				// make a transparent background
-				Color transparent = new Color(tableComposite.getParent().getDisplay(), 255, 255, 255, 0);
-				gc.setBackground(transparent);
-				gc.fillRectangle(0, 0, dimensions, dimensions);
-				// draw color preview
+
+				// fill a circle with the label color
 				gc.setBackground(color);
-				gc.fillOval(0, 0, dimensions, dimensions);
-				// draw outline around color preview
+				gc.fillOval(x_offset, y_offset, diameter, diameter);
+
+				// draw outline around the label circle
 				gc.setForeground(new Color(tableComposite.getParent().getDisplay(), darken(rgb, 0.6f)));
 				gc.setLineWidth(1);
-				gc.drawOval(0, 0, dimensions, dimensions);
+				gc.drawOval(x_offset, y_offset, diameter, diameter);
 				gc.dispose();
 				color.dispose();
 				colorPreviewImages.add(image);
