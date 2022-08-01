@@ -168,7 +168,7 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 			@Override
 			public Image getImage(Object element) {
 				return painter.getLabelImage((ActivityLabel) element,
-						fAppearanceColorTableViewer.getTable().getItemHeight());
+						fAppearanceColorTableViewer.getTable().getItemHeight(), false);
 			}
 
 			@Override

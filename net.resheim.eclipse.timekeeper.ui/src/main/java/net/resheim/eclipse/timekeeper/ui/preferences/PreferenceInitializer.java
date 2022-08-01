@@ -28,15 +28,15 @@ public class PreferenceInitializer extends AbstractPreferenceInitializer {
 			}
 		}
 
-		// Add default labels if the database is empty
+		// Add default activity labels if the database is empty
 		if (TimekeeperPlugin.getLabels().count() == 0) {
-			TimekeeperPlugin.setLabel(new ActivityLabel("Red", StringConverter.asString(new RGB(244, 103, 88))));
-			TimekeeperPlugin.setLabel(new ActivityLabel("Orange", StringConverter.asString(new RGB(245, 166, 81))));
-			TimekeeperPlugin.setLabel(new ActivityLabel("Yellow", StringConverter.asString(new RGB(246, 208, 90))));
-			TimekeeperPlugin.setLabel(new ActivityLabel("Green", StringConverter.asString(new RGB(87, 206, 105))));
-			TimekeeperPlugin.setLabel(new ActivityLabel("Blue", StringConverter.asString(new RGB(66, 136, 243))));
-			TimekeeperPlugin.setLabel(new ActivityLabel("Purple", StringConverter.asString(new RGB(177, 111, 209))));
-			TimekeeperPlugin.setLabel(new ActivityLabel("Gray", StringConverter.asString(new RGB(156, 156, 160))));
+			TimekeeperPlugin.setLabel(new ActivityLabel("Production issue", StringConverter.asString(new RGB(244, 103, 88))));
+			TimekeeperPlugin.setLabel(new ActivityLabel("Testing", StringConverter.asString(new RGB(245, 166, 81))));
+			TimekeeperPlugin.setLabel(new ActivityLabel("Prototyping", StringConverter.asString(new RGB(246, 208, 90))));
+			TimekeeperPlugin.setLabel(new ActivityLabel("Programming", StringConverter.asString(new RGB(87, 206, 105))));
+			TimekeeperPlugin.setLabel(new ActivityLabel("Communication", StringConverter.asString(new RGB(66, 136, 243))));
+			TimekeeperPlugin.setLabel(new ActivityLabel("Prototyping", StringConverter.asString(new RGB(177, 111, 209))));
+			TimekeeperPlugin.setLabel(new ActivityLabel("Meeting", StringConverter.asString(new RGB(156, 156, 160))));
 		}
 
 	}

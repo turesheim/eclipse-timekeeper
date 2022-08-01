@@ -141,7 +141,7 @@ public class DatabasePreferencePage extends FieldEditorPreferencePage implements
 							shell.getDisplay().asyncExec(() -> {
 								// the view may not be open
 								if (showView != null) {
-									((WorkWeekView) showView).refresh();
+									((WorkWeekView) showView).refreshAll();
 								}
 								MessageDialog.openInformation(shell,
 										Messages.DatabasePreferences_DataImported,

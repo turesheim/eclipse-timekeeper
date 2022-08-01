@@ -16,23 +16,34 @@ import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.ui.IViewPart;
+import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.handlers.HandlerUtil;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
 import net.resheim.eclipse.timekeeper.ui.ActivityLabelMenu;
+import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
-public class AddLabelCommand extends AbstractHandler {
+/**
+ * This command is used to add a label to an activity.
+ *
+ * @since 2.0
+ */
+public class ToggleLabelCommand extends AbstractHandler {
 
 	@Override
 	public Object execute(ExecutionEvent event) throws ExecutionException {
-		String id = event.getParameter(ActivityLabelMenu.ADD_LABEL_PARAMETER_ID);
+		String id = event.getParameter(ActivityLabelMenu.TOGGLE_LABEL_PARAMETER_ID);
 		ActivityLabel label = TimekeeperPlugin.getLabels().filter(l -> l.getId().equals(id)).findFirst().get();
 		ISelection selection = HandlerUtil.getCurrentSelection(event);
 		Object obj = ((IStructuredSelection) selection).getFirstElement();
 		if (obj instanceof Activity) {
-			((Activity) obj).getLabels().add(label);
+			((Activity) obj).toggleLabel(label);
+			IWorkbenchPage page = HandlerUtil.getActiveWorkbenchWindow(event).getActivePage();
+			IViewPart view = page.findView(WorkWeekView.VIEW_ID);
+			((WorkWeekView) view).refresh(obj);
 		}
 		return null;
 	}

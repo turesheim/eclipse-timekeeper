@@ -26,7 +26,7 @@ import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
 
 public class ActivityLabelPainter {
 
-	public Image getLabelImage(ActivityLabel label, int height) {
+	public Image getLabelImage(ActivityLabel label, int height, boolean outline) {
 		// determine the fill color
 		RGB rgb = StringConverter.asRGB(label.getColor());
 		Display display = Display.getCurrent();
@@ -59,15 +59,15 @@ public class ActivityLabelPainter {
 		// fill a circle with the label color
 		gc.setBackground(color);
 		gc.fillOval(x_offset, y_offset, diameter, diameter);
+		color.dispose();
 
 		// draw outline around the label circle
-		// Color outlineColor = new Color(display, darken(rgb, 1.9f));
-		Color outlineColor = display.getSystemColor(SWT.COLOR_WHITE);
-		gc.setForeground(outlineColor);
-		gc.drawOval(x_offset - 1, y_offset - 1, diameter + 1, diameter + 1);
+		if (outline) {
+			Color outlineColor = display.getSystemColor(SWT.COLOR_WHITE);
+			gc.setForeground(outlineColor);
+			gc.drawOval(x_offset - 1, y_offset - 1, diameter + 1, diameter + 1);
+		}
 		gc.dispose();
-		color.dispose();
-		// colorPreviewImages.add(image);
 		return image;
 
 	}

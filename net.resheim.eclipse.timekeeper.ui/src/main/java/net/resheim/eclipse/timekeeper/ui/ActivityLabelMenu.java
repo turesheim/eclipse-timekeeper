@@ -26,10 +26,15 @@ import org.eclipse.ui.services.IServiceLocator;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
 
+/**
+ * This menu presents all available labels for an activity with image and text.
+ * If an label has already been added to the activity, the label is removed when
+ * an entry is activated, otherwise the label is added.
+ */
 public class ActivityLabelMenu extends CompoundContributionItem implements IWorkbenchContribution {
-
-	public static final String ADD_LABEL_COMMAND_ID = "net.resheim.eclipse.timekeeper.ui.addLabelCommand";
-	public static final String ADD_LABEL_PARAMETER_ID = "net.resheim.eclipse.timekeeper.ui.addLabelCommand_id";
+	// --> toggleLabelCommand
+	public static final String TOGGLE_LABEL_COMMAND_ID = "net.resheim.eclipse.timekeeper.ui.toggleLabelCommand";
+	public static final String TOGGLE_LABEL_PARAMETER_ID = "net.resheim.eclipse.timekeeper.ui.toggleLabelCommand_id";
 
 	private IServiceLocator serviceLocator;
 	private ActivityLabelPainter labelPainter;
@@ -47,11 +52,11 @@ public class ActivityLabelMenu extends CompoundContributionItem implements IWork
 
 	private IContributionItem addToMenu(ActivityLabel label) {
 		Map<String, String> parameters = new HashMap<>();
-		parameters.put(ADD_LABEL_PARAMETER_ID, label.getId());
-		Image image = labelPainter.getLabelImage(label, 16);
+		parameters.put(TOGGLE_LABEL_PARAMETER_ID, label.getId());
+		Image image = labelPainter.getLabelImage(label, 16, false);
 		ImageDescriptor id = ImageDescriptor.createFromImage(image);
 		CommandContributionItemParameter contributionParameters = new CommandContributionItemParameter(serviceLocator,
-				null, ADD_LABEL_COMMAND_ID, parameters, id, null, null, label.getName(), null, null,
+				null, TOGGLE_LABEL_COMMAND_ID, parameters, id, null, null, label.getName(), null, null,
 				CommandContributionItem.STYLE_PUSH,
 				null, true);
 		return new CommandContributionItem(contributionParameters);

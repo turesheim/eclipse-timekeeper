@@ -19,6 +19,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.WeekFields;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
@@ -57,16 +58,20 @@ import org.eclipse.swt.events.ControlAdapter;
 import org.eclipse.swt.events.ControlEvent;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.DateTime;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.Tree;
 import org.eclipse.swt.widgets.TreeColumn;
+import org.eclipse.swt.widgets.TreeItem;
 import org.eclipse.ui.IActionBars;
 import org.eclipse.ui.ISharedImages;
 import org.eclipse.ui.PlatformUI;
@@ -75,8 +80,10 @@ import org.eclipse.ui.part.ViewPart;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
+import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
 import net.resheim.eclipse.timekeeper.db.model.Project;
 import net.resheim.eclipse.timekeeper.db.model.Task;
+import net.resheim.eclipse.timekeeper.ui.ActivityLabelPainter;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 @SuppressWarnings("restriction")
@@ -356,7 +363,7 @@ public class WorkWeekView extends ViewPart {
 		GridData layoutData = GridDataFactory.fillDefaults().grab(true, true).span(3, 1).create();
 		viewer.getControl().setLayoutData(layoutData);
 
-		// create the columns
+		// create the time columns
 		createTitleColumn();
 		for (int i = 0; i < 7; i++) {
 			createTimeColumn(i);
@@ -369,6 +376,32 @@ public class WorkWeekView extends ViewPart {
 		tree.setHeaderVisible(true);
 		tree.setLinesVisible(true);
 		tree.setData("org.eclipse.swtbot.widget.key", "workweek-editor-tree");
+
+		// paint the activity label icons – coloured circles for each label
+		// applied
+		ActivityLabelPainter painter = new ActivityLabelPainter();
+		tree.addListener(SWT.PaintItem, new Listener() {
+
+			@Override
+			public void handleEvent(Event event) {
+				TreeItem treeItem = (TreeItem) event.item;
+				int width = tree.getColumn(0).getWidth();
+				if (treeItem.getData() instanceof Activity && event.index == 0) {
+					int offset = 0;
+					List<ActivityLabel> labels = ((Activity) treeItem.getData()).getLabels();
+					for (ActivityLabel label : labels) {
+						Image image = painter.getLabelImage(label, 16, true);
+						int x = width - image.getBounds().width;
+						int itemHeight = tree.getItemHeight();
+						int imageHeight = image.getBounds().height;
+						int y = event.y + (itemHeight - imageHeight) / 2;
+						event.gc.drawImage(image, x + offset, y);
+						offset -= 6;
+					}
+				}
+			}
+
+		});
 
 		// adjust column widths when view is resized
 		main.addControlListener(new ControlAdapter() {
@@ -676,7 +709,7 @@ public class WorkWeekView extends ViewPart {
 				if (obj instanceof Task) {
 					((Task) obj).endActivity();
 					((Task) obj).startActivity();
-					refresh();
+					refreshAll();
 				}
 			}
 		};
@@ -715,7 +748,13 @@ public class WorkWeekView extends ViewPart {
 	 * Used to notify the view that the content have had an massive change.
 	 * Typically after importing a number of records.
 	 */
-	public void refresh() {
+	public void refreshAll() {
+		viewer.getContentProvider().inputChanged(viewer, viewer.getInput(), null);
+		viewer.expandAll();
+	}
+
+	// XXX: Don't do expandAll() but be more targeted
+	public void refresh(Object element) {
 		viewer.getContentProvider().inputChanged(viewer, viewer.getInput(), null);
 		viewer.expandAll();
 	}

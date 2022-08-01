@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
@@ -257,9 +258,15 @@ public class Activity implements Comparable<Activity>, Serializable {
 	public List<ActivityLabel> getLabels() {
 		return labels;
 	}
-
-	public void setLabels(List<ActivityLabel> labels) {
-		this.labels = labels;
-	}
 	
+	public void toggleLabel(ActivityLabel label) {
+		Optional<ActivityLabel> hasLabel = labels.stream().filter(l -> l.getId().equals(label.getId())).findFirst();
+		if (hasLabel.isEmpty()) {
+			labels.add(label);
+		} else {
+			labels.remove(label);
+		}
+		
+	}
+
 }

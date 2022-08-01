@@ -59,21 +59,11 @@
          </commandParameter>
       </command>
       <command
-            defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.AddLabelCommand"
-            id="net.resheim.eclipse.timekeeper.ui.addLabelCommand"
-            name="Add Label">
+            defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.ToggleLabelCommand"
+            id="net.resheim.eclipse.timekeeper.ui.toggleLabelCommand"
+            name="Toggle label">
          <commandParameter
-               id="net.resheim.eclipse.timekeeper.ui.addLabelCommand_id"
-               name="id"
-               optional="true">
-         </commandParameter>
-      </command>
-      <command
-            defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.RemoveLabelCommand"
-            id="net.resheim.eclipse.timekeeper.ui.removeLabelCommand"
-            name="Remove Label">
-         <commandParameter
-               id="net.resheim.eclipse.timekeeper.ui.removeLabelCommand_id"
+               id="net.resheim.eclipse.timekeeper.ui.toggleLabelCommand_id"
                name="id"
                optional="true">
          </commandParameter>
