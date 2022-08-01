@@ -37,10 +37,12 @@ import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConver
 
 /**
  * The {@link Activity} type represents a period of work on a task. It holds the
- * start time, and the stop time. An activity can stretch over several days,
- * however that should typically not be the case. Multiple activities can be
- * assign to the same {@link Task}, on the same day.
+ * start time, and the stop time a description and optionally a set of labels.
+ * An activity can stretch over several days, however that should typically not
+ * be the case. Multiple activities can be assign to the same {@link Task}, on
+ * the same day.
  * 
+ * @since 1.0
  * @author Torkild U. Resheim
  */
 @Entity
