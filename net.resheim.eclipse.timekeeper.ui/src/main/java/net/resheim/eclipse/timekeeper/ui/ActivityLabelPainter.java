@@ -26,22 +26,20 @@ import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
 
 public class ActivityLabelPainter {
 
-	public Image getLabelImage(ActivityLabel label, int height, boolean outline) {
+	public Image getLabelImage(ActivityLabel label, int size, boolean outline) {
 		// determine the fill color
 		RGB rgb = StringConverter.asRGB(label.getColor());
 		Display display = Display.getCurrent();
 		Color color = new Color(display, rgb.red, rgb.green, rgb.blue);
 
 		// determine dimensions – this can probably be much improved
-		int x_offset = 4;
-		int y_offset = 4;
-		int diameter = height - 6;
+		int x_offset = (size / 4) + 1;
+		int y_offset = (size / 4) + 1;
+		int diameter = size - 6;
 
 		// create transparent base image
-		Image base = new Image(display, height + 2, height + 2);
+		Image base = new Image(display, size, size);
 		ImageData imageData = base.getImageData();
-		int whitePixel = imageData.palette.getPixel(new RGB(0, 0, 0));
-		imageData.transparentPixel = whitePixel;
 		imageData.setAlpha(0, 0, 0);
 		Arrays.fill(imageData.alphaData, (byte) 0);
 		base.dispose();
@@ -50,11 +48,8 @@ public class ActivityLabelPainter {
 		Image image = new Image(display, imageData);
 		GC gc = new GC(image);
 		gc.setLineWidth(0);
-		gc.setAntialias(SWT.OFF);
+		gc.setAntialias(SWT.ON);
 		gc.setAdvanced(true);
-		// black will be transparent
-		gc.setBackground(display.getSystemColor(SWT.COLOR_BLACK));
-		gc.fillRectangle(image.getBounds());
 
 		// fill a circle with the label color
 		gc.setBackground(color);
