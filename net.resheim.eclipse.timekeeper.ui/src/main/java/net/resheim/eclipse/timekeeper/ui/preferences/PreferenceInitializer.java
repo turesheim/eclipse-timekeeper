@@ -34,8 +34,8 @@ public class PreferenceInitializer extends AbstractPreferenceInitializer {
 			TimekeeperPlugin.setLabel(new ActivityLabel("Testing", StringConverter.asString(new RGB(245, 166, 81))));
 			TimekeeperPlugin.setLabel(new ActivityLabel("Prototyping", StringConverter.asString(new RGB(246, 208, 90))));
 			TimekeeperPlugin.setLabel(new ActivityLabel("Programming", StringConverter.asString(new RGB(87, 206, 105))));
+			TimekeeperPlugin.setLabel(new ActivityLabel("Debugging", StringConverter.asString(new RGB(177, 111, 209))));
 			TimekeeperPlugin.setLabel(new ActivityLabel("Communication", StringConverter.asString(new RGB(66, 136, 243))));
-			TimekeeperPlugin.setLabel(new ActivityLabel("Prototyping", StringConverter.asString(new RGB(177, 111, 209))));
 			TimekeeperPlugin.setLabel(new ActivityLabel("Meeting", StringConverter.asString(new RGB(156, 156, 160))));
 		}
 
