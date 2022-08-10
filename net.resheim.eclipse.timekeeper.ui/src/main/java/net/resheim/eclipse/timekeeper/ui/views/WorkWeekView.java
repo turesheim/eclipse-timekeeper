@@ -290,6 +290,8 @@ public class WorkWeekView extends ViewPart {
 
 	private Label statusLabel;
 
+	private ActivityLabelPainter activityLabelPainter;
+
 	/**
 	 * The constructor.
 	 */
@@ -377,9 +379,7 @@ public class WorkWeekView extends ViewPart {
 		tree.setLinesVisible(true);
 		tree.setData("org.eclipse.swtbot.widget.key", "workweek-editor-tree");
 
-		// paint the activity label icons – coloured circles for each label
-		// applied
-		ActivityLabelPainter painter = new ActivityLabelPainter();
+		activityLabelPainter = new ActivityLabelPainter();
 		tree.addListener(SWT.PaintItem, new Listener() {
 
 			@Override
@@ -390,7 +390,7 @@ public class WorkWeekView extends ViewPart {
 					int offset = 0;
 					List<ActivityLabel> labels = ((Activity) treeItem.getData()).getLabels();
 					for (ActivityLabel label : labels) {
-						Image image = painter.getLabelImage(label, 16, true);
+						Image image = activityLabelPainter.getLabelImage(label, 16, true);
 						int x = width - image.getBounds().width;
 						int itemHeight = tree.getItemHeight();
 						int imageHeight = image.getBounds().height;
@@ -500,10 +500,12 @@ public class WorkWeekView extends ViewPart {
 		column.setLabelProvider(new TreeColumnViewerLabelProvider(new TitleColumnLabelProvider(contentProvider)));
 		column.setEditingSupport(new ActivitySummaryEditingSupport(viewer));
 	}
+
 	@Override
 	public void dispose() {
 		TasksUiPlugin.getTaskActivityManager().removeActivationListener(taskListener);
 		TasksUiPlugin.getTaskList().removeChangeListener(taskListener);
+		activityLabelPainter.disposeImages();
 		super.dispose();
 	}
 

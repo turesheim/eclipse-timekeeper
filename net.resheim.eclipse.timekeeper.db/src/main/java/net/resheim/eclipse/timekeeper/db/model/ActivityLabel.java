@@ -20,15 +20,14 @@ import javax.persistence.NamedQuery;
 import javax.persistence.Table;
 
 /**
- * A label has a colour and a name and is used to categorize an
- * {@link Activity}.
+ * A label has a color and a name and is used to categorize an {@link Activity}.
  * 
  * @author Torkild Ulvøy Resheim
  */
 @Entity
 @Table(name = "ACTIVITYLABEL")
 @NamedQuery(name="ActivityLabel.findAll", query="SELECT a FROM ActivityLabel a")
-public class ActivityLabel implements Serializable{
+public class ActivityLabel implements Serializable {
 	
 	private static final long serialVersionUID = -3021226114768805330L;
 
