@@ -33,9 +33,9 @@ public class ActivityLabelPainter {
 		Color color = new Color(display, rgb.red, rgb.green, rgb.blue);
 
 		// determine dimensions – this can probably be much improved
-		int x_offset = (size / 4) + 1;
+		int x_offset = (size / 4) + 1; // the +1 is to adjust for the outline
 		int y_offset = (size / 4) + 1;
-		int diameter = size - 6;
+		int diameter = size - (size / 2);
 
 		// create transparent base image
 		Image base = new Image(display, size, size);
