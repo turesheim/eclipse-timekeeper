@@ -12,19 +12,26 @@
 
 package net.resheim.eclipse.timekeeper.ui.preferences;
 
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.eclipse.jface.dialogs.Dialog;
+import org.eclipse.jface.layout.GridDataFactory;
 import org.eclipse.jface.layout.PixelConverter;
 import org.eclipse.jface.layout.TableColumnLayout;
 import org.eclipse.jface.preference.ColorSelector;
 import org.eclipse.jface.preference.PreferencePage;
 import org.eclipse.jface.resource.StringConverter;
-import org.eclipse.jface.viewers.ArrayContentProvider;
 import org.eclipse.jface.viewers.ColumnWeightData;
+import org.eclipse.jface.viewers.IStructuredContentProvider;
 import org.eclipse.jface.viewers.LabelProvider;
 import org.eclipse.jface.viewers.SelectionChangedEvent;
 import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.TableViewer;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.FocusEvent;
+import org.eclipse.swt.events.FocusListener;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.SelectionAdapter;
@@ -52,78 +59,79 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 	private ColorSelector fAppearanceColorEditor;
 	private TableViewer fAppearanceColorTableViewer;
 	private ActivityLabelPainter painter;
+	private Text labelText;
+	private List<ActivityLabel> editableLabels;
 
 	public LabelPreferencePage() {
 	}
 
 	private Control createAppearancePage(Composite parent) {
-		Composite appearanceComposite = new Composite(parent, SWT.NONE);
-		GridLayout layout = new GridLayout();
-		layout.numColumns = 2;
-		layout.marginHeight = 0;
-		layout.marginWidth = 0;
+		Composite container = new Composite(parent, SWT.NULL);
+		container.setLayout(new GridLayout(2, false));
 
-		appearanceComposite.setLayout(layout);
-
-		Composite tableComposite = new Composite(appearanceComposite, SWT.NONE);
+		Composite tableComposite = new Composite(container, SWT.NONE);
 		GridData tableGD = new GridData(GridData.FILL_VERTICAL);
 		tableComposite.setLayoutData(tableGD);
 		fAppearanceColorTableViewer = new TableViewer(tableComposite, SWT.SINGLE | SWT.V_SCROLL | SWT.BORDER);
 		initializeLabelList(tableComposite);
 
-		Composite stylesComposite = new Composite(appearanceComposite, SWT.NONE);
-		layout = new GridLayout();
-		layout.marginHeight = 0;
-		layout.marginWidth = 0;
-		layout.numColumns = 2;
-		stylesComposite.setLayout(layout);
-		stylesComposite.setLayoutData(new GridData(GridData.FILL_BOTH));
+		Composite stylesComposite = new Composite(container, SWT.NONE);
+		stylesComposite.setLayout(new GridLayout(2, false));
+		GridData create = GridDataFactory.fillDefaults().create();
+		create.grabExcessHorizontalSpace = true;
+		create.grabExcessVerticalSpace = true;
+		stylesComposite.setLayoutData(create);
 
 		Label l = new Label(stylesComposite, SWT.LEFT);
 		l.setText("&Color:");
-		GridData gd = new GridData();
-		gd.horizontalAlignment = GridData.BEGINNING;
-		l.setLayoutData(gd);
+		l.setLayoutData(new GridData(SWT.BEGINNING, SWT.CENTER, false, false, 1, 1));
 
 		fAppearanceColorEditor = new ColorSelector(stylesComposite);
 		Button foregroundColorButton = fAppearanceColorEditor.getButton();
-		gd = new GridData(GridData.FILL_HORIZONTAL);
-		gd.horizontalAlignment = GridData.BEGINNING;
-		foregroundColorButton.setLayoutData(gd);
+		foregroundColorButton.setLayoutData(new GridData());
 
 		l = new Label(stylesComposite, SWT.LEFT);
 		l.setText("&Label:");
-		gd = new GridData();
-		gd.horizontalAlignment = GridData.BEGINNING;
-		l.setLayoutData(gd);
+		l.setLayoutData(new GridData(SWT.BEGINNING, SWT.CENTER, false, false, 1, 1));
 
-		Text text = new Text(stylesComposite, SWT.LEFT | SWT.BORDER);
-		gd = new GridData();
-		gd.horizontalAlignment = GridData.BEGINNING | GridData.FILL_HORIZONTAL;
-		text.setLayoutData(gd);
+		labelText = new Text(stylesComposite, SWT.LEFT | SWT.BORDER);
+		labelText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
 
-		text.addModifyListener(new ModifyListener() {
+		labelText.addModifyListener(new ModifyListener() {
 
 			@Override
 			public void modifyText(ModifyEvent e) {
-				// ignore
+				ActivityLabel selectedLabel = getSelectedAppearanceColorOption();
+				selectedLabel.setName(labelText.getText());
 			}
 
+		});
+
+		labelText.addFocusListener(new FocusListener() {
+
+			@Override
+			public void focusLost(FocusEvent e) {
+				fAppearanceColorTableViewer.refresh();
+			}
+
+			@Override
+			public void focusGained(FocusEvent e) {
+				// ignore
+			}
 		});
 
 		foregroundColorButton.addSelectionListener(new SelectionAdapter() {
 			@Override
 			public void widgetSelected(SelectionEvent e) {
 				ActivityLabel selectedLabel = getSelectedAppearanceColorOption();
-				text.setText(selectedLabel.getName());
 				selectedLabel.setColor(StringConverter.asString(fAppearanceColorEditor.getColorValue()));
 				// Make the newly selected color display in the table
 				fAppearanceColorTableViewer.update(selectedLabel, null);
-				text.setText(selectedLabel.getName());
+				labelText.setText(selectedLabel.getName());
 			}
 		});
 
-		return appearanceComposite;
+		return container;
 	}
 
 	@Override
@@ -144,6 +152,7 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 		RGB rgb = StringConverter.asRGB(selectedLabel.getColor());
 		fAppearanceColorEditor.setColorValue(rgb);
 		fAppearanceColorTableViewer.update(selectedLabel, null);
+		labelText.setText(selectedLabel.getName());
 	}
 
 	@Override
@@ -152,7 +161,14 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 	}
 
 	private void initialize() {
-		fAppearanceColorTableViewer.setContentProvider(ArrayContentProvider.getInstance());
+		editableLabels = TimekeeperPlugin.getLabels().map(l -> new ActivityLabel(l))
+				.collect(Collectors.toList());
+		fAppearanceColorTableViewer.setContentProvider(new IStructuredContentProvider() {
+			@Override
+			public Object[] getElements(Object inputElement) {
+				return editableLabels.toArray();
+			}
+		});
 		fAppearanceColorTableViewer.setInput(TimekeeperPlugin.getLabels().toArray());
 		fAppearanceColorTableViewer.setSelection(new StructuredSelection(fAppearanceColorTableViewer.getElementAt(0)),
 				true);
@@ -186,6 +202,35 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 		Table fAppearanceColorTable = fAppearanceColorTableViewer.getTable();
 		gd.heightHint = fAppearanceColorTable.getItemHeight() * 8;
 		fAppearanceColorTable.setLayoutData(gd);
+	}
+
+	@Override
+	protected void performApply() {
+		updateDatabase();
+		super.performApply();
+	}
+
+	@Override
+	public boolean performOk() {
+		updateDatabase();
+		return true;
+	}
+
+	private void updateDatabase() {
+		Map<String, ActivityLabel> labels = TimekeeperPlugin.getLabels()
+				.collect(Collectors.toMap(l -> l.getId(), l -> l));
+
+		editableLabels.forEach(l -> {
+			String key = l.getId();
+			ActivityLabel label = labels.get(key);
+			if (label != null) {
+				label.setColor(l.getColor());
+				label.setName(l.getName());
+				TimekeeperPlugin.setLabel(label);
+			} else {
+				TimekeeperPlugin.setLabel(l);
+			}
+		});
 	}
 
 }

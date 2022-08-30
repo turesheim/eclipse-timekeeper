@@ -50,6 +50,12 @@ public class ActivityLabel implements Serializable {
 		this.color = color;
 	}
 
+	public ActivityLabel(ActivityLabel label) {
+		this.id = label.getId();
+		this.name = label.getName();
+		this.color = label.getColor();
+	}
+
 	public String getName() {
 		return name;
 	}
