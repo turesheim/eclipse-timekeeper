@@ -54,6 +54,7 @@ import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
 import net.resheim.eclipse.timekeeper.ui.ActivityLabelPainter;
 
+// TODO: Implement buttons for adding and removing labels
 public class LabelPreferencePage extends PreferencePage implements IWorkbenchPreferencePage {
 
 	private ColorSelector fAppearanceColorEditor;
@@ -61,6 +62,8 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 	private ActivityLabelPainter painter;
 	private Text labelText;
 	private List<ActivityLabel> editableLabels;
+	private Button addButton;
+	private Button removeButton;
 
 	public LabelPreferencePage() {
 	}
@@ -70,17 +73,18 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 		container.setLayout(new GridLayout(2, false));
 
 		Composite tableComposite = new Composite(container, SWT.NONE);
-		GridData tableGD = new GridData(GridData.FILL_VERTICAL);
+		GridData tableGD = new GridData(GridData.FILL_VERTICAL | GridData.FILL_HORIZONTAL);
+		tableGD.grabExcessHorizontalSpace = true;
+		tableGD.grabExcessVerticalSpace = true;
 		tableComposite.setLayoutData(tableGD);
 		fAppearanceColorTableViewer = new TableViewer(tableComposite, SWT.SINGLE | SWT.V_SCROLL | SWT.BORDER);
 		initializeLabelList(tableComposite);
 
 		Composite stylesComposite = new Composite(container, SWT.NONE);
 		stylesComposite.setLayout(new GridLayout(2, false));
-		GridData create = GridDataFactory.fillDefaults().create();
-		create.grabExcessHorizontalSpace = true;
-		create.grabExcessVerticalSpace = true;
-		stylesComposite.setLayoutData(create);
+		GridData editGD = GridDataFactory.fillDefaults().create();
+		editGD.widthHint = 200;
+		stylesComposite.setLayoutData(editGD);
 
 		Label l = new Label(stylesComposite, SWT.LEFT);
 		l.setText("&Color:");
@@ -131,6 +135,32 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 			}
 		});
 
+		GridData buttonLayoutData = new GridData(SWT.BEGINNING, SWT.CENTER, false, false, 2, 1);
+		buttonLayoutData.widthHint = 120;
+
+		addButton = new Button(stylesComposite, NONE);
+		addButton.setLayoutData(buttonLayoutData);
+		addButton.setText("Add");
+		addButton.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				editableLabels.add(new ActivityLabel("new label", "0,0,0"));
+				fAppearanceColorTableViewer.refresh();
+			}
+		});
+
+		removeButton = new Button(stylesComposite, NONE);
+		removeButton.setLayoutData(buttonLayoutData);
+		removeButton.setText("Remove");
+		removeButton.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				ActivityLabel selectedLabel = getSelectedAppearanceColorOption();
+				editableLabels.remove(selectedLabel);
+				fAppearanceColorTableViewer.refresh();
+			}
+		});
+
 		return container;
 	}
 
@@ -149,10 +179,12 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 
 	private void handleAppearanceColorListSelection() {
 		ActivityLabel selectedLabel = getSelectedAppearanceColorOption();
-		RGB rgb = StringConverter.asRGB(selectedLabel.getColor());
-		fAppearanceColorEditor.setColorValue(rgb);
-		fAppearanceColorTableViewer.update(selectedLabel, null);
-		labelText.setText(selectedLabel.getName());
+		if (selectedLabel != null) {
+			RGB rgb = StringConverter.asRGB(selectedLabel.getColor());
+			fAppearanceColorEditor.setColorValue(rgb);
+			fAppearanceColorTableViewer.update(selectedLabel, null);
+			labelText.setText(selectedLabel.getName());
+		}
 	}
 
 	@Override
@@ -217,20 +249,30 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 	}
 
 	private void updateDatabase() {
-		Map<String, ActivityLabel> labels = TimekeeperPlugin.getLabels()
+
+		Map<String, ActivityLabel> savedLabels = TimekeeperPlugin.getLabels()
 				.collect(Collectors.toMap(l -> l.getId(), l -> l));
 
-		editableLabels.forEach(l -> {
-			String key = l.getId();
-			ActivityLabel label = labels.get(key);
-			if (label != null) {
-				label.setColor(l.getColor());
-				label.setName(l.getName());
-				TimekeeperPlugin.setLabel(label);
-			} else {
-				TimekeeperPlugin.setLabel(l);
+		Map<String, ActivityLabel> updatedLabels = editableLabels.stream()
+				.collect(Collectors.toMap(l -> l.getId(), l -> l));
+
+		savedLabels.forEach((t, u) -> {
+			if (!updatedLabels.containsKey(t)) {
+				TimekeeperPlugin.removeLabel(u);
 			}
 		});
+
+		updatedLabels.forEach((t, u) -> {
+			ActivityLabel label = savedLabels.get(t);
+			if (label != null) {
+				label.setColor(u.getColor());
+				label.setName(u.getName());
+				TimekeeperPlugin.setLabel(label);
+			} else {
+				TimekeeperPlugin.setLabel(u);
+			}
+		});
+
 	}
 
 }

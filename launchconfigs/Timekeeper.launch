@@ -12,7 +12,19 @@
     <stringAttribute key="configLocation" value="${workspace_loc}/.metadata/.plugins/org.eclipse.pde.core/Timekeeper"/>
     <booleanAttribute key="default" value="true"/>
     <booleanAttribute key="includeOptional" value="true"/>
+    <booleanAttribute key="jmc.jfr.launching.JFR.AUTO_OPEN" value="false"/>
+    <booleanAttribute key="jmc.jfr.launching.JFR.CONTINUOUS" value="true"/>
+    <stringAttribute key="jmc.jfr.launching.JFR.DELAY" value="0 s"/>
+    <stringAttribute key="jmc.jfr.launching.JFR.DURATION" value="1 min"/>
+    <booleanAttribute key="jmc.jfr.launching.JFR.ENABLED" value="false"/>
+    <stringAttribute key="jmc.jfr.launching.JFR.FILENAME" value="/Mission Control/flight_recording.jfr"/>
+    <stringAttribute key="jmc.jfr.launching.JFR.NAME" value="Timekeeper"/>
+    <booleanAttribute key="jmc.jfr.launching.JFR.ORACLE_JDK_LESS_THAN_11" value="false"/>
+    <stringAttribute key="jmc.jfr.launching.JFR.SETTINGS" value="/Users/torkild/Developer/Resheim/eclipse-workspace/.metadata/.plugins/org.openjdk.jmc.flightrecorder.controlpanel.ui/.rectemplates/template-7420553643643103331.jfc"/>
     <stringAttribute key="location" value="${workspace_loc}/../runtime-Timekeeper"/>
+    <mapAttribute key="org.eclipse.debug.core.preferred_launchers">
+        <mapEntry key="[run]" value="org.openjdk.jmc.ide.launch.JFREclipseLaunchDelegate"/>
+    </mapAttribute>
     <listAttribute key="org.eclipse.debug.ui.favoriteGroups">
         <listEntry value="org.eclipse.debug.ui.launchGroup.debug"/>
         <listEntry value="org.eclipse.eclemma.ui.launchGroup.coverage"/>
@@ -23,7 +35,7 @@
     <stringAttribute key="org.eclipse.jdt.launching.JRE_CONTAINER" value="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-11"/>
     <stringAttribute key="org.eclipse.jdt.launching.PROGRAM_ARGUMENTS" value="-os ${target.os} -ws ${target.ws} -arch ${target.arch} -nl ${target.nl} -consoleLog -clean"/>
     <stringAttribute key="org.eclipse.jdt.launching.SOURCE_PATH_PROVIDER" value="org.eclipse.pde.ui.workbenchClasspathProvider"/>
-    <stringAttribute key="org.eclipse.jdt.launching.VM_ARGUMENTS" value="-Dorg.eclipse.swt.internal.carbon.smallFonts&#10;-Dorg.eclipse.swtbot.generator.enable=true&#10;-Dnet.resheim.eclipse.timekeeper.db.url=&quot;jdbc:h2:${workspace_loc}/../runtime-Timekeeper/.timekeeper/h2db;AUTO_SERVER=TRUE;FILE_LOCK=SOCKET;AUTO_RECONNECT=TRUE;AUTO_SERVER_PORT=9092"/>
+    <stringAttribute key="org.eclipse.jdt.launching.VM_ARGUMENTS" value="-Dcom.sun.management.jmxremote=true&#10;-Dcom.sun.management.jmxremote.port=9990&#10;-Dcom.sun.management.jmxremote.authenticate=false&#10;-Dcom.sun.management.jmxremote.ssl=false&#10;-Dorg.eclipse.swt.internal.carbon.smallFonts&#10;-Dorg.eclipse.swtbot.generator.enable=true&#10;-Dnet.resheim.eclipse.timekeeper.db.url=&quot;jdbc:h2:${workspace_loc}/../runtime-Timekeeper/.timekeeper/h2db;AUTO_SERVER=TRUE;FILE_LOCK=SOCKET;AUTO_RECONNECT=TRUE;AUTO_SERVER_PORT=9092"/>
     <stringAttribute key="pde.version" value="3.3"/>
     <stringAttribute key="product" value="org.eclipse.platform.ide"/>
     <booleanAttribute key="show_selected_only" value="false"/>

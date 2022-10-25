@@ -670,10 +670,6 @@ public class TimekeeperPlugin extends Plugin {
 				.getResultStream();
 	}
 	
-	/**
-	 * 
-	 * @param label
-	 */
 	public static void setLabel(ActivityLabel label) {
 		EntityTransaction transaction = entityManager.getTransaction();
 		boolean activeTransaction = transaction.isActive();
@@ -686,6 +682,17 @@ public class TimekeeperPlugin extends Plugin {
 		}
 	}
 
+	public static void removeLabel(ActivityLabel label) {
+		EntityTransaction transaction = entityManager.getTransaction();
+		boolean activeTransaction = transaction.isActive();
+		if (!activeTransaction) {
+			transaction.begin();
+		}
+		entityManager.remove(label);
+		if (!activeTransaction) {
+			transaction.commit();
+		}
+	}
 	/**
 	 * Links the given task with a Mylyn task if found in any of the workspace task
 	 * repositories. If a local task could not be found the tracked task will be
