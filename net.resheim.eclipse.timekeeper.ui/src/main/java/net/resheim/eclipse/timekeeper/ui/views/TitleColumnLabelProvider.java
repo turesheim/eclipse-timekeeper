@@ -32,7 +32,7 @@ import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 /**
- * Provides decorations fot the task information column.
+ * Provides decorations fot the task and activity information column.
  */
 @SuppressWarnings("restriction")
 class TitleColumnLabelProvider extends TimeColumnLabelProvider {

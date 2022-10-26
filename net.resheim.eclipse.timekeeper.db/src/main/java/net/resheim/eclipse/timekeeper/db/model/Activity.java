@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
@@ -36,10 +37,12 @@ import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConver
 
 /**
  * The {@link Activity} type represents a period of work on a task. It holds the
- * start time, and the stop time. An activity can stretch over several days,
- * however that should typically not be the case. Multiple activities can be
- * assign to the same {@link Task}, on the same day.
+ * start time, and the stop time a description and optionally a set of labels.
+ * An activity can stretch over several days, however that should typically not
+ * be the case. Multiple activities can be assign to the same {@link Task}, on
+ * the same day.
  * 
+ * @since 1.0
  * @author Torkild U. Resheim
  */
 @Entity
@@ -80,7 +83,7 @@ public class Activity implements Comparable<Activity>, Serializable {
 	private Project project;
 
 	@OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-	private List<Label> labels;
+	private List<ActivityLabel> labels;
 
 	/** A short summary of the activity */
 	@Column(name = "SUMMARY")
@@ -254,12 +257,18 @@ public class Activity implements Comparable<Activity>, Serializable {
 		return true;
 	}
 
-	public List<Label> getLabels() {
+	public List<ActivityLabel> getLabels() {
 		return labels;
 	}
-
-	public void setLabels(List<Label> labels) {
-		this.labels = labels;
-	}
 	
+	public void toggleLabel(ActivityLabel label) {
+		Optional<ActivityLabel> hasLabel = labels.stream().filter(l -> l.getId().equals(label.getId())).findFirst();
+		if (hasLabel.isEmpty()) {
+			labels.add(label);
+		} else {
+			labels.remove(label);
+		}
+		
+	}
+
 }

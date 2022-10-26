@@ -58,6 +58,16 @@
                optional="true">
          </commandParameter>
       </command>
+      <command
+            defaultHandler="net.resheim.eclipse.timekeeper.ui.commands.ToggleLabelCommand"
+            id="net.resheim.eclipse.timekeeper.ui.toggleLabelCommand"
+            name="Toggle label">
+         <commandParameter
+               id="net.resheim.eclipse.timekeeper.ui.toggleLabelCommand_id"
+               name="id"
+               optional="true">
+         </commandParameter>
+      </command>
    </extension>
    <extension
          point="org.eclipse.ui.menus">
@@ -91,6 +101,14 @@
                id="net.resheim.eclipse.timekeeper.ui.dynamicTemplateMenu">
          </dynamic>
       </menuContribution>
+      <menuContribution
+            allPopups="false"
+            locationURI="popup:net.resheim.eclipse.timekeeper.ui.views.workWeek?after=labels">
+         <dynamic
+               class="net.resheim.eclipse.timekeeper.ui.ActivityLabelMenu"
+               id="net.resheim.eclipse.timekeeper.ui.dynamicActivityLabelMenu">
+         </dynamic>
+      </menuContribution>
    </extension>
    <extension
          point="org.eclipse.ui.preferencePages">
@@ -110,6 +128,12 @@
             class="net.resheim.eclipse.timekeeper.ui.preferences.TemplatePreferencePage"
             id="net.resheim.eclipse.timekeeper.ui.preferences.TemplatePreferences"
             name="Report Templates">
+      </page>
+      <page
+            category="net.resheim.eclipse.timekeeper.ui.preferences.TimekeeperPreferences"
+            class="net.resheim.eclipse.timekeeper.ui.preferences.LabelPreferencePage"
+            id="net.resheim.eclipse.timekeeper.ui.preferences.LabelPreferences"
+            name="Labels">
       </page>
    </extension>
    <extension

@@ -1,4 +1,4 @@
-target "Eclipse Timekeeper Target Platform" with source requirements
+target "Resheim Timekeeper Target Platform" with source requirements
 
 // Base dependencies
 location "http://download.eclipse.org/releases/2022-03/" {

@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.stream.Stream;
 
 import javax.persistence.EntityManager;
@@ -65,17 +66,17 @@ import org.eclipse.osgi.service.datalocation.Location;
 import org.eclipse.persistence.config.PersistenceUnitProperties;
 import org.eclipse.persistence.jpa.PersistenceProvider;
 import org.eclipse.ui.preferences.ScopedPreferenceStore;
-import org.flywaydb.core.Flyway;
 import org.osgi.framework.BundleContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.resheim.eclipse.timekeeper.db.model.Activity;
+import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
+import net.resheim.eclipse.timekeeper.db.model.GlobalTaskId;
 import net.resheim.eclipse.timekeeper.db.model.Project;
 import net.resheim.eclipse.timekeeper.db.model.ProjectType;
 import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.db.model.TaskLinkStatus;
-import net.resheim.eclipse.timekeeper.db.model.GlobalTaskId;
 import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
 
 /**
@@ -88,6 +89,8 @@ import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
 public class TimekeeperPlugin extends Plugin {
 	
 	private static final Logger log = LoggerFactory.getLogger(TimekeeperPlugin.class);
+	
+	private static final CountDownLatch latch = new CountDownLatch(1);
 
 	public static final String BUNDLE_ID = "net.resheim.eclipse.timekeeper.db"; //$NON-NLS-1$
 
@@ -159,10 +162,11 @@ public class TimekeeperPlugin extends Plugin {
 	}
 
 	private void connectToDatabase() {
-		Job connectDatabaseJob = new Job("Connecting to Timekeeper database") {
-
-			@Override
-			protected IStatus run(IProgressMonitor monitor) {
+//		Job connectDatabaseJob = new Job("Connecting to Timekeeper database") {
+//
+//			@Override
+//			protected IStatus run(IProgressMonitor monitor) {
+		Runnable runnable = () -> {
 				log.info("Connecting to Timekeeper database");
 				Map<String, Object> props = new HashMap<String, Object>();
 				// default, default location
@@ -213,17 +217,26 @@ public class TimekeeperPlugin extends Plugin {
 				}
 				cleanTaskActivities();
 				notifyListeners();
-				return Status.OK_STATUS;
-			}
+				latch.countDown();
 		};
-		connectDatabaseJob.setPriority(Job.INTERACTIVE);
-		connectDatabaseJob.schedule();
+		Thread thread = new Thread(runnable);
+        thread.start();
+//				return Status.OK_STATUS;
+//			}
+//		};
+//		log.info("Starting connection job");
+//		connectDatabaseJob.setPriority(Job.LONG);
+//		connectDatabaseJob.schedule();
 	}
 
 	private static void createEntityManager(Map<String, Object> props) {
 		entityManager = new PersistenceProvider()
 				.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
 				.createEntityManager(props);
+	}
+	
+	public boolean isReady() {
+		return latch.getCount() == 0;
 	}
 
 	public class WorkspaceSaveParticipant implements ISaveParticipant {
@@ -646,7 +659,40 @@ public class TimekeeperPlugin extends Plugin {
 				.filter(a -> a.getDuration(startDate, endDate) != Duration.ZERO);
 		return filter.count() > 0;
 	}
+	
+	/**
+	 * Finds and returns all activity label instances in the database.
+	 * 
+	 * @return a stream of labels
+	 */
+	public static Stream<ActivityLabel> getLabels(){
+		return entityManager.createNamedQuery("ActivityLabel.findAll", ActivityLabel.class)
+				.getResultStream();
+	}
+	
+	public static void setLabel(ActivityLabel label) {
+		EntityTransaction transaction = entityManager.getTransaction();
+		boolean activeTransaction = transaction.isActive();
+		if (!activeTransaction) {
+			transaction.begin();
+		}
+		entityManager.persist(label);
+		if (!activeTransaction) {
+			transaction.commit();
+		}
+	}
 
+	public static void removeLabel(ActivityLabel label) {
+		EntityTransaction transaction = entityManager.getTransaction();
+		boolean activeTransaction = transaction.isActive();
+		if (!activeTransaction) {
+			transaction.begin();
+		}
+		entityManager.remove(label);
+		if (!activeTransaction) {
+			transaction.commit();
+		}
+	}
 	/**
 	 * Links the given task with a Mylyn task if found in any of the workspace task
 	 * repositories. If a local task could not be found the tracked task will be

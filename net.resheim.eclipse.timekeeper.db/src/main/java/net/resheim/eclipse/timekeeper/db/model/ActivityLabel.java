@@ -10,22 +10,27 @@
  *******************************************************************************/
 package net.resheim.eclipse.timekeeper.db.model;
 
+import java.io.Serializable;
+
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.NamedQuery;
 import javax.persistence.Table;
 
 /**
- * A label has a colour and a name and is used to categorize an
- * {@link Activity}.
+ * A label has a color and a name and is used to categorize an {@link Activity}.
  * 
- * @author Torkild Ulvøy Resheim, Itema AS
+ * @author Torkild Ulvøy Resheim
  */
 @Entity
-@Table(name = "LABEL")
-public class Label {
+@Table(name = "ACTIVITYLABEL")
+@NamedQuery(name="ActivityLabel.findAll", query="SELECT a FROM ActivityLabel a")
+public class ActivityLabel implements Serializable {
 	
+	private static final long serialVersionUID = -3021226114768805330L;
+
 	@Id
 	@GeneratedValue(generator = "uuid")
 	@Column(name = "ID")
@@ -37,9 +42,18 @@ public class Label {
 	@Column(name = "COLOR")
 	private String color;
 	
-	public Label() {
-		this.name="label";
-		this.color="#000000";
+	public ActivityLabel() {
+	}
+
+	public ActivityLabel(String name, String color) {
+		this.name = name;
+		this.color = color;
+	}
+
+	public ActivityLabel(ActivityLabel label) {
+		this.id = label.getId();
+		this.name = label.getName();
+		this.color = label.getColor();
 	}
 
 	public String getName() {
@@ -58,5 +72,8 @@ public class Label {
 		this.color = color;
 	}
 
+	public String getId() {
+		return id;
+	}
 
 }

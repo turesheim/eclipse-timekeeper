@@ -6,8 +6,8 @@
 		<provider>org.eclipse.persistence.jpa.PersistenceProvider</provider>
 		<class>net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConverter</class>
 		<class>net.resheim.eclipse.timekeeper.db.model.Activity</class>
+		<class>net.resheim.eclipse.timekeeper.db.model.ActivityLabel</class>
 		<class>net.resheim.eclipse.timekeeper.db.model.GlobalTaskId</class>
-		<class>net.resheim.eclipse.timekeeper.db.model.Label</class>
 		<class>net.resheim.eclipse.timekeeper.db.model.Project</class>
 		<class>net.resheim.eclipse.timekeeper.db.model.ProjectType</class>
 		<class>net.resheim.eclipse.timekeeper.db.model.Task</class>
