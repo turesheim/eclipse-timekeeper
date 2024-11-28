@@ -3,6 +3,7 @@
 This is a simple time-tracking plug-in integrating with [Eclipse Mylyn](http://eclipse.org/mylyn/) Tasks.
 
 ![image](https://github.com/turesheim/eclipse-timekeeper/raw/master/resources/screenshots/workweek-view.png)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fturesheim%2Feclipse-timekeeper.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fturesheim%2Feclipse-timekeeper?ref=badge_shield)
 
 Whenever a task is *activated* in Mylyn it will automatically show up in the **Workweek** view with a bold label, and the amount of time the task is active will be tracked. An *activity* will be added to the task, which is the entity keeping track of the time and a short note. Multiple activities can be added to each task.
 
@@ -46,3 +47,6 @@ This project is using [JProfiler](https://www.ej-technologies.com/products/jprof
 ## License
 
 Copyright © 2014-2020 Torkild Ulvøy Resheim. All rights reserved. This program and the accompanying materials are made available under the terms of the Eclipse Public License v1.0 which accompanies this distribution, and is available at http://www.eclipse.org/legal/epl-v10.html
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fturesheim%2Feclipse-timekeeper.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fturesheim%2Feclipse-timekeeper?ref=badge_large)
