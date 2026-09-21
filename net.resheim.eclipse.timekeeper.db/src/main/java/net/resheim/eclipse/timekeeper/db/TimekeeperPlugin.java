@@ -337,11 +337,12 @@ public class TimekeeperPlugin extends Plugin {
 
 	static LocalDateTime recoveredActivityEnd(LocalDateTime start, LocalDateTime tick,
 			LocalDateTime now, long elapsedTimeMillis) {
+		LocalDateTime latestValidEnd = now.isBefore(start) ? start : now;
 		LocalDateTime recovered = tick != null && !tick.isBefore(start)
 				? tick
 				: start.plus(elapsedTimeMillis, ChronoUnit.MILLIS);
 		if (recovered.isBefore(start)) return start;
-		return recovered.isAfter(now) ? now : recovered;
+		return recovered.isAfter(latestValidEnd) ? latestValidEnd : recovered;
 	}
 
 	@Override

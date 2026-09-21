@@ -36,5 +36,7 @@ class TaskActivityTest {
 				TimekeeperPlugin.recoveredActivityEnd(start, start.minusMinutes(1), now, 240_000));
 		assertEquals(now,
 				TimekeeperPlugin.recoveredActivityEnd(start, null, now, 900_000));
+		assertEquals(start,
+				TimekeeperPlugin.recoveredActivityEnd(start, start.plusMinutes(7), start.minusMinutes(1), 0));
 	}
 }
