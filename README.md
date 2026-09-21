@@ -38,6 +38,13 @@ must not be used as a database backup, migration or rollback mechanism.
 You can install the latest **public release** from the <a href="http://marketplace.eclipse.org/content/timekeeper-eclipse">Eclipse Marketplace</a> or drag <a href="http://marketplace.eclipse.org/marketplace-client-intro?mpc_install=2196325" title="Drag and drop into a running Eclipse workspace to install Eclipse Timekeeper"><img src="https://marketplace.eclipse.org/sites/all/themes/solstice/public/images/marketplace/btn-install.png" height="28px"/>
 </a> into an running Eclipse instance. The latest CI build artifacts can be found under [GitHub Actions](https://github.com/turesheim/eclipse-timekeeper/actions?query=workflow%3ABuild). In order to install from there you must download the _p2-repository_ zip file and point your Eclipse instance to that. 
 
+The Eclipse 2026-09 upgrade has been installed and updated in a clean Eclipse
+4.41 runtime on macOS Apple Silicon with Java 21. Installation requires the
+complete Mylyn Tasks feature; enable the Eclipse 2026-09 software site so p2 can
+resolve it. Additional repository connectors such as Bugzilla are optional.
+See the [installed-IDE acceptance report](baseline/INSTALLED-IDE.md) for verified
+behavior and remaining runtime issues. This is not yet a release certification.
+
 ## Building
 
 Use JDK 21 and Maven 3.9.9 or newer. Clone the project and from the root execute:

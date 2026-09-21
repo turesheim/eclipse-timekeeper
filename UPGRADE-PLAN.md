@@ -7,12 +7,13 @@ Goal: Timekeeper can be installed and used in Eclipse IDE 2026-09
 Historical data migrations are explicitly out of scope.
 This was the latest stable Eclipse release when the plan was created.
 
-Status: PRs #185/#186/#188/#189/#191/#192/#193/#194/#195 are merged into `main`,
-with PR #195's Linux/Xvfb CI passing. Normal storage uses H2 2.5.250.
+Status: PRs #185/#186/#188/#189/#191/#192/#193/#194/#195/#196 are merged into `main`,
+with PR #196's Linux/Xvfb CI passing. Normal storage uses H2 2.5.250.
 The maintainer has removed historical migration support from scope: no one
 depends on those formats. Schema versioning and guarded target lifecycle hooks
-remain for future migrations. Installed-IDE and broader runtime acceptance
-are still outstanding. Earlier migration reports are historical, not active
+remain for future migrations. Clean installed-IDE creation, update and restart
+are verified on macOS Apple Silicon; broader runtime acceptance remains open.
+Earlier migration reports are historical, not active
 support promises. Test enablement from steps 4/5 was brought forward.
 See the [scope-change report](baseline/MIGRATION-SIMPLIFICATION.md).
 See the [original baseline](baseline/README.md),
@@ -20,7 +21,8 @@ See the [original baseline](baseline/README.md),
 [test-enablement results](baseline/TEST-UPGRADE.md) and
 [Mylyn/UI results](baseline/MYLYN-UI-UPGRADE.md) and
 [database-safety results](baseline/DATABASE-SAFETY.md) and
-[storage-mode acceptance](baseline/STORAGE-MODES.md).
+[storage-mode acceptance](baseline/STORAGE-MODES.md) and
+[installed-IDE acceptance](baseline/INSTALLED-IDE.md).
 The [database policy](DATABASE-RECOVERY.md) documents current backups and the future migration contract.
 
 ## Following this plan
@@ -144,7 +146,10 @@ Fixed blank task/project totals, updates targeting obsolete row types and null
 Mylyn links for deleted tasks. Public APIs now cover activity-manager access and
 task icons. Remaining internals and the existing macOS/Mylyn runtime-log errors
 are documented in [baseline/MYLYN-UI-UPGRADE.md](baseline/MYLYN-UI-UPGRADE.md).
-The runtime-error checkbox remains open pending clean installed-IDE verification.
+Clean installed-IDE verification fixed missing Tasks search contributions and a
+duplicate logging provider through feature metadata. The runtime-error checkbox
+remains open: Mylyn's theme color parser also fails in the installed Task List.
+See [installed-IDE acceptance](baseline/INSTALLED-IDE.md).
 
 ## 4. Secure the database baseline and future migration infrastructure
 
@@ -173,6 +178,8 @@ Do not add published-release fixtures or legacy migration recipes for this relea
   Persistence-layer sharing is covered; UI cache refresh, concurrent edits,
   active-task ownership, disconnect/failover and fixed-port conflicts remain open.
 - [ ] Verify new/current database startup and interrupted-activity behavior in installed Eclipse.
+  New/current embedded startup, normal shutdown and restart are verified in a
+  clean installation using the URL override; interrupted activity remains open.
 
 Completion criterion: new/current-baseline storage works, records are preserved,
 unsupported databases fail safely, and future migrations have a documented,
@@ -181,9 +188,9 @@ tested lifecycle. Backward migration support is not a release criterion.
 See [migration simplification](baseline/MIGRATION-SIMPLIFICATION.md) and the
 [current database policy](DATABASE-RECOVERY.md). Historical baseline totals
 remain 2 projects, 3 tasks, 5 activities, 2 labels, 3 assignments and 19,800 seconds
-for the current synthetic fixture. Next: installed-IDE and multi-instance runtime acceptance.
+for the current synthetic fixture. Next: remaining installed-IDE and multi-instance runtime acceptance.
 
-The simplified clean build passes 60 database/report tests and 8 UI/integration
+The latest clean build passes 62 database/report/packaging tests and 8 UI/integration
 tests; one existing CSV-export test remains ignored. Removed historical tests
 are no longer applicable, not skipped tests.
 
@@ -213,13 +220,15 @@ the remaining Eclipse runtime log warnings/errors.
 
 ## 6. Verify installation and prepare the release
 
-- [ ] Update feature and p2 metadata for the selected dependencies.
-- [ ] Build the p2 repository and install into a clean Eclipse 2026-09.
-- [ ] Check that required dependencies are included or can be installed automatically.
-- [ ] Test plugin updates against the new versioned database baseline.
+- [x] Update feature and p2 metadata for the selected dependencies.
+- [x] Build the p2 repository and install into a clean Eclipse 2026-09.
+- [x] Check that required dependencies are included or can be installed automatically.
+- [x] Test plugin updates against the new versioned database baseline.
   Historical data migration is out of scope.
 - [ ] Verify restart, settings and existing data after upgrading.
+  Restart and stored activity verified; storage preference switching remains open.
 - [ ] Check the Eclipse Error Log for Timekeeper and dependency errors.
+  Inspected installed runtime logs; the Mylyn theme-parser error remains unresolved.
 - [ ] Update version numbers, README, CHANGES and any migration instructions.
 - [ ] Document supported Eclipse/Java versions, installation and rollback.
 - [ ] Record the final build, test results and release artifact location.
@@ -228,7 +237,15 @@ Completion criterion: Installation, upgrade, restart and use with existing data
 work without dependency errors. A verified p2 repository and the required
 documentation are ready for publication.
 
-Results and deviations: Not started.
+Results and deviations: Clean p2 install and update passed on Eclipse Platform
+4.41 / Java 21 / macOS aarch64. Requiring the complete Mylyn Tasks feature fixed
+missing search contributions; removing the bundled Equinox SLF4J provider fixed
+duplicate providers. Synthetic task/activity/label data survived update and
+restart, including display in a fresh Mylyn workspace. Relinking the local task
+normalized its URL from NULL to an empty string; activity data was unchanged.
+Full build: 70 passing tests and one existing ignored export test. This is
+partial release acceptance, not publication approval. See
+[the installed-IDE report](baseline/INSTALLED-IDE.md) for artifacts and limitations.
 
 ## Decisions to track
 
@@ -238,7 +255,7 @@ Results and deviations: Not started.
 | Minimum Java version and tested runtime | Java 21; build tested with Temurin 21.0.12.1 |
 | EclipseLink/JPA version and possible Jakarta migration | EclipseLink 2.7.16 / javax.persistence 2.2.1; no namespace migration for test enablement |
 | H2 and migration scope | H2 2.5.250 / schema 1; no historical migrations; future lifecycle infrastructure retained |
-| Supported operating systems and architectures | Verify in step 5 |
+| Supported operating systems and architectures | macOS aarch64 clean install/update tested; Linux/Xvfb CI passes; broader support remains open |
 | New Timekeeper version | Decide before completing step 6 |
 
 Installed-IDE, multi-instance and platform acceptance remain the largest

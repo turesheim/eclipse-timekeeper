@@ -45,6 +45,11 @@
 		<testSourceDirectory>${project.basedir}/src/test/java</testSourceDirectory>
 		<testResources>
 			<testResource>
+				<directory>${project.basedir}/../net.resheim.eclipse.timekeeper-feature</directory>
+				<targetPath>packaging-fixture</targetPath>
+				<includes><include>feature.xml</include></includes>
+			</testResource>
+			<testResource>
 				<directory>${project.basedir}/src/test/java</directory>
 			</testResource>
 		</testResources>
