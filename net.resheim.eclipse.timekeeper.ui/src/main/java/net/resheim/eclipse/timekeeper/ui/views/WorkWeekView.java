@@ -45,7 +45,6 @@ import org.eclipse.jface.viewers.TreeViewerColumn;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.viewers.ViewerComparator;
 import org.eclipse.jface.window.ToolTip;
-import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.ITaskListChangeListener;
 import org.eclipse.mylyn.internal.tasks.core.TaskContainerDelta;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
@@ -202,8 +201,7 @@ public class WorkWeekView extends ViewPart {
 			// do not refresh with an editor active, that would deactivate the
 			// editor and lose focus
 			if (!viewer.isCellEditorActive()) {
-				viewer.refresh(activeTask);
-				viewer.refresh(contentProvider.getParent(activeTask));
+				refreshActiveTask(activeTask);
 				viewer.refresh(WeekViewContentProvider.WEEKLY_SUMMARY);
 			}
 		} else if (getActiveTime() > 0) {
@@ -214,12 +212,21 @@ public class WorkWeekView extends ViewPart {
 			// do not refresh with an editor active, that would deactivate the
 			// editor and lose focus
 			if (!viewer.isCellEditorActive()) {
-				viewer.refresh(activeTask);
-				viewer.refresh(contentProvider.getParent(activeTask));
+				refreshActiveTask(activeTask);
 				viewer.refresh(WeekViewContentProvider.WEEKLY_SUMMARY);
 			}
 		}
 
+	}
+
+	private void refreshActiveTask(ITask activeTask) {
+		Task tracked = TimekeeperPlugin.getDefault().getTask(activeTask);
+		if (tracked != null) {
+			viewer.refresh(tracked);
+			if (tracked.getProject() != null) {
+				viewer.refresh(tracked.getProject());
+			}
+		}
 	}
 
 	private class ContentProvider extends WeekViewContentProvider {
@@ -439,7 +446,7 @@ public class WorkWeekView extends ViewPart {
 		hookDoubleClickAction();
 		contributeToActionBars();
 		taskListener = new TaskListener();
-		TasksUiPlugin.getTaskActivityManager().addActivationListener(taskListener);
+		TasksUi.getTaskActivityManager().addActivationListener(taskListener);
 		TasksUiPlugin.getTaskList().addChangeListener(taskListener);
 		viewer.setInput(getViewSite());
 		// Force a redraw so content is visible
@@ -474,14 +481,10 @@ public class WorkWeekView extends ViewPart {
 				// Use modern formatting
 				long seconds = 0;
 				LocalDate date = contentProvider.getFirstDayOfWeek().plusDays(weekday);
-				if (element instanceof String) {
+				if (element instanceof Project) {
 					seconds = getSum(contentProvider.getFiltered(), date, (Project) element);
-				} else if (element instanceof ITask) {
-					AbstractTask task = (AbstractTask) element;
-					Task trackedTask = TimekeeperPlugin.getDefault().getTask(task);
-					if (trackedTask != null) {
-						seconds = trackedTask.getDuration(contentProvider.getDate(weekday)).getSeconds();
-					}
+				} else if (element instanceof Task) {
+					seconds = ((Task) element).getDuration(date).getSeconds();
 				} else if (element instanceof WeeklySummary) {
 					seconds = getSum(contentProvider.getFiltered(), date);
 				} else if (element instanceof Activity) {
@@ -503,7 +506,7 @@ public class WorkWeekView extends ViewPart {
 
 	@Override
 	public void dispose() {
-		TasksUiPlugin.getTaskActivityManager().removeActivationListener(taskListener);
+		TasksUi.getTaskActivityManager().removeActivationListener(taskListener);
 		TasksUiPlugin.getTaskList().removeChangeListener(taskListener);
 		activityLabelPainter.disposeImages();
 		super.dispose();
@@ -519,10 +522,9 @@ public class WorkWeekView extends ViewPart {
 		Object obj = ((IStructuredSelection) selection).getFirstElement();
 		if (obj instanceof Task) {
 			manager.add(new Separator("task"));
-			if (((Task) obj).getMylynTask().isActive()) {
-				manager.add(deactivateAction);
-			} else {
-				manager.add(activateAction);
+			ITask mylynTask = ((Task) obj).getMylynTask();
+			if (mylynTask != null) {
+				manager.add(mylynTask.isActive() ? deactivateAction : activateAction);
 			}
 			manager.add(newActivityAction);
 		}
@@ -672,7 +674,7 @@ public class WorkWeekView extends ViewPart {
 			public void run() {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
-				if (obj instanceof Task) {
+				if (obj instanceof Task && ((Task) obj).getMylynTask() != null) {
 					TasksUiUtil.openTask(((Task) obj).getMylynTask());
 				}
 			}

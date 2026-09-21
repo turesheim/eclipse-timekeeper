@@ -11,7 +11,6 @@
 
 package net.resheim.eclipse.timekeeper.ui.views;
 
-import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.Map;
@@ -25,8 +24,8 @@ import org.eclipse.jface.viewers.AbstractTreeViewer;
 import org.eclipse.jface.viewers.ITreeContentProvider;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.Viewer;
-import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.core.ITask;
+import org.eclipse.mylyn.tasks.ui.TasksUi;
 
 import net.resheim.eclipse.timekeeper.db.DatabaseChangeListener;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
@@ -34,7 +33,6 @@ import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.Project;
 import net.resheim.eclipse.timekeeper.db.model.Task;
 
-@SuppressWarnings("restriction")
 public abstract class WeekViewContentProvider implements ITreeContentProvider, DatabaseChangeListener {
 
 	public static final WeeklySummary WEEKLY_SUMMARY = new WeeklySummary();
@@ -99,6 +97,12 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 
 	@Override
 	public Object getParent(Object element) {
+		if (element instanceof Task) {
+			return ((Task) element).getProject();
+		}
+		if (element instanceof Activity) {
+			return ((Activity) element).getTrackedTask();
+		}
 		if (element instanceof ITask) {
 			return TimekeeperPlugin.getMylynProjectName((ITask) element);
 		}
@@ -118,7 +122,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 
 	private boolean hasData(Activity activity) {
 		LocalDate endDate = firstDayOfWeek.plusDays(7);
-		return activity.getDuration(firstDayOfWeek, endDate) != Duration.ZERO;
+		return !activity.getDuration(firstDayOfWeek, endDate).isZero();
 	}
 
 	protected void filter() {
@@ -141,14 +145,20 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 
 	@Override
 	public void databaseStateChanged() {
-		filter();
-		if (viewer != null) {
+		if (viewer != null && !viewer.getControl().isDisposed()) {
 			viewer.getControl().getDisplay().asyncExec(new Runnable() {
 				@Override
 				public void run() {
-					ITask activeTask = TasksUiPlugin.getTaskActivityManager().getActiveTask();
+					if (viewer.getControl().isDisposed()) {
+						return;
+					}
+					filter();
+					ITask activeTask = TasksUi.getTaskActivityManager().getActiveTask();
 					if (activeTask != null) {
-						filtered.add(TimekeeperPlugin.getDefault().getTask(activeTask));
+						Task tracked = TimekeeperPlugin.getDefault().getTask(activeTask);
+						if (tracked != null) {
+							filtered.add(tracked);
+						}
 					}
 					viewer.refresh();
 					if (viewer instanceof TreeViewer) {

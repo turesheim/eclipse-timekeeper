@@ -74,7 +74,7 @@ abstract class TimeColumnLabelProvider extends ColumnLabelProvider {
 					.getFiltered()
 					.stream()
 					.filter(t -> p.equals(t.getProject()))
-					.anyMatch(t -> t.getMylynTask().isActive())) {
+					.anyMatch(t -> t.getMylynTask() != null && t.getMylynTask().isActive())) {
 				return JFaceResources.getFontRegistry().getBold(JFaceResources.DIALOG_FONT);
 			}
 

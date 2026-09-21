@@ -11,18 +11,9 @@
 
 package net.resheim.eclipse.timekeeper.ui.views;
 
-import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.mylyn.commons.ui.CommonImages;
-import org.eclipse.mylyn.internal.tasks.core.TaskCategory;
-import org.eclipse.mylyn.internal.tasks.core.TaskGroup;
-import org.eclipse.mylyn.internal.tasks.core.UncategorizedTaskContainer;
-import org.eclipse.mylyn.internal.tasks.core.UnsubmittedTaskContainer;
-import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
-import org.eclipse.mylyn.tasks.core.IRepositoryElement;
-import org.eclipse.mylyn.tasks.core.IRepositoryQuery;
 import org.eclipse.mylyn.tasks.core.ITask;
-import org.eclipse.mylyn.tasks.core.ITaskContainer;
-import org.eclipse.mylyn.tasks.ui.AbstractRepositoryConnectorUi;
+import org.eclipse.mylyn.tasks.ui.TaskElementLabelProvider;
 import org.eclipse.mylyn.tasks.ui.TasksUiImages;
 import org.eclipse.swt.graphics.Image;
 
@@ -32,85 +23,35 @@ import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 /**
- * Provides decorations fot the task and activity information column.
+ * Provides decorations for the task and activity information column.
  */
-@SuppressWarnings("restriction")
 class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 
 	public TitleColumnLabelProvider(WeekViewContentProvider contentProvider) {
 		super(contentProvider);
 	}
 
-	private class CompositeImageDescriptor {
-		ImageDescriptor icon;
-		ImageDescriptor overlayKind;
-	}
-
+	private final TaskElementLabelProvider mylynLabels = new TaskElementLabelProvider();
 
 	@Override
 	public Image getImage(Object element) {
 		if (element instanceof Activity) {
 			return TimekeeperUiPlugin.getDefault().getImageRegistry().get(TimekeeperUiPlugin.OBJ_ACTIVITY);
 		}
-		// Mylyn stuff, should be rewritten to use Mylyn HiDPI images when these
-		// are ready
-		CompositeImageDescriptor compositeDescriptor = getImageDescriptor(element);
-		if (element instanceof ITask) {
-			if (compositeDescriptor.overlayKind == null) {
-				compositeDescriptor.overlayKind = CommonImages.OVERLAY_CLEAR;
-			}
-			return CommonImages.getCompositeTaskImage(compositeDescriptor.icon, compositeDescriptor.overlayKind,
-					false);
-		} else if (element instanceof ITaskContainer) {
-			return CommonImages.getCompositeTaskImage(compositeDescriptor.icon, CommonImages.OVERLAY_CLEAR, false);
-		} else {
-			return CommonImages.getCompositeTaskImage(compositeDescriptor.icon, null, false);
+		if (element instanceof Project) {
+			return CommonImages.getImage(TasksUiImages.CATEGORY);
 		}
+		if (element instanceof Task) {
+			ITask linked = ((Task) element).getMylynTask();
+			return linked == null ? CommonImages.getImage(TasksUiImages.TASK) : mylynLabels.getImage(linked);
+		}
+		return null;
 	}
 
-	private CompositeImageDescriptor getImageDescriptor(Object object) {
-		CompositeImageDescriptor compositeDescriptor = new CompositeImageDescriptor();
-		if (object instanceof UncategorizedTaskContainer || object instanceof UnsubmittedTaskContainer) {
-			compositeDescriptor.icon = TasksUiImages.CATEGORY_UNCATEGORIZED;
-			return compositeDescriptor;
-		} else if (object instanceof TaskCategory) {
-			compositeDescriptor.icon = TasksUiImages.CATEGORY;
-		} else if (object instanceof TaskGroup) {
-			compositeDescriptor.icon = CommonImages.GROUPING;
-		}
-
-		if (object instanceof Task) {
-			ITask task = ((Task) object).getMylynTask();
-			if (task == null) {
-				compositeDescriptor.icon = TasksUiImages.TASK;
-				return compositeDescriptor;
-			} else {
-				object = task;
-			}
-		}
-
-		if (object instanceof ITaskContainer) {
-			IRepositoryElement element = (IRepositoryElement) object;
-
-			AbstractRepositoryConnectorUi connectorUi = null;
-			if (element instanceof ITask) {
-				ITask repositoryTask = (ITask) element;
-				connectorUi = TasksUiPlugin.getConnectorUi(((ITask) element).getConnectorKind());
-				if (connectorUi != null) {
-					compositeDescriptor.overlayKind = connectorUi.getTaskKindOverlay(repositoryTask);
-				}
-			} else if (element instanceof IRepositoryQuery) {
-				connectorUi = TasksUiPlugin.getConnectorUi(((IRepositoryQuery) element).getConnectorKind());
-			}
-			if (connectorUi != null) {
-				compositeDescriptor.icon = connectorUi.getImageDescriptor(element);
-				return compositeDescriptor;
-			} else {
-				compositeDescriptor.icon = TasksUiImages.TASK;
-				return compositeDescriptor;
-			}
-		}
-		return compositeDescriptor;
+	@Override
+	public void dispose() {
+		mylynLabels.dispose();
+		super.dispose();
 	}
 
 	@Override
@@ -119,11 +60,10 @@ class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 			return ((Project) element).getName();
 		}
 		if (element instanceof Task) {
-			ITask itask = ((Task) element).getMylynTask();
 			Task task = (Task) element;
 			StringBuilder sb = new StringBuilder();
-			if (itask != null && itask.getTaskId() != null) {
-				sb.append(itask.getTaskId());
+			if (task.getTaskId() != null) {
+				sb.append(task.getTaskId());
 				sb.append(": ");
 			}
 			sb.append(task.getTaskSummary());

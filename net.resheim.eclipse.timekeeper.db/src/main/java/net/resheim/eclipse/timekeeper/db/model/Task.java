@@ -39,14 +39,14 @@ import javax.persistence.Transient;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTaskCategory;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTaskContainer;
-import org.eclipse.mylyn.internal.tasks.core.RepositoryQuery;
+import org.eclipse.mylyn.tasks.core.IRepositoryQuery;
 import org.eclipse.mylyn.tasks.core.ITask;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConverter;
 
 /**
- * A {@link Task} is the persisted link to an {@link AbstractTask}. It holds a
+ * A {@link Task} is the optional persisted link to an {@link ITask}. It holds a
  * number of {@link Activity} instances which each represent a period of work on
  * the task.
  * 
@@ -234,10 +234,16 @@ public class Task implements Serializable {
 	public void linkWithMylynTask(ITask task) {
 		// associate this tracked task with the Mylyn task
 		this.mylynTask = task;
+		if (task == null) {
+			// Unlink without erasing the persisted identity or reporting metadata.
+			taskLinkStatus = TaskLinkStatus.UNLINKED;
+			return;
+		}
 		taskId = task.getTaskId();
 		repositoryUrl = TimekeeperPlugin.getRepositoryUrl(task);
 		taskUrl = task.getUrl();
 		taskSummary = task.getSummary();
+		taskLinkStatus = TaskLinkStatus.LINKED;
 
 		// figure out the project name and set this
 		if (task instanceof AbstractTask) {
@@ -245,7 +251,7 @@ public class Task implements Serializable {
 			parentContainers.forEach(p -> {
 				String projectName = null;
 				// it's a remote task
-				if (p instanceof RepositoryQuery) {
+				if (p instanceof IRepositoryQuery) {
 					projectName = TimekeeperPlugin.getMylynProjectName(task);
 				}
 				// it's a local task
