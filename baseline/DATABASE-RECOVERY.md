@@ -10,6 +10,11 @@ verification of the receipt's engine, target URL and recomputed data totals.
 The [schema-versioning follow-up](DATABASE-VERSIONING.md) preserves these checks,
 adds regressions for them and introduces an in-database marker for new recoveries.
 
+The later [H2-upgrade change](H2-UPGRADE.md) supersedes the engine/UI boundaries
+below: normal storage uses H2 2.5.250 and backup upgrades also accept current-model
+H2 1.4.194 sources with labels. Earlier receipts require reconversion, as explained
+in the current [user procedure](../DATABASE-RECOVERY.md).
+
 ## Behavior and recovery boundary
 
 The Database preference page offers **Convert historical backup…** and

@@ -82,7 +82,7 @@ public class WeekViewContentProviderTest {
 					String location = database.getPreferenceStore().getString(TimekeeperPlugin.PREF_DATABASE_LOCATION);
 					String url = database.getPreferenceStore().getString(TimekeeperPlugin.PREF_DATABASE_URL);
 					database.createControl(shell);
-					assertTrue(button((Composite) database.getControl(), "Convert historical backup...").isEnabled());
+					assertTrue(button((Composite) database.getControl(), "Upgrade database backup...").isEnabled());
 					assertTrue(button((Composite) database.getControl(), "Verify recovered database...").isEnabled());
 					assertEquals(location, database.getPreferenceStore().getString(TimekeeperPlugin.PREF_DATABASE_LOCATION));
 					assertEquals(url, database.getPreferenceStore().getString(TimekeeperPlugin.PREF_DATABASE_URL));

@@ -1,10 +1,16 @@
-# Recovering a historical Timekeeper database
+# Upgrading an H2 1.4.194 Timekeeper database
 
 This workflow is part of the Eclipse 2026-09 upgrade under development. It
-supports the repository's historical V1/V2 `TRACKEDTASK` schemas using **H2
-1.4.194**, converting into the current `Task` model. It is not a general H2
-upgrade, a CSV importer, or a promise of compatibility with every published
-Timekeeper release. Current-model databases do not need this conversion.
+upgrades **H2 1.4.194 to H2 2.5.250**, using separate storage. It supports both
+historical V1/V2 `TRACKEDTASK` schemas and current `Task` databases, including
+labels and relationships, with or without the version-1 schema marker. It is
+not a CSV importer or a promise of compatibility with every published release.
+**Current-model H2 1.4.194 databases need this engine conversion too.**
+
+H2 1.x files cannot be opened directly by H2 2.x. The new engine is used for
+normal storage; the bundled old driver is isolated and loaded only when explicitly
+reading a backup copy. Never replace an old installation's H2 JAR and then try to
+open its database in place.
 
 The converter never opens your original database: it reads a supplied backup
 ZIP, retains a copy, and works inside a newly created recovery directory. It
@@ -58,12 +64,12 @@ Use your Eclipse launcher's actual path. This database is temporary: **do not
 track real work in this recovery session**. The URL override takes precedence
 over preferences; remove it before deliberately switching to persistent storage.
 
-Open **Preferences > Timekeeper > Database > Historical database recovery**.
+Open **Preferences > Timekeeper > Database > Database upgrade and recovery**.
 These actions also remain available when normal database startup has failed.
 
 ## 3. Convert the backup
 
-1. Choose **Convert historical backup…** and select your trusted backup ZIP.
+1. Choose **Upgrade database backup…** and select your trusted H2 1.4.194 backup ZIP.
 2. Select a private, local parent folder with enough free space for the backup,
    extracted source and converted database. The operation creates its own new
    `timekeeper-recovery-<unique ID>` subfolder; it never reuses an earlier attempt.
@@ -79,13 +85,16 @@ The directory contains:
 | --- | --- |
 | `started.properties` | Marks the attempt and conversion/receipt format versions |
 | `backup.zip` | Retained, byte-verified copy of the supplied backup |
-| `source.mv.db` | Extracted historical source; opened read-only |
-| `converted.mv.db` | Separate current-model database; not automatically activated |
+| `source.mv.db` | Extracted H2 1.4.194 source; opened read-only with the isolated old driver |
+| `converted.mv.db` | Separate H2 2.5.250 current-model database; not automatically activated |
 | `validated.properties` | Completed validation receipt with hashes, versions, totals and the new JDBC URL |
 
 Conversion compares every mapped value before commit, then closes/reopens the
 database, loads the model through JPA, and compares all mapped rows again through
 read-only connections. It does not infer missing activity end times or seed labels.
+Current-model sources retain all labels, assignments, project types and
+associations. Historical schemas have no labels to recover. JDBC timestamp
+formatting differences are normalized for comparison without reducing precision.
 The receipt is written only after these checks. Archive and extracted database
 limits are 256 MiB and 1 GiB respectively; conversion also holds rows in memory,
 so larger datasets may require more memory or a separate migration approach.
@@ -93,6 +102,8 @@ so larger datasets may require more memory or a separate migration approach.
 Only use backups you trust. This is not a sandbox for hostile H2 database content.
 Encrypted/password-protected backups, `.h2.db` PageStore files, multiple databases,
 extra Flyway history and unknown/mixed schemas are outside this workflow.
+Other old engine versions (including 1.4.200) are not yet verified input formats.
+H2 2.5.250 backups use the new engine's own backup/restore workflow, not this converter.
 
 ## 4. Verify and deliberately switch
 
@@ -113,6 +124,11 @@ extra Flyway history and unknown/mixed schemas are outside this workflow.
    normal tracking. Do not point old clients at the converted database, or use
    old and new clients against one shared database.
 
+The default shared URL now uses `AUTO_SERVER=TRUE;AUTO_SERVER_PORT=9090` without
+`AUTO_RECONNECT` or `FILE_LOCK=SOCKET`. Do not carry those old settings into a
+custom H2 2.5.250 URL. Use the validated local URL for the initial trial; broad
+shared/server and cross-process testing is still outstanding.
+
 Java properties files escape punctuation, so `target.jdbcUrl=jdbc\:h2\:...`
 in the receipt means `jdbc:h2:...` in the preference. The success dialog also
 shows the unescaped URL. Paths must not contain semicolons or line breaks.
@@ -123,10 +139,18 @@ the old hash is expected to fail verification; do not convert it again or edit
 the receipt to make it pass. Keep making separate backups of new work.
 
 New conversions also contain an in-database `TIMEKEEPER_SCHEMA` marker with
-current-model version 1 and the historical source version. Startup refuses a
+current-model version 1 and origin `LEGACY_V1`, `LEGACY_V2` or `H2_1_4` (an engine
+upgrade of the current model). Startup refuses a
 marker that is unknown or still `CREATING`/`RECOVERING`. Existing unversioned
-current-model databases are not automatically stamped or changed. Receipts from
-the initial recovery workflow remain supported for those unversioned targets.
+current-model databases are never stamped or changed in place. Conversion of
+an unstamped H2 1.4.194 source adopts the marker in its new H2 2.5.250 copy.
+
+Receipts from PR #192/#193 describe H2 1.4.194 targets and are not activation
+certificates for the new engine. If that old converted target has never been
+used, run its retained `backup.zip` through the new upgrade action into a fresh
+folder. **If you recorded work in the old converted target, back up that target
+now and upgrade this new backup instead**, or those later records would be omitted.
+Keep the earlier files and receipts; do not edit them to bypass version checks.
 
 ## 5. Failure, interruption and rollback
 
@@ -148,8 +172,9 @@ the initial recovery workflow remain supported for those unversioned targets.
   configuration and original database. Do not overwrite the original with the
   converted file. **Records added after the switch are not merged back.**
 
-Version adoption for existing unversioned databases, previous published-release
-fixtures, shared/server concurrency and clean installed-IDE acceptance remain
+Previous published-release fixtures, other source engine versions, shared/server
+concurrency and clean installed-IDE acceptance remain
 open in [the upgrade plan](UPGRADE-PLAN.md). See the
 [recovery evidence](baseline/DATABASE-RECOVERY.md) and
-[schema-versioning evidence](baseline/DATABASE-VERSIONING.md).
+[schema-versioning evidence](baseline/DATABASE-VERSIONING.md) and
+[H2-upgrade evidence](baseline/H2-UPGRADE.md).

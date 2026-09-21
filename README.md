@@ -22,7 +22,10 @@ The Database configuration page in preferences (**Timekeeper > Database**) allow
 
 Multiple instances of the Timekeeper can share the database as it utilizes a H2 feature called mixed mode. This will automatically start a server instance on port 9090 if more connections are needed.
 
-For the Eclipse 2026-09 upgrade, use the separate **Historical database recovery**
+The Eclipse 2026-09 upgrade uses **H2 2.5.250**. Existing H2 1.4.194 files,
+including current-model databases with labels, require conversion into separate
+storage; they cannot be opened in place with the new engine.
+Use the **Database upgrade and recovery**
 actions and follow the [backup, conversion and rollback procedure](DATABASE-RECOVERY.md).
 These actions retain the backup, convert into a new database and verify it without
 changing preferences. The legacy CSV Export/Import path still needs current-model

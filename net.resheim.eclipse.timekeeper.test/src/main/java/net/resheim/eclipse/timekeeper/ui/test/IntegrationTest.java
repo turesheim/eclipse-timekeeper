@@ -65,6 +65,7 @@ import org.junit.runner.RunWith;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.DatabaseRecovery;
+import net.resheim.eclipse.timekeeper.db.LegacyH2;
 import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.TaskLinkStatus;
@@ -88,7 +89,7 @@ public class IntegrationTest {
 		Properties credentials = new Properties();
 		credentials.setProperty("user", "sa");
 		credentials.setProperty("password", "");
-		try (var connection = new org.h2.Driver().connect("jdbc:h2:" + root.resolve("original"), credentials);
+		try (var connection = LegacyH2.open("jdbc:h2:" + root.resolve("original"));
 				var stream = DatabaseRecovery.class.getResourceAsStream("/db/V1__baseline.sql")) {
 			assertNotNull(stream);
 			try (var reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {

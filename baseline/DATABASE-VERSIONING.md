@@ -5,6 +5,11 @@ merged with passing Linux/Xvfb CI. Its receipt-validation review changes are
 preserved and now have explicit regression coverage. All databases used here
 are synthetic; no personal database was accessed.
 
+Merged as PR #193 (`5e85e8b`) with passing Linux/Xvfb CI. The
+[H2-upgrade follow-up](H2-UPGRADE.md) moves normal storage to H2 2.5.250 and
+adds backed-up adoption for H2 1.4.194 current-model databases. The sections below
+record the original versioning baseline, before that engine upgrade.
+
 ## Version contract
 
 New databases and newly converted historical backups contain `TIMEKEEPER_SCHEMA`.

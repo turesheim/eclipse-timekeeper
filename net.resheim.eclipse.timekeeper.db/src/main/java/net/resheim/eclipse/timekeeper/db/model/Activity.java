@@ -61,12 +61,12 @@ public class Activity implements Comparable<Activity>, Serializable {
 	private String id;
 
 	/** The time the activity was started */
-	@Column(name = "START_TIME")
+	@Column(name = "START_TIME", columnDefinition = "TIMESTAMP(9)")
 	@Convert(converter = LocalDateTimeAttributeConverter.class)
 	private LocalDateTime start = null;
 
 	/** The time the activity was stopped */
-	@Column(name = "END_TIME")
+	@Column(name = "END_TIME", columnDefinition = "TIMESTAMP(9)")
 	@Convert(converter = LocalDateTimeAttributeConverter.class)
 	private LocalDateTime end = null;
 

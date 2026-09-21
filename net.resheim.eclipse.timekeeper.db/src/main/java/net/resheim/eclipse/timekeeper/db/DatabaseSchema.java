@@ -94,13 +94,14 @@ public final class DatabaseSchema {
 
 	private static Map<String, Set<String>> schema(Connection connection) throws SQLException {
 		Map<String, Set<String>> result = new TreeMap<>();
-		try (ResultSet tables = connection.getMetaData().getTables(null, null, "%", new String[] { "TABLE", "VIEW" })) {
+		try (ResultSet tables = connection.getMetaData().getTables(null, null, "%", new String[] { "TABLE", "BASE TABLE", "VIEW" })) {
 			while (tables.next()) {
 				String namespace = tables.getString("TABLE_SCHEM");
 				if ("INFORMATION_SCHEMA".equals(namespace)) {
 					continue;
 				}
-				if (!"PUBLIC".equals(namespace) || !"TABLE".equals(tables.getString("TABLE_TYPE"))) {
+				String type = tables.getString("TABLE_TYPE");
+				if (!"PUBLIC".equals(namespace) || (!"TABLE".equals(type) && !"BASE TABLE".equals(type))) {
 					throw new SQLException("Unsupported schema or view in Timekeeper database; no schema changes were made");
 				}
 				String table = tables.getString("TABLE_NAME");

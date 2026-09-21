@@ -32,8 +32,7 @@ public final class DatabaseRecovery {
 	private static final long MAX_BACKUP_BYTES = 256L * 1024 * 1024;
 	private static final long MAX_DATABASE_BYTES = 1024L * 1024 * 1024;
 	private static final String RECEIPT_VERSION = "1";
-	private static final String CONVERSION_VERSION = "legacy-v1-v2-to-versioned-1";
-	private static final String UNVERSIONED_CONVERSION = "legacy-v1-v2-to-current-1";
+	private static final String CONVERSION_VERSION = "h2-1.4.194-to-2.5.250-1";
 
 	private DatabaseRecovery() { }
 
@@ -58,7 +57,8 @@ public final class DatabaseRecovery {
 		Properties receipt = new Properties();
 		receipt.setProperty("receipt.version", RECEIPT_VERSION);
 		receipt.setProperty("conversion.version", CONVERSION_VERSION);
-		receipt.setProperty("engine", "H2 1.4.194");
+		receipt.setProperty("engine", "H2 2.5.250");
+		receipt.setProperty("source.engine", "H2 1.4.194");
 		receipt.setProperty("started", Instant.now().toString());
 		writeProperties(directory.resolve("started.properties"), receipt);
 
@@ -91,23 +91,26 @@ public final class DatabaseRecovery {
 		receipt.setProperty("source.sha256", sourceHash);
 		String targetUrl = jdbcUrl(directory, "converted");
 		LegacyDatabaseConverter.Result data;
-		try (Connection source = connect(jdbcUrl(directory, "source"), true)) {
+		DatabaseSchema.Kind sourceKind;
+		try (Connection source = source(directory)) {
 			DatabaseSchema.Kind kind = DatabaseSchema.inspect(source);
-			if (kind != DatabaseSchema.Kind.LEGACY_V1 && kind != DatabaseSchema.Kind.LEGACY_V2) {
-				throw new SQLException("This recovery tool supports only historical V1/V2 databases, not " + kind);
+			sourceKind = kind;
+			if (kind != DatabaseSchema.Kind.LEGACY_V1 && kind != DatabaseSchema.Kind.LEGACY_V2 && kind != DatabaseSchema.Kind.CURRENT) {
+				throw new SQLException("Unsupported H2 1.4.194 source schema: " + kind);
 			}
+			receipt.setProperty("source.schema", kind.name());
 			checkCancelled(cancelled);
-			EntityManager manager = DatabaseStartup.openRecoveryTarget(targetUrl,
-					kind == DatabaseSchema.Kind.LEGACY_V1 ? 1 : 2);
+			EntityManager manager = openTarget(targetUrl, kind);
 			DatabaseStartup.close(manager);
 			try (Connection target = connect(targetUrl, false)) {
-				data = LegacyDatabaseConverter.convert(source, target);
+				data = kind == DatabaseSchema.Kind.CURRENT ? CurrentDatabaseConverter.convert(source, target)
+						: LegacyDatabaseConverter.convert(source, target);
 			}
 		}
 		checkCancelled(cancelled);
 		// Reopen without schema generation and exercise JPA before the final, read-only
 		// comparison. No core startup cleanup, activity inference or label seeding runs.
-		EntityManager manager = DatabaseStartup.openRecoveryTarget(targetUrl + ";IFEXISTS=TRUE", data.sourceVersion());
+		EntityManager manager = openTarget(targetUrl + ";IFEXISTS=TRUE", sourceKind);
 		try {
 			for (String entity : new String[] { "Project", "Task", "Activity" }) {
 				manager.createQuery("SELECT e FROM " + entity + " e").getResultList();
@@ -152,20 +155,19 @@ public final class DatabaseRecovery {
 		String expectedTargetUrl = jdbcUrl(directory, "converted") + ";IFEXISTS=TRUE";
 		String conversion = receipt.getProperty("conversion.version");
 		if (!RECEIPT_VERSION.equals(receipt.getProperty("receipt.version"))
-				|| (!CONVERSION_VERSION.equals(conversion) && !UNVERSIONED_CONVERSION.equals(conversion))
-				|| !"H2 1.4.194".equals(receipt.getProperty("engine"))
+				|| !CONVERSION_VERSION.equals(conversion)
+				|| !"H2 2.5.250".equals(receipt.getProperty("engine"))
+				|| !"H2 1.4.194".equals(receipt.getProperty("source.engine"))
 				|| !expectedTargetUrl.equals(receipt.getProperty("target.jdbcUrl"))) {
-			throw new IOException("Unsupported recovery receipt version or metadata.");
+			throw new IOException("Unsupported recovery receipt version or metadata."
+					+ " For an earlier H2 recovery, convert its retained backup.zip into a new folder with this version.");
 		}
 		try (Connection target = connect(jdbcUrl(directory, "converted"), true)) {
-			if (CONVERSION_VERSION.equals(conversion)) {
-				DatabaseVersion.Stamp version = DatabaseVersion.read(target);
-				if (!version.state().equals("READY")
-						|| !version.origin().equals("LEGACY_V" + receipt.getProperty("source.version"))) {
-					throw new IOException("Recovery database version does not match its completion receipt.");
-				}
-			} else if (DatabaseSchema.hasVersion(target)) {
-				throw new IOException("An unversioned recovery receipt cannot describe a versioned database.");
+			DatabaseVersion.Stamp version = DatabaseVersion.read(target);
+			String origin = "CURRENT".equals(receipt.getProperty("source.schema")) ? "H2_1_4"
+					: "LEGACY_V" + receipt.getProperty("source.version");
+			if (!version.state().equals("READY") || !version.origin().equals(origin)) {
+				throw new IOException("Recovery database version does not match its completion receipt.");
 			}
 		}
 		for (String name : new String[] { "backup", "source", "target" }) {
@@ -176,6 +178,11 @@ public final class DatabaseRecovery {
 			}
 		}
 		LegacyDatabaseConverter.Result data = verifyData(directory);
+		try (Connection source = source(directory)) {
+			if (!DatabaseSchema.inspect(source).name().equals(receipt.getProperty("source.schema"))) {
+				throw new IOException("Recovery source schema does not match its receipt.");
+			}
+		}
 		if (!Integer.toString(data.sourceVersion()).equals(receipt.getProperty("source.version"))
 				|| !Integer.toString(data.projects()).equals(receipt.getProperty("projects"))
 				|| !Integer.toString(data.tasks()).equals(receipt.getProperty("tasks"))
@@ -188,10 +195,20 @@ public final class DatabaseRecovery {
 	}
 
 	private static LegacyDatabaseConverter.Result verifyData(Path directory) throws SQLException, IOException {
-		try (Connection source = connect(jdbcUrl(directory, "source"), true);
+		try (Connection source = source(directory);
 				Connection target = connect(jdbcUrl(directory, "converted"), true)) {
-			return LegacyDatabaseConverter.verify(source, target);
+			return DatabaseSchema.inspect(source) == DatabaseSchema.Kind.CURRENT ? CurrentDatabaseConverter.verify(source, target)
+					: LegacyDatabaseConverter.verify(source, target);
 		}
+	}
+
+	private static EntityManager openTarget(String url, DatabaseSchema.Kind kind) throws SQLException {
+		return kind == DatabaseSchema.Kind.CURRENT ? DatabaseStartup.openEngineUpgradeTarget(url)
+				: DatabaseStartup.openRecoveryTarget(url, kind == DatabaseSchema.Kind.LEGACY_V1 ? 1 : 2);
+	}
+
+	private static Connection source(Path directory) throws IOException, SQLException {
+		return LegacyH2.open(jdbcUrl(directory, "source") + ";IFEXISTS=TRUE;ACCESS_MODE_DATA=r");
 	}
 
 	private static Connection connect(String url, boolean readOnly) throws SQLException {

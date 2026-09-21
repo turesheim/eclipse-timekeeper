@@ -17,8 +17,6 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.security.MessageDigest;
-import java.util.HexFormat;
 import java.time.Duration;
 import java.util.Properties;
 import java.util.zip.ZipEntry;
@@ -215,7 +213,7 @@ class DatabaseRecoveryTest {
 	}
 
 	@ParameterizedTest
-	@ValueSource(strings = { "engine", "target.jdbcUrl", "conversion.version", "source.version", "projects", "tasks",
+	@ValueSource(strings = { "engine", "source.engine", "source.schema", "target.jdbcUrl", "conversion.version", "source.version", "projects", "tasks",
 			"activities", "open.activities", "closed.duration" })
 	void rejectsChangedReceiptMetadata(String property) throws Exception {
 		Path output = directory.resolve("recovery");
@@ -229,25 +227,19 @@ class DatabaseRecoveryTest {
 	}
 
 	@Test
-	void stillVerifiesThePreviousUnversionedReceiptFormatWithoutStampingIt() throws Exception {
+	void rejectsPreviousEngineReceiptsWithReconversionGuidance() throws Exception {
 		Path output = directory.resolve("recovery");
-		var result = DatabaseRecovery.recover(backup(true, null), output, () -> false);
-		// Reproduce PR #192's target/receipt format using the same synthetic data.
-		try (Connection target = DriverManager.getConnection(result.jdbcUrl(), "sa", ""); var statement = target.createStatement()) {
-			statement.execute("DROP TABLE TIMEKEEPER_SCHEMA");
-		}
+		DatabaseRecovery.recover(backup(true, null), output, () -> false);
+		byte[] before = Files.readAllBytes(output.resolve("converted.mv.db"));
 		Properties receipt = receipt(output);
 		receipt.setProperty("conversion.version", "legacy-v1-v2-to-current-1");
-		receipt.setProperty("target.sha256", HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-				.digest(Files.readAllBytes(output.resolve("converted.mv.db")))));
+		receipt.setProperty("engine", "H2 1.4.194");
 		try (var stream = Files.newOutputStream(output.resolve("validated.properties"))) {
 			receipt.store(stream, "Synthetic previous-format receipt");
 		}
-		assertEquals(result, DatabaseRecovery.verify(output));
-		DatabaseStartup.close(DatabaseStartup.open(result.jdbcUrl()));
-		try (Connection target = readOnly(output.resolve("converted"))) {
-			assertFalse(DatabaseSchema.hasVersion(target));
-		}
+		IOException failure = assertThrows(IOException.class, () -> DatabaseRecovery.verify(output));
+		assertTrue(failure.getMessage().contains("backup.zip"));
+		assertArrayEquals(before, Files.readAllBytes(output.resolve("converted.mv.db")));
 	}
 
 	@Test
@@ -271,7 +263,7 @@ class DatabaseRecoveryTest {
 	}
 
 	private Path backup(boolean v2, String mutation) throws Exception {
-		try (Connection source = DriverManager.getConnection("jdbc:h2:" + directory.resolve("original"), "sa", "")) {
+		try (Connection source = LegacyH2.open("jdbc:h2:" + directory.resolve("original"))) {
 			run(source, "V1__baseline.sql");
 			if (v2) {
 				run(source, "V2__add_project_taskurl_and_tasksummary.sql");
@@ -306,6 +298,7 @@ class DatabaseRecoveryTest {
 	}
 
 	private Connection readOnly(Path file) throws SQLException {
+		if (file.getFileName().toString().equals("source")) return LegacyH2.open("jdbc:h2:" + file + ";IFEXISTS=TRUE;ACCESS_MODE_DATA=r");
 		return DriverManager.getConnection("jdbc:h2:" + file + ";IFEXISTS=TRUE;ACCESS_MODE_DATA=r", "sa", "");
 	}
 }

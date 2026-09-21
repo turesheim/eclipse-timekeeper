@@ -88,7 +88,7 @@ public class Task implements Serializable {
 
 	/** The last time the task was active while the user was not idle */
 	@Convert(converter = LocalDateTimeAttributeConverter.class)
-	@Column(name = "TICK")
+	@Column(name = "TICK", columnDefinition = "TIMESTAMP(9)")
 	private LocalDateTime tick;
 
 	@OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)

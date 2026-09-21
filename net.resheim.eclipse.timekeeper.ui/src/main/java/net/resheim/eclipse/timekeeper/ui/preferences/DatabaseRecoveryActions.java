@@ -29,15 +29,15 @@ final class DatabaseRecoveryActions {
 
 	static void addTo(Composite parent) {
 		Group group = new Group(parent, SWT.NONE);
-		group.setText("Historical database recovery");
+		group.setText("Database upgrade and recovery");
 		group.setLayout(new GridLayout(2, false));
 		group.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false, 2, 1));
 		Label description = new Label(group, SWT.WRAP);
-		description.setText("Convert a trusted H2 1.4.194 backup ZIP into a separate database.\n"
+		description.setText("Upgrade a trusted H2 1.4.194 backup ZIP into a separate H2 2.5.250 database.\n"
 				+ "The original database and your storage preferences are not changed.");
 		description.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false, 2, 1));
 		Button convert = new Button(group, SWT.PUSH);
-		convert.setText("Convert historical backup...");
+		convert.setText("Upgrade database backup...");
 		convert.addListener(SWT.Selection, event -> convert(group.getShell()));
 		Button verify = new Button(group, SWT.PUSH);
 		verify.setText("Verify recovered database...");
@@ -46,7 +46,7 @@ final class DatabaseRecoveryActions {
 
 	private static void convert(Shell shell) {
 		FileDialog input = new FileDialog(shell, SWT.OPEN);
-		input.setText("Choose a trusted historical H2 backup ZIP");
+		input.setText("Choose a trusted H2 1.4.194 backup ZIP");
 		input.setFilterExtensions(new String[] { "*.zip" });
 		String backup = input.open();
 		if (backup == null) return;
@@ -55,8 +55,9 @@ final class DatabaseRecoveryActions {
 		String parent = output.open();
 		if (parent == null) return;
 		Path destination = Path.of(parent).resolve("timekeeper-recovery-" + UUID.randomUUID());
-		if (!MessageDialog.openConfirm(shell, "Convert historical backup",
+		if (!MessageDialog.openConfirm(shell, "Upgrade database backup",
 				"Use a backup created with H2 1.4.194, containing exactly one .mv.db file.\n"
+				+ "Both historical TRACKEDTASK and current Task databases are supported.\n"
 				+ "Do not ZIP or copy a database while it is in use. Stop time tracking before your final backup.\n\n"
 				+ "The backup, extracted source, converted database and validation receipt will be retained in:\n"
 				+ destination + "\n\nOnly open trusted backups. Continue?")) return;
@@ -81,7 +82,7 @@ final class DatabaseRecoveryActions {
 		AtomicReference<DatabaseRecovery.Result> completed = new AtomicReference<>();
 		try {
 			new ProgressMonitorDialog(shell).run(true, cancellable, monitor -> {
-				monitor.beginTask("Validate historical Timekeeper recovery", IProgressMonitor.UNKNOWN);
+				monitor.beginTask("Validate Timekeeper database upgrade", IProgressMonitor.UNKNOWN);
 				try {
 					completed.set(operation.run(monitor));
 				} catch (IOException | SQLException | RuntimeException failure) {

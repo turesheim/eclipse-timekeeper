@@ -39,6 +39,10 @@ public final class DatabaseStartup {
 		return open(jdbcUrl, "LEGACY_V" + legacyVersion);
 	}
 
+	static EntityManager openEngineUpgradeTarget(String jdbcUrl) throws SQLException {
+		return open(jdbcUrl, "H2_1_4");
+	}
+
 	private static EntityManager open(String jdbcUrl, String origin) throws SQLException {
 		boolean recovery = !origin.equals("NEW");
 		// INIT runs before inspection and could mutate an existing schema. Unnamed
@@ -102,6 +106,12 @@ public final class DatabaseStartup {
 				else if (factory != null && factory.isOpen()) factory.close();
 			} catch (RuntimeException cleanup) {
 				failure.addSuppressed(cleanup);
+			}
+			if (failure instanceof SQLException sql && sql.getErrorCode() == 90048) {
+				throw new SQLException("H2 2.5.250 cannot open this database format."
+						+ " H2 1.4.194 files require an explicit backup upgrade into a separate database"
+						+ " (Preferences > Timekeeper > Database > Database upgrade and recovery)."
+						+ " Keep the original; do not replace its files.", sql.getSQLState(), sql.getErrorCode(), sql);
 			}
 			throw failure;
 		}
