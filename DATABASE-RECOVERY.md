@@ -122,6 +122,12 @@ or live database version ledger. Once normal tracking changes the database,
 the old hash is expected to fail verification; do not convert it again or edit
 the receipt to make it pass. Keep making separate backups of new work.
 
+New conversions also contain an in-database `TIMEKEEPER_SCHEMA` marker with
+current-model version 1 and the historical source version. Startup refuses a
+marker that is unknown or still `CREATING`/`RECOVERING`. Existing unversioned
+current-model databases are not automatically stamped or changed. Receipts from
+the initial recovery workflow remain supported for those unversioned targets.
+
 ## 5. Failure, interruption and rollback
 
 - If conversion fails or is cancelled, retain the attempt directory for diagnosis.
@@ -133,11 +139,17 @@ the receipt to make it pass. Keep making separate backups of new work.
   Files are flushed before publishing the completion receipt, but this is not a
   guarantee against storage failure/power loss. Reverify before first use and
   keep an independent backup.
+- The database becomes `READY` after data validation but before the receipt is
+  published. A late failure can therefore leave a ready marker without a receipt;
+  that is still an incomplete workflow. Do not bypass the missing-receipt rule
+  or manually edit the marker. Startup checks database state, not receipt presence.
 - To roll back after a deliberate switch: stop the upgraded clients, preserve
   the new database and its later records, then use the old plugin with the old
   configuration and original database. Do not overwrite the original with the
   converted file. **Records added after the switch are not merged back.**
 
-In-database schema versioning, previous published-release fixtures, shared/server
-concurrency and clean installed-IDE acceptance remain open in
-[the upgrade plan](UPGRADE-PLAN.md). See [verification evidence](baseline/DATABASE-RECOVERY.md).
+Version adoption for existing unversioned databases, previous published-release
+fixtures, shared/server concurrency and clean installed-IDE acceptance remain
+open in [the upgrade plan](UPGRADE-PLAN.md). See the
+[recovery evidence](baseline/DATABASE-RECOVERY.md) and
+[schema-versioning evidence](baseline/DATABASE-VERSIONING.md).

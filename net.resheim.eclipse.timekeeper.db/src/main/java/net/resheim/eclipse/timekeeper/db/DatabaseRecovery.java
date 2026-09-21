@@ -32,7 +32,8 @@ public final class DatabaseRecovery {
 	private static final long MAX_BACKUP_BYTES = 256L * 1024 * 1024;
 	private static final long MAX_DATABASE_BYTES = 1024L * 1024 * 1024;
 	private static final String RECEIPT_VERSION = "1";
-	private static final String CONVERSION_VERSION = "legacy-v1-v2-to-current-1";
+	private static final String CONVERSION_VERSION = "legacy-v1-v2-to-versioned-1";
+	private static final String UNVERSIONED_CONVERSION = "legacy-v1-v2-to-current-1";
 
 	private DatabaseRecovery() { }
 
@@ -96,7 +97,8 @@ public final class DatabaseRecovery {
 				throw new SQLException("This recovery tool supports only historical V1/V2 databases, not " + kind);
 			}
 			checkCancelled(cancelled);
-			EntityManager manager = DatabaseStartup.open(targetUrl);
+			EntityManager manager = DatabaseStartup.openRecoveryTarget(targetUrl,
+					kind == DatabaseSchema.Kind.LEGACY_V1 ? 1 : 2);
 			DatabaseStartup.close(manager);
 			try (Connection target = connect(targetUrl, false)) {
 				data = LegacyDatabaseConverter.convert(source, target);
@@ -105,7 +107,7 @@ public final class DatabaseRecovery {
 		checkCancelled(cancelled);
 		// Reopen without schema generation and exercise JPA before the final, read-only
 		// comparison. No core startup cleanup, activity inference or label seeding runs.
-		EntityManager manager = DatabaseStartup.open(targetUrl + ";IFEXISTS=TRUE");
+		EntityManager manager = DatabaseStartup.openRecoveryTarget(targetUrl + ";IFEXISTS=TRUE", data.sourceVersion());
 		try {
 			for (String entity : new String[] { "Project", "Task", "Activity" }) {
 				manager.createQuery("SELECT e FROM " + entity + " e").getResultList();
@@ -116,6 +118,10 @@ public final class DatabaseRecovery {
 		if (!data.equals(verifyData(directory))) throw new SQLException("Reopened conversion totals differ.");
 		if (!sourceHash.equals(hash(sourceFile, MAX_DATABASE_BYTES, cancelled))) {
 			throw new IOException("The extracted source changed during conversion.");
+		}
+		checkCancelled(cancelled);
+		try (Connection target = connect(targetUrl, false)) {
+			DatabaseVersion.recoveryValidated(target);
 		}
 		receipt.setProperty("target.sha256", hash(directory.resolve("converted.mv.db"), MAX_DATABASE_BYTES, cancelled));
 		receipt.setProperty("target.jdbcUrl", targetUrl + ";IFEXISTS=TRUE");
@@ -143,12 +149,24 @@ public final class DatabaseRecovery {
 		try (InputStream stream = Files.newInputStream(directory.resolve("validated.properties"))) {
 			receipt.load(stream);
 		}
-String expectedTargetUrl = jdbcUrl(directory, "converted") + ";IFEXISTS=TRUE";
+		String expectedTargetUrl = jdbcUrl(directory, "converted") + ";IFEXISTS=TRUE";
+		String conversion = receipt.getProperty("conversion.version");
 		if (!RECEIPT_VERSION.equals(receipt.getProperty("receipt.version"))
-				|| !CONVERSION_VERSION.equals(receipt.getProperty("conversion.version"))
+				|| (!CONVERSION_VERSION.equals(conversion) && !UNVERSIONED_CONVERSION.equals(conversion))
 				|| !"H2 1.4.194".equals(receipt.getProperty("engine"))
 				|| !expectedTargetUrl.equals(receipt.getProperty("target.jdbcUrl"))) {
 			throw new IOException("Unsupported recovery receipt version or metadata.");
+		}
+		try (Connection target = connect(jdbcUrl(directory, "converted"), true)) {
+			if (CONVERSION_VERSION.equals(conversion)) {
+				DatabaseVersion.Stamp version = DatabaseVersion.read(target);
+				if (!version.state().equals("READY")
+						|| !version.origin().equals("LEGACY_V" + receipt.getProperty("source.version"))) {
+					throw new IOException("Recovery database version does not match its completion receipt.");
+				}
+			} else if (DatabaseSchema.hasVersion(target)) {
+				throw new IOException("An unversioned recovery receipt cannot describe a versioned database.");
+			}
 		}
 		for (String name : new String[] { "backup", "source", "target" }) {
 			String file = name.equals("backup") ? "backup.zip" : name.equals("source") ? "source.mv.db" : "converted.mv.db";

@@ -30,6 +30,17 @@ public final class DatabaseStartup {
 	}
 
 	public static EntityManager open(String jdbcUrl) throws SQLException {
+		return open(jdbcUrl, "NEW");
+	}
+
+	/** Only the explicit recovery workflow may create/reopen a pending conversion. */
+	static EntityManager openRecoveryTarget(String jdbcUrl, int legacyVersion) throws SQLException {
+		if (legacyVersion != 1 && legacyVersion != 2) throw new SQLException("Unsupported historical version");
+		return open(jdbcUrl, "LEGACY_V" + legacyVersion);
+	}
+
+	private static EntityManager open(String jdbcUrl, String origin) throws SQLException {
+		boolean recovery = !origin.equals("NEW");
 		// INIT runs before inspection and could mutate an existing schema. Unnamed
 		// memory databases cannot be shared between the inspection and JPA connections.
 		if (jdbcUrl == null || !jdbcUrl.startsWith("jdbc:h2:")
@@ -49,15 +60,24 @@ public final class DatabaseStartup {
 				throw new SQLException("The Timekeeper database is read-only; time tracking requires writable storage.");
 			}
 			DatabaseSchema.Kind schema = DatabaseSchema.inspect(inspection);
+			if (schema == DatabaseSchema.Kind.INCOMPLETE || (!recovery && schema == DatabaseSchema.Kind.RECOVERING)) {
+				throw new SQLException("Incomplete Timekeeper database initialization or recovery."
+						+ " Preserve this attempt and retry from a backup into new storage; no schema changes were made.");
+			}
 			if (schema == DatabaseSchema.Kind.LEGACY_V1 || schema == DatabaseSchema.Kind.LEGACY_V2) {
 				throw new SQLException("Historical Timekeeper database detected (" + schema
 						+ "). Back up the closed database and convert a separate copy before using it."
 						+ " No schema changes were made.");
 			}
-			if (schema != DatabaseSchema.Kind.EMPTY && schema != DatabaseSchema.Kind.CURRENT) {
+			boolean existing = recovery ? schema == DatabaseSchema.Kind.RECOVERING : schema == DatabaseSchema.Kind.CURRENT;
+			if (schema != DatabaseSchema.Kind.EMPTY && !existing) {
 				throw new SQLException("Unrecognized or mixed Timekeeper database schema."
 						+ " No schema changes were made. Keep the original and review a backup before proceeding.");
 			}
+			if (recovery && existing && !DatabaseVersion.read(inspection).origin().equals(origin)) {
+				throw new SQLException("Recovery target belongs to a different source schema version.");
+			}
+			if (schema == DatabaseSchema.Kind.EMPTY) DatabaseVersion.begin(inspection, origin);
 			Map<String, Object> properties = new HashMap<>();
 			properties.put(PersistenceUnitProperties.CLASSLOADER, DatabaseStartup.class.getClassLoader());
 			properties.put(PersistenceUnitProperties.JDBC_URL, jdbcUrl);
@@ -71,9 +91,10 @@ public final class DatabaseStartup {
 					.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", properties);
 			manager = factory.createEntityManager();
 			manager.createQuery("SELECT COUNT(t) FROM Task t", Long.class).getSingleResult();
-			if (DatabaseSchema.inspect(inspection) != DatabaseSchema.Kind.CURRENT) {
+			if (!DatabaseSchema.hasCurrentTables(inspection)) {
 				throw new SQLException("Timekeeper schema creation did not complete. Preserve the database for diagnosis.");
 			}
+			if (schema == DatabaseSchema.Kind.EMPTY) DatabaseVersion.schemaCreated(inspection);
 			return manager;
 		} catch (SQLException | RuntimeException failure) {
 			try {

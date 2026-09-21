@@ -15,7 +15,7 @@ import java.util.TreeSet;
 public final class DatabaseSchema {
 	private DatabaseSchema() { }
 
-	public enum Kind { EMPTY, CURRENT, LEGACY_V1, LEGACY_V2, UNKNOWN }
+	public enum Kind { EMPTY, CURRENT, LEGACY_V1, LEGACY_V2, RECOVERING, INCOMPLETE, UNKNOWN }
 
 	// Order is also the foreign-key-safe insertion order. No constraints are disabled.
 	static final Map<String, List<String>> CURRENT = columns(
@@ -32,11 +32,40 @@ public final class DatabaseSchema {
 
 	public static Kind inspect(Connection connection) throws SQLException {
 		Map<String, Set<String>> actual = schema(connection);
+		DatabaseVersion.Stamp version = removeVersion(connection, actual);
+		if (version != null) {
+			if (version.state().equals("CREATING")) return Kind.INCOMPLETE;
+			if (version.state().equals("RECOVERING")) {
+				return matches(actual, CURRENT) ? Kind.RECOVERING : Kind.INCOMPLETE;
+			}
+			return matches(actual, CURRENT) ? Kind.CURRENT : Kind.UNKNOWN;
+		}
 		if (actual.isEmpty()) return Kind.EMPTY;
 		if (matches(actual, CURRENT)) return Kind.CURRENT;
 		if (matches(actual, legacy(false))) return Kind.LEGACY_V1;
 		if (matches(actual, legacy(true))) return Kind.LEGACY_V2;
 		return Kind.UNKNOWN;
+	}
+
+	/** Internal initialization check; never treats pending state as ready for startup. */
+	static boolean hasCurrentTables(Connection connection) throws SQLException {
+		Map<String, Set<String>> actual = schema(connection);
+		removeVersion(connection, actual);
+		return matches(actual, CURRENT);
+	}
+
+	static boolean hasVersion(Connection connection) throws SQLException {
+		return schema(connection).containsKey(DatabaseVersion.TABLE);
+	}
+
+	private static DatabaseVersion.Stamp removeVersion(Connection connection, Map<String, Set<String>> actual)
+			throws SQLException {
+		Set<String> columns = actual.remove(DatabaseVersion.TABLE);
+		if (columns == null) return null;
+		if (!columns.equals(DatabaseVersion.COLUMNS)) {
+			throw new SQLException("Unrecognized Timekeeper schema-version table. No schema changes were made.");
+		}
+		return DatabaseVersion.read(connection);
 	}
 
 	private static Map<String, List<String>> legacy(boolean v2) {
