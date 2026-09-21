@@ -7,6 +7,10 @@ labels and relationships, with or without the version-1 schema marker. It is
 not a CSV importer or a promise of compatibility with every published release.
 **Current-model H2 1.4.194 databases need this engine conversion too.**
 
+The published 1.1.0 release used Mylyn task attributes, not H2; this converter
+does not import those records. See the [published-release audit](baseline/PUBLISHED-RELEASES.md)
+for the distinction between released formats and repository-generated fixtures.
+
 H2 1.x files cannot be opened directly by H2 2.x. The new engine is used for
 normal storage; the bundled old driver is isolated and loaded only when explicitly
 reading a backup copy. Never replace an old installation's H2 JAR and then try to

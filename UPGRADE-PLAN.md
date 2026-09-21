@@ -6,9 +6,9 @@ Goal: Timekeeper can be installed and used in Eclipse IDE 2026-09
 (Eclipse Platform 4.41), preserving existing time records.
 This was the latest stable Eclipse release when the plan was created.
 
-Status: PRs #185/#186/#188/#189/#191/#192/#193 are merged into `main`, with PR #193's
-Linux/Xvfb CI passing. At the maintainer's request the next changeset upgrades
-normal storage to H2 2.5.250, the latest stable release checked on September 21.
+Status: PRs #185/#186/#188/#189/#191/#192/#193/#194 are merged into `main`, with PR #194's
+Linux/Xvfb CI passing. At the maintainer's request normal storage now uses
+H2 2.5.250, the latest stable release checked on September 21.
 Backup conversion now covers both historical and current-model H2 1.4.194
 databases, including backed-up version adoption. Previous-release fixtures,
 installed-IDE acceptance and broader runtime coverage remain outstanding. Test enablement from
@@ -22,7 +22,8 @@ See the [original baseline](baseline/README.md),
 [startup-safety results](baseline/DATABASE-STARTUP.md) and
 [recovery-workflow results](baseline/DATABASE-RECOVERY.md) and
 [schema-versioning results](baseline/DATABASE-VERSIONING.md) and
-[H2-upgrade results](baseline/H2-UPGRADE.md).
+[H2-upgrade results](baseline/H2-UPGRADE.md) and
+[storage-mode acceptance](baseline/STORAGE-MODES.md).
 The [recovery procedure](DATABASE-RECOVERY.md) documents the end-user steps.
 
 ## Following this plan
@@ -154,6 +155,9 @@ The runtime-error checkbox remains open pending clean installed-IDE verification
   Current-model JPA and frozen pre-label-fix schema fixtures pass; the historical
   V1/V2 fixtures now convert into a readable current-model database. Databases
   from previous published releases are still outstanding.
+  The [release audit](baseline/PUBLISHED-RELEASES.md) found that public 1.1.0 uses
+  Mylyn attributes, not H2; an identifiable distributed H2-based artifact is
+  still needed. Do not mislabel repository-generated fixtures as release fixtures.
 - [x] Preserve the current `Task`/activity model and reporting independent of Mylyn
   when migrating from the historical `TRACKEDTASK` schema, using #163 and #165 as design context.
   Verified for the repository's V1/V2 schemas through an explicit converter into
@@ -182,7 +186,13 @@ The runtime-error checkbox remains open pending clean installed-IDE verification
   with backups, validation and documented rollback. Implemented as column-aware
   JDBC logical export/import, retaining an isolated old reader for trusted copies.
 - [ ] Verify existing JDBC parameters, shared storage, workspace storage and configured servers.
+  Synthetic embedded/mixed-mode/TCP coverage now includes separate JVMs, paths
+  with spaces, restart and server-side schema guards. Installed preference paths,
+  fixed-port conflicts and broader server configurations remain unverified.
 - [ ] Test concurrent access from multiple Eclipse instances and handling of incompatible clients.
+  Two persistence-layer JVMs share data successfully; H2 1.4.194 clients are
+  rejected by the new TCP server. Multiple installed Eclipse instances, concurrent
+  task edits/ownership and failover remain open.
 - [ ] Test new databases, existing databases, migration failures and restart.
   New/current-model databases, restart, closed-file copy, SQL restore and transaction
   rollback are covered. Explicit V1/V2 conversion failures and converted-database
@@ -226,8 +236,12 @@ remains disabled. The version-marker follow-up passes 99 database/report and
 [versioning results](baseline/DATABASE-VERSIONING.md). The H2 2.5.250 follow-up
 passes 115 database/report and 9 UI/integration cases, plus the existing ignored
 test; see [H2 results](baseline/H2-UPGRADE.md). Installed-IDE recovery acceptance
-and previous-release compatibility remain open. Next: previous published-release
-fixtures and broader shared/server/runtime acceptance.
+and previous-release compatibility remain open. The storage-mode follow-up adds
+seven cross-process/server cases; see [acceptance boundaries](baseline/STORAGE-MODES.md).
+Its clean build passes 122 database/report and 9 UI/integration cases, plus the
+existing ignored CSV-export test.
+Next: installed-IDE and multi-instance runtime acceptance. Add a published-release
+fixture when an identifiable H2-based distribution is available.
 
 ## 5. Modernize tests, libraries and CI
 
