@@ -6,12 +6,14 @@ Goal: Timekeeper can be installed and used in Eclipse IDE 2026-09
 (Eclipse Platform 4.41), preserving existing time records.
 This was the latest stable Eclipse release when the plan was created.
 
-Status: Step 2 is complete. Test enablement from steps 4/5 has been brought
-forward at the maintainer's request: EclipseLink is updated and JUnit 4/5 tests
-now execute. Migration and remaining runtime/test coverage are still outstanding.
+Status: Step 2 is merged in PR #185 with passing Linux/Xvfb CI. Step 3 now has
+Mylyn API/dependency cleanup, workweek fixes and passing local lifecycle/history
+regressions. Runtime-log follow-up, migration and broader test coverage remain
+outstanding. Test enablement from steps 4/5 was brought forward at the maintainer's request.
 See the [original baseline](baseline/README.md),
 [step 2 results](baseline/BUILD-UPGRADE.md) and
-[test-enablement results](baseline/TEST-UPGRADE.md).
+[test-enablement results](baseline/TEST-UPGRADE.md) and
+[Mylyn/UI results](baseline/MYLYN-UI-UPGRADE.md).
 
 ## Following this plan
 
@@ -107,20 +109,30 @@ Results and deviations, September 21, 2026:
 
 ## 3. Adapt the Mylyn integration and UI
 
-- [ ] Confirm that the selected Mylyn release works with Eclipse 2026-09.
-- [ ] Update manifest version ranges based on verified compatibility.
-- [ ] Review internal Mylyn APIs in `TimekeeperPlugin`, `Task`, `Project`,
+- [x] Confirm that the selected Mylyn release works with Eclipse 2026-09.
+  Verified local-task lifecycle and workweek behavior; live remote connectors remain untested.
+- [x] Update manifest version ranges based on verified compatibility.
+- [x] Review internal Mylyn APIs in `TimekeeperPlugin`, `Task`, `Project`,
   `WorkWeekView`, and the content and label providers.
-- [ ] Replace internal APIs with public APIs where possible.
-- [ ] Consolidate and document any remaining internal API dependencies.
-- [ ] Determine whether Bugzilla must remain a mandatory dependency.
+- [x] Replace internal APIs with public APIs where possible.
+- [x] Consolidate and document any remaining internal API dependencies.
+  See the compatibility-boundary inventory in the step 3 report.
+- [x] Determine whether Bugzilla must remain a mandatory dependency.
+  Removed the unused bundle requirement and target root; connectors can be installed separately.
 - [ ] Fix necessary compilation and runtime issues in Eclipse/SWT/JFace integration.
-- [ ] Verify task activation/deactivation, categories and workweek view updates.
+- [x] Verify task activation/deactivation, categories and workweek view updates.
+  Synthetic lifecycle and deleted-task tests pass; category reassignment is not yet covered.
 
 Completion criterion: The plugin starts in Eclipse 2026-09 and tracks time
 correctly using test data. Final verification depends on a working database layer in step 4.
 
-Results and deviations: Not started.
+Results and deviations: Clean `verify` passes on macOS aarch64 with 4 database/report
+cases and 4 active UI tests passing, plus the existing ignored export test.
+Fixed blank task/project totals, updates targeting obsolete row types and null
+Mylyn links for deleted tasks. Public APIs now cover activity-manager access and
+task icons. Remaining internals and the existing macOS/Mylyn runtime-log errors
+are documented in [baseline/MYLYN-UI-UPGRADE.md](baseline/MYLYN-UI-UPGRADE.md).
+The runtime-error checkbox remains open pending clean installed-IDE verification.
 
 ## 4. Secure the database layer and upgrade path
 
@@ -159,7 +171,8 @@ Existing-database compatibility and migration remain unverified.
 - [x] Update GitHub Actions for checkout, Java, caching, reports and artifacts.
 - [ ] Run automated tests for time tracking, manual editing, labels,
   report export, import and restart.
-- [ ] Run UI tests in CI with the required display/Xvfb configuration.
+- [x] Run UI tests in CI with the required display/Xvfb configuration.
+  PR #185 passed Linux/Xvfb CI before merge; subsequent changes require their own CI result.
 - [ ] Check idle detection on Windows, macOS and Linux.
 - [ ] Verify Apple Silicon and assess X11/Wayland separately; document limitations.
 - [ ] Document the OS/architecture combinations that have been tested and are supported.
@@ -195,7 +208,7 @@ Results and deviations: Not started.
 
 | Decision | Status |
 | --- | --- |
-| Exact Mylyn version and required connectors | Mylyn 4.12; Tasks/Bugzilla in target; runtime reviewed in step 3 |
+| Exact Mylyn version and required connectors | Mylyn 4.12 Tasks; Bugzilla no longer mandatory; local lifecycle verified in step 3 |
 | Minimum Java version and tested runtime | Java 21; build tested with Temurin 21.0.12.1 |
 | EclipseLink/JPA version and possible Jakarta migration | EclipseLink 2.7.16 / javax.persistence 2.2.1; no namespace migration for test enablement |
 | H2 upgrade and migration procedure | Decide in step 4 |

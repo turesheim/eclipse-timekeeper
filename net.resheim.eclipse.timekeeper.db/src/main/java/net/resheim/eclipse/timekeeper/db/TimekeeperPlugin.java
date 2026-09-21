@@ -55,7 +55,6 @@ import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.jface.preference.IPreferenceStore;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTaskContainer;
-import org.eclipse.mylyn.internal.tasks.core.TaskRepositoryManager;
 import org.eclipse.mylyn.tasks.core.IRepositoryManager;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.core.TaskRepository;
@@ -126,6 +125,8 @@ public class TimekeeperPlugin extends Plugin {
 	public static final String ATTR_GROUPING = KEY_VALUELIST_ID + ".grouping"; //$NON-NLS-1$
 
 	private static final String LOCAL_REPO_ID = "local";
+	// Persisted Timekeeper repository identity; preserve this prefix across Mylyn upgrades.
+	private static final String LOCAL_REPO_PREFIX = LOCAL_REPO_ID + "-";
 
 	private static final String LOCAL_REPO_KEY_ID = "net.resheim.eclipse.timekeeper.repo-id"; //$NON-NLS-1$
 	
@@ -546,9 +547,9 @@ public class TimekeeperPlugin extends Plugin {
 	 * @param task task to find the name for
 	 * @return the name of the task
 	 */
-	public static String getParentContainerSummary(AbstractTask task) {
-		if (!task.getParentContainers().isEmpty()) {
-			AbstractTaskContainer next = task.getParentContainers().iterator().next();
+	public static String getParentContainerSummary(ITask task) {
+		if (task instanceof AbstractTask concrete && !concrete.getParentContainers().isEmpty()) {
+			AbstractTaskContainer next = concrete.getParentContainers().iterator().next();
 			return next.getSummary();
 		}
 		// FIXME: Should return null
@@ -567,7 +568,7 @@ public class TimekeeperPlugin extends Plugin {
 			switch (c) {
 			case KIND_GITHUB:
 			case KIND_LOCAL:
-				return getParentContainerSummary((AbstractTask) task);
+				return getParentContainerSummary(task);
 			// Bugzilla and JIRA users may want to group on different
 			// values.
 			case KIND_BUGZILLA:
@@ -585,7 +586,7 @@ public class TimekeeperPlugin extends Plugin {
 						if (c.equals(KIND_BUGZILLA)) {
 							return task.getAttribute("product"); //$NON-NLS-1$
 						}
-						return getParentContainerSummary((AbstractTask) task);
+						return getParentContainerSummary(task);
 					}
 				}
 				break;
@@ -702,14 +703,13 @@ public class TimekeeperPlugin extends Plugin {
 	 * @return the modified tracked task
 	 */
 	private static Task linkWithMylynTask(Task tt) {
-		Optional<TaskRepository> tr = TasksUi.getRepositoryManager()
-				.getAllRepositories()
-				.stream()
-				.filter(r -> r.getRepositoryUrl().equals(tt.getRepositoryUrl())).findFirst();
-		if (tr.isPresent()) {
-			tt.linkWithMylynTask(TasksUi.getRepositoryModel().getTask(tr.get(), tt.getTaskId()));
+		ITask linked = getMylynTask(tt);
+		if (linked != null) {
+			tt.linkWithMylynTask(linked);
 			tt.setTaskLinkStatus(TaskLinkStatus.LINKED);
 		} else {
+			// Keep historical records usable when their Mylyn task was deleted.
+			tt.linkWithMylynTask(null);
 			tt.setTaskLinkStatus(TaskLinkStatus.UNLINKED);
 		}
 		return tt;
@@ -787,6 +787,9 @@ public class TimekeeperPlugin extends Plugin {
 		Task ttask = getTask(task);
 		if (ttask != null) {
 			Activity activity = ttask.endActivity();
+			if (activity == null) {
+				return;
+			}
 			EntityTransaction transaction = entityManager.getTransaction();
 			boolean activeTransaction = transaction.isActive();
 			if (!activeTransaction) {
@@ -796,7 +799,8 @@ public class TimekeeperPlugin extends Plugin {
 			if (!activeTransaction) {
 				transaction.commit();
 			}
-			log.debug("Dectivating task '{}'", task);
+			log.debug("Deactivating task '{}'", task);
+			notifyListeners();
 		}
 	}
 
@@ -820,7 +824,7 @@ public class TimekeeperPlugin extends Plugin {
 					task.getRepositoryUrl());
 			String id = repository.getProperty(TimekeeperPlugin.LOCAL_REPO_KEY_ID);
 			if (id == null) {
-				id = TaskRepositoryManager.PREFIX_LOCAL + UUID.randomUUID().toString();
+				id = LOCAL_REPO_PREFIX + UUID.randomUUID().toString();
 				repository.setProperty(TimekeeperPlugin.LOCAL_REPO_KEY_ID, id);
 			}
 			url = id;

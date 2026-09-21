@@ -19,6 +19,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.WeekFields;
+import java.util.Locale;
+import java.util.concurrent.FutureTask;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +31,7 @@ import org.eclipse.core.runtime.Platform;
 import org.eclipse.mylyn.internal.tasks.core.TaskList;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.ui.TasksUi;
+import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Shell;
@@ -53,6 +59,8 @@ import org.junit.runner.RunWith;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Task;
+import net.resheim.eclipse.timekeeper.db.model.Activity;
+import net.resheim.eclipse.timekeeper.db.model.TaskLinkStatus;
 
 @SuppressWarnings("restriction")
 @RunWith(SWTBotJunit4ClassRunner.class)
@@ -158,6 +166,78 @@ public class IntegrationTest {
 				.menuItem("Copy as").click().menu("Basic HTML").click();		
 	}
 	
+	@Test
+	public void testTaskActivationAndDeactivation() throws Exception {
+		prepareWorkweekView();
+		ITask[] previous = new ITask[1];
+		Task[] tracked = new Task[1];
+		try {
+			runOnUi(() -> {
+				previous[0] = TasksUi.getTaskActivityManager().getActiveTask();
+				ITask task = TestUtility.createTask(tl, "Lifecycle checks", "3001",
+						"Track an activity").getMylynTask();
+				TasksUi.getTaskActivityManager().activateTask(task);
+				tracked[0] = TimekeeperPlugin.getDefault().getTask(task);
+				assertEquals("Lifecycle checks", tracked[0].getProject().getName());
+				Activity activity = tracked[0].getCurrentActivity().orElseThrow();
+				assertEquals(1, tracked[0].getActivities().size());
+				Assert.assertNull(activity.getEnd());
+				activity.setSummary("Lifecycle activity");
+				activity.setStart(LocalDateTime.now().minusMinutes(2));
+				TasksUi.getTaskActivityManager().deactivateTask(task);
+				assertTrue(tracked[0].getCurrentActivity().isEmpty());
+				assertNotNull(activity.getEnd());
+				assertTrue(activity.getEnd().isAfter(activity.getStart()));
+				// Duplicate deactivation must not try to persist a null activity.
+				TimekeeperPlugin.getDefault().endMylynTask(task);
+			});
+			int today = LocalDate.now().get(WeekFields.of(Locale.getDefault()).dayOfWeek());
+			var project = bot.treeWithId("workweek-editor-tree").getTreeItem("Lifecycle checks");
+			var task = project.getNode("3001: Track an activity");
+			assertEquals("0:02", project.cell(today));
+			assertEquals("0:02", task.cell(today));
+			assertEquals("0:02", task.getNode("Lifecycle activity").cell(today));
+		} finally {
+			runOnUi(() -> {
+				ITask active = TasksUi.getTaskActivityManager().getActiveTask();
+				if (active != null) TasksUi.getTaskActivityManager().deactivateTask(active);
+				if (previous[0] != null) TasksUi.getTaskActivityManager().activateTask(previous[0]);
+			});
+		}
+	}
+
+	@Test
+	public void testDeletedMylynTaskRemainsVisible() throws Exception {
+		prepareWorkweekView();
+		runOnUi(() -> {
+			Task historical = TestUtility.createTask(tl, "Historical records", "3002", "Keep recorded time");
+			TestUtility.createActivity(1, historical, "Recorded before deletion");
+			tl.deleteTask(historical.getMylynTask());
+			LocalDate first = LocalDate.now().with(WeekFields.of(Locale.getDefault()).dayOfWeek(), 1);
+			Task reloaded = TimekeeperPlugin.getTasks(first)
+					.filter(t -> "3002".equals(t.getTaskId())).findFirst().orElseThrow();
+			Assert.assertNull(reloaded.getMylynTask());
+			assertEquals(TaskLinkStatus.UNLINKED, reloaded.getTaskLinkStatus());
+			assertEquals("Keep recorded time", reloaded.getTaskSummary());
+			assertEquals("Historical records", reloaded.getProject().getName());
+		});
+		bot.activePart().toolbarButton("Show current week").click();
+		var row = bot.treeWithId("workweek-editor-tree").getTreeItem("Historical records")
+				.getNode("3002: Keep recorded time");
+		assertEquals("1:00", row.cell(1));
+		assertEquals("1:00", row.getNode("Recorded before deletion").cell(1));
+		var menu = row.contextMenu("New activity");
+		assertTrue(menu.isEnabled());
+		menu.hide();
+	}
+
+	private static void runOnUi(Runnable action) throws Exception {
+		// Propagate assertion failures to JUnit instead of Eclipse's event-loop log.
+		FutureTask<Void> invocation = new FutureTask<>(action, null);
+		bot.getDisplay().syncExec(invocation);
+		invocation.get();
+	}
+
 	//@Test
 	public void testEditTimeRange() {
 		// ignore this test as it always fails on Travis-CI due to the bot not

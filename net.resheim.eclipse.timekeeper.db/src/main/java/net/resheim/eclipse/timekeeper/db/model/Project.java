@@ -24,14 +24,12 @@ import javax.persistence.NamedQuery;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
-import org.eclipse.mylyn.internal.tasks.core.Category;
-
 /**
  * The {@link Project} type represents a project where time is spent on
  * {@link Task} {@link Activity}. A project is typically a representation of a
  * Mylyn query or category but can be independent of Mylyn.
  * 
- * A project can be a Mylyn {@link Category} which is typically a query into one
+ * A project can represent a Mylyn category or a query into one
  * of the task repositories added, or it can also be independent of Mylyn. There
  * is currently no way of manually adding a project to the workweek view.
  * 
