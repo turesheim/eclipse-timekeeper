@@ -422,11 +422,11 @@ public class TimekeeperPlugin extends Plugin {
 		EntityTransaction transaction = entityManager.getTransaction();
 		transaction.begin();
 		int tasksExported = entityManager
-				.createNativeQuery("CALL CSVWRITE('" + tasks + "', 'SELECT * FROM TRACKEDTASK');").executeUpdate();
+				.createNativeQuery("CALL CSVWRITE('" + tasks + "', 'SELECT * FROM TASK');").executeUpdate();
 		int activitiesExported = entityManager
 				.createNativeQuery("CALL CSVWRITE('" + activities + "', 'SELECT * FROM ACTIVITY');").executeUpdate();
 		// relations are not automatically created, so we do this the easy way
-		entityManager.createNativeQuery("CALL CSVWRITE('" + relations + "', 'SELECT * FROM TRACKEDTASK_ACTIVITY');")
+		entityManager.createNativeQuery("CALL CSVWRITE('" + relations + "', 'SELECT * FROM TASK_ACTIVITY');")
 				.executeUpdate();
 		transaction.commit();
 		return tasksExported + activitiesExported;
@@ -457,13 +457,13 @@ public class TimekeeperPlugin extends Plugin {
 			transaction.begin();
 			entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE;").executeUpdate();
 			int tasksImported = entityManager
-					.createNativeQuery("MERGE INTO TRACKEDTASK (SELECT * FROM CSVREAD('" + tasks + "'));")
+					.createNativeQuery("MERGE INTO TASK (SELECT * FROM CSVREAD('" + tasks + "'));")
 					.executeUpdate();
 			int activitiesImported = entityManager
 					.createNativeQuery("MERGE INTO ACTIVITY (SELECT * FROM CSVREAD('" + activities + "'));")
 					.executeUpdate();
 			entityManager
-					.createNativeQuery("MERGE INTO TRACKEDTASK_ACTIVITY (SELECT * FROM CSVREAD('" + relations + "'));")
+					.createNativeQuery("MERGE INTO TASK_ACTIVITY (SELECT * FROM CSVREAD('" + relations + "'));")
 					.executeUpdate();
 			entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE;").executeUpdate();
 			transaction.commit();

@@ -14,8 +14,8 @@ synthetic; no personal Timekeeper database was opened.
   SHA-512 matched the release's `buildproperties.json`:
   `5a35d58899a1400c8b0447c0e3a34b8124637c7c0da78326c2a1dac212ff9d61e0e80b307b9dd0c2a4ae1ae2cc9dacf526d7639267f812759b043e534c9737a1`.
 - Clean build: `mvn -B -ntp clean verify -Dtycho.localArtifacts=ignore`.
-  All six reactor projects passed: 62 database/report/packaging tests and
-  8 UI/integration tests passed; one existing CSV-export test remained ignored.
+  All six reactor projects passed: 63 database/report/packaging tests and
+  9 UI/integration tests passed; current-schema CSV export is active again.
 - Verified p2 ZIP:
   `net.resheim.eclipse.timekeeper-site/target/net.resheim.eclipse.timekeeper-2.0.0.202609211009.zip`.
   This is a verification artifact, not a published release.
@@ -127,6 +127,11 @@ H2's `org.h2.tools.Script`, with `IFEXISTS=TRUE;ACCESS_MODE_DATA=r` on the URL a
   manual editing, CSV import/export and OS idle detection remain unverified.
 - macOS Apple Silicon was exercised here. Linux CI is separate evidence;
   Windows and other desktop/runtime combinations are not certified by this run.
+
+The follow-up clean build re-enabled current-schema CSV export coverage and added
+a round-trip import assertion: all 9 UI/integration tests passed. Manual editing
+still needs dedicated coverage; the CSV format is not a database backup or
+migration mechanism.
 
 The follow-up lifecycle test also found and fixed a timestamp defect in
 `Task.endActivity(LocalDateTime)`: the idle-time path supplied the last active

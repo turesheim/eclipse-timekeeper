@@ -51,7 +51,6 @@ import org.eclipse.ui.actions.ActionFactory;
 import org.eclipse.ui.dialogs.PreferencesUtil;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -300,7 +299,6 @@ public class IntegrationTest {
 	 * This is not a UI test but we put it here as everything is nicely rigged
 	 */
 	@Test
-	@Ignore("Legacy CSV export uses TRACKEDTASK tables; reconcile with TASK schema in upgrade step 4")
 	public void testExport() {
 		try {
 			File newFolder = folder.newFolder();
@@ -308,13 +306,15 @@ public class IntegrationTest {
 			TimekeeperPlugin.getDefault().exportTo(path);
 			// probably don't have to verify that the content is correct as this is actually
 			// done by H2
-			Assert.assertEquals("\"TASK_ID\",\"REPOSITORY_URL\",\"TICK\",\"CURRENTACTIVITY_ID\"",
+			Assert.assertEquals("\"TASK_ID\",\"REPOSITORY_URL\",\"TASK_SUMMARY\",\"TASK_URL\",\"TICK\",\"TASK_PROJECT\",\"CURRENTACTIVITY_ID\"",
 					Files.readAllLines(path.resolve("trackedtask.csv")).get(0));
 			Assert.assertEquals(
-					"\"ID\",\"END_TIME\",\"ADJUSTED\",\"START_TIME\",\"SUMMARY\",\"TASK_ID\",\"REPOSITORY_URL\"",
+					"\"ID\",\"END_TIME\",\"ADJUSTED\",\"START_TIME\",\"SUMMARY\",\"ACTIVITY_PROJECT\",\"TASK_ID\",\"REPOSITORY_URL\"",
 					Files.readAllLines(path.resolve("activity.csv")).get(0));
 			Assert.assertEquals("\"TASK_ID\",\"REPOSITORY_URL\",\"ACTIVITIES_ID\"",
 					Files.readAllLines(path.resolve("trackedtask_activity.csv")).get(0));
+			int imported = TimekeeperPlugin.getDefault().importFrom(path);
+			Assert.assertTrue("Current-schema CSV round trip imported no rows", imported > 0);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
