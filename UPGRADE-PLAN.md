@@ -6,14 +6,13 @@ Goal: Timekeeper can be installed and used in Eclipse IDE 2026-09
 (Eclipse Platform 4.41), preserving existing time records.
 This was the latest stable Eclipse release when the plan was created.
 
-Status: Steps 2/3 changes and the first step 4 changes are merged in PRs
-#185/#186/#188 with passing Linux/Xvfb CI. PR #189 remains open with a tested
-historical V1/V2 conversion engine and review regression. A dependent changeset
-now guards startup schema creation and removes the blocking preference wait.
+Status: PRs #185/#186/#188/#189 are merged into `main`. PR #190 passed Linux/Xvfb
+CI but merged into the old conversion branch, not `main`. Its reviewed startup
+guards and nonblocking preferences are now carried forward on a main-based
+integration branch, including origin's shutdown and closed-connection fixes.
 A user-facing migration/recovery workflow, durable versioning, runtime-log
-follow-up and broader test coverage
-remain outstanding. Test enablement from steps 4/5
-was brought forward at the maintainer's request.
+follow-up and broader test coverage remain outstanding. Test enablement from
+steps 4/5 was brought forward at the maintainer's request.
 See the [original baseline](baseline/README.md),
 [step 2 results](baseline/BUILD-UPGRADE.md) and
 [test-enablement results](baseline/TEST-UPGRADE.md) and
@@ -199,7 +198,8 @@ exported/restored without the old schema's duplicate-index DDL. The original
 historical export remains non-restorable. Full local verification now passes
 27 database/report and 7 UI cases, plus the existing ignored UI test. See
 [historical-conversion results](baseline/LEGACY-CONVERSION.md). Startup follow-up
-passes 42 database/report and 8 UI cases, plus the existing ignored UI test; see
+passes 44 database/report and 8 UI cases, plus the existing ignored UI test after
+adding the connection-availability review regressions; see
 [startup-safety results](baseline/DATABASE-STARTUP.md). Automatic migration,
 durable versioning, end-user recovery and previous-release compatibility remain open.
 

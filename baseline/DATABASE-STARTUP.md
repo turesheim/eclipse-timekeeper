@@ -6,6 +6,29 @@ merged. Origin's `a84dfc8` review fix rejects activities assigned to both a task
 and a project. A regression for that fix was verified and pushed separately to
 PR #189 before starting this work.
 
+## Main-branch integration follow-up
+
+PR #189 merged into `main` as `54d1640`. PR #190 subsequently merged into
+`codex/legacy-database-conversion` as `02ecba7`, rather than into `main`, with
+passing Linux/Xvfb CI. Its exact reviewed changes were cherry-picked onto a new
+branch based on `origin/main`; no approved production changes were dropped.
+The follow-up PR targets `main` directly, avoiding another dependency on the
+already-merged conversion branch.
+
+Origin's review fixes retain cancelled status when startup fails during plugin
+shutdown and return an empty label stream when the entity manager is closed.
+`DatabaseAvailabilityTest` adds isolated regressions for absent and closed entity
+managers, restoring the prior test connection afterward. The closed-manager case
+fails when the pre-review guard is restored in the temporary source copy.
+
+Full local verification of the main-based integration passes 44 database/report
+cases and 8 UI cases, with the one existing export test still ignored. All six
+reactor projects pass and produce the p2 repository/ZIP. Evidence is in
+`/private/tmp/timekeeper-integration.log` and the corresponding
+`timekeeper-integration` temporary source directory; the negative regression run
+is recorded in `/private/tmp/timekeeper-integration-before.log`.
+The original verification results below remain the historical PR #190 baseline.
+
 ## Startup behavior
 
 `DatabaseSchema` provides shared table/column recognition for startup and the
