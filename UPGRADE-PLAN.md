@@ -6,10 +6,11 @@ Mål: Timekeeper skal kunne installeres og brukes i Eclipse IDE 2026-09
 (Eclipse Platform 4.41), med eksisterende tidsregistreringer bevart.
 Dette var siste stabile Eclipse-utgave da planen ble laget.
 
-Status: Trinn 1 er gjennomført så langt dagens bygg tillater. Bygget stopper
-ved Mylyn-oppløsning før tester; syntetisk database og filkopi er verifisert.
-Faktisk testoppdagelse og plugin-oppstart gjenstår etter trinn 2.
-Detaljer og reproduksjon finnes i [baseline-rapporten](baseline/README.md).
+Status: Trinn 2 er gjennomført. Rene kilder kompilerer og pakkes mot Eclipse
+2026-09 med Java 21. Full testkjøring feiler i persistenslaget; JUnit 5-testene
+kjøres fortsatt ikke. Plugin-oppstart, migrering og øvrig testdekning gjenstår.
+Se [opprinnelig baseline](baseline/README.md) og
+[resultatene fra trinn 2](baseline/BUILD-UPGRADE.md).
 
 ## Slik følger vi planen
 
@@ -38,7 +39,8 @@ Detaljer og reproduksjon finnes i [baseline-rapporten](baseline/README.md).
 
 - [x] Registrer JDK- og Maven-versjoner og kjør dagens bygg.
 - [x] Dokumenter byggefeil, testresultater og status for oppstart.
-- [ ] Kontroller hvilke tester som faktisk oppdages og kjøres, inkludert JUnit 5-testene.
+- [x] Kontroller hvilke tester som faktisk oppdages og kjøres, inkludert JUnit 5-testene.
+  Verifisert i trinn 2: to JUnit 4-metoder kjøres og feiler; `TemplateTest` kjøres ikke.
 - [x] Lag representative syntetiske testdata med oppgaver, aktiviteter,
   separat etikettspesifikasjon og rapportgrunnlag.
 - [x] Registrer forventede antall, relasjoner og tidssummer for senere sammenligning.
@@ -54,7 +56,7 @@ Resultater og avvik, 21. september 2026:
 - Java 11.0.32.1 og Maven 3.9.16 ble brukt uten å endre lokale Java-innstillinger.
 - Bygget feilet før kompilering: target-repositoryet kunne ikke levere
   `org.eclipse.mylyn.bugzilla_feature.feature.group/3.25.2.v20200814-0512`.
-- Ingen tester kjørte i dag. To beståtte database-tester finnes i en historisk
+- Ingen tester kjørte i det opprinnelige baseline-bygget. To beståtte database-tester finnes i en historisk
   rapport fra 2022; testinventaret og JUnit 5-usikkerheten er dokumentert.
 - Brukeren valgte syntetiske fixtures dersom en eksisterende database ikke var tilgjengelig.
   Original og filkopi er validert med 3 oppgaver, 5 aktiviteter og totalt 5 t 30 min.
@@ -71,23 +73,34 @@ Resultater og avvik, 21. september 2026:
 
 ## 2. Oppgradere bygg og samle målplattformen
 
-- [ ] Oppdater Tycho til 5.0.4 og bruk Maven 3.9.9 eller nyere.
-- [ ] Bruk JDK 21 som utgangspunkt for bygget og verifiser kjøretidskravene til målplattformen.
-- [ ] Fastsett pluginens Java-minimum og samordne Maven, manifestene,
+- [x] Oppdater Tycho til 5.0.4 og bruk Maven 3.9.9 eller nyere.
+- [x] Bruk JDK 21 som utgangspunkt for bygget og verifiser kjøretidskravene til målplattformen.
+- [x] Fastsett pluginens Java-minimum og samordne Maven, manifestene,
   `.settings`, `.classpath`, `.java-version` og CI.
-- [ ] Oppdater `default.tpd` og `default.target` til Eclipse 2026-09.
-- [ ] Velg og lås kompatible versjoner av Mylyn og øvrige avhengigheter.
-- [ ] Bruk HTTPS og versjonsbestemte repositories der det er tilgjengelig.
-- [ ] Gjennomgå behovet for Gemini JPA, gamle Orbit-biblioteker og connector-avhengigheter.
-- [ ] Samle prosjektet om én målplattform og avvikle den gamle Neon-definisjonen.
-- [ ] Oppdater relevante launch-konfigurasjoner.
-- [ ] Verifiser avhengighetsoppløsning fra en ren utsjekking uten lokale Eclipse-artefakter.
+- [x] Oppdater `default.target` til Eclipse 2026-09 og avvikle `.tpd` som parallell definisjon.
+- [x] Lås Mylyn og øvrige avhengigheter for bygging; persistenskompatibilitet gjenstår i trinn 4.
+- [x] Bruk HTTPS og versjonsbestemte repositories der det er tilgjengelig.
+- [x] Gjennomgå behovet for Gemini JPA, gamle Orbit-biblioteker og connector-avhengigheter.
+- [x] Samle prosjektet om én målplattform og avvikle den gamle Neon-definisjonen.
+- [x] Oppdater relevante launch-konfigurasjoner.
+- [x] Verifiser avhengighetsoppløsning fra en ren utsjekking uten lokale Eclipse-artefakter.
 
 Ferdigkriterium: Avhengighetene løses konsistent mot Eclipse 2026-09, og
 utviklingsmiljøet og kommandolinjebygget bruker samme målplattform.
 Eventuelle gjenværende kildekodefeil er dokumentert for trinn 3 og 4.
 
-Resultater og avvik: Ikke påbegynt.
+Resultater og avvik, 21. september 2026:
+
+- Eclipse 4.41, Mylyn 4.12 og SWTBot 4.3 løses fra ett datert SimRel-repository.
+- Java-minimum er 21. Tycho 5.0.4 og JaCoCo 0.8.15 brukes i bygget.
+- Ren kildeeksport kompilerer alle moduler og lager p2-repository med tester
+  eksplisitt hoppet over. UI-testklasser er nå nykompilerte, ikke gjenbruk fra `bin/`.
+- Full `verify` kjøres med tester og feiler i `SharedStorageTest`: EclipseLink 2.7.3
+  avviser Java 21-bytecode (`Unsupported class file major version 65`) og
+  gjenkjenner ikke entity-modellen. Dette følges opp i trinn 4.
+- JUnit 5-rapporttestene kjøres ikke av dagens provider. Dette følges opp i trinn 5.
+- CI kjører fortsatt full `verify`; endringen er ikke klar for utgivelse.
+- Se [baseline/BUILD-UPGRADE.md](baseline/BUILD-UPGRADE.md) for detaljert verifikasjon.
 
 ## 3. Tilpasse Mylyn-integrasjonen og brukergrensesnittet
 
@@ -169,8 +182,8 @@ Resultater og avvik: Ikke påbegynt.
 
 | Beslutning | Status |
 | --- | --- |
-| Eksakt Mylyn-versjon og nødvendige connectors | Avklares i trinn 2–3 |
-| Java-minimum for pluginen og testet kjøretid | Avklares i trinn 2 |
+| Eksakt Mylyn-versjon og nødvendige connectors | Mylyn 4.12; Tasks/Bugzilla i target, runtime vurderes i trinn 3 |
+| Java-minimum for pluginen og testet kjøretid | Java 21; bygg testet med Temurin 21.0.12.1 |
 | EclipseLink/JPA-versjon og eventuelt Jakarta-skifte | Avklares i trinn 4 |
 | H2-oppgradering og migreringsprosedyre | Avklares i trinn 4 |
 | Støttede OS og arkitekturer | Verifiseres i trinn 5 |
