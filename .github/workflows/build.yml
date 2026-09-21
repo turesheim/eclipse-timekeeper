@@ -1,6 +1,11 @@
 name: Build
 
-on: [push, pull_request]
+# Feature branches are tested through their PR, avoiding a second push build.
+on:
+  push:
+    branches: [main]
+    tags: ['**']
+  pull_request:
 
 permissions:
   contents: read
