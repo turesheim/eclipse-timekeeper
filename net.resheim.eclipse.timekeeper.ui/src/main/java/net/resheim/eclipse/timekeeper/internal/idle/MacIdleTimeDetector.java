@@ -82,8 +82,11 @@ public class MacIdleTimeDetector implements IdleTimeDetector {
 			double idleTimeSeconds = ApplicationServices.INSTANCE.CGEventSourceSecondsSinceLastEventType(
 					ApplicationServices.KCG_EVENT_SOURCE_STATE_COMBINED_SESSION_STATE,
 					ApplicationServices.KCG_ANY_INPUT_EVENT_TYPE);
+			if (!Double.isFinite(idleTimeSeconds) || idleTimeSeconds < 0) {
+				throw new IllegalStateException("ApplicationServices returned an invalid idle time");
+			}
 			return (long) (idleTimeSeconds * 1000);
-		} catch (Exception e) {
+		} catch (LinkageError | RuntimeException e) {
 			IStatus status = new Status(IStatus.ERROR, getClass(), e.getMessage());
 			StatusManager.getManager().handle(status, StatusManager.LOG);
 			return NOT_WORKING;
