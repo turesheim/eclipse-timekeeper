@@ -6,18 +6,20 @@ Goal: Timekeeper can be installed and used in Eclipse IDE 2026-09
 (Eclipse Platform 4.41), preserving existing time records.
 This was the latest stable Eclipse release when the plan was created.
 
-Status: Steps 2/3 changes and the first step 4 changes are merged in PRs
-#185/#186/#188 with passing Linux/Xvfb CI. Step 4 now also has an explicit,
-tested historical V1/V2 conversion engine. Startup integration, a user-facing
-migration/recovery workflow, runtime-log follow-up and broader test coverage
-remain outstanding. Test enablement from steps 4/5
-was brought forward at the maintainer's request.
+Status: PRs #185/#186/#188/#189 are merged into `main`. PR #190 passed Linux/Xvfb
+CI but merged into the old conversion branch, not `main`. Its reviewed startup
+guards and nonblocking preferences are now carried forward on a main-based
+integration branch, including origin's shutdown and closed-connection fixes.
+A user-facing migration/recovery workflow, durable versioning, runtime-log
+follow-up and broader test coverage remain outstanding. Test enablement from
+steps 4/5 was brought forward at the maintainer's request.
 See the [original baseline](baseline/README.md),
 [step 2 results](baseline/BUILD-UPGRADE.md) and
 [test-enablement results](baseline/TEST-UPGRADE.md) and
 [Mylyn/UI results](baseline/MYLYN-UI-UPGRADE.md) and
 [database-safety results](baseline/DATABASE-SAFETY.md) and
-[historical-conversion results](baseline/LEGACY-CONVERSION.md).
+[historical-conversion results](baseline/LEGACY-CONVERSION.md) and
+[startup-safety results](baseline/DATABASE-STARTUP.md).
 
 ## Following this plan
 
@@ -156,8 +158,9 @@ The runtime-error checkbox remains open pending clean installed-IDE verification
 - [x] Determine whether migration from `javax.persistence` to `jakarta.persistence` is necessary;
   if so, make it a separate, testable change.
 - [ ] Review and repair schema creation and migration, including the disabled Flyway call.
-  Conversion data writes are transactional and verified before commit; startup
-  schema detection, durable versioning and the recovery workflow are still open.
+  Conversion data writes are transactional and verified before commit. Startup
+  now creates schema only in empty databases and refuses historical/mixed/unknown
+  layouts. Durable versioning and the recovery workflow remain open; Flyway stays disabled.
 - [ ] Decide whether to upgrade H2 in this release, documenting the rationale and any follow-up.
 - [ ] If moving to H2 2.x, export with the old H2 version and import into a new database,
   with backups, validation and documented rollback.
@@ -166,7 +169,8 @@ The runtime-error checkbox remains open pending clean installed-IDE verification
 - [ ] Test new databases, existing databases, migration failures and restart.
   New/current-model databases, restart, closed-file copy, SQL restore and transaction
   rollback are covered. Explicit V1/V2 conversion failures and converted-database
-  restart/restore are now covered; production startup modes remain open.
+  restart/restore are covered. Startup guards and UI preference failure behavior
+  now have automated coverage; installed-IDE and shared/server startup remain open.
 - [x] Compare counts, relationships and time totals with the step 1 baseline.
   Current-model synthetic data matches the baseline, including labels. Converted
   historical data also matches its 19,800-second baseline; historical schemas
@@ -193,8 +197,11 @@ unknown/mixed schemas and inconsistent associations. Converted data can be
 exported/restored without the old schema's duplicate-index DDL. The original
 historical export remains non-restorable. Full local verification now passes
 27 database/report and 7 UI cases, plus the existing ignored UI test. See
-[historical-conversion results](baseline/LEGACY-CONVERSION.md). Automatic migration,
-startup integration and previous-release compatibility remain unverified.
+[historical-conversion results](baseline/LEGACY-CONVERSION.md). Startup follow-up
+passes 44 database/report and 8 UI cases, plus the existing ignored UI test after
+adding the connection-availability review regressions; see
+[startup-safety results](baseline/DATABASE-STARTUP.md). Automatic migration,
+durable versioning, end-user recovery and previous-release compatibility remain open.
 
 ## 5. Modernize tests, libraries and CI
 
