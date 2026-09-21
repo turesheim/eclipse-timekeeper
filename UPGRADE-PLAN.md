@@ -247,6 +247,11 @@ Full build: 70 passing tests and one existing ignored export test. This is
 partial release acceptance, not publication approval. See
 [the installed-IDE report](baseline/INSTALLED-IDE.md) for artifacts and limitations.
 
+The follow-up activity lifecycle test passes (63 database tests). It also fixes
+`Task.endActivity(LocalDateTime)`, which previously ignored the timestamp used
+by the idle-time recovery path. Manual editing/export and interrupted-activity
+GUI scenarios remain open.
+
 ## Decisions to track
 
 | Decision | Status |
