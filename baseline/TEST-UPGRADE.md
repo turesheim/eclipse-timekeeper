@@ -29,47 +29,55 @@ from steps 4/5 forward without changing the database format.
 
 ## Verification
 
-Verified September 21, 2026: macOS 27.0 / aarch64, Temurin 21.0.12.1, Maven 3.9.16.
-Builds run from a clean temporary source copy, excluding local IDE metadata,
-uncommitted classpath edits and generated files. The normal Maven dependency
-cache is used; this is not an empty-cache verification.
+Verified September 21, 2026 after the interrupted-activity recovery merge:
+macOS 27.0 / aarch64, Temurin 21.0.12.1, Maven 3.9.16. The build ran from a
+clean worktree, excluding local IDE metadata and uncommitted classpath edits.
+The normal Maven dependency cache was used; this was not an empty-cache
+verification.
 
 ```sh
 mvn -B -ntp clean verify -Dtycho.localArtifacts=ignore
 ```
 
-The local run additionally used an empty temporary Maven settings file with `-s`
-to exclude unrelated private repositories. No skip flags were used.
-The final clean build completed in approximately 17 seconds. Local evidence is
-in `/private/tmp/timekeeper-tests-final.log` and the `target/surefire-reports`
-directories under `/private/tmp/timekeeper-tests-clean.LIDs1m/`. These temporary
-files are not committed and may be removed by the operating system.
+No skip flags were used. The clean build completed in approximately 31 seconds.
+The generated Surefire XML reports and p2 repository were inspected in their
+module `target` directories; these generated files are not committed.
 
 | Suite / check | Result |
 | --- | --- |
-| `SharedStorageTest` (JUnit 4 via Vintage) | 2 passed |
-| `TemplateTest` (JUnit Jupiter) | 2 template cases passed |
-| `IntegrationTest` (SWTBot/JUnit 4) | 2 passed, 1 existing explicit skip |
+| Database/report/packaging suites | 64 passed |
+| `TemplateTest` | 2 bundled report templates rendered and content checked |
+| `IntegrationTest` (SWTBot/JUnit 4) | 6 passed |
+| `WeekViewContentProviderTest` (SWTBot/JUnit 4) | 4 passed |
 | Six-project reactor and p2 repository/ZIP | Passed |
-| English legacy fixture and closed-file database copy | Passed with JDK 11 |
+| Current-model fixture, restart, copy and SQL restore | Passed with Java 21 |
 
-Passing UI checks cover workweek navigation, clipboard-template menu interaction
-and preferences. They are not comprehensive time-tracking or clipboard-content tests.
-The test suite still has an explicitly ignored CSV export test, which targets
-the obsolete `TRACKEDTASK` schema. `testEditTimeRange` still has its `@Test`
-annotation commented out and is not counted as an executed or skipped test.
-These existing coverage gaps remain in the plan; no active tests were disabled.
+The automated acceptance coverage maps to the upgrade-plan item as follows:
+
+- Time tracking: `IntegrationTest.testTaskActivationAndDeactivation` verifies
+  activity creation, closure, duration and workweek totals.
+- Manual editing: `IntegrationTest.testEditTimeRange` edits a workweek cell and
+  verifies the resulting duration.
+- Labels and restart: the current-model fixture verifies two labels, three
+  assignments, relationships and labelled totals after closing and reopening
+  file-backed storage in `StorageModesTest` and `FileStorageTest`.
+- Report export: `TemplateTest` renders every bundled template and checks
+  project, task and activity content; SWTBot also invokes both clipboard export
+  paths from the workweek view.
+- Import/export: `IntegrationTest.testExport` checks current-schema CSV headers
+  and performs a non-empty export/import round trip.
+
+No active tests were disabled. The UI run also covers deleted-Mylyn-task
+history, preference storage and UI-thread refresh behavior.
 
 ## Remaining limitations
 
-- Existing-database migration, full SQL restore, label round-trips, import/export
-  and restart are not established by the passing tests. No personal database was used.
-- The macOS test runtime reports missing theme/Cocoa menu contributions and a
-  Mylyn `CommonColors` shutdown error (`Invalid thread access`). Passing Surefire
-  results do not establish an error-free Eclipse runtime or release readiness.
-- Linux/Xvfb CI and Windows runtime results must be checked separately.
-- The legacy synthetic fixture still reproduces the documented full SQL restore
-  failure. English descriptions retain explicit Unicode samples (`æøå`).
+- The manual-edit test remains guarded on Linux because SWTBot can focus the
+  workbench's Find Actions editor instead of the workweek cell editor.
+- Template files are content-checked directly, while the SWTBot clipboard test
+  verifies command/menu execution rather than reading the OS clipboard payload.
+- Linux/Xvfb, Windows and native idle detection still require their separate
+  platform acceptance steps. No personal database was used.
 
 ## Sources
 
