@@ -199,7 +199,11 @@ tests are no longer applicable, not skipped tests.
 - [x] Update SWTBot, Surefire/test execution and JaCoCo to compatible versions.
 - [x] Ensure that existing JUnit 4 and JUnit 5 tests actually run,
   or consolidate them on one test platform.
-- [ ] Review and update JNA, FreeMarker and logging as required for compatibility.
+- [x] Review and update JNA, FreeMarker and logging as required for compatibility.
+  Updated embedded JNA to 5.19.1 and FreeMarker to 2.3.35; the host logging
+  provider packaging was corrected in PR #197. Native idle behavior across
+  operating systems remains a separate acceptance item. See
+  [dependency audit](baseline/DEPENDENCY-AUDIT.md).
 - [x] Update GitHub Actions for checkout, Java, caching, reports and artifacts.
 - [ ] Run automated tests for time tracking, manual editing, labels,
   report export, import and restart.

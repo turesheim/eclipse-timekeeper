@@ -31,7 +31,7 @@ Import-Package: javax.persistence,
  org.eclipse.core.resources,
  org.eclipse.osgi.service.datalocation
 Bundle-ClassPath: lib/h2-2.5.250.jar,
- lib/freemarker-2.3.27.jar,
+ lib/freemarker-2.3.35.jar,
  .
 Bundle-ActivationPolicy: lazy
 Bundle-Activator: net.resheim.eclipse.timekeeper.db.TimekeeperPlugin
