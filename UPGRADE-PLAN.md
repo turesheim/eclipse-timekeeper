@@ -6,12 +6,12 @@ Goal: Timekeeper can be installed and used in Eclipse IDE 2026-09
 (Eclipse Platform 4.41), preserving existing time records.
 This was the latest stable Eclipse release when the plan was created.
 
-Status: PRs #185/#186/#188/#189 are merged into `main`. PR #190 passed Linux/Xvfb
-CI but merged into the old conversion branch, not `main`. Its reviewed startup
-guards and nonblocking preferences are now carried forward on a main-based
-integration branch, including origin's shutdown and closed-connection fixes.
-A user-facing migration/recovery workflow, durable versioning, runtime-log
-follow-up and broader test coverage remain outstanding. Test enablement from
+Status: PRs #185/#186/#188/#189/#191 are merged into `main`. PR #191 passed
+Linux/Xvfb CI and brought PR #190's reviewed startup guards and nonblocking
+preferences onto `main`, including origin's shutdown and closed-connection fixes.
+The next changeset adds explicit backup recovery, read-only revalidation and
+versioned conversion receipts. In-database versioning, installed-IDE acceptance,
+runtime-log follow-up and broader test coverage remain outstanding. Test enablement from
 steps 4/5 was brought forward at the maintainer's request.
 See the [original baseline](baseline/README.md),
 [step 2 results](baseline/BUILD-UPGRADE.md) and
@@ -19,7 +19,9 @@ See the [original baseline](baseline/README.md),
 [Mylyn/UI results](baseline/MYLYN-UI-UPGRADE.md) and
 [database-safety results](baseline/DATABASE-SAFETY.md) and
 [historical-conversion results](baseline/LEGACY-CONVERSION.md) and
-[startup-safety results](baseline/DATABASE-STARTUP.md).
+[startup-safety results](baseline/DATABASE-STARTUP.md) and
+[recovery-workflow results](baseline/DATABASE-RECOVERY.md).
+The [recovery procedure](DATABASE-RECOVERY.md) documents the end-user steps.
 
 ## Following this plan
 
@@ -160,7 +162,12 @@ The runtime-error checkbox remains open pending clean installed-IDE verification
 - [ ] Review and repair schema creation and migration, including the disabled Flyway call.
   Conversion data writes are transactional and verified before commit. Startup
   now creates schema only in empty databases and refuses historical/mixed/unknown
-  layouts. Durable versioning and the recovery workflow remain open; Flyway stays disabled.
+  layouts. Explicit backup recovery now has versioned conversion receipts;
+  in-database versioning and broader recovery acceptance remain open. Flyway stays disabled.
+- [x] Provide explicit backup conversion into separate storage, post-reopen
+  validation, interrupted-attempt handling and documented rollback without
+  automatically switching preferences. The initial workflow is limited to
+  trusted single-file H2 1.4.194 backup ZIPs and repository V1/V2 schemas.
 - [ ] Decide whether to upgrade H2 in this release, documenting the rationale and any follow-up.
 - [ ] If moving to H2 2.x, export with the old H2 version and import into a new database,
   with backups, validation and documented rollback.
@@ -200,8 +207,12 @@ historical export remains non-restorable. Full local verification now passes
 [historical-conversion results](baseline/LEGACY-CONVERSION.md). Startup follow-up
 passes 44 database/report and 8 UI cases, plus the existing ignored UI test after
 adding the connection-availability review regressions; see
-[startup-safety results](baseline/DATABASE-STARTUP.md). Automatic migration,
-durable versioning, end-user recovery and previous-release compatibility remain open.
+[startup-safety results](baseline/DATABASE-STARTUP.md). The backup-recovery follow-up
+passes 64 database/report and 9 UI/integration cases, plus the existing ignored
+test; see [recovery results](baseline/DATABASE-RECOVERY.md). End-user conversion
+and revalidation are now explicit preference-page actions. Automatic migration
+remains disabled; in-database versioning, installed-IDE recovery acceptance and
+previous-release compatibility remain open.
 
 ## 5. Modernize tests, libraries and CI
 

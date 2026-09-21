@@ -69,6 +69,7 @@ public class DatabasePreferencePage extends FieldEditorPreferencePage implements
 		g2.setLayout(new GridLayout(2, true));
 		addExportButton(g2);
 		addImportButton(g2);
+		DatabaseRecoveryActions.addTo(getFieldEditorParent());
 		adjustGridLayout();
 	}
 

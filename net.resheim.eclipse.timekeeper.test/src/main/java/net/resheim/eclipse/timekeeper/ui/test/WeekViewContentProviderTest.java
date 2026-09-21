@@ -3,6 +3,7 @@ package net.resheim.eclipse.timekeeper.ui.test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 import java.lang.reflect.Field;
 import java.util.HashSet;
@@ -15,6 +16,8 @@ import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swtbot.eclipse.finder.SWTWorkbenchBot;
@@ -25,6 +28,7 @@ import org.junit.Test;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.ui.preferences.LabelPreferencePage;
+import net.resheim.eclipse.timekeeper.ui.preferences.DatabasePreferencePage;
 import net.resheim.eclipse.timekeeper.ui.preferences.PreferenceInitializer;
 import net.resheim.eclipse.timekeeper.ui.views.WeekViewContentProvider;
 
@@ -69,11 +73,21 @@ public class WeekViewContentProviderTest {
 			onUi(() -> {
 				Shell shell = new Shell(Display.getCurrent());
 				LabelPreferencePage page = new LabelPreferencePage();
+				DatabasePreferencePage database = new DatabasePreferencePage();
 				try {
 					page.createControl(shell);
 					assertFalse(page.isValid());
 					assertFalse(page.performOk());
+					database.init(PlatformUI.getWorkbench());
+					String location = database.getPreferenceStore().getString(TimekeeperPlugin.PREF_DATABASE_LOCATION);
+					String url = database.getPreferenceStore().getString(TimekeeperPlugin.PREF_DATABASE_URL);
+					database.createControl(shell);
+					assertTrue(button((Composite) database.getControl(), "Convert historical backup...").isEnabled());
+					assertTrue(button((Composite) database.getControl(), "Verify recovered database...").isEnabled());
+					assertEquals(location, database.getPreferenceStore().getString(TimekeeperPlugin.PREF_DATABASE_LOCATION));
+					assertEquals(url, database.getPreferenceStore().getString(TimekeeperPlugin.PREF_DATABASE_URL));
 				} finally {
+					database.dispose();
 					page.dispose();
 					shell.dispose();
 				}
@@ -82,6 +96,17 @@ public class WeekViewContentProviderTest {
 			managerField.set(null, previousManager);
 			field.set(null, previous);
 		}
+	}
+
+	private static Button button(Composite parent, String text) {
+		for (Control child : parent.getChildren()) {
+			if (child instanceof Button button && text.equals(button.getText())) return button;
+			if (child instanceof Composite composite) {
+				Button found = button(composite, text);
+				if (found != null) return found;
+			}
+		}
+		return null;
 	}
 
 	@Test

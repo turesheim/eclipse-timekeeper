@@ -80,12 +80,7 @@ public final class LegacyDatabaseConverter {
 					}
 				}
 			}
-			for (String table : CURRENT.keySet()) {
-				List<List<String>> actual = rows(target, "SELECT " + String.join(",", CURRENT.get(table)) + " FROM " + table);
-				if (!sorted(expected.get(table)).equals(sorted(actual))) {
-					throw new SQLException("Conversion verification failed for " + table);
-				}
-			}
+			verifyRows(target, expected);
 			target.commit();
 		} catch (SQLException | RuntimeException failure) {
 			try {
@@ -99,6 +94,34 @@ public final class LegacyDatabaseConverter {
 		}
 		target.setAutoCommit(true);
 		return result;
+	}
+
+	/** Revalidates every mapped value after reopening both databases read-only. */
+	public static Result verify(Connection source, Connection target) throws SQLException {
+		requireH2(source);
+		requireH2(target);
+		if (!source.isReadOnly() || !target.isReadOnly() || !source.getAutoCommit() || !target.getAutoCommit()) {
+			throw new SQLException("Verification requires idle read-only connections");
+		}
+		DatabaseSchema.Kind kind = DatabaseSchema.inspect(source);
+		boolean v2 = kind == DatabaseSchema.Kind.LEGACY_V2;
+		if ((!v2 && kind != DatabaseSchema.Kind.LEGACY_V1)
+				|| DatabaseSchema.inspect(target) != DatabaseSchema.Kind.CURRENT) {
+			throw new SQLException("Unsupported source or target schema for conversion verification");
+		}
+		validateSource(source, v2);
+		Map<String, List<List<String>>> expected = readSource(source, v2);
+		verifyRows(target, expected);
+		return report(expected, v2 ? 2 : 1);
+	}
+
+	private static void verifyRows(Connection target, Map<String, List<List<String>>> expected) throws SQLException {
+		for (String table : CURRENT.keySet()) {
+			List<List<String>> actual = rows(target, "SELECT " + String.join(",", CURRENT.get(table)) + " FROM " + table);
+			if (!sorted(expected.get(table)).equals(sorted(actual))) {
+				throw new SQLException("Conversion verification failed for " + table);
+			}
+		}
 	}
 
 	private static void validateSource(Connection source, boolean v2) throws SQLException {
