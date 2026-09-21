@@ -6,16 +6,18 @@ Goal: Timekeeper can be installed and used in Eclipse IDE 2026-09
 (Eclipse Platform 4.41), preserving existing time records.
 This was the latest stable Eclipse release when the plan was created.
 
-Status: Steps 2/3 changes are merged in PRs #185/#186 with passing Linux/Xvfb CI.
-Step 4 now has current-model file-backed fixtures, label safety fixes and local
-restart/backup/restore regressions. Runtime-log follow-up, historical migration
-and broader test coverage remain outstanding. Test enablement from steps 4/5
+Status: Steps 2/3 changes and the first step 4 changes are merged in PRs
+#185/#186/#188 with passing Linux/Xvfb CI. Step 4 now also has an explicit,
+tested historical V1/V2 conversion engine. Startup integration, a user-facing
+migration/recovery workflow, runtime-log follow-up and broader test coverage
+remain outstanding. Test enablement from steps 4/5
 was brought forward at the maintainer's request.
 See the [original baseline](baseline/README.md),
 [step 2 results](baseline/BUILD-UPGRADE.md) and
 [test-enablement results](baseline/TEST-UPGRADE.md) and
 [Mylyn/UI results](baseline/MYLYN-UI-UPGRADE.md) and
-[database-safety results](baseline/DATABASE-SAFETY.md).
+[database-safety results](baseline/DATABASE-SAFETY.md) and
+[historical-conversion results](baseline/LEGACY-CONVERSION.md).
 
 ## Following this plan
 
@@ -144,13 +146,18 @@ The runtime-error checkbox remains open pending clean installed-IDE verification
 
 - [ ] Test the existing database format and persistence configuration on the new runtime.
   Current-model JPA and frozen pre-label-fix schema fixtures pass; the historical
-  schema and databases from previous published releases are still outstanding.
-- [ ] Preserve the current `Task`/activity model and reporting independent of Mylyn
+  V1/V2 fixtures now convert into a readable current-model database. Databases
+  from previous published releases are still outstanding.
+- [x] Preserve the current `Task`/activity model and reporting independent of Mylyn
   when migrating from the historical `TRACKEDTASK` schema, using #163 and #165 as design context.
+  Verified for the repository's V1/V2 schemas through an explicit converter into
+  a separate empty target. No automatic migration is enabled.
 - [x] Select a compatible EclipseLink/JPA combination and document the versions.
 - [x] Determine whether migration from `javax.persistence` to `jakarta.persistence` is necessary;
   if so, make it a separate, testable change.
 - [ ] Review and repair schema creation and migration, including the disabled Flyway call.
+  Conversion data writes are transactional and verified before commit; startup
+  schema detection, durable versioning and the recovery workflow are still open.
 - [ ] Decide whether to upgrade H2 in this release, documenting the rationale and any follow-up.
 - [ ] If moving to H2 2.x, export with the old H2 version and import into a new database,
   with backups, validation and documented rollback.
@@ -158,10 +165,12 @@ The runtime-error checkbox remains open pending clean installed-IDE verification
 - [ ] Test concurrent access from multiple Eclipse instances and handling of incompatible clients.
 - [ ] Test new databases, existing databases, migration failures and restart.
   New/current-model databases, restart, closed-file copy, SQL restore and transaction
-  rollback are covered. Migration failures and production startup modes remain open.
+  rollback are covered. Explicit V1/V2 conversion failures and converted-database
+  restart/restore are now covered; production startup modes remain open.
 - [x] Compare counts, relationships and time totals with the step 1 baseline.
-  Current-model synthetic data matches the baseline, including labels. Comparison
-  after historical-schema migration is still required once that migration exists.
+  Current-model synthetic data matches the baseline, including labels. Converted
+  historical data also matches its 19,800-second baseline; historical schemas
+  contain no labels, so conversion leaves labels empty.
 
 Completion criterion: New database creation and supported upgrades of existing
 data work. Records are preserved, and failed migrations can be handled without losing original data.
@@ -178,8 +187,14 @@ version decision and historical migration remain open. Clean `verify` passes
 Test-enablement follow-up: EclipseLink 2.7.16 with ASM 9.8.0 reads Java 21
 entities while retaining `javax.persistence` 2.2.1 and H2 1.4.194. No Jakarta
 namespace or database-format migration is required just to execute the tests.
-Current-model compatibility now has synthetic coverage; historical migration
-and previous-release database compatibility remain unverified.
+Current-model compatibility and explicit V1/V2 conversion now have synthetic
+coverage. Conversion preserves a read-only source byte-for-byte and rejects
+unknown/mixed schemas and inconsistent associations. Converted data can be
+exported/restored without the old schema's duplicate-index DDL. The original
+historical export remains non-restorable. Full local verification now passes
+27 database/report and 7 UI cases, plus the existing ignored UI test. See
+[historical-conversion results](baseline/LEGACY-CONVERSION.md). Automatic migration,
+startup integration and previous-release compatibility remain unverified.
 
 ## 5. Modernize tests, libraries and CI
 
