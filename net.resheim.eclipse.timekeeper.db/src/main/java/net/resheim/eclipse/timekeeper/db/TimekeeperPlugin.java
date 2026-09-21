@@ -199,9 +199,13 @@ public class TimekeeperPlugin extends Plugin {
 				} catch (RuntimeException cleanup) {
 					failure.addSuppressed(cleanup);
 				}
-				databaseStatus = new Status(IStatus.ERROR, BUNDLE_ID,
-						"Timekeeper database unavailable: " + failure.getMessage(), failure);
-				getLog().log(databaseStatus);
+				if (stopping) {
+					databaseStatus = Status.CANCEL_STATUS;
+				} else {
+					databaseStatus = new Status(IStatus.ERROR, BUNDLE_ID,
+							"Timekeeper database unavailable: " + failure.getMessage(), failure);
+					getLog().log(databaseStatus);
+				}
 			}
 			notifyListeners();
 		}, "Timekeeper database startup");
