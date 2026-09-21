@@ -5,6 +5,11 @@ Started from merged PR #188, `origin/main` revision `1b81564`, on September 21,
 engine; it does not activate automatic migration or provide a finished end-user
 migration wizard/command. No personal database was opened or modified.
 
+This is the original H2 1.4.194 baseline. The subsequent
+[H2 upgrade](H2-UPGRADE.md) now uses an isolated H2 1.4.194 source and an H2 2.5.250
+target, including exact timestamp-value comparison and nanosecond target columns.
+Use the current [upgrade procedure](../DATABASE-RECOVERY.md) for end-user steps.
+
 ## Supported boundary
 
 `LegacyDatabaseConverter.convert(source, target)` accepts the table/column layout

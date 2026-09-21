@@ -503,7 +503,7 @@ public class TimekeeperPlugin extends Plugin {
 	 * @return a connection URL string for the shared location
 	 */
 	public String getSharedLocation() {
-		return "jdbc:h2:~/.timekeeper/h2db;AUTO_SERVER=TRUE;FILE_LOCK=SOCKET;AUTO_RECONNECT=TRUE;AUTO_SERVER_PORT=9090";
+		return "jdbc:h2:~/.timekeeper/h2db;AUTO_SERVER=TRUE;AUTO_SERVER_PORT=9090";
 	}
 
 	public String getWorkspaceLocation() throws IOException {

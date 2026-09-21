@@ -31,11 +31,11 @@ public final class LegacyDatabaseConverter {
  * Copies and verifies every mapped value before committing. Unknown/mixed schemas,
  * inconsistent associations, populated targets and unsupported engines are rejected.
  * A failed data copy is rolled back; callers should discard a failed target and
- * retain their untouched source/backup. This is not an in-place or H2 2.x migration.
+ * retain their untouched source/backup. Reads H2 1.4.194 and writes H2 2.5.250.
  */
 	public static Result convert(Connection source, Connection target) throws SQLException {
-		requireH2(source);
-		requireH2(target);
+		requireH2(source, "1.4.194");
+		requireH2(target, "2.5.250");
 		if (!source.isReadOnly() || target.isReadOnly() || !source.getAutoCommit() || !target.getAutoCommit()) {
 			throw new SQLException("Conversion requires an idle read-only source and an idle writable target");
 		}
@@ -58,6 +58,11 @@ public final class LegacyDatabaseConverter {
 		validateSource(source, v2);
 		Map<String, List<List<String>>> expected = readSource(source, v2);
 		Result result = report(expected, v2 ? 2 : 1);
+		copyRows(target, expected);
+		return result;
+	}
+
+	static void copyRows(Connection target, Map<String, List<List<String>>> expected) throws SQLException {
 		target.setAutoCommit(false);
 		try {
 			for (String table : CURRENT.keySet()) {
@@ -100,13 +105,12 @@ public final class LegacyDatabaseConverter {
 			throw failure;
 		}
 		target.setAutoCommit(true);
-		return result;
 	}
 
 	/** Revalidates every mapped value after reopening both databases read-only. */
 	public static Result verify(Connection source, Connection target) throws SQLException {
-		requireH2(source);
-		requireH2(target);
+		requireH2(source, "1.4.194");
+		requireH2(target, "2.5.250");
 		if (!source.isReadOnly() || !target.isReadOnly() || !source.getAutoCommit() || !target.getAutoCommit()) {
 			throw new SQLException("Verification requires idle read-only connections");
 		}
@@ -131,7 +135,7 @@ public final class LegacyDatabaseConverter {
 		}
 	}
 
-	private static void verifyRows(Connection target, Map<String, List<List<String>>> expected) throws SQLException {
+	static void verifyRows(Connection target, Map<String, List<List<String>>> expected) throws SQLException {
 		for (String table : CURRENT.keySet()) {
 			List<List<String>> actual = rows(target, "SELECT " + String.join(",", CURRENT.get(table)) + " FROM " + table);
 			if (!sorted(expected.get(table)).equals(sorted(actual))) {
@@ -186,7 +190,7 @@ public final class LegacyDatabaseConverter {
 		return result;
 	}
 
-	private static Result report(Map<String, List<List<String>>> data, int version) {
+	static Result report(Map<String, List<List<String>>> data, int version) {
 		Duration total = Duration.ZERO;
 		int open = 0;
 		for (List<String> activity : data.get("ACTIVITY")) {
@@ -201,14 +205,14 @@ public final class LegacyDatabaseConverter {
 				data.get("ACTIVITY").size(), open, total);
 	}
 
-	private static void requireH2(Connection connection) throws SQLException {
+	static void requireH2(Connection connection, String version) throws SQLException {
 		if (!connection.getMetaData().getDatabaseProductName().equals("H2")
-				|| !connection.getMetaData().getDatabaseProductVersion().startsWith("1.4.194")) {
-			throw new SQLException("Only the verified H2 1.4.194 conversion is supported");
+				|| !connection.getMetaData().getDatabaseProductVersion().startsWith(version + " ")) {
+			throw new SQLException("Expected the verified H2 " + version + " engine");
 		}
 	}
 
-	private static void requireNoRows(Connection connection, String sql, String message) throws SQLException {
+	static void requireNoRows(Connection connection, String sql, String message) throws SQLException {
 		try (var statement = connection.createStatement(); ResultSet rows = statement.executeQuery(sql)) {
 			if (rows.next()) {
 				throw new SQLException(message);
@@ -216,13 +220,23 @@ public final class LegacyDatabaseConverter {
 		}
 	}
 
-	private static List<List<String>> rows(Connection connection, String sql) throws SQLException {
+	static List<List<String>> rows(Connection connection, String sql) throws SQLException {
 		List<List<String>> result = new ArrayList<>();
 		try (var statement = connection.createStatement(); ResultSet rows = statement.executeQuery(sql)) {
 			while (rows.next()) {
 				List<String> row = new ArrayList<>();
 				for (int column = 1; column <= rows.getMetaData().getColumnCount(); column++) {
-					row.add(rows.getString(column));
+					// JDBC text formatting differs between H2 generations (notably .0
+					// on whole-second timestamps). Compare values, retaining all nanos.
+					if (rows.getMetaData().getColumnType(column) == java.sql.Types.TIMESTAMP) {
+						var timestamp = rows.getTimestamp(column);
+						row.add(timestamp == null ? null : timestamp.toLocalDateTime().toString());
+					} else if (rows.getMetaData().getColumnType(column) == java.sql.Types.BOOLEAN) {
+						boolean value = rows.getBoolean(column);
+						row.add(rows.wasNull() ? null : Boolean.toString(value));
+					} else {
+						row.add(rows.getString(column));
+					}
 				}
 				result.add(row);
 			}

@@ -298,7 +298,7 @@ public class LegacyDatabaseConverterTest {
 	}
 
 	private void createSource(boolean v2) throws Exception {
-		try (Connection connection = DriverManager.getConnection(url("source"), "sa", "")) {
+		try (Connection connection = LegacyH2.open(url("source"))) {
 			run(connection, "V1__baseline.sql");
 			if (v2) {
 				run(connection, "V2__add_project_taskurl_and_tasksummary.sql");
@@ -321,11 +321,11 @@ public class LegacyDatabaseConverterTest {
 	}
 
 	private Connection source() throws SQLException {
-		return DriverManager.getConnection(url("source") + ";IFEXISTS=TRUE;ACCESS_MODE_DATA=r", "sa", "");
+		return LegacyH2.open(url("source") + ";IFEXISTS=TRUE;ACCESS_MODE_DATA=r");
 	}
 
 	private Connection writableSource() throws SQLException {
-		return DriverManager.getConnection(url("source") + ";IFEXISTS=TRUE", "sa", "");
+		return LegacyH2.open(url("source") + ";IFEXISTS=TRUE");
 	}
 
 	private Connection target() throws SQLException {

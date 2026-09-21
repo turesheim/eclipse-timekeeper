@@ -11,7 +11,7 @@ final class DatabaseVersion {
 	static final String TABLE = "TIMEKEEPER_SCHEMA";
 	static final int CURRENT = 1;
 	static final Set<String> COLUMNS = Set.of("ID", "VERSION", "STATE", "ORIGIN");
-	private static final Set<String> ORIGINS = Set.of("NEW", "LEGACY_V1", "LEGACY_V2");
+	private static final Set<String> ORIGINS = Set.of("NEW", "LEGACY_V1", "LEGACY_V2", "H2_1_4");
 	private static final Set<String> STATES = Set.of("CREATING", "RECOVERING", "READY");
 
 	record Stamp(int version, String state, String origin) { }

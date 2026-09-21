@@ -6,12 +6,12 @@ Goal: Timekeeper can be installed and used in Eclipse IDE 2026-09
 (Eclipse Platform 4.41), preserving existing time records.
 This was the latest stable Eclipse release when the plan was created.
 
-Status: PRs #185/#186/#188/#189/#191/#192 are merged into `main`. PR #192 passed
-Linux/Xvfb CI, including the reviewed receipt-validation checks. Explicit backup
-recovery and revalidation are available. The next changeset adds durable schema
-identity and initialization state for new/recovered databases, while leaving
-existing unversioned databases unchanged. Previous-release fixtures, version
-adoption, installed-IDE acceptance and broader runtime coverage remain outstanding. Test enablement from
+Status: PRs #185/#186/#188/#189/#191/#192/#193 are merged into `main`, with PR #193's
+Linux/Xvfb CI passing. At the maintainer's request the next changeset upgrades
+normal storage to H2 2.5.250, the latest stable release checked on September 21.
+Backup conversion now covers both historical and current-model H2 1.4.194
+databases, including backed-up version adoption. Previous-release fixtures,
+installed-IDE acceptance and broader runtime coverage remain outstanding. Test enablement from
 steps 4/5 was brought forward at the maintainer's request.
 See the [original baseline](baseline/README.md),
 [step 2 results](baseline/BUILD-UPGRADE.md) and
@@ -21,7 +21,8 @@ See the [original baseline](baseline/README.md),
 [historical-conversion results](baseline/LEGACY-CONVERSION.md) and
 [startup-safety results](baseline/DATABASE-STARTUP.md) and
 [recovery-workflow results](baseline/DATABASE-RECOVERY.md) and
-[schema-versioning results](baseline/DATABASE-VERSIONING.md).
+[schema-versioning results](baseline/DATABASE-VERSIONING.md) and
+[H2-upgrade results](baseline/H2-UPGRADE.md).
 The [recovery procedure](DATABASE-RECOVERY.md) documents the end-user steps.
 
 ## Following this plan
@@ -164,19 +165,22 @@ The runtime-error checkbox remains open pending clean installed-IDE verification
   Conversion data writes are transactional and verified before commit. Startup
   now creates schema only in empty databases and refuses historical/mixed/unknown
   layouts. New/recovered databases now have a durable version/state marker;
-  adoption of existing unversioned databases and broader recovery acceptance
-  remain open. Flyway stays disabled.
+  backed-up H2 1.4.194 conversion adopts it in separate storage. Broader recovery
+  acceptance remains open. Flyway stays disabled.
 - [x] Persist schema identity and initialization/recovery state in new and
   converted databases, refusing unknown versions and incomplete states at startup.
-- [ ] Provide explicit backed-up version adoption for existing unversioned
-  current-model databases; never stamp them automatically during normal startup.
+- [x] Provide explicit backed-up version adoption for existing unversioned
+  H2 1.4.194 current-model databases by converting into a new H2 2.5.250 target;
+  never stamp or migrate the original during normal startup.
 - [x] Provide explicit backup conversion into separate storage, post-reopen
   validation, interrupted-attempt handling and documented rollback without
   automatically switching preferences. The initial workflow is limited to
-  trusted single-file H2 1.4.194 backup ZIPs and repository V1/V2 schemas.
-- [ ] Decide whether to upgrade H2 in this release, documenting the rationale and any follow-up.
-- [ ] If moving to H2 2.x, export with the old H2 version and import into a new database,
-  with backups, validation and documented rollback.
+  trusted single-file H2 1.4.194 backup ZIPs with repository V1/V2 or current schemas.
+- [x] Decide whether to upgrade H2 in this release, documenting the rationale and any follow-up.
+  The maintainer requested the latest release: H2 2.5.250 is selected and pinned.
+- [x] If moving to H2 2.x, export with the old H2 version and import into a new database,
+  with backups, validation and documented rollback. Implemented as column-aware
+  JDBC logical export/import, retaining an isolated old reader for trusted copies.
 - [ ] Verify existing JDBC parameters, shared storage, workspace storage and configured servers.
 - [ ] Test concurrent access from multiple Eclipse instances and handling of incompatible clients.
 - [ ] Test new databases, existing databases, migration failures and restart.
@@ -219,9 +223,11 @@ test; see [recovery results](baseline/DATABASE-RECOVERY.md). End-user conversion
 and revalidation are now explicit preference-page actions. Automatic migration
 remains disabled. The version-marker follow-up passes 99 database/report and
 9 UI/integration cases, plus the existing ignored test; see
-[versioning results](baseline/DATABASE-VERSIONING.md). Adoption of unversioned
-databases, installed-IDE recovery acceptance and previous-release compatibility
-remain open. Next: previous published-release fixtures and the H2 version decision.
+[versioning results](baseline/DATABASE-VERSIONING.md). The H2 2.5.250 follow-up
+passes 115 database/report and 9 UI/integration cases, plus the existing ignored
+test; see [H2 results](baseline/H2-UPGRADE.md). Installed-IDE recovery acceptance
+and previous-release compatibility remain open. Next: previous published-release
+fixtures and broader shared/server/runtime acceptance.
 
 ## 5. Modernize tests, libraries and CI
 
