@@ -75,7 +75,7 @@ public class LegacyFixture {
             throw new AssertionError("Expected a header and three label assignments");
         }
         Map<String, Integer> counts = new HashMap<>();
-        Map<String, String> colors = Map.of("Fakturerbar", "\"0,128,0\"", "Intern", "\"128,128,128\"");
+        Map<String, String> colors = Map.of("Billable", "\"0,128,0\"", "Internal", "\"128,128,128\"");
         try (var query = connection.prepareStatement("SELECT COUNT(*) FROM ACTIVITY WHERE ID = ?")) {
             for (String line : lines.subList(1, lines.size())) {
                 String[] fields = line.split(",", 3);
@@ -91,7 +91,7 @@ public class LegacyFixture {
                 counts.merge(fields[1], 1, Integer::sum);
             }
         }
-        if (!counts.equals(Map.of("Fakturerbar", 2, "Intern", 1))) {
+        if (!counts.equals(Map.of("Billable", 2, "Internal", 1))) {
             throw new AssertionError("Unexpected label counts: " + counts);
         }
     }
@@ -108,7 +108,7 @@ public class LegacyFixture {
         expect(connection, "SELECT COUNT(*) FROM ACTIVITY a JOIN TRACKEDTASK_ACTIVITY r ON "
                 + "a.ID=r.ACTIVITIES_ID AND a.TASK_ID=r.TASK_ID AND a.REPOSITORY_URL=r.REPOSITORY_URL", 5);
         expect(connection, "SELECT COUNT(*) FROM TRACKEDTASK t JOIN PROJECT p ON t.PROJECT=p.NAME", 3);
-        expect(connection, "SELECT COUNT(*) FROM ACTIVITY WHERE SUMMARY = 'Manuelt justert – æøå'", 1);
+        expect(connection, "SELECT COUNT(*) FROM ACTIVITY WHERE SUMMARY = 'Manually adjusted – Unicode: æøå'", 1);
         Map<LocalDate, Long> daily = new TreeMap<>();
         Map<String, Long> tasks = new TreeMap<>();
         try (Statement statement = connection.createStatement();

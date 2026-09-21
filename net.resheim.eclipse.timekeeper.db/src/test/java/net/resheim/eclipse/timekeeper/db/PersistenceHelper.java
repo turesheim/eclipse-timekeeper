@@ -12,42 +12,48 @@ package net.resheim.eclipse.timekeeper.db;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
 import javax.persistence.Persistence;
 
 import org.eclipse.persistence.config.PersistenceUnitProperties;
 
 /**
- * Utility for setting up an {@link EntityManager} for testing. Logging level is
- * set to FINE and the database resides in memory only.
+ * Creates an isolated in-memory database for each test. No user database is opened.
  * 
  * @author Torkild U. Resheim
  */
 public class PersistenceHelper {
 	
-	private static final EntityManager entityManager;
-	
-	static {
+	public static EntityManager getEntityManager() {
 		Map<String, Object> props = new HashMap<String, Object>();
-		props.put(PersistenceUnitProperties.JDBC_URL, "jdbc:h2:mem:test_mem");
+		props.put(PersistenceUnitProperties.JDBC_URL, "jdbc:h2:mem:test_" + UUID.randomUUID());
 		props.put(PersistenceUnitProperties.JDBC_DRIVER, "org.h2.Driver");
 		props.put(PersistenceUnitProperties.JDBC_USER, "sa");
 		props.put(PersistenceUnitProperties.JDBC_PASSWORD, "");
-		props.put(PersistenceUnitProperties.LOGGING_LEVEL, "fine");
-		entityManager = Persistence	
+		props.put(PersistenceUnitProperties.LOGGING_LEVEL, "warning");
+		return Persistence
 				.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
 				.createEntityManager();
-	};
+	}
 
 	/**
-	 * Returns an entity manager that only stores data in memory. This will not
-	 * conflict with any other Timekeeper databases running on the system.
-	 * 
-	 * @return an entity manager for testing
+	 * Rolls back unfinished work and closes the isolated test database and its pool.
 	 */
-	public static EntityManager getEntityManager() {
-		return entityManager;
-	};
+	public static void close(EntityManager entityManager) {
+		if (entityManager != null && entityManager.isOpen()) {
+			EntityManagerFactory factory = entityManager.getEntityManagerFactory();
+			try {
+				if (entityManager.getTransaction().isActive()) {
+					entityManager.getTransaction().rollback();
+				}
+			} finally {
+				entityManager.close();
+				factory.close();
+			}
+		}
+	}
 
 }

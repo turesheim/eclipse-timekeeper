@@ -1,33 +1,35 @@
-# Baseline før Eclipse-oppgradering
+# Baseline before the Eclipse upgrade
 
-Dato: 21. september 2026. Kildegrunnlag: commit
-`0105303faa60193f3796cd98c5ff01eac5234ca5` med eksisterende lokale endringer
-i `.java-version` og database-/UI-prosjektenes `.classpath`.
-Disse lokale endringene er bevart. Ingen produksjonskode eller byggkonfigurasjon
-er endret i baseline-arbeidet.
+Date: September 21, 2026. Source commit:
+`0105303faa60193f3796cd98c5ff01eac5234ca5`, with pre-existing local changes
+to `.java-version` and the database/UI projects' `.classpath` files.
+Those changes were preserved. The baseline work did not change production
+code or build configuration. This document records the original baseline;
+see [BUILD-UPGRADE.md](BUILD-UPGRADE.md) for subsequent build changes.
 
-## Byggmiljø og resultat
+## Build environment and result
 
-| Egenskap | Observert verdi |
+| Property | Observed value |
 | --- | --- |
-| OS / arkitektur | macOS 27.0 / aarch64 |
+| OS / architecture | macOS 27.0 / aarch64 |
 | Maven | Homebrew Maven 3.9.16 |
-| JDK brukt til bygget | Homebrew OpenJDK 11.0.32.1 |
-| Tycho | 2.7.5, uendret |
-| Målplattform | Eclipse 2022-03, uendret |
-| Standard Java-valg | Feiler: jenv finner ikke `17.0.4.1` fra `.java-version` |
-| Byggresultat | Exit 1 under oppløsning av målplattform, før kompilering og tester |
+| JDK used for the build | Homebrew OpenJDK 11.0.32.1 |
+| Tycho | 2.7.5, unchanged |
+| Target platform | Eclipse 2022-03, unchanged |
+| Default Java selection | Failed: jenv could not find the pinned `17.0.4.1` |
+| Build result | Exit 1 during target resolution, before compilation or tests |
 
-Kommando kjørt fra prosjektroten, med eksplisitt JDK for å omgå det utdaterte jenv-valget:
+Command run from the project root, explicitly selecting a JDK to bypass the
+unavailable jenv version:
 
 ```sh
 env JAVA_HOME=/opt/homebrew/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home \
   /opt/homebrew/bin/mvn -B -ntp clean verify -Dtycho.localArtifacts=ignore
 ```
 
-Første forsøk i sandbox stoppet fordi Tycho ikke kunne opprette en lås i Maven-cachen
-(`Unable to create lock manager`). Etter godkjent kjøring uten denne begrensningen
-kom bygget frem til følgende prosjekt-/repository-feil:
+The sandboxed attempt stopped because Tycho could not lock the Maven cache
+(`Unable to create lock manager`). An approved run outside that restriction
+reached the following repository error:
 
 ```text
 Failed to resolve target definition .../default.target:
@@ -35,107 +37,103 @@ Could not find "org.eclipse.mylyn.bugzilla_feature.feature.group/3.25.2.v2020081
 in the repositories of the current location
 ```
 
-`default.target` ber om denne eksakte versjonen fra
-`http://download.eclipse.org/mylyn/releases/latest`. Den ble ikke funnet der ved
-dagens kjøring. Bygget meldte også at SLF4J manglet `StaticLoggerBinder` og brukte
-logging uten output. Det er Mylyn-oppløsningen som stopper bygget.
+`default.target` requested that exact version from
+`http://download.eclipse.org/mylyn/releases/latest`, where it was unavailable
+during this run. SLF4J also reported a missing `StaticLoggerBinder` and disabled
+logging, but Mylyn resolution was the build blocker.
 
-Ingen nye tester ble kjørt. Ingen validerbar plugin ble bygget, og oppstart i Eclipse
-er ikke testet. Feilen kom før Maven kunne utføre `clean`, så gamle `target`-filer
-og rapporter finnes fortsatt og må ikke tas som resultat fra denne kjøringen.
+No new tests ran, no usable plugin was built, and Eclipse startup was not tested.
+The failure occurred before Maven executed `clean`, leaving historical output
+in place at that point. Those files were not evidence of a successful baseline run.
 
-Detaljerte lokale logger fra arbeidet ligger i
-`/private/tmp/timekeeper-baseline.gvEheO/`: `build.log` (sandbox),
-`build-unrestricted.log` (repository-feil), `fixture.log` og `restore.log`.
-Midlertidige filer kan forsvinne; konklusjonene og reproduksjonskommandoene er
-derfor bevart i dette dokumentet.
+Local logs were stored in `/private/tmp/timekeeper-baseline.gvEheO/`:
+`build.log` (sandbox), `build-unrestricted.log` (repository failure),
+`fixture.log` and `restore.log`. Temporary files may disappear; this document
+preserves the conclusions and reproduction commands.
 
-## Testinventar
+## Test inventory
 
-| Test | Deklarert i koden | Dagens kjøring |
+| Test | Declared in source | Baseline run |
 | --- | --- | --- |
-| `SharedStorageTest` | To JUnit 4-tester: enkel persistens og varighet per dag | Ikke nådd |
-| `TemplateTest` | Én JUnit 5-parametrisert test, to malfiler i `templates/` | Ikke nådd |
-| `IntegrationTest.testNavigateWorkweekView` | Aktiv JUnit 4/SWTBot-test | Ikke nådd |
-| `IntegrationTest.testOpenPreferences` | Aktiv JUnit 4/SWTBot-test | Ikke nådd |
-| `IntegrationTest.testExport` | `@Test` sammen med `@Ignore` | Deaktivert i koden |
-| `IntegrationTest.testEditTimeRange` | `@Test` er kommentert ut | Ikke en aktiv test |
+| `SharedStorageTest` | Two JUnit 4 tests: simple persistence and daily duration | Not reached |
+| `TemplateTest` | One parameterized JUnit 5 test, two files in `templates/` | Not reached |
+| `IntegrationTest.testNavigateWorkweekView` | Active JUnit 4/SWTBot test | Not reached |
+| `IntegrationTest.testOpenPreferences` | Active JUnit 4/SWTBot test | Not reached |
+| `IntegrationTest.testExport` | `@Test` with `@Ignore` | Disabled |
+| `IntegrationTest.testEditTimeRange` | `@Test` commented out | Not an active test |
 
-Historisk rapport i `net.resheim.eclipse.timekeeper.db/target/surefire-reports/`
-er datert 19. september 2022 og viser to beståtte `SharedStorageTest`-tester,
-ingen feil og ingen skips. Den angir Java 11.0.15 og Maven 3.8.6.
-Dette er historisk evidens, ikke en ny verifikasjon. En kopi ble bevart i loggmappen.
+The historical report in the database project's `target/surefire-reports/`
+was dated September 19, 2022: two passing `SharedStorageTest` tests, no errors
+or skips, Java 11.0.15 and Maven 3.8.6. A copy was saved with the baseline logs.
+This was historical evidence, not a new verification.
 
-Database-POM-en bruker Surefire 2.19.1 og deklarerer Jupiter API og params 5.8.2,
-men ingen Jupiter engine eller eksplisitt JUnit Platform-provider. Det finnes
-ingen historisk `TemplateTest`-rapport i prosjektet. Testoppdagelse og faktisk
-kjøring av JUnit 5 må derfor verifiseres når målplattformen igjen kan løses;
-en vellykket Maven-exit alene vil ikke være nok.
+The original database POM used Surefire 2.19.1 and Jupiter API/params 5.8.2,
+without a Jupiter engine or an explicit JUnit Platform provider. No historical
+`TemplateTest` report was present. JUnit 5 discovery and execution therefore
+needed explicit verification; a successful Maven exit alone would not suffice.
 
-## Syntetiske data og forventninger
+## Synthetic data and expectations
 
-Brukeren valgte syntetiske fixtures dersom ingen eksisterende database var tilgjengelig.
-Ingen databasefil ble funnet i prosjektet. Ingen personlig Timekeeper-database er
-åpnet eller endret.
+The user selected synthetic fixtures if no existing database was available.
+No database file was found in the project. No personal Timekeeper database
+was opened or modified.
 
-### Historikk og hensikt med modellen
+### Model history and intent
 
-Brukeren knytter databaseomleggingen til ønsket om å samordne modellen med
-Timewarrior/Taskwarrior. [Issue #165](https://github.com/turesheim/eclipse-timekeeper/issues/165),
-opprettet 20. april 2020, bekrefter dette som et prosjektmål. Saken er fortsatt åpen
-og har ingen beskrivelse eller kommentarer som definerer et konkret kompatibilitetsformat.
+The user connected the database redesign to alignment with Timewarrior/Taskwarrior.
+[Issue #165](https://github.com/turesheim/eclipse-timekeeper/issues/165), created
+April 20, 2020, establishes that project goal. At baseline review, it was open
+with no description or comments defining a concrete compatibility format.
 
-Git-historikken viser at endringen gikk fra `TrackedTask` til `Task`:
+Git history shows the change from `TrackedTask` to `Task`:
 
-- `da5ab90`: innføring av delt databaselagring i 2016/2017, med `TrackedTask`.
-- `7cb249f`, 4. november 2020: prosjekt, oppgave-URL og navn lagres i databasen.
-  [Issue #163](https://github.com/turesheim/eclipse-timekeeper/issues/163) forklarer
-  at rapporter skal kunne lages uten å laste Mylyn-oppgaver eller kontakte deres repository.
-- `66590d6`, 8. november 2020: `TrackedTask` blir `Task`, `TRACKEDTASK` blir `TASK`,
-  og `TrackedTaskId` blir `GlobalTaskId`. Modellen får også tydeligere valgfri Mylyn-kobling.
-- `0105303`, 26. oktober 2022: etikettarbeidet fra
-  [issue #166](https://github.com/turesheim/eclipse-timekeeper/issues/166) integreres.
+- `da5ab90`: shared database storage introduced in 2016/2017, using `TrackedTask`.
+- `7cb249f`, November 4, 2020: project, task URL and summary stored in the database.
+  [Issue #163](https://github.com/turesheim/eclipse-timekeeper/issues/163) describes
+  reporting without loading Mylyn tasks or contacting their repository.
+- `66590d6`, November 8, 2020: `TrackedTask` renamed to `Task`, `TRACKEDTASK`
+  to `TASK`, and `TrackedTaskId` to `GlobalTaskId`, with clearer optional Mylyn linkage.
+- `0105303`, October 26, 2022: label work from
+  [issue #166](https://github.com/turesheim/eclipse-timekeeper/issues/166) merged.
 
-Dette underbygger at forskjellen mellom SQL-skjemaet og dagens modell kommer fra
-en bevisst videreutvikling. Den konkrete koblingen mellom rename-committen og #165
-er ikke dokumentert i commitmeldingen; brukerens forklaring er registrert som designkontekst.
-Oppgraderingen skal bevare dagens modell og muligheten for rapportering uavhengig av
-Mylyn. Den historiske fixturen er migreringsgrunnlag, ikke et forslag om å gå tilbake
-til `TRACKEDTASK`. Ny Timewarrior/Taskwarrior-integrasjon er ikke lagt til oppgraderingsomfanget.
+This supports treating the SQL/current-model difference as intentional evolution.
+The rename commit does not document a direct link to #165; the user's explanation
+is recorded as design context. Preserve the current model and Mylyn-independent
+reporting. The legacy fixture is migration input, not a proposal to revert to
+`TRACKEDTASK`. New Timewarrior/Taskwarrior integration is outside the upgrade scope.
 
-`legacy-data.sql` bruker prosjektets uendrede `V1__baseline.sql` og
-`V2__add_project_taskurl_and_tasksummary.sql`. Den representerer det historiske
-SQL-skjemaet i repositoryet; den er ikke dokumentasjon på skjemaet til en bestemt
-publisert utgave eller en database opprettet av dagens JPA-modell.
+`legacy-data.sql` uses the unchanged `V1__baseline.sql` and
+`V2__add_project_taskurl_and_tasksummary.sql`. It represents the repository's
+historical SQL schema, not a proven schema from a particular published release
+or a database created by the current JPA model.
 
-| Kontroll | Forventet |
+| Check | Expected |
 | --- | --- |
-| Prosjekter | 2 |
-| Oppgaver | 3, inkludert én uten aktiviteter |
-| Oppgave-ID `1` | 2 forskjellige repositories, separate sammensatte nøkler |
-| Aktiviteter / oppgave-aktivitetskoblinger | 5 / 5 |
-| Manuelt justerte aktiviteter | 1 |
-| Varighet for oppgave `a/1` / `b/1` | 9 900 / 9 900 sekunder |
-| Total varighet | 19 800 sekunder = 5 t 30 min |
-| 18. september 2022 | 1 800 sekunder = 30 min |
-| 19. september 2022 | 13 500 sekunder = 3 t 45 min |
-| 20. september 2022 | 4 500 sekunder = 1 t 15 min |
-| ISO-uke 37 / 38 | 30 min / 5 t |
-| Etiketter / tilordninger i separat spesifikasjon | 2 / 3 |
-| Fakturerbar / Intern / uten etikett | 2 t 45 min / 45 min / 2 t |
+| Projects | 2 |
+| Tasks | 3, including one without activities |
+| Task ID `1` | Two repositories, distinct composite keys |
+| Activities / task-activity links | 5 / 5 |
+| Manually adjusted activities | 1 |
+| Duration for task `a/1` / `b/1` | 9,900 / 9,900 seconds |
+| Total duration | 19,800 seconds = 5 h 30 min |
+| September 18, 2022 | 1,800 seconds = 30 min |
+| September 19, 2022 | 13,500 seconds = 3 h 45 min |
+| September 20, 2022 | 4,500 seconds = 1 h 15 min |
+| ISO weeks 37 / 38 | 30 min / 5 h |
+| Labels / assignments in the separate specification | 2 / 3 |
+| Billable / Internal / unlabelled | 2 h 45 min / 45 min / 2 h |
 
-Dataene omfatter flere aktiviteter per oppgave, norsk tekst, manuell justering,
-midnatt og overgang fra søndag til mandag. Rapportene skal senere sammenlignes
-med disse verdiene, ikke bare kontrolleres for at en fil blir opprettet.
+The data covers multiple activities per task, Unicode text, manual adjustment,
+midnight and Sunday-to-Monday boundaries. Later report checks must compare these
+values, not merely verify that an output file exists.
 
-`labels.csv` definerer etiketter og hvilke aktivitets-ID-er de skal knyttes til.
-Det gamle SQL-skjemaet har ingen etiketttabeller. Derfor ligger etikettene separat,
-og fixture-verktøyet kontrollerer antall, farger og referanser til eksisterende
-aktiviteter. Persistens av etiketter gjennom dagens JPA-modell er fortsatt uverifisert.
+`labels.csv` specifies labels and activity assignments. The historical schema
+has no label tables, so these are separate. The utility checks counts, colors
+and references to existing activities. This does not verify JPA label persistence.
 
-## Reprodusere og kontrollere databasekopien
+## Reproduce and verify the database copy
 
-Kjør fra prosjektroten med JDK 11 og den medfølgende H2 1.4.194:
+Run from the project root with JDK 11 and the bundled H2 1.4.194:
 
 ```sh
 /opt/homebrew/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home/bin/java \
@@ -143,22 +141,22 @@ Kjør fra prosjektroten med JDK 11 og den medfølgende H2 1.4.194:
   baseline/LegacyFixture.java
 ```
 
-På andre maskiner kan Java-stien erstattes med en installert JDK 11.
-Verktøyet bruker JDBC direkte, krever ikke Maven eller en Eclipse-installasjon,
-og oppretter en ny midlertidig mappe for hver kjøring. Det skriver ut plasseringen
-og oppretter `original.mv.db`, `copy.mv.db` og `export.sql`. Kopien tas etter at
-databasen er lukket. Original og kopi kontrolleres for antall, koblinger,
-manuell justering, norsk tekst og tidssummer. Det er ikke en JPA-/UI-test.
+Replace the Java path with another installed JDK 11 as needed. The utility uses
+JDBC directly, requires neither Maven nor Eclipse, and creates a new temporary
+directory for each run. It prints the location and creates `original.mv.db`,
+`copy.mv.db` and `export.sql`. The database is closed before copying.
+Both databases are checked for counts, relationships, manual adjustment,
+Unicode text and duration totals. This is not a JPA or UI test.
 
-Resultat 21. september: **bestått**, exit 0. Testdata og verifisert kopi ble laget i
+Original baseline result: **passed**, exit 0. Data and verified copy were created in
 `/var/folders/8m/2g_5_qdj5490htv6jfkzkcsh0000gn/T/timekeeper-legacy-fixture-7656006107624216071/`.
-Genererte binærfiler er ikke sjekket inn; kildefilene gjør dem reproducerbare.
+Generated binary files are not committed; the source fixtures make them reproducible.
 
-For å gjenskape den observerte SQL-restore-feilen, kjør samme kommando med
-`--restore` etter `baseline/LegacyFixture.java`. Den oppretter enda en ny mappe
-og forsøker å lese full SQL-eksport inn i `restored.mv.db`.
+To reproduce the observed SQL restore failure, append `--restore` to the command.
+This creates another temporary directory and attempts to restore the full SQL
+export into `restored.mv.db`.
 
-Resultat 21. september: **feilet**, exit 1, etter at original og filkopi var validert:
+Original baseline result: **failed**, exit 1, after validating the original and copy:
 
 ```text
 Index "PRIMARY_KEY_1" already exists
@@ -166,21 +164,21 @@ CREATE UNIQUE INDEX PUBLIC.PRIMARY_KEY_1 ON PUBLIC.TRACKEDTASK_ACTIVITY(...)
 [42111-194]
 ```
 
-Feilen er reprodusert med samme H2-versjon på begge sider. Den er ikke rettet
-eller skjult ved å endre de historiske migreringene. Full SQL-eksport kan ikke
-regnes som en verifisert tilbakeføringsvei for dette skjemaet før trinn 4.
+The failure was reproduced with the same H2 version on both sides. Historical
+migrations have not been rewritten to hide it. Full SQL export is not a verified
+rollback path for this schema; that remains part of step 4.
 
-## Oppfølging i neste trinn
+## Baseline follow-up items
 
-- Trinn 2: rett målplattformens Mylyn-oppløsning, og kjør baseline-testene på nytt.
-- Trinn 3/5: gjennomfør plugin-oppstart og UI-testene når et bygg er tilgjengelig.
-- Trinn 4: avklar forskjellen mellom `TRACKEDTASK` i migreringene og `TASK` med
-  etiketter i dagens JPA-modell, og opprett en fixture gjennom den faktiske modellen.
-- Trinn 4: verifiser etikettpersistens og en fungerende eksport/import-/tilbakeføringsvei.
-- Trinn 5: verifiser Jupiter-testoppdagelse og ta stilling til de deaktiverte UI-testene.
+- Step 2: fix Mylyn target resolution and rerun the baseline tests.
+- Steps 3/5: verify plugin startup and UI tests once a build is available.
+- Step 4: reconcile historical `TRACKEDTASK` with current `TASK` and labels,
+  and create a fixture through the actual JPA model.
+- Step 4: verify label persistence and a working export/import/rollback path.
+- Step 5: verify Jupiter discovery and address the disabled UI tests.
 
-Flyway-kallet er kommentert ut i `TimekeeperPlugin`, men `persistence.xml`
-aktiverer fortsatt EclipseLinks `create-tables`. Oppstarten er derfor ikke uten
-skjemaoppretting; det som mangler er en verifisert, versjonert migreringsvei.
-Standard JDBC-URL i `persistence.xml` har også dobbelt `jdbc:h2:`-prefiks,
-mens både pluginoppstarten og `PersistenceHelper` overstyrer URL-en.
+The Flyway call in `TimekeeperPlugin` is commented out, but `persistence.xml`
+still enables EclipseLink `create-tables`. Schema creation is not entirely
+disabled; the missing part is a verified, versioned migration path.
+The original default JDBC URL also has a duplicate `jdbc:h2:` prefix, although
+plugin startup and `PersistenceHelper` override it.

@@ -65,6 +65,20 @@
 				<artifactId>tycho-surefire-plugin</artifactId>
 				<version>${tycho.version}</version>
 				<configuration>
+					<forkedProcessTimeoutInSeconds>180</forkedProcessTimeoutInSeconds>
+					<failIfNoTests>true</failIfNoTests>
+					<dependencies>
+						<dependency>
+							<type>eclipse-plugin</type>
+							<artifactId>org.eclipse.sdk</artifactId>
+							<version>0.0.0</version>
+						</dependency>
+						<dependency>
+							<type>eclipse-plugin</type>
+							<artifactId>org.eclipse.equinox.slf4j</artifactId>
+							<version>0.0.0</version>
+						</dependency>
+					</dependencies>
 					<includes>
 						<include>**/*Test.java</include>
 					</includes>

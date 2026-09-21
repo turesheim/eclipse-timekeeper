@@ -51,7 +51,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 
-import net.resheim.eclipse.timekeeper.db.DatabaseChangeListener;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Task;
 
@@ -110,25 +109,18 @@ public class IntegrationTest {
 		if (!screenshotsDir.exists()) {
 			screenshotsDir.mkdirs();
 		}
-		// we need to wait until the database is ready
-		Object object = new Object();
-		log.info("Preparing database");
-		TimekeeperPlugin.getDefault().addListener(new DatabaseChangeListener() {			
+		// Poll the latched state: a one-shot listener can miss startup completion.
+		bot.waitUntil(new DefaultCondition() {
 			@Override
-			public void databaseStateChanged() {
-				synchronized (object) {
-					object.notifyAll();
-				}
+			public boolean test() {
+				return TimekeeperPlugin.getDefault().isReady();
 			}
-		});
-		synchronized (object) {
-			try {
-				log.info("Waiting for database to become ready");
-				object.wait();
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();				
+
+			@Override
+			public String getFailureMessage() {
+				return "Timekeeper database did not become ready";
 			}
-		}
+		}, 30000);
 		log.info("Database is ready, proceeding with tests.");
 		tl = TasksUiPlugin.getTaskList();
 		closeWelcome();
@@ -228,7 +220,7 @@ public class IntegrationTest {
 	 * This is not a UI test but we put it here as everything is nicely rigged
 	 */
 	@Test
-	@Ignore // TODO: fix this test
+	@Ignore("Legacy CSV export uses TRACKEDTASK tables; reconcile with TASK schema in upgrade step 4")
 	public void testExport() {
 		try {
 			File newFolder = folder.newFolder();
@@ -286,18 +278,22 @@ public class IntegrationTest {
 	@SuppressWarnings("deprecation")
 	private SWTBotView prepareWorkweekView() {
 		bot.resetWorkbench();
-		bot.getDisplay().syncExec(() -> bot.getDisplay().getActiveShell().setSize(1024, 400));
+		bot.getDisplay().syncExec(() -> {
+			Shell shell = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell();
+			shell.setSize(1024, 400);
+			shell.forceActive();
+		});
 		SWTBotView view = openViewById("net.resheim.eclipse.timekeeper.ui.views.workWeek");
 		UIThreadRunnable.syncExec(bot.getDisplay(), () -> {
 			ActionFactory.IWorkbenchAction maximizeAction = ActionFactory.MAXIMIZE
-					.create(bot.viewByTitle(MAIN_VIEW_NAME).getViewReference().getPage().getWorkbenchWindow());
+					.create(view.getViewReference().getPage().getWorkbenchWindow());
 			maximizeAction.run();			
 		});
 		view.setFocus();
 		// Take a screenshot for documentation
 		bot.getDisplay().syncExec(() -> {
 			TestUtility.takeScreenshot(screenshotsDir,
-					((Composite)bot.activeView().getWidget()).getParent().getParent(), "workweek-view.png");
+					view.getViewReference().getPage().getWorkbenchWindow().getShell(), "workweek-view.png");
 		});
 		return view;
 	}

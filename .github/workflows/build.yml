@@ -34,8 +34,11 @@ jobs:
       if: always()
       with:
         name: test-results
+        include-hidden-files: true
         path: |
           **/target/surefire-reports/
+          **/target/test-reports/
+          net.resheim.eclipse.timekeeper.test/target/work/data/.metadata/.log
           net.resheim.eclipse.timekeeper.test/screenshots/
           images/
         if-no-files-found: warn

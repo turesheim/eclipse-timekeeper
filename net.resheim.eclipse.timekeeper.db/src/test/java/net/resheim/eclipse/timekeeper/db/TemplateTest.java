@@ -10,12 +10,14 @@
  *******************************************************************************/
 package net.resheim.eclipse.timekeeper.db;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,7 +31,6 @@ import java.util.stream.Stream;
 
 import javax.persistence.EntityManager;
 import javax.persistence.EntityTransaction;
-import javax.persistence.Query;
 
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.LocalTask;
@@ -37,6 +38,7 @@ import org.eclipse.mylyn.internal.tasks.core.TaskCategory;
 import org.eclipse.mylyn.internal.tasks.core.TaskList;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -57,7 +59,7 @@ import net.resheim.eclipse.timekeeper.db.report.model.WorkWeek;
 /**
  * Used to verify that the report template mechanism works. This will run a
  * parameterized test over all templates found in the "templates" folder and for
- * each generate a file placed in "test-reports".
+ * each generate and check a file placed in "target/test-reports".
  * 
  * @author Torkild Ulvøy Resheim
  */
@@ -66,34 +68,26 @@ public class TemplateTest {
 	
 	private final String[] VERBS = {"investigated","fixed", "studied"}; 
 	private final String[] SUBJECTS = {"weird code","annoying bug", "new feature", "build service"}; 	
-	private static EntityManager entityManager;
-	
-	static {
-		entityManager = PersistenceHelper.getEntityManager(); 
-	}
-
+	private EntityManager entityManager;
 	static Configuration configuration;
 	
 	@BeforeAll
 	public static void before() throws IOException {
 		configuration = new Configuration(Configuration.VERSION_2_3_27);
 		configuration.setTemplateLoader(new FileTemplateLoader(new File("./templates/")));
+		Files.createDirectories(Paths.get("target/test-reports"));
+	}
+
+	@BeforeEach
+	public void setUpDatabase() {
+		entityManager = PersistenceHelper.getEntityManager();
 		TimekeeperPlugin.setEntityManager(entityManager);
-		Files.createDirectories(Paths.get("./test-reports"));
 	}
 
 	@AfterEach
 	public void after() {
-		// empty all tables
-		EntityTransaction transaction = entityManager.getTransaction();
-		if (transaction.isActive()) {
-			transaction.rollback();
-		}
-		// clean up after running tests
-		transaction.begin();
-		Query createQuery = entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE;TRUNCATE TABLE ACTIVITY;TRUNCATE TABLE TASK;SET REFERENTIAL_INTEGRITY TRUE");
-		createQuery.executeUpdate();
-		transaction.commit();
+		TimekeeperPlugin.setEntityManager(null);
+		PersistenceHelper.close(entityManager);
 	}
 	
 	@ParameterizedTest
@@ -101,9 +95,7 @@ public class TemplateTest {
 	public void testSimpleTemplate(String name) throws TemplateNotFoundException, MalformedTemplateNameException, ParseException,
 			IOException, TemplateException {
 		Template template = configuration.getTemplate(name, Locale.getDefault(), "utf-8", true);
-		File result = new File("test-reports/" + name);
-		FileOutputStream fos = new FileOutputStream(result);
-		Writer out = new OutputStreamWriter(fos);
+		File result = new File("target/test-reports/" + name);
 		
 		// create the objects we're reporting on
 		List<WorkWeek> weeks  = new ArrayList<>();
@@ -121,11 +113,22 @@ public class TemplateTest {
 		// add the actual data
 		contents.put("weeks", weeks);
 		// and do the processing
-		template.process(contents, out);
+		try (Writer out = Files.newBufferedWriter(result.toPath(), StandardCharsets.UTF_8)) {
+			template.process(contents, out);
+		}
+		String report = Files.readString(result.toPath(), StandardCharsets.UTF_8);
+		assertTrue(report.contains("Timesheet"), "Report heading must be rendered");
+		assertTrue(report.contains("Project A"), "Project A must be rendered");
+		assertTrue(report.contains("Project B"), "Project B must be rendered");
+		assertTrue(report.contains("Task #1"), "Task summary must be rendered");
+		assertTrue(report.contains("Activity investigated weird code"), "Activity must be rendered");
 	}
 	
 	static Stream<String> listTemplates() throws IOException{
-		return Files.list(Paths.get("templates")).map(f -> f.getFileName().toString());
+		try (Stream<Path> files = Files.list(Paths.get("templates"))) {
+			return files.filter(Files::isRegularFile).map(f -> f.getFileName().toString())
+					.sorted().toList().stream();
+		}
 	}
 
 	private void persist(Task ttask) {
@@ -154,7 +157,7 @@ public class TemplateTest {
 			AbstractTask mylynTask = new LocalTask(String.valueOf(i), "Task #" + i);
 //			tasks.add(mylynTask);
 			tl.addTask(mylynTask, projects[i%2]);
-			Task task = new Task();
+			Task task = new Task(mylynTask);
 			// for each task, create one activity 
 			for (int d = 1; d < 3 + (d%i); d++) {
 				int offset = d + i - 2;

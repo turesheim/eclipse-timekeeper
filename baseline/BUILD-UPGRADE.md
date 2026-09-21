@@ -1,55 +1,53 @@
-# Trinn 2: bygg og målplattform
+# Step 2: build and target platform
 
-Verifisert 21. september 2026 på macOS aarch64 med Temurin 21.0.12.1 og
-Maven 3.9.16. Kodegrunnlag for sluttkontrollen: `65fe25d`.
+Initial verification: September 21, 2026, on macOS aarch64 with Temurin 21.0.12.1
+and Maven 3.9.16. Source revision: `65fe25d`. This records the initial build
+upgrade; subsequent test-enablement results are recorded in [TEST-UPGRADE.md](TEST-UPGRADE.md).
 
-## Endringer
+## Changes
 
-| Del | Valgt versjon / oppsett |
+| Component | Selected version / configuration |
 | --- | --- |
 | Eclipse SDK | 2026-09 / 4.41 |
-| Mylyn | 4.12 fra samme SimRel-repository |
-| SWTBot | 4.3 fra samme SimRel-repository |
+| Mylyn | 4.12 from the same SimRel repository |
+| SWTBot | 4.3 from the same SimRel repository |
 | Tycho | 5.0.4 |
-| Java | JavaSE-21 i manifest, kompilator, launch-konfigurasjoner og CI |
-| Maven | Minimum 3.9.9, kontrollert med Enforcer 3.6.3 |
-| JaCoCo | 0.8.15, felles versjon i parent-POM |
-| Commons Lang | 3.20.0, oppdaterte import- og bundle-navn |
-| Logging | SLF4J 2.0.18 og Eclipse Equinox SLF4J-provider |
-| Persistens | EclipseLink 2.7.3 / javax.persistence beholdt inntil trinn 4 |
+| Java | JavaSE-21 in manifests, compiler settings, launches and CI |
+| Maven | Minimum 3.9.9, checked with Enforcer 3.6.3 |
+| JaCoCo | 0.8.15, shared parent-POM property |
+| Commons Lang | 3.20.0, updated imports and bundle names |
+| Logging | SLF4J 2.0.18 and the Eclipse Equinox SLF4J provider |
+| Persistence at this stage | EclipseLink 2.7.3 / javax.persistence retained |
 
-`default.target` er nå eneste målplattformdefinisjon. Alle rotavhengigheter er
-versjonslåst mot `https://download.eclipse.org/releases/2026-09/202609091000/`.
-De gamle `.tpd`-filene og Neon-målplattformen er fjernet og kan gjenfinnes i Git.
-Gemini JPA er ikke brukt av koden, som oppretter EclipseLink-provider direkte.
-Gamle Orbit-, JAXB-, log4j- og ekstra connector-røtter er tatt ut; transitive
-avhengigheter løses fra SimRel. Mylyn Tasks og Bugzilla er beholdt i målplattformen.
+`default.target` became the sole target definition, with all root dependencies
+pinned to `https://download.eclipse.org/releases/2026-09/202609091000/`.
+Old `.tpd` files and the Neon target were removed; they remain recoverable from Git.
+The code does not use Gemini JPA: it instantiates EclipseLink directly.
+Old Orbit, JAXB, log4j and extra connector roots were removed; transitive
+dependencies resolve through SimRel. Mylyn Tasks and Bugzilla remain included.
 
-Java-pinnen ble endret fra den lokalt manglende `17.0.4.1` til den eksisterende
-`21.0`-aliasen. I database- og UI-prosjektenes classpath-filer er kun
-JavaSE-21-linjen inkludert i committen; øvrige eksisterende lokale endringer
-er bevart utenfor committen.
+The local Java pin changed from unavailable `17.0.4.1` to installed alias `21.0`.
+Only the JavaSE-21 lines in the database/UI classpath files were committed;
+unrelated pre-existing local changes were preserved outside the commit.
 
-Launch-konfigurasjonene bruker standard PDE-launchere uten JMC-avhengighet.
-CI bruker Java 21 og oppdaterte GitHub Actions, kjører også på pull requests
-og laster opp testresultater selv om bygget feiler. Den fulle testkjøringen
-er fortsatt obligatorisk i CI; skip-flagg er kun brukt i den separate
-kompilerings-/pakkekontrollen under.
+Launch configurations use standard PDE launchers without JMC. CI uses Java 21
+and updated GitHub Actions, runs on pull requests, and uploads test results even
+on failure. Full test execution remains mandatory in CI; skip flags were only
+used for the separate diagnostic compilation/package check below.
 
-UI-testprosjektet kompilerer nå til `target/classes`, slik at `clean` rydder
-output og pakken ikke gjenbruker gamle klasser fra `bin/`. En ren bygging
-avdekket log4j-importer som var skjult av lokale 2022-klasser; testene bruker
-nå SLF4J og den gamle log4j-konfigurasjonen er fjernet. Ubrukt Guava-avhengighet
-og Tycho-parametere som ikke lenger støttes, er også fjernet.
+UI tests compile into `target/classes` so `clean` removes their output rather
+than reusing old `bin/` classes. A clean build exposed log4j imports previously
+masked by local 2022 classes. These were converted to SLF4J and the old log4j
+configuration was removed, along with unused Guava and obsolete Tycho parameters.
 
-## Verifikasjon
+## Initial verification
 
-En ren kildeeksport med `git archive` ble bygget i en ny midlertidig mappe,
-uten `.metadata`, lokale classpath-endringer eller gamle `target`-/`bin`-filer.
-Den vanlige Maven-avhengighetscachen ble brukt, med `-Dtycho.localArtifacts=ignore`.
-Dette er verifikasjon fra rene kilder, ikke fra en tom nedlastingscache.
-En tom, midlertidig Maven-settings-fil utelot maskinens uvedkommende private
-repositories; brukerens Maven-konfigurasjon ble ikke endret.
+A clean `git archive` source export was built in a new temporary directory,
+without `.metadata`, local classpath edits or old `target`/`bin` files.
+The normal Maven cache was used with `-Dtycho.localArtifacts=ignore`; this
+was clean-source verification, not an empty-cache build.
+An empty temporary Maven settings file excluded unrelated private repositories
+configured on the machine. The user's Maven configuration was not modified.
 
 ```sh
 mvn -s /path/to/empty-settings.xml -B -ntp clean package \
@@ -58,44 +56,44 @@ mvn -s /path/to/empty-settings.xml -B -ntp verify \
   -Dtycho.localArtifacts=ignore
 ```
 
-På maskiner uten egne Maven-repositories kan `-s` utelates.
+Omit `-s` on machines without custom Maven repositories.
 
-| Kontroll | Resultat |
+| Check | Initial result |
 | --- | --- |
-| XML og eksakte target-versjoner mot publisert p2-indeks | Bestått |
-| Maven/Java-krav | Bestått |
-| Ren kompilering og pakking av alle seks reactor-prosjekter | Bestått, tester hoppet over eksplisitt |
-| Nye UI-testklasser | Verifisert Java 21-bytecode, major version 65 |
-| p2-repository, ZIP og medfølgende index.html | Opprettet |
-| Full `verify` | Feiler i database-testene |
-| JaCoCo-instrumentering av Java 21 | Ingen tidligere class-file-feil etter oppdateringen |
-| Plugin-oppstart og faktisk UI-testkjøring | Ikke verifisert |
+| XML and exact target versions against published p2 metadata | Passed |
+| Maven/Java requirements | Passed |
+| Clean compilation and packaging of all six reactor projects | Passed, tests explicitly skipped |
+| Newly compiled UI test classes | Java 21 bytecode, major version 65 |
+| p2 repository, ZIP and bundled index.html | Created |
+| Full `verify` | Failed in database tests |
+| JaCoCo instrumentation on Java 21 | Previous class-file errors resolved |
+| Plugin startup and UI test execution | Not verified at this stage |
 
-Ren pakkekjøring tok omtrent 8 sekunder med oppvarmet cache. Resultatet ligger i
-`net.resheim.eclipse.timekeeper-site/target/repository` i den rene utsjekkingen.
-Artefakten er kun til videre testing, ikke til publisering som ferdig oppgradering.
+The clean package run took about eight seconds with a warm cache. Its result was
+`net.resheim.eclipse.timekeeper-site/target/repository` in the clean checkout.
+That artifact was for further testing, not publication as a completed upgrade.
 
-## Gjenstående feil og avgrensning
+## Failures identified at this stage
 
-Begge testmetodene i `SharedStorageTest` kjøres og feiler. EclipseLink 2.7.3
-avviser modellklassene med `Unsupported class file major version 65`, rapporterer
-tomt metamodel og `Object ... is not a known Entity type`; oppryddingen feiler
-deretter fordi `ACTIVITY`-tabellen mangler. Surefire oppsummerer to feilende
-testmetoder; XML-rapporten har fire feiloppføringer fordi oppryddingsfeil også
-registreres. Dette må løses i trinn 4 med en Java 21-kompatibel persistensstakk.
+Both `SharedStorageTest` methods executed and failed. EclipseLink 2.7.3 rejected
+the model classes with `Unsupported class file major version 65`, reported an
+empty metamodel and `Object ... is not a known Entity type`. Cleanup then failed
+because the `ACTIVITY` table did not exist. Surefire summarized two failing
+methods; the XML contained four error entries including cleanup failures.
+A Java 21-compatible persistence implementation was required.
 
-`TemplateTest` blir ikke kjørt av den eksisterende JUnit 4-provider-en. Det finnes
-bare en `SharedStorageTest`-rapport. JUnit 5-engine/provider og faktisk
-rapporttestdekning må håndteres i trinn 5. UI-testene kompilerer fra rene kilder,
-men `verify` stopper før UI-testmodulen; ingen UI-beståttstatus er hevdet.
+`TemplateTest` did not execute under the existing JUnit 4 provider; only a
+`SharedStorageTest` report existed. Jupiter engine/provider configuration and
+actual report-test execution needed repair. UI tests compiled from clean source,
+but `verify` stopped before that module, so no UI success was claimed.
 
-P2-løsning er konfigurert for Windows x86_64, Linux x86_64/aarch64 og
-macOS x86_64/aarch64. Dette dokumenterer avhengighets- og byggekontroll;
-kjøretidstesting på hver plattform gjenstår.
+Target resolution covers Windows x86_64, Linux x86_64/aarch64 and
+macOS x86_64/aarch64. Dependency/build verification is not runtime verification
+on each platform.
 
-## Kilder for versjonsvalgene
+## Sources for version selection
 
-- [Eclipse 2026-09, datert repository](https://download.eclipse.org/releases/2026-09/202609091000/)
-- [Tycho-krav til Maven og Java](https://tycho.eclipseprojects.io/doc/latest/tycho-compiler-plugin/plugin-info.html)
+- [Dated Eclipse 2026-09 repository](https://download.eclipse.org/releases/2026-09/202609091000/)
+- [Tycho Maven and Java requirements](https://tycho.eclipseprojects.io/doc/latest/tycho-compiler-plugin/plugin-info.html)
 - [Maven Enforcer](https://maven.apache.org/enforcer/maven-enforcer-plugin/usage.html)
-- [JaCoCo-endringer](https://www.jacoco.org/jacoco/trunk/doc/changes.html)
+- [JaCoCo changes](https://www.jacoco.org/jacoco/trunk/doc/changes.html)
