@@ -190,9 +190,9 @@ See [migration simplification](baseline/MIGRATION-SIMPLIFICATION.md) and the
 remain 2 projects, 3 tasks, 5 activities, 2 labels, 3 assignments and 19,800 seconds
 for the current synthetic fixture. Next: remaining installed-IDE and multi-instance runtime acceptance.
 
-The latest clean build passes 62 database/report/packaging tests and 8 UI/integration
-tests; one existing CSV-export test remains ignored. Removed historical tests
-are no longer applicable, not skipped tests.
+The latest clean build passes 63 database/report/packaging tests and 9 UI/integration
+tests. Current-schema CSV export coverage is active again. Removed historical
+tests are no longer applicable, not skipped tests.
 
 ## 5. Modernize tests, libraries and CI
 
@@ -203,6 +203,7 @@ are no longer applicable, not skipped tests.
 - [x] Update GitHub Actions for checkout, Java, caching, reports and artifacts.
 - [ ] Run automated tests for time tracking, manual editing, labels,
   report export, import and restart.
+  Current-schema CSV export is verified; CSV import and manual editing remain open.
 - [x] Run UI tests in CI with the required display/Xvfb configuration.
   PR #185 passed Linux/Xvfb CI before merge; subsequent changes require their own CI result.
 - [ ] Check idle detection on Windows, macOS and Linux.
@@ -212,10 +213,9 @@ are no longer applicable, not skipped tests.
 Completion criterion: Relevant tests are discovered, executed and pass. CI
 produces test results and a p2 repository, and platform support is documented.
 
-Results and deviations: Clean `verify` passes on macOS aarch64 with 4 database/report
-cases and 2 active UI tests passing. One legacy export test remains ignored and
-the manual-edit test remains inactive. CI/platform validation and broader coverage
-are still open. See [test-enablement results](baseline/TEST-UPGRADE.md), including
+Results and deviations: Clean `verify` passes on macOS aarch64 with 63 database/report
+tests and 9 active UI tests passing. The manual-edit test remains inactive. CI/platform
+validation and broader coverage are still open. See [test-enablement results](baseline/TEST-UPGRADE.md), including
 the remaining Eclipse runtime log warnings/errors.
 
 ## 6. Verify installation and prepare the release
@@ -243,14 +243,14 @@ missing search contributions; removing the bundled Equinox SLF4J provider fixed
 duplicate providers. Synthetic task/activity/label data survived update and
 restart, including display in a fresh Mylyn workspace. Relinking the local task
 normalized its URL from NULL to an empty string; activity data was unchanged.
-Full build: 70 passing tests and one existing ignored export test. This is
+Full build: 72 passing tests with CSV export coverage active. This is
 partial release acceptance, not publication approval. See
 [the installed-IDE report](baseline/INSTALLED-IDE.md) for artifacts and limitations.
 
 The follow-up activity lifecycle test passes (63 database tests). It also fixes
 `Task.endActivity(LocalDateTime)`, which previously ignored the timestamp used
-by the idle-time recovery path. Manual editing/export and interrupted-activity
-GUI scenarios remain open.
+by the idle-time recovery path. Current-schema CSV export now passes in the UI
+harness; CSV import, manual editing and interrupted-activity GUI scenarios remain open.
 
 ## Decisions to track
 
