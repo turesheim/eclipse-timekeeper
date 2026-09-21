@@ -129,9 +129,10 @@ H2's `org.h2.tools.Script`, with `IFEXISTS=TRUE;ACCESS_MODE_DATA=r` on the URL a
   Windows and other desktop/runtime combinations are not certified by this run.
 
 The follow-up clean build re-enabled current-schema CSV export coverage and added
-a round-trip import assertion: all 9 UI/integration tests passed. Manual editing
-still needs dedicated coverage; the CSV format is not a database backup or
-migration mechanism.
+a round-trip import assertion: all 10 UI/integration tests passed, including
+manual activity time-range editing on macOS aarch64. The editor test remains
+guarded on Linux because of its known SWTBot focus issue. The CSV format is not
+a database backup or migration mechanism.
 
 The follow-up lifecycle test also found and fixed a timestamp defect in
 `Task.endActivity(LocalDateTime)`: the idle-time path supplied the last active

@@ -203,7 +203,9 @@ tests are no longer applicable, not skipped tests.
 - [x] Update GitHub Actions for checkout, Java, caching, reports and artifacts.
 - [ ] Run automated tests for time tracking, manual editing, labels,
   report export, import and restart.
-  Current-schema CSV export/import round-trip is verified; manual editing remains open.
+  Current-schema CSV export/import round-trip and manual activity editing are
+  verified on macOS aarch64; Linux remains guarded due to the known SWTBot
+  editor-focus issue.
 - [x] Run UI tests in CI with the required display/Xvfb configuration.
   PR #185 passed Linux/Xvfb CI before merge; subsequent changes require their own CI result.
 - [ ] Check idle detection on Windows, macOS and Linux.
@@ -214,8 +216,9 @@ Completion criterion: Relevant tests are discovered, executed and pass. CI
 produces test results and a p2 repository, and platform support is documented.
 
 Results and deviations: Clean `verify` passes on macOS aarch64 with 63 database/report
-tests and 9 active UI tests passing. The manual-edit test remains inactive. CI/platform
-validation and broader coverage are still open. See [test-enablement results](baseline/TEST-UPGRADE.md), including
+tests and 10 active UI tests passing, including manual activity time-range editing.
+The manual-edit test remains guarded on Linux due to the known SWTBot editor-focus
+issue. CI/platform validation and broader coverage are still open. See [test-enablement results](baseline/TEST-UPGRADE.md), including
 the remaining Eclipse runtime log warnings/errors.
 
 ## 6. Verify installation and prepare the release
@@ -243,7 +246,7 @@ missing search contributions; removing the bundled Equinox SLF4J provider fixed
 duplicate providers. Synthetic task/activity/label data survived update and
 restart, including display in a fresh Mylyn workspace. Relinking the local task
 normalized its URL from NULL to an empty string; activity data was unchanged.
-Full build: 72 passing tests with CSV export coverage active. This is
+Full build: 73 passing tests with CSV export/import and manual-edit coverage active. This is
 partial release acceptance, not publication approval. See
 [the installed-IDE report](baseline/INSTALLED-IDE.md) for artifacts and limitations.
 
