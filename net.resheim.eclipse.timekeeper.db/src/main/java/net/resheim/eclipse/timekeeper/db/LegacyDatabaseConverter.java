@@ -15,6 +15,8 @@ import java.util.Map;
  * Explicit, offline data conversion for the repository's historical V1/V2 schemas.
  * Not invoked during plugin startup. Callers must use a read-only source connection
  * and a separate, freshly created current-model database with no other clients.
+ * A versioned target must be in RECOVERING state for the matching historical
+ * source version. READY targets are never converted, even when empty.
  * Schema creation is deliberately outside the conversion transaction: H2 DDL
  * cannot be rolled back with the copied rows. Neither connection is closed here.
  */
@@ -42,9 +44,14 @@ public final class LegacyDatabaseConverter {
 		if (!v2 && sourceKind != DatabaseSchema.Kind.LEGACY_V1) {
 			throw new SQLException("Unsupported source schema: " + sourceKind);
 		}
-		if (DatabaseSchema.inspect(target) != DatabaseSchema.Kind.CURRENT) {
+		DatabaseSchema.Kind targetKind = DatabaseSchema.inspect(target);
+		if (targetKind != DatabaseSchema.Kind.CURRENT && targetKind != DatabaseSchema.Kind.RECOVERING) {
 			throw new SQLException("Unsupported target schema; an empty current-model database is required");
 		}
+		if (targetKind == DatabaseSchema.Kind.CURRENT && DatabaseSchema.hasVersion(target)) {
+			throw new SQLException("A versioned target must be prepared by the explicit recovery workflow, not ready for tracking");
+		}
+		requireMatchingOrigin(target, v2);
 		for (String table : CURRENT.keySet()) {
 			requireNoRows(target, "SELECT 1 FROM " + table, "Target must be empty: " + table);
 		}
@@ -105,14 +112,23 @@ public final class LegacyDatabaseConverter {
 		}
 		DatabaseSchema.Kind kind = DatabaseSchema.inspect(source);
 		boolean v2 = kind == DatabaseSchema.Kind.LEGACY_V2;
+		DatabaseSchema.Kind targetKind = DatabaseSchema.inspect(target);
 		if ((!v2 && kind != DatabaseSchema.Kind.LEGACY_V1)
-				|| DatabaseSchema.inspect(target) != DatabaseSchema.Kind.CURRENT) {
+				|| (targetKind != DatabaseSchema.Kind.CURRENT && targetKind != DatabaseSchema.Kind.RECOVERING)) {
 			throw new SQLException("Unsupported source or target schema for conversion verification");
 		}
+		requireMatchingOrigin(target, v2);
 		validateSource(source, v2);
 		Map<String, List<List<String>>> expected = readSource(source, v2);
 		verifyRows(target, expected);
 		return report(expected, v2 ? 2 : 1);
+	}
+
+	private static void requireMatchingOrigin(Connection target, boolean v2) throws SQLException {
+		if (DatabaseSchema.hasVersion(target)
+				&& !DatabaseVersion.read(target).origin().equals(v2 ? "LEGACY_V2" : "LEGACY_V1")) {
+			throw new SQLException("Recovery target belongs to a different historical source version");
+		}
 	}
 
 	private static void verifyRows(Connection target, Map<String, List<List<String>>> expected) throws SQLException {

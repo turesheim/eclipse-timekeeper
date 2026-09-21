@@ -121,8 +121,10 @@ Local evidence (temporary files may be removed by the OS):
 
 ## Limits and next work
 
-Recognition checks table/column layout, not a durable database version, every
-column type/constraint, or record-level consistency. It is intentionally strict:
+The original recognition checks table/column layout, not every application-column
+type/constraint or record-level consistency. The subsequent
+[versioning change](DATABASE-VERSIONING.md) adds durable identity/state checks for
+new/recovered databases; existing unversioned layouts remain unstamped. Recognition is intentionally strict:
 extra Flyway history tables, schema variants and previous-release databases need
 explicit compatibility work. It never guesses how to repair an incomplete schema.
 If new-schema creation itself fails, H2 DDL may leave a partial database; preserve
@@ -137,6 +139,7 @@ refused database is still required. Existing Eclipse/Mylyn runtime-log warnings
 remain documented in the earlier reports.
 
 The subsequent [recovery workflow](DATABASE-RECOVERY.md) adds explicit backup
-conversion, revalidation and versioned conversion receipts. In-database version
-metadata, previous-release fixtures and shared/server compatibility remain open.
+conversion, revalidation and versioned conversion receipts. In-database markers
+are added in the [versioning follow-up](DATABASE-VERSIONING.md); existing-version
+adoption, previous-release fixtures and shared/server compatibility remain open.
 Historical databases are still refused at startup; automatic conversion is disabled.

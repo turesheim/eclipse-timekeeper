@@ -17,6 +17,8 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.time.Duration;
 import java.util.Properties;
 import java.util.zip.ZipEntry;
@@ -57,6 +59,9 @@ class DatabaseRecoveryTest {
 		assertEquals("1", receipt.getProperty("receipt.version"));
 		assertEquals(result.jdbcUrl(), receipt.getProperty("target.jdbcUrl"));
 		assertEquals(v2 ? "PT5H30M" : "PT0S", receipt.getProperty("closed.duration"));
+		try (Connection target = readOnly(output.resolve("converted"))) {
+			assertEquals(new DatabaseVersion.Stamp(1, "READY", v2 ? "LEGACY_V2" : "LEGACY_V1"), DatabaseVersion.read(target));
+		}
 	}
 
 	@Test
@@ -99,6 +104,10 @@ class DatabaseRecoveryTest {
 		assertFalse(Files.exists(output.resolve("validated.properties")));
 		assertThrows(IOException.class, () -> DatabaseRecovery.verify(output));
 		var retry = DatabaseRecovery.recover(backup, directory.resolve("retry"), () -> false);
+		assertThrows(SQLException.class, () -> DatabaseStartup.open("jdbc:h2:" + output.resolve("converted") + ";IFEXISTS=TRUE"));
+		try (Connection target = readOnly(output.resolve("converted"))) {
+			assertEquals("RECOVERING", DatabaseVersion.read(target).state());
+		}
 		assertEquals(5, retry.data().activities());
 	}
 
@@ -108,6 +117,25 @@ class DatabaseRecoveryTest {
 		Path output = directory.resolve("cancelled");
 		assertThrows(InterruptedIOException.class, () -> DatabaseRecovery.recover(backup, output, () -> true));
 		assertFalse(Files.exists(output));
+	}
+
+	@Test
+	void lateCancellationAfterDatabaseValidationStillDoesNotPublishAReceipt() throws Exception {
+		Path backup = backup(true, null);
+		Path output = directory.resolve("late-cancellation");
+		assertThrows(InterruptedIOException.class, () -> DatabaseRecovery.recover(backup, output, () -> {
+			if (!Files.exists(output.resolve("converted.mv.db"))) return false;
+			try (Connection target = readOnly(output.resolve("converted"))) {
+				return DatabaseVersion.read(target).state().equals("READY");
+			} catch (SQLException failure) {
+				throw new AssertionError(failure);
+			}
+		}));
+		try (Connection target = readOnly(output.resolve("converted"))) {
+			assertEquals("READY", DatabaseVersion.read(target).state());
+		}
+		assertFalse(Files.exists(output.resolve("validated.properties")));
+		assertThrows(IOException.class, () -> DatabaseRecovery.verify(output));
 	}
 
 	@Test
@@ -180,6 +208,54 @@ class DatabaseRecoveryTest {
 		DatabaseRecovery.recover(backup, output, () -> false);
 		Properties receipt = receipt(output);
 		receipt.setProperty("receipt.version", "999");
+		try (var stream = Files.newOutputStream(output.resolve("validated.properties"))) {
+			receipt.store(stream, "Test mutation");
+		}
+		assertThrows(IOException.class, () -> DatabaseRecovery.verify(output));
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "engine", "target.jdbcUrl", "conversion.version", "source.version", "projects", "tasks",
+			"activities", "open.activities", "closed.duration" })
+	void rejectsChangedReceiptMetadata(String property) throws Exception {
+		Path output = directory.resolve("recovery");
+		DatabaseRecovery.recover(backup(true, null), output, () -> false);
+		Properties receipt = receipt(output);
+		receipt.setProperty(property, "invalid");
+		try (var stream = Files.newOutputStream(output.resolve("validated.properties"))) {
+			receipt.store(stream, "Test mutation");
+		}
+		assertThrows(IOException.class, () -> DatabaseRecovery.verify(output));
+	}
+
+	@Test
+	void stillVerifiesThePreviousUnversionedReceiptFormatWithoutStampingIt() throws Exception {
+		Path output = directory.resolve("recovery");
+		var result = DatabaseRecovery.recover(backup(true, null), output, () -> false);
+		// Reproduce PR #192's target/receipt format using the same synthetic data.
+		try (Connection target = DriverManager.getConnection(result.jdbcUrl(), "sa", ""); var statement = target.createStatement()) {
+			statement.execute("DROP TABLE TIMEKEEPER_SCHEMA");
+		}
+		Properties receipt = receipt(output);
+		receipt.setProperty("conversion.version", "legacy-v1-v2-to-current-1");
+		receipt.setProperty("target.sha256", HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+				.digest(Files.readAllBytes(output.resolve("converted.mv.db")))));
+		try (var stream = Files.newOutputStream(output.resolve("validated.properties"))) {
+			receipt.store(stream, "Synthetic previous-format receipt");
+		}
+		assertEquals(result, DatabaseRecovery.verify(output));
+		DatabaseStartup.close(DatabaseStartup.open(result.jdbcUrl()));
+		try (Connection target = readOnly(output.resolve("converted"))) {
+			assertFalse(DatabaseSchema.hasVersion(target));
+		}
+	}
+
+	@Test
+	void cannotDisguiseAVersionedTargetAsTheOldReceiptFormat() throws Exception {
+		Path output = directory.resolve("recovery");
+		DatabaseRecovery.recover(backup(true, null), output, () -> false);
+		Properties receipt = receipt(output);
+		receipt.setProperty("conversion.version", "legacy-v1-v2-to-current-1");
 		try (var stream = Files.newOutputStream(output.resolve("validated.properties"))) {
 			receipt.store(stream, "Test mutation");
 		}

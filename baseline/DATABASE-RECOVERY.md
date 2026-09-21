@@ -5,6 +5,11 @@ merged the reviewed startup guards into `main` and passed Linux/Xvfb CI.
 This changeset adds an end-user workflow around the tested conversion engine.
 No personal database was opened; all verification used synthetic fixtures.
 
+Merged as PR #192 (`7422d52`) with passing Linux/Xvfb CI. Origin's review added
+verification of the receipt's engine, target URL and recomputed data totals.
+The [schema-versioning follow-up](DATABASE-VERSIONING.md) preserves these checks,
+adds regressions for them and introduces an in-database marker for new recoveries.
+
 ## Behavior and recovery boundary
 
 The Database preference page offers **Convert historical backup…** and
@@ -75,7 +80,8 @@ the OS. Local `.classpath` edits and `.metadata/` were excluded and preserved.
 ## Remaining work
 
 This is not release acceptance or a complete schema-migration framework. Durable
-**in-database** versioning is still needed. Previous published-release files,
+**in-database** identity/state is added by the [follow-up](DATABASE-VERSIONING.md);
+adoption of existing unversioned databases remains open. Previous published-release files,
 other H2 versions/storage formats, real server/shared mode and concurrent clients
 remain outside the verified boundary. The workflow expects exclusive access to
 its private recovery folder. It does not lock other clients or detect later

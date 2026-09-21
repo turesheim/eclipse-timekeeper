@@ -113,6 +113,15 @@ public class IntegrationTest {
 		assertEquals(1, result.data().tasks());
 		assertEquals(Duration.ofMinutes(25), result.data().closedDuration());
 		assertEquals(result, DatabaseRecovery.verify(result.directory()));
+		try (var target = new org.h2.Driver().connect(result.jdbcUrl() + ";ACCESS_MODE_DATA=r", credentials);
+				var statement = target.createStatement();
+				var rows = statement.executeQuery("SELECT VERSION,STATE,ORIGIN FROM TIMEKEEPER_SCHEMA")) {
+			assertTrue(rows.next());
+			assertEquals(1, rows.getInt(1));
+			assertEquals("READY", rows.getString(2));
+			assertEquals("LEGACY_V1", rows.getString(3));
+			Assert.assertFalse(rows.next());
+		}
 		Assert.assertSame(manager, plugin.getEntityManager());
 		assertTrue(plugin.isReady());
 		assertEquals(taskCount, manager.createQuery("SELECT COUNT(t) FROM Task t", Long.class).getSingleResult().longValue());

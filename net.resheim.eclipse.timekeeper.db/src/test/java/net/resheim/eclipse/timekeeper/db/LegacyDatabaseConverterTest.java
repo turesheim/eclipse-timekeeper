@@ -280,6 +280,23 @@ public class LegacyDatabaseConverterTest {
 		}
 	}
 
+	@Test
+	void rejectsReadyVersionedTargetsAndPendingTargetsForAnotherSourceVersion() throws Exception {
+		createSource(true);
+		DatabaseStartup.close(DatabaseStartup.open(url("target")));
+		try (Connection source = source(); Connection target = target()) {
+			assertThrows(SQLException.class, () -> LegacyDatabaseConverter.convert(source, target));
+			assertEmpty(target);
+			assertEquals(new DatabaseVersion.Stamp(1, "READY", "NEW"), DatabaseVersion.read(target));
+		}
+		DatabaseStartup.close(DatabaseStartup.openRecoveryTarget(url("wrong-version"), 1));
+		try (Connection source = source(); Connection target = DriverManager.getConnection(url("wrong-version"), "sa", "")) {
+			assertThrows(SQLException.class, () -> LegacyDatabaseConverter.convert(source, target));
+			assertEmpty(target);
+			assertEquals(new DatabaseVersion.Stamp(1, "RECOVERING", "LEGACY_V1"), DatabaseVersion.read(target));
+		}
+	}
+
 	private void createSource(boolean v2) throws Exception {
 		try (Connection connection = DriverManager.getConnection(url("source"), "sa", "")) {
 			run(connection, "V1__baseline.sql");

@@ -14,6 +14,11 @@ verified H2 1.4.194 engine. The source must be opened read-only, and the target
 must be a separate, empty database with the current JPA schema already created.
 Both connections must be in autocommit mode on entry, with no other clients.
 
+The [versioning follow-up](DATABASE-VERSIONING.md) additionally supports versioned
+targets prepared in `RECOVERING` state by the explicit recovery workflow. Their
+historical origin must match the source. Versioned `READY` databases are not
+conversion targets, even when empty; unversioned empty targets remain supported.
+
 Unknown tables/columns, mixed historical/current schemas, views, other application
 schemas, and extra Flyway history tables are rejected rather than silently
 discarded. Recognition is deliberately limited to table/column shape, not a
