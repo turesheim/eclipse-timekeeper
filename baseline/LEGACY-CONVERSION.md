@@ -42,7 +42,8 @@ presented as recovered historical data. Current-activity pointers and open end
 times are preserved, not automatically stopped or assigned a guessed duration.
 
 Missing task/project references, inconsistent task/activity memberships, current
-activities belonging to another task, null start/adjustment values and negative
+activities belonging to another task, activities assigned to both a task and a
+project, null start/adjustment values and negative
 closed durations are rejected. This prevents ambiguous historical data from being
 "repaired" through unreviewed guesses. No foreign-key checks are disabled.
 
@@ -74,7 +75,7 @@ The tests load the historical SQL and baseline data directly from their existing
 repository files via test resources. There is no second handwritten schema copy.
 All files are synthetic and live in JUnit temporary directories.
 
-Fourteen new conversion test cases cover:
+Fifteen new conversion test cases cover:
 
 - V1 conversion with absent metadata kept null.
 - V2 conversion: 2 projects, 3 tasks, 5 activities and 19,800 seconds, including
@@ -82,7 +83,8 @@ Fourteen new conversion test cases cover:
 - Reopening through the current JPA model without schema generation or Mylyn links.
 - SQL export/restore of the converted database followed by the same JPA checks.
 - Open activity/current pointer, fractional-second tick and project-only activity.
-- Seven malformed/ambiguous source cases, leaving the target empty.
+- Eight malformed/ambiguous source cases, leaving the target empty, including
+  the dual task/project association rejected by the PR review fix.
 - A constraint failure after partial insertion, rollback, reopen and successful retry.
 - A test trigger that changes copied summaries: verification detects the change
   and rolls back before commit.
@@ -104,7 +106,7 @@ mvn -B -ntp clean verify -Dtycho.localArtifacts=ignore
 
 Used an isolated source copy, the normal dependency cache and an empty temporary
 Maven settings file. No tests were disabled through build flags. Results:
-27 database/report tests and 7 UI tests pass, with the one pre-existing ignored
+28 database/report tests and 7 UI tests pass, with the one pre-existing ignored
 CSV-export UI test unchanged. All six reactor projects pass and produce the p2
 repository/ZIP. Local evidence is `/private/tmp/timekeeper-legacy.log` and reports
 under `/private/tmp/timekeeper-legacy.ewI8ND/`; temporary files may be removed by the OS.
