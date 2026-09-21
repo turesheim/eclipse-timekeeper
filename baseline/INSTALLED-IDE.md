@@ -130,6 +130,23 @@ unavailable status and an unchanged before/after SQL export. See the
 [concurrent installed-instance report](CONCURRENT-INSTANCES.md) for the full
 procedure, evidence and limitations.
 
+## Interrupted activities
+
+The installed acceptance matrix now also covers abrupt termination and startup
+reconciliation. A durable open activity retained the same ID and start time
+across restart, `SIGKILL` and another restart while its Mylyn task remained
+active. When the same durable database state was opened with that Mylyn task
+inactive, startup closed the activity at its persisted last-active tick and
+committed both the end time and cleared current reference.
+
+This run found and fixed two recovery defects (an uncommitted update and a
+30-minute probe end that could be in the future) plus a null idle-status race.
+The corrected installed build was `2.0.0.202609211243`; the full build passed
+64 database/report/packaging and 10 UI/integration tests. See the
+[interrupted-activity report](INTERRUPTED-ACTIVITY.md) for exact identifiers,
+timestamps, reproduction boundaries and the immediate post-activation durability
+limitation.
+
 ## Repeating the checks safely
 
 Use disposable copies of the runtime and separate temporary workspace/home/data
@@ -173,12 +190,12 @@ H2's `org.h2.tools.Script`, with `IFEXISTS=TRUE;ACCESS_MODE_DATA=r` on the URL a
   errors in the installed IDE. Passing tests alone does not settle runtime logs.
 - This verifies embedded storage selected by the original test override, normal
   shutdown, sequential restart/update, all installed storage preferences and a
-  local-only TCP server. Two installed instances and graceful shared-storage
-  owner handoff are characterized separately; live cache synchronization,
-  active-activity ownership and abrupt-failure recovery are not supported or
-  certified. Interrupted activities, externally managed remote servers, remote
-  connectors and OS idle detection remain unverified. Manual editing and CSV
-  import/export are covered by the follow-up UI harness, not by installed-
+  local-only TCP server. Durable interrupted activities and abrupt process
+  restart are characterized separately; the immediate post-activation storage
+  window, filesystem/power failure, live cache synchronization and active-
+  activity ownership are not certified. Externally managed remote servers,
+  remote connectors and OS idle detection remain unverified. Manual editing and
+  CSV import/export are covered by the follow-up UI harness, not by installed-
   runtime interaction.
 - macOS Apple Silicon was exercised here. Linux CI is separate evidence;
   Windows and other desktop/runtime combinations are not certified by this run.

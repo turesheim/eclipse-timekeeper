@@ -13,10 +13,12 @@ package net.resheim.eclipse.timekeeper.ui.test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -60,6 +62,7 @@ import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.TaskLinkStatus;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 @SuppressWarnings("restriction")
 @RunWith(SWTBotJunit4ClassRunner.class)
@@ -168,6 +171,8 @@ public class IntegrationTest {
 	@Test
 	public void testTaskActivationAndDeactivation() throws Exception {
 		prepareWorkweekView();
+		Field lastActiveTime = TimekeeperUiPlugin.class.getDeclaredField("lastActiveTime");
+		lastActiveTime.setAccessible(true);
 		ITask[] previous = new ITask[1];
 		Task[] tracked = new Task[1];
 		try {
@@ -176,6 +181,13 @@ public class IntegrationTest {
 				ITask task = TestUtility.createTask(tl, "Lifecycle checks", "3001",
 						"Track an activity").getMylynTask();
 				TasksUi.getTaskActivityManager().activateTask(task);
+				try {
+					lastActiveTime.set(TimekeeperUiPlugin.getDefault(), null);
+				} catch (IllegalAccessException e) {
+					throw new AssertionError(e);
+				}
+				assertNull("Idle start is unknown until the idle detector has sampled activity",
+						TimekeeperUiPlugin.getDefault().getIdleSince());
 				tracked[0] = TimekeeperPlugin.getDefault().getTask(task);
 				assertEquals("Lifecycle checks", tracked[0].getProject().getName());
 				Activity activity = tracked[0].getCurrentActivity().orElseThrow();

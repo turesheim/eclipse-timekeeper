@@ -23,7 +23,8 @@ See the [original baseline](baseline/README.md),
 [database-safety results](baseline/DATABASE-SAFETY.md) and
 [storage-mode acceptance](baseline/STORAGE-MODES.md) and
 [installed-IDE acceptance](baseline/INSTALLED-IDE.md) and
-[concurrent installed-instance acceptance](baseline/CONCURRENT-INSTANCES.md).
+[concurrent installed-instance acceptance](baseline/CONCURRENT-INSTANCES.md) and
+[interrupted-activity acceptance](baseline/INTERRUPTED-ACTIVITY.md).
 The [database policy](DATABASE-RECOVERY.md) documents current backups and the future migration contract.
 
 ## Following this plan
@@ -188,9 +189,14 @@ Do not add published-release fixtures or legacy migration recipes for this relea
   without changing the database. There is no live cross-process cache refresh
   or active-activity owner/lease; simultaneous edits to the same task are not
   supported. See [the acceptance report](baseline/CONCURRENT-INSTANCES.md).
-- [ ] Verify new/current database startup and interrupted-activity behavior in installed Eclipse.
-  New/current embedded startup, normal shutdown and restart are verified in a
-  clean installation using the URL override; interrupted activity remains open.
+- [x] Verify new/current database startup and interrupted-activity behavior in installed Eclipse.
+  An already durable open activity retained its ID and start time across restart,
+  `SIGKILL` and another restart while its Mylyn task remained active. With the
+  task inactive, startup durably cleared the current reference and ended the
+  activity at its persisted last-active tick. The run fixed an uncommitted,
+  potentially future recovery timestamp and a null idle-status startup race.
+  An immediate kill after a brand-new activation exposed a bounded durability
+  window before the record reached recoverable storage; see the acceptance report.
 
 Completion criterion: new/current-baseline storage works, records are preserved,
 unsupported databases fail safely, and future migrations have a documented,
@@ -199,9 +205,9 @@ tested lifecycle. Backward migration support is not a release criterion.
 See [migration simplification](baseline/MIGRATION-SIMPLIFICATION.md) and the
 [current database policy](DATABASE-RECOVERY.md). Historical baseline totals
 remain 2 projects, 3 tasks, 5 activities, 2 labels, 3 assignments and 19,800 seconds
-for the current synthetic fixture. Next: remaining installed-IDE interrupted-activity acceptance.
+for the current synthetic fixture. Next: remaining automated and cross-platform acceptance.
 
-The latest clean build passes 63 database/report/packaging tests and 10 UI/integration
+The latest clean build passes 64 database/report/packaging tests and 10 UI/integration
 tests. Current-schema CSV export coverage is active again. Removed historical
 tests are no longer applicable, not skipped tests.
 
@@ -269,8 +275,8 @@ partial release acceptance, not publication approval. See
 
 The follow-up activity lifecycle test passes (63 database tests). It also fixes
 `Task.endActivity(LocalDateTime)`, which previously ignored the timestamp used
-by the idle-time recovery path. Current-schema CSV export now passes in the UI
-harness; manual editing and interrupted-activity GUI scenarios remain open.
+by the idle-time recovery path. Current-schema CSV export and manual editing now
+pass in the UI harness, and installed interrupted-activity scenarios are verified.
 
 ## Decisions to track
 
@@ -283,8 +289,8 @@ harness; manual editing and interrupted-activity GUI scenarios remain open.
 | Supported operating systems and architectures | macOS aarch64 clean install/update tested; Linux/Xvfb CI passes; broader support remains open |
 | New Timekeeper version | Decide before completing step 6 |
 
-Installed-IDE interrupted-activity and platform acceptance remain the largest
-uncertainties. Multi-instance storage is characterized but intentionally lacks
+Cross-platform acceptance remains the largest uncertainty. Multi-instance
+storage is characterized but intentionally lacks
 live cache synchronization and active-activity ownership. Historical data
 migration is no longer a release blocker.
 
