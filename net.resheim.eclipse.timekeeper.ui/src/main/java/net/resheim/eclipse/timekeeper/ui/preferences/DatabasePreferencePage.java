@@ -60,7 +60,7 @@ public class DatabasePreferencePage extends FieldEditorPreferencePage implements
 			{ "Specified by JDBC URL", TimekeeperPlugin.PREF_DATABASE_LOCATION_URL },
 		}, getFieldEditorParent(), true));
 
-		addField(new StringFieldEditor(TimekeeperPlugin.PREF_DATABASE_URL, Messages.DatabasePreferences_URL,
+		addField(new JdbcUrlFieldEditor(TimekeeperPlugin.PREF_DATABASE_URL, Messages.DatabasePreferences_URL,
 				getFieldEditorParent()));
 
 		Group g2 = new Group(getFieldEditorParent(), SWT.SHADOW_ETCHED_IN);
@@ -70,6 +70,26 @@ public class DatabasePreferencePage extends FieldEditorPreferencePage implements
 		addExportButton(g2);
 		addImportButton(g2);
 		adjustGridLayout();
+	}
+
+	/**
+	 * JFace 3.40 may invoke {@code doStore()} for a lazily-created field editor
+	 * whose text control has not been created yet. The JDBC URL is optional when
+	 * another database location is selected, so it must not prevent the other
+	 * preferences from being stored.
+	 */
+	private static final class JdbcUrlFieldEditor extends StringFieldEditor {
+
+		JdbcUrlFieldEditor(String name, String labelText, Composite parent) {
+			super(name, labelText, parent);
+		}
+
+		@Override
+		protected void doStore() {
+			if (getTextControl() != null && !getTextControl().isDisposed()) {
+				super.doStore();
+			}
+		}
 	}
 
 	private void addExportButton(Composite g) {
