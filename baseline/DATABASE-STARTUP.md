@@ -15,6 +15,9 @@ branch based on `origin/main`; no approved production changes were dropped.
 The follow-up PR targets `main` directly, avoiding another dependency on the
 already-merged conversion branch.
 
+Integration completed in PR #191 (`3d63647`), merged into `main` with passing
+Linux/Xvfb CI. The [recovery-workflow follow-up](DATABASE-RECOVERY.md) builds on it.
+
 Origin's review fixes retain cancelled status when startup fails during plugin
 shutdown and return an empty label stream when the entity manager is closed.
 `DatabaseAvailabilityTest` adds isolated regressions for absent and closed entity
@@ -133,7 +136,7 @@ The UI regression simulates a failure status; a clean installed-IDE run against 
 refused database is still required. Existing Eclipse/Mylyn runtime-log warnings
 remain documented in the earlier reports.
 
-Next: an explicit backup/copy/conversion/recovery workflow with durable version
-metadata, followed by previous-release fixtures and shared/server compatibility.
-Historical databases are now refused safely at startup, but automatic conversion
-is still disabled and no end-user conversion wizard/command is supplied yet.
+The subsequent [recovery workflow](DATABASE-RECOVERY.md) adds explicit backup
+conversion, revalidation and versioned conversion receipts. In-database version
+metadata, previous-release fixtures and shared/server compatibility remain open.
+Historical databases are still refused at startup; automatic conversion is disabled.

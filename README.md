@@ -12,7 +12,7 @@ The context menu and toolbar buttons can be used to browse back and forward by o
 
 See the <a href="../../wiki">wiki</a>  for more about usage.
 
-The data is now stored in a H2 SQL database, mapped to POJOs using the Java Persistence API with EclipseLink. Establishing the baseline and migration to a new version of the database is handled using Flyway, and finally; reports are generated using Apache FreeMarker.
+The data is stored in an H2 SQL database, mapped to POJOs using the Java Persistence API with EclipseLink. Reports are generated using Apache FreeMarker. Automatic Flyway migration is currently disabled; historical databases require explicit backup conversion as described below.
 
 ## Database configuration
 
@@ -22,7 +22,12 @@ The Database configuration page in preferences (**Timekeeper > Database**) allow
 
 Multiple instances of the Timekeeper can share the database as it utilizes a H2 feature called mixed mode. This will automatically start a server instance on port 9090 if more connections are needed.
 
-The Export and Import buttons are used for exactly that. CSV files, one for each table, are created once a destination folder has been selected. Note that when importing, the data is merged with what’s already in the database. So if you at some time want to start with a clean sheet, it you will have to delete the database files while no Timekeeper instance is  running.
+For the Eclipse 2026-09 upgrade, use the separate **Historical database recovery**
+actions and follow the [backup, conversion and rollback procedure](DATABASE-RECOVERY.md).
+These actions retain the backup, convert into a new database and verify it without
+changing preferences. The legacy CSV Export/Import path still needs current-model
+compatibility work and must not be used as an upgrade backup/migration mechanism.
+CSV import is a separate merge operation, not a database replacement or rollback tool.
 
 ## Installing
 
