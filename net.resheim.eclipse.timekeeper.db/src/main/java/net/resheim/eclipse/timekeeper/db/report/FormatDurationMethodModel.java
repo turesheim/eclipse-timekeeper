@@ -15,7 +15,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 
-import org.apache.commons.lang.time.DurationFormatUtils;
+import org.apache.commons.lang3.time.DurationFormatUtils;
 
 import freemarker.ext.beans.StringModel;
 import freemarker.template.TemplateMethodModelEx;

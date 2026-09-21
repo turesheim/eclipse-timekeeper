@@ -1,60 +1,50 @@
 name: Build
 
-on: [push]
+on: [push, pull_request]
+
+permissions:
+  contents: read
 
 jobs:
   Build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v7.0.1
 
-    - name: Prepare Maven Cache           
-      uses: actions/cache@v1
+    - name: Set up JDK 21
+      uses: actions/setup-java@v6.0.1
       with:
-        path: ~/.m2/repository
-        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-        restore-keys: |
-          ${{ runner.os }}-maven-
-          
-    - name: Set up JDK 11
-      uses: actions/setup-java@v2
-      with:
-        distribution: 'temurin'
-        java-version: 11
-        
+        distribution: temurin
+        java-version: 21
+        cache: maven
+        cache-dependency-path: |
+          **/pom.xml
+          **/META-INF/MANIFEST.MF
+          default.target
+
     - name: Install Xvfb
-      run: sudo apt-get install xvfb
-    
+      run: sudo apt-get update && sudo apt-get install -y xvfb
+
     - name: Build with Maven
-      run: xvfb-run --server-args="-screen 0, 1024x768x24" --auto-servernum mvn clean verify -Pother-os -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=20000 -Dscreenshots=${{ github.workspace }}/images  
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        
-    - name: Upload Failed Tests screenshots
-      uses: actions/upload-artifact@v3
-      if: failure()
-      with:
-        name: Failed tests screenshots
-        path: net.resheim.eclipse.timekeeper.test/screenshots
+      run: xvfb-run --server-args="-screen 0, 1024x768x24" --auto-servernum mvn -B -ntp clean verify -Pother-os -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=20000 -Dscreenshots=${{ github.workspace }}/images
 
-    - name: Upload screenshots
-      uses: actions/upload-artifact@v3
+    - name: Upload test reports and screenshots
+      uses: actions/upload-artifact@v7.0.1
       if: always()
       with:
-        name: Documentation screenshots
-        path: images
+        name: test-results
+        include-hidden-files: true
+        path: |
+          **/target/surefire-reports/
+          **/target/test-reports/
+          net.resheim.eclipse.timekeeper.test/target/work/data/.metadata/.log
+          net.resheim.eclipse.timekeeper.test/screenshots/
+          images/
+        if-no-files-found: warn
 
-    - name: Publish Surefire report
-      uses: ScaCap/action-surefire-report@v1.0.13
-      if: always()
-      with:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        report_paths: "**/target/surefire-reports/*.xml"
-                
     - name: Upload p2 repository
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v7.0.1
       with:
         name: p2-repository
         path: net.resheim.eclipse.timekeeper-site/target/repository

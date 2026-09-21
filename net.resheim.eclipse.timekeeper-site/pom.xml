@@ -29,7 +29,7 @@
 					<finalName>${project.groupId}-${unqualifiedVersion}.${buildQualifier}</finalName>
 					<additionalFileSets>
 						<fileSet>
-							<directory>${basedir}/resources</directory>
+							<directory>${basedir}/src/main/resources</directory>
 							<includes>
 								<include>**/*.html</include>
 							</includes>

@@ -5,19 +5,19 @@ Bundle-SymbolicName: net.resheim.eclipse.timekeeper.test;singleton:=true
 Bundle-Version: 2.0.0.qualifier
 Bundle-ActivationPolicy: lazy
 Bundle-Vendor: 
-Bundle-RequiredExecutionEnvironment: JavaSE-11
+Bundle-RequiredExecutionEnvironment: JavaSE-21
 Require-Bundle: org.eclipse.swtbot.go,
  org.eclipse.mylyn.tasks.core,
  net.resheim.eclipse.timekeeper.db,
  net.resheim.eclipse.timekeeper.ui,
  org.eclipse.mylyn.tasks.ui,
  org.eclipse.core.resources,
- com.google.guava;bundle-version="21.0.0",
  org.eclipse.ui.ide
 Import-Package: javax.persistence;version="2.2.0",
  net.resheim.eclipse.timekeeper.db,
  net.resheim.eclipse.timekeeper.ui.test,
  org.eclipse.mylyn.internal.tasks.core,
- org.eclipse.mylyn.tasks.core
+ org.eclipse.mylyn.tasks.core,
+ org.slf4j;version="[2.0.0,3.0.0)"
 Export-Package: net.resheim.eclipse.timekeeper.ui.test;x-internal:=true
 Automatic-Module-Name: net.resheim.eclipse.timekeeper.test

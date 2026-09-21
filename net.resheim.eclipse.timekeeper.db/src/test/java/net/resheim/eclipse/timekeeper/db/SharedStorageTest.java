@@ -18,7 +18,6 @@ import java.util.List;
 
 import javax.persistence.EntityManager;
 import javax.persistence.EntityTransaction;
-import javax.persistence.Query;
 
 import org.eclipse.mylyn.internal.tasks.core.LocalTask;
 import org.eclipse.mylyn.tasks.core.ITask;
@@ -34,7 +33,7 @@ import net.resheim.eclipse.timekeeper.db.model.GlobalTaskId;
 @SuppressWarnings("restriction")
 public class SharedStorageTest {
 	
-	private static EntityManager entityManager;
+	private EntityManager entityManager;
 	
 	public static final String KEY_VALUELIST_ID = "net.resheim.eclipse.timekeeper"; //$NON-NLS-1$
 
@@ -47,9 +46,6 @@ public class SharedStorageTest {
 	//------------------------------------------------------------------------
 	static long remainder = 0;
 	
-	static {
-		entityManager = PersistenceHelper.getEntityManager(); 
-	}
 
 	synchronized static void accumulateTime(ITask task, String dateString, long millis) {
 		millis = millis + remainder;
@@ -143,21 +139,13 @@ public class SharedStorageTest {
 
 	@Before
 	public void before() {
+		entityManager = PersistenceHelper.getEntityManager();
 		mylynTask = new LocalTask("1", "TestmylynTask");
 	}
 
 	@After
 	public void after() {
-		// empty all tables
-		EntityTransaction transaction = entityManager.getTransaction();
-		if (transaction.isActive()) {
-			transaction.rollback();
-		}
-		// clean up after running tests
-		transaction.begin();
-		Query createQuery = entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE;TRUNCATE TABLE ACTIVITY;TRUNCATE TABLE TASK;SET REFERENTIAL_INTEGRITY TRUE");
-		createQuery.executeUpdate();
-		transaction.commit();
+		PersistenceHelper.close(entityManager);
 	}
 
 	private void persist(Task ttask) {
@@ -165,6 +153,9 @@ public class SharedStorageTest {
 		transaction.begin();
 		entityManager.persist(ttask);
 		transaction.commit();
+		// Force subsequent reads through the database, not either JPA cache.
+		entityManager.clear();
+		entityManager.getEntityManagerFactory().getCache().evictAll();
 	}
 
 	@Test
@@ -180,6 +171,7 @@ public class SharedStorageTest {
 		// now attempt to load the task from the persistent storage
 		GlobalTaskId id = new GlobalTaskId(ttask.getRepositoryUrl(), ttask.getTaskId());
 		Task dbTask = entityManager.find(Task.class, id);
+		Assert.assertNotNull("Persisted task must be reloadable", dbTask);
 		// Test the single task
 		if (dbTask instanceof Task) {
 			List<Activity> activities = ((Task) dbTask).getActivities();
