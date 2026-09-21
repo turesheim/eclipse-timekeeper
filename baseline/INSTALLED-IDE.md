@@ -112,7 +112,23 @@ This verifies the installed storage selector, embedded workspace storage,
 shared mixed mode and a local TCP server. It does not certify an externally
 managed remote server, authentication, encryption or network-failure behavior.
 Evidence remains under `/private/tmp/timekeeper-installed.RaDTib`; it is
-temporary and contains only synthetic empty databases.
+temporary and contains only synthetic databases.
+
+## Concurrent installed instances
+
+A later follow-up ran two copies of the installed application with separate
+workspaces against one shared AUTO_SERVER database. Both read the same task;
+the second committed a new activity while the first remained connected, and
+the first client's later shutdown did not overwrite it. The second client also
+saved successfully after the original server-owner process shut down.
+
+The test exposed an important support boundary: a running client does not
+invalidate its EclipseLink or Workweek cache when another process commits, and
+the shared current activity has no client owner or lease. Restart reloads the
+new records. A deliberate port 9090 conflict produced a visible database-
+unavailable status and an unchanged before/after SQL export. See the
+[concurrent installed-instance report](CONCURRENT-INSTANCES.md) for the full
+procedure, evidence and limitations.
 
 ## Repeating the checks safely
 
@@ -157,10 +173,13 @@ H2's `org.h2.tools.Script`, with `IFEXISTS=TRUE;ACCESS_MODE_DATA=r` on the URL a
   errors in the installed IDE. Passing tests alone does not settle runtime logs.
 - This verifies embedded storage selected by the original test override, normal
   shutdown, sequential restart/update, all installed storage preferences and a
-  local-only TCP server. Interrupted activities, multiple installed instances,
-  externally managed remote servers, remote connectors and OS idle detection
-  remain unverified. Manual editing and CSV import/export are covered by the
-  follow-up UI harness, not by installed-runtime interaction.
+  local-only TCP server. Two installed instances and graceful shared-storage
+  owner handoff are characterized separately; live cache synchronization,
+  active-activity ownership and abrupt-failure recovery are not supported or
+  certified. Interrupted activities, externally managed remote servers, remote
+  connectors and OS idle detection remain unverified. Manual editing and CSV
+  import/export are covered by the follow-up UI harness, not by installed-
+  runtime interaction.
 - macOS Apple Silicon was exercised here. Linux CI is separate evidence;
   Windows and other desktop/runtime combinations are not certified by this run.
 
