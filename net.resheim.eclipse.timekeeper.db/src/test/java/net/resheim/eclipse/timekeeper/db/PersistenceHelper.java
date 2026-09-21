@@ -28,8 +28,14 @@ import org.eclipse.persistence.config.PersistenceUnitProperties;
 public class PersistenceHelper {
 	
 	public static EntityManager getEntityManager() {
+		return getEntityManager("jdbc:h2:mem:test_" + UUID.randomUUID(), "create-tables");
+	}
+
+	/** Opens only the synthetic database URL supplied by a test. */
+	public static EntityManager getEntityManager(String jdbcUrl, String ddlGeneration) {
 		Map<String, Object> props = new HashMap<String, Object>();
-		props.put(PersistenceUnitProperties.JDBC_URL, "jdbc:h2:mem:test_" + UUID.randomUUID());
+		props.put(PersistenceUnitProperties.JDBC_URL, jdbcUrl);
+		props.put(PersistenceUnitProperties.DDL_GENERATION, ddlGeneration);
 		props.put(PersistenceUnitProperties.JDBC_DRIVER, "org.h2.Driver");
 		props.put(PersistenceUnitProperties.JDBC_USER, "sa");
 		props.put(PersistenceUnitProperties.JDBC_PASSWORD, "");

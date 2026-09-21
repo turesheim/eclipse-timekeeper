@@ -16,7 +16,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import javax.persistence.CascadeType;
@@ -27,8 +29,9 @@ import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
+import javax.persistence.JoinTable;
+import javax.persistence.ManyToMany;
 import javax.persistence.ManyToOne;
-import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
 import org.eclipse.persistence.annotations.UuidGenerator;
@@ -82,8 +85,12 @@ public class Activity implements Comparable<Activity>, Serializable {
 	@JoinColumn(name = "ACTIVITY_PROJECT")
 	private Project project;
 
-	@OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-	private List<ActivityLabel> labels;
+	// Labels are shared: removing an activity must never remove its labels.
+	@ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE }, fetch = FetchType.LAZY)
+	@JoinTable(name = "ACTIVITY_ACTIVITYLABEL",
+			joinColumns = @JoinColumn(name = "Activity_ID", referencedColumnName = "ID"),
+			inverseJoinColumns = @JoinColumn(name = "labels_ID", referencedColumnName = "ID"))
+	private List<ActivityLabel> labels = new ArrayList<>();
 
 	/** A short summary of the activity */
 	@Column(name = "SUMMARY")
@@ -262,11 +269,14 @@ public class Activity implements Comparable<Activity>, Serializable {
 	}
 	
 	public void toggleLabel(ActivityLabel label) {
-		Optional<ActivityLabel> hasLabel = labels.stream().filter(l -> l.getId().equals(label.getId())).findFirst();
+		Objects.requireNonNull(label, "label");
+		Optional<ActivityLabel> hasLabel = labels.stream()
+				.filter(l -> l == label || (label.getId() != null && label.getId().equals(l.getId())))
+				.findFirst();
 		if (hasLabel.isEmpty()) {
 			labels.add(label);
 		} else {
-			labels.remove(label);
+			labels.remove(hasLabel.get());
 		}
 		
 	}
