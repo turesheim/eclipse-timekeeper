@@ -143,9 +143,12 @@ public final class DatabaseRecovery {
 		try (InputStream stream = Files.newInputStream(directory.resolve("validated.properties"))) {
 			receipt.load(stream);
 		}
+String expectedTargetUrl = jdbcUrl(directory, "converted") + ";IFEXISTS=TRUE";
 		if (!RECEIPT_VERSION.equals(receipt.getProperty("receipt.version"))
-				|| !CONVERSION_VERSION.equals(receipt.getProperty("conversion.version"))) {
-			throw new IOException("Unsupported recovery receipt version.");
+				|| !CONVERSION_VERSION.equals(receipt.getProperty("conversion.version"))
+				|| !"H2 1.4.194".equals(receipt.getProperty("engine"))
+				|| !expectedTargetUrl.equals(receipt.getProperty("target.jdbcUrl"))) {
+			throw new IOException("Unsupported recovery receipt version or metadata.");
 		}
 		for (String name : new String[] { "backup", "source", "target" }) {
 			String file = name.equals("backup") ? "backup.zip" : name.equals("source") ? "source.mv.db" : "converted.mv.db";
@@ -154,7 +157,16 @@ public final class DatabaseRecovery {
 				throw new IOException("Recovery file changed: " + file + ". Do not reuse this receipt after time tracking starts.");
 			}
 		}
-		return new Result(directory, jdbcUrl(directory, "converted") + ";IFEXISTS=TRUE", verifyData(directory));
+		LegacyDatabaseConverter.Result data = verifyData(directory);
+		if (!Integer.toString(data.sourceVersion()).equals(receipt.getProperty("source.version"))
+				|| !Integer.toString(data.projects()).equals(receipt.getProperty("projects"))
+				|| !Integer.toString(data.tasks()).equals(receipt.getProperty("tasks"))
+				|| !Integer.toString(data.activities()).equals(receipt.getProperty("activities"))
+				|| !Integer.toString(data.openActivities()).equals(receipt.getProperty("open.activities"))
+				|| !data.closedDuration().toString().equals(receipt.getProperty("closed.duration"))) {
+			throw new IOException("Recovery receipt metadata does not match the verified data.");
+		}
+		return new Result(directory, expectedTargetUrl, data);
 	}
 
 	private static LegacyDatabaseConverter.Result verifyData(Path directory) throws SQLException, IOException {
