@@ -17,23 +17,17 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.WeekFields;
 import java.util.Locale;
-import java.util.Properties;
-import java.time.Duration;
 import java.util.concurrent.FutureTask;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.eclipse.core.runtime.Platform;
-import org.eclipse.core.runtime.preferences.InstanceScope;
-import org.eclipse.ui.preferences.ScopedPreferenceStore;
 import org.eclipse.mylyn.internal.tasks.core.TaskList;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.ui.TasksUi;
@@ -64,8 +58,6 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.DatabaseRecovery;
-import net.resheim.eclipse.timekeeper.db.LegacyH2;
 import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.TaskLinkStatus;
@@ -82,53 +74,6 @@ public class IntegrationTest {
 
 	@Rule
 	public TemporaryFolder folder = new TemporaryFolder();
-
-	@Test
-	public void historicalRecoveryLeavesRunningDatabaseAndPreferencesUntouched() throws Exception {
-		Path root = folder.newFolder("recovery").toPath();
-		Properties credentials = new Properties();
-		credentials.setProperty("user", "sa");
-		credentials.setProperty("password", "");
-		try (var connection = LegacyH2.open("jdbc:h2:" + root.resolve("original"));
-				var stream = DatabaseRecovery.class.getResourceAsStream("/db/V1__baseline.sql")) {
-			assertNotNull(stream);
-			try (var reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
-				org.h2.tools.RunScript.execute(connection, reader);
-			}
-			try (var statement = connection.createStatement()) {
-				statement.execute("INSERT INTO TRACKEDTASK(TASK_ID,REPOSITORY_URL) VALUES ('1','https://example.invalid/recovery')");
-				statement.execute("INSERT INTO ACTIVITY(ID,START_TIME,END_TIME,ADJUSTED,TASK_ID,REPOSITORY_URL) VALUES"
-						+ " ('00000000-0000-0000-0000-000000000001','2022-09-19 09:00:00','2022-09-19 09:25:00',FALSE,'1','https://example.invalid/recovery')");
-				statement.execute("INSERT INTO TRACKEDTASK_ACTIVITY SELECT TASK_ID,REPOSITORY_URL,ID FROM ACTIVITY");
-			}
-		}
-		Path backup = root.resolve("backup.zip");
-		org.h2.tools.Backup.execute(backup.toString(), root.toString(), "original", true);
-		var plugin = TimekeeperPlugin.getDefault();
-		var manager = plugin.getEntityManager();
-		long taskCount = manager.createQuery("SELECT COUNT(t) FROM Task t", Long.class).getSingleResult();
-		var preferences = new ScopedPreferenceStore(InstanceScope.INSTANCE, TimekeeperPlugin.BUNDLE_ID);
-		String location = preferences.getString(TimekeeperPlugin.PREF_DATABASE_LOCATION);
-		String url = preferences.getString(TimekeeperPlugin.PREF_DATABASE_URL);
-		var result = DatabaseRecovery.recover(backup, root.resolve("converted"), () -> false);
-		assertEquals(1, result.data().tasks());
-		assertEquals(Duration.ofMinutes(25), result.data().closedDuration());
-		assertEquals(result, DatabaseRecovery.verify(result.directory()));
-		try (var target = new org.h2.Driver().connect(result.jdbcUrl() + ";ACCESS_MODE_DATA=r", credentials);
-				var statement = target.createStatement();
-				var rows = statement.executeQuery("SELECT VERSION,STATE,ORIGIN FROM TIMEKEEPER_SCHEMA")) {
-			assertTrue(rows.next());
-			assertEquals(1, rows.getInt(1));
-			assertEquals("READY", rows.getString(2));
-			assertEquals("LEGACY_V1", rows.getString(3));
-			Assert.assertFalse(rows.next());
-		}
-		Assert.assertSame(manager, plugin.getEntityManager());
-		assertTrue(plugin.isReady());
-		assertEquals(taskCount, manager.createQuery("SELECT COUNT(t) FROM Task t", Long.class).getSingleResult().longValue());
-		assertEquals(location, preferences.getString(TimekeeperPlugin.PREF_DATABASE_LOCATION));
-		assertEquals(url, preferences.getString(TimekeeperPlugin.PREF_DATABASE_URL));
-	}
 
 	private static final String TEST_MAIN_CATEGORY = "Timekeeper for Eclipse";
 	private static final String TEST_MAIN_TASK = "152: Set up test rig for user interface tests";

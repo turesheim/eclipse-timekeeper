@@ -1,5 +1,11 @@
 # Step 4: Upgrade normal storage to H2 2.5.250
 
+> Historical report: the maintainer subsequently removed legacy migration support.
+> Historical conversion steps and related release-acceptance requirements below
+> are superseded by [migration simplification](MIGRATION-SIMPLIFICATION.md) and the
+> [current database policy](../DATABASE-RECOVERY.md). Version/lifecycle infrastructure
+> and current-storage tests remain; old test totals are historical results.
+
 Started from merged PR #193, `origin/main` revision `5e85e8b`, on September 21,
 2026. Its Linux/Xvfb CI passed. The maintainer requested the latest H2 release;
 [H2's official site](https://h2database.com/) and

@@ -1,5 +1,11 @@
 # Step 4: Explicit backup recovery workflow
 
+> Historical report: the maintainer subsequently removed legacy migration support.
+> Historical conversion steps and related release-acceptance requirements below
+> are superseded by [migration simplification](MIGRATION-SIMPLIFICATION.md) and the
+> [current database policy](../DATABASE-RECOVERY.md). Version/lifecycle infrastructure
+> and current-storage tests remain; old test totals are historical results.
+
 Started from `origin/main` revision `3d63647` on September 21, 2026. PR #191
 merged the reviewed startup guards into `main` and passed Linux/Xvfb CI.
 This changeset adds an end-user workflow around the tested conversion engine.

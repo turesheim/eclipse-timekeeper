@@ -59,7 +59,7 @@ class DatabaseVersionTest {
 			"UPDATE TIMEKEEPER_SCHEMA SET VERSION=2",
 			"UPDATE TIMEKEEPER_SCHEMA SET VERSION=0",
 			"UPDATE TIMEKEEPER_SCHEMA SET STATE='CREATING'",
-			"UPDATE TIMEKEEPER_SCHEMA SET STATE='RECOVERING',ORIGIN='LEGACY_V1'",
+			"UPDATE TIMEKEEPER_SCHEMA SET STATE='MIGRATING',ORIGIN='MIGRATION'",
 			"UPDATE TIMEKEEPER_SCHEMA SET STATE='UNKNOWN'",
 			"UPDATE TIMEKEEPER_SCHEMA SET ORIGIN='UNKNOWN'",
 			"ALTER TABLE TIMEKEEPER_SCHEMA ADD EXTRA VARCHAR",
@@ -90,14 +90,14 @@ class DatabaseVersionTest {
 	}
 
 	@Test
-	void pendingRecoveryCannotBeOpenedByNormalStartupOrADifferentRecovery() throws Exception {
-		DatabaseStartup.close(DatabaseStartup.openRecoveryTarget(url("database"), 2));
+	void pendingMigrationCannotBeOpenedByNormalStartupOrRetriedInPlace() throws Exception {
+		DatabaseStartup.close(DatabaseStartup.openMigrationTarget(url("database")));
 		List<String> before = snapshot();
 		assertThrows(SQLException.class, () -> DatabaseStartup.open(url("database")));
-		assertThrows(SQLException.class, () -> DatabaseStartup.openRecoveryTarget(url("database"), 1));
+		assertThrows(SQLException.class, () -> DatabaseStartup.openMigrationTarget(url("database")));
 		try (Connection connection = connection()) {
-			assertEquals(new DatabaseVersion.Stamp(1, "RECOVERING", "LEGACY_V2"), DatabaseVersion.read(connection));
-			assertEquals(DatabaseSchema.Kind.RECOVERING, DatabaseSchema.inspect(connection));
+			assertEquals(new DatabaseVersion.Stamp(1, "MIGRATING", "MIGRATION"), DatabaseVersion.read(connection));
+			assertEquals(DatabaseSchema.Kind.MIGRATING, DatabaseSchema.inspect(connection));
 		}
 		assertEquals(before, snapshot());
 	}
@@ -113,9 +113,58 @@ class DatabaseVersionTest {
 			assertEquals(DatabaseSchema.Kind.EMPTY, DatabaseSchema.inspect(connection));
 			DatabaseVersion.begin(connection, "NEW");
 			assertThrows(SQLException.class, () -> DatabaseVersion.schemaCreated(connection));
-			assertThrows(SQLException.class, () -> DatabaseVersion.recoveryValidated(connection));
+			assertThrows(SQLException.class, () -> DatabaseVersion.migrationValidated(connection));
 			assertEquals(new DatabaseVersion.Stamp(1, "CREATING", "NEW"), DatabaseVersion.read(connection));
 		}
+	}
+
+	@Test
+	void futureMigrationTargetRemainsBlockedUntilExplicitValidation() throws Exception {
+		var manager = DatabaseStartup.openMigrationTarget(url("database"));
+		try { CurrentModelFixture.seed(manager); }
+		finally { DatabaseStartup.close(manager); }
+		assertThrows(SQLException.class, () -> DatabaseStartup.open(url("database")));
+		// Simulate a future runner's post-reopen validation, without any legacy recipe.
+		manager = PersistenceHelper.getEntityManager(url("database") + ";IFEXISTS=TRUE", "none");
+		try { CurrentModelFixture.verify(manager); }
+		finally { PersistenceHelper.close(manager); }
+		try (Connection connection = connection()) {
+			assertEquals(new DatabaseVersion.Stamp(1, "MIGRATING", "MIGRATION"), DatabaseVersion.read(connection));
+			connection.setAutoCommit(false);
+			assertThrows(SQLException.class, () -> DatabaseVersion.migrationValidated(connection));
+			connection.rollback();
+			connection.setAutoCommit(true);
+			DatabaseVersion.migrationValidated(connection);
+			assertEquals(new DatabaseVersion.Stamp(1, "READY", "MIGRATION"), DatabaseVersion.read(connection));
+			assertThrows(SQLException.class, () -> DatabaseVersion.migrationValidated(connection));
+		}
+		manager = DatabaseStartup.open(url("database") + ";IFEXISTS=TRUE");
+		try { CurrentModelFixture.verify(manager); }
+		finally { DatabaseStartup.close(manager); }
+	}
+
+	@Test
+	void futureMigrationNeverOverwritesAnExistingReadyDatabase() throws Exception {
+		var manager = DatabaseStartup.open(url("database"));
+		try { CurrentModelFixture.seed(manager); }
+		finally { DatabaseStartup.close(manager); }
+		List<String> before = snapshot();
+		assertThrows(SQLException.class, () -> DatabaseStartup.openMigrationTarget(url("database")));
+		try (Connection connection = connection()) {
+			assertThrows(SQLException.class, () -> DatabaseVersion.migrationValidated(connection));
+		}
+		assertEquals(before, snapshot());
+	}
+
+	@Test
+	void futureMigrationCannotMarkAnIncompleteTargetReady() throws Exception {
+		DatabaseStartup.close(DatabaseStartup.openMigrationTarget(url("database")));
+		try (Connection connection = connection(); var statement = connection.createStatement()) {
+			statement.execute("DROP TABLE ACTIVITY_ACTIVITYLABEL");
+			assertThrows(SQLException.class, () -> DatabaseVersion.migrationValidated(connection));
+			assertEquals("MIGRATING", DatabaseVersion.read(connection).state());
+		}
+		assertThrows(SQLException.class, () -> DatabaseStartup.open(url("database")));
 	}
 
 	@ParameterizedTest
@@ -138,9 +187,9 @@ class DatabaseVersionTest {
 			assertThrows(SQLException.class, () -> DatabaseVersion.begin(connection, "NEW"));
 			assertFalse(DatabaseSchema.hasVersion(connection));
 		}
-		DatabaseStartup.close(DatabaseStartup.open(url("database")));
+		assertThrows(SQLException.class, () -> DatabaseStartup.open(url("database")));
 		try (Connection connection = connection()) {
-			assertEquals(DatabaseSchema.Kind.CURRENT, DatabaseSchema.inspect(connection));
+			assertEquals(DatabaseSchema.Kind.UNKNOWN, DatabaseSchema.inspect(connection));
 			assertFalse(DatabaseSchema.hasVersion(connection));
 			assertTrue(DatabaseSchema.hasCurrentTables(connection));
 		}

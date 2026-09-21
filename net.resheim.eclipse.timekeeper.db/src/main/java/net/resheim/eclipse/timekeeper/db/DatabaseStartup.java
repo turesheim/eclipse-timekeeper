@@ -12,7 +12,7 @@ import javax.persistence.EntityManagerFactory;
 import org.eclipse.persistence.config.PersistenceUnitProperties;
 import org.eclipse.persistence.jpa.PersistenceProvider;
 
-/** Opens only an empty or recognized current-model database. Never migrates in place. */
+/** Opens only an empty or versioned current-model database. Never migrates in place. */
 public final class DatabaseStartup {
 	private DatabaseStartup() { }
 
@@ -33,18 +33,13 @@ public final class DatabaseStartup {
 		return open(jdbcUrl, "NEW");
 	}
 
-	/** Only the explicit recovery workflow may create/reopen a pending conversion. */
-	static EntityManager openRecoveryTarget(String jdbcUrl, int legacyVersion) throws SQLException {
-		if (legacyVersion != 1 && legacyVersion != 2) throw new SQLException("Unsupported historical version");
-		return open(jdbcUrl, "LEGACY_V" + legacyVersion);
-	}
-
-	static EntityManager openEngineUpgradeTarget(String jdbcUrl) throws SQLException {
-		return open(jdbcUrl, "H2_1_4");
+	/** Infrastructure for future explicit migrations into separate, empty storage. */
+	static EntityManager openMigrationTarget(String jdbcUrl) throws SQLException {
+		return open(jdbcUrl, "MIGRATION");
 	}
 
 	private static EntityManager open(String jdbcUrl, String origin) throws SQLException {
-		boolean recovery = !origin.equals("NEW");
+		boolean migration = !origin.equals("NEW");
 		// INIT runs before inspection and could mutate an existing schema. Unnamed
 		// memory databases cannot be shared between the inspection and JPA connections.
 		if (jdbcUrl == null || !jdbcUrl.startsWith("jdbc:h2:")
@@ -64,22 +59,15 @@ public final class DatabaseStartup {
 				throw new SQLException("The Timekeeper database is read-only; time tracking requires writable storage.");
 			}
 			DatabaseSchema.Kind schema = DatabaseSchema.inspect(inspection);
-			if (schema == DatabaseSchema.Kind.INCOMPLETE || (!recovery && schema == DatabaseSchema.Kind.RECOVERING)) {
-				throw new SQLException("Incomplete Timekeeper database initialization or recovery."
+			if (schema == DatabaseSchema.Kind.INCOMPLETE || schema == DatabaseSchema.Kind.MIGRATING) {
+				throw new SQLException("Incomplete Timekeeper database initialization or migration."
 						+ " Preserve this attempt and retry from a backup into new storage; no schema changes were made.");
 			}
-			if (schema == DatabaseSchema.Kind.LEGACY_V1 || schema == DatabaseSchema.Kind.LEGACY_V2) {
-				throw new SQLException("Historical Timekeeper database detected (" + schema
-						+ "). Back up the closed database and convert a separate copy before using it."
-						+ " No schema changes were made.");
-			}
-			boolean existing = recovery ? schema == DatabaseSchema.Kind.RECOVERING : schema == DatabaseSchema.Kind.CURRENT;
+			boolean existing = !migration && schema == DatabaseSchema.Kind.CURRENT;
 			if (schema != DatabaseSchema.Kind.EMPTY && !existing) {
-				throw new SQLException("Unrecognized or mixed Timekeeper database schema."
-						+ " No schema changes were made. Keep the original and review a backup before proceeding.");
-			}
-			if (recovery && existing && !DatabaseVersion.read(inspection).origin().equals(origin)) {
-				throw new SQLException("Recovery target belongs to a different source schema version.");
+				throw new SQLException("Unsupported, unversioned or non-empty migration-target database."
+						+ " No schema changes were made. Historical migration is not supported; keep the original"
+						+ " and select separate empty storage for a new database.");
 			}
 			if (schema == DatabaseSchema.Kind.EMPTY) DatabaseVersion.begin(inspection, origin);
 			Map<String, Object> properties = new HashMap<>();
@@ -109,9 +97,8 @@ public final class DatabaseStartup {
 			}
 			if (failure instanceof SQLException sql && sql.getErrorCode() == 90048) {
 				throw new SQLException("H2 2.5.250 cannot open this database format."
-						+ " H2 1.4.194 files require an explicit backup upgrade into a separate database"
-						+ " (Preferences > Timekeeper > Database > Database upgrade and recovery)."
-						+ " Keep the original; do not replace its files.", sql.getSQLState(), sql.getErrorCode(), sql);
+						+ " Historical migration is not supported. Keep the original; do not replace its files."
+						+ " Select separate empty storage for a new database.", sql.getSQLState(), sql.getErrorCode(), sql);
 			}
 			throw failure;
 		}

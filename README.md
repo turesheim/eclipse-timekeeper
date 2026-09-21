@@ -12,7 +12,7 @@ The context menu and toolbar buttons can be used to browse back and forward by o
 
 See the <a href="../../wiki">wiki</a>  for more about usage.
 
-The data is stored in an H2 SQL database, mapped to POJOs using the Java Persistence API with EclipseLink. Reports are generated using Apache FreeMarker. Automatic Flyway migration is currently disabled; historical databases require explicit backup conversion as described below.
+The data is stored in an H2 SQL database, mapped to POJOs using the Java Persistence API with EclipseLink. Reports are generated using Apache FreeMarker. The database has an explicit schema version and initialization state; historical data migration is not supported.
 
 ## Database configuration
 
@@ -22,15 +22,16 @@ The Database configuration page in preferences (**Timekeeper > Database**) allow
 
 Multiple instances of the Timekeeper can share the database as it utilizes a H2 feature called mixed mode. This will automatically start a server instance on port 9090 if more connections are needed.
 
-The Eclipse 2026-09 upgrade uses **H2 2.5.250**. Existing H2 1.4.194 files,
-including current-model databases with labels, require conversion into separate
-storage; they cannot be opened in place with the new engine.
-Use the **Database upgrade and recovery**
-actions and follow the [backup, conversion and rollback procedure](DATABASE-RECOVERY.md).
-These actions retain the backup, convert into a new database and verify it without
-changing preferences. The legacy CSV Export/Import path still needs current-model
-compatibility work and must not be used as an upgrade backup/migration mechanism.
-CSV import is a separate merge operation, not a database replacement or rollback tool.
+The Eclipse 2026-09 upgrade uses **H2 2.5.250 with schema version 1** as its
+supported database baseline. Start with new storage; historical H2 files,
+unversioned databases and old Mylyn attribute records are not imported.
+Schema versioning and guarded migration-target infrastructure are retained for
+future migrations, but there are no active migration recipes or recovery buttons.
+See the [database policy, backups and future migration contract](DATABASE-RECOVERY.md).
+
+Keep unsupported databases intact and select a separate empty location. The
+legacy CSV Export/Import path still needs current-model compatibility work and
+must not be used as a database backup, migration or rollback mechanism.
 
 ## Installing
 
@@ -58,7 +59,7 @@ are tracked in [UPGRADE-PLAN.md](UPGRADE-PLAN.md) and [baseline/README.md](basel
 
 ## Note
 
-The Eclipse 2026-09 upgrade targets Java 21. Database migration and runtime
+The Eclipse 2026-09 upgrade targets Java 21. Current-baseline storage and runtime
 compatibility must be verified before publishing the upgraded plugin.
 
 This project is using [JProfiler](https://www.ej-technologies.com/products/jprofiler/overview.html) for debugging performance issues.

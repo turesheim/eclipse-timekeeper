@@ -1,5 +1,11 @@
 # Step 4: Guard database startup before schema creation
 
+> Historical report: the maintainer subsequently removed legacy migration support.
+> Historical conversion steps and related release-acceptance requirements below
+> are superseded by [migration simplification](MIGRATION-SIMPLIFICATION.md) and the
+> [current database policy](../DATABASE-RECOVERY.md). Version/lifecycle infrastructure
+> and current-storage tests remain; old test totals are historical results.
+
 Started on September 21, 2026, from PR #189's branch at `77d1871`. That PR was
 still open, so this is a dependent changeset, not a claim that conversion has
 merged. Origin's `a84dfc8` review fix rejects activities assigned to both a task

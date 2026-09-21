@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.DriverManager;
@@ -80,29 +79,8 @@ class StorageModesTest {
 		finally { DatabaseStartup.close(reopened); }
 	}
 
-	@Test
-	void oldClientCannotConnectToModernServerOrChangeRecords() throws Exception {
-		String embedded = "jdbc:h2:" + directory.resolve("serverdb");
-		EntityManager manager = DatabaseStartup.open(embedded);
-		try { CurrentModelFixture.seed(manager); }
-		finally { DatabaseStartup.close(manager); }
-		Path legacy = directory.resolve("h2-1.4.194.jar");
-		try (var input = getClass().getResourceAsStream("/lib/h2-1.4.194.jar")) { Files.copy(input, legacy); }
-		Server server = server();
-		try {
-			// No modern driver or production code on this child's classpath.
-			String testClasses = Path.of(StorageProcessClient.class.getProtectionDomain()
-					.getCodeSource().getLocation().toURI()).toString();
-			runChild(legacy + File.pathSeparator + testClasses, StorageProcessClient.class,
-					remote(server, "serverdb") + ";IFEXISTS=TRUE", "90047");
-		} finally { server.stop(); }
-		manager = DatabaseStartup.open(embedded + ";IFEXISTS=TRUE");
-		try { CurrentModelFixture.verify(manager); }
-		finally { DatabaseStartup.close(manager); }
-	}
-
 	@ParameterizedTest
-	@ValueSource(strings = { "VERSION=999", "STATE='RECOVERING'" })
+	@ValueSource(strings = { "VERSION=999", "STATE='MIGRATING'" })
 	void serverStartupEnforcesSchemaGuardsWithoutChangingMarker(String mutation) throws Exception {
 		String embedded = "jdbc:h2:" + directory.resolve("guarded");
 		EntityManager manager = DatabaseStartup.open(embedded);
@@ -111,7 +89,7 @@ class StorageModesTest {
 		try (var connection = DriverManager.getConnection(embedded, "sa", ""); var statement = connection.createStatement()) {
 			statement.executeUpdate("UPDATE TIMEKEEPER_SCHEMA SET " + mutation);
 			if (mutation.startsWith("STATE=")) {
-				statement.executeUpdate("UPDATE TIMEKEEPER_SCHEMA SET ORIGIN='H2_1_4'");
+				statement.executeUpdate("UPDATE TIMEKEEPER_SCHEMA SET ORIGIN='MIGRATION'");
 			}
 		}
 		Server server = server();
