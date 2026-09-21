@@ -81,6 +81,28 @@ were not copied into the test checkout.
 Local evidence: `/private/tmp/timekeeper-mylyn-3.log` and reports under
 `/private/tmp/timekeeper-mylyn.WUttZ3/`. Temporary evidence may be removed by the OS.
 
+### PR review follow-up: background notifications and disposal
+
+Addressed [Copilot's review comment](https://github.com/turesheim/eclipse-timekeeper/pull/186#discussion_r4059430599)
+by capturing the viewer's display during `inputChanged` on the UI thread.
+Database notification threads now only read that published display reference and
+queue work; all viewer/control access happens inside the UI callback. Provider
+disposal clears the reference, queued callbacks recheck disposal, and a display
+shutdown while scheduling is ignored only for `SWT.ERROR_DEVICE_DISPOSED`.
+
+Three synthetic regression tests cover a normal background notification and
+notifications queued before or delivered after control/provider disposal. The
+test viewer rejects off-UI-thread access. Disposal tests hold the UI thread until
+the background notification is queued, making their ordering deterministic.
+All three tests fail against the original provider due to background viewer
+access and pass with the fix. The full fixed-source reactor passes with 4
+database/report tests and 7 UI tests passing; the existing CSV-export test remains
+ignored. No personal database is used.
+
+Local evidence: `/private/tmp/timekeeper-review.log` (passing fixed build),
+`/private/tmp/timekeeper-review-before.log` (expected regression failures), and
+the isolated source copy at `/private/tmp/timekeeper-review.J6mERX/`.
+
 ## Limits and follow-up
 
 This is not a release-readiness or data-migration sign-off. Existing databases,

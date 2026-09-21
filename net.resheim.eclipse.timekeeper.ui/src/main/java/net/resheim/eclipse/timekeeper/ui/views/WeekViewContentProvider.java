@@ -26,6 +26,9 @@ import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.ui.TasksUi;
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.SWTException;
+import org.eclipse.swt.widgets.Display;
 
 import net.resheim.eclipse.timekeeper.db.DatabaseChangeListener;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
@@ -42,6 +45,8 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	protected Set<Task> filtered = Collections.emptySet();
 
 	private Viewer viewer;
+	// Published on the UI thread; notification threads must not dereference the viewer.
+	private volatile Display viewerDisplay;
 
 	public Set<Task> getFiltered() {
 		return filtered;
@@ -49,12 +54,15 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 
 	@Override
 	public void dispose() {
+		viewerDisplay = null;
+		viewer = null;
 		TimekeeperPlugin.getDefault().removeListener(this);
 	}
 
 	@Override
 	public void inputChanged(Viewer v, Object oldInput, Object newInput) {
 		this.viewer = v;
+		viewerDisplay = v.getControl().getDisplay();
 	}
 
 	@Override
@@ -145,11 +153,15 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 
 	@Override
 	public void databaseStateChanged() {
-		if (viewer != null && !viewer.getControl().isDisposed()) {
-			viewer.getControl().getDisplay().asyncExec(new Runnable() {
+		Display display = viewerDisplay;
+		if (display == null) {
+			return;
+		}
+		try {
+			display.asyncExec(new Runnable() {
 				@Override
 				public void run() {
-					if (viewer.getControl().isDisposed()) {
+					if (viewerDisplay != display || viewer == null || viewer.getControl().isDisposed()) {
 						return;
 					}
 					filter();
@@ -166,6 +178,11 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 					}
 				}
 			});
+		} catch (SWTException e) {
+			// The display may shut down between capturing it and queueing the callback.
+			if (e.code != SWT.ERROR_DEVICE_DISPOSED) {
+				throw e;
+			}
 		}
 	}
 
