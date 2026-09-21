@@ -31,15 +31,27 @@ You can install the latest **public release** from the <a href="http://marketpla
 
 ## Building
 
-Clone the project and from the root execute:
+Use JDK 21 and Maven 3.9.9 or newer. Clone the project and from the root execute:
 
-    mvn clean org.jacoco:jacoco-maven-plugin:prepare-agent verify
+    mvn -B -ntp clean verify -Dtycho.localArtifacts=ignore
 
 When the build completes successfully there will be a Eclipse p2 repository at *net.resheim.eclipse.timekeeper-site/target/repository* which you can install from.
 
+For Eclipse PDE development, open `default.target` and choose **Set as Active
+Target Platform**. This is the authoritative target for both PDE and Maven,
+using the dated Eclipse 2026-09 repository with pinned root dependencies.
+Configure a JavaSE-21 execution environment in Eclipse. The development and
+integration-test launch configurations use this environment and standard PDE
+launchers; Java Mission Control is not required.
+
+On Linux, run the UI tests under a graphical session or Xvfb, as in the GitHub
+Actions workflow. Upgrade progress, known failures and migration requirements
+are tracked in [UPGRADE-PLAN.md](UPGRADE-PLAN.md) and [baseline/README.md](baseline/README.md).
+
 ## Note
 
-This project started out as an experiment, attempting to make use of the *Java 8 Date/Time API* along with new collection features such as *Streams*. Hence **Java 8** is absolutely required for this feature to work.
+The Eclipse 2026-09 upgrade targets Java 21. Database migration and runtime
+compatibility must be verified before publishing the upgraded plugin.
 
 This project is using [JProfiler](https://www.ej-technologies.com/products/jprofiler/overview.html) for debugging performance issues.
 

@@ -44,7 +44,7 @@ Export-Package: net.resheim.eclipse.timekeeper.db,
  org.h2.upgrade;x-internal:=true,
  org.h2.util;x-internal:=true,
  org.h2.value;x-internal:=true
-Bundle-RequiredExecutionEnvironment: JavaSE-11
+Bundle-RequiredExecutionEnvironment: JavaSE-21
 Require-Bundle: org.eclipse.mylyn.tasks.core,
  org.eclipse.mylyn.tasks.ui,
  org.eclipse.mylyn.commons.notifications.core;bundle-version="1.16.0",
@@ -55,11 +55,11 @@ Require-Bundle: org.eclipse.mylyn.tasks.core,
  org.eclipse.persistence.jpa,
  org.eclipse.persistence.jpa.jpql,
  org.eclipse.persistence.asm,
- javax.persistence,
- org.slf4j.api
+ javax.persistence
 Import-Package: javax.persistence,
  net.resheim.eclipse.timekeeper.db,
- org.apache.commons.lang.time;version="2.4.0",
+ org.apache.commons.lang3.time;version="[3.20.0,4.0.0)",
+ org.slf4j;version="[2.0.0,3.0.0)",
  org.eclipse.core.resources,
  org.eclipse.mylyn.internal.tasks.ui,
  org.eclipse.osgi.service.datalocation
