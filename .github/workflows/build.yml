@@ -46,7 +46,7 @@ jobs:
 
     - name: Build with Maven (Windows idle detector)
       if: runner.os == 'Windows'
-      run: mvn -B -ntp clean verify "-Didle-platform-tests" "-Dtycho.localArtifacts=ignore" "-Dorg.eclipse.swtbot.search.timeout=20000" "-Dscreenshots=${{ github.workspace }}\images"
+      run: mvn -B -ntp clean verify "-Pother-os" "-Didle-platform-tests" "-Dtycho.localArtifacts=ignore" "-Dorg.eclipse.swtbot.search.timeout=20000" "-Dscreenshots=${{ github.workspace }}\images"
 
     - name: Upload test reports and screenshots
       uses: actions/upload-artifact@v7.0.1
