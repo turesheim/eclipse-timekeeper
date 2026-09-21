@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
 import java.util.stream.Stream;
 
 import javax.persistence.EntityManager;
@@ -62,8 +61,6 @@ import org.eclipse.mylyn.tasks.core.data.TaskAttribute;
 import org.eclipse.mylyn.tasks.core.data.TaskData;
 import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.osgi.service.datalocation.Location;
-import org.eclipse.persistence.config.PersistenceUnitProperties;
-import org.eclipse.persistence.jpa.PersistenceProvider;
 import org.eclipse.ui.preferences.ScopedPreferenceStore;
 import org.osgi.framework.BundleContext;
 import org.slf4j.Logger;
@@ -89,7 +86,9 @@ public class TimekeeperPlugin extends Plugin {
 	
 	private static final Logger log = LoggerFactory.getLogger(TimekeeperPlugin.class);
 	
-	private static final CountDownLatch latch = new CountDownLatch(1);
+	private static volatile IStatus databaseStatus = new Status(IStatus.INFO, TimekeeperPlugin.BUNDLE_ID,
+			"Connecting to the Timekeeper database.");
+	private volatile boolean stopping;
 
 	public static final String BUNDLE_ID = "net.resheim.eclipse.timekeeper.db"; //$NON-NLS-1$
 
@@ -107,7 +106,7 @@ public class TimekeeperPlugin extends Plugin {
 
 	private static TimekeeperPlugin instance;
 
-	private static EntityManager entityManager = null;
+	private static volatile EntityManager entityManager = null;
 
 	private static Job saveDatabaseJob;
 
@@ -163,81 +162,80 @@ public class TimekeeperPlugin extends Plugin {
 	}
 
 	private void connectToDatabase() {
-//		Job connectDatabaseJob = new Job("Connecting to Timekeeper database") {
-//
-//			@Override
-//			protected IStatus run(IProgressMonitor monitor) {
-		Runnable runnable = () -> {
-				log.info("Connecting to Timekeeper database");
-				Map<String, Object> props = new HashMap<String, Object>();
-				// default, default location
-				String jdbc_url = "jdbc:h2:~/.timekeeper/h2db";
-				try {
+		Thread thread = new Thread(() -> {
+			EntityManager candidate = null;
+			try {
+				String jdbcUrl = System.getProperty("net.resheim.eclipse.timekeeper.db.url");
+				if (jdbcUrl == null) {
 					String location = Platform.getPreferencesService().getString(BUNDLE_ID, PREF_DATABASE_LOCATION,
 							PREF_DATABASE_LOCATION_SHARED, new IScopeContext[] { InstanceScope.INSTANCE });
 					switch (location) {
-					default:
-					case PREF_DATABASE_LOCATION_SHARED:
-						jdbc_url = getSharedLocation();
-						// Fix https://github.com/turesheim/eclipse-timekeeper/issues/107
-						System.setProperty("h2.bindAddress", "localhost");
-						break;
 					case PREF_DATABASE_LOCATION_WORKSPACE:
-						jdbc_url = getWorkspaceLocation();
+						jdbcUrl = getWorkspaceLocation();
 						break;
 					case PREF_DATABASE_LOCATION_URL:
-						jdbc_url = getSpecifiedLocation();
+						jdbcUrl = getSpecifiedLocation();
+						break;
+					default:
+						System.setProperty("h2.bindAddress", "localhost");
+						jdbcUrl = getSharedLocation();
 						break;
 					}
-					// if this property has been specified it will override all other settings
-					if (System.getProperty("net.resheim.eclipse.timekeeper.db.url") != null) {
-						log.info("Database URL was specified using property 'net.resheim.eclipse.timekeeper.db.url'");
-						jdbc_url = System.getProperty("net.resheim.eclipse.timekeeper.db.url");
-					}
-					log.info("Using database at '{}'", jdbc_url);
-
-					// baseline the database
-//					Flyway flyway = Flyway.configure()
-//							.dataSource(jdbc_url, "sa", "")
-//							.baselineOnMigrate(false)
-//							.locations("classpath:/db/").load();
-//					flyway.migrate();
-					// https://www.eclipse.org/forums/index.php?t=msg&goto=541155&
-					props.put(PersistenceUnitProperties.CLASSLOADER, TimekeeperPlugin.class.getClassLoader());
-					props.put(PersistenceUnitProperties.JDBC_URL, jdbc_url);
-					props.put(PersistenceUnitProperties.JDBC_DRIVER, "org.h2.Driver");
-					props.put(PersistenceUnitProperties.JDBC_USER, "sa");
-					props.put(PersistenceUnitProperties.JDBC_PASSWORD, "");
-					props.put(PersistenceUnitProperties.LOGGING_LEVEL, "fine"); // fine / fine
-					// we want Flyway to create the database, it gives us better control over migrating?
-//					props.put(PersistenceUnitProperties.DDL_GENERATION, "create-tables");
-//					props.put(PersistenceUnitProperties.JAVASE_DB_INTERACTION, "true");
-					createEntityManager(props);
-				} catch (Exception e) {
-					throw new RuntimeException("Could not connect to Timekeeper database at " + jdbc_url, e);
 				}
-				cleanTaskActivities();
-				notifyListeners();
-				latch.countDown();
-		};
-		Thread thread = new Thread(runnable);
-        thread.start();
-//				return Status.OK_STATUS;
-//			}
-//		};
-//		log.info("Starting connection job");
-//		connectDatabaseJob.setPriority(Job.LONG);
-//		connectDatabaseJob.schedule();
+				candidate = DatabaseStartup.open(jdbcUrl);
+				cleanTaskActivities(candidate);
+				initializeDefaultLabels(candidate);
+				synchronized (this) {
+					if (stopping) {
+						DatabaseStartup.close(candidate);
+						return;
+					}
+					entityManager = candidate;
+					databaseStatus = Status.OK_STATUS;
+				}
+			} catch (Exception failure) {
+				try {
+					DatabaseStartup.close(candidate);
+				} catch (RuntimeException cleanup) {
+					failure.addSuppressed(cleanup);
+				}
+				if (stopping) {
+					databaseStatus = Status.CANCEL_STATUS;
+				} else {
+					databaseStatus = new Status(IStatus.ERROR, BUNDLE_ID,
+							"Timekeeper database unavailable: " + failure.getMessage(), failure);
+					getLog().log(databaseStatus);
+				}
+			}
+			notifyListeners();
+		}, "Timekeeper database startup");
+		thread.setDaemon(true);
+		thread.start();
 	}
 
-	private static void createEntityManager(Map<String, Object> props) {
-		entityManager = new PersistenceProvider()
-				.createEntityManagerFactory("net.resheim.eclipse.timekeeper.db", props)
-				.createEntityManager(props);
-	}
-	
 	public boolean isReady() {
-		return latch.getCount() == 0;
+		return databaseStatus.isOK();
+	}
+
+	/** Published startup status for the workweek view and preferences. */
+	public IStatus getDatabaseStatus() {
+		return databaseStatus;
+	}
+
+	static void initializeDefaultLabels(EntityManager manager) {
+		if (manager.createQuery("SELECT COUNT(l) FROM ActivityLabel l", Long.class).getSingleResult() != 0) {
+			return;
+		}
+		String[][] defaults = {
+				{ "Production issue", "244,103,88" }, { "Testing", "245,166,81" },
+				{ "Prototyping", "246,208,90" }, { "Programming", "87,206,105" },
+				{ "Debugging", "177,111,209" }, { "Communication", "66,136,243" },
+				{ "Meeting", "156,156,160" } };
+		manager.getTransaction().begin();
+		for (String[] label : defaults) {
+			manager.persist(new ActivityLabel(label[0], label[1]));
+		}
+		manager.getTransaction().commit();
 	}
 
 	public class WorkspaceSaveParticipant implements ISaveParticipant {
@@ -284,8 +282,11 @@ public class TimekeeperPlugin extends Plugin {
 	public void start(BundleContext context) throws Exception {
 		super.start(context);
 		log.info("Starting TimekeeperPlugin");
-		connectToDatabase();
+		instance = this;
+		stopping = false;
+		databaseStatus = new Status(IStatus.INFO, BUNDLE_ID, "Connecting to the Timekeeper database.");
 		createSaveJob();
+		connectToDatabase();
 		ISaveParticipant saveParticipant = new WorkspaceSaveParticipant();
 		ResourcesPlugin.getWorkspace().addSaveParticipant(BUNDLE_ID, saveParticipant);
 	}
@@ -296,8 +297,8 @@ public class TimekeeperPlugin extends Plugin {
 	 * closed before the database has been updated. In this case some guesswork is
 	 * applied using data from Mylyn.
 	 */
-	private void cleanTaskActivities() {
-		TypedQuery<Task> createQuery = entityManager.createQuery("SELECT t FROM Task t",
+	private void cleanTaskActivities(EntityManager manager) {
+		TypedQuery<Task> createQuery = manager.createQuery("SELECT t FROM Task t",
 				Task.class);
 		List<Task> resultList = createQuery.getResultList();
 		for (Task trackedTask : resultList) {
@@ -330,11 +331,17 @@ public class TimekeeperPlugin extends Plugin {
 	}
 
 	@Override
-	public void stop(BundleContext context) throws Exception {
-		if (entityManager != null && entityManager.isOpen()) {
-			entityManager.close();
+	public synchronized void stop(BundleContext context) throws Exception {
+		stopping = true;
+		databaseStatus = Status.CANCEL_STATUS;
+		if (saveDatabaseJob != null) saveDatabaseJob.cancel();
+		try {
+			DatabaseStartup.close(entityManager);
+		} finally {
+			entityManager = null;
+			linkCache.clear();
+			super.stop(context);
 		}
-		super.stop(context);
 	}
 
 	/**
@@ -347,7 +354,7 @@ public class TimekeeperPlugin extends Plugin {
 	 */
 	public Task getTask(ITask task) {
 		// the UI will typically attempt to get some task details before the database is ready 
-		if (entityManager == null) {
+		if (entityManager == null || task == null) {
 			return null;
 		}
 		if (linkCache.containsKey(task)) {
@@ -667,6 +674,7 @@ public class TimekeeperPlugin extends Plugin {
 	 * @return a stream of labels
 	 */
 	public static Stream<ActivityLabel> getLabels(){
+		if (entityManager == null || !entityManager.isOpen()) return Stream.empty();
 		return entityManager.createNamedQuery("ActivityLabel.findAll", ActivityLabel.class)
 				.getResultStream();
 	}
