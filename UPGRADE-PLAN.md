@@ -6,14 +6,16 @@ Goal: Timekeeper can be installed and used in Eclipse IDE 2026-09
 (Eclipse Platform 4.41), preserving existing time records.
 This was the latest stable Eclipse release when the plan was created.
 
-Status: Step 2 is merged in PR #185 with passing Linux/Xvfb CI. Step 3 now has
-Mylyn API/dependency cleanup, workweek fixes and passing local lifecycle/history
-regressions. Runtime-log follow-up, migration and broader test coverage remain
-outstanding. Test enablement from steps 4/5 was brought forward at the maintainer's request.
+Status: Steps 2/3 changes are merged in PRs #185/#186 with passing Linux/Xvfb CI.
+Step 4 now has current-model file-backed fixtures, label safety fixes and local
+restart/backup/restore regressions. Runtime-log follow-up, historical migration
+and broader test coverage remain outstanding. Test enablement from steps 4/5
+was brought forward at the maintainer's request.
 See the [original baseline](baseline/README.md),
 [step 2 results](baseline/BUILD-UPGRADE.md) and
 [test-enablement results](baseline/TEST-UPGRADE.md) and
-[Mylyn/UI results](baseline/MYLYN-UI-UPGRADE.md).
+[Mylyn/UI results](baseline/MYLYN-UI-UPGRADE.md) and
+[database-safety results](baseline/DATABASE-SAFETY.md).
 
 ## Following this plan
 
@@ -50,7 +52,8 @@ See the [original baseline](baseline/README.md),
 - [x] Record expected counts, relationships and time totals for later comparison.
 - [x] Create a synthetic database using the repository's historical SQL schema
   and a verified file copy for upgrade testing.
-- [ ] Also verify labels and relationships in a fixture created through the current JPA model.
+- [x] Also verify labels and relationships in a fixture created through the current JPA model.
+  Completed in step 4 with file-backed restart, copy and SQL restore tests.
 
 Completion criterion: A documented baseline and test data can reveal lost or
 changed records. Existing failures are distinguished from newly introduced failures.
@@ -65,7 +68,8 @@ Results and deviations, September 21, 2026:
 - Synthetic fixtures were selected because no existing database was available.
   The original and file copy were validated with 3 tasks, 5 activities and a total of 5 h 30 min.
 - The label specification contains 2 labels and 3 assignments, but the historical
-  SQL schema does not support labels. Persistence through the current JPA model remains unverified.
+  SQL schema does not support labels. Step 4 now verifies the same assignments
+  through the current JPA model; this does not add labels to the historical schema.
 - The maintainer associates the model changes with the Timewarrior/Taskwarrior goal in
   [#165](https://github.com/turesheim/eclipse-timekeeper/issues/165).
   Git history shows `TrackedTask` → `Task` in November 2020. Preserve the current
@@ -126,8 +130,10 @@ Results and deviations, September 21, 2026:
 Completion criterion: The plugin starts in Eclipse 2026-09 and tracks time
 correctly using test data. Final verification depends on a working database layer in step 4.
 
-Results and deviations: Clean `verify` passes on macOS aarch64 with 4 database/report
-cases and 4 active UI tests passing, plus the existing ignored export test.
+Results and deviations: PR #186 merged with passing Linux/Xvfb CI. Its clean
+`verify` passed on macOS aarch64 with 4 database/report cases and 7 active UI
+tests passing, plus the existing ignored export test, including the three
+background-notification/disposal regressions added during review.
 Fixed blank task/project totals, updates targeting obsolete row types and null
 Mylyn links for deleted tasks. Public APIs now cover activity-manager access and
 task icons. Remaining internals and the existing macOS/Mylyn runtime-log errors
@@ -137,6 +143,8 @@ The runtime-error checkbox remains open pending clean installed-IDE verification
 ## 4. Secure the database layer and upgrade path
 
 - [ ] Test the existing database format and persistence configuration on the new runtime.
+  Current-model JPA and frozen pre-label-fix schema fixtures pass; the historical
+  schema and databases from previous published releases are still outstanding.
 - [ ] Preserve the current `Task`/activity model and reporting independent of Mylyn
   when migrating from the historical `TRACKEDTASK` schema, using #163 and #165 as design context.
 - [x] Select a compatible EclipseLink/JPA combination and document the versions.
@@ -149,18 +157,29 @@ The runtime-error checkbox remains open pending clean installed-IDE verification
 - [ ] Verify existing JDBC parameters, shared storage, workspace storage and configured servers.
 - [ ] Test concurrent access from multiple Eclipse instances and handling of incompatible clients.
 - [ ] Test new databases, existing databases, migration failures and restart.
-- [ ] Compare counts, relationships and time totals with the step 1 baseline.
+  New/current-model databases, restart, closed-file copy, SQL restore and transaction
+  rollback are covered. Migration failures and production startup modes remain open.
+- [x] Compare counts, relationships and time totals with the step 1 baseline.
+  Current-model synthetic data matches the baseline, including labels. Comparison
+  after historical-schema migration is still required once that migration exists.
 
 Completion criterion: New database creation and supported upgrades of existing
 data work. Records are preserved, and failed migrations can be handled without losing original data.
 
-Results and deviations: Persistence runtime selection completed for test execution;
-migration and data-safety work remain open.
+Results and deviations: Current-model fixtures verify 2 projects, 3 tasks,
+5 activities, 2 labels, 3 assignments and 19,800 seconds after restart/copy/restore.
+Fixed label initialization, toggle identity and cascading deletion. The label
+mapping retains the existing join table and is tested against a frozen pre-change
+schema without DDL generation. H2 remains unchanged in this changeset; the release
+version decision and historical migration remain open. Clean `verify` passes
+13 database/report and 7 UI cases, with one existing UI test ignored. See
+[database-safety results](baseline/DATABASE-SAFETY.md) for evidence and limitations.
 
 Test-enablement follow-up: EclipseLink 2.7.16 with ASM 9.8.0 reads Java 21
 entities while retaining `javax.persistence` 2.2.1 and H2 1.4.194. No Jakarta
 namespace or database-format migration is required just to execute the tests.
-Existing-database compatibility and migration remain unverified.
+Current-model compatibility now has synthetic coverage; historical migration
+and previous-release database compatibility remain unverified.
 
 ## 5. Modernize tests, libraries and CI
 
