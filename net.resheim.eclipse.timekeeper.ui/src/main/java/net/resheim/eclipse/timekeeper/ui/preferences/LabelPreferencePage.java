@@ -62,6 +62,7 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 	private ActivityLabelPainter painter;
 	private Text labelText;
 	private List<ActivityLabel> editableLabels;
+	private boolean databaseLoaded;
 	private Button addButton;
 	private Button removeButton;
 
@@ -193,6 +194,12 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 	}
 
 	private void initialize() {
+		databaseLoaded = TimekeeperPlugin.getDefault().isReady();
+		if (!databaseLoaded) {
+			setErrorMessage(TimekeeperPlugin.getDefault().getDatabaseStatus().getMessage()
+					+ " Reopen this page after the database is available.");
+			setValid(false);
+		}
 		editableLabels = TimekeeperPlugin.getLabels().map(l -> new ActivityLabel(l))
 				.collect(Collectors.toList());
 		fAppearanceColorTableViewer.setContentProvider(new IStructuredContentProvider() {
@@ -202,8 +209,8 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 			}
 		});
 		fAppearanceColorTableViewer.setInput(TimekeeperPlugin.getLabels().toArray());
-		fAppearanceColorTableViewer.setSelection(new StructuredSelection(fAppearanceColorTableViewer.getElementAt(0)),
-				true);
+		Object first = fAppearanceColorTableViewer.getElementAt(0);
+		fAppearanceColorTableViewer.setSelection(first == null ? StructuredSelection.EMPTY : new StructuredSelection(first), true);
 	}
 
 	private void initializeLabelList(Composite tableComposite) {
@@ -244,11 +251,13 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 
 	@Override
 	public boolean performOk() {
+		if (!databaseLoaded || !TimekeeperPlugin.getDefault().isReady()) return false;
 		updateDatabase();
 		return true;
 	}
 
 	private void updateDatabase() {
+		if (!databaseLoaded || !TimekeeperPlugin.getDefault().isReady()) return;
 
 		Map<String, ActivityLabel> savedLabels = TimekeeperPlugin.getLabels()
 				.collect(Collectors.toMap(l -> l.getId(), l -> l));

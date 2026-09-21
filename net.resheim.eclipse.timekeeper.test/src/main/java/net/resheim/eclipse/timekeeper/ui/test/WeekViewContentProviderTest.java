@@ -1,12 +1,16 @@
 package net.resheim.eclipse.timekeeper.ui.test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 
+import java.lang.reflect.Field;
 import java.util.HashSet;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.Viewer;
@@ -20,6 +24,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
+import net.resheim.eclipse.timekeeper.ui.preferences.LabelPreferencePage;
+import net.resheim.eclipse.timekeeper.ui.preferences.PreferenceInitializer;
 import net.resheim.eclipse.timekeeper.ui.views.WeekViewContentProvider;
 
 /** Regression coverage for notifications racing with view disposal. */
@@ -38,6 +44,44 @@ public class WeekViewContentProviderTest {
 				return "Timekeeper database did not become ready";
 			}
 		}, 30000);
+	}
+
+	@Test
+	public void preferencesRemainResponsiveWhenDatabaseStartupFails() throws Exception {
+		// Simulate a terminal failure by temporarily hiding the live connection.
+		// Restore from the test thread even on timeout, so the old blocking loop
+		// would be released rather than hanging the remaining Eclipse tests.
+		Field field = TimekeeperPlugin.class.getDeclaredField("databaseStatus");
+		field.setAccessible(true);
+		Object previous = field.get(null);
+		Field managerField = TimekeeperPlugin.class.getDeclaredField("entityManager");
+		managerField.setAccessible(true);
+		Object previousManager = managerField.get(null);
+		try {
+			field.set(null, new Status(IStatus.ERROR, TimekeeperPlugin.BUNDLE_ID, "Synthetic startup failure"));
+			managerField.set(null, null);
+			FutureTask<Void> initialization = new FutureTask<>(() -> {
+				new PreferenceInitializer().initializeDefaultPreferences();
+				return null;
+			});
+			PlatformUI.getWorkbench().getDisplay().asyncExec(initialization);
+			initialization.get(3, TimeUnit.SECONDS);
+			onUi(() -> {
+				Shell shell = new Shell(Display.getCurrent());
+				LabelPreferencePage page = new LabelPreferencePage();
+				try {
+					page.createControl(shell);
+					assertFalse(page.isValid());
+					assertFalse(page.performOk());
+				} finally {
+					page.dispose();
+					shell.dispose();
+				}
+			});
+		} finally {
+			managerField.set(null, previousManager);
+			field.set(null, previous);
+		}
 	}
 
 	@Test
