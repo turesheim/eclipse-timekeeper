@@ -222,11 +222,14 @@ tests are no longer applicable, not skipped tests.
   operating systems remains a separate acceptance item. See
   [dependency audit](baseline/DEPENDENCY-AUDIT.md).
 - [x] Update GitHub Actions for checkout, Java, caching, reports and artifacts.
-- [ ] Run automated tests for time tracking, manual editing, labels,
+- [x] Run automated tests for time tracking, manual editing, labels,
   report export, import and restart.
-  Current-schema CSV export/import round-trip and manual activity editing are
-  verified on macOS aarch64; Linux remains guarded due to the known SWTBot
-  editor-focus issue.
+  A clean macOS aarch64 run verifies task activation/deactivation and recorded
+  time, manual activity editing, labels and relationships after file-backed
+  restart, every bundled report template, and current-schema CSV export/import.
+  The run passed 64 database/report/packaging tests and 10 UI tests. The manual
+  editor remains guarded on Linux due to the known SWTBot editor-focus issue;
+  see [test-enablement results](baseline/TEST-UPGRADE.md).
 - [x] Run UI tests in CI with the required display/Xvfb configuration.
   PR #185 passed Linux/Xvfb CI before merge; subsequent changes require their own CI result.
 - [ ] Check idle detection on Windows, macOS and Linux.
@@ -236,11 +239,12 @@ tests are no longer applicable, not skipped tests.
 Completion criterion: Relevant tests are discovered, executed and pass. CI
 produces test results and a p2 repository, and platform support is documented.
 
-Results and deviations: Clean `verify` passes on macOS aarch64 with 63 database/report
+Results and deviations: Clean `verify` passes on macOS aarch64 with 64 database/report
 tests and 10 active UI tests passing, including manual activity time-range editing.
 The manual-edit test remains guarded on Linux due to the known SWTBot editor-focus
-issue. CI/platform validation and broader coverage are still open. See [test-enablement results](baseline/TEST-UPGRADE.md), including
-the remaining Eclipse runtime log warnings/errors.
+issue. Cross-platform validation is still open. See
+[test-enablement results](baseline/TEST-UPGRADE.md) for the coverage mapping and
+remaining limitations.
 
 ## 6. Verify installation and prepare the release
 
