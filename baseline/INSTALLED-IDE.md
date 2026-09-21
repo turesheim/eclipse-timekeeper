@@ -128,5 +128,10 @@ H2's `org.h2.tools.Script`, with `IFEXISTS=TRUE;ACCESS_MODE_DATA=r` on the URL a
 - macOS Apple Silicon was exercised here. Linux CI is separate evidence;
   Windows and other desktop/runtime combinations are not certified by this run.
 
+The follow-up lifecycle test also found and fixed a timestamp defect in
+`Task.endActivity(LocalDateTime)`: the idle-time path supplied the last active
+timestamp, but the method discarded it and used the current clock time. The
+regression test now verifies that the supplied timestamp is persisted exactly.
+
 The clean install/update portions of step 6 are verified. The upgrade is not
 ready for publication while the remaining runtime and platform checks are open.

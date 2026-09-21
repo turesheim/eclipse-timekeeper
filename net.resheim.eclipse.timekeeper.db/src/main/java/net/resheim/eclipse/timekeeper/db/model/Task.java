@@ -159,7 +159,7 @@ public class Task implements Serializable {
 	public void endActivity(LocalDateTime time) {
 		if (currentActivity != null) {
 			lock.lock();
-			currentActivity.setEnd(LocalDateTime.now());
+			currentActivity.setEnd(time);
 			currentActivity = null;
 			lock.unlock();
 		}
