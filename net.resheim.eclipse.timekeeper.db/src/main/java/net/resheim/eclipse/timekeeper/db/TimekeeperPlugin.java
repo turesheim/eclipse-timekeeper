@@ -16,12 +16,11 @@ import java.io.ObjectInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.sql.Date;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Calendar;
 import java.util.HashMap;
@@ -298,36 +297,52 @@ public class TimekeeperPlugin extends Plugin {
 	 * applied using data from Mylyn.
 	 */
 	private void cleanTaskActivities(EntityManager manager) {
-		TypedQuery<Task> createQuery = manager.createQuery("SELECT t FROM Task t",
-				Task.class);
-		List<Task> resultList = createQuery.getResultList();
-		for (Task trackedTask : resultList) {
-			trackedTask.getCurrentActivity().ifPresent(activity -> {
+		EntityTransaction transaction = manager.getTransaction();
+		boolean activeTransaction = transaction.isActive();
+		if (!activeTransaction) transaction.begin();
+		try {
+			TypedQuery<Task> createQuery = manager.createQuery("SELECT t FROM Task t", Task.class);
+			List<Task> resultList = createQuery.getResultList();
+			for (Task trackedTask : resultList) {
+				Optional<Activity> current = trackedTask.getCurrentActivity();
+				if (current.isEmpty()) continue;
 				ITask task = trackedTask.getMylynTask() == null ? getMylynTask(trackedTask)
 						: trackedTask.getMylynTask();
-				// note that the ITask may not exist in this workspace
-				if (task != null && !task.isActive()) {
-					// try to figure out when it was last active
-					ZonedDateTime start = activity.getStart().atZone(ZoneId.systemDefault());
-					ZonedDateTime end = start.plusMinutes(30);
-					Calendar s = Calendar.getInstance();
-					Calendar e = Calendar.getInstance();
-					while (true) {
-						s.setTime(Date.from(start.toInstant()));
-						e.setTime(Date.from(end.toInstant()));
-						long elapsedTime = TasksUi.getTaskActivityManager().getElapsedTime(task, s, e);
-						// update the end time on the activity
-						if (elapsedTime == 0 || e.after(Calendar.getInstance())) {
-							activity.setEnd(LocalDateTime.ofInstant(e.toInstant(), ZoneId.systemDefault()));
-							trackedTask.endActivity();
-							break;
-						}
-						start = start.plusMinutes(30);
-						end = end.plusMinutes(30);
-					}
+				// The ITask may not exist in this workspace. An active task must keep
+				// its activity open so tracking can continue after a restart.
+				if (task == null || TasksUi.getTaskActivityManager().isActive(task)) continue;
+
+				Activity activity = current.get();
+				LocalDateTime now = LocalDateTime.now();
+				long elapsedTime = 0;
+				LocalDateTime tick = trackedTask.getTick();
+				if (tick == null || tick.isBefore(activity.getStart())) {
+					Calendar start = Calendar.getInstance();
+					start.setTimeInMillis(activity.getStart().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+					Calendar end = Calendar.getInstance();
+					end.setTimeInMillis(now.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+					elapsedTime = TasksUi.getTaskActivityManager().getElapsedTime(task, start, end);
 				}
-			});
+				LocalDateTime end = recoveredActivityEnd(activity.getStart(), tick, now, elapsedTime);
+				trackedTask.endActivity(end);
+				manager.persist(activity);
+				manager.persist(trackedTask);
+			}
+			if (!activeTransaction) transaction.commit();
+		} catch (RuntimeException e) {
+			if (!activeTransaction && transaction.isActive()) transaction.rollback();
+			throw e;
 		}
+	}
+
+	static LocalDateTime recoveredActivityEnd(LocalDateTime start, LocalDateTime tick,
+			LocalDateTime now, long elapsedTimeMillis) {
+		LocalDateTime latestValidEnd = now.isBefore(start) ? start : now;
+		LocalDateTime recovered = tick != null && !tick.isBefore(start)
+				? tick
+				: start.plus(elapsedTimeMillis, ChronoUnit.MILLIS);
+		if (recovered.isBefore(start)) return start;
+		return recovered.isAfter(latestValidEnd) ? latestValidEnd : recovered;
 	}
 
 	@Override

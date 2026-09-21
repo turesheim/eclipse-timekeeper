@@ -12,11 +12,15 @@
 package net.resheim.eclipse.timekeeper.ui.test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -60,6 +64,8 @@ import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.TaskLinkStatus;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
+import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
 @SuppressWarnings("restriction")
 @RunWith(SWTBotJunit4ClassRunner.class)
@@ -168,14 +174,42 @@ public class IntegrationTest {
 	@Test
 	public void testTaskActivationAndDeactivation() throws Exception {
 		prepareWorkweekView();
+		Field lastActiveTime = TimekeeperUiPlugin.class.getDeclaredField("lastActiveTime");
+		lastActiveTime.setAccessible(true);
+		Field lastIdleTimeMillis = TimekeeperUiPlugin.class.getDeclaredField("lastIdleTimeMillis");
+		lastIdleTimeMillis.setAccessible(true);
+		Method updateStatus = WorkWeekView.class.getDeclaredMethod("updateStatus");
+		updateStatus.setAccessible(true);
 		ITask[] previous = new ITask[1];
 		Task[] tracked = new Task[1];
+		Object[] previousLastActive = new Object[1];
+		long[] previousLastIdle = new long[1];
 		try {
 			runOnUi(() -> {
 				previous[0] = TasksUi.getTaskActivityManager().getActiveTask();
+				try {
+					previousLastActive[0] = lastActiveTime.get(TimekeeperUiPlugin.getDefault());
+					previousLastIdle[0] = lastIdleTimeMillis.getLong(null);
+				} catch (IllegalAccessException e) {
+					throw new AssertionError(e);
+				}
 				ITask task = TestUtility.createTask(tl, "Lifecycle checks", "3001",
 						"Track an activity").getMylynTask();
 				TasksUi.getTaskActivityManager().activateTask(task);
+				try {
+					lastActiveTime.set(TimekeeperUiPlugin.getDefault(), null);
+					lastIdleTimeMillis.setLong(null, Long.MAX_VALUE);
+					assertFalse("Idle status requires a last-active sample",
+							TimekeeperUiPlugin.getDefault().isIdle());
+					assertNull("Idle start is unknown until the idle detector has sampled activity",
+							TimekeeperUiPlugin.getDefault().getIdleSince());
+					WorkWeekView view = (WorkWeekView) PlatformUI.getWorkbench().getActiveWorkbenchWindow()
+							.getActivePage().findView(WorkWeekView.VIEW_ID);
+					assertNotNull(view);
+					updateStatus.invoke(view);
+				} catch (ReflectiveOperationException e) {
+					throw new AssertionError(e);
+				}
 				tracked[0] = TimekeeperPlugin.getDefault().getTask(task);
 				assertEquals("Lifecycle checks", tracked[0].getProject().getName());
 				Activity activity = tracked[0].getCurrentActivity().orElseThrow();
@@ -198,6 +232,12 @@ public class IntegrationTest {
 			assertEquals("0:02", task.getNode("Lifecycle activity").cell(today));
 		} finally {
 			runOnUi(() -> {
+				try {
+					lastActiveTime.set(TimekeeperUiPlugin.getDefault(), previousLastActive[0]);
+					lastIdleTimeMillis.setLong(null, previousLastIdle[0]);
+				} catch (IllegalAccessException e) {
+					throw new AssertionError(e);
+				}
 				ITask active = TasksUi.getTaskActivityManager().getActiveTask();
 				if (active != null) TasksUi.getTaskActivityManager().deactivateTask(active);
 				if (previous[0] != null) TasksUi.getTaskActivityManager().activateTask(previous[0]);

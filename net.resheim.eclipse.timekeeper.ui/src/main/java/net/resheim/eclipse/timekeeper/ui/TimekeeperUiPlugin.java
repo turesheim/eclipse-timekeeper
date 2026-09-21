@@ -220,7 +220,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	 */
 	public boolean isIdle() {
 		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
-		if (task != null) {
+		if (task != null && lastActiveTime != null) {
 			return lastIdleTimeMillis > consideredIdleThreshold;
 		}
 		return false;
@@ -254,7 +254,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	 */
 	public LocalDateTime getIdleSince() {
 		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
-		if (task != null) {
+		if (task != null && lastActiveTime != null) {
 			return lastActiveTime.minus(consideredIdleThreshold, ChronoUnit.MILLIS);
 		}
 		return null;
