@@ -40,9 +40,13 @@ jobs:
       if: runner.os == 'Linux'
       run: xvfb-run --server-args="-screen 0, 1024x768x24" --auto-servernum mvn -B -ntp clean verify -Pother-os -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=20000 -Dscreenshots=${{ github.workspace }}/images
 
-    - name: Build with Maven
-      if: runner.os != 'Linux'
-      run: mvn -B -ntp clean verify -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=20000 -Dscreenshots=${{ github.workspace }}/images
+    - name: Build with Maven (macOS idle detector)
+      if: runner.os == 'macOS'
+      run: mvn -B -ntp clean verify -Didle-platform-tests -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=20000 -Dscreenshots=${{ github.workspace }}/images
+
+    - name: Build with Maven (Windows idle detector)
+      if: runner.os == 'Windows'
+      run: mvn -B -ntp clean verify "-Didle-platform-tests" "-Dtycho.localArtifacts=ignore" "-Dorg.eclipse.swtbot.search.timeout=20000" "-Dscreenshots=${{ github.workspace }}\images"
 
     - name: Upload test reports and screenshots
       uses: actions/upload-artifact@v7.0.1

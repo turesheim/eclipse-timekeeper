@@ -17,6 +17,7 @@
 
 	<properties>
 		<uitest.vmparams>-Dorg.eclipse.swtbot.search.timeout=10000 -Xmx1024m -Dscreenshots=${project.build.directory}/../../images -Dnet.resheim.eclipse.timekeeper.db.url=jdbc:h2:mem:timekeeper_db;DB_CLOSE_DELAY=-1</uitest.vmparams>
+		<ui.test.include>**/*Test.java</ui.test.include>
 		<sonar.coverage.jacoco.xmlReportPaths>${project.basedir}/../net.resheim.eclipse.timekeeper.test/target/site/jacoco-it/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
 	</properties>
 
@@ -30,6 +31,17 @@
 			</activation>
 			<properties>
 				<maven.test.skip>true</maven.test.skip>
+			</properties>
+		</profile>
+		<profile>
+			<id>idle-platform-tests</id>
+			<activation>
+				<property>
+					<name>idle-platform-tests</name>
+				</property>
+			</activation>
+			<properties>
+				<ui.test.include>**/IdleTimeDetectorTest.java</ui.test.include>
 			</properties>
 		</profile>
 		<profile>
@@ -80,7 +92,7 @@
 						</dependency>
 					</dependencies>
 					<includes>
-						<include>**/*Test.java</include>
+						<include>${ui.test.include}</include>
 					</includes>
 					<argLine>${tycho.testArgLine} ${ui.test.vmargs}</argLine>
 					<useUIHarness>true</useUIHarness>
