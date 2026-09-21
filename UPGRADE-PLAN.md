@@ -131,7 +131,9 @@ Results and deviations, September 21, 2026:
   See the compatibility-boundary inventory in the step 3 report.
 - [x] Determine whether Bugzilla must remain a mandatory dependency.
   Removed the unused bundle requirement and target root; connectors can be installed separately.
-- [ ] Fix necessary compilation and runtime issues in Eclipse/SWT/JFace integration.
+- [x] Fix necessary compilation and runtime issues in Eclipse/SWT/JFace integration.
+  PR #202 guards the optional JDBC URL field against lazy JFace control creation,
+  allowing the database location preference to be saved on Eclipse 2026-09.
 - [x] Verify task activation/deactivation, categories and workweek view updates.
   Synthetic lifecycle and deleted-task tests pass; category reassignment is not yet covered.
 
@@ -190,7 +192,7 @@ See [migration simplification](baseline/MIGRATION-SIMPLIFICATION.md) and the
 remain 2 projects, 3 tasks, 5 activities, 2 labels, 3 assignments and 19,800 seconds
 for the current synthetic fixture. Next: remaining installed-IDE and multi-instance runtime acceptance.
 
-The latest clean build passes 63 database/report/packaging tests and 9 UI/integration
+The latest clean build passes 63 database/report/packaging tests and 10 UI/integration
 tests. Current-schema CSV export coverage is active again. Removed historical
 tests are no longer applicable, not skipped tests.
 
