@@ -286,12 +286,14 @@ public class IntegrationTest {
 		bot.sleep(200);
 		bot.styledText().navigateTo(50, 10);
 		bot.sleep(100);
-		bot.getDisplay().syncExec(() -> {			
+		bot.getDisplay().syncExec(() -> {
 			Composite main = (Composite)((Composite)bot.activeShell().widget.getChildren()[0]).getChildren()[0];
 			TestUtility.takeScreenshot(screenshotsDir, main.getChildren()[3], "preferences-templates.png");
 		});
+		// Verify that the complete preference page can be stored on current JFace.
+		// The JDBC URL editor is optional for the selected shared database location.
 		SWTBotShell activeShell = bot.activeShell();
-		activeShell.close();
+		bot.button("Apply and Close").click();
 		waitUntilShellIsClosed(bot, activeShell);
 	}
 	
