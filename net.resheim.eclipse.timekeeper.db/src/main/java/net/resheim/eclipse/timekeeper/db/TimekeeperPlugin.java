@@ -674,7 +674,7 @@ public class TimekeeperPlugin extends Plugin {
 	 * @return a stream of labels
 	 */
 	public static Stream<ActivityLabel> getLabels(){
-		if (entityManager == null) return Stream.empty();
+		if (entityManager == null || !entityManager.isOpen()) return Stream.empty();
 		return entityManager.createNamedQuery("ActivityLabel.findAll", ActivityLabel.class)
 				.getResultStream();
 	}
