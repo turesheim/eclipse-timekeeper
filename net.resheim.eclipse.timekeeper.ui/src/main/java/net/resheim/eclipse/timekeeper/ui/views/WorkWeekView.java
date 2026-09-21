@@ -192,6 +192,10 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void updateStatus() {
+		if (!TimekeeperPlugin.getDefault().isReady()) {
+			statusLabel.setText(TimekeeperPlugin.getDefault().getDatabaseStatus().getMessage());
+			return;
+		}
 		ITask activeTask = TasksUi.getTaskActivityManager().getActiveTask();
 		if (activeTask == null) {
 			statusLabel.setText("");

@@ -162,7 +162,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 				ITask task = TasksUi.getTaskActivityManager().getActiveTask();
 				Task ttask = TimekeeperPlugin.getDefault().getTask(task);
 				// and we have recorded a starting point
-				if (task != null && ttask.getCurrentActivity().isPresent()) {
+				if (task != null && ttask != null && ttask.getCurrentActivity().isPresent()) {
 					dialogIsOpen = true;
 					LocalDateTime lastActive = ttask.getTick();
 
