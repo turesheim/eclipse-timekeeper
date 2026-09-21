@@ -14,8 +14,8 @@ in the idle detectors or report/template classes.
 
 The official projects identify JNA 5.19.1 as the current release and FreeMarker
 2.3.35 as the current stable release at the time of this audit. Reconfirm these
-versions before a later release. Native idle behavior on Windows, Linux/X11 and
-Wayland remains platform acceptance work; this audit does not certify those
-native environments.
+versions before a later release. Subsequent native smoke tests passed on Windows
+x86_64, macOS aarch64 and Linux x86_64/X11. Pure Wayland remains unsupported;
+see [platform acceptance](PLATFORM-ACCEPTANCE.md).
 
 Temporary candidate build: `/private/tmp/timekeeper-deps-test` (not committed).
