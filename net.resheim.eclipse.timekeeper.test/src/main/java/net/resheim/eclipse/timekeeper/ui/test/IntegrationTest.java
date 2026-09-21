@@ -313,6 +313,8 @@ public class IntegrationTest {
 					Files.readAllLines(path.resolve("activity.csv")).get(0));
 			Assert.assertEquals("\"TASK_ID\",\"REPOSITORY_URL\",\"ACTIVITIES_ID\"",
 					Files.readAllLines(path.resolve("trackedtask_activity.csv")).get(0));
+			int imported = TimekeeperPlugin.getDefault().importFrom(path);
+			Assert.assertTrue("Current-schema CSV round trip imported no rows", imported > 0);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}

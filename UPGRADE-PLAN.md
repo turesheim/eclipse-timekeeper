@@ -203,7 +203,7 @@ tests are no longer applicable, not skipped tests.
 - [x] Update GitHub Actions for checkout, Java, caching, reports and artifacts.
 - [ ] Run automated tests for time tracking, manual editing, labels,
   report export, import and restart.
-  Current-schema CSV export is verified; CSV import and manual editing remain open.
+  Current-schema CSV export/import round-trip is verified; manual editing remains open.
 - [x] Run UI tests in CI with the required display/Xvfb configuration.
   PR #185 passed Linux/Xvfb CI before merge; subsequent changes require their own CI result.
 - [ ] Check idle detection on Windows, macOS and Linux.
@@ -250,7 +250,7 @@ partial release acceptance, not publication approval. See
 The follow-up activity lifecycle test passes (63 database tests). It also fixes
 `Task.endActivity(LocalDateTime)`, which previously ignored the timestamp used
 by the idle-time recovery path. Current-schema CSV export now passes in the UI
-harness; CSV import, manual editing and interrupted-activity GUI scenarios remain open.
+harness; manual editing and interrupted-activity GUI scenarios remain open.
 
 ## Decisions to track
 
