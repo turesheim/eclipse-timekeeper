@@ -173,8 +173,11 @@ Do not add published-release fixtures or legacy migration recipes for this relea
 - [x] Test current records, labels, relationships, time totals, timestamp precision,
   restart, closed-file copy, SQL restore and transaction rollback with synthetic data.
 - [x] Test future migration lifecycle safeguards without implementing old migrations.
-- [ ] Verify storage preferences and supported server configurations in installed Eclipse.
-  Embedded/mixed-mode/TCP tests cover separate JVMs, paths with spaces, restart,
+- [x] Verify storage preferences and supported server configurations in installed Eclipse.
+  The installed preference dialog selected workspace, shared `AUTO_SERVER`, an
+  explicit file URL and a local-only H2 TCP server in turn. Each selection took
+  effect after restart and opened a separate schema 1 READY database. The
+  persistence tests additionally cover separate JVMs, paths with spaces,
   missing database refusal and server-side version/state guards.
 - [ ] Test concurrent access from multiple installed Eclipse instances.
   Persistence-layer sharing is covered; UI cache refresh, concurrent edits,
@@ -234,8 +237,10 @@ the remaining Eclipse runtime log warnings/errors.
 - [x] Check that required dependencies are included or can be installed automatically.
 - [x] Test plugin updates against the new versioned database baseline.
   Historical data migration is out of scope.
-- [ ] Verify restart, settings and existing data after upgrading.
-  Restart and stored activity verified; storage preference switching remains open.
+- [x] Verify restart, settings and existing data after upgrading.
+  Restart and stored activity were verified during the package update. The
+  follow-up installed-IDE run verified preference switching and restart across
+  workspace, shared, explicit file and local H2 TCP storage.
 - [ ] Check the Eclipse Error Log for Timekeeper and dependency errors.
   Inspected installed runtime logs; the Mylyn theme-parser error remains unresolved.
 - [ ] Update version numbers, README, CHANGES and any migration instructions.

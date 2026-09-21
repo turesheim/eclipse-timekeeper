@@ -78,7 +78,41 @@ Every GUI launch explicitly supplied a temporary workspace, temporary Java
 `user.home`, Java 21 and
 `-Dnet.resheim.eclipse.timekeeper.db.url=jdbc:h2:/private/tmp/timekeeper-installed.RaDTib/data/timekeeper`.
 The database URL override acts before normal storage preference resolution;
-these checks therefore do not validate preference-selected storage modes.
+these original checks therefore did not validate preference-selected storage modes.
+
+## Storage preference acceptance
+
+A follow-up used the corrected installed feature build
+`2.0.0.202609211112` from PR #202 with the same Eclipse Platform 4.41 and
+Java 21 runtime. The subsequent documentation-only PR #203 does not change the
+installed bundles. A clean build of its merged `main` passed 63
+database/report/packaging tests and 10 UI/integration tests before the installed
+checks. No GUI launch in this follow-up supplied the database URL system
+property, so the persisted preference was the only storage selector.
+
+The installed Database preference page selected and saved each of these modes,
+with a normal Eclipse shutdown and restart between changes:
+
+- workspace-relative storage at
+  `<workspace>/.timekeeper/h2db`;
+- shared storage at `~/.timekeeper/h2db` with `AUTO_SERVER=TRUE` and the
+  configured fixed port;
+- an explicit file URL in a separate temporary directory; and
+- an explicit `jdbc:h2:tcp://localhost:19092/timekeeper` URL served by a
+  separate local-only H2 process.
+
+Workweek opened normally after every restart. Console output identified the
+expected JDBC URL in each run. Each new database contained schema version 1 in
+`READY`/`NEW` state and seven default labels. Switching storage left the other
+database files intact; modification times changed only when their corresponding
+mode was active. The TCP database was also queried through its server after
+Eclipse shut down, then the temporary server was stopped cleanly.
+
+This verifies the installed storage selector, embedded workspace storage,
+shared mixed mode and a local TCP server. It does not certify an externally
+managed remote server, authentication, encryption or network-failure behavior.
+Evidence remains under `/private/tmp/timekeeper-installed.RaDTib`; it is
+temporary and contains only synthetic empty databases.
 
 ## Repeating the checks safely
 
@@ -121,10 +155,12 @@ H2's `org.h2.tools.Script`, with `IFEXISTS=TRUE;ACCESS_MODE_DATA=r` on the URL a
   with the synthetic database's `sa`/empty-password configuration.
 - Test-harness Cocoa/menu/theme messages were not reproduced as those same
   errors in the installed IDE. Passing tests alone does not settle runtime logs.
-- This verifies embedded storage selected by the test override, normal shutdown
-  and sequential restart/update. Preference switching, interrupted activities,
-  multiple installed instances, server configurations, remote connectors,
-  manual editing, CSV import/export and OS idle detection remain unverified.
+- This verifies embedded storage selected by the original test override, normal
+  shutdown, sequential restart/update, all installed storage preferences and a
+  local-only TCP server. Interrupted activities, multiple installed instances,
+  externally managed remote servers, remote connectors and OS idle detection
+  remain unverified. Manual editing and CSV import/export are covered by the
+  follow-up UI harness, not by installed-runtime interaction.
 - macOS Apple Silicon was exercised here. Linux CI is separate evidence;
   Windows and other desktop/runtime combinations are not certified by this run.
 
