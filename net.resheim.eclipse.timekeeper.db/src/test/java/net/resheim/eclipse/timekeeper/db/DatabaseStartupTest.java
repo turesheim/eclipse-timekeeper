@@ -67,48 +67,25 @@ class DatabaseStartupTest {
 	}
 
 	@Test
-	void opensExistingCurrentModelWithoutChangingSchemaOrData() throws Exception {
+	void refusesUnversionedCurrentModelWithoutChangingSchemaOrData() throws Exception {
 		try (Connection connection = connection()) {
 			run(connection, "/net/resheim/eclipse/timekeeper/db/fixtures/current-model-186355a.sql");
 		}
 		List<String> before = snapshot();
-		EntityManager manager = DatabaseStartup.open(url() + ";IFEXISTS=TRUE");
-		try {
-			TimekeeperPlugin.initializeDefaultLabels(manager);
-			CurrentModelFixture.verify(manager);
-		} finally {
-			DatabaseStartup.close(manager);
-		}
-		assertEquals(before, snapshot());
-	}
-
-	@ParameterizedTest
-	@ValueSource(booleans = { false, true })
-	void refusesLegacySchemasBeforeJpaCanCreateTables(boolean v2) throws Exception {
-		try (Connection connection = connection()) {
-			run(connection, "/legacy-fixture/V1__baseline.sql");
-			if (v2) {
-				run(connection, "/legacy-fixture/V2__add_project_taskurl_and_tasksummary.sql");
-				run(connection, "/legacy-fixture/legacy-data.sql");
-			}
-			assertEquals(v2 ? DatabaseSchema.Kind.LEGACY_V2 : DatabaseSchema.Kind.LEGACY_V1,
-					DatabaseSchema.inspect(connection));
-		}
-		List<String> before = snapshot();
-		SQLException failure = assertThrows(SQLException.class, () -> DatabaseStartup.open(url()));
-		assertTrue(failure.getMessage().contains("Historical Timekeeper database"));
+		assertThrows(SQLException.class, () -> DatabaseStartup.open(url() + ";IFEXISTS=TRUE"));
 		assertEquals(before, snapshot());
 	}
 
 	@ParameterizedTest
 	@ValueSource(strings = {
 			"CREATE TABLE UNRELATED(ID INT)",
+			"CREATE TABLE TRACKEDTASK(TASK_ID VARCHAR)",
 			"CREATE TABLE TASK(ID INT)",
 			"CREATE VIEW EXTRA_VIEW AS SELECT 1 AS ID"
 	})
 	void refusesUnknownMixedAndViewSchemas(String extra) throws Exception {
 		try (Connection connection = connection(); var statement = connection.createStatement()) {
-			run(connection, "/legacy-fixture/V1__baseline.sql");
+			statement.execute("CREATE TABLE EXISTING_DATA(ID INT)");
 			statement.execute(extra);
 		}
 		List<String> before = snapshot();

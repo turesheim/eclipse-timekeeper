@@ -11,8 +11,8 @@ final class DatabaseVersion {
 	static final String TABLE = "TIMEKEEPER_SCHEMA";
 	static final int CURRENT = 1;
 	static final Set<String> COLUMNS = Set.of("ID", "VERSION", "STATE", "ORIGIN");
-	private static final Set<String> ORIGINS = Set.of("NEW", "LEGACY_V1", "LEGACY_V2", "H2_1_4");
-	private static final Set<String> STATES = Set.of("CREATING", "RECOVERING", "READY");
+	private static final Set<String> ORIGINS = Set.of("NEW", "MIGRATION");
+	private static final Set<String> STATES = Set.of("CREATING", "MIGRATING", "READY");
 
 	record Stamp(int version, String state, String origin) { }
 
@@ -39,7 +39,7 @@ final class DatabaseVersion {
 			String state = rows.getString("STATE");
 			String origin = rows.getString("ORIGIN");
 			if (state == null || origin == null || !STATES.contains(state) || !ORIGINS.contains(origin)
-					|| (state.equals("RECOVERING") && origin.equals("NEW")) || rows.next()) {
+					|| (state.equals("MIGRATING") && origin.equals("NEW")) || rows.next()) {
 				throw new SQLException("Invalid Timekeeper schema-version state. Preserve the database for diagnosis.");
 			}
 			return new Stamp(CURRENT, state, origin);
@@ -65,12 +65,12 @@ final class DatabaseVersion {
 
 	static void schemaCreated(Connection connection) throws SQLException {
 		Stamp stamp = read(connection);
-		advance(connection, "CREATING", stamp.origin().equals("NEW") ? "READY" : "RECOVERING");
+		advance(connection, "CREATING", stamp.origin().equals("NEW") ? "READY" : "MIGRATING");
 	}
 
-	/** Called only after the recovery wrapper's post-reopen value comparison succeeds. */
-	static void recoveryValidated(Connection connection) throws SQLException {
-		advance(connection, "RECOVERING", "READY");
+	/** Future migration runners must validate copied data after reopen before calling this. */
+	static void migrationValidated(Connection connection) throws SQLException {
+		advance(connection, "MIGRATING", "READY");
 	}
 
 	private static void advance(Connection connection, String expected, String next) throws SQLException {

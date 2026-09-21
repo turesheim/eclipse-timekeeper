@@ -1,5 +1,11 @@
 # H2 storage-mode acceptance
 
+> Historical report: the maintainer subsequently removed legacy migration support.
+> Historical conversion steps and related release-acceptance requirements below
+> are superseded by [migration simplification](MIGRATION-SIMPLIFICATION.md) and the
+> [current database policy](../DATABASE-RECOVERY.md). Version/lifecycle infrastructure
+> and current-storage tests remain; old test totals are historical results.
+
 Follow-up to merged PR #194, using H2 2.5.250 and Java 21.
 
 ## Automated coverage

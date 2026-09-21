@@ -183,7 +183,7 @@ class FileStorageTest {
 	private Map<String, List<List<String>>> snapshot(String name) throws Exception {
 		Map<String, List<List<String>>> snapshot = new TreeMap<>();
 		try (Connection connection = DriverManager.getConnection(existingUrl(name), "sa", "");
-				ResultSet tables = connection.getMetaData().getTables(null, "PUBLIC", "%", new String[] { "TABLE" })) {
+				ResultSet tables = connection.getMetaData().getTables(null, "PUBLIC", "%", new String[] { "TABLE", "BASE TABLE" })) {
 			while (tables.next()) {
 				String table = tables.getString("TABLE_NAME");
 				List<List<String>> rows = new ArrayList<>();

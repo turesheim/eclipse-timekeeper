@@ -15,7 +15,7 @@ import java.util.TreeSet;
 public final class DatabaseSchema {
 	private DatabaseSchema() { }
 
-	public enum Kind { EMPTY, CURRENT, LEGACY_V1, LEGACY_V2, RECOVERING, INCOMPLETE, UNKNOWN }
+	public enum Kind { EMPTY, CURRENT, MIGRATING, INCOMPLETE, UNKNOWN }
 
 	// Order is also the foreign-key-safe insertion order. No constraints are disabled.
 	static final Map<String, List<String>> CURRENT = columns(
@@ -35,15 +35,13 @@ public final class DatabaseSchema {
 		DatabaseVersion.Stamp version = removeVersion(connection, actual);
 		if (version != null) {
 			if (version.state().equals("CREATING")) return Kind.INCOMPLETE;
-			if (version.state().equals("RECOVERING")) {
-				return matches(actual, CURRENT) ? Kind.RECOVERING : Kind.INCOMPLETE;
+			if (version.state().equals("MIGRATING")) {
+				return matches(actual, CURRENT) ? Kind.MIGRATING : Kind.INCOMPLETE;
 			}
 			return matches(actual, CURRENT) ? Kind.CURRENT : Kind.UNKNOWN;
 		}
 		if (actual.isEmpty()) return Kind.EMPTY;
-		if (matches(actual, CURRENT)) return Kind.CURRENT;
-		if (matches(actual, legacy(false))) return Kind.LEGACY_V1;
-		if (matches(actual, legacy(true))) return Kind.LEGACY_V2;
+		// Unversioned layouts are not an implicit migration baseline.
 		return Kind.UNKNOWN;
 	}
 
@@ -66,15 +64,6 @@ public final class DatabaseSchema {
 			throw new SQLException("Unrecognized Timekeeper schema-version table. No schema changes were made.");
 		}
 		return DatabaseVersion.read(connection);
-	}
-
-	private static Map<String, List<String>> legacy(boolean v2) {
-		Map<String, List<String>> result = columns(
-				"ACTIVITY:ID,END_TIME,ADJUSTED,START_TIME,SUMMARY,TASK_ID,REPOSITORY_URL" + (v2 ? ",PROJECT" : ""),
-				"TRACKEDTASK:TASK_ID,REPOSITORY_URL,TICK,CURRENTACTIVITY_ID" + (v2 ? ",TASK_URL,TASK_SUMMARY,PROJECT" : ""),
-				"TRACKEDTASK_ACTIVITY:TASK_ID,REPOSITORY_URL,ACTIVITIES_ID");
-		if (v2) result.put("PROJECT", List.of("NAME", "REPOSITORY_URL", "EXTERNAL_ID"));
-		return result;
 	}
 
 	private static boolean matches(Map<String, Set<String>> actual, Map<String, List<String>> expected) {

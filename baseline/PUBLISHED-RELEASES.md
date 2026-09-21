@@ -1,5 +1,11 @@
 # Published-release storage audit
 
+> Historical report: the maintainer subsequently removed legacy migration support.
+> Historical conversion steps and related release-acceptance requirements below
+> are superseded by [migration simplification](MIGRATION-SIMPLIFICATION.md) and the
+> [current database policy](../DATABASE-RECOVERY.md). Version/lifecycle infrastructure
+> and current-storage tests remain; old test totals are historical results.
+
 Checked September 21, 2026, while following step 4 of the upgrade plan.
 This is a provenance audit, **not** a successful migration test of a published
 H2-based release. No personal database was accessed.

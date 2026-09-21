@@ -1,5 +1,11 @@
 # Step 4: Explicit historical database conversion
 
+> Historical report: the maintainer subsequently removed legacy migration support.
+> Historical conversion steps and related release-acceptance requirements below
+> are superseded by [migration simplification](MIGRATION-SIMPLIFICATION.md) and the
+> [current database policy](../DATABASE-RECOVERY.md). Version/lifecycle infrastructure
+> and current-storage tests remain; old test totals are historical results.
+
 Started from merged PR #188, `origin/main` revision `1b81564`, on September 21,
 2026. That PR passed Linux/Xvfb CI. This change adds and tests the conversion
 engine; it does not activate automatic migration or provide a finished end-user

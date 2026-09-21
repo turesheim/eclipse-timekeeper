@@ -2,6 +2,7 @@ package net.resheim.eclipse.timekeeper.ui.test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
@@ -82,8 +83,9 @@ public class WeekViewContentProviderTest {
 					String location = database.getPreferenceStore().getString(TimekeeperPlugin.PREF_DATABASE_LOCATION);
 					String url = database.getPreferenceStore().getString(TimekeeperPlugin.PREF_DATABASE_URL);
 					database.createControl(shell);
-					assertTrue(button((Composite) database.getControl(), "Upgrade database backup...").isEnabled());
-					assertTrue(button((Composite) database.getControl(), "Verify recovered database...").isEnabled());
+					assertNull(button((Composite) database.getControl(), "Upgrade database backup..."));
+					assertNull(button((Composite) database.getControl(), "Verify recovered database..."));
+					assertTrue(button((Composite) database.getControl(), "Specified by JDBC URL").isEnabled());
 					assertEquals(location, database.getPreferenceStore().getString(TimekeeperPlugin.PREF_DATABASE_LOCATION));
 					assertEquals(url, database.getPreferenceStore().getString(TimekeeperPlugin.PREF_DATABASE_URL));
 				} finally {

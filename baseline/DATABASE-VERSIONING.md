@@ -1,5 +1,11 @@
 # Step 4: Durable schema identity and initialization state
 
+> Historical report: the maintainer subsequently removed legacy migration support.
+> Historical conversion steps and related release-acceptance requirements below
+> are superseded by [migration simplification](MIGRATION-SIMPLIFICATION.md) and the
+> [current database policy](../DATABASE-RECOVERY.md). Version/lifecycle infrastructure
+> and current-storage tests remain; old test totals are historical results.
+
 Started from `origin/main` revision `7422d52` on September 21, 2026. PR #192
 merged with passing Linux/Xvfb CI. Its receipt-validation review changes are
 preserved and now have explicit regression coverage. All databases used here

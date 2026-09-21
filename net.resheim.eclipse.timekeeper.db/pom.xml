@@ -45,21 +45,6 @@
 		<testSourceDirectory>${project.basedir}/src/test/java</testSourceDirectory>
 		<testResources>
 			<testResource>
-				<directory>${project.basedir}/lib</directory>
-				<targetPath>lib</targetPath>
-				<includes><include>h2-1.4.194.jar</include></includes>
-			</testResource>
-			<testResource>
-				<directory>${project.basedir}/db</directory>
-				<targetPath>legacy-fixture</targetPath>
-				<includes><include>V*.sql</include></includes>
-			</testResource>
-			<testResource>
-				<directory>${project.basedir}/../baseline</directory>
-				<targetPath>legacy-fixture</targetPath>
-				<includes><include>legacy-data.sql</include></includes>
-			</testResource>
-			<testResource>
 				<directory>${project.basedir}/src/test/java</directory>
 			</testResource>
 		</testResources>

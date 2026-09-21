@@ -3,28 +3,25 @@
 Created: September 21, 2026.
 
 Goal: Timekeeper can be installed and used in Eclipse IDE 2026-09
-(Eclipse Platform 4.41), preserving existing time records.
+(Eclipse Platform 4.41), preserving records in the new versioned database baseline.
+Historical data migrations are explicitly out of scope.
 This was the latest stable Eclipse release when the plan was created.
 
-Status: PRs #185/#186/#188/#189/#191/#192/#193/#194 are merged into `main`, with PR #194's
-Linux/Xvfb CI passing. At the maintainer's request normal storage now uses
-H2 2.5.250, the latest stable release checked on September 21.
-Backup conversion now covers both historical and current-model H2 1.4.194
-databases, including backed-up version adoption. Previous-release fixtures,
-installed-IDE acceptance and broader runtime coverage remain outstanding. Test enablement from
-steps 4/5 was brought forward at the maintainer's request.
+Status: PRs #185/#186/#188/#189/#191/#192/#193/#194/#195 are merged into `main`,
+with PR #195's Linux/Xvfb CI passing. Normal storage uses H2 2.5.250.
+The maintainer has removed historical migration support from scope: no one
+depends on those formats. Schema versioning and guarded target lifecycle hooks
+remain for future migrations. Installed-IDE and broader runtime acceptance
+are still outstanding. Earlier migration reports are historical, not active
+support promises. Test enablement from steps 4/5 was brought forward.
+See the [scope-change report](baseline/MIGRATION-SIMPLIFICATION.md).
 See the [original baseline](baseline/README.md),
 [step 2 results](baseline/BUILD-UPGRADE.md) and
 [test-enablement results](baseline/TEST-UPGRADE.md) and
 [Mylyn/UI results](baseline/MYLYN-UI-UPGRADE.md) and
 [database-safety results](baseline/DATABASE-SAFETY.md) and
-[historical-conversion results](baseline/LEGACY-CONVERSION.md) and
-[startup-safety results](baseline/DATABASE-STARTUP.md) and
-[recovery-workflow results](baseline/DATABASE-RECOVERY.md) and
-[schema-versioning results](baseline/DATABASE-VERSIONING.md) and
-[H2-upgrade results](baseline/H2-UPGRADE.md) and
 [storage-mode acceptance](baseline/STORAGE-MODES.md).
-The [recovery procedure](DATABASE-RECOVERY.md) documents the end-user steps.
+The [database policy](DATABASE-RECOVERY.md) documents current backups and the future migration contract.
 
 ## Following this plan
 
@@ -149,99 +146,46 @@ task icons. Remaining internals and the existing macOS/Mylyn runtime-log errors
 are documented in [baseline/MYLYN-UI-UPGRADE.md](baseline/MYLYN-UI-UPGRADE.md).
 The runtime-error checkbox remains open pending clean installed-IDE verification.
 
-## 4. Secure the database layer and upgrade path
+## 4. Secure the database baseline and future migration infrastructure
 
-- [ ] Test the existing database format and persistence configuration on the new runtime.
-  Current-model JPA and frozen pre-label-fix schema fixtures pass; the historical
-  V1/V2 fixtures now convert into a readable current-model database. Databases
-  from previous published releases are still outstanding.
-  The [release audit](baseline/PUBLISHED-RELEASES.md) found that public 1.1.0 uses
-  Mylyn attributes, not H2; an identifiable distributed H2-based artifact is
-  still needed. Do not mislabel repository-generated fixtures as release fixtures.
-- [x] Preserve the current `Task`/activity model and reporting independent of Mylyn
-  when migrating from the historical `TRACKEDTASK` schema, using #163 and #165 as design context.
-  Verified for the repository's V1/V2 schemas through an explicit converter into
-  a separate empty target. No automatic migration is enabled.
-- [x] Select a compatible EclipseLink/JPA combination and document the versions.
-- [x] Determine whether migration from `javax.persistence` to `jakarta.persistence` is necessary;
-  if so, make it a separate, testable change.
-- [ ] Review and repair schema creation and migration, including the disabled Flyway call.
-  Conversion data writes are transactional and verified before commit. Startup
-  now creates schema only in empty databases and refuses historical/mixed/unknown
-  layouts. New/recovered databases now have a durable version/state marker;
-  backed-up H2 1.4.194 conversion adopts it in separate storage. Broader recovery
-  acceptance remains open. Flyway stays disabled.
-- [x] Persist schema identity and initialization/recovery state in new and
-  converted databases, refusing unknown versions and incomplete states at startup.
-- [x] Provide explicit backed-up version adoption for existing unversioned
-  H2 1.4.194 current-model databases by converting into a new H2 2.5.250 target;
-  never stamp or migrate the original during normal startup.
-- [x] Provide explicit backup conversion into separate storage, post-reopen
-  validation, interrupted-attempt handling and documented rollback without
-  automatically switching preferences. The initial workflow is limited to
-  trusted single-file H2 1.4.194 backup ZIPs with repository V1/V2 or current schemas.
-- [x] Decide whether to upgrade H2 in this release, documenting the rationale and any follow-up.
-  The maintainer requested the latest release: H2 2.5.250 is selected and pinned.
-- [x] If moving to H2 2.x, export with the old H2 version and import into a new database,
-  with backups, validation and documented rollback. Implemented as column-aware
-  JDBC logical export/import, retaining an isolated old reader for trusted copies.
-- [ ] Verify existing JDBC parameters, shared storage, workspace storage and configured servers.
-  Synthetic embedded/mixed-mode/TCP coverage now includes separate JVMs, paths
-  with spaces, restart and server-side schema guards. Installed preference paths,
-  fixed-port conflicts and broader server configurations remain unverified.
-- [ ] Test concurrent access from multiple Eclipse instances and handling of incompatible clients.
-  Two persistence-layer JVMs share data successfully; H2 1.4.194 clients are
-  rejected by the new TCP server. Multiple installed Eclipse instances, concurrent
-  task edits/ownership and failover remain open.
-- [ ] Test new databases, existing databases, migration failures and restart.
-  New/current-model databases, restart, closed-file copy, SQL restore and transaction
-  rollback are covered. Explicit V1/V2 conversion failures and converted-database
-  restart/restore are covered. Startup guards and UI preference failure behavior
-  now have automated coverage; installed-IDE and shared/server startup remain open.
-- [x] Compare counts, relationships and time totals with the step 1 baseline.
-  Current-model synthetic data matches the baseline, including labels. Converted
-  historical data also matches its 19,800-second baseline; historical schemas
-  contain no labels, so conversion leaves labels empty.
+Scope decision: historical database/Mylyn data migration is not required.
+The legacy converters, recovery UI, old H2 runtime and unused Flyway libraries
+have been removed. Old report results below `baseline/` are retained as history.
+Do not add published-release fixtures or legacy migration recipes for this release.
 
-Completion criterion: New database creation and supported upgrades of existing
-data work. Records are preserved, and failed migrations can be handled without losing original data.
+- [x] Preserve the current Task/activity/project/label model and reporting.
+- [x] Use EclipseLink 2.7.16 / javax.persistence 2.2.1; no Jakarta migration is needed.
+- [x] Use H2 2.5.250 as the only database engine.
+- [x] Establish schema version 1 as the supported baseline; initialize only empty databases.
+- [x] Reject unknown/unversioned schemas and malformed versions without changing them.
+- [x] Persist initialization/migration state and refuse incomplete targets at normal startup.
+- [x] Retain generic empty migration-target creation and explicit validated completion.
+  There are no active migration recipes. Future runners must add source-version
+  dispatch, backups, data transformation and validation before using these hooks.
+- [x] Document the future migration contract, current backups and deliberate rollback.
+- [x] Test current records, labels, relationships, time totals, timestamp precision,
+  restart, closed-file copy, SQL restore and transaction rollback with synthetic data.
+- [x] Test future migration lifecycle safeguards without implementing old migrations.
+- [ ] Verify storage preferences and supported server configurations in installed Eclipse.
+  Embedded/mixed-mode/TCP tests cover separate JVMs, paths with spaces, restart,
+  missing database refusal and server-side version/state guards.
+- [ ] Test concurrent access from multiple installed Eclipse instances.
+  Persistence-layer sharing is covered; UI cache refresh, concurrent edits,
+  active-task ownership, disconnect/failover and fixed-port conflicts remain open.
+- [ ] Verify new/current database startup and interrupted-activity behavior in installed Eclipse.
 
-Results and deviations: Current-model fixtures verify 2 projects, 3 tasks,
-5 activities, 2 labels, 3 assignments and 19,800 seconds after restart/copy/restore.
-Fixed label initialization, toggle identity and cascading deletion. The label
-mapping retains the existing join table and is tested against a frozen pre-change
-schema without DDL generation. H2 remains unchanged in this changeset; the release
-version decision and historical migration remain open. Clean `verify` passes
-13 database/report and 7 UI cases, with one existing UI test ignored. See
-[database-safety results](baseline/DATABASE-SAFETY.md) for evidence and limitations.
+Completion criterion: new/current-baseline storage works, records are preserved,
+unsupported databases fail safely, and future migrations have a documented,
+tested lifecycle. Backward migration support is not a release criterion.
 
-Test-enablement follow-up: EclipseLink 2.7.16 with ASM 9.8.0 reads Java 21
-entities while retaining `javax.persistence` 2.2.1 and H2 1.4.194. No Jakarta
-namespace or database-format migration is required just to execute the tests.
-Current-model compatibility and explicit V1/V2 conversion now have synthetic
-coverage. Conversion preserves a read-only source byte-for-byte and rejects
-unknown/mixed schemas and inconsistent associations. Converted data can be
-exported/restored without the old schema's duplicate-index DDL. The original
-historical export remains non-restorable. Full local verification now passes
-27 database/report and 7 UI cases, plus the existing ignored UI test. See
-[historical-conversion results](baseline/LEGACY-CONVERSION.md). Startup follow-up
-passes 44 database/report and 8 UI cases, plus the existing ignored UI test after
-adding the connection-availability review regressions; see
-[startup-safety results](baseline/DATABASE-STARTUP.md). The backup-recovery follow-up
-passes 64 database/report and 9 UI/integration cases, plus the existing ignored
-test; see [recovery results](baseline/DATABASE-RECOVERY.md). End-user conversion
-and revalidation are now explicit preference-page actions. Automatic migration
-remains disabled. The version-marker follow-up passes 99 database/report and
-9 UI/integration cases, plus the existing ignored test; see
-[versioning results](baseline/DATABASE-VERSIONING.md). The H2 2.5.250 follow-up
-passes 115 database/report and 9 UI/integration cases, plus the existing ignored
-test; see [H2 results](baseline/H2-UPGRADE.md). Installed-IDE recovery acceptance
-and previous-release compatibility remain open. The storage-mode follow-up adds
-seven cross-process/server cases; see [acceptance boundaries](baseline/STORAGE-MODES.md).
-Its clean build passes 122 database/report and 9 UI/integration cases, plus the
-existing ignored CSV-export test.
-Next: installed-IDE and multi-instance runtime acceptance. Add a published-release
-fixture when an identifiable H2-based distribution is available.
+See [migration simplification](baseline/MIGRATION-SIMPLIFICATION.md) and the
+[current database policy](DATABASE-RECOVERY.md). Historical baseline totals
+remain 2 projects, 3 tasks, 5 activities, 2 labels, 3 assignments and 19,800 seconds
+for the current synthetic fixture. Next: installed-IDE and multi-instance runtime acceptance.
+
+The simplified clean build passes 60 database/report tests and 8 UI/integration
+tests; one existing CSV-export test remains ignored. Removed historical tests
+are no longer applicable, not skipped tests.
 
 ## 5. Modernize tests, libraries and CI
 
@@ -272,7 +216,8 @@ the remaining Eclipse runtime log warnings/errors.
 - [ ] Update feature and p2 metadata for the selected dependencies.
 - [ ] Build the p2 repository and install into a clean Eclipse 2026-09.
 - [ ] Check that required dependencies are included or can be installed automatically.
-- [ ] Test upgrading from the previous published Timekeeper release.
+- [ ] Test plugin updates against the new versioned database baseline.
+  Historical data migration is out of scope.
 - [ ] Verify restart, settings and existing data after upgrading.
 - [ ] Check the Eclipse Error Log for Timekeeper and dependency errors.
 - [ ] Update version numbers, README, CHANGES and any migration instructions.
@@ -292,12 +237,12 @@ Results and deviations: Not started.
 | Exact Mylyn version and required connectors | Mylyn 4.12 Tasks; Bugzilla no longer mandatory; local lifecycle verified in step 3 |
 | Minimum Java version and tested runtime | Java 21; build tested with Temurin 21.0.12.1 |
 | EclipseLink/JPA version and possible Jakarta migration | EclipseLink 2.7.16 / javax.persistence 2.2.1; no namespace migration for test enablement |
-| H2 upgrade and migration procedure | Decide in step 4 |
+| H2 and migration scope | H2 2.5.250 / schema 1; no historical migrations; future lifecycle infrastructure retained |
 | Supported operating systems and architectures | Verify in step 5 |
 | New Timekeeper version | Decide before completing step 6 |
 
-Mylyn compatibility and database migration are the largest uncertainties.
-Resolve them early before finalizing scope and estimates.
+Installed-IDE, multi-instance and platform acceptance remain the largest
+uncertainties. Historical data migration is no longer a release blocker.
 
 ## Sources
 

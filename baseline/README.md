@@ -1,5 +1,11 @@
 # Baseline before the Eclipse upgrade
 
+> Historical report: the maintainer subsequently removed legacy migration support.
+> Historical conversion steps and related release-acceptance requirements below
+> are superseded by [migration simplification](MIGRATION-SIMPLIFICATION.md) and the
+> [current database policy](../DATABASE-RECOVERY.md). Version/lifecycle infrastructure
+> and current-storage tests remain; old test totals are historical results.
+
 Date: September 21, 2026. Source commit:
 `0105303faa60193f3796cd98c5ff01eac5234ca5`, with pre-existing local changes
 to `.java-version` and the database/UI projects' `.classpath` files.
