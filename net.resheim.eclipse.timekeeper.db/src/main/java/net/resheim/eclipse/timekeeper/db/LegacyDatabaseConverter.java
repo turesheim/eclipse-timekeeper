@@ -138,6 +138,8 @@ public final class LegacyDatabaseConverter {
 				+ " AND a.TASK_ID=t.TASK_ID AND a.REPOSITORY_URL=t.REPOSITORY_URL)",
 				"Current activity does not belong to its task");
 		if (v2) {
+			requireNoRows(source, "SELECT 1 FROM ACTIVITY WHERE TASK_ID IS NOT NULL AND PROJECT IS NOT NULL",
+					"Activity cannot reference both a task and a project");
 			for (String table : List.of("TRACKEDTASK", "ACTIVITY")) {
 				requireNoRows(source, "SELECT 1 FROM " + table + " t WHERE PROJECT IS NOT NULL AND NOT EXISTS"
 						+ " (SELECT 1 FROM PROJECT p WHERE p.NAME=t.PROJECT)", "Missing project referenced by " + table);
