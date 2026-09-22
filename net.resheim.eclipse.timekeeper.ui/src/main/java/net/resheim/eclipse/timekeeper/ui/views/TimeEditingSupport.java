@@ -46,11 +46,13 @@ class TimeEditingSupport extends EditingSupport {
 	private static final String TIME_POINT = "([0-9]|0[0-9]|1[0-9]|2[0-3]):([0-5][0-9])";
 
 	private final int weekday;
+	private final WeekViewContentProvider contentProvider;
 	private int width_i;
 	private int width_0;
 
 	public TimeEditingSupport(TreeViewer viewer, WeekViewContentProvider contentProvider, int weekday) {
 		super(viewer);
+		this.contentProvider = contentProvider;
 		this.weekday = weekday;
 	}
 
@@ -66,12 +68,12 @@ class TimeEditingSupport extends EditingSupport {
 	}
 
 	private boolean startsOnThisDay(Activity activity) {
-		return activity.getStart().getDayOfWeek().getValue() == (weekday + 1);
+		return activity.getStart().atZone(contentProvider.getZoneId()).getDayOfWeek().getValue() == (weekday + 1);
 	}
 
 	private boolean endsOnThisDay(Activity activity) {
 		if (activity.getEnd() != null) {
-			return activity.getEnd().getDayOfWeek().getValue() == (weekday + 1);
+			return activity.getEnd().atZone(contentProvider.getZoneId()).getDayOfWeek().getValue() == (weekday + 1);
 		}
 		return false;
 	}
@@ -92,8 +94,9 @@ class TimeEditingSupport extends EditingSupport {
 		if (element instanceof Activity) {
 			Activity activity = (Activity) element;
 			StringBuilder sb = new StringBuilder();
-			LocalDateTime start = activity.getStart();
-			LocalDateTime end = activity.getEnd();
+			LocalDateTime start = LocalDateTime.ofInstant(activity.getStart(), contentProvider.getZoneId());
+			LocalDateTime end = activity.getEnd() == null ? null
+					: LocalDateTime.ofInstant(activity.getEnd(), contentProvider.getZoneId());
 			sb.append(start.format(DateTimeFormatter.ofPattern("HH:mm")));
 			if (end != null) {
 				sb.append("-");
@@ -110,7 +113,7 @@ class TimeEditingSupport extends EditingSupport {
 			if (value instanceof String) {
 				Task trackedTask = ((Activity) element).getTrackedTask();
 				ITask task = trackedTask.getMylynTask();
-				LocalDateTime start = ((Activity) element).getStart();
+				LocalDateTime start = LocalDateTime.ofInstant(((Activity) element).getStart(), contentProvider.getZoneId());
 				// has time point or range been specified...
 				Matcher range = Pattern.compile(TIME_RANGE).matcher((String) value);
 				Matcher point = Pattern.compile(TIME_POINT).matcher((String) value);
@@ -120,7 +123,7 @@ class TimeEditingSupport extends EditingSupport {
 					start = start.withMinute(Integer.parseInt(range.group(2)));
 					start = start.withSecond(0);
 					start = start.withNano(0);
-					((Activity) element).setStart(start);
+					((Activity) element).setStart(start.atZone(contentProvider.getZoneId()).toInstant());
 
 					// only set the end time if the task is not active,
 					// otherwise it will be reset
@@ -134,7 +137,7 @@ class TimeEditingSupport extends EditingSupport {
 					Assert.isNotNull(start);
 					start = start.withHour(Integer.parseInt(point.group(1)));
 					start = start.withMinute(Integer.parseInt(point.group(2)));
-					((Activity) element).setStart(start);
+					((Activity) element).setStart(start.atZone(contentProvider.getZoneId()).toInstant());
 					update(element, task);
 				}
 			}
@@ -142,7 +145,8 @@ class TimeEditingSupport extends EditingSupport {
 	}
 
 	private void setEndTime(Object element, LocalDateTime start, Matcher range) {
-		LocalDateTime end = ((Activity) element).getEnd();
+		LocalDateTime end = ((Activity) element).getEnd() == null ? null
+				: LocalDateTime.ofInstant(((Activity) element).getEnd(), contentProvider.getZoneId());
 		if (end == null) {
 			end = start;
 		}
@@ -153,7 +157,7 @@ class TimeEditingSupport extends EditingSupport {
 		// also reset the end date in want of a better solution
 		end = end.withYear(start.getYear());
 		end = end.withDayOfYear(start.getDayOfYear());
-		((Activity) element).setEnd(end);
+		((Activity) element).setEnd(end.atZone(contentProvider.getZoneId()).toInstant());
 	}
 
 	private void update(Object element, ITask task) {

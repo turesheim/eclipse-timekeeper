@@ -9,7 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -25,7 +25,7 @@ import net.resheim.eclipse.timekeeper.db.model.Task;
 
 /** Real second JVMs, temporary files and local-only servers; never personal storage. */
 class StorageModesTest {
-	private static final LocalDateTime CHILD_TICK = LocalDateTime.parse("2022-09-21T10:11:12.123456789");
+	private static final Instant CHILD_TICK = Instant.parse("2022-09-21T10:11:12.123456789Z");
 	@TempDir Path directory;
 
 	@ParameterizedTest

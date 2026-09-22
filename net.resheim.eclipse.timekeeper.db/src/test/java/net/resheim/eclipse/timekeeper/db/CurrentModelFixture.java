@@ -6,8 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,7 @@ import javax.persistence.EntityManager;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
 import net.resheim.eclipse.timekeeper.db.model.ExternalTaskReference;
+import net.resheim.eclipse.timekeeper.db.model.OwnerIdentity;
 import net.resheim.eclipse.timekeeper.db.model.Project;
 import net.resheim.eclipse.timekeeper.db.model.ProjectType;
 import net.resheim.eclipse.timekeeper.db.model.Task;
@@ -75,12 +77,12 @@ final class CurrentModelFixture {
 	}
 
 	private static Activity activity(Task task, String start, int minutes, String summary, boolean adjusted) {
-		Activity activity = new Activity(task, LocalDateTime.parse(start));
+		Activity activity = new Activity(task, Instant.parse(start + ":00Z"));
 		activity.setSummary(summary);
 		if (adjusted) {
 			activity.setDuration(Duration.ofMinutes(minutes));
 		} else {
-			activity.setEnd(activity.getStart().plusMinutes(minutes));
+			activity.setEnd(activity.getStart().plus(Duration.ofMinutes(minutes)));
 		}
 		task.addActivity(activity);
 		return activity;
@@ -99,6 +101,7 @@ final class CurrentModelFixture {
 		assertEquals(19800, activities.stream().mapToLong(a -> a.getDuration().getSeconds()).sum());
 		Map<String, Long> labelledSeconds = new HashMap<>();
 		for (Activity activity : activities) {
+			assertEquals(OwnerIdentity.LOCAL, activity.getOwner());
 			assertNotNull(activity.getTrackedTask());
 			assertTrue(activity.getTrackedTask().getActivities().contains(activity));
 			for (ActivityLabel label : activity.getLabels()) {
@@ -145,7 +148,8 @@ final class CurrentModelFixture {
 		long[] dailySeconds = { 1800, 13500, 4500 };
 		for (int i = 0; i < dailySeconds.length; i++) {
 			LocalDate day = LocalDate.of(2022, 9, 18).plusDays(i);
-			assertEquals(dailySeconds[i], tasks.stream().mapToLong(t -> t.getDuration(day).getSeconds()).sum());
+			assertEquals(dailySeconds[i], tasks.stream()
+					.mapToLong(t -> t.getDuration(day, ZoneOffset.UTC).getSeconds()).sum());
 		}
 	}
 }

@@ -13,7 +13,9 @@ package net.resheim.eclipse.timekeeper.db;
 import static org.junit.Assert.fail;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import javax.persistence.EntityManager;
@@ -160,7 +162,7 @@ public class SharedStorageTest {
 	@Test
 	public void testSimpleTaskPersistence() {
 		Task ttask = new Task(mylynTask);
-		LocalDateTime now = LocalDateTime.now();
+		Instant now = Instant.now();
 		Activity a = new Activity(ttask,now);
 		ttask.addActivity(a);
 		a.setStart(now.minus(Duration.ofHours(1)));
@@ -189,13 +191,13 @@ public class SharedStorageTest {
 	public void testTrackedTask_getDuration() {
 		Task task = new Task(mylynTask);
 
-		LocalDateTime start = LocalDateTime.of(2016, 3, 14, 22, 0);
-		LocalDateTime start2 = LocalDateTime.of(2016, 3, 16, 0, 0);
+		Instant start = Instant.parse("2016-03-14T22:00:00Z");
+		Instant start2 = Instant.parse("2016-03-16T00:00:00Z");
 		Activity a1 = new Activity();
 		task.addActivity(a1);
 
 		a1.setStart(start);
-		a1.setEnd(start.plusHours(4));
+		a1.setEnd(start.plus(Duration.ofHours(4)));
 
 		Activity a2 = new Activity();
 		task.addActivity(a2);
@@ -206,7 +208,7 @@ public class SharedStorageTest {
 		Activity a3 = new Activity();
 		task.addActivity(a3);
 		a3.setStart(start2);
-		a3.setEnd(start2.plusHours(25));
+		a3.setEnd(start2.plus(Duration.ofHours(25)));
 
 		// store
 		persist(task);
@@ -219,9 +221,11 @@ public class SharedStorageTest {
 		if (dbTask instanceof Task) {
 			Task trackedTask = (Task) dbTask;
 			// total work on the 14th of March should be 4 hours
-			Assert.assertEquals(Duration.ofHours(4), trackedTask.getDuration(start.toLocalDate()));
+			Assert.assertEquals(Duration.ofHours(4),
+					trackedTask.getDuration(LocalDate.of(2016, 3, 14), ZoneOffset.UTC));
 			// total work on the 16th of March should be 24 hours
-			Assert.assertEquals(Duration.ofHours(24), trackedTask.getDuration(start2.toLocalDate()));
+			Assert.assertEquals(Duration.ofHours(24),
+					trackedTask.getDuration(LocalDate.of(2016, 3, 16), ZoneOffset.UTC));
 		} else fail("Could not find task");
 	}
 

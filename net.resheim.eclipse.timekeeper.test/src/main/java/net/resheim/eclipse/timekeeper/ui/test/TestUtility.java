@@ -7,7 +7,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.time.temporal.TemporalField;
 import java.time.temporal.WeekFields;
 import java.util.Locale;
@@ -35,6 +36,7 @@ import org.eclipse.swt.widgets.Display;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.Task;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 @SuppressWarnings("restriction")
 public class TestUtility {
@@ -44,9 +46,9 @@ public class TestUtility {
 	private static final int RADIUS = 32;
 
 	static void createActivity(int dayOfWeek, Task ttask, String text) {
-		LocalDateTime now = LocalDateTime.now();
+		ZonedDateTime now = Instant.now().atZone(TimekeeperUiPlugin.getCalendarZone());
 		TemporalField fieldISO = WeekFields.of(Locale.getDefault()).dayOfWeek();
-		LocalDateTime start = now.with(fieldISO, dayOfWeek);
+		Instant start = now.with(fieldISO, dayOfWeek).toInstant();
 		Activity a = new Activity(ttask, start);
 		a.setSummary(text);
 		ttask.addActivity(a);

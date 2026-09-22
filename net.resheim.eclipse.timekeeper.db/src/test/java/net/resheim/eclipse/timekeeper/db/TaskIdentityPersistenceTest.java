@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.time.Instant;
+
 import javax.persistence.EntityManager;
 import javax.persistence.RollbackException;
 
@@ -11,6 +13,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import net.resheim.eclipse.timekeeper.db.model.Task;
+import net.resheim.eclipse.timekeeper.db.model.OwnerIdentity;
 
 class TaskIdentityPersistenceTest {
 	private EntityManager manager;
@@ -59,6 +62,22 @@ class TaskIdentityPersistenceTest {
 		} finally {
 			concurrent.close();
 		}
+	}
+
+	@Test
+	void activityOwnerSurvivesPersistenceWithoutAnExternalTaskProvider() {
+		manager = PersistenceHelper.getEntityManager();
+		Task task = new Task("Server-created task");
+		task.startActivity(new OwnerIdentity("user:alice"), Instant.parse("2026-09-21T08:00:00Z"));
+		task.endActivity(Instant.parse("2026-09-21T09:00:00Z"));
+		manager.getTransaction().begin();
+		manager.persist(task);
+		manager.getTransaction().commit();
+		manager.clear();
+
+		Task reloaded = manager.find(Task.class, task.getId());
+		assertEquals(new OwnerIdentity("user:alice"), reloaded.getActivities().get(0).getOwner());
+		assertEquals(Instant.parse("2026-09-21T08:00:00Z"), reloaded.getActivities().get(0).getStart());
 	}
 
 	private Task linkedTask(String summary) {

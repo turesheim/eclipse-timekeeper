@@ -13,6 +13,7 @@ package net.resheim.eclipse.timekeeper.db.report;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 import freemarker.ext.beans.StringModel;
@@ -27,10 +28,15 @@ import net.resheim.eclipse.timekeeper.db.model.Task;
  * @author Torkild Ulvøy Resheim
  */
 public class GetActivitiesMethodModel implements TemplateMethodModelEx {
+	private final ZoneId zoneId;
+
+	public GetActivitiesMethodModel(ZoneId zoneId) {
+		this.zoneId = zoneId;
+	}
 
 	private boolean hasData(Activity activity, LocalDate date) {
 		LocalDate endDate = date.plusDays(1);
-		return activity.getDuration(date, endDate) != Duration.ZERO;
+		return !activity.getDuration(date, endDate, zoneId).isZero();
 	}
 
 	public Object exec(@SuppressWarnings("rawtypes") List args) throws TemplateModelException {

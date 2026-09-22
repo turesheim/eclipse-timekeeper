@@ -14,6 +14,10 @@ database baseline.
   refresh behavior and high-resolution display assets.
 - Preserved tasks, projects, labels, activities and reporting in the new
   versioned database baseline.
+- Made Timekeeper tasks provider-independent UUID aggregates with optional,
+  uniquely constrained external task references.
+- Added explicit activity owner identities, UTC instant persistence and
+  time-zone-aware daily and weekly reporting, including DST-safe boundaries.
 - Added guarded database initialization and future migration lifecycle
   infrastructure. Unsupported, unversioned and incomplete databases fail closed.
 - Verified workspace, shared `AUTO_SERVER`, explicit file and local H2 TCP

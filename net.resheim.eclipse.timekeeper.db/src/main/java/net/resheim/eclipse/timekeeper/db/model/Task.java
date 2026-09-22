@@ -12,8 +12,9 @@ package net.resheim.eclipse.timekeeper.db.model;
 
 import java.io.Serializable;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -46,7 +47,7 @@ import org.eclipse.mylyn.tasks.core.IRepositoryQuery;
 import org.eclipse.mylyn.tasks.core.ITask;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConverter;
+import net.resheim.eclipse.timekeeper.db.converters.InstantAttributeConverter;
 
 /**
  * A provider-independent unit of work tracked by Timekeeper. It holds a number
@@ -89,9 +90,9 @@ public class Task implements Serializable {
 	private Activity currentActivity;
 
 	/** The last time the task was active while the user was not idle */
-	@Convert(converter = LocalDateTimeAttributeConverter.class)
-	@Column(name = "TICK", columnDefinition = "TIMESTAMP(9)")
-	private LocalDateTime tick;
+	@Convert(converter = InstantAttributeConverter.class)
+	@Column(name = "TICK", columnDefinition = "VARCHAR(30)")
+	private Instant tick;
 
 	@OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
 	private List<Activity> activities;
@@ -145,14 +146,14 @@ public class Task implements Serializable {
 	 * 
 	 * @return the current activity
 	 * @see #startActivity()
-	 * @see #endActivity(LocalDateTime)
+	 * @see #endActivity(Instant)
 	 */
 	public Activity endActivity() {
 		Activity returnActivity = null;
 		if (currentActivity != null) {
 			lock.lock();
 			if (currentActivity.getEnd() == null) {
-				currentActivity.setEnd(LocalDateTime.now());
+				currentActivity.setEnd(Instant.now());
 			}
 			returnActivity = currentActivity;
 			currentActivity = null;
@@ -169,7 +170,7 @@ public class Task implements Serializable {
 	 * @see #startActivity()
 	 * @see #endActivity()
 	 */
-	public void endActivity(LocalDateTime time) {
+	public void endActivity(Instant time) {
 		if (currentActivity != null) {
 			lock.lock();
 			currentActivity.setEnd(time);
@@ -203,14 +204,15 @@ public class Task implements Serializable {
 	 * day.
 	 * 
 	 * @param date the date to get duration for
+	 * @param zoneId the calendar time zone that defines the date boundaries
 	 * @return the total duration of work on the date
 	 */
-	public Duration getDuration(LocalDate date) {
+	public Duration getDuration(LocalDate date, ZoneId zoneId) {
 		Duration total = Duration.ZERO;
 		// sum up the duration
 		return getActivities()
 				.stream()
-				.map(a -> a.getDuration(date))
+				.map(a -> a.getDuration(date, zoneId))
 				.reduce(total, (t, u) -> t.plus(u));
 	}
 
@@ -235,7 +237,7 @@ public class Task implements Serializable {
 	 * 
 	 * @return the last time the task was active and not idle
 	 */
-	public LocalDateTime getTick() {
+	public Instant getTick() {
 		return tick;
 	}
 
@@ -317,7 +319,7 @@ public class Task implements Serializable {
 	 * 
 	 * @param tick the tick time
 	 */
-	public void setTick(LocalDateTime tick) {
+	public void setTick(Instant tick) {
 		this.tick = tick;
 	}
 
@@ -329,9 +331,14 @@ public class Task implements Serializable {
 	 * @see #getCurrentActivity()
 	 */
 	public Activity startActivity() {
+		return startActivity(OwnerIdentity.LOCAL, Instant.now());
+	}
+
+	/** Starts an activity for an explicit owner at an explicit instant. */
+	public Activity startActivity(OwnerIdentity owner, Instant start) {
 		if (currentActivity == null) {
 			lock.lock();
-			currentActivity = new Activity(this, LocalDateTime.now());
+			currentActivity = new Activity(this, owner, start);
 			addActivity(currentActivity);
 			lock.unlock();
 			return currentActivity;

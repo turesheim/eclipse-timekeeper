@@ -7,7 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.DriverManager;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import org.h2.tools.RunScript;
 import org.junit.jupiter.api.Test;
@@ -20,9 +20,9 @@ class H2RuntimeTest {
 
 	@Test
 	void currentEnginePreservesNanosecondTimestampsAcrossRestartAndSqlRestore() throws Exception {
-		var start = LocalDateTime.parse("2022-09-19T09:00:00.123456789");
-		var end = LocalDateTime.parse("2022-09-19T10:30:00.987654321");
-		var tick = LocalDateTime.parse("2022-09-19T09:42:00.222333444");
+		var start = Instant.parse("2022-09-19T09:00:00.123456789Z");
+		var end = Instant.parse("2022-09-19T10:30:00.987654321Z");
+		var tick = Instant.parse("2022-09-19T09:42:00.222333444Z");
 		String id;
 		var manager = DatabaseStartup.open(url("original"));
 		try {

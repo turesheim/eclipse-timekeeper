@@ -12,6 +12,7 @@
 package net.resheim.eclipse.timekeeper.ui.views;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
@@ -41,6 +42,10 @@ abstract class TimeColumnLabelProvider extends ColumnLabelProvider {
 
 	public TimeColumnLabelProvider(WeekViewContentProvider contentProvider) {
 		this.contentProvider = contentProvider;
+	}
+
+	protected ZoneId getZoneId() {
+		return contentProvider.getZoneId();
 	}
 
 	@Override
@@ -87,12 +92,13 @@ abstract class TimeColumnLabelProvider extends ColumnLabelProvider {
 		if (element instanceof Activity) {
 			StringBuilder sb = new StringBuilder();
 			sb.append("Started at ");
-			LocalDateTime start = ((Activity) element).getStart();
+			LocalDateTime start = LocalDateTime.ofInstant(((Activity) element).getStart(), contentProvider.getZoneId());
 			sb.append(start.format(DateTimeFormatter.ofPattern("HH:mm")));
 			sb.append(" on the ");
 			sb.append(start.format(DateTimeFormatter.ofPattern("d")));
 			sb.append("th");
-			LocalDateTime end = ((Activity) element).getEnd();
+			LocalDateTime end = ((Activity) element).getEnd() == null ? null
+					: LocalDateTime.ofInstant(((Activity) element).getEnd(), contentProvider.getZoneId());
 			if (end != null) {
 				sb.append(", ended at ");
 				sb.append(end.format(DateTimeFormatter.ofPattern("HH:mm")));

@@ -24,7 +24,7 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.temporal.WeekFields;
 import java.util.Locale;
 import java.util.concurrent.FutureTask;
@@ -216,7 +216,7 @@ public class IntegrationTest {
 				assertEquals(1, tracked[0].getActivities().size());
 				Assert.assertNull(activity.getEnd());
 				activity.setSummary("Lifecycle activity");
-				activity.setStart(LocalDateTime.now().minusMinutes(2));
+				activity.setStart(Instant.now().minusSeconds(120));
 				TasksUi.getTaskActivityManager().deactivateTask(task);
 				assertTrue(tracked[0].getCurrentActivity().isEmpty());
 				assertNotNull(activity.getEnd());
@@ -253,7 +253,7 @@ public class IntegrationTest {
 			TestUtility.createActivity(1, historical, "Recorded before deletion");
 			tl.deleteTask(historical.getMylynTask());
 			LocalDate first = LocalDate.now().with(WeekFields.of(Locale.getDefault()).dayOfWeek(), 1);
-			Task reloaded = TimekeeperPlugin.getTasks(first)
+			Task reloaded = TimekeeperPlugin.getTasks(first, TimekeeperUiPlugin.getCalendarZone())
 					.filter(t -> "3002".equals(t.getTaskId())).findFirst().orElseThrow();
 			Assert.assertNull(reloaded.getMylynTask());
 			assertEquals(TaskLinkStatus.UNLINKED, reloaded.getTaskLinkStatus());
@@ -351,7 +351,7 @@ public class IntegrationTest {
 			Assert.assertEquals("\"ID\",\"TASK_SUMMARY\",\"TASK_URL\",\"TICK\",\"VERSION\",\"TASK_PROJECT\",\"CURRENTACTIVITY_ID\"",
 					Files.readAllLines(path.resolve("trackedtask.csv")).get(0));
 			Assert.assertEquals(
-					"\"ID\",\"END_TIME\",\"ADJUSTED\",\"START_TIME\",\"SUMMARY\",\"ACTIVITY_PROJECT\",\"TASK_ID\"",
+					"\"ID\",\"END_TIME\",\"ADJUSTED\",\"OWNER_ID\",\"START_TIME\",\"SUMMARY\",\"ACTIVITY_PROJECT\",\"TASK_ID\"",
 					Files.readAllLines(path.resolve("activity.csv")).get(0));
 			Assert.assertEquals("\"TASK_ID\",\"ACTIVITIES_ID\"",
 					Files.readAllLines(path.resolve("trackedtask_activity.csv")).get(0));

@@ -13,6 +13,8 @@
 package net.resheim.eclipse.timekeeper.db.report;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Objects;
 import java.util.Set;
 
 import net.resheim.eclipse.timekeeper.db.model.Project;
@@ -24,6 +26,11 @@ import net.resheim.eclipse.timekeeper.db.model.Task;
  * @author Torkild U. Resheim
  */
 public abstract class AbstractExporter {
+	protected final ZoneId zoneId;
+
+	protected AbstractExporter(ZoneId zoneId) {
+		this.zoneId = Objects.requireNonNull(zoneId, "zoneId");
+	}
 
 	/**
 	 * Calculates the total amount of seconds accumulated on the project for the
@@ -41,7 +48,7 @@ public abstract class AbstractExporter {
 		return tasks
 				.stream()
 				.filter(t -> project.equals(t.getProject()))
-				.mapToLong(t -> t.getDuration(date).getSeconds())
+				.mapToLong(t -> t.getDuration(date, zoneId).getSeconds())
 				.sum();
 	}
 
@@ -57,7 +64,7 @@ public abstract class AbstractExporter {
 	protected long getSum(Set<Task> tasks, LocalDate date) {
 		return tasks
 				.stream()
-				.mapToLong(t -> t.getDuration(date).getSeconds())
+				.mapToLong(t -> t.getDuration(date, zoneId).getSeconds())
 				.sum();
 	}
 

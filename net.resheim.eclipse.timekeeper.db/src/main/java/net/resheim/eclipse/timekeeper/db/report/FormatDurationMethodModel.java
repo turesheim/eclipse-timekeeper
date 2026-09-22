@@ -13,6 +13,7 @@ package net.resheim.eclipse.timekeeper.db.report;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 import org.apache.commons.lang3.time.DurationFormatUtils;
@@ -29,6 +30,11 @@ import net.resheim.eclipse.timekeeper.db.model.Task;
  * @author Torkild Ulvøy Resheim
  */
 public class FormatDurationMethodModel implements TemplateMethodModelEx {
+	private final ZoneId zoneId;
+
+	public FormatDurationMethodModel(ZoneId zoneId) {
+		this.zoneId = zoneId;
+	}
 	
 	public Object exec(@SuppressWarnings("rawtypes") List args) throws TemplateModelException {
 		if (args.size() == 1) {
@@ -45,11 +51,11 @@ public class FormatDurationMethodModel implements TemplateMethodModelEx {
 		long seconds = 0;
 		if ((((StringModel) args.get(1)).getWrappedObject()) instanceof Task) {
 			Task task = (Task) ((StringModel) args.get(1)).getWrappedObject();
-			seconds = task.getDuration(day).getSeconds();
+			seconds = task.getDuration(day, zoneId).getSeconds();
 		}
 		if ((((StringModel) args.get(1)).getWrappedObject()) instanceof Activity) {
 			Activity task = (Activity) ((StringModel) args.get(1)).getWrappedObject();
-			seconds = task.getDuration(day).getSeconds();
+			seconds = task.getDuration(day, zoneId).getSeconds();
 		}
 		if (seconds > 60) {
 			return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);

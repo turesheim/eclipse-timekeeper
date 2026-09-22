@@ -16,11 +16,9 @@ import java.io.ObjectInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Calendar;
 import java.util.HashMap;
@@ -313,17 +311,17 @@ public class TimekeeperPlugin extends Plugin {
 				if (task == null || TasksUi.getTaskActivityManager().isActive(task)) continue;
 
 				Activity activity = current.get();
-				LocalDateTime now = LocalDateTime.now();
+				Instant now = Instant.now();
 				long elapsedTime = 0;
-				LocalDateTime tick = trackedTask.getTick();
+				Instant tick = trackedTask.getTick();
 				if (tick == null || tick.isBefore(activity.getStart())) {
 					Calendar start = Calendar.getInstance();
-					start.setTimeInMillis(activity.getStart().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+					start.setTimeInMillis(activity.getStart().toEpochMilli());
 					Calendar end = Calendar.getInstance();
-					end.setTimeInMillis(now.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+					end.setTimeInMillis(now.toEpochMilli());
 					elapsedTime = TasksUi.getTaskActivityManager().getElapsedTime(task, start, end);
 				}
-				LocalDateTime end = recoveredActivityEnd(activity.getStart(), tick, now, elapsedTime);
+				Instant end = recoveredActivityEnd(activity.getStart(), tick, now, elapsedTime);
 				trackedTask.endActivity(end);
 				manager.persist(activity);
 				manager.persist(trackedTask);
@@ -335,12 +333,12 @@ public class TimekeeperPlugin extends Plugin {
 		}
 	}
 
-	static LocalDateTime recoveredActivityEnd(LocalDateTime start, LocalDateTime tick,
-			LocalDateTime now, long elapsedTimeMillis) {
-		LocalDateTime latestValidEnd = now.isBefore(start) ? start : now;
-		LocalDateTime recovered = tick != null && !tick.isBefore(start)
+	static Instant recoveredActivityEnd(Instant start, Instant tick,
+			Instant now, long elapsedTimeMillis) {
+		Instant latestValidEnd = now.isBefore(start) ? start : now;
+		Instant recovered = tick != null && !tick.isBefore(start)
 				? tick
-				: start.plus(elapsedTimeMillis, ChronoUnit.MILLIS);
+				: start.plusMillis(elapsedTimeMillis);
 		if (recovered.isBefore(start)) return start;
 		return recovered.isAfter(latestValidEnd) ? latestValidEnd : recovered;
 	}
@@ -678,18 +676,18 @@ public class TimekeeperPlugin extends Plugin {
 	 * 
 	 * @return a stream of tasks
 	 */
-	public static Stream<Task> getTasks(LocalDate startDate) {
+	public static Stream<Task> getTasks(LocalDate startDate, ZoneId zoneId) {
 		if (entityManager == null) {
 			return Stream.empty();
 		}
 		return entityManager.createNamedQuery("Task.findAll", Task.class)
 				.getResultStream()
 				// TODO: Move filtering to database
-				.filter(tt -> hasData(tt, startDate))
+				.filter(tt -> hasData(tt, startDate, zoneId))
 				.map(TimekeeperPlugin::linkWithMylynTask);
 	}
 	
-	private static boolean hasData/* this week */(Task task, LocalDate startDate) {
+	private static boolean hasData/* this week */(Task task, LocalDate startDate, ZoneId zoneId) {
 		// this should only be NULL if the database has not started yet. See databaseStateChanged()
 		if (task == null) {
 			return false;
@@ -698,7 +696,7 @@ public class TimekeeperPlugin extends Plugin {
 		Stream<Activity> filter = task
 				.getActivities()
 				.stream()
-				.filter(a -> a.getDuration(startDate, endDate) != Duration.ZERO);
+				.filter(a -> !a.getDuration(startDate, endDate, zoneId).isZero());
 		return filter.count() > 0;
 	}
 	

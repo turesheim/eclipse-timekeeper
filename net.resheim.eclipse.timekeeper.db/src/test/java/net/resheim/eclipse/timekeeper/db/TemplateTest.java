@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -100,16 +101,16 @@ public class TemplateTest {
 		// create the objects we're reporting on
 		List<WorkWeek> weeks  = new ArrayList<>();
 		// create a new work week instance with associated tasks
-		weeks.add(new WorkWeek(LocalDate.of(1969, 3, 10), createTestTasks()));
+		weeks.add(new WorkWeek(LocalDate.of(1969, 3, 10), createTestTasks(), ZoneOffset.UTC));
 		
 		// add the various models that we need for formatting and data extraction
 		HashMap<String, Object> contents = new HashMap<>();
 		// utility for formatting DateTime instances
 		contents.put("formatDateTime", new FormatDateTimeMethodModel());
 		// utility for formatting duration
-		contents.put("formatDuration", new FormatDurationMethodModel());
+		contents.put("formatDuration", new FormatDurationMethodModel(ZoneOffset.UTC));
 		// utility for getting activities from a task
-		contents.put("getActivities", new GetActivitiesMethodModel());
+		contents.put("getActivities", new GetActivitiesMethodModel(ZoneOffset.UTC));
 		// add the actual data
 		contents.put("weeks", weeks);
 		// and do the processing
@@ -166,8 +167,8 @@ public class TemplateTest {
 				a1.setSummary(String.format("Activity %1$s %2$s", VERBS[vi], SUBJECTS[si]));
 				LocalDateTime start = LocalDateTime.of(1969, 3, 10+offset, 8, 0);
 				task.addActivity(a1);
-				a1.setStart(start);
-				a1.setEnd(start.plusMinutes(30+(d*10)));
+				a1.setStart(start.toInstant(ZoneOffset.UTC));
+				a1.setEnd(start.plusMinutes(30+(d*10)).toInstant(ZoneOffset.UTC));
 				vi++; si++;
 				if (vi==VERBS.length)vi=0;
 				if (si==VERBS.length)si=0;
