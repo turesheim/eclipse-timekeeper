@@ -78,7 +78,11 @@ public class Task implements Serializable {
 	@ManyToOne
 	@JoinColumn(name = "TASK_PROJECT")
 	private Project taskProject;
-	
+
+	@ManyToOne
+	@JoinColumn(name = "PARENT_TASK")
+	private Task parentTask;
+
 	@Column(name = "TASK_URL")
 	private String taskUrl;
 
@@ -416,6 +420,14 @@ public class Task implements Serializable {
 
 	public Project getProject() {
 		return taskProject;
+	}
+
+	public Task getParentTask() {
+		return parentTask;
+	}
+
+	public void setParentTask(Task parentTask) {
+		this.parentTask = parentTask;
 	}
 
 	public void setProject(Project project) {

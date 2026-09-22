@@ -17,14 +17,14 @@ import org.eclipse.swt.widgets.Text;
 
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 
-final class ExternalReferenceDialog extends TitleAreaDialog {
+public final class ExternalReferenceDialog extends TitleAreaDialog {
 	private Text providerText;
 	private Text repositoryText;
 	private Text externalIdText;
 	private Text urlText;
 	private ExternalTaskReference reference;
 
-	ExternalReferenceDialog(Shell parentShell) {
+	public ExternalReferenceDialog(Shell parentShell) {
 		super(parentShell);
 	}
 
@@ -93,7 +93,7 @@ final class ExternalReferenceDialog extends TitleAreaDialog {
 		super.okPressed();
 	}
 
-	ExternalTaskReference reference() {
+	public ExternalTaskReference reference() {
 		return reference;
 	}
 }

@@ -84,7 +84,7 @@ import net.resheim.eclipse.timekeeper.db.model.Project;
 import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.ui.ActivityLabelPainter;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
-import net.resheim.eclipse.timekeeper.ui.tasks.StandaloneTaskManagerDialog;
+import net.resheim.eclipse.timekeeper.ui.tasks.NativeTaskTreeActions;
 
 @SuppressWarnings("restriction")
 public class WorkWeekView extends ViewPart {
@@ -286,7 +286,7 @@ public class WorkWeekView extends ViewPart {
 
 	private Action deleteAction;
 
-	private Action manageTasksAction;
+	private NativeTaskTreeActions nativeTaskActions;
 
 	private TaskListener taskListener;
 
@@ -529,12 +529,16 @@ public class WorkWeekView extends ViewPart {
 		Object obj = ((IStructuredSelection) selection).getFirstElement();
 		if (obj instanceof Task) {
 			manager.add(new Separator("task"));
-			ITask mylynTask = ((Task) obj).getMylynTask();
-			if (mylynTask != null) {
-				manager.add(mylynTask.isActive() ? deactivateAction : activateAction);
+			Task task = (Task) obj;
+			if (!nativeTaskActions.isNative(task)) {
+				ITask mylynTask = task.getMylynTask();
+				if (mylynTask != null) {
+					manager.add(mylynTask.isActive() ? deactivateAction : activateAction);
+				}
+				manager.add(newActivityAction);
 			}
-			manager.add(newActivityAction);
 		}
+		nativeTaskActions.fillContextMenu(manager, obj);
 		if (obj instanceof Activity) {
 			manager.add(new Separator("labels"));
 			manager.add(new Separator("activity"));
@@ -547,12 +551,12 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void fillLocalPullDown(IMenuManager manager) {
-		manager.add(manageTasksAction);
+		manager.add(nativeTaskActions.newProjectAction());
 	}
 
 	private void fillLocalToolBar(IToolBarManager manager) {
 		manager.add(new Separator("additions"));
-		manager.add(manageTasksAction);
+		manager.add(nativeTaskActions.newProjectAction());
 		manager.add(new Separator("navigation"));
 		manager.add(previousWeekAction);
 		manager.add(currentWeekAction);
@@ -635,17 +639,8 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void makeActions() {
-		manageTasksAction = new Action("Manage tasks...") {
-			@Override
-			public void run() {
-				new StandaloneTaskManagerDialog(getSite().getShell(),
-						TimekeeperUiPlugin.getDefault().getTimekeeperService()).open();
-				refreshAll();
-			}
-		};
-		manageTasksAction.setToolTipText("Manage Timekeeper tasks");
-		manageTasksAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
-				.getImageDescriptor(ISharedImages.IMG_OBJ_ELEMENT));
+		nativeTaskActions = new NativeTaskTreeActions(getSite().getShell(),
+				TimekeeperUiPlugin.getDefault().getTimekeeperService(), this::refreshAll);
 
 		// browse to previous week
 		previousWeekAction = new Action() {
@@ -694,8 +689,10 @@ public class WorkWeekView extends ViewPart {
 			public void run() {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
-				if (obj instanceof Task && ((Task) obj).getMylynTask() != null) {
-					TasksUiUtil.openTask(((Task) obj).getMylynTask());
+				if (obj instanceof Task) {
+					Task task = (Task) obj;
+					if (nativeTaskActions.open(task)) return;
+					if (task.getMylynTask() != null) TasksUiUtil.openTask(task.getMylynTask());
 				}
 			}
 		};

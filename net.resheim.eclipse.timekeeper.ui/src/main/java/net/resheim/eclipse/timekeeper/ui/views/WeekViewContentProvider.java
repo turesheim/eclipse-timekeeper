@@ -88,23 +88,34 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 			return filtered
 					.stream()
 					.filter(t -> p.equals(t.getProject()))
+					.filter(t -> t.getParentTask() == null)
 					.toArray(size -> new Task[size]);
 		}
 		if (parentElement instanceof Task) {
-			return ((Task) parentElement).getActivities()
+			Task task = (Task) parentElement;
+			Object[] subtasks = filtered.stream()
+					.filter(candidate -> task.equals(candidate.getParentTask()))
+					.toArray();
+			Object[] activities = task.getActivities()
 					.stream()
 					.filter(this::hasData)
 					.toArray();
+			Object[] children = new Object[subtasks.length + activities.length];
+			System.arraycopy(subtasks, 0, children, 0, subtasks.length);
+			System.arraycopy(activities, 0, children, subtasks.length, activities.length);
+			return children;
 		}
 		return new Object[0];
 	}
 
 	public Object[] getElements(Object parent) {
-		Object[] projects = filtered
+		Object[] projects = java.util.stream.Stream.concat(filtered
 				.stream()
-				.map(Task::getProject)
+				.map(Task::getProject), TimekeeperPlugin.getProjects()
+						.filter(project -> project.getServiceId() != null))
 				.filter(Objects::nonNull)
-				.filter(distinctByKey(Project::getName))
+				.filter(distinctByKey(project -> project.getServiceId() == null
+						? project.getName() : project.getServiceId()))
 				.toArray();
 		Object[] standaloneTasks = filtered.stream()
 				.filter(task -> task.getProject() == null)
@@ -127,7 +138,8 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	@Override
 	public Object getParent(Object element) {
 		if (element instanceof Task) {
-			return ((Task) element).getProject();
+			Task task = (Task) element;
+			return task.getParentTask() == null ? task.getProject() : task.getParentTask();
 		}
 		if (element instanceof Activity) {
 			return ((Activity) element).getTrackedTask();

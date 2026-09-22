@@ -276,79 +276,78 @@ public class IntegrationTest {
 	}
 
 	@Test
-	public void testStandaloneTaskWorkflowUsesTheClientService() throws Exception {
+	public void testNativeTaskTreeWorkflowUsesTheClientService() throws Exception {
 		SWTBotView workweek = prepareWorkweekView();
 		ITask previous = TasksUi.getTaskActivityManager().getActiveTask();
 		if (previous != null) runOnUi(() -> TasksUi.getTaskActivityManager().deactivateTask(previous));
-
-		workweek.toolbarButton("Manage Timekeeper tasks").click();
-		bot.waitUntil(Conditions.shellIsActive("Timekeeper Tasks"));
-		SWTBotShell manager = bot.activeShell();
-		var managerBot = manager.bot();
-		managerBot.button("New...").click();
-		bot.waitUntil(Conditions.shellIsActive("New Timekeeper Task"));
-		bot.textWithId("standalone-task-summary").setText("Draft standalone task documentation");
-		bot.textWithId("standalone-task-url").setText("https://example.test/standalone");
+		workweek.toolbarButton("Create a native Timekeeper project").click();
+		bot.waitUntil(Conditions.shellIsActive("New Timekeeper Project"));
+		SWTBotShell projectDialog = bot.activeShell();
+		bot.textWithId("native-project-name").setText("Timekeeper documentation");
 		bot.button("Create").click();
-		bot.waitUntil(Conditions.shellIsActive("Timekeeper Tasks"));
+		waitUntilShellIsClosed(bot, projectDialog);
 
-		var row = managerBot.tableWithId("standalone-task-table")
-				.getTableItem("Draft standalone task documentation");
-		row.select();
-		assertEquals("https://example.test/standalone", row.getText(1));
-		assertEquals("Standalone", row.getText(2));
-		assertTrue(managerBot.button("Open URL").isEnabled());
-		var created = TimekeeperUiPlugin.getDefault().getTimekeeperService().tasks().stream()
-				.filter(task -> "Draft standalone task documentation".equals(task.summary()))
-				.findFirst().orElseThrow();
-		var identity = created.id();
-		assertTrue(created.projectId().isEmpty());
+		var tree = workweek.bot().treeWithId("workweek-editor-tree");
+		var project = tree.getTreeItem("Timekeeper documentation");
+		project.contextMenu("New task...").click();
+		bot.waitUntil(Conditions.shellIsActive("New Timekeeper Task"));
+		SWTBotShell taskDialog = bot.activeShell();
+		bot.textWithId("native-task-summary").setText("Document native task workflow");
+		bot.textWithId("native-task-url").setText("https://example.test/native-task");
+		bot.sleep(200);
+		runOnUi(() -> TestUtility.takeScreenshot(screenshotsDir, taskDialog.widget.getChildren()[0],
+				"native-task-editor.png"));
+		bot.button("Create").click();
+		waitUntilShellIsClosed(bot, taskDialog);
 
-		managerBot.button("Edit...").click();
+		var task = tree.getTreeItem("Timekeeper documentation").getNode("Document native task workflow");
+		task.contextMenu("New subtask...").click();
+		bot.waitUntil(Conditions.shellIsActive("New Timekeeper Subtask"));
+		SWTBotShell subtaskDialog = bot.activeShell();
+		bot.textWithId("native-task-summary").setText("Capture Workweek screenshot");
+		bot.button("Create").click();
+		waitUntilShellIsClosed(bot, subtaskDialog);
+
+		var subtask = tree.getTreeItem("Timekeeper documentation")
+				.getNode("Document native task workflow").getNode("Capture Workweek screenshot");
+		subtask.contextMenu("Edit task...").click();
 		bot.waitUntil(Conditions.shellIsActive("Edit Timekeeper Task"));
-		bot.textWithId("standalone-task-summary").setText("Document standalone tasks");
-		bot.textWithId("standalone-task-url").setText("https://example.test/renamed");
+		SWTBotShell editDialog = bot.activeShell();
+		bot.textWithId("native-task-summary").setText("Capture native task tree");
 		bot.button("Save").click();
-		bot.waitUntil(Conditions.shellIsActive("Timekeeper Tasks"));
-		row = managerBot.tableWithId("standalone-task-table").getTableItem("Document standalone tasks");
-		row.select();
+		waitUntilShellIsClosed(bot, editDialog);
 
-		managerBot.button("Link...").click();
+		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
+		var parent = service.tasks().stream().filter(value -> "Document native task workflow".equals(value.summary()))
+				.findFirst().orElseThrow();
+		var child = service.tasks().stream().filter(value -> "Capture native task tree".equals(value.summary()))
+				.findFirst().orElseThrow();
+		assertEquals(parent.projectId(), child.projectId());
+		assertEquals(parent.id(), child.parentTaskId().orElseThrow());
+		tree.getTreeItem("Timekeeper documentation").getNode("Document native task workflow")
+				.contextMenu("Start activity").click();
+		assertEquals(parent.id(), service.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL)
+				.orElseThrow().taskId());
+		tree.getTreeItem("Timekeeper documentation").getNode("Document native task workflow")
+				.contextMenu("Stop activity").click();
+		assertTrue(service.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL).isEmpty());
+
+		tree.getTreeItem("Timekeeper documentation").getNode("Document native task workflow")
+				.contextMenu("Link external task...").click();
 		bot.waitUntil(Conditions.shellIsActive("Link External Task"));
+		SWTBotShell linkDialog = bot.activeShell();
 		bot.textWithId("external-provider").setText("github");
 		bot.textWithId("external-repository").setText("turesheim/eclipse-timekeeper");
 		bot.textWithId("external-task-id").setText("183");
 		bot.textWithId("external-task-url").setText("https://github.com/turesheim/eclipse-timekeeper/issues/183");
 		bot.button("Link").click();
-		bot.waitUntil(Conditions.shellIsActive("Timekeeper Tasks"));
-		row = managerBot.tableWithId("standalone-task-table").getTableItem("Document standalone tasks");
-		row.select();
-		assertEquals("github:183", row.getText(2));
-		runOnUi(() -> TestUtility.takeScreenshot(screenshotsDir, manager.widget.getChildren()[0],
-				"standalone-tasks.png"));
-		managerBot.button("Unlink...").click();
-		assertEquals("Standalone", managerBot.tableWithId("standalone-task-table")
-				.getTableItem("Document standalone tasks").getText(2));
+		waitUntilShellIsClosed(bot, linkDialog);
+		assertEquals(parent.id(), service.findTask(new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey(
+				"github", "turesheim/eclipse-timekeeper", "183")).orElseThrow().id());
 
-		managerBot.tableWithId("standalone-task-table").getTableItem("Document standalone tasks").select();
-		managerBot.button("Start Activity").click();
-		assertEquals(identity, TimekeeperUiPlugin.getDefault().getTimekeeperService()
-				.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL).orElseThrow().taskId());
-		bot.sleep(1100);
-		managerBot.button("Stop Activity").click();
-		assertTrue(TimekeeperUiPlugin.getDefault().getTimekeeperService()
-				.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL).isEmpty());
-		assertEquals(identity, TimekeeperUiPlugin.getDefault().getTimekeeperService().task(identity).orElseThrow().id());
-
-		managerBot.button("Close").click();
-		waitUntilShellIsClosed(bot, manager);
-		workweek.setFocus();
-		workweek.toolbarButton("Show current week").click();
-		assertNotNull(workweek.bot().treeWithId("workweek-editor-tree")
-				.getTreeItem("Document standalone tasks"));
 		runOnUi(() -> TestUtility.takeScreenshot(screenshotsDir,
 				workweek.getViewReference().getPage().getWorkbenchWindow().getShell(),
-				"standalone-task-workweek.png"));
+				"native-task-tree.png"));
 	}
 
 	private static void runOnUi(Runnable action) throws Exception {
@@ -364,10 +363,11 @@ public class IntegrationTest {
 		// being able to locate the tree and gets stuck on the "Find Actions"
 		// text editor instead.
 		if (!Platform.getOS().equals(Platform.OS_LINUX)) {
-			prepareWorkweekView();
+			SWTBotView workweek = prepareWorkweekView();
 			assertTrue(bot.viewByTitle(MAIN_VIEW_NAME).isActive());
+			var tree = workweek.bot().treeWithId("workweek-editor-tree");
 			// verify that a text field can be edited, first day of week
-			bot.treeWithId("workweek-editor-tree").getTreeItem(TEST_MAIN_CATEGORY)
+			tree.getTreeItem(TEST_MAIN_CATEGORY)
 				.getNode(TEST_MAIN_TASK)
 					.getNode(TEST_MAIN_ACTIVITY).select().click(1);
 			bot.text().setText("17:00-20:12");
@@ -376,7 +376,7 @@ public class IntegrationTest {
 				bot.text().pressShortcut(SWT.CR, SWT.LF);
 			});
 			log.info("Verify changed value");
-			String value = bot.treeWithId("workweek-editor-tree").getTreeItem(TEST_MAIN_CATEGORY)
+			String value = tree.getTreeItem(TEST_MAIN_CATEGORY)
 				.getNode(TEST_MAIN_TASK)
 					.getNode(TEST_MAIN_ACTIVITY).select().cell(1);
 			assertEquals("Time range is not correctly updated", "3:12", value);
@@ -429,13 +429,20 @@ public class IntegrationTest {
 			TimekeeperPlugin.getDefault().exportTo(path);
 			// probably don't have to verify that the content is correct as this is actually
 			// done by H2
-			Assert.assertEquals("\"ID\",\"TASK_SUMMARY\",\"TASK_URL\",\"TICK\",\"VERSION\",\"TASK_PROJECT\",\"CURRENTACTIVITY_ID\"",
+			Assert.assertEquals("\"ID\"", Files.readAllLines(path.resolve("project_type.csv")).get(0));
+			Assert.assertEquals("\"NAME\",\"EXTERNAL_ID\",\"PROJECT_URL\",\"REPOSITORY_URL\",\"TASKS_URL\",\"TYPE\"",
+					Files.readAllLines(path.resolve("project.csv")).get(0));
+			Assert.assertEquals("\"ID\",\"TASK_SUMMARY\",\"TASK_URL\",\"TICK\",\"VERSION\",\"PARENT_TASK\",\"TASK_PROJECT\",\"CURRENTACTIVITY_ID\"",
 					Files.readAllLines(path.resolve("trackedtask.csv")).get(0));
 			Assert.assertEquals(
 					"\"ID\",\"END_TIME\",\"ADJUSTED\",\"OWNER_ID\",\"START_TIME\",\"SUMMARY\",\"ACTIVITY_PROJECT\",\"TASK_ID\"",
 					Files.readAllLines(path.resolve("activity.csv")).get(0));
 			Assert.assertEquals("\"TASK_ID\",\"ACTIVITIES_ID\"",
 					Files.readAllLines(path.resolve("trackedtask_activity.csv")).get(0));
+			Assert.assertEquals("\"PROJECT_NAME\",\"TASKS_ID\"",
+					Files.readAllLines(path.resolve("project_task.csv")).get(0));
+			Assert.assertEquals("\"PROJECT_NAME\",\"CHILDREN_ID\"",
+					Files.readAllLines(path.resolve("project_activity.csv")).get(0));
 			Assert.assertEquals("\"ID\",\"EXTERNAL_ID\",\"EXTERNAL_URL\",\"PROVIDER_ID\",\"REPOSITORY_ID\",\"TASK_ID\"",
 					Files.readAllLines(path.resolve("external_task_reference.csv")).get(0));
 			int imported = TimekeeperPlugin.getDefault().importFrom(path);

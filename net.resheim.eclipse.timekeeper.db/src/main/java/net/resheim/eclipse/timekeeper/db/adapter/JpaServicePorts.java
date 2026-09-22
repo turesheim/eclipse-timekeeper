@@ -132,6 +132,12 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 	}
 
 	@Override
+	public boolean existsByParent(TaskId taskId) {
+		return manager().createQuery("SELECT COUNT(t) FROM Task t WHERE t.parentTask.id = :id", Long.class)
+				.setParameter("id", taskId.value().toString()).getSingleResult() > 0;
+	}
+
+	@Override
 	public Task save(Task snapshot) {
 		EntityManager manager = manager();
 		String id = snapshot.id().value().toString();
@@ -146,6 +152,8 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 		entity.setTaskSummary(snapshot.summary());
 		entity.setTaskUrl(snapshot.url().orElse(null));
 		entity.setProject(snapshot.projectId().flatMap(this::findProject).orElse(null));
+		entity.setParentTask(snapshot.parentTaskId().map(value -> manager().find(
+				net.resheim.eclipse.timekeeper.db.model.Task.class, value.value().toString())).orElse(null));
 		synchronizeReferences(entity, snapshot.externalReferences());
 		manager.flush();
 		return task(entity);
@@ -153,7 +161,12 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 
 	@Override
 	public void delete(TaskId id) {
-		remove(net.resheim.eclipse.timekeeper.db.model.Task.class, id.value().toString());
+		net.resheim.eclipse.timekeeper.db.model.Task entity = manager().find(
+				net.resheim.eclipse.timekeeper.db.model.Task.class, id.value().toString());
+		if (entity == null) return;
+		entity.setProject(null);
+		entity.setParentTask(null);
+		manager().remove(entity);
 	}
 
 	@Override
@@ -373,7 +386,9 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 		Set<ExternalTaskReference> references = entity.getExternalReferences().stream()
 				.map(value -> new ExternalTaskReference(value.getProviderId(), value.getRepositoryId(),
 						value.getExternalId(), value.getExternalUrl())).collect(java.util.stream.Collectors.toSet());
-		return new Task(new TaskId(UUID.fromString(entity.getId())), project, entity.getTaskSummary(),
+		Optional<TaskId> parent = Optional.ofNullable(entity.getParentTask())
+				.map(value -> new TaskId(UUID.fromString(value.getId())));
+		return new Task(new TaskId(UUID.fromString(entity.getId())), project, parent, entity.getTaskSummary(),
 				Optional.ofNullable(entity.getTaskUrl()), references, entity.getVersion());
 	}
 

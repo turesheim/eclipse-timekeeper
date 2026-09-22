@@ -82,6 +82,8 @@ public class TestUtility {
 	 */
 	static void takeScreenshot(File screenshotsDir, final Control widget, String filename) {
 		log.info("Taking screenshot of " + widget);
+		widget.getShell().layout(true, true);
+		widget.getShell().update();
 		// Grab a screenshot of the dialog shell
 		final Rectangle b = widget.getBounds();
 		int width = b.width;

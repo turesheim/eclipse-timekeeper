@@ -138,6 +138,37 @@ class DefaultTimekeeperServiceTest {
 	}
 
 	@Test
+	void nativeTasksFormAnAcyclicHierarchyInsideOneProject() {
+		Project project = service.createProject(new CreateProject("Native project"));
+		Task parent = service.createTask(new CreateTask(Optional.of(project.id()), Optional.empty(),
+				"Parent", Optional.empty()));
+		Task child = service.createTask(new CreateTask(Optional.of(project.id()), Optional.of(parent.id()),
+				"Child", Optional.empty()));
+
+		assertEquals(parent.id(), child.parentTaskId().orElseThrow());
+		ServiceException containsSubtasks = assertThrows(ServiceException.class,
+				() -> service.deleteTask(new DeleteTask(parent.id(), parent.version())));
+		assertEquals(FailureCode.CONFLICT, containsSubtasks.code());
+
+		Task childSnapshot = child;
+		ServiceException cycle = assertThrows(ServiceException.class, () -> service.updateTask(new UpdateTask(
+				parent.id(), parent.version(), parent.projectId(), Optional.of(childSnapshot.id()),
+				parent.summary(), parent.url())));
+		assertEquals(FailureCode.CONFLICT, cycle.code());
+
+		Project other = service.createProject(new CreateProject("Other project"));
+		ServiceException differentProject = assertThrows(ServiceException.class, () -> service.createTask(new CreateTask(
+				Optional.of(other.id()), Optional.of(parent.id()), "Invalid child", Optional.empty())));
+		assertEquals(FailureCode.CONFLICT, differentProject.code());
+		ServiceException moveParent = assertThrows(ServiceException.class, () -> service.updateTask(new UpdateTask(
+				parent.id(), parent.version(), Optional.of(other.id()), Optional.empty(), parent.summary(), parent.url())));
+		assertEquals(FailureCode.CONFLICT, moveParent.code());
+
+		service.deleteTask(new DeleteTask(child.id(), child.version()));
+		service.deleteTask(new DeleteTask(parent.id(), parent.version()));
+	}
+
+	@Test
 	void manualActivityCanBeReportedEditedAndDeleted() {
 		Project project = service.createProject(new CreateProject("Server"));
 		Task task = service.createTask(new CreateTask(Optional.of(project.id()), "REST API", Optional.empty()));
@@ -250,6 +281,9 @@ class DefaultTimekeeperServiceTest {
 		@Override public List<Task> findAllTasks() { return List.copyOf(tasks.values()); }
 		@Override public boolean existsByProject(ProjectId id) {
 			return tasks.values().stream().anyMatch(task -> task.projectId().filter(id::equals).isPresent());
+		}
+		@Override public boolean existsByParent(TaskId id) {
+			return tasks.values().stream().anyMatch(task -> task.parentTaskId().filter(id::equals).isPresent());
 		}
 		@Override public Task save(Task value) { tasks.put(value.id(), value); return value; }
 		@Override public void delete(TaskId id) { tasks.remove(id); }

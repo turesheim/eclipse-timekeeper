@@ -432,8 +432,8 @@ public class TimekeeperPlugin extends Plugin {
 	}
 
 	/**
-	 * Exports Timekeeper tasks, activities, their relations, and optional external
-	 * task identities to separate CSV files.
+	 * Exports Timekeeper projects, tasks, activities, their relations, and optional
+	 * external task identities to separate CSV files.
 	 * 
 	 * TODO: Compress into zip
 	 * 
@@ -444,12 +444,21 @@ public class TimekeeperPlugin extends Plugin {
 		if (!path.toFile().exists()) {
 			Files.createDirectory(path);
 		}
+		Path projectTypes = path.resolve("project_type.csv");
+		Path projects = path.resolve("project.csv");
 		Path tasks = path.resolve("trackedtask.csv");
 		Path activities = path.resolve("activity.csv");
 		Path relations = path.resolve("trackedtask_activity.csv");
+		Path projectTasks = path.resolve("project_task.csv");
+		Path projectActivities = path.resolve("project_activity.csv");
 		Path externalReferences = path.resolve("external_task_reference.csv");
 		EntityTransaction transaction = entityManager.getTransaction();
 		transaction.begin();
+		int projectTypesExported = entityManager
+				.createNativeQuery("CALL CSVWRITE('" + projectTypes + "', 'SELECT * FROM PROJECT_TYPE');")
+				.executeUpdate();
+		int projectsExported = entityManager
+				.createNativeQuery("CALL CSVWRITE('" + projects + "', 'SELECT * FROM PROJECT');").executeUpdate();
 		int tasksExported = entityManager
 				.createNativeQuery("CALL CSVWRITE('" + tasks + "', 'SELECT * FROM TASK');").executeUpdate();
 		int activitiesExported = entityManager
@@ -457,10 +466,14 @@ public class TimekeeperPlugin extends Plugin {
 		// relations are not automatically created, so we do this the easy way
 		entityManager.createNativeQuery("CALL CSVWRITE('" + relations + "', 'SELECT * FROM TASK_ACTIVITY');")
 				.executeUpdate();
+		entityManager.createNativeQuery("CALL CSVWRITE('" + projectTasks + "', 'SELECT * FROM PROJECT_TASK');")
+				.executeUpdate();
+		entityManager.createNativeQuery("CALL CSVWRITE('" + projectActivities + "', 'SELECT * FROM PROJECT_ACTIVITY');")
+				.executeUpdate();
 		int referencesExported = entityManager.createNativeQuery("CALL CSVWRITE('" + externalReferences
 				+ "', 'SELECT * FROM EXTERNAL_TASK_REFERENCE');").executeUpdate();
 		transaction.commit();
-		return tasksExported + activitiesExported + referencesExported;
+		return projectTypesExported + projectsExported + tasksExported + activitiesExported + referencesExported;
 	}
 
 	/**
@@ -471,10 +484,20 @@ public class TimekeeperPlugin extends Plugin {
 	 * @throws IOException
 	 */
 	public int importFrom(Path path) throws IOException {
+		Path projectTypes = path.resolve("project_type.csv");
+		Path projects = path.resolve("project.csv");
 		Path tasks = path.resolve("trackedtask.csv");
 		Path activities = path.resolve("activity.csv");
 		Path relations = path.resolve("trackedtask_activity.csv");
+		Path projectTasks = path.resolve("project_task.csv");
+		Path projectActivities = path.resolve("project_activity.csv");
 		Path externalReferences = path.resolve("external_task_reference.csv");
+		if (!projectTypes.toFile().exists()) {
+			throw new IOException("'project_type.csv' does not exist in the specified location.");
+		}
+		if (!projects.toFile().exists()) {
+			throw new IOException("'project.csv' does not exist in the specified location.");
+		}
 		if (!tasks.toFile().exists()) {
 			throw new IOException("'trackedtask.csv' does not exist in the specified location.");
 		}
@@ -484,6 +507,12 @@ public class TimekeeperPlugin extends Plugin {
 		if (!relations.toFile().exists()) {
 			throw new IOException("'trackedtask_activity.csv' does not exist in the specified location.");
 		}
+		if (!projectTasks.toFile().exists()) {
+			throw new IOException("'project_task.csv' does not exist in the specified location.");
+		}
+		if (!projectActivities.toFile().exists()) {
+			throw new IOException("'project_activity.csv' does not exist in the specified location.");
+		}
 		if (!externalReferences.toFile().exists()) {
 			throw new IOException("'external_task_reference.csv' does not exist in the specified location.");
 		}
@@ -491,6 +520,12 @@ public class TimekeeperPlugin extends Plugin {
 		try {
 			transaction.begin();
 			entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE;").executeUpdate();
+			int projectTypesImported = entityManager
+					.createNativeQuery("MERGE INTO PROJECT_TYPE (SELECT * FROM CSVREAD('" + projectTypes + "'));")
+					.executeUpdate();
+			int projectsImported = entityManager
+					.createNativeQuery("MERGE INTO PROJECT (SELECT * FROM CSVREAD('" + projects + "'));")
+					.executeUpdate();
 			int tasksImported = entityManager
 					.createNativeQuery("MERGE INTO TASK (SELECT * FROM CSVREAD('" + tasks + "'));")
 					.executeUpdate();
@@ -500,18 +535,21 @@ public class TimekeeperPlugin extends Plugin {
 			entityManager
 					.createNativeQuery("MERGE INTO TASK_ACTIVITY (SELECT * FROM CSVREAD('" + relations + "'));")
 					.executeUpdate();
+			entityManager
+					.createNativeQuery("MERGE INTO PROJECT_TASK (SELECT * FROM CSVREAD('" + projectTasks + "'));")
+					.executeUpdate();
+			entityManager.createNativeQuery(
+					"MERGE INTO PROJECT_ACTIVITY (SELECT * FROM CSVREAD('" + projectActivities + "'));")
+					.executeUpdate();
 			int referencesImported = entityManager.createNativeQuery("MERGE INTO EXTERNAL_TASK_REFERENCE "
 					+ "(SELECT * FROM CSVREAD('" + externalReferences + "'));").executeUpdate();
 			entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE;").executeUpdate();
 			transaction.commit();
-			// update all instances with potentially new content
-			TypedQuery<Task> createQuery = entityManager.createQuery("SELECT t FROM Task t",
-					Task.class);
-			List<Task> resultList = createQuery.getResultList();
-			for (Task trackedTask : resultList) {
-				entityManager.refresh(trackedTask);
-			}
-			return tasksImported + activitiesImported + referencesImported;
+			// Refresh task state without detaching objects still used by Mylyn and the
+			// Workweek view.
+			List<Task> restoredTasks = entityManager.createQuery("SELECT t FROM Task t", Task.class).getResultList();
+			for (Task restoredTask : restoredTasks) entityManager.refresh(restoredTask);
+			return projectTypesImported + projectsImported + tasksImported + activitiesImported + referencesImported;
 		} catch (PersistenceException e) {
 			transaction.rollback();
 			throw new IOException(e.getMessage());
@@ -648,6 +686,12 @@ public class TimekeeperPlugin extends Plugin {
 		return entityManager.createNamedQuery("Project.findAll", Project.class).getResultStream()
 				.filter(project -> title.equals(project.getName())).findFirst().orElse(null);
 	}
+
+	/** Returns all persisted projects, including empty native projects. */
+	public static Stream<Project> getProjects() {
+		if (entityManager == null) return Stream.empty();
+		return entityManager.createNamedQuery("Project.findAll", Project.class).getResultStream();
+	}
 	
 	/**
 	 * Creates a new {@link Project} based on information obtained from the Mylyn task. A {@link ProjectType} will also
@@ -690,7 +734,10 @@ public class TimekeeperPlugin extends Plugin {
 		return entityManager.createNamedQuery("Task.findAll", Task.class)
 				.getResultStream()
 				// TODO: Move filtering to database
-				.filter(tt -> hasData(tt, startDate, zoneId))
+				// Native task trees remain available for maintenance even before time is
+				// recorded in the selected week.
+				.filter(tt -> hasData(tt, startDate, zoneId)
+						|| tt.getProject() != null && tt.getProject().getServiceId() != null)
 				.map(TimekeeperPlugin::linkWithMylynTask);
 	}
 	

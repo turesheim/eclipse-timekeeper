@@ -17,28 +17,36 @@ import org.eclipse.swt.widgets.Text;
 
 import net.resheim.eclipse.timekeeper.domain.Task;
 
-final class TaskEditorDialog extends TitleAreaDialog {
+public final class TaskEditorDialog extends TitleAreaDialog {
 	private final Task task;
+	private final boolean subtask;
 	private Text summaryText;
 	private Text urlText;
 	private String summary;
 	private Optional<String> url = Optional.empty();
 
-	TaskEditorDialog(Shell parentShell, Task task) {
+	public TaskEditorDialog(Shell parentShell, Task task) {
+		this(parentShell, task, false);
+	}
+
+	public TaskEditorDialog(Shell parentShell, Task task, boolean subtask) {
 		super(parentShell);
 		this.task = task;
+		this.subtask = subtask;
 	}
 
 	@Override
 	protected void configureShell(Shell shell) {
 		super.configureShell(shell);
-		shell.setText(task == null ? "New Timekeeper Task" : "Edit Timekeeper Task");
+		shell.setText(task == null ? (subtask ? "New Timekeeper Subtask" : "New Timekeeper Task")
+				: "Edit Timekeeper Task");
 	}
 
 	@Override
 	protected Control createDialogArea(Composite parent) {
-		setTitle(task == null ? "Create a standalone task" : "Edit standalone task");
-		setMessage("Standalone tasks are native Timekeeper records and do not require Mylyn.");
+		setTitle(task == null ? (subtask ? "Create a native subtask" : "Create a native task")
+				: "Edit native task");
+		setMessage("Native tasks are stored by Timekeeper and do not require Mylyn.");
 		Composite area = (Composite) super.createDialogArea(parent);
 		Composite fields = new Composite(area, SWT.NONE);
 		fields.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
@@ -47,12 +55,12 @@ final class TaskEditorDialog extends TitleAreaDialog {
 		new Label(fields, SWT.NONE).setText("Summary:");
 		summaryText = new Text(fields, SWT.BORDER);
 		summaryText.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-		summaryText.setData("org.eclipse.swtbot.widget.key", "standalone-task-summary");
+		summaryText.setData("org.eclipse.swtbot.widget.key", "native-task-summary");
 
 		new Label(fields, SWT.NONE).setText("URL:");
 		urlText = new Text(fields, SWT.BORDER);
 		urlText.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-		urlText.setData("org.eclipse.swtbot.widget.key", "standalone-task-url");
+		urlText.setData("org.eclipse.swtbot.widget.key", "native-task-url");
 
 		if (task != null) {
 			summaryText.setText(task.summary());
@@ -97,11 +105,11 @@ final class TaskEditorDialog extends TitleAreaDialog {
 		super.okPressed();
 	}
 
-	String summary() {
+	public String summary() {
 		return summary;
 	}
 
-	Optional<String> url() {
+	public Optional<String> url() {
 		return url;
 	}
 }

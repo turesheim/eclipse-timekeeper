@@ -32,6 +32,7 @@ public final class Ports {
 		Optional<Task> findByExternalReference(ExternalTaskReferenceKey reference);
 		List<Task> findAllTasks();
 		boolean existsByProject(ProjectId projectId);
+		boolean existsByParent(TaskId taskId);
 		Task save(Task task);
 		void delete(TaskId id);
 	}

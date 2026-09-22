@@ -26,6 +26,8 @@ import net.resheim.eclipse.timekeeper.service.Commands.CreateActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateTask;
+import net.resheim.eclipse.timekeeper.service.Commands.DeleteProject;
+import net.resheim.eclipse.timekeeper.service.Commands.DeleteTask;
 import net.resheim.eclipse.timekeeper.service.Commands.LinkExternalReference;
 import net.resheim.eclipse.timekeeper.service.Commands.UnlinkExternalReference;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
@@ -56,6 +58,8 @@ class JpaServicePortsTest {
 		var project = service.createProject(new CreateProject("Embedded"));
 		project = service.updateProject(new UpdateProject(project.id(), project.version(), "Renamed"));
 		var task = service.createTask(new CreateTask(Optional.of(project.id()), "Adapter task", Optional.empty()));
+		var subtask = service.createTask(new CreateTask(Optional.of(project.id()), Optional.of(task.id()),
+				"Adapter subtask", Optional.empty()));
 		var label = service.createLabel(new CreateLabel("Billable", Optional.of("0,128,0")));
 		Instant start = Instant.parse("2026-09-22T08:00:00Z");
 		var activity = service.createActivity(new CreateActivity(task.id(), OwnerId.LOCAL, start,
@@ -65,16 +69,34 @@ class JpaServicePortsTest {
 				Optional.of(OwnerId.LOCAL), Optional.of(task.id()), Optional.of(project.id()), ZoneOffset.UTC));
 		assertEquals(Duration.ofMinutes(45), report.total());
 		assertEquals(activity.id(), report.activities().getFirst().id());
-		assertEquals(5, events.size());
+		assertEquals(6, events.size());
 
 		var projectId = project.id();
 		var taskId = task.id();
+		var subtaskId = subtask.id();
 		DatabaseStartup.close(manager);
 		manager = DatabaseStartup.open(url("service") + ";IFEXISTS=TRUE");
 		service = service(new ArrayList<>());
 		assertEquals("Renamed", service.project(projectId).orElseThrow().name());
 		assertEquals(projectId, service.task(taskId).orElseThrow().projectId().orElseThrow());
+		assertEquals(taskId, service.task(subtaskId).orElseThrow().parentTaskId().orElseThrow());
 		assertEquals(activity.id(), service.activity(activity.id()).orElseThrow().id());
+	}
+
+	@Test
+	void projectCanBeDeletedAfterItsTaskHierarchy() throws Exception {
+		manager = DatabaseStartup.open(url("delete-hierarchy"));
+		TimekeeperService service = service(new ArrayList<>());
+		var project = service.createProject(new CreateProject("Disposable"));
+		var parent = service.createTask(new CreateTask(Optional.of(project.id()), "Parent", Optional.empty()));
+		var child = service.createTask(new CreateTask(Optional.of(project.id()), Optional.of(parent.id()),
+				"Child", Optional.empty()));
+
+		service.deleteTask(new DeleteTask(child.id(), child.version()));
+		service.deleteTask(new DeleteTask(parent.id(), parent.version()));
+		service.deleteProject(new DeleteProject(project.id(), project.version()));
+		assertTrue(service.projects().isEmpty());
+		assertTrue(service.tasks().isEmpty());
 	}
 
 	@Test

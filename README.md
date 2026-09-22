@@ -13,24 +13,28 @@ The context menu and toolbar buttons can be used to browse back and forward by o
 
 See the <a href="../../wiki">wiki</a>  for more about usage.
 
-## Standalone Timekeeper tasks
+## Native Timekeeper tasks
 
-Work can be tracked without first creating a task in Mylyn or another external
-system. Choose **Manage Timekeeper tasks** from the Workweek toolbar, then use
-**New...** to enter a summary and, optionally, an absolute URL. The task manager
-also lets you rename or delete a task, open its URL in Eclipse's internal
-browser, and start or stop an activity.
+Work can be organized and tracked without first creating a task in Mylyn or
+another external system. Use **New Timekeeper project...** in the Workweek
+toolbar to create a native project. The project appears directly in the tree;
+use its context menu to create tasks, then use a task's context menu to create
+subtasks.
 
-![Managing standalone Timekeeper tasks](resources/screenshots/standalone-tasks.png)
+![Creating a native Timekeeper task](resources/screenshots/native-task-editor.png)
 
-A standalone task can later be linked to an external provider such as GitHub or
-Jira without changing its Timekeeper identity or losing its recorded
-activities. External references can also be removed while keeping the task and
-its history. Native tasks appear as top-level rows in the Workweek view and are
-included in weekly totals, reports, and CSV export alongside externally linked
-tasks.
+Native projects, tasks, and subtasks are maintained in the Workweek view. A
+double-click edits a task, while the context menu provides actions for editing,
+deleting, starting or stopping activity tracking, opening an optional URL, and
+linking or unlinking an external task. Recorded activities remain beneath the
+task or subtask to which they belong.
 
-![A standalone task in the Workweek view](resources/screenshots/standalone-task-workweek.png)
+![Native project, task, and subtask in the Workweek view](resources/screenshots/native-task-tree.png)
+
+A native task can later be linked to a provider such as GitHub or Jira without
+changing its Timekeeper identity, hierarchy, or recorded history. Native tasks
+participate in weekly totals, reports, and CSV export alongside tasks originating
+in external systems.
 
 The data is stored in an H2 SQL database, mapped to POJOs using the Java Persistence API with EclipseLink. Reports are generated using Apache FreeMarker. The database has an explicit schema version and initialization state; historical data migration is not supported.
 
@@ -54,7 +58,7 @@ The Database configuration page in preferences (**Timekeeper > Database**) allow
 
 Multiple instances of the Timekeeper can share the database as it utilizes a H2 feature called mixed mode. This will automatically start a server instance on port 9090 if more connections are needed.
 
-The Eclipse 2026-09 upgrade uses **H2 2.5.250 with schema version 1** as its
+The Eclipse 2026-09 upgrade uses **H2 2.5.250 with schema version 2** as its
 supported database baseline. Start with new storage; historical H2 files,
 unversioned databases and old Mylyn attribute records are not imported.
 Schema versioning and guarded migration-target infrastructure are retained for
@@ -62,9 +66,10 @@ future migrations, but there are no active migration recipes or recovery buttons
 See the [database policy, backups and future migration contract](DATABASE-RECOVERY.md).
 
 Keep unsupported databases intact and select a separate empty location. CSV
-Export/Import now targets the current `TASK`, `EXTERNAL_TASK_REFERENCE`,
-`ACTIVITY` and `TASK_ACTIVITY` schema, but it remains a convenience interchange
-format rather than a database backup, migration or rollback mechanism.
+Export/Import now targets the current project, task, activity, external-reference
+and relation tables, including native task hierarchy, but it remains a
+convenience interchange format rather than a database backup, migration or
+rollback mechanism.
 
 ## Installing
 
