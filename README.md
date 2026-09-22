@@ -30,9 +30,9 @@ future migrations, but there are no active migration recipes or recovery buttons
 See the [database policy, backups and future migration contract](DATABASE-RECOVERY.md).
 
 Keep unsupported databases intact and select a separate empty location. CSV
-Export/Import now targets the current `TASK`, `ACTIVITY` and `TASK_ACTIVITY`
-schema, but it remains a convenience interchange format rather than a database
-backup, migration or rollback mechanism.
+Export/Import now targets the current `TASK`, `EXTERNAL_TASK_REFERENCE`,
+`ACTIVITY` and `TASK_ACTIVITY` schema, but it remains a convenience interchange
+format rather than a database backup, migration or rollback mechanism.
 
 ## Installing
 

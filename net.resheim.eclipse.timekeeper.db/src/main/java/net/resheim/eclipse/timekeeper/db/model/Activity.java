@@ -76,8 +76,7 @@ public class Activity implements Comparable<Activity>, Serializable {
 
 	/** The task the activity is associated with */
 	@ManyToOne
-	@JoinColumn(name = "TASK_ID", referencedColumnName = "TASK_ID")
-	@JoinColumn(name = "REPOSITORY_URL", referencedColumnName = "REPOSITORY_URL")
+	@JoinColumn(name = "TASK_ID", referencedColumnName = "ID")
 	private Task task;
 
 	/** The project this activity is associated with, if not associated with a tracked task */

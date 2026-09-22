@@ -15,9 +15,11 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -27,14 +29,15 @@ import javax.persistence.Convert;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
 import javax.persistence.Id;
-import javax.persistence.IdClass;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.NamedQuery;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
+import javax.persistence.OrderBy;
 import javax.persistence.Table;
 import javax.persistence.Transient;
+import javax.persistence.Version;
 
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTaskCategory;
@@ -46,16 +49,15 @@ import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConverter;
 
 /**
- * A {@link Task} is the optional persisted link to an {@link ITask}. It holds a
- * number of {@link Activity} instances which each represent a period of work on
- * the task.
+ * A provider-independent unit of work tracked by Timekeeper. It holds a number
+ * of {@link Activity} instances and can optionally be linked to Mylyn or other
+ * external task providers through {@link ExternalTaskReference} instances.
  * 
  * @author Torkild U. Resheim
  */
 @SuppressWarnings("restriction")
 @Entity
 @Table(name = "TASK")
-@IdClass(value = GlobalTaskId.class)
 @NamedQuery(name="Task.findAll", query="SELECT t FROM Task t")
 public class Task implements Serializable {
 	
@@ -65,12 +67,12 @@ public class Task implements Serializable {
 	private transient Lock lock = new ReentrantLock();
 
 	@Id
-	@Column(name = "REPOSITORY_URL")
-	private String repositoryUrl;
+	@Column(name = "ID", nullable = false, updatable = false)
+	private String id = UUID.randomUUID().toString();
 
-	@Id
-	@Column(name = "TASK_ID")
-	private String taskId;
+	@Version
+	@Column(name = "VERSION", nullable = false)
+	private long version;
 
 	@ManyToOne
 	@JoinColumn(name = "TASK_PROJECT")
@@ -93,6 +95,10 @@ public class Task implements Serializable {
 
 	@OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
 	private List<Activity> activities;
+
+	@OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+	@OrderBy("providerId ASC, repositoryId ASC, externalId ASC")
+	private List<ExternalTaskReference> externalReferences;
 	
 	/** Optional link to a Mylyn task */
 	@Transient
@@ -107,6 +113,13 @@ public class Task implements Serializable {
 
 	public Task() {
 		activities = new ArrayList<>();
+		externalReferences = new ArrayList<>();
+	}
+
+	/** Creates a native Timekeeper task with no external provider dependency. */
+	public Task(String summary) {
+		this();
+		setTaskSummary(summary);
 	}
 
 	/**
@@ -116,7 +129,7 @@ public class Task implements Serializable {
 	 * @param task the associated Mylyn task
 	 */
 	public Task(ITask task) {
-		this();
+		this(task.getSummary());
 		linkWithMylynTask(task);
 		if (taskProject != null) {
 			taskProject.addTask(this);
@@ -239,8 +252,9 @@ public class Task implements Serializable {
 			taskLinkStatus = TaskLinkStatus.UNLINKED;
 			return;
 		}
-		taskId = task.getTaskId();
-		repositoryUrl = TimekeeperPlugin.getRepositoryUrl(task);
+		String providerId = task.getConnectorKind() == null ? "mylyn" : task.getConnectorKind();
+		String repositoryId = TimekeeperPlugin.getRepositoryUrl(task);
+		linkExternalTask(providerId, repositoryId, task.getTaskId(), task.getUrl());
 		taskUrl = task.getUrl();
 		taskSummary = task.getSummary();
 		taskLinkStatus = TaskLinkStatus.LINKED;
@@ -266,6 +280,36 @@ public class Task implements Serializable {
 				this.setProject(project);
 			});
 		}
+	}
+
+	/** Adds or refreshes an optional external identity for this Timekeeper task. */
+	public ExternalTaskReference linkExternalTask(String providerId, String repositoryId, String externalId,
+			String externalUrl) {
+		providerId = ExternalTaskReference.normalizeRequired(providerId, "providerId");
+		repositoryId = ExternalTaskReference.normalizeRequired(repositoryId, "repositoryId");
+		externalId = ExternalTaskReference.normalizeRequired(externalId, "externalId");
+		String normalizedProviderId = providerId;
+		String normalizedRepositoryId = repositoryId;
+		String normalizedExternalId = externalId;
+		ExternalTaskReference reference = externalReferences.stream()
+				.filter(candidate -> candidate.matches(normalizedProviderId, normalizedRepositoryId, normalizedExternalId))
+				.findFirst().orElseGet(() -> {
+					ExternalTaskReference created = new ExternalTaskReference(normalizedProviderId,
+							normalizedRepositoryId, normalizedExternalId, externalUrl);
+					created.attachTo(this);
+					externalReferences.add(created);
+					return created;
+				});
+		reference.setExternalUrl(externalUrl);
+		return reference;
+	}
+
+	public List<ExternalTaskReference> getExternalReferences() {
+		return Collections.unmodifiableList(externalReferences);
+	}
+
+	private Optional<ExternalTaskReference> firstExternalReference() {
+		return externalReferences.stream().findFirst();
 	}
 
 	/**
@@ -296,21 +340,24 @@ public class Task implements Serializable {
 	}
 
 	/**
-	 * Returns the <i>Mylyn</i> repository URL. Internally an UUID for each Eclipse
+	 * Compatibility accessor returning the first external repository in stable
+	 * provider/repository/ID order. Internally an UUID for each Eclipse
 	 * workspace is postfixed the local repository URL in order to keep them apart.
 	 * This method will only return "local" for local repositories.
 	 * 
 	 * @return the repository URL or "local"
 	 */
 	public String getRepositoryUrl() {
-		if (repositoryUrl.startsWith("local-")) {
+		String repositoryUrl = firstExternalReference().map(ExternalTaskReference::getRepositoryId).orElse(null);
+		if (repositoryUrl != null && repositoryUrl.startsWith("local-")) {
 			return TimekeeperPlugin.KIND_LOCAL;
 		}
 		return repositoryUrl;
 	}
 
 	/**
-	 * Returns the tasks identifier associated with this tracked task. If it's a
+	 * Compatibility accessor returning the first external task identifier in stable
+	 * provider/repository/ID order. If it's a
 	 * local task, only the number will be returned and one would have to use the
 	 * repository to correctly identify the {@link ITask} instance. If the task is
 	 * linked to a Mylyn task, this task's identifier will be returned.
@@ -318,7 +365,16 @@ public class Task implements Serializable {
 	 * @return the task identifier
 	 */
 	public String getTaskId() {
-		return taskId;
+		return firstExternalReference().map(ExternalTaskReference::getExternalId).orElse(null);
+	}
+
+	/** Returns the provider-independent Timekeeper identity. */
+	public String getId() {
+		return id;
+	}
+
+	public long getVersion() {
+		return version;
 	}
 
 	/**
@@ -351,7 +407,7 @@ public class Task implements Serializable {
 
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
-		sb.append(taskId);
+		sb.append(getTaskId() == null ? id : getTaskId());
 		sb.append(": ");
 		sb.append(getTaskSummary());
 		return sb.toString();

@@ -348,13 +348,15 @@ public class IntegrationTest {
 			TimekeeperPlugin.getDefault().exportTo(path);
 			// probably don't have to verify that the content is correct as this is actually
 			// done by H2
-			Assert.assertEquals("\"TASK_ID\",\"REPOSITORY_URL\",\"TASK_SUMMARY\",\"TASK_URL\",\"TICK\",\"TASK_PROJECT\",\"CURRENTACTIVITY_ID\"",
+			Assert.assertEquals("\"ID\",\"TASK_SUMMARY\",\"TASK_URL\",\"TICK\",\"VERSION\",\"TASK_PROJECT\",\"CURRENTACTIVITY_ID\"",
 					Files.readAllLines(path.resolve("trackedtask.csv")).get(0));
 			Assert.assertEquals(
-					"\"ID\",\"END_TIME\",\"ADJUSTED\",\"START_TIME\",\"SUMMARY\",\"ACTIVITY_PROJECT\",\"TASK_ID\",\"REPOSITORY_URL\"",
+					"\"ID\",\"END_TIME\",\"ADJUSTED\",\"START_TIME\",\"SUMMARY\",\"ACTIVITY_PROJECT\",\"TASK_ID\"",
 					Files.readAllLines(path.resolve("activity.csv")).get(0));
-			Assert.assertEquals("\"TASK_ID\",\"REPOSITORY_URL\",\"ACTIVITIES_ID\"",
+			Assert.assertEquals("\"TASK_ID\",\"ACTIVITIES_ID\"",
 					Files.readAllLines(path.resolve("trackedtask_activity.csv")).get(0));
+			Assert.assertEquals("\"ID\",\"EXTERNAL_ID\",\"EXTERNAL_URL\",\"PROVIDER_ID\",\"REPOSITORY_ID\",\"TASK_ID\"",
+					Files.readAllLines(path.resolve("external_task_reference.csv")).get(0));
 			int imported = TimekeeperPlugin.getDefault().importFrom(path);
 			Assert.assertTrue("Current-schema CSV round trip imported no rows", imported > 0);
 		} catch (IOException e) {

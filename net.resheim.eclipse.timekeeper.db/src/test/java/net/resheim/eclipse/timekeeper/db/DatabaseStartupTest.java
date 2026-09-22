@@ -69,7 +69,7 @@ class DatabaseStartupTest {
 	@Test
 	void refusesUnversionedCurrentModelWithoutChangingSchemaOrData() throws Exception {
 		try (Connection connection = connection()) {
-			run(connection, "/net/resheim/eclipse/timekeeper/db/fixtures/current-model-186355a.sql");
+			run(connection, "/net/resheim/eclipse/timekeeper/db/fixtures/current-native-model.sql");
 		}
 		List<String> before = snapshot();
 		assertThrows(SQLException.class, () -> DatabaseStartup.open(url() + ";IFEXISTS=TRUE"));
@@ -96,7 +96,7 @@ class DatabaseStartupTest {
 	@Test
 	void refusesIncompleteCurrentSchemaWithoutCreatingMissingTables() throws Exception {
 		try (Connection connection = connection(); var statement = connection.createStatement()) {
-			run(connection, "/net/resheim/eclipse/timekeeper/db/fixtures/current-model-186355a.sql");
+			run(connection, "/net/resheim/eclipse/timekeeper/db/fixtures/current-native-model.sql");
 			statement.execute("DROP TABLE ACTIVITY_ACTIVITYLABEL");
 		}
 		List<String> before = snapshot();

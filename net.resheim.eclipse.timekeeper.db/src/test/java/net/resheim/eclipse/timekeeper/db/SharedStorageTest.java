@@ -28,7 +28,6 @@ import org.junit.Test;
 
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.Task;
-import net.resheim.eclipse.timekeeper.db.model.GlobalTaskId;
 
 @SuppressWarnings("restriction")
 public class SharedStorageTest {
@@ -169,7 +168,7 @@ public class SharedStorageTest {
 		persist(ttask);
 
 		// now attempt to load the task from the persistent storage
-		GlobalTaskId id = new GlobalTaskId(ttask.getRepositoryUrl(), ttask.getTaskId());
+		String id = ttask.getId();
 		Task dbTask = entityManager.find(Task.class, id);
 		Assert.assertNotNull("Persisted task must be reloadable", dbTask);
 		// Test the single task
@@ -213,7 +212,7 @@ public class SharedStorageTest {
 		persist(task);
 
 		// now attempt to load the task from the persistent storage
-		GlobalTaskId id = new GlobalTaskId(task.getRepositoryUrl(), task.getTaskId());
+		String id = task.getId();
 		Task dbTask = entityManager.find(Task.class, id);
 
 		// verify that the accumulated duration is correct
