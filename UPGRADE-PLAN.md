@@ -273,8 +273,15 @@ for the support boundaries.
   [Error Log report](baseline/ERROR-LOG.md). Timekeeper-owned errors are fixed or
   belong to deliberate negative scenarios, but the installed Mylyn theme-parser
   dependency error remains an open release blocker.
-- [ ] Update version numbers, README, CHANGES and any migration instructions.
-- [ ] Document supported Eclipse/Java versions, installation and rollback.
+- [x] Update version numbers, README, CHANGES and any migration instructions.
+  Version 2.0.0 is confirmed in the Maven, OSGi bundle and feature metadata.
+  Maven `-SNAPSHOT` and OSGi `.qualifier` suffixes remain intentionally so
+  verified builds receive a timestamped p2 version until publication. Release
+  notes now describe the supported schema baseline and the lack of historical
+  migration support.
+- [x] Document supported Eclipse/Java versions, installation and rollback.
+  The README documents Eclipse 2026-09 / Java 21 requirements, evidence by
+  platform, p2 installation, separate-storage upgrade and deliberate rollback.
 - [ ] Record the final build, test results and release artifact location.
 
 Completion criterion: Installation, upgrade, restart and use with existing data
@@ -305,7 +312,7 @@ pass in the UI harness, and installed interrupted-activity scenarios are verifie
 | EclipseLink/JPA version and possible Jakarta migration | EclipseLink 2.7.16 / javax.persistence 2.2.1; no namespace migration for test enablement |
 | H2 and migration scope | H2 2.5.250 / schema 1; no historical migrations; future lifecycle infrastructure retained |
 | Supported operating systems and architectures | macOS aarch64 fully exercised; Linux x86_64/X11 full CI; Windows x86_64 build/native idle smoke; see platform acceptance for limitations |
-| New Timekeeper version | Decide before completing step 6 |
+| New Timekeeper version | 2.0.0; build qualifiers remain until publication |
 
 Installed-IDE acceptance outside macOS remains limited. Multi-instance storage
 is characterized but intentionally lacks

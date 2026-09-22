@@ -1,26 +1,58 @@
-## Changes
+# Changes
 
-### Version 2.0.0 (Next release)
+## 2.0.0 (unreleased)
 
-The main goal of this release was to make sure records were not lost if your workspace got wiped. To do this a shared SQL database ([H2](http://www.h2database.com)) containing all Timekeeper data from all workspaces is used. Old data should be automatically converted to an old workspace once you upgrade.
+Timekeeper 2.0.0 updates the plug-in for Eclipse 2026-09 (4.41), Mylyn Tasks
+4.12 and Java 21. It establishes H2 2.5.250 schema version 1 as the supported
+database baseline.
 
-Additionally, the data structure has been reworked so as few as possible are kept in the Mylyn Task metadata, but rather stored in the database. When creating a new Eclipse Workspace with a fresh Mylyn Tasks database, the Timekeeper connections to Mylyn will be remade if there are any previous records. Note that the connection to any _local_ tasks will be lost unless you make a backup of the tasks. In order to separate the various local instances a unique identifier is written to the Mylyn end.
+### Highlights
 
-A preference setting allows you to change the database URL in case you don't want the default location. And lastly, there is a CSV export/import mechanism along with configurable templates for reporting.
+- Updated the build, target platform and runtime dependencies for Eclipse
+  2026-09 and Java 21.
+- Added activity-based tracking with editable start and end times, improved
+  refresh behavior and high-resolution display assets.
+- Preserved tasks, projects, labels, activities and reporting in the new
+  versioned database baseline.
+- Added guarded database initialization and future migration lifecycle
+  infrastructure. Unsupported, unversioned and incomplete databases fail closed.
+- Verified workspace, shared `AUTO_SERVER`, explicit file and local H2 TCP
+  storage selected through Timekeeper preferences.
+- Fixed installed-IDE packaging so Mylyn Tasks search contributions are present
+  and only the host logging provider is installed. Bugzilla is no longer a
+  mandatory dependency.
+- Fixed interrupted-activity recovery, startup races, supplied activity end
+  timestamps and database preference saving on current Eclipse releases.
+- Updated embedded JNA to 5.19.1 and FreeMarker to 2.3.35.
+- Added configurable FreeMarker report templates and current-schema CSV
+  export/import. Automated checks cover manual activity editing, labels,
+  reports, restart and native idle detection.
+- Added Linux/X11, macOS and Windows CI coverage. Installed-IDE acceptance was
+  completed on macOS Apple Silicon.
 
-Another issue with the 1.x releases was that the mechanism keeping track of passed time would sometimes create a large umber of UI events that could not catch up and cause a "spinning beachball of death" on macOS, similarly on other operating systems. This has been resolved by introducing the concept of an "activity". This basically has a start time, end time and a comment. So you can have multiple activities for each task, each with a period of time being summed up on each task. The times of the activity can be manually changed, but it is no longer possible to just specify the amount of time. The time tracker no longer needs to continously update its data.
+### Upgrade notes
 
-#### Summary
+Historical databases and Mylyn attribute records are not migrated. Preserve any
+existing database, then select a separate empty location for Timekeeper 2.0.0.
+CSV export/import is a convenience interchange format, not a database backup or
+rollback mechanism. See the [database policy](DATABASE-RECOVERY.md) and the
+[installation and rollback instructions](README.md#upgrade-and-rollback).
 
-* Added _activities_ to tasks in order to help track time.
-* Added improved export to CSV, added import from CSV.
-* Improved tracking of passed time.
-* The *workweek* view will no longer lose focus while editing when tasks are refreshed.
-* Added high-resolution icons for HighDPI displays.
-* Added configurable templates for reporting and exporting.
+### Known limitations
 
-#### Known issues
+- Mylyn 4.12 logs a theme color parsing error when a Task List tooltip is
+  created on Eclipse 4.41. This upstream dependency error remains a release
+  blocker even though the Workweek view continues to function.
+- Native idle detection requires X11/XScreenSaver on Linux and is unavailable
+  in a pure Wayland session.
+- Concurrent clients do not receive live cross-process cache invalidation, and
+  an active activity has no client owner or lease. Restart reloads committed
+  records; simultaneous edits to the same task are unsupported.
+- Externally managed remote H2 servers, authentication, encryption and network
+  failure behavior have not received installed-runtime acceptance.
 
-Timekeeper will be unable to connect to the database when restarting an Eclipse instance after installing a new plug-in or feature. The solution is to simply close your Eclipse instance and start it again.
+## 1.1.0
 
-Exporting a week task list to HTML and pasting it into an Eclipse editor won't work. This appears to be due to the fact that the _type_ is HTML and not _plain text_ and that the editors for some reason does not accept the prior.
+The previous public release. See the
+[v1.1.0 tag](https://github.com/turesheim/eclipse-timekeeper/tree/v1.1.0)
+for its source and release history.
