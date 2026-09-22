@@ -18,6 +18,9 @@ database baseline.
   uniquely constrained external task references.
 - Added explicit activity owner identities, UTC instant persistence and
   time-zone-aware daily and weekly reporting, including DST-safe boundaries.
+- Added persistence-neutral Java domain and application-service modules with
+  immutable commands and snapshots, transactional repository ports, stable
+  validation failures and in-memory-tested standalone CRUD and time tracking.
 - Added guarded database initialization and future migration lifecycle
   infrastructure. Unsupported, unversioned and incomplete databases fail closed.
 - Verified workspace, shared `AUTO_SERVER`, explicit file and local H2 TCP

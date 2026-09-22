@@ -49,6 +49,7 @@
 	<properties>
 		<tycho.version>5.0.4</tycho.version>
 		<jacoco.version>0.8.15</jacoco.version>
+		<junit.version>5.13.4</junit.version>
 		<tycho.scmUrl>scm:git:git://github.com/turesheim/eclipse-timekeeper.git</tycho.scmUrl>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.release>21</maven.compiler.release>
@@ -149,6 +150,8 @@
 	</build>
 
 	<modules>
+		<module>timekeeper-domain</module>
+		<module>timekeeper-service-api</module>
 		<module>net.resheim.eclipse.timekeeper-feature</module>
 		<module>net.resheim.eclipse.timekeeper.db</module>
 		<module>net.resheim.eclipse.timekeeper.ui</module>
