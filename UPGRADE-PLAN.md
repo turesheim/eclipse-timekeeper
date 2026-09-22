@@ -24,7 +24,8 @@ See the [original baseline](baseline/README.md),
 [storage-mode acceptance](baseline/STORAGE-MODES.md) and
 [installed-IDE acceptance](baseline/INSTALLED-IDE.md) and
 [concurrent installed-instance acceptance](baseline/CONCURRENT-INSTANCES.md) and
-[interrupted-activity acceptance](baseline/INTERRUPTED-ACTIVITY.md).
+[interrupted-activity acceptance](baseline/INTERRUPTED-ACTIVITY.md) and
+[Error Log acceptance](baseline/ERROR-LOG.md).
 The [database policy](DATABASE-RECOVERY.md) documents current backups and the future migration contract.
 
 ## Following this plan
@@ -268,7 +269,10 @@ for the support boundaries.
   follow-up installed-IDE run verified preference switching and restart across
   workspace, shared, explicit file and local H2 TCP storage.
 - [ ] Check the Eclipse Error Log for Timekeeper and dependency errors.
-  Inspected installed runtime logs; the Mylyn theme-parser error remains unresolved.
+  All retained installed and current test-runtime logs are classified in the
+  [Error Log report](baseline/ERROR-LOG.md). Timekeeper-owned errors are fixed or
+  belong to deliberate negative scenarios, but the installed Mylyn theme-parser
+  dependency error remains an open release blocker.
 - [ ] Update version numbers, README, CHANGES and any migration instructions.
 - [ ] Document supported Eclipse/Java versions, installation and rollback.
 - [ ] Record the final build, test results and release artifact location.
