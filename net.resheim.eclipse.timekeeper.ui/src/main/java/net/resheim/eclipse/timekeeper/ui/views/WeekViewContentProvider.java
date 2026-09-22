@@ -12,6 +12,7 @@
 package net.resheim.eclipse.timekeeper.ui.views;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
@@ -35,18 +36,32 @@ import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.Project;
 import net.resheim.eclipse.timekeeper.db.model.Task;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 public abstract class WeekViewContentProvider implements ITreeContentProvider, DatabaseChangeListener {
 
 	public static final WeeklySummary WEEKLY_SUMMARY = new WeeklySummary();
 
 	private LocalDate firstDayOfWeek;
+	private final ZoneId zoneId;
 
 	protected Set<Task> filtered = Collections.emptySet();
 
 	private Viewer viewer;
 	// Published on the UI thread; notification threads must not dereference the viewer.
 	private volatile Display viewerDisplay;
+
+	protected WeekViewContentProvider() {
+		this(TimekeeperUiPlugin.getCalendarZone());
+	}
+
+	protected WeekViewContentProvider(ZoneId zoneId) {
+		this.zoneId = zoneId;
+	}
+
+	ZoneId getZoneId() {
+		return zoneId;
+	}
 
 	public Set<Task> getFiltered() {
 		return filtered;
@@ -130,12 +145,12 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 
 	private boolean hasData(Activity activity) {
 		LocalDate endDate = firstDayOfWeek.plusDays(7);
-		return !activity.getDuration(firstDayOfWeek, endDate).isZero();
+		return !activity.getDuration(firstDayOfWeek, endDate, zoneId).isZero();
 	}
 
 	protected void filter() {
 		filtered = TimekeeperPlugin
-				.getTasks(getFirstDayOfWeek())
+				.getTasks(getFirstDayOfWeek(), zoneId)
 				.collect(Collectors.toSet());
 	}
 

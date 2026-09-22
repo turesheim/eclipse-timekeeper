@@ -44,10 +44,10 @@ class FileStorageTest {
 	}
 
 	@Test
-	void previousLabelMappingRemainsReadableAndWritableWithoutSchemaChanges() throws Exception {
+	void frozenNativeTaskMappingRemainsReadableAndWritableWithoutSchemaChanges() throws Exception {
 		try (Connection connection = DriverManager.getConnection(url("original"), "sa", "");
-				var stream = FileStorageTest.class.getResourceAsStream("fixtures/current-model-186355a.sql")) {
-			assertNotNull(stream, "The frozen pre-change schema fixture must be packaged");
+				var stream = FileStorageTest.class.getResourceAsStream("fixtures/current-native-model.sql")) {
+			assertNotNull(stream, "The frozen native-task schema fixture must be packaged");
 			try (var reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
 				RunScript.execute(connection, reader);
 			}

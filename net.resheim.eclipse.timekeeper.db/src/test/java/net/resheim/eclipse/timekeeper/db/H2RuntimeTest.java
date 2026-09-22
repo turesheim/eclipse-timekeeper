@@ -7,13 +7,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.DriverManager;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import org.h2.tools.RunScript;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import net.resheim.eclipse.timekeeper.db.model.GlobalTaskId;
 import net.resheim.eclipse.timekeeper.db.model.Task;
 
 class H2RuntimeTest {
@@ -21,15 +20,16 @@ class H2RuntimeTest {
 
 	@Test
 	void currentEnginePreservesNanosecondTimestampsAcrossRestartAndSqlRestore() throws Exception {
-		var start = LocalDateTime.parse("2022-09-19T09:00:00.123456789");
-		var end = LocalDateTime.parse("2022-09-19T10:30:00.987654321");
-		var tick = LocalDateTime.parse("2022-09-19T09:42:00.222333444");
-		var id = new GlobalTaskId(CurrentModelFixture.REPOSITORY_A, "1");
+		var start = Instant.parse("2022-09-19T09:00:00.123456789Z");
+		var end = Instant.parse("2022-09-19T10:30:00.987654321Z");
+		var tick = Instant.parse("2022-09-19T09:42:00.222333444Z");
+		String id;
 		var manager = DatabaseStartup.open(url("original"));
 		try {
 			CurrentModelFixture.seed(manager);
 			manager.getTransaction().begin();
-			Task task = manager.find(Task.class, id);
+			Task task = CurrentModelFixture.task(manager, CurrentModelFixture.REPOSITORY_A, "1");
+			id = task.getId();
 			task.setTick(tick);
 			var activity = task.getActivities().stream().filter(a -> a.getSummary().equals("Investigated the build"))
 					.findFirst().orElseThrow();

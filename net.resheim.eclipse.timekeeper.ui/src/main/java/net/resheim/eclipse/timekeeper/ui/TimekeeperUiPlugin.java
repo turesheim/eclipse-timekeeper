@@ -12,10 +12,10 @@
 package net.resheim.eclipse.timekeeper.ui;
 
 import java.text.MessageFormat;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.time.temporal.WeekFields;
 import java.util.Locale;
 import java.util.Optional;
@@ -72,6 +72,18 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	 */
 	private static final int SHORT_INTERVAL = 1000;
 
+	/** Embedded-mode policy: calendar reports and editing use the Eclipse host zone. */
+	private static final ZoneId CALENDAR_ZONE = ZoneId.systemDefault();
+
+	public static ZoneId getCalendarZone() {
+		return CALENDAR_ZONE;
+	}
+
+	private static String formatInstant(Instant instant) {
+		return DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US)
+				.withZone(CALENDAR_ZONE).format(instant);
+	}
+
 	/**
 	 * Returns the shared plug-in instance.
 	 *
@@ -100,7 +112,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	private Listener reactivationListener;
 
 	/** The last time any activity was detected. */
-	protected LocalDateTime lastActiveTime;
+	protected Instant lastActiveTime;
 
 	/**
 	 * The number of milliseconds before user is considered idle. Controlled by
@@ -164,7 +176,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 				// and we have recorded a starting point
 				if (task != null && ttask != null && ttask.getCurrentActivity().isPresent()) {
 					dialogIsOpen = true;
-					LocalDateTime lastActive = ttask.getTick();
+					Instant lastActive = ttask.getTick();
 
 					// If the user have been idle, but not long enough to be
 					// considered AFK we will ask whether or not to add the
@@ -181,7 +193,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 								"Disregard idle time?", null,
 								MessageFormat.format(
 										"The computer has been idle since {0}, more than {1}. Stop current activity and set end time to last active time? A new activity will be started from now.",
-										lastActive.format(DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US)),
+										formatInstant(lastActive),
 										time),
 								MessageDialog.QUESTION, new String[] { "No", "Yes" }, 1);
 						int open = md.open();
@@ -203,8 +215,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 									"Activity automatically stopped",
 									MessageFormat.format(
 											"You have been away for too long ({0}) and tracking of the current activity was automatically ended on {1}.",
-											duration, lastActive.format(
-													DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US))));
+											duration, formatInstant(lastActive)));
 						}
 					}
 				}
@@ -232,7 +243,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	 *
 	 * @return the active time or <code>null</code>
 	 */
-	public LocalDateTime getActiveSince() {
+	public Instant getActiveSince() {
 		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
 		if (task != null) {
 			Task trackedTask = TimekeeperPlugin.getDefault().getTask(task);
@@ -252,10 +263,10 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	 *
 	 * @return the estimated time when user stopped activity
 	 */
-	public LocalDateTime getIdleSince() {
+	public Instant getIdleSince() {
 		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
 		if (task != null && lastActiveTime != null) {
-			return lastActiveTime.minus(consideredIdleThreshold, ChronoUnit.MILLIS);
+			return lastActiveTime.minusMillis(consideredIdleThreshold);
 		}
 		return null;
 	}
@@ -298,7 +309,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 							// has been idle for too long, but is now activated
 							Display.getDefault().syncExec(() -> handleReactivation(idleTimeMillis));
 						} else if (lastIdleTimeMillis < consideredIdleThreshold) {
-							lastActiveTime = LocalDateTime.now();
+							lastActiveTime = Instant.now();
 							Task trtask = TimekeeperPlugin.getDefault().getTask(task);
 							if (trtask != null) {
 								trtask.setTick(lastActiveTime);

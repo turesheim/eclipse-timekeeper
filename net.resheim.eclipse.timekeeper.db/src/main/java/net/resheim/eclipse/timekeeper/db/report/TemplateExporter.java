@@ -15,6 +15,7 @@ package net.resheim.eclipse.timekeeper.db.report;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -41,7 +42,8 @@ public class TemplateExporter extends AbstractExporter {
 
 	private final ReportTemplate reportTemplate;
 
-	public TemplateExporter(ReportTemplate template) {
+	public TemplateExporter(ReportTemplate template, ZoneId zoneId) {
+		super(zoneId);
 		// TODO: Clean up this mess
 		configuration = new Configuration(Configuration.VERSION_2_3_26);
 		StringTemplateLoader templateLoader = new StringTemplateLoader();
@@ -57,20 +59,20 @@ public class TemplateExporter extends AbstractExporter {
 			StringWriter out = new StringWriter();
 
 			Set<Task>filtered = TimekeeperPlugin
-					.getTasks(firstDateOfWeek)
+					.getTasks(firstDateOfWeek, zoneId)
 					.collect(Collectors.toSet());
 
 			// create the objects we're reporting on
 			List<WorkWeek> weeks = new ArrayList<>();
-			weeks.add(new WorkWeek(firstDateOfWeek, filtered));
+			weeks.add(new WorkWeek(firstDateOfWeek, filtered, zoneId));
 			// add the various models that we need for formatting and data extraction
 			HashMap<String, Object> contents = new HashMap<>();
 			// utility for formatting DateTime instances
 			contents.put("formatDateTime", new FormatDateTimeMethodModel());
 			// utility for formatting duration
-			contents.put("formatDuration", new FormatDurationMethodModel());
+			contents.put("formatDuration", new FormatDurationMethodModel(zoneId));
 			//
-			contents.put("getActivities", new GetActivitiesMethodModel());
+			contents.put("getActivities", new GetActivitiesMethodModel(zoneId));
 			// add the actual data
 			contents.put("weeks", weeks);
 			// and do the processing

@@ -38,6 +38,7 @@ import org.eclipse.ui.handlers.HandlerUtil;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
 import net.resheim.eclipse.timekeeper.db.report.TemplateExporter;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
 public class TemplateExportHandler extends AbstractHandler implements IHandler {
@@ -57,7 +58,7 @@ public class TemplateExportHandler extends AbstractHandler implements IHandler {
 			Map<String, ReportTemplate> templates = TimekeeperPlugin.getTemplates();
 			LocalDate firstDayOfWeek = ((WorkWeekView) activePart).getFirstDayOfWeek();
 			ReportTemplate template = templates.get(parameters.get(COMMAND_PARAMETER_TEMPLATE_NAME));
-			TemplateExporter export = new TemplateExporter(template);
+			TemplateExporter export = new TemplateExporter(template, TimekeeperUiPlugin.getCalendarZone());
 			String result = export.getData(firstDayOfWeek);
 			if (result != null) {
 				// save to file or copy to clipboard

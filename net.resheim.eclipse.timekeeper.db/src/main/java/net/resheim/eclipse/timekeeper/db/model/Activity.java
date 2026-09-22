@@ -12,10 +12,9 @@ package net.resheim.eclipse.timekeeper.db.model;
 
 import java.io.Serializable;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -36,7 +35,7 @@ import javax.persistence.Table;
 
 import org.eclipse.persistence.annotations.UuidGenerator;
 
-import net.resheim.eclipse.timekeeper.db.converters.LocalDateTimeAttributeConverter;
+import net.resheim.eclipse.timekeeper.db.converters.InstantAttributeConverter;
 
 /**
  * The {@link Activity} type represents a period of work on a task. It holds the
@@ -61,14 +60,14 @@ public class Activity implements Comparable<Activity>, Serializable {
 	private String id;
 
 	/** The time the activity was started */
-	@Column(name = "START_TIME", columnDefinition = "TIMESTAMP(9)")
-	@Convert(converter = LocalDateTimeAttributeConverter.class)
-	private LocalDateTime start = null;
+	@Column(name = "START_TIME", columnDefinition = "VARCHAR(30)")
+	@Convert(converter = InstantAttributeConverter.class)
+	private Instant start;
 
 	/** The time the activity was stopped */
-	@Column(name = "END_TIME", columnDefinition = "TIMESTAMP(9)")
-	@Convert(converter = LocalDateTimeAttributeConverter.class)
-	private LocalDateTime end = null;
+	@Column(name = "END_TIME", columnDefinition = "VARCHAR(30)")
+	@Convert(converter = InstantAttributeConverter.class)
+	private Instant end;
 
 	/** Whether or not activity properties have been manually adjusted or created */
 	@Column(name = "ADJUSTED")
@@ -76,9 +75,12 @@ public class Activity implements Comparable<Activity>, Serializable {
 
 	/** The task the activity is associated with */
 	@ManyToOne
-	@JoinColumn(name = "TASK_ID", referencedColumnName = "TASK_ID")
-	@JoinColumn(name = "REPOSITORY_URL", referencedColumnName = "REPOSITORY_URL")
+	@JoinColumn(name = "TASK_ID", referencedColumnName = "ID")
 	private Task task;
+
+	/** Identity of the person or service that owns this time record. */
+	@Column(name = "OWNER_ID", nullable = false, updatable = false)
+	private String ownerId = OwnerIdentity.LOCAL.value();
 
 	/** The project this activity is associated with, if not associated with a tracked task */
 	@ManyToOne
@@ -99,15 +101,15 @@ public class Activity implements Comparable<Activity>, Serializable {
 	public Activity() {
 	}
 
-	public Activity(Task task, LocalDateTime start) {
+	public Activity(Task task, Instant start) {
+		this(task, OwnerIdentity.LOCAL, start);
+	}
+
+	public Activity(Task task, OwnerIdentity owner, Instant start) {
 		this.task = task;
-		this.start = start;
-		StringBuilder sb = new StringBuilder();
-		sb.append("Activity started on ");
-		sb.append(getStart().format(DateTimeFormatter.ISO_LOCAL_DATE));
-		sb.append(" at ");
-		sb.append(getStart().format(DateTimeFormatter.ofPattern("HH:mm")));
-		summary = sb.toString();
+		this.ownerId = Objects.requireNonNull(owner, "owner").value();
+		this.start = Objects.requireNonNull(start, "start");
+		summary = "Activity started at " + start;
 	}
 
 	/**
@@ -123,10 +125,11 @@ public class Activity implements Comparable<Activity>, Serializable {
 	 * Returns the duration of work on the given date if any.
 	 * 
 	 * @param date the date to calculate for
+	 * @param zoneId the calendar time zone that defines the date boundaries
 	 * @return the amount of work occuring on the given date
 	 */
-	public Duration getDuration(LocalDate date) {
-		return getDuration(date, date.plusDays(1));
+	public Duration getDuration(LocalDate date, ZoneId zoneId) {
+		return getDuration(date, date.plusDays(1), zoneId);
 	}
 
 	/**
@@ -134,33 +137,29 @@ public class Activity implements Comparable<Activity>, Serializable {
 	 * 
 	 * @param start the start date
 	 * @param end   the end date
+	 * @param zoneId the calendar time zone that defines the date boundaries
 	 * @return the duration of work between the two days
 	 */
-	public Duration getDuration(LocalDate start, LocalDate end) {
-		LocalDateTime min = LocalDateTime.of(start, LocalTime.MIN);
-		LocalDateTime max = LocalDateTime.of(end, LocalTime.MIN);
+	public Duration getDuration(LocalDate start, LocalDate end, ZoneId zoneId) {
+		Objects.requireNonNull(zoneId, "zoneId");
+		Instant min = start.atStartOfDay(zoneId).toInstant();
+		Instant max = end.atStartOfDay(zoneId).toInstant();
 
-		LocalDateTime s = getStart();
-		LocalDateTime e = getEnd();
+		Instant s = getStart();
+		Instant e = getEnd();
 
 		// end time has not been specified so the task must be currently
 		// active, using current time as the end date.
 		if (e == null) {
-			e = LocalDateTime.now();
+			e = Instant.now();
 		}
 
-		if (s.isAfter(max) || e.isBefore(min)) {
+		if (!s.isBefore(max) || !e.isAfter(min)) {
 			return Duration.ZERO;
 		}
-
-		Duration d = Duration.between(s, e);
-		if (s.isBefore(min)) {
-			d = d.minus(Duration.between(s, min));
-		}
-		if (e.isAfter(max)) {
-			d = d.minus(Duration.between(max, e));
-		}
-		return d;
+		Instant clippedStart = s.isBefore(min) ? min : s;
+		Instant clippedEnd = e.isAfter(max) ? max : e;
+		return Duration.between(clippedStart, clippedEnd);
 	}
 
 	/**
@@ -175,20 +174,24 @@ public class Activity implements Comparable<Activity>, Serializable {
 		manual = true;
 	}
 
-	public LocalDateTime getEnd() {
+	public Instant getEnd() {
 		return end;
 	}
 
-	public LocalDateTime getStart() {
+	public Instant getStart() {
 		return start;
 	}
 
-	public void setEnd(LocalDateTime end) {
+	public void setEnd(Instant end) {
 		this.end = end;
 	}
 
-	public void setStart(LocalDateTime start) {
+	public void setStart(Instant start) {
 		this.start = start;
+	}
+
+	public OwnerIdentity getOwner() {
+		return new OwnerIdentity(ownerId);
 	}
 
 	public boolean isEdited() {
@@ -219,6 +222,7 @@ public class Activity implements Comparable<Activity>, Serializable {
 		result = prime * result + ((end == null) ? 0 : end.hashCode());
 		result = prime * result + ((id == null) ? 0 : id.hashCode());
 		result = prime * result + (manual ? 1231 : 1237);
+		result = prime * result + ((ownerId == null) ? 0 : ownerId.hashCode());
 		result = prime * result + ((start == null) ? 0 : start.hashCode());
 		result = prime * result + ((summary == null) ? 0 : summary.hashCode());
 		result = prime * result + ((task == null) ? 0 : task.hashCode());
@@ -245,6 +249,8 @@ public class Activity implements Comparable<Activity>, Serializable {
 		} else if (!id.equals(other.id))
 			return false;
 		if (manual != other.manual)
+			return false;
+		if (!Objects.equals(ownerId, other.ownerId))
 			return false;
 		if (start == null) {
 			if (other.start != null)

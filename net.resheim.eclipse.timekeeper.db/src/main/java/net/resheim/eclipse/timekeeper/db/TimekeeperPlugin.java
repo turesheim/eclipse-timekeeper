@@ -16,11 +16,9 @@ import java.io.ObjectInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Calendar;
 import java.util.HashMap;
@@ -67,7 +65,7 @@ import org.slf4j.LoggerFactory;
 
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
-import net.resheim.eclipse.timekeeper.db.model.GlobalTaskId;
+import net.resheim.eclipse.timekeeper.db.model.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.db.model.Project;
 import net.resheim.eclipse.timekeeper.db.model.ProjectType;
 import net.resheim.eclipse.timekeeper.db.model.Task;
@@ -313,17 +311,17 @@ public class TimekeeperPlugin extends Plugin {
 				if (task == null || TasksUi.getTaskActivityManager().isActive(task)) continue;
 
 				Activity activity = current.get();
-				LocalDateTime now = LocalDateTime.now();
+				Instant now = Instant.now();
 				long elapsedTime = 0;
-				LocalDateTime tick = trackedTask.getTick();
+				Instant tick = trackedTask.getTick();
 				if (tick == null || tick.isBefore(activity.getStart())) {
 					Calendar start = Calendar.getInstance();
-					start.setTimeInMillis(activity.getStart().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+					start.setTimeInMillis(activity.getStart().toEpochMilli());
 					Calendar end = Calendar.getInstance();
-					end.setTimeInMillis(now.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+					end.setTimeInMillis(now.toEpochMilli());
 					elapsedTime = TasksUi.getTaskActivityManager().getElapsedTime(task, start, end);
 				}
-				LocalDateTime end = recoveredActivityEnd(activity.getStart(), tick, now, elapsedTime);
+				Instant end = recoveredActivityEnd(activity.getStart(), tick, now, elapsedTime);
 				trackedTask.endActivity(end);
 				manager.persist(activity);
 				manager.persist(trackedTask);
@@ -335,12 +333,12 @@ public class TimekeeperPlugin extends Plugin {
 		}
 	}
 
-	static LocalDateTime recoveredActivityEnd(LocalDateTime start, LocalDateTime tick,
-			LocalDateTime now, long elapsedTimeMillis) {
-		LocalDateTime latestValidEnd = now.isBefore(start) ? start : now;
-		LocalDateTime recovered = tick != null && !tick.isBefore(start)
+	static Instant recoveredActivityEnd(Instant start, Instant tick,
+			Instant now, long elapsedTimeMillis) {
+		Instant latestValidEnd = now.isBefore(start) ? start : now;
+		Instant recovered = tick != null && !tick.isBefore(start)
 				? tick
-				: start.plus(elapsedTimeMillis, ChronoUnit.MILLIS);
+				: start.plusMillis(elapsedTimeMillis);
 		if (recovered.isBefore(start)) return start;
 		return recovered.isAfter(latestValidEnd) ? latestValidEnd : recovered;
 	}
@@ -375,8 +373,15 @@ public class TimekeeperPlugin extends Plugin {
 		if (linkCache.containsKey(task)) {
 			return linkCache.get(task);
 		}
-		GlobalTaskId id = new GlobalTaskId(TimekeeperPlugin.getRepositoryUrl(task), task.getTaskId());
-		Task found = entityManager.find(Task.class, id);
+		String providerId = task.getConnectorKind() == null ? "mylyn" : task.getConnectorKind();
+		String repositoryId = TimekeeperPlugin.getRepositoryUrl(task);
+		List<Task> matches = entityManager.createNamedQuery("ExternalTaskReference.findTask", Task.class)
+				.setParameter("providerId", providerId)
+				.setParameter("repositoryId", repositoryId)
+				.setParameter("externalId", task.getTaskId())
+				.setMaxResults(1)
+				.getResultList();
+		Task found = matches.isEmpty() ? null : matches.get(0);
 		if (found == null) {
 			// no such tracked task exists, create one
 			Task tt = new Task(task);
@@ -406,21 +411,24 @@ public class TimekeeperPlugin extends Plugin {
 	public static ITask getMylynTask(Task task) {
 		// get the repository then find the task. Seems like the Mylyn API is
 		// a bit limited in this area as I could not find something more usable
-		Optional<TaskRepository> tr = TasksUi
-				.getRepositoryManager()
-				.getAllRepositories()
-				.stream()
-				.filter(r -> r.getRepositoryUrl().equals(task.getRepositoryUrl())).findFirst();
-		if (tr.isPresent()) {
-			return TasksUi.getRepositoryModel().getTask(tr.get(), task.getTaskId());
+		List<TaskRepository> repositories = TasksUi.getRepositoryManager().getAllRepositories();
+		for (ExternalTaskReference reference : task.getExternalReferences()) {
+			String repositoryUrl = reference.getRepositoryId();
+			if (repositoryUrl.startsWith(LOCAL_REPO_PREFIX)) repositoryUrl = LOCAL_REPO_ID;
+			String selectedRepositoryUrl = repositoryUrl;
+			Optional<TaskRepository> repository = repositories.stream()
+					.filter(candidate -> candidate.getRepositoryUrl().equals(selectedRepositoryUrl)).findFirst();
+			if (repository.isPresent()) {
+				ITask linked = TasksUi.getRepositoryModel().getTask(repository.get(), reference.getExternalId());
+				if (linked != null) return linked;
+			}
 		}
 		return null;
 	}
 
 	/**
-	 * Exports Timekeeper related data to two separate CSV files. One for
-	 * {@link Task}, another for {@link Activity} instances and yet another
-	 * for the relations between these two.
+	 * Exports Timekeeper tasks, activities, their relations, and optional external
+	 * task identities to separate CSV files.
 	 * 
 	 * TODO: Compress into zip
 	 * 
@@ -434,6 +442,7 @@ public class TimekeeperPlugin extends Plugin {
 		Path tasks = path.resolve("trackedtask.csv");
 		Path activities = path.resolve("activity.csv");
 		Path relations = path.resolve("trackedtask_activity.csv");
+		Path externalReferences = path.resolve("external_task_reference.csv");
 		EntityTransaction transaction = entityManager.getTransaction();
 		transaction.begin();
 		int tasksExported = entityManager
@@ -443,8 +452,10 @@ public class TimekeeperPlugin extends Plugin {
 		// relations are not automatically created, so we do this the easy way
 		entityManager.createNativeQuery("CALL CSVWRITE('" + relations + "', 'SELECT * FROM TASK_ACTIVITY');")
 				.executeUpdate();
+		int referencesExported = entityManager.createNativeQuery("CALL CSVWRITE('" + externalReferences
+				+ "', 'SELECT * FROM EXTERNAL_TASK_REFERENCE');").executeUpdate();
 		transaction.commit();
-		return tasksExported + activitiesExported;
+		return tasksExported + activitiesExported + referencesExported;
 	}
 
 	/**
@@ -458,6 +469,7 @@ public class TimekeeperPlugin extends Plugin {
 		Path tasks = path.resolve("trackedtask.csv");
 		Path activities = path.resolve("activity.csv");
 		Path relations = path.resolve("trackedtask_activity.csv");
+		Path externalReferences = path.resolve("external_task_reference.csv");
 		if (!tasks.toFile().exists()) {
 			throw new IOException("'trackedtask.csv' does not exist in the specified location.");
 		}
@@ -466,6 +478,9 @@ public class TimekeeperPlugin extends Plugin {
 		}
 		if (!relations.toFile().exists()) {
 			throw new IOException("'trackedtask_activity.csv' does not exist in the specified location.");
+		}
+		if (!externalReferences.toFile().exists()) {
+			throw new IOException("'external_task_reference.csv' does not exist in the specified location.");
 		}
 		EntityTransaction transaction = entityManager.getTransaction();
 		try {
@@ -480,6 +495,8 @@ public class TimekeeperPlugin extends Plugin {
 			entityManager
 					.createNativeQuery("MERGE INTO TASK_ACTIVITY (SELECT * FROM CSVREAD('" + relations + "'));")
 					.executeUpdate();
+			int referencesImported = entityManager.createNativeQuery("MERGE INTO EXTERNAL_TASK_REFERENCE "
+					+ "(SELECT * FROM CSVREAD('" + externalReferences + "'));").executeUpdate();
 			entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE;").executeUpdate();
 			transaction.commit();
 			// update all instances with potentially new content
@@ -489,7 +506,7 @@ public class TimekeeperPlugin extends Plugin {
 			for (Task trackedTask : resultList) {
 				entityManager.refresh(trackedTask);
 			}
-			return tasksImported + activitiesImported;
+			return tasksImported + activitiesImported + referencesImported;
 		} catch (PersistenceException e) {
 			transaction.rollback();
 			throw new IOException(e.getMessage());
@@ -659,18 +676,18 @@ public class TimekeeperPlugin extends Plugin {
 	 * 
 	 * @return a stream of tasks
 	 */
-	public static Stream<Task> getTasks(LocalDate startDate) {
+	public static Stream<Task> getTasks(LocalDate startDate, ZoneId zoneId) {
 		if (entityManager == null) {
 			return Stream.empty();
 		}
 		return entityManager.createNamedQuery("Task.findAll", Task.class)
 				.getResultStream()
 				// TODO: Move filtering to database
-				.filter(tt -> hasData(tt, startDate))
+				.filter(tt -> hasData(tt, startDate, zoneId))
 				.map(TimekeeperPlugin::linkWithMylynTask);
 	}
 	
-	private static boolean hasData/* this week */(Task task, LocalDate startDate) {
+	private static boolean hasData/* this week */(Task task, LocalDate startDate, ZoneId zoneId) {
 		// this should only be NULL if the database has not started yet. See databaseStateChanged()
 		if (task == null) {
 			return false;
@@ -679,7 +696,7 @@ public class TimekeeperPlugin extends Plugin {
 		Stream<Activity> filter = task
 				.getActivities()
 				.stream()
-				.filter(a -> a.getDuration(startDate, endDate) != Duration.ZERO);
+				.filter(a -> !a.getDuration(startDate, endDate, zoneId).isZero());
 		return filter.count() > 0;
 	}
 	

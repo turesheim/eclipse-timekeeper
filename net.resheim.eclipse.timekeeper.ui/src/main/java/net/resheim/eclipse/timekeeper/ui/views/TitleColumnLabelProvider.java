@@ -81,12 +81,13 @@ class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 	@Override
 	public String getToolTipText(Object element) {
 		if (element instanceof Activity) {
+			Activity activity = (Activity) element;
 			StringBuilder sb = new StringBuilder();
 			sb.append("Started on ");
-			sb.append(((Activity) element).getStart());
-			if (((Activity) element).getEnd() != null) {
+			sb.append(activity.getStart().atZone(getZoneId()).toLocalDateTime());
+			if (activity.getEnd() != null) {
 				sb.append(", ended on ");
-				sb.append(((Activity) element).getEnd());
+				sb.append(activity.getEnd().atZone(getZoneId()).toLocalDateTime());
 			}
 			return sb.toString();
 		}

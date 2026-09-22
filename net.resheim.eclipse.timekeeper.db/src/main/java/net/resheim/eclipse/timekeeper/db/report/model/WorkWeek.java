@@ -12,11 +12,11 @@ package net.resheim.eclipse.timekeeper.db.report.model;
 
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.temporal.WeekFields;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -38,6 +38,9 @@ public class WorkWeek {
 	/** Date of the first day of this week */
 	private LocalDate firstDayOfWeek;
 
+	/** Time zone used to turn calendar dates into instant boundaries. */
+	private final ZoneId zoneId;
+
 	/** All tasks that have been active this week */
 	protected Set<Task> tasks = Collections.emptySet();
 	
@@ -49,10 +52,11 @@ public class WorkWeek {
 	 * @param tasks
 	 *            a list of tasks being active this week
 	 */
-	public WorkWeek(LocalDate firstDayOfWeek, Set<Task> tasks) {
+	public WorkWeek(LocalDate firstDayOfWeek, Set<Task> tasks, ZoneId zoneId) {
 		super();
-		this.firstDayOfWeek = firstDayOfWeek;
-		this.tasks = tasks;
+		this.firstDayOfWeek = Objects.requireNonNull(firstDayOfWeek, "firstDayOfWeek");
+		this.tasks = Objects.requireNonNull(tasks, "tasks");
+		this.zoneId = Objects.requireNonNull(zoneId, "zoneId");
 		update();
 	}
 
@@ -90,7 +94,7 @@ public class WorkWeek {
 		Duration total = Duration.ZERO;
 		for (LocalDate date : dates) {
 			Optional<Duration> d = tasks.stream()
-				.map(t -> t.getDuration(date))
+				.map(t -> t.getDuration(date, zoneId))
 				.reduce(Duration::plus);	
 			if (d.isPresent()) {
 				total = total.plus(d.get());
@@ -105,7 +109,7 @@ public class WorkWeek {
 	public Duration getSum(Task task) {
 		Duration total = Duration.ZERO;
 		for (LocalDate date : dates) {
-			total = total.plus(task.getDuration(date));								
+			total = total.plus(task.getDuration(date, zoneId));
 		}
 		return total;
 	}
@@ -118,7 +122,7 @@ public class WorkWeek {
 	 */
 	public Duration getSum(LocalDate date) {
 		Optional<Duration> d = tasks.stream()
-			.map(t -> t.getDuration(date))
+			.map(t -> t.getDuration(date, zoneId))
 			.reduce(Duration::plus);
 		if (d.isPresent()) {
 			return d.get();
@@ -139,7 +143,7 @@ public class WorkWeek {
 		for (LocalDate date : dates) {
 			total = total.plus(tasks.stream()
 					.filter(t -> project.equals(t.getProject()))
-					.map(t -> t.getDuration(date))
+					.map(t -> t.getDuration(date, zoneId))
 					.reduce(Duration::plus).orElse(Duration.ZERO));			
 		}
 		return total;
@@ -151,17 +155,13 @@ public class WorkWeek {
 	public Duration getSum(Project project, LocalDate date) {
 		return tasks.stream()
 			.filter(t -> project.equals(t.getProject()))
-			.map(t -> t.getDuration(date))
+			.map(t -> t.getDuration(date, zoneId))
 			.reduce(Duration::plus).orElse(Duration.ZERO);
 	}
 
 	private void update() {
 		dates = new LocalDate[7];
-		WeekFields weekFields = WeekFields.of(Locale.getDefault());
-		// Current day in the week
-		long day = firstDayOfWeek.get(weekFields.dayOfWeek());
-		// First date of the week
-		LocalDate first = firstDayOfWeek.minusDays(day - 1l);
+		LocalDate first = firstDayOfWeek;
 		for (int i = 0; i < 7; i++) {
 			dates[i] = first;
 			first = first.plusDays(1);

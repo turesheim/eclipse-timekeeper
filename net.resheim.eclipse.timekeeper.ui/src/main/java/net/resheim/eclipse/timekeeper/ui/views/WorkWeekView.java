@@ -13,10 +13,10 @@
 package net.resheim.eclipse.timekeeper.ui.views;
 
 import java.text.MessageFormat;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.time.temporal.WeekFields;
 import java.util.Iterator;
 import java.util.List;
@@ -183,10 +183,9 @@ public class WorkWeekView extends ViewPart {
 	 * @return the active milliseconds or "0"
 	 */
 	public long getActiveTime() {
-		LocalDateTime activeSince = TimekeeperUiPlugin.getDefault().getActiveSince();
+		Instant activeSince = TimekeeperUiPlugin.getDefault().getActiveSince();
 		if (activeSince != null) {
-			LocalDateTime now = LocalDateTime.now();
-			return activeSince.until(now, ChronoUnit.MILLIS);
+			return Duration.between(activeSince, Instant.now()).toMillis();
 		}
 		return 0;
 	}
@@ -210,7 +209,7 @@ public class WorkWeekView extends ViewPart {
 			}
 		} else if (getActiveTime() > 0) {
 			long activeTime = getActiveTime();
-			LocalDateTime activeSince = TimekeeperUiPlugin.getDefault().getActiveSince();
+			Instant activeSince = TimekeeperUiPlugin.getDefault().getActiveSince();
 			statusLabel.setText(MessageFormat.format("Active since {0}, {1} elapsed", timeFormat.format(activeSince),
 					DurationFormatUtils.formatDurationWords(activeTime, true, true)));
 			// do not refresh with an editor active, that would deactivate the
@@ -271,7 +270,8 @@ public class WorkWeekView extends ViewPart {
 
 	private static final DateTimeFormatter weekFormat = DateTimeFormatter.ofPattern("w");
 
-	private static final DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("EEEE HH:mm:ss", Locale.ENGLISH);
+	private static final DateTimeFormatter timeFormat = DateTimeFormatter
+			.ofPattern("EEEE HH:mm:ss", Locale.ENGLISH).withZone(TimekeeperUiPlugin.getCalendarZone());
 
 	private Action previousWeekAction;
 
@@ -488,11 +488,11 @@ public class WorkWeekView extends ViewPart {
 				if (element instanceof Project) {
 					seconds = getSum(contentProvider.getFiltered(), date, (Project) element);
 				} else if (element instanceof Task) {
-					seconds = ((Task) element).getDuration(date).getSeconds();
+					seconds = ((Task) element).getDuration(date, contentProvider.getZoneId()).getSeconds();
 				} else if (element instanceof WeeklySummary) {
 					seconds = getSum(contentProvider.getFiltered(), date);
 				} else if (element instanceof Activity) {
-					seconds = ((Activity) element).getDuration(date).getSeconds();
+					seconds = ((Activity) element).getDuration(date, contentProvider.getZoneId()).getSeconds();
 				}
 				if (seconds > 0) {
 					return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
@@ -578,7 +578,7 @@ public class WorkWeekView extends ViewPart {
 		return filtered
 				.stream()
 				//.filter(t -> TimekeeperPlugin.getDefault().getTask(t) != null)
-				.mapToLong(t -> t.getDuration(date).getSeconds())
+				.mapToLong(t -> t.getDuration(date, contentProvider.getZoneId()).getSeconds())
 				.sum();
 	}
 
@@ -597,7 +597,7 @@ public class WorkWeekView extends ViewPart {
 				.stream()
 				.filter(t -> t != null)
 				.filter(t -> project.equals(t.getProject()))
-				.mapToLong(t -> t.getDuration(date).getSeconds())
+				.mapToLong(t -> t.getDuration(date, contentProvider.getZoneId()).getSeconds())
 				.sum();
 	}
 

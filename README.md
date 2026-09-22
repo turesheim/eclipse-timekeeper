@@ -14,6 +14,18 @@ See the <a href="../../wiki">wiki</a>  for more about usage.
 
 The data is stored in an H2 SQL database, mapped to POJOs using the Java Persistence API with EclipseLink. Reports are generated using Apache FreeMarker. The database has an explicit schema version and initialization state; historical data migration is not supported.
 
+In the 2.0 data model, a Timekeeper task has its own UUID and can be created,
+edited and persisted without Mylyn. Mylyn, Jira, GitHub and future providers are
+optional external references; each provider/repository/task tuple can be linked
+to only one Timekeeper task. Recorded activities carry an explicit owner identity.
+The embedded Eclipse client uses the stable owner `local`, while a future service
+can supply authenticated user or service identities.
+
+Activity and heartbeat timestamps are stored as UTC instants. Calendar operations
+such as day and workweek totals require an explicit time zone; the Eclipse client
+uses the host system zone. This keeps persisted data independent of the process
+time zone while making daylight-saving and week-boundary behavior deterministic.
+
 ## Database configuration
 
 The Database configuration page in preferences (**Timekeeper > Database**) allows you to configure where the database for the running Eclipse instance should be kept. The default is to place it in the shared location, under `.timekeeper` in your home folder. But you can also use a workspace relative path, or even a H2 server if you have one running.
@@ -30,9 +42,9 @@ future migrations, but there are no active migration recipes or recovery buttons
 See the [database policy, backups and future migration contract](DATABASE-RECOVERY.md).
 
 Keep unsupported databases intact and select a separate empty location. CSV
-Export/Import now targets the current `TASK`, `ACTIVITY` and `TASK_ACTIVITY`
-schema, but it remains a convenience interchange format rather than a database
-backup, migration or rollback mechanism.
+Export/Import now targets the current `TASK`, `EXTERNAL_TASK_REFERENCE`,
+`ACTIVITY` and `TASK_ACTIVITY` schema, but it remains a convenience interchange
+format rather than a database backup, migration or rollback mechanism.
 
 ## Installing
 

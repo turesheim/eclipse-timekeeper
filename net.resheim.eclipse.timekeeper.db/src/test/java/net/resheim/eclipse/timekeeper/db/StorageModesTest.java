@@ -9,7 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -21,12 +21,11 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import net.resheim.eclipse.timekeeper.db.model.GlobalTaskId;
 import net.resheim.eclipse.timekeeper.db.model.Task;
 
 /** Real second JVMs, temporary files and local-only servers; never personal storage. */
 class StorageModesTest {
-	private static final LocalDateTime CHILD_TICK = LocalDateTime.parse("2022-09-21T10:11:12.123456789");
+	private static final Instant CHILD_TICK = Instant.parse("2022-09-21T10:11:12.123456789Z");
 	@TempDir Path directory;
 
 	@ParameterizedTest
@@ -51,7 +50,7 @@ class StorageModesTest {
 				runChild(classpath(), JpaClient.class, url + ";IFEXISTS=TRUE");
 				first.clear();
 				first.getEntityManagerFactory().getCache().evictAll();
-				assertEquals(CHILD_TICK, first.find(Task.class, taskId()).getTick());
+				assertEquals(CHILD_TICK, task(first).getTick());
 				CurrentModelFixture.verify(first);
 			} finally { DatabaseStartup.close(first); }
 		} finally {
@@ -61,7 +60,7 @@ class StorageModesTest {
 		EntityManager reopened = DatabaseStartup.open(embedded + ";IFEXISTS=TRUE");
 		try {
 			CurrentModelFixture.verify(reopened);
-			assertEquals(CHILD_TICK, reopened.find(Task.class, taskId()).getTick());
+			assertEquals(CHILD_TICK, task(reopened).getTick());
 		} finally { DatabaseStartup.close(reopened); }
 	}
 
@@ -133,7 +132,9 @@ class StorageModesTest {
 		return "jdbc:h2:tcp://localhost:" + server.getPort() + "/" + name;
 	}
 
-	private static GlobalTaskId taskId() { return new GlobalTaskId(CurrentModelFixture.REPOSITORY_A, "1"); }
+	private static Task task(EntityManager manager) {
+		return CurrentModelFixture.task(manager, CurrentModelFixture.REPOSITORY_A, "1");
+	}
 
 	private static String classpath() {
 		return System.getProperty("surefire.test.class.path", System.getProperty("java.class.path"));
@@ -169,7 +170,7 @@ class StorageModesTest {
 			try {
 				CurrentModelFixture.verify(manager);
 				manager.getTransaction().begin();
-				manager.find(Task.class, taskId()).setTick(CHILD_TICK);
+				task(manager).setTick(CHILD_TICK);
 				manager.getTransaction().commit();
 			} finally { DatabaseStartup.close(manager); }
 		}

@@ -33,6 +33,7 @@ import org.eclipse.ui.preferences.ScopedPreferenceStore;
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
 import net.resheim.eclipse.timekeeper.db.report.TemplateExporter;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
 /**
@@ -52,7 +53,7 @@ public class DefaultTemplateToClipboardHandler extends AbstractHandler {
 			String defaultTemplate = store.getString(TimekeeperPlugin.PREF_DEFAULT_TEMPLATE);
 			LocalDate firstDayOfWeek = ((WorkWeekView) activePart).getFirstDayOfWeek();
 			ReportTemplate template = templates.get(defaultTemplate);
-			TemplateExporter export = new TemplateExporter(template);
+			TemplateExporter export = new TemplateExporter(template, TimekeeperUiPlugin.getCalendarZone());
 			String result = export.getData(firstDayOfWeek);
 			if (result != null) {
 				Clipboard clipboard = new Clipboard(Display.getCurrent());

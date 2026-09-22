@@ -5,21 +5,20 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.lang.reflect.Proxy;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import javax.persistence.EntityManager;
 
-import org.eclipse.mylyn.tasks.core.ITask;
-
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
-import net.resheim.eclipse.timekeeper.db.model.GlobalTaskId;
+import net.resheim.eclipse.timekeeper.db.model.ExternalTaskReference;
+import net.resheim.eclipse.timekeeper.db.model.OwnerIdentity;
 import net.resheim.eclipse.timekeeper.db.model.Project;
 import net.resheim.eclipse.timekeeper.db.model.ProjectType;
 import net.resheim.eclipse.timekeeper.db.model.Task;
@@ -62,28 +61,28 @@ final class CurrentModelFixture {
 	}
 
 	private static Task task(Project project, String id, String summary) {
-		// Supply only identity metadata; no Eclipse workspace or live connector is loaded.
-		ITask source = (ITask) Proxy.newProxyInstance(ITask.class.getClassLoader(), new Class<?>[] { ITask.class },
-				(proxy, method, args) -> switch (method.getName()) {
-					case "getTaskId" -> id;
-					case "getRepositoryUrl" -> project.getRepositoryUrl();
-					case "getUrl" -> project.getRepositoryUrl() + "/" + id;
-					case "getSummary" -> summary;
-					default -> throw new AssertionError("Unexpected Mylyn call: " + method.getName());
-				});
-		Task task = new Task(source);
+		Task task = new Task(summary);
+		task.linkExternalTask("synthetic", project.getRepositoryUrl(), id, project.getRepositoryUrl() + "/" + id);
+		task.setTaskUrl(project.getRepositoryUrl() + "/" + id);
 		task.setProject(project);
-		task.linkWithMylynTask(null);
 		return task;
 	}
 
+	static Task task(EntityManager manager, String repository, String externalId) {
+		return manager.createNamedQuery("ExternalTaskReference.findTask", Task.class)
+				.setParameter("providerId", "synthetic")
+				.setParameter("repositoryId", repository)
+				.setParameter("externalId", externalId)
+				.getSingleResult();
+	}
+
 	private static Activity activity(Task task, String start, int minutes, String summary, boolean adjusted) {
-		Activity activity = new Activity(task, LocalDateTime.parse(start));
+		Activity activity = new Activity(task, Instant.parse(start + ":00Z"));
 		activity.setSummary(summary);
 		if (adjusted) {
 			activity.setDuration(Duration.ofMinutes(minutes));
 		} else {
-			activity.setEnd(activity.getStart().plusMinutes(minutes));
+			activity.setEnd(activity.getStart().plus(Duration.ofMinutes(minutes)));
 		}
 		task.addActivity(activity);
 		return activity;
@@ -102,6 +101,7 @@ final class CurrentModelFixture {
 		assertEquals(19800, activities.stream().mapToLong(a -> a.getDuration().getSeconds()).sum());
 		Map<String, Long> labelledSeconds = new HashMap<>();
 		for (Activity activity : activities) {
+			assertEquals(OwnerIdentity.LOCAL, activity.getOwner());
 			assertNotNull(activity.getTrackedTask());
 			assertTrue(activity.getTrackedTask().getActivities().contains(activity));
 			for (ActivityLabel label : activity.getLabels()) {
@@ -117,16 +117,21 @@ final class CurrentModelFixture {
 			assertEquals(Map.of("Billable", "0,128,0", "Internal", "128,128,128").get(label.getName()), label.getColor());
 		}
 		for (Task task : tasks) {
+			assertNotNull(task.getId());
 			assertNull(task.getMylynTask(), "Reports must not require a Mylyn link");
 			assertNotNull(task.getProject());
 			assertTrue(task.getProject().getTasks().contains(task));
+			assertEquals(1, task.getExternalReferences().size());
+			ExternalTaskReference reference = task.getExternalReferences().get(0);
+			assertEquals("synthetic", reference.getProviderId());
 			assertEquals(task.getRepositoryUrl() + "/" + task.getTaskId(), task.getTaskUrl());
 			assertEquals("synthetic", task.getProject().getProjectType().getId());
 			assertTrue(task.getCurrentActivity().isEmpty());
 		}
-		Task first = manager.find(Task.class, new GlobalTaskId(REPOSITORY_A, "1"));
-		Task second = manager.find(Task.class, new GlobalTaskId(REPOSITORY_B, "1"));
-		Task empty = manager.find(Task.class, new GlobalTaskId(REPOSITORY_A, "2"));
+		assertEquals(3, tasks.stream().map(Task::getId).distinct().count());
+		Task first = task(manager, REPOSITORY_A, "1");
+		Task second = task(manager, REPOSITORY_B, "1");
+		Task empty = task(manager, REPOSITORY_A, "2");
 		assertNotNull(first);
 		assertNotNull(second);
 		assertNotNull(empty);
@@ -143,7 +148,8 @@ final class CurrentModelFixture {
 		long[] dailySeconds = { 1800, 13500, 4500 };
 		for (int i = 0; i < dailySeconds.length; i++) {
 			LocalDate day = LocalDate.of(2022, 9, 18).plusDays(i);
-			assertEquals(dailySeconds[i], tasks.stream().mapToLong(t -> t.getDuration(day).getSeconds()).sum());
+			assertEquals(dailySeconds[i], tasks.stream()
+					.mapToLong(t -> t.getDuration(day, ZoneOffset.UTC).getSeconds()).sum());
 		}
 	}
 }
