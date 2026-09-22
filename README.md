@@ -63,7 +63,8 @@ supported database baseline. Start with new storage; historical H2 files,
 unversioned databases and old Mylyn attribute records are not imported.
 Schema versioning and guarded migration-target infrastructure are retained for
 future migrations, but there are no active migration recipes or recovery buttons.
-See the [database policy, backups and future migration contract](DATABASE-RECOVERY.md).
+See the [complete data model and ER diagram](DATA-MODEL.md) and the
+[database policy, backups and future migration contract](DATABASE-RECOVERY.md).
 
 Keep unsupported databases intact and select a separate empty location. CSV
 Export/Import now targets the current project, task, activity, external-reference
