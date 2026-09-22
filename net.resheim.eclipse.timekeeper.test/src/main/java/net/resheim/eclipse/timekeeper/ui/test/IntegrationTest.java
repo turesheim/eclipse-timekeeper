@@ -284,33 +284,34 @@ public class IntegrationTest {
 		bot.activePart().toolbarButton("Manage Timekeeper tasks").click();
 		bot.waitUntil(Conditions.shellIsActive("Timekeeper Tasks"));
 		SWTBotShell manager = bot.activeShell();
-		bot.button("New...").click();
+		var managerBot = manager.bot();
+		managerBot.button("New...").click();
 		bot.waitUntil(Conditions.shellIsActive("New Timekeeper Task"));
 		bot.textWithId("standalone-task-summary").setText("Standalone UI task");
 		bot.textWithId("standalone-task-url").setText("https://example.test/standalone");
 		bot.button("Create").click();
 		bot.waitUntil(Conditions.shellIsActive("Timekeeper Tasks"));
 
-		var row = bot.tableWithId("standalone-task-table").getTableItem("Standalone UI task");
+		var row = managerBot.tableWithId("standalone-task-table").getTableItem("Standalone UI task");
 		row.select();
 		assertEquals("https://example.test/standalone", row.getText(1));
 		assertEquals("Standalone", row.getText(2));
-		assertTrue(bot.button("Open URL").isEnabled());
+		assertTrue(managerBot.button("Open URL").isEnabled());
 		var created = TimekeeperUiPlugin.getDefault().getTimekeeperService().tasks().stream()
 				.filter(task -> "Standalone UI task".equals(task.summary())).findFirst().orElseThrow();
 		var identity = created.id();
 		assertTrue(created.projectId().isEmpty());
 
-		bot.button("Edit...").click();
+		managerBot.button("Edit...").click();
 		bot.waitUntil(Conditions.shellIsActive("Edit Timekeeper Task"));
 		bot.textWithId("standalone-task-summary").setText("Standalone UI task renamed");
 		bot.textWithId("standalone-task-url").setText("https://example.test/renamed");
 		bot.button("Save").click();
 		bot.waitUntil(Conditions.shellIsActive("Timekeeper Tasks"));
-		row = bot.tableWithId("standalone-task-table").getTableItem("Standalone UI task renamed");
+		row = managerBot.tableWithId("standalone-task-table").getTableItem("Standalone UI task renamed");
 		row.select();
 
-		bot.button("Link...").click();
+		managerBot.button("Link...").click();
 		bot.waitUntil(Conditions.shellIsActive("Link External Task"));
 		bot.textWithId("external-provider").setText("github");
 		bot.textWithId("external-repository").setText("turesheim/eclipse-timekeeper");
@@ -318,24 +319,24 @@ public class IntegrationTest {
 		bot.textWithId("external-task-url").setText("https://github.com/turesheim/eclipse-timekeeper/issues/183");
 		bot.button("Link").click();
 		bot.waitUntil(Conditions.shellIsActive("Timekeeper Tasks"));
-		row = bot.tableWithId("standalone-task-table").getTableItem("Standalone UI task renamed");
+		row = managerBot.tableWithId("standalone-task-table").getTableItem("Standalone UI task renamed");
 		row.select();
 		assertEquals("github:183", row.getText(2));
-		bot.button("Unlink...").click();
-		assertEquals("Standalone", bot.tableWithId("standalone-task-table")
+		managerBot.button("Unlink...").click();
+		assertEquals("Standalone", managerBot.tableWithId("standalone-task-table")
 				.getTableItem("Standalone UI task renamed").getText(2));
 
-		bot.tableWithId("standalone-task-table").getTableItem("Standalone UI task renamed").select();
-		bot.button("Start Activity").click();
+		managerBot.tableWithId("standalone-task-table").getTableItem("Standalone UI task renamed").select();
+		managerBot.button("Start Activity").click();
 		assertEquals(identity, TimekeeperUiPlugin.getDefault().getTimekeeperService()
 				.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL).orElseThrow().taskId());
 		bot.sleep(1100);
-		bot.button("Stop Activity").click();
+		managerBot.button("Stop Activity").click();
 		assertTrue(TimekeeperUiPlugin.getDefault().getTimekeeperService()
 				.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL).isEmpty());
 		assertEquals(identity, TimekeeperUiPlugin.getDefault().getTimekeeperService().task(identity).orElseThrow().id());
 
-		bot.button("Close").click();
+		managerBot.button("Close").click();
 		waitUntilShellIsClosed(bot, manager);
 		bot.activePart().toolbarButton("Show current week").click();
 		assertNotNull(bot.treeWithId("workweek-editor-tree").getTreeItem("Standalone UI task renamed"));
