@@ -1,6 +1,7 @@
 # Timekeeper for Eclipse [![Build](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml/badge.svg)](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml)
 
-This is a simple time-tracking plug-in integrating with [Eclipse Mylyn](http://eclipse.org/mylyn/) Tasks.
+This is a simple time-tracking plug-in for native Timekeeper tasks and
+[Eclipse Mylyn](http://eclipse.org/mylyn/) Tasks.
 
 ![Timekeeper Workweek view](resources/screenshots/workweek-view.png)
 
@@ -11,6 +12,25 @@ When the task is *deactivated* the end time is registered on the activity and th
 The context menu and toolbar buttons can be used to browse back and forward by one week. The current locale is used to determine week numbers. Left of the navigation buttons there is a button for copying and exporting the displayed workweek in various formats. The export definitions can be modified or new ones can be added using [Freemarker](https://freemarker.apache.org) templates found in the preference settings. 
 
 See the <a href="../../wiki">wiki</a>  for more about usage.
+
+## Standalone Timekeeper tasks
+
+Work can be tracked without first creating a task in Mylyn or another external
+system. Choose **Manage Timekeeper tasks** from the Workweek toolbar, then use
+**New...** to enter a summary and, optionally, an absolute URL. The task manager
+also lets you rename or delete a task, open its URL in Eclipse's internal
+browser, and start or stop an activity.
+
+![Managing standalone Timekeeper tasks](resources/screenshots/standalone-tasks.png)
+
+A standalone task can later be linked to an external provider such as GitHub or
+Jira without changing its Timekeeper identity or losing its recorded
+activities. External references can also be removed while keeping the task and
+its history. Native tasks appear as top-level rows in the Workweek view and are
+included in weekly totals, reports, and CSV export alongside externally linked
+tasks.
+
+![A standalone task in the Workweek view](resources/screenshots/standalone-task-workweek.png)
 
 The data is stored in an H2 SQL database, mapped to POJOs using the Java Persistence API with EclipseLink. Reports are generated using Apache FreeMarker. The database has an explicit schema version and initialization state; historical data migration is not supported.
 

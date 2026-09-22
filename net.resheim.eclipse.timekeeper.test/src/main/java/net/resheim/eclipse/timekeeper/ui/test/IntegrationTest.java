@@ -277,38 +277,40 @@ public class IntegrationTest {
 
 	@Test
 	public void testStandaloneTaskWorkflowUsesTheClientService() throws Exception {
-		prepareWorkweekView();
+		SWTBotView workweek = prepareWorkweekView();
 		ITask previous = TasksUi.getTaskActivityManager().getActiveTask();
 		if (previous != null) runOnUi(() -> TasksUi.getTaskActivityManager().deactivateTask(previous));
 
-		bot.activePart().toolbarButton("Manage Timekeeper tasks").click();
+		workweek.toolbarButton("Manage Timekeeper tasks").click();
 		bot.waitUntil(Conditions.shellIsActive("Timekeeper Tasks"));
 		SWTBotShell manager = bot.activeShell();
 		var managerBot = manager.bot();
 		managerBot.button("New...").click();
 		bot.waitUntil(Conditions.shellIsActive("New Timekeeper Task"));
-		bot.textWithId("standalone-task-summary").setText("Standalone UI task");
+		bot.textWithId("standalone-task-summary").setText("Draft standalone task documentation");
 		bot.textWithId("standalone-task-url").setText("https://example.test/standalone");
 		bot.button("Create").click();
 		bot.waitUntil(Conditions.shellIsActive("Timekeeper Tasks"));
 
-		var row = managerBot.tableWithId("standalone-task-table").getTableItem("Standalone UI task");
+		var row = managerBot.tableWithId("standalone-task-table")
+				.getTableItem("Draft standalone task documentation");
 		row.select();
 		assertEquals("https://example.test/standalone", row.getText(1));
 		assertEquals("Standalone", row.getText(2));
 		assertTrue(managerBot.button("Open URL").isEnabled());
 		var created = TimekeeperUiPlugin.getDefault().getTimekeeperService().tasks().stream()
-				.filter(task -> "Standalone UI task".equals(task.summary())).findFirst().orElseThrow();
+				.filter(task -> "Draft standalone task documentation".equals(task.summary()))
+				.findFirst().orElseThrow();
 		var identity = created.id();
 		assertTrue(created.projectId().isEmpty());
 
 		managerBot.button("Edit...").click();
 		bot.waitUntil(Conditions.shellIsActive("Edit Timekeeper Task"));
-		bot.textWithId("standalone-task-summary").setText("Standalone UI task renamed");
+		bot.textWithId("standalone-task-summary").setText("Document standalone tasks");
 		bot.textWithId("standalone-task-url").setText("https://example.test/renamed");
 		bot.button("Save").click();
 		bot.waitUntil(Conditions.shellIsActive("Timekeeper Tasks"));
-		row = managerBot.tableWithId("standalone-task-table").getTableItem("Standalone UI task renamed");
+		row = managerBot.tableWithId("standalone-task-table").getTableItem("Document standalone tasks");
 		row.select();
 
 		managerBot.button("Link...").click();
@@ -319,14 +321,16 @@ public class IntegrationTest {
 		bot.textWithId("external-task-url").setText("https://github.com/turesheim/eclipse-timekeeper/issues/183");
 		bot.button("Link").click();
 		bot.waitUntil(Conditions.shellIsActive("Timekeeper Tasks"));
-		row = managerBot.tableWithId("standalone-task-table").getTableItem("Standalone UI task renamed");
+		row = managerBot.tableWithId("standalone-task-table").getTableItem("Document standalone tasks");
 		row.select();
 		assertEquals("github:183", row.getText(2));
+		runOnUi(() -> TestUtility.takeScreenshot(screenshotsDir, manager.widget.getChildren()[0],
+				"standalone-tasks.png"));
 		managerBot.button("Unlink...").click();
 		assertEquals("Standalone", managerBot.tableWithId("standalone-task-table")
-				.getTableItem("Standalone UI task renamed").getText(2));
+				.getTableItem("Document standalone tasks").getText(2));
 
-		managerBot.tableWithId("standalone-task-table").getTableItem("Standalone UI task renamed").select();
+		managerBot.tableWithId("standalone-task-table").getTableItem("Document standalone tasks").select();
 		managerBot.button("Start Activity").click();
 		assertEquals(identity, TimekeeperUiPlugin.getDefault().getTimekeeperService()
 				.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL).orElseThrow().taskId());
@@ -338,8 +342,13 @@ public class IntegrationTest {
 
 		managerBot.button("Close").click();
 		waitUntilShellIsClosed(bot, manager);
-		bot.activePart().toolbarButton("Show current week").click();
-		assertNotNull(bot.treeWithId("workweek-editor-tree").getTreeItem("Standalone UI task renamed"));
+		workweek.setFocus();
+		workweek.toolbarButton("Show current week").click();
+		assertNotNull(workweek.bot().treeWithId("workweek-editor-tree")
+				.getTreeItem("Document standalone tasks"));
+		runOnUi(() -> TestUtility.takeScreenshot(screenshotsDir,
+				workweek.getViewReference().getPage().getWorkbenchWindow().getShell(),
+				"standalone-task-workweek.png"));
 	}
 
 	private static void runOnUi(Runnable action) throws Exception {
