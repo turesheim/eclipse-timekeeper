@@ -19,21 +19,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Convert;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.JoinTable;
 import javax.persistence.ManyToMany;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
-
-import org.eclipse.persistence.annotations.UuidGenerator;
 
 import net.resheim.eclipse.timekeeper.db.converters.InstantAttributeConverter;
 
@@ -49,15 +47,13 @@ import net.resheim.eclipse.timekeeper.db.converters.InstantAttributeConverter;
  */
 @Entity
 @Table(name = "ACTIVITY")
-@UuidGenerator(name = "uuid")
 public class Activity implements Comparable<Activity>, Serializable {
 
 	private static final long serialVersionUID = 7770745026684660897L;
 
 	@Id
-	@GeneratedValue(generator = "uuid")
-	@Column(name = "ID")
-	private String id;
+	@Column(name = "ID", nullable = false, updatable = false)
+	private String id = UUID.randomUUID().toString();
 
 	/** The time the activity was started */
 	@Column(name = "START_TIME", columnDefinition = "VARCHAR(30)")
@@ -110,6 +106,11 @@ public class Activity implements Comparable<Activity>, Serializable {
 		this.ownerId = Objects.requireNonNull(owner, "owner").value();
 		this.start = Objects.requireNonNull(start, "start");
 		summary = "Activity started at " + start;
+	}
+
+	public Activity(String id, Task task, OwnerIdentity owner, Instant start) {
+		this(task, owner, start);
+		this.id = Objects.requireNonNull(id, "id");
 	}
 
 	/**
@@ -178,6 +179,10 @@ public class Activity implements Comparable<Activity>, Serializable {
 		return end;
 	}
 
+	public String getId() {
+		return id;
+	}
+
 	public Instant getStart() {
 		return start;
 	}
@@ -190,6 +195,14 @@ public class Activity implements Comparable<Activity>, Serializable {
 		this.start = start;
 	}
 
+	public void setOwner(OwnerIdentity owner) {
+		this.ownerId = Objects.requireNonNull(owner, "owner").value();
+	}
+
+	public void setManual(boolean manual) {
+		this.manual = manual;
+	}
+
 	public OwnerIdentity getOwner() {
 		return new OwnerIdentity(ownerId);
 	}
@@ -200,6 +213,14 @@ public class Activity implements Comparable<Activity>, Serializable {
 
 	public Task getTrackedTask() {
 		return task;
+	}
+
+	public Project getProject() {
+		return project;
+	}
+
+	public void setProject(Project project) {
+		this.project = project;
 	}
 
 	public String getSummary() {
@@ -272,6 +293,11 @@ public class Activity implements Comparable<Activity>, Serializable {
 
 	public List<ActivityLabel> getLabels() {
 		return labels;
+	}
+
+	public void setLabels(List<ActivityLabel> labels) {
+		this.labels.clear();
+		this.labels.addAll(labels);
 	}
 	
 	public void toggleLabel(ActivityLabel label) {

@@ -23,8 +23,7 @@ import org.eclipse.ui.menus.CommandContributionItemParameter;
 import org.eclipse.ui.menus.IWorkbenchContribution;
 import org.eclipse.ui.services.IServiceLocator;
 
-import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
+import net.resheim.eclipse.timekeeper.domain.Label;
 
 /**
  * This menu presents all available labels for an activity with image and text.
@@ -47,16 +46,17 @@ public class ActivityLabelMenu extends CompoundContributionItem implements IWork
 
 	@Override
 	protected IContributionItem[] getContributionItems() {
-		return TimekeeperPlugin.getLabels().map(label -> addToMenu(label)).toArray(IContributionItem[]::new);
+		return TimekeeperUiPlugin.getDefault().getTimekeeperService().labels().stream()
+				.map(this::addToMenu).toArray(IContributionItem[]::new);
 	}
 
-	private IContributionItem addToMenu(ActivityLabel label) {
+	private IContributionItem addToMenu(Label label) {
 		Map<String, String> parameters = new HashMap<>();
-		parameters.put(TOGGLE_LABEL_PARAMETER_ID, label.getId());
+		parameters.put(TOGGLE_LABEL_PARAMETER_ID, label.id().value().toString());
 		Image image = labelPainter.getLabelImage(label, 16, false);
 		ImageDescriptor id = ImageDescriptor.createFromImage(image);
 		CommandContributionItemParameter contributionParameters = new CommandContributionItemParameter(serviceLocator,
-				null, TOGGLE_LABEL_COMMAND_ID, parameters, id, null, null, label.getName(), null, null,
+				null, TOGGLE_LABEL_COMMAND_ID, parameters, id, null, null, label.name(), null, null,
 				CommandContributionItem.STYLE_PUSH,
 				null, true);
 		return new CommandContributionItem(contributionParameters);

@@ -156,6 +156,11 @@ public class IntegrationTest {
 	}
 		
 	@Test
+	public void testEmbeddedServiceIsResolvedThroughOsgi() {
+		assertNotNull(TimekeeperUiPlugin.getDefault().getTimekeeperService());
+	}
+
+	@Test
 	public void testNavigateWorkweekView() throws Exception {
 		prepareWorkweekView();
 		assertTrue(bot.viewByTitle(MAIN_VIEW_NAME).isActive());

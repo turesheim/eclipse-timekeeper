@@ -5,6 +5,7 @@ Bundle-SymbolicName: net.resheim.eclipse.timekeeper.db;singleton:=true
 Automatic-Module-Name: net.resheim.eclipse.timekeeper.db
 Bundle-Version: 2.0.0.qualifier
 Export-Package: net.resheim.eclipse.timekeeper.db,
+ net.resheim.eclipse.timekeeper.db.adapter,
  net.resheim.eclipse.timekeeper.db.converters,
  net.resheim.eclipse.timekeeper.db.model,
  net.resheim.eclipse.timekeeper.db.report,
@@ -23,7 +24,9 @@ Require-Bundle: org.eclipse.mylyn.tasks.core;bundle-version="[4.12.0,5.0.0)",
  org.eclipse.persistence.jpa;bundle-version="[2.7.16,3.0.0)",
  org.eclipse.persistence.jpa.jpql;bundle-version="[2.7.16,3.0.0)",
  org.eclipse.persistence.asm;bundle-version="[9.8.0,10.0.0)",
- javax.persistence
+ javax.persistence,
+ net.resheim.eclipse.timekeeper.domain;bundle-version="[2.0.0,3.0.0)",
+ net.resheim.eclipse.timekeeper.service;bundle-version="[2.0.0,3.0.0)"
 Import-Package: javax.persistence,
  net.resheim.eclipse.timekeeper.db,
  org.apache.commons.lang3.time;version="[3.20.0,4.0.0)",
@@ -35,4 +38,5 @@ Bundle-ClassPath: lib/h2-2.5.250.jar,
  .
 Bundle-ActivationPolicy: lazy
 Bundle-Activator: net.resheim.eclipse.timekeeper.db.TimekeeperPlugin
+Service-Component: OSGI-INF/embedded-timekeeper-service.xml
 Bundle-Vendor: Torkild U. Resheim

@@ -10,6 +10,7 @@ Require-Bundle: org.eclipse.swtbot.go,
  org.eclipse.mylyn.tasks.core,
  net.resheim.eclipse.timekeeper.db,
  net.resheim.eclipse.timekeeper.ui,
+ net.resheim.eclipse.timekeeper.service,
  org.eclipse.mylyn.tasks.ui,
  org.eclipse.core.resources,
  org.eclipse.ui.ide

@@ -25,7 +25,6 @@ import org.eclipse.swt.graphics.Font;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.themes.IThemeManager;
 
-import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.Project;
 import net.resheim.eclipse.timekeeper.db.model.Task;
@@ -65,7 +64,6 @@ abstract class TimeColumnLabelProvider extends ColumnLabelProvider {
 		}
 		if (element instanceof Activity) {
 			Task trackedTask = ((Activity) element).getTrackedTask();
-			TimekeeperPlugin.getDefault();
 			ITask task = trackedTask.getMylynTask();
 			if (task != null && task.isActive()) {
 				if (trackedTask.getCurrentActivity().equals(Optional.of(element))) {

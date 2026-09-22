@@ -11,10 +11,10 @@
 package net.resheim.eclipse.timekeeper.db.model;
 
 import java.io.Serializable;
+import java.util.UUID;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.NamedQuery;
 import javax.persistence.Table;
@@ -32,10 +32,9 @@ public class ActivityLabel implements Serializable {
 	private static final long serialVersionUID = -3021226114768805330L;
 
 	@Id
-	@GeneratedValue(generator = "uuid")
-	@Column(name = "ID")
-	private String id;
-	
+	@Column(name = "ID", nullable = false, updatable = false)
+	private String id = UUID.randomUUID().toString();
+
 	@Column(name = "NAME")
 	private String name;
 
@@ -46,6 +45,12 @@ public class ActivityLabel implements Serializable {
 	}
 
 	public ActivityLabel(String name, String color) {
+		this.name = name;
+		this.color = color;
+	}
+
+	public ActivityLabel(String id, String name, String color) {
+		this.id = id;
 		this.name = name;
 		this.color = color;
 	}

@@ -158,6 +158,11 @@ public class TimekeeperPlugin extends Plugin {
 		}
 	}
 
+	/** Notifies Eclipse consumers about a service-level persistence change. */
+	public void notifyServiceListeners() {
+		notifyListeners();
+	}
+
 	private void connectToDatabase() {
 		Thread thread = new Thread(() -> {
 			EntityManager candidate = null;
@@ -639,7 +644,9 @@ public class TimekeeperPlugin extends Plugin {
 	}
 	
 	public static Project getProject(String title) {
-		return entityManager.find(Project.class, title);
+		if (title == null) return null;
+		return entityManager.createNamedQuery("Project.findAll", Project.class).getResultStream()
+				.filter(project -> title.equals(project.getName())).findFirst().orElse(null);
 	}
 	
 	/**

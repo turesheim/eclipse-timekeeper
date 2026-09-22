@@ -26,6 +26,7 @@ import org.eclipse.swt.graphics.RGB;
 import org.eclipse.swt.widgets.Display;
 
 import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
+import net.resheim.eclipse.timekeeper.domain.Label;
 
 /**
  * This type will generate images for {@link ActivityLabel} instances. These are
@@ -57,12 +58,20 @@ public class ActivityLabelPainter {
 	}
 
 	public Image getLabelImage(ActivityLabel label, int size, boolean outline) {
+		return getLabelImage(label, label.getColor(), size, outline);
+	}
 
-		Object key = generateKey(label, Boolean.valueOf(outline));
+	public Image getLabelImage(Label label, int size, boolean outline) {
+		return getLabelImage(label.id(), label.color().orElse("0,0,0"), size, outline);
+	}
+
+	private Image getLabelImage(Object keySource, String labelColor, int size, boolean outline) {
+
+		Object key = generateKey(keySource, Boolean.valueOf(outline));
 
 		if (images.containsKey(key)) {
 			ActivityLabelImage activityLabelImage = images.get(key);
-			if (activityLabelImage.lastColor.equals(label.getColor())) {
+			if (activityLabelImage.lastColor.equals(labelColor)) {
 				return activityLabelImage.image;
 			} else {
 				// color has changed, dispose of the old image and continue
@@ -73,7 +82,7 @@ public class ActivityLabelPainter {
 		}
 
 		// determine the fill color
-		RGB rgb = StringConverter.asRGB(label.getColor());
+		RGB rgb = StringConverter.asRGB(labelColor);
 		Display display = Display.getCurrent();
 		Color color = new Color(display, rgb.red, rgb.green, rgb.blue);
 
@@ -114,7 +123,7 @@ public class ActivityLabelPainter {
 		// store image in cache
 		ActivityLabelImage activityImage = new ActivityLabelImage();
 		activityImage.image = image;
-		activityImage.lastColor = label.getColor();
+		activityImage.lastColor = labelColor;
 		images.put(key, activityImage);
 
 		return image;
