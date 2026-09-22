@@ -12,7 +12,11 @@ permissions:
 
 jobs:
   Build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v7.0.1
@@ -29,16 +33,26 @@ jobs:
           default.target
 
     - name: Install Xvfb
+      if: runner.os == 'Linux'
       run: sudo apt-get update && sudo apt-get install -y xvfb
 
-    - name: Build with Maven
+    - name: Build with Maven (Linux/X11)
+      if: runner.os == 'Linux'
       run: xvfb-run --server-args="-screen 0, 1024x768x24" --auto-servernum mvn -B -ntp clean verify -Pother-os -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=20000 -Dscreenshots=${{ github.workspace }}/images
+
+    - name: Build with Maven (macOS idle detector)
+      if: runner.os == 'macOS'
+      run: mvn -B -ntp clean verify -Didle-platform-tests -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=20000 -Dscreenshots=${{ github.workspace }}/images
+
+    - name: Build with Maven (Windows idle detector)
+      if: runner.os == 'Windows'
+      run: mvn -B -ntp clean verify "-Pother-os" "-Didle-platform-tests" "-Dtycho.localArtifacts=ignore" "-Dorg.eclipse.swtbot.search.timeout=20000" "-Dscreenshots=${{ github.workspace }}\images"
 
     - name: Upload test reports and screenshots
       uses: actions/upload-artifact@v7.0.1
       if: always()
       with:
-        name: test-results
+        name: test-results-${{ runner.os }}-${{ runner.arch }}
         include-hidden-files: true
         path: |
           **/target/surefire-reports/
@@ -49,6 +63,7 @@ jobs:
         if-no-files-found: warn
 
     - name: Upload p2 repository
+      if: runner.os == 'Linux'
       uses: actions/upload-artifact@v7.0.1
       with:
         name: p2-repository

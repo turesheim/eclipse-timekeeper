@@ -49,6 +49,7 @@ module `target` directories; these generated files are not committed.
 | `TemplateTest` | 2 bundled report templates rendered and content checked |
 | `IntegrationTest` (SWTBot/JUnit 4) | 6 passed |
 | `WeekViewContentProviderTest` (SWTBot/JUnit 4) | 4 passed |
+| `IdleTimeDetectorTest` (SWTBot/JUnit 4) | 1 passed locally and on Linux/X11, macOS and Windows CI |
 | Six-project reactor and p2 repository/ZIP | Passed |
 | Current-model fixture, restart, copy and SQL restore | Passed with Java 21 |
 
@@ -76,8 +77,9 @@ history, preference storage and UI-thread refresh behavior.
   workbench's Find Actions editor instead of the workweek cell editor.
 - Template files are content-checked directly, while the SWTBot clipboard test
   verifies command/menu execution rather than reading the OS clipboard payload.
-- Linux/Xvfb, Windows and native idle detection still require their separate
-  platform acceptance steps. No personal database was used.
+- Installed-IDE acceptance outside macOS remains limited, and pure Wayland has
+  no native idle detector. See [platform acceptance](PLATFORM-ACCEPTANCE.md).
+  No personal database was used.
 
 ## Sources
 

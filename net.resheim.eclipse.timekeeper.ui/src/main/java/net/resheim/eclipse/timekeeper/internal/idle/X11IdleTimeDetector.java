@@ -125,9 +125,14 @@ public class X11IdleTimeDetector implements IdleTimeDetector {
 			}
 			window = X11.INSTANCE.XDefaultRootWindow(display);
 			info = new XScreenSaverInfo();
-			Xss.INSTANCE.XScreenSaverQueryInfo(display, window, info);
+			if (Xss.INSTANCE.XScreenSaverQueryInfo(display, window, info) == 0) {
+				throw new IllegalStateException("XScreenSaverQueryInfo failed");
+			}
 			idleMillis = info.idle.longValue();
-		} catch (UnsatisfiedLinkError e) {
+			if (idleMillis < 0) {
+				throw new IllegalStateException("XScreenSaverQueryInfo returned a negative idle time");
+			}
+		} catch (LinkageError | RuntimeException e) {
 			IStatus status = new Status(IStatus.ERROR, getClass(), e.getMessage());
 			StatusManager.getManager().handle(status, StatusManager.LOG);
 			return IdleTimeDetector.NOT_WORKING;

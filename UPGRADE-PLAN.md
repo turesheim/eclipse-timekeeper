@@ -232,19 +232,29 @@ tests are no longer applicable, not skipped tests.
   see [test-enablement results](baseline/TEST-UPGRADE.md).
 - [x] Run UI tests in CI with the required display/Xvfb configuration.
   PR #185 passed Linux/Xvfb CI before merge; subsequent changes require their own CI result.
-- [ ] Check idle detection on Windows, macOS and Linux.
-- [ ] Verify Apple Silicon and assess X11/Wayland separately; document limitations.
-- [ ] Document the OS/architecture combinations that have been tested and are supported.
+- [x] Check idle detection on Windows, macOS and Linux.
+  A native smoke test passed on GitHub-hosted Windows x86_64, macOS aarch64 and
+  Ubuntu x86_64/X11, and also on the local macOS aarch64 system.
+- [x] Verify Apple Silicon and assess X11/Wayland separately; document limitations.
+  Apple Silicon and X11/XScreenSaver passed. Pure Wayland is unsupported by the
+  current detector; XWayland requires a usable `DISPLAY` and XScreenSaver.
+- [x] Document the OS/architecture combinations that have been tested and are supported.
+  See [platform acceptance](baseline/PLATFORM-ACCEPTANCE.md) for validation
+  levels and the combinations that remain build-only or unverified.
 
 Completion criterion: Relevant tests are discovered, executed and pass. CI
 produces test results and a p2 repository, and platform support is documented.
 
 Results and deviations: Clean `verify` passes on macOS aarch64 with 64 database/report
-tests and 10 active UI tests passing, including manual activity time-range editing.
+tests and 11 active UI tests passing, including manual activity time-range editing
+and the native idle smoke test. The CI matrix passes on Linux/X11 x86_64, macOS
+aarch64 and Windows x86_64. Linux runs the full UI suite; macOS and Windows run
+the native idle test in the UI harness after compiling and packaging every module.
 The manual-edit test remains guarded on Linux due to the known SWTBot editor-focus
-issue. Cross-platform validation is still open. See
+issue. Installed-IDE acceptance outside macOS remains limited. See
 [test-enablement results](baseline/TEST-UPGRADE.md) for the coverage mapping and
-remaining limitations.
+remaining test limitations and [platform acceptance](baseline/PLATFORM-ACCEPTANCE.md)
+for the support boundaries.
 
 ## 6. Verify installation and prepare the release
 
@@ -290,11 +300,11 @@ pass in the UI harness, and installed interrupted-activity scenarios are verifie
 | Minimum Java version and tested runtime | Java 21; build tested with Temurin 21.0.12.1 |
 | EclipseLink/JPA version and possible Jakarta migration | EclipseLink 2.7.16 / javax.persistence 2.2.1; no namespace migration for test enablement |
 | H2 and migration scope | H2 2.5.250 / schema 1; no historical migrations; future lifecycle infrastructure retained |
-| Supported operating systems and architectures | macOS aarch64 clean install/update tested; Linux/Xvfb CI passes; broader support remains open |
+| Supported operating systems and architectures | macOS aarch64 fully exercised; Linux x86_64/X11 full CI; Windows x86_64 build/native idle smoke; see platform acceptance for limitations |
 | New Timekeeper version | Decide before completing step 6 |
 
-Cross-platform acceptance remains the largest uncertainty. Multi-instance
-storage is characterized but intentionally lacks
+Installed-IDE acceptance outside macOS remains limited. Multi-instance storage
+is characterized but intentionally lacks
 live cache synchronization and active-activity ownership. Historical data
 migration is no longer a release blocker.
 
