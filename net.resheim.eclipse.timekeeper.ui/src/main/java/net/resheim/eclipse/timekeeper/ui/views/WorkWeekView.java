@@ -84,6 +84,7 @@ import net.resheim.eclipse.timekeeper.db.model.Project;
 import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.ui.ActivityLabelPainter;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
+import net.resheim.eclipse.timekeeper.ui.tasks.StandaloneTaskManagerDialog;
 
 @SuppressWarnings("restriction")
 public class WorkWeekView extends ViewPart {
@@ -284,6 +285,8 @@ public class WorkWeekView extends ViewPart {
 	private Action doubleClickAction;
 
 	private Action deleteAction;
+
+	private Action manageTasksAction;
 
 	private TaskListener taskListener;
 
@@ -544,11 +547,12 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void fillLocalPullDown(IMenuManager manager) {
-		// Use to populate the local pulldown menu
+		manager.add(manageTasksAction);
 	}
 
 	private void fillLocalToolBar(IToolBarManager manager) {
 		manager.add(new Separator("additions"));
+		manager.add(manageTasksAction);
 		manager.add(new Separator("navigation"));
 		manager.add(previousWeekAction);
 		manager.add(currentWeekAction);
@@ -631,6 +635,18 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void makeActions() {
+		manageTasksAction = new Action("Manage tasks...") {
+			@Override
+			public void run() {
+				new StandaloneTaskManagerDialog(getSite().getShell(),
+						TimekeeperUiPlugin.getDefault().getTimekeeperService()).open();
+				refreshAll();
+			}
+		};
+		manageTasksAction.setToolTipText("Manage Timekeeper tasks");
+		manageTasksAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
+				.getImageDescriptor(ISharedImages.IMG_OBJ_ELEMENT));
+
 		// browse to previous week
 		previousWeekAction = new Action() {
 			@Override

@@ -114,12 +114,14 @@ class DefaultTimekeeperServiceTest {
 		TaskId linkedId = linked.id();
 
 		Activity first = service.startActivity(new StartActivity(standalone.id(), OwnerId.LOCAL, "local work", Set.of()));
+		assertEquals(first, service.activeActivity(OwnerId.LOCAL).orElseThrow());
 		ServiceException alreadyOpen = assertThrows(ServiceException.class,
 				() -> service.startActivity(new StartActivity(linkedId, OwnerId.LOCAL, "linked work", Set.of())));
 		assertEquals(FailureCode.CONFLICT, alreadyOpen.code());
 
 		time.advance(Duration.ofMinutes(30));
 		first = service.stopActivity(new StopActivity(first.id(), 0));
+		assertTrue(service.activeActivity(OwnerId.LOCAL).isEmpty());
 		Activity second = service.startActivity(new StartActivity(linkedId, OwnerId.LOCAL, "linked work", Set.of()));
 		time.advance(Duration.ofMinutes(45));
 		second = service.stopActivity(new StopActivity(second.id(), 0));

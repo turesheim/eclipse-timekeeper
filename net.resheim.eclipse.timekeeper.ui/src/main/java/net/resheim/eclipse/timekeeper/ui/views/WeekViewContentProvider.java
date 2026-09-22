@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -102,14 +103,19 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 		Object[] projects = filtered
 				.stream()
 				.map(Task::getProject)
+				.filter(Objects::nonNull)
 				.filter(distinctByKey(Project::getName))
 				.toArray();
-		if (projects.length == 0) {
+		Object[] standaloneTasks = filtered.stream()
+				.filter(task -> task.getProject() == null)
+				.toArray();
+		if (projects.length == 0 && standaloneTasks.length == 0) {
 			return new Object[0];
 		}
-		Object[] elements = new Object[projects.length + 1];
+		Object[] elements = new Object[projects.length + standaloneTasks.length + 1];
 		System.arraycopy(projects, 0, elements, 0, projects.length);
-		elements[projects.length] = WEEKLY_SUMMARY;
+		System.arraycopy(standaloneTasks, 0, elements, projects.length, standaloneTasks.length);
+		elements[elements.length - 1] = WEEKLY_SUMMARY;
 		return elements;
 	}
 

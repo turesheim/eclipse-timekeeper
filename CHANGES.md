@@ -24,6 +24,9 @@ database baseline.
 - Added the embedded JPA service adapter and OSGi service registration, with
   atomic rollback coverage and UI service lookup while retaining schema-v1
   startup, backup and storage compatibility.
+- Added standalone Timekeeper task management in the Workweek view, including
+  native task creation and editing, optional URLs, external link management and
+  activity start/stop without a Mylyn task or connection.
 - Added guarded database initialization and future migration lifecycle
   infrastructure. Unsupported, unversioned and incomplete databases fail closed.
 - Verified workspace, shared `AUTO_SERVER`, explicit file and local H2 TCP

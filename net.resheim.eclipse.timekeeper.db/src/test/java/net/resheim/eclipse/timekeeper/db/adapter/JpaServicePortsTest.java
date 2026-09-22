@@ -21,10 +21,14 @@ import org.junit.jupiter.api.io.TempDir;
 
 import net.resheim.eclipse.timekeeper.db.adapter.JpaServicePorts;
 import net.resheim.eclipse.timekeeper.domain.OwnerId;
+import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateTask;
+import net.resheim.eclipse.timekeeper.service.Commands.LinkExternalReference;
+import net.resheim.eclipse.timekeeper.service.Commands.UnlinkExternalReference;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateProject;
 import net.resheim.eclipse.timekeeper.service.DefaultTimekeeperService;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
@@ -71,6 +75,39 @@ class JpaServicePortsTest {
 		assertEquals("Renamed", service.project(projectId).orElseThrow().name());
 		assertEquals(projectId, service.task(taskId).orElseThrow().projectId().orElseThrow());
 		assertEquals(activity.id(), service.activity(activity.id()).orElseThrow().id());
+	}
+
+	@Test
+	void standaloneTaskSurvivesRestartAndExternalLinkChangesKeepItsIdentityAndActivities() throws Exception {
+		manager = DatabaseStartup.open(url("standalone"));
+		TimekeeperService service = service(new ArrayList<>());
+		var task = service.createTask(new CreateTask(Optional.empty(), "Local task",
+				Optional.of("https://example.test/local")));
+		Instant start = Instant.parse("2026-09-22T10:00:00Z");
+		var activity = service.createActivity(new CreateActivity(task.id(), OwnerId.LOCAL, start,
+				Optional.of(start.plus(Duration.ofMinutes(20))), "Standalone work", Set.of()));
+		var taskId = task.id();
+
+		DatabaseStartup.close(manager);
+		manager = DatabaseStartup.open(url("standalone") + ";IFEXISTS=TRUE");
+		service = service(new ArrayList<>());
+		task = service.task(taskId).orElseThrow();
+		assertTrue(task.projectId().isEmpty());
+		assertEquals("https://example.test/local", task.url().orElseThrow());
+		task = service.updateTask(new UpdateTask(task.id(), task.version(), Optional.empty(),
+				"Renamed local task", Optional.of("https://example.test/renamed")));
+		ExternalTaskReference link = new ExternalTaskReference("github", "example/timekeeper", "183",
+				"https://github.com/example/timekeeper/issues/183");
+		task = service.linkExternalReference(new LinkExternalReference(task.id(), task.version(), link));
+		assertEquals(taskId, service.findTask(link.key()).orElseThrow().id());
+		task = service.unlinkExternalReference(new UnlinkExternalReference(task.id(), task.version(), link.key()));
+
+		assertEquals(taskId, task.id());
+		assertTrue(task.externalReferences().isEmpty());
+		assertEquals(activity.id(), service.activity(activity.id()).orElseThrow().id());
+		assertEquals(Duration.ofMinutes(20), service.activities(new ActivityQuery(start.minusSeconds(1),
+				start.plusSeconds(3600), Optional.of(OwnerId.LOCAL), Optional.of(taskId), Optional.empty(),
+				ZoneOffset.UTC)).total());
 	}
 
 	@Test

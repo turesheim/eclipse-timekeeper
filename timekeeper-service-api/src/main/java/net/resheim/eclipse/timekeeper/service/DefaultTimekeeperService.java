@@ -273,6 +273,11 @@ public class DefaultTimekeeperService implements TimekeeperService {
 	}
 
 	@Override
+	public Optional<Activity> activeActivity(OwnerId ownerId) {
+		return tx(() -> ports.activities().findOpenByOwner(required(ownerId, "ownerId")));
+	}
+
+	@Override
 	public Activity createActivity(CreateActivity command) {
 		return tx(() -> {
 			required(command, "command");
