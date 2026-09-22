@@ -13,6 +13,7 @@ package net.resheim.eclipse.timekeeper.db.model;
 import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
@@ -41,10 +42,11 @@ import javax.persistence.Table;
 public class Project implements Comparable<Project>, Serializable {
 	
 	private static final long serialVersionUID = 4761882953730015432L;
+	private static final String SERVICE_ID_SEPARATOR = "\u001e";
 
 	/** The project name */
 	@Id
-	@Column
+	@Column(name = "NAME")
 	private String name;
 
 	/** The issue tracker / tasks URL (if any) */
@@ -90,6 +92,16 @@ public class Project implements Comparable<Project>, Serializable {
 		this.setName(title);
 		this.setProjectType(type);
 	}
+
+	public Project(String title) {
+		this();
+		this.name = title;
+	}
+
+	/** Creates a service-owned project while retaining the version-1 schema. */
+	public Project(String serviceId, String title) {
+		this(encode(title, serviceId));
+	}
 	
 	public Set<Task> getTasks() {
 		return tasks;
@@ -97,6 +109,22 @@ public class Project implements Comparable<Project>, Serializable {
 	
 	public void addTask(Task task) {
 		tasks.add(task);
+	}
+
+	public void removeTask(Task task) {
+		tasks.remove(task);
+	}
+
+	public Set<Activity> getChildren() {
+		return children;
+	}
+
+	public void addActivity(Activity activity) {
+		children.add(activity);
+	}
+
+	public void removeActivity(Activity activity) {
+		children.remove(activity);
 	}
 
 
@@ -122,11 +150,30 @@ public class Project implements Comparable<Project>, Serializable {
 	}
 
 	public String getName() {
-		return name;
+		String serviceId = getServiceId();
+		return serviceId == null ? name : name.substring(0, name.lastIndexOf(SERVICE_ID_SEPARATOR));
 	}
 
 	public void setName(String name) {
-		this.name = name;
+		String serviceId = getServiceId();
+		this.name = serviceId == null ? name : encode(name, serviceId);
+	}
+
+	/** UUID stored inside the existing name column for service-created projects. */
+	public String getServiceId() {
+		int separator = name == null ? -1 : name.lastIndexOf(SERVICE_ID_SEPARATOR);
+		if (separator < 0) return null;
+		String candidate = name.substring(separator + SERVICE_ID_SEPARATOR.length());
+		try {
+			UUID.fromString(candidate);
+			return candidate;
+		} catch (IllegalArgumentException malformed) {
+			return null;
+		}
+	}
+
+	private static String encode(String title, String serviceId) {
+		return title + SERVICE_ID_SEPARATOR + serviceId;
 	}
 
 	public String getProjectUrl() {

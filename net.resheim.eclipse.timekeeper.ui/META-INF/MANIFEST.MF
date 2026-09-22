@@ -15,7 +15,9 @@ Require-Bundle: org.eclipse.ui;bundle-version="3.109.100",
  org.eclipse.jface;bundle-version="3.14.0",
  org.eclipse.jface.text;bundle-version="3.11.2",
  org.apache.commons.lang3;bundle-version="[3.20.0,4.0.0)",
- net.resheim.eclipse.timekeeper.db;bundle-version="2.0.0"
+ net.resheim.eclipse.timekeeper.db;bundle-version="2.0.0",
+ net.resheim.eclipse.timekeeper.domain;bundle-version="[2.0.0,3.0.0)",
+ net.resheim.eclipse.timekeeper.service;bundle-version="[2.0.0,3.0.0)"
 Bundle-RequiredExecutionEnvironment: JavaSE-21
 Bundle-ActivationPolicy: lazy
 Bundle-ClassPath: .,
@@ -30,3 +32,4 @@ Export-Package: net.resheim.eclipse.timekeeper.internal;x-friends:="net.resheim.
  net.resheim.eclipse.timekeeper.ui.preferences,
  net.resheim.eclipse.timekeeper.ui.views
 Automatic-Module-Name: net.resheim.eclipse.timekeeper.ui
+Import-Package: org.osgi.util.tracker

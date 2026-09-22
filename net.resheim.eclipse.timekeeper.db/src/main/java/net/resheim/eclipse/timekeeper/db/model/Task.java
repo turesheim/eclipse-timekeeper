@@ -123,6 +123,11 @@ public class Task implements Serializable {
 		setTaskSummary(summary);
 	}
 
+	public Task(String id, String summary) {
+		this(summary);
+		this.id = id;
+	}
+
 	/**
 	 * Creates a new tracked task and associates the instance with the given Mylyn
 	 * task.
@@ -138,7 +143,17 @@ public class Task implements Serializable {
 	}
 
 	public void addActivity(Activity activity) {
-		activities.add(activity);
+		if (!activities.contains(activity)) activities.add(activity);
+	}
+
+	public void removeActivity(Activity activity) {
+		activities.remove(activity);
+		if (currentActivity == activity) currentActivity = null;
+	}
+
+	public void setCurrentActivity(Activity activity) {
+		currentActivity = activity;
+		if (activity != null) addActivity(activity);
 	}
 
 	/**
@@ -306,6 +321,10 @@ public class Task implements Serializable {
 		return reference;
 	}
 
+	public void unlinkExternalTask(String providerId, String repositoryId, String externalId) {
+		externalReferences.removeIf(reference -> reference.matches(providerId, repositoryId, externalId));
+	}
+
 	public List<ExternalTaskReference> getExternalReferences() {
 		return Collections.unmodifiableList(externalReferences);
 	}
@@ -400,8 +419,10 @@ public class Task implements Serializable {
 	}
 
 	public void setProject(Project project) {
+		if (this.taskProject == project) return;
+		if (this.taskProject != null) this.taskProject.removeTask(this);
 		this.taskProject = project;
-		this.taskProject.addTask(this);
+		if (this.taskProject != null) this.taskProject.addTask(this);
 	}
 	
 	public TaskLinkStatus getTaskLinkStatus() {

@@ -9,8 +9,8 @@
 		<version>2.0.0-SNAPSHOT</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
-	<artifactId>timekeeper-domain</artifactId>
-	<packaging>jar</packaging>
+	<artifactId>net.resheim.eclipse.timekeeper.domain</artifactId>
+	<packaging>eclipse-plugin</packaging>
 	<name>Timekeeper domain</name>
 	<dependencies>
 		<dependency>

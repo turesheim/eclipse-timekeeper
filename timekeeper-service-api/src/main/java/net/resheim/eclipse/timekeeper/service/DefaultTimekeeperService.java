@@ -53,7 +53,7 @@ import net.resheim.eclipse.timekeeper.service.TimekeeperEvent.ChangeType;
 import net.resheim.eclipse.timekeeper.service.TimekeeperEvent.EntityType;
 
 /** Default application service. Every public operation owns one transaction boundary. */
-public final class DefaultTimekeeperService implements TimekeeperService {
+public class DefaultTimekeeperService implements TimekeeperService {
 	private final ServicePorts ports;
 
 	public DefaultTimekeeperService(ServicePorts ports) {

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scr:component xmlns:scr="http://www.osgi.org/xmlns/scr/v1.4.0"
+    name="net.resheim.eclipse.timekeeper.embedded-service" immediate="true">
+  <implementation class="net.resheim.eclipse.timekeeper.db.adapter.EmbeddedTimekeeperService"/>
+  <service>
+    <provide interface="net.resheim.eclipse.timekeeper.service.TimekeeperService"/>
+  </service>
+</scr:component>

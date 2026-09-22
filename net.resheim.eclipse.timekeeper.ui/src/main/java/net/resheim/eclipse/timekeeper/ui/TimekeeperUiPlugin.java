@@ -40,6 +40,7 @@ import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.internal.util.BundleUtility;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
 import org.osgi.framework.BundleContext;
+import org.osgi.util.tracker.ServiceTracker;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
@@ -49,6 +50,7 @@ import net.resheim.eclipse.timekeeper.internal.idle.IdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.MacIdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.WindowsIdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.X11IdleTimeDetector;
+import net.resheim.eclipse.timekeeper.service.TimekeeperService;
 import net.resheim.eclipse.timekeeper.ui.preferences.PreferenceConstants;
 
 @SuppressWarnings("restriction")
@@ -64,6 +66,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	private static long lastIdleTimeMillis;
 
 	private static TimekeeperUiPlugin plugin;
+	private ServiceTracker<TimekeeperService, TimekeeperService> serviceTracker;
 
 	public static final String PLUGIN_ID = "net.resheim.eclipse.timekeeper.ui"; //$NON-NLS-1$
 
@@ -91,6 +94,13 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	 */
 	public static TimekeeperUiPlugin getDefault() {
 		return plugin;
+	}
+
+	/** Returns the persistence-neutral application service registered by the embedded adapter. */
+	public TimekeeperService getTimekeeperService() {
+		TimekeeperService service = serviceTracker == null ? null : serviceTracker.getService();
+		if (service == null) throw new IllegalStateException("Timekeeper service is not available");
+		return service;
 	}
 
 	@Override
@@ -347,6 +357,8 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	public void start(BundleContext context) throws Exception {
 		super.start(context);
 		plugin = this;
+		serviceTracker = new ServiceTracker<>(context, TimekeeperService.class, null);
+		serviceTracker.open();
 		consideredIdleThreshold = getPreferenceStore().getLong(PreferenceConstants.MINUTES_IDLE) * 60_000l;
 		afkInterval = getPreferenceStore().getLong(PreferenceConstants.MINUTES_AWAY) * 60_000l;
 		afkDeactivate = getPreferenceStore().getBoolean(PreferenceConstants.DEACTIVATE_WHEN_AWAY);
@@ -356,6 +368,8 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 
 	@Override
 	public void stop(BundleContext context) throws Exception {
+		if (serviceTracker != null) serviceTracker.close();
+		serviceTracker = null;
 		plugin = null;
 		getPreferenceStore().removePropertyChangeListener(this);
 		super.stop(context);

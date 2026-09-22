@@ -38,6 +38,20 @@
          unpack="false"/>
 
    <plugin
+         id="net.resheim.eclipse.timekeeper.domain"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
+         id="net.resheim.eclipse.timekeeper.service"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
          id="javax.persistence"
          download-size="0"
          install-size="0"

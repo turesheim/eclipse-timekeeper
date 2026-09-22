@@ -21,6 +21,9 @@ database baseline.
 - Added persistence-neutral Java domain and application-service modules with
   immutable commands and snapshots, transactional repository ports, stable
   validation failures and in-memory-tested standalone CRUD and time tracking.
+- Added the embedded JPA service adapter and OSGi service registration, with
+  atomic rollback coverage and UI service lookup while retaining schema-v1
+  startup, backup and storage compatibility.
 - Added guarded database initialization and future migration lifecycle
   infrastructure. Unsupported, unversioned and incomplete databases fail closed.
 - Verified workspace, shared `AUTO_SERVER`, explicit file and local H2 TCP

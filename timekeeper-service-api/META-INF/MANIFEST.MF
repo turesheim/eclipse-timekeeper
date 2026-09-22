@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Timekeeper service API
+Bundle-SymbolicName: net.resheim.eclipse.timekeeper.service
+Bundle-Version: 2.0.0.qualifier
+Bundle-RequiredExecutionEnvironment: JavaSE-21
+Require-Bundle: net.resheim.eclipse.timekeeper.domain;bundle-version="[2.0.0,3.0.0)"
+Export-Package: net.resheim.eclipse.timekeeper.service
+Automatic-Module-Name: net.resheim.eclipse.timekeeper.service
