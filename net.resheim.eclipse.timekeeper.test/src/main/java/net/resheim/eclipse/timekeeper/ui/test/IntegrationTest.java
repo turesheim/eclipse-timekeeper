@@ -42,6 +42,7 @@ import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swtbot.eclipse.finder.SWTWorkbenchBot;
 import org.eclipse.swtbot.eclipse.finder.waits.Conditions;
@@ -341,8 +342,14 @@ public class IntegrationTest {
 		bot.sleep(300);
 
 		// Capture the Mylyn task tree rather than the surrounding Eclipse window.
-		runOnUi(() -> TestUtility.takeScreenshot(screenshotsDir, tree.widget.getParent(),
-				"native-task-tree.png"));
+		runOnUi(() -> {
+			Control capture = tree.widget;
+			while ((capture.getBounds().width <= 32 || capture.getBounds().height <= 32)
+					&& capture.getParent() != null) {
+				capture = capture.getParent();
+			}
+			TestUtility.takeScreenshot(screenshotsDir, capture, "native-task-tree.png");
+		});
 	}
 
 	private static Optional<AbstractTask> mylynTask(TaskId id) {
