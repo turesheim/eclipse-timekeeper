@@ -10,9 +10,9 @@ startup allow-list for tables and columns.
 
 A `PROJECT` groups zero or more `TASK` records. A task may point to another task
 in the same project through `PARENT_TASK`, forming the project > task > subtask
-tree shown in Workweek. `ACTIVITY` records are time intervals recorded against a
-task. Activities may have reusable labels, and tasks may have identities in one
-or more external task providers.
+tree. `ACTIVITY` records are time intervals recorded against a task. Activities
+may have reusable labels, and tasks may have identities in one or more external
+task providers.
 
 The schema also contains three association tables created by the older
 unidirectional JPA collections. They duplicate the child-side foreign keys used
@@ -131,6 +131,29 @@ erDiagram
 `UK` on the three external-reference columns denotes one composite unique key,
 not three independent unique constraints.
 
+## Eclipse and Mylyn projection
+
+The Mylyn representation is a projection of this model and does not add tables
+to the schema. When Timekeeper runs inside Eclipse, the synchronizer applies the
+following mapping:
+
+| Timekeeper model | Mylyn Task List | Stable mapping |
+| --- | --- | --- |
+| `PROJECT` | User-managed task category | Project UUID to category-handle mapping in Eclipse instance preferences |
+| Root `TASK` | Local task below the project category | Timekeeper task UUID stored as a Mylyn task attribute |
+| Child `TASK` | Local task below its parent local task | The same task UUID attribute plus the Mylyn parent container |
+
+A Mylyn local task is the Eclipse form of a native Timekeeper task, not an
+external task reference. It therefore needs no task-repository connector and no
+row in `EXTERNAL_TASK_REFERENCE`. Changes made with the normal Mylyn category
+and local-task commands are written through `TimekeeperService`; backend-created
+projects and native tasks are projected back into the Task List. The Workweek
+view consumes activities and totals and is not a second project/task editor.
+
+Connector-backed Mylyn tasks continue to use `EXTERNAL_TASK_REFERENCE`, keyed
+by connector kind, repository and provider task ID. The stable native task UUID
+remains unchanged if such references are later added or removed.
+
 ## Table reference
 
 ### `TIMEKEEPER_SCHEMA`
@@ -148,7 +171,7 @@ JPA.
 
 ### `PROJECT_TYPE`
 
-Optional classification for integration-created projects, normally derived from
+Optional classification for connector-created projects, normally derived from
 the Mylyn connector kind.
 
 | Column | SQL type | Required | Meaning |
@@ -157,7 +180,7 @@ the Mylyn connector kind.
 
 ### `PROJECT`
 
-The repository/project node displayed at the root of a Workweek tree.
+The repository/project aggregate that owns a native task tree.
 
 | Column | SQL type | Required | Meaning |
 | --- | --- | --- | --- |
@@ -201,7 +224,7 @@ only one task.
 | Column | SQL type | Required | Meaning |
 | --- | --- | --- | --- |
 | `ID` | `VARCHAR` | yes | UUID primary key for the reference itself. |
-| `PROVIDER_ID` | `VARCHAR` | yes | Provider or connector kind, such as Mylyn, GitHub, or Jira. |
+| `PROVIDER_ID` | `VARCHAR` | yes | Provider or connector kind, such as GitHub, Jira, or Bugzilla. |
 | `REPOSITORY_ID` | `VARCHAR` | yes | Repository/account namespace within the provider. |
 | `EXTERNAL_ID` | `VARCHAR` | yes | Provider's task identifier. |
 | `EXTERNAL_URL` | `VARCHAR` | no | Direct URL supplied by the provider. |

@@ -24,9 +24,10 @@ database baseline.
 - Added the embedded JPA service adapter and OSGi service registration, with
   atomic rollback coverage and UI service lookup, plus schema-v2 startup,
   backup and storage coverage.
-- Added native Timekeeper project, task and subtask management directly in the
-  Workweek tree, including optional URLs, external link management and activity
-  start/stop without a Mylyn task or connection.
+- Added bidirectional synchronization between native Timekeeper projects/tasks
+  and the standard Mylyn Task List: categories map to projects, local tasks map
+  to tasks, and nested local tasks map to subtasks without requiring a connector.
+  Workweek remains focused on activity tracking and reporting.
 - Added guarded database initialization and future migration lifecycle
   infrastructure. Unsupported, unversioned and incomplete databases fail closed.
 - Verified workspace, shared `AUTO_SERVER`, explicit file and local H2 TCP

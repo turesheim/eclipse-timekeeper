@@ -32,4 +32,5 @@ Export-Package: net.resheim.eclipse.timekeeper.internal;x-friends:="net.resheim.
  net.resheim.eclipse.timekeeper.ui.preferences,
  net.resheim.eclipse.timekeeper.ui.views
 Automatic-Module-Name: net.resheim.eclipse.timekeeper.ui
-Import-Package: org.osgi.util.tracker
+Import-Package: org.osgi.service.prefs,
+ org.osgi.util.tracker

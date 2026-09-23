@@ -1,6 +1,6 @@
 # Timekeeper for Eclipse [![Build](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml/badge.svg)](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml)
 
-This is a simple time-tracking plug-in for native Timekeeper tasks and
+This is a simple time-tracking plug-in for local and connector-backed
 [Eclipse Mylyn](http://eclipse.org/mylyn/) Tasks.
 
 ![Timekeeper Workweek view](resources/screenshots/workweek-view.png)
@@ -15,35 +15,37 @@ See the <a href="../../wiki">wiki</a>  for more about usage.
 
 ## Native Timekeeper tasks
 
-Work can be organized and tracked without first creating a task in Mylyn or
-another external system. Use **New Timekeeper project...** in the Workweek
-toolbar to create a native project. The project appears directly in the tree;
-use its context menu to create tasks, then use a task's context menu to create
-subtasks.
+In Eclipse, a native Timekeeper task is an ordinary Mylyn **Local Task**; it
+does not require a task-repository connector. Use the standard **Task List**
+view to create and maintain the hierarchy:
 
-![Creating a native Timekeeper task](resources/screenshots/native-task-editor.png)
+- a Mylyn task category represents a Timekeeper project;
+- a local task in that category represents a root Timekeeper task; and
+- a local task placed below another local task represents a subtask.
 
-Native projects, tasks, and subtasks are maintained in the Workweek view. A
-double-click edits a task, while the context menu provides actions for editing,
-deleting, starting or stopping activity tracking, opening an optional URL, and
-linking or unlinking an external task. Recorded activities remain beneath the
-task or subtask to which they belong.
+The normal Mylyn commands remain the editing UI. Creating, renaming, or moving
+these categories and local tasks is synchronized into the Timekeeper backend.
+The reverse direction works as well: a project or native task created through
+the backend is materialized in Eclipse as a Mylyn category or local task, with
+the same task/subtask structure.
 
-![Native project, task, and subtask in the Workweek view](resources/screenshots/native-task-tree.png)
+![Native project, task, and subtask in the Mylyn Task List](resources/screenshots/native-task-tree.png)
 
-A native task can later be linked to a provider such as GitHub or Jira without
-changing its Timekeeper identity, hierarchy, or recorded history. Native tasks
-participate in weekly totals, reports, and CSV export alongside tasks originating
-in external systems.
+The **Workweek** view is reserved for time tracking and reporting. Activate the
+local task through Mylyn as usual; Timekeeper records its activities and shows
+the resulting time in Workweek. Native tasks participate in weekly totals,
+reports, and CSV export alongside connector-backed tasks.
 
 The data is stored in an H2 SQL database, mapped to POJOs using the Java Persistence API with EclipseLink. Reports are generated using Apache FreeMarker. The database has an explicit schema version and initialization state; historical data migration is not supported.
 
 In the 2.0 data model, a Timekeeper task has its own UUID and can be created,
-edited and persisted without Mylyn. Mylyn, Jira, GitHub and future providers are
-optional external references; each provider/repository/task tuple can be linked
-to only one Timekeeper task. Recorded activities carry an explicit owner identity.
-The embedded Eclipse client uses the stable owner `local`, while a future service
-can supply authenticated user or service identities.
+edited and persisted without Eclipse. The Eclipse projection stores that UUID
+on its Mylyn local task; it is not an external connector identity. Jira, GitHub
+and future providers are optional external references, and each
+provider/repository/task tuple can be linked to only one Timekeeper task.
+Recorded activities carry an explicit owner identity. The embedded Eclipse
+client uses the stable owner `local`, while a future service can supply
+authenticated user or service identities.
 
 Activity and heartbeat timestamps are stored as UTC instants. Calendar operations
 such as day and workweek totals require an explicit time zone; the Eclipse client

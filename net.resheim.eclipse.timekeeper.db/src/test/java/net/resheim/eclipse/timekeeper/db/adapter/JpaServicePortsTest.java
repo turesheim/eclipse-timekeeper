@@ -12,6 +12,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.persistence.EntityManager;
 
@@ -144,6 +145,21 @@ class JpaServicePortsTest {
 		manager.clear();
 		assertEquals(0L, manager.createQuery("SELECT COUNT(p) FROM Project p", Long.class).getSingleResult());
 		assertFalse(manager.getTransaction().isActive());
+	}
+
+	@Test
+	void canPublishNotificationsAfterTheTransactionCommits() throws Exception {
+		manager = DatabaseStartup.open(url("after-commit"));
+		JpaServicePorts ports = new JpaServicePorts(() -> manager);
+		AtomicBoolean published = new AtomicBoolean();
+		TimekeeperService service = new DefaultTimekeeperService(ports.ports(event -> ports.afterCommit(() -> {
+			assertFalse(manager.getTransaction().isActive());
+			published.set(true);
+		})));
+
+		service.createProject(new CreateProject("Committed first"));
+
+		assertTrue(published.get());
 	}
 
 	@Test

@@ -27,12 +27,16 @@ import java.time.LocalDate;
 import java.time.Instant;
 import java.time.temporal.WeekFields;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.concurrent.FutureTask;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.mylyn.internal.tasks.core.TaskList;
+import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
+import org.eclipse.mylyn.internal.tasks.core.LocalTask;
+import org.eclipse.mylyn.internal.tasks.core.TaskCategory;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.mylyn.tasks.core.ITask;
@@ -64,6 +68,9 @@ import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Task;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.TaskLinkStatus;
+import net.resheim.eclipse.timekeeper.domain.TaskId;
+import net.resheim.eclipse.timekeeper.service.Commands.CreateProject;
+import net.resheim.eclipse.timekeeper.service.Commands.CreateTask;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
@@ -254,12 +261,12 @@ public class IntegrationTest {
 	public void testDeletedMylynTaskRemainsVisible() throws Exception {
 		prepareWorkweekView();
 		runOnUi(() -> {
-			Task historical = TestUtility.createTask(tl, "Historical records", "3002", "Keep recorded time");
+			Task historical = TestUtility.createTask(tl, "Historical records", "9002", "Keep recorded time");
 			TestUtility.createActivity(1, historical, "Recorded before deletion");
 			tl.deleteTask(historical.getMylynTask());
 			LocalDate first = LocalDate.now().with(WeekFields.of(Locale.getDefault()).dayOfWeek(), 1);
 			Task reloaded = TimekeeperPlugin.getTasks(first, TimekeeperUiPlugin.getCalendarZone())
-					.filter(t -> "3002".equals(t.getTaskId())).findFirst().orElseThrow();
+					.filter(t -> "9002".equals(t.getTaskId())).findFirst().orElseThrow();
 			Assert.assertNull(reloaded.getMylynTask());
 			assertEquals(TaskLinkStatus.UNLINKED, reloaded.getTaskLinkStatus());
 			assertEquals("Keep recorded time", reloaded.getTaskSummary());
@@ -267,7 +274,7 @@ public class IntegrationTest {
 		});
 		bot.activePart().toolbarButton("Show current week").click();
 		var row = bot.treeWithId("workweek-editor-tree").getTreeItem("Historical records")
-				.getNode("3002: Keep recorded time");
+				.getNode("9002: Keep recorded time");
 		assertEquals("1:00", row.cell(1));
 		assertEquals("1:00", row.getNode("Recorded before deletion").cell(1));
 		var menu = row.contextMenu("New activity");
@@ -276,78 +283,76 @@ public class IntegrationTest {
 	}
 
 	@Test
-	public void testNativeTaskTreeWorkflowUsesTheClientService() throws Exception {
-		SWTBotView workweek = prepareWorkweekView();
-		ITask previous = TasksUi.getTaskActivityManager().getActiveTask();
-		if (previous != null) runOnUi(() -> TasksUi.getTaskActivityManager().deactivateTask(previous));
-		workweek.toolbarButton("Create a native Timekeeper project").click();
-		bot.waitUntil(Conditions.shellIsActive("New Timekeeper Project"));
-		SWTBotShell projectDialog = bot.activeShell();
-		bot.textWithId("native-project-name").setText("Timekeeper documentation");
-		bot.button("Create").click();
-		waitUntilShellIsClosed(bot, projectDialog);
-
-		var tree = workweek.bot().treeWithId("workweek-editor-tree");
-		var project = tree.getTreeItem("Timekeeper documentation");
-		project.contextMenu("New task...").click();
-		bot.waitUntil(Conditions.shellIsActive("New Timekeeper Task"));
-		SWTBotShell taskDialog = bot.activeShell();
-		bot.textWithId("native-task-summary").setText("Document native task workflow");
-		bot.textWithId("native-task-url").setText("https://example.test/native-task");
-		bot.sleep(200);
-		runOnUi(() -> TestUtility.takeScreenshot(screenshotsDir, taskDialog.widget.getChildren()[0],
-				"native-task-editor.png"));
-		bot.button("Create").click();
-		waitUntilShellIsClosed(bot, taskDialog);
-
-		var task = tree.getTreeItem("Timekeeper documentation").getNode("Document native task workflow");
-		task.contextMenu("New subtask...").click();
-		bot.waitUntil(Conditions.shellIsActive("New Timekeeper Subtask"));
-		SWTBotShell subtaskDialog = bot.activeShell();
-		bot.textWithId("native-task-summary").setText("Capture Workweek screenshot");
-		bot.button("Create").click();
-		waitUntilShellIsClosed(bot, subtaskDialog);
-
-		var subtask = tree.getTreeItem("Timekeeper documentation")
-				.getNode("Document native task workflow").getNode("Capture Workweek screenshot");
-		subtask.contextMenu("Edit task...").click();
-		bot.waitUntil(Conditions.shellIsActive("Edit Timekeeper Task"));
-		SWTBotShell editDialog = bot.activeShell();
-		bot.textWithId("native-task-summary").setText("Capture native task tree");
-		bot.button("Save").click();
-		waitUntilShellIsClosed(bot, editDialog);
-
+	public void testMylynAndBackendTaskTreesStaySynchronized() throws Exception {
 		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
-		var parent = service.tasks().stream().filter(value -> "Document native task workflow".equals(value.summary()))
-				.findFirst().orElseThrow();
-		var child = service.tasks().stream().filter(value -> "Capture native task tree".equals(value.summary()))
-				.findFirst().orElseThrow();
-		assertEquals(parent.projectId(), child.projectId());
-		assertEquals(parent.id(), child.parentTaskId().orElseThrow());
-		tree.getTreeItem("Timekeeper documentation").getNode("Document native task workflow")
-				.contextMenu("Start activity").click();
-		assertEquals(parent.id(), service.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL)
-				.orElseThrow().taskId());
-		tree.getTreeItem("Timekeeper documentation").getNode("Document native task workflow")
-				.contextMenu("Stop activity").click();
-		assertTrue(service.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL).isEmpty());
+		var project = service.createProject(new CreateProject("Backend-created project"));
+		var parent = service.createTask(new CreateTask(Optional.of(project.id()), Optional.empty(),
+				"Document native task workflow", Optional.of("https://example.test/native-task")));
+		var child = service.createTask(new CreateTask(Optional.of(project.id()), Optional.of(parent.id()),
+				"Capture native task tree", Optional.empty()));
 
-		tree.getTreeItem("Timekeeper documentation").getNode("Document native task workflow")
-				.contextMenu("Link external task...").click();
-		bot.waitUntil(Conditions.shellIsActive("Link External Task"));
-		SWTBotShell linkDialog = bot.activeShell();
-		bot.textWithId("external-provider").setText("github");
-		bot.textWithId("external-repository").setText("turesheim/eclipse-timekeeper");
-		bot.textWithId("external-task-id").setText("183");
-		bot.textWithId("external-task-url").setText("https://github.com/turesheim/eclipse-timekeeper/issues/183");
-		bot.button("Link").click();
-		waitUntilShellIsClosed(bot, linkDialog);
-		assertEquals(parent.id(), service.findTask(new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey(
-				"github", "turesheim/eclipse-timekeeper", "183")).orElseThrow().id());
+		bot.waitUntil(new DefaultCondition() {
+			@Override public boolean test() {
+				return mylynTask(parent.id()).isPresent() && mylynTask(child.id()).isPresent();
+			}
+			@Override public String getFailureMessage() { return "Backend tasks were not projected into Mylyn"; }
+		});
+		AbstractTask mylynParent = mylynTask(parent.id()).orElseThrow();
+		AbstractTask mylynChild = mylynTask(child.id()).orElseThrow();
+		assertTrue(mylynParent instanceof LocalTask);
+		assertEquals(TimekeeperPlugin.KIND_LOCAL, mylynParent.getConnectorKind());
+		assertTrue(mylynChild.getParentContainers().contains(mylynParent));
+		assertTrue(mylynParent.getParentContainers().stream()
+				.anyMatch(container -> "Backend-created project".equals(container.getSummary())));
+		assertTrue(service.task(parent.id()).orElseThrow().externalReferences().isEmpty());
 
-		// Capture the Workweek content rather than the surrounding Eclipse window.
+		TaskCategory mylynProject = new TaskCategory("mylyn-created-project", "Created in Mylyn");
+		LocalTask mylynCreatedParent = new LocalTask("4101", "Created in the Tasks view");
+		LocalTask mylynCreatedChild = new LocalTask("4102", "Created as a Mylyn subtask");
+		runOnUi(() -> {
+			tl.addCategory(mylynProject);
+			tl.addTask(mylynCreatedParent, mylynProject);
+			tl.addTask(mylynCreatedChild, mylynCreatedParent);
+		});
+		bot.waitUntil(new DefaultCondition() {
+			@Override public boolean test() {
+				return mylynCreatedParent.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID) != null
+						&& mylynCreatedChild.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID) != null;
+			}
+			@Override public String getFailureMessage() { return "Mylyn tasks were not replicated into Timekeeper"; }
+		});
+		var replicatedParent = service.task(taskId(mylynCreatedParent)).orElseThrow();
+		var replicatedChild = service.task(taskId(mylynCreatedChild)).orElseThrow();
+		assertEquals(replicatedParent.projectId(), replicatedChild.projectId());
+		assertEquals(replicatedParent.id(), replicatedChild.parentTaskId().orElseThrow());
+		assertEquals("Created in Mylyn", service.project(replicatedParent.projectId().orElseThrow())
+				.orElseThrow().name());
+		assertTrue(replicatedParent.externalReferences().isEmpty());
+		assertTrue(replicatedChild.externalReferences().isEmpty());
+
+		SWTBotView taskList = prepareTaskListView();
+		var tree = taskList.bot().tree();
+		tree.getTreeItem("Backend-created project").expand()
+				.getNode("Document native task workflow").expand()
+				.getNode("Capture native task tree");
+		tree.getTreeItem("Created in Mylyn").expand()
+				.getNode("Created in the Tasks view").expand()
+				.getNode("Created as a Mylyn subtask");
+		bot.sleep(300);
+
+		// Capture the Mylyn task tree rather than the surrounding Eclipse window.
 		runOnUi(() -> TestUtility.takeScreenshot(screenshotsDir, tree.widget.getParent(),
 				"native-task-tree.png"));
+	}
+
+	private static Optional<AbstractTask> mylynTask(TaskId id) {
+		return tl.getAllTasks().stream().filter(task -> id.value().toString()
+				.equals(task.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID))).findFirst();
+	}
+
+	private static TaskId taskId(ITask task) {
+		return new TaskId(java.util.UUID.fromString(
+				task.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID)));
 	}
 
 	private static void runOnUi(Runnable action) throws Exception {
@@ -507,6 +512,23 @@ public class IntegrationTest {
 			TestUtility.takeScreenshot(screenshotsDir,
 					view.getViewReference().getPage().getWorkbenchWindow().getShell(), "workweek-view.png");
 		});
+		return view;
+	}
+
+	private SWTBotView prepareTaskListView() {
+		bot.resetWorkbench();
+		bot.getDisplay().syncExec(() -> {
+			Shell shell = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell();
+			shell.setSize(700, 290);
+			shell.forceActive();
+		});
+		SWTBotView view = openViewById("org.eclipse.mylyn.tasks.ui.views.tasks");
+		UIThreadRunnable.syncExec(bot.getDisplay(), () -> {
+			ActionFactory.IWorkbenchAction maximizeAction = ActionFactory.MAXIMIZE
+					.create(view.getViewReference().getPage().getWorkbenchWindow());
+			maximizeAction.run();
+		});
+		view.setFocus();
 		return view;
 	}
 	

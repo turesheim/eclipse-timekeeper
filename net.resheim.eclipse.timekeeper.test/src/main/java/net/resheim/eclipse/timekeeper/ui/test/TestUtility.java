@@ -70,7 +70,7 @@ public class TestUtility {
 		});
 		ITask task = new LocalTask(id, text);
 		tl.addTask(task, c);
-		return new Task(task);
+		return TimekeeperPlugin.getDefault().getTask(task);
 	}
 
 	/**

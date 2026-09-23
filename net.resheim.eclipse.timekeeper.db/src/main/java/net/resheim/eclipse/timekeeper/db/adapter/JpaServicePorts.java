@@ -43,6 +43,8 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 		LabelRepository, IdentifierSource, TransactionRunner {
 	private final Supplier<EntityManager> managers;
 	private final Object transactionLock = new Object();
+	private final ThreadLocal<EntityManager> transactionManagers = new ThreadLocal<>();
+	private List<Runnable> afterCommitActions;
 
 	public JpaServicePorts(Supplier<EntityManager> managers) {
 		this.managers = managers;
@@ -54,21 +56,55 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 
 	@Override
 	public <T> T required(Supplier<T> work) {
+		List<Runnable> committedActions = List.of();
+		T result;
 		synchronized (transactionLock) {
-			EntityManager manager = manager();
+			EntityManager manager = transactionManagers.get();
+			boolean owner = manager == null;
+			if (owner) {
+				EntityManager shared = sharedManager();
+				manager = shared.getEntityManagerFactory().createEntityManager();
+				transactionManagers.set(manager);
+			}
 			EntityTransaction transaction = manager.getTransaction();
-			boolean owner = !transaction.isActive();
-			if (owner) transaction.begin();
+			if (owner) {
+				transaction.begin();
+				afterCommitActions = new ArrayList<>();
+			}
 			try {
-				T result = work.get();
-				if (owner) transaction.commit();
-				return result;
+				result = work.get();
+				if (owner) {
+					transaction.commit();
+					committedActions = List.copyOf(afterCommitActions);
+				}
 			} catch (RuntimeException failure) {
 				if (owner && transaction.isActive()) transaction.rollback();
 				if (owner) manager.clear();
 				throw failure;
+			} finally {
+				if (owner) {
+					afterCommitActions = null;
+					transactionManagers.remove();
+					manager.close();
+				}
 			}
 		}
+		committedActions.forEach(Runnable::run);
+		return result;
+	}
+
+	/**
+	 * Runs an action after the current service-owned transaction has committed. If
+	 * there is no such transaction, the action runs immediately.
+	 */
+	public void afterCommit(Runnable action) {
+		synchronized (transactionLock) {
+			if (afterCommitActions != null) {
+				afterCommitActions.add(action);
+				return;
+			}
+		}
+		action.run();
 	}
 
 	@Override
@@ -284,6 +320,11 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 	@Override public LabelId newLabelId() { return new LabelId(UUID.randomUUID()); }
 
 	private EntityManager manager() {
+		EntityManager manager = transactionManagers.get();
+		return manager == null ? sharedManager() : manager;
+	}
+
+	private EntityManager sharedManager() {
 		EntityManager manager = managers.get();
 		if (manager == null || !manager.isOpen()) {
 			throw ServiceException.conflict("database", "Timekeeper database is not ready");
