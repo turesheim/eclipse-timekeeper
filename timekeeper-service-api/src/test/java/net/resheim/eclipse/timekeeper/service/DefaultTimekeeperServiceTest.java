@@ -114,12 +114,14 @@ class DefaultTimekeeperServiceTest {
 		TaskId linkedId = linked.id();
 
 		Activity first = service.startActivity(new StartActivity(standalone.id(), OwnerId.LOCAL, "local work", Set.of()));
+		assertEquals(first, service.activeActivity(OwnerId.LOCAL).orElseThrow());
 		ServiceException alreadyOpen = assertThrows(ServiceException.class,
 				() -> service.startActivity(new StartActivity(linkedId, OwnerId.LOCAL, "linked work", Set.of())));
 		assertEquals(FailureCode.CONFLICT, alreadyOpen.code());
 
 		time.advance(Duration.ofMinutes(30));
 		first = service.stopActivity(new StopActivity(first.id(), 0));
+		assertTrue(service.activeActivity(OwnerId.LOCAL).isEmpty());
 		Activity second = service.startActivity(new StartActivity(linkedId, OwnerId.LOCAL, "linked work", Set.of()));
 		time.advance(Duration.ofMinutes(45));
 		second = service.stopActivity(new StopActivity(second.id(), 0));
@@ -133,6 +135,37 @@ class DefaultTimekeeperServiceTest {
 		linked = service.unlinkExternalReference(new UnlinkExternalReference(linked.id(), linked.version(), reference.key()));
 		assertTrue(linked.externalReferences().isEmpty());
 		assertTrue(service.findTask(reference.key()).isEmpty());
+	}
+
+	@Test
+	void nativeTasksFormAnAcyclicHierarchyInsideOneProject() {
+		Project project = service.createProject(new CreateProject("Native project"));
+		Task parent = service.createTask(new CreateTask(Optional.of(project.id()), Optional.empty(),
+				"Parent", Optional.empty()));
+		Task child = service.createTask(new CreateTask(Optional.of(project.id()), Optional.of(parent.id()),
+				"Child", Optional.empty()));
+
+		assertEquals(parent.id(), child.parentTaskId().orElseThrow());
+		ServiceException containsSubtasks = assertThrows(ServiceException.class,
+				() -> service.deleteTask(new DeleteTask(parent.id(), parent.version())));
+		assertEquals(FailureCode.CONFLICT, containsSubtasks.code());
+
+		Task childSnapshot = child;
+		ServiceException cycle = assertThrows(ServiceException.class, () -> service.updateTask(new UpdateTask(
+				parent.id(), parent.version(), parent.projectId(), Optional.of(childSnapshot.id()),
+				parent.summary(), parent.url())));
+		assertEquals(FailureCode.CONFLICT, cycle.code());
+
+		Project other = service.createProject(new CreateProject("Other project"));
+		ServiceException differentProject = assertThrows(ServiceException.class, () -> service.createTask(new CreateTask(
+				Optional.of(other.id()), Optional.of(parent.id()), "Invalid child", Optional.empty())));
+		assertEquals(FailureCode.CONFLICT, differentProject.code());
+		ServiceException moveParent = assertThrows(ServiceException.class, () -> service.updateTask(new UpdateTask(
+				parent.id(), parent.version(), Optional.of(other.id()), Optional.empty(), parent.summary(), parent.url())));
+		assertEquals(FailureCode.CONFLICT, moveParent.code());
+
+		service.deleteTask(new DeleteTask(child.id(), child.version()));
+		service.deleteTask(new DeleteTask(parent.id(), parent.version()));
 	}
 
 	@Test
@@ -248,6 +281,9 @@ class DefaultTimekeeperServiceTest {
 		@Override public List<Task> findAllTasks() { return List.copyOf(tasks.values()); }
 		@Override public boolean existsByProject(ProjectId id) {
 			return tasks.values().stream().anyMatch(task -> task.projectId().filter(id::equals).isPresent());
+		}
+		@Override public boolean existsByParent(TaskId id) {
+			return tasks.values().stream().anyMatch(task -> task.parentTaskId().filter(id::equals).isPresent());
 		}
 		@Override public Task save(Task value) { tasks.put(value.id(), value); return value; }
 		@Override public void delete(TaskId id) { tasks.remove(id); }

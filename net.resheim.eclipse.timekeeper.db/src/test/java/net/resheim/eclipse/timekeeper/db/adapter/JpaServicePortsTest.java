@@ -12,6 +12,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.persistence.EntityManager;
 
@@ -21,10 +22,16 @@ import org.junit.jupiter.api.io.TempDir;
 
 import net.resheim.eclipse.timekeeper.db.adapter.JpaServicePorts;
 import net.resheim.eclipse.timekeeper.domain.OwnerId;
+import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateTask;
+import net.resheim.eclipse.timekeeper.service.Commands.DeleteProject;
+import net.resheim.eclipse.timekeeper.service.Commands.DeleteTask;
+import net.resheim.eclipse.timekeeper.service.Commands.LinkExternalReference;
+import net.resheim.eclipse.timekeeper.service.Commands.UnlinkExternalReference;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateProject;
 import net.resheim.eclipse.timekeeper.service.DefaultTimekeeperService;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
@@ -52,6 +59,8 @@ class JpaServicePortsTest {
 		var project = service.createProject(new CreateProject("Embedded"));
 		project = service.updateProject(new UpdateProject(project.id(), project.version(), "Renamed"));
 		var task = service.createTask(new CreateTask(Optional.of(project.id()), "Adapter task", Optional.empty()));
+		var subtask = service.createTask(new CreateTask(Optional.of(project.id()), Optional.of(task.id()),
+				"Adapter subtask", Optional.empty()));
 		var label = service.createLabel(new CreateLabel("Billable", Optional.of("0,128,0")));
 		Instant start = Instant.parse("2026-09-22T08:00:00Z");
 		var activity = service.createActivity(new CreateActivity(task.id(), OwnerId.LOCAL, start,
@@ -61,16 +70,67 @@ class JpaServicePortsTest {
 				Optional.of(OwnerId.LOCAL), Optional.of(task.id()), Optional.of(project.id()), ZoneOffset.UTC));
 		assertEquals(Duration.ofMinutes(45), report.total());
 		assertEquals(activity.id(), report.activities().getFirst().id());
-		assertEquals(5, events.size());
+		assertEquals(6, events.size());
 
 		var projectId = project.id();
 		var taskId = task.id();
+		var subtaskId = subtask.id();
 		DatabaseStartup.close(manager);
 		manager = DatabaseStartup.open(url("service") + ";IFEXISTS=TRUE");
 		service = service(new ArrayList<>());
 		assertEquals("Renamed", service.project(projectId).orElseThrow().name());
 		assertEquals(projectId, service.task(taskId).orElseThrow().projectId().orElseThrow());
+		assertEquals(taskId, service.task(subtaskId).orElseThrow().parentTaskId().orElseThrow());
 		assertEquals(activity.id(), service.activity(activity.id()).orElseThrow().id());
+	}
+
+	@Test
+	void projectCanBeDeletedAfterItsTaskHierarchy() throws Exception {
+		manager = DatabaseStartup.open(url("delete-hierarchy"));
+		TimekeeperService service = service(new ArrayList<>());
+		var project = service.createProject(new CreateProject("Disposable"));
+		var parent = service.createTask(new CreateTask(Optional.of(project.id()), "Parent", Optional.empty()));
+		var child = service.createTask(new CreateTask(Optional.of(project.id()), Optional.of(parent.id()),
+				"Child", Optional.empty()));
+
+		service.deleteTask(new DeleteTask(child.id(), child.version()));
+		service.deleteTask(new DeleteTask(parent.id(), parent.version()));
+		service.deleteProject(new DeleteProject(project.id(), project.version()));
+		assertTrue(service.projects().isEmpty());
+		assertTrue(service.tasks().isEmpty());
+	}
+
+	@Test
+	void standaloneTaskSurvivesRestartAndExternalLinkChangesKeepItsIdentityAndActivities() throws Exception {
+		manager = DatabaseStartup.open(url("standalone"));
+		TimekeeperService service = service(new ArrayList<>());
+		var task = service.createTask(new CreateTask(Optional.empty(), "Local task",
+				Optional.of("https://example.test/local")));
+		Instant start = Instant.parse("2026-09-22T10:00:00Z");
+		var activity = service.createActivity(new CreateActivity(task.id(), OwnerId.LOCAL, start,
+				Optional.of(start.plus(Duration.ofMinutes(20))), "Standalone work", Set.of()));
+		var taskId = task.id();
+
+		DatabaseStartup.close(manager);
+		manager = DatabaseStartup.open(url("standalone") + ";IFEXISTS=TRUE");
+		service = service(new ArrayList<>());
+		task = service.task(taskId).orElseThrow();
+		assertTrue(task.projectId().isEmpty());
+		assertEquals("https://example.test/local", task.url().orElseThrow());
+		task = service.updateTask(new UpdateTask(task.id(), task.version(), Optional.empty(),
+				"Renamed local task", Optional.of("https://example.test/renamed")));
+		ExternalTaskReference link = new ExternalTaskReference("github", "example/timekeeper", "183",
+				"https://github.com/example/timekeeper/issues/183");
+		task = service.linkExternalReference(new LinkExternalReference(task.id(), task.version(), link));
+		assertEquals(taskId, service.findTask(link.key()).orElseThrow().id());
+		task = service.unlinkExternalReference(new UnlinkExternalReference(task.id(), task.version(), link.key()));
+
+		assertEquals(taskId, task.id());
+		assertTrue(task.externalReferences().isEmpty());
+		assertEquals(activity.id(), service.activity(activity.id()).orElseThrow().id());
+		assertEquals(Duration.ofMinutes(20), service.activities(new ActivityQuery(start.minusSeconds(1),
+				start.plusSeconds(3600), Optional.of(OwnerId.LOCAL), Optional.of(taskId), Optional.empty(),
+				ZoneOffset.UTC)).total());
 	}
 
 	@Test
@@ -85,6 +145,21 @@ class JpaServicePortsTest {
 		manager.clear();
 		assertEquals(0L, manager.createQuery("SELECT COUNT(p) FROM Project p", Long.class).getSingleResult());
 		assertFalse(manager.getTransaction().isActive());
+	}
+
+	@Test
+	void canPublishNotificationsAfterTheTransactionCommits() throws Exception {
+		manager = DatabaseStartup.open(url("after-commit"));
+		JpaServicePorts ports = new JpaServicePorts(() -> manager);
+		AtomicBoolean published = new AtomicBoolean();
+		TimekeeperService service = new DefaultTimekeeperService(ports.ports(event -> ports.afterCommit(() -> {
+			assertFalse(manager.getTransaction().isActive());
+			published.set(true);
+		})));
+
+		service.createProject(new CreateProject("Committed first"));
+
+		assertTrue(published.get());
 	}
 
 	@Test

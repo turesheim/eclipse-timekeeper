@@ -11,6 +11,6 @@ public final class EmbeddedTimekeeperService extends DefaultTimekeeperService {
 	}
 
 	EmbeddedTimekeeperService(JpaServicePorts ports) {
-		super(ports.ports(event -> TimekeeperPlugin.getDefault().notifyServiceListeners()));
+		super(ports.ports(event -> ports.afterCommit(() -> TimekeeperPlugin.getDefault().notifyServiceListeners())));
 	}
 }

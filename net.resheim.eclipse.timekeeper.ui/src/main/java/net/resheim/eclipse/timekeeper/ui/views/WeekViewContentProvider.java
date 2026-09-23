@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -87,29 +88,45 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 			return filtered
 					.stream()
 					.filter(t -> p.equals(t.getProject()))
+					.filter(t -> t.getParentTask() == null)
 					.toArray(size -> new Task[size]);
 		}
 		if (parentElement instanceof Task) {
-			return ((Task) parentElement).getActivities()
+			Task task = (Task) parentElement;
+			Object[] subtasks = filtered.stream()
+					.filter(candidate -> task.equals(candidate.getParentTask()))
+					.toArray();
+			Object[] activities = task.getActivities()
 					.stream()
 					.filter(this::hasData)
 					.toArray();
+			Object[] children = new Object[subtasks.length + activities.length];
+			System.arraycopy(subtasks, 0, children, 0, subtasks.length);
+			System.arraycopy(activities, 0, children, subtasks.length, activities.length);
+			return children;
 		}
 		return new Object[0];
 	}
 
 	public Object[] getElements(Object parent) {
-		Object[] projects = filtered
+		Object[] projects = java.util.stream.Stream.concat(filtered
 				.stream()
-				.map(Task::getProject)
-				.filter(distinctByKey(Project::getName))
+				.map(Task::getProject), TimekeeperPlugin.getProjects()
+						.filter(project -> project.getServiceId() != null))
+				.filter(Objects::nonNull)
+				.filter(distinctByKey(project -> project.getServiceId() == null
+						? project.getName() : project.getServiceId()))
 				.toArray();
-		if (projects.length == 0) {
+		Object[] standaloneTasks = filtered.stream()
+				.filter(task -> task.getProject() == null)
+				.toArray();
+		if (projects.length == 0 && standaloneTasks.length == 0) {
 			return new Object[0];
 		}
-		Object[] elements = new Object[projects.length + 1];
+		Object[] elements = new Object[projects.length + standaloneTasks.length + 1];
 		System.arraycopy(projects, 0, elements, 0, projects.length);
-		elements[projects.length] = WEEKLY_SUMMARY;
+		System.arraycopy(standaloneTasks, 0, elements, projects.length, standaloneTasks.length);
+		elements[elements.length - 1] = WEEKLY_SUMMARY;
 		return elements;
 	}
 
@@ -121,7 +138,8 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	@Override
 	public Object getParent(Object element) {
 		if (element instanceof Task) {
-			return ((Task) element).getProject();
+			Task task = (Task) element;
+			return task.getParentTask() == null ? task.getProject() : task.getParentTask();
 		}
 		if (element instanceof Activity) {
 			return ((Activity) element).getTrackedTask();

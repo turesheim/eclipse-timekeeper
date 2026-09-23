@@ -52,6 +52,7 @@ import net.resheim.eclipse.timekeeper.internal.idle.WindowsIdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.X11IdleTimeDetector;
 import net.resheim.eclipse.timekeeper.service.TimekeeperService;
 import net.resheim.eclipse.timekeeper.ui.preferences.PreferenceConstants;
+import net.resheim.eclipse.timekeeper.ui.tasks.MylynTaskSynchronizer;
 
 @SuppressWarnings("restriction")
 public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyChangeListener {
@@ -67,6 +68,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 
 	private static TimekeeperUiPlugin plugin;
 	private ServiceTracker<TimekeeperService, TimekeeperService> serviceTracker;
+	private MylynTaskSynchronizer mylynTaskSynchronizer;
 
 	public static final String PLUGIN_ID = "net.resheim.eclipse.timekeeper.ui"; //$NON-NLS-1$
 
@@ -359,6 +361,9 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 		plugin = this;
 		serviceTracker = new ServiceTracker<>(context, TimekeeperService.class, null);
 		serviceTracker.open();
+		mylynTaskSynchronizer = new MylynTaskSynchronizer(getTimekeeperService(),
+				PlatformUI.getWorkbench().getDisplay());
+		mylynTaskSynchronizer.start();
 		consideredIdleThreshold = getPreferenceStore().getLong(PreferenceConstants.MINUTES_IDLE) * 60_000l;
 		afkInterval = getPreferenceStore().getLong(PreferenceConstants.MINUTES_AWAY) * 60_000l;
 		afkDeactivate = getPreferenceStore().getBoolean(PreferenceConstants.DEACTIVATE_WHEN_AWAY);
@@ -368,6 +373,8 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 
 	@Override
 	public void stop(BundleContext context) throws Exception {
+		if (mylynTaskSynchronizer != null) mylynTaskSynchronizer.stop();
+		mylynTaskSynchronizer = null;
 		if (serviceTracker != null) serviceTracker.close();
 		serviceTracker = null;
 		plugin = null;
