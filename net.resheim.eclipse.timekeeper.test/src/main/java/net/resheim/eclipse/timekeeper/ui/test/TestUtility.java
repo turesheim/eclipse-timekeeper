@@ -112,7 +112,7 @@ public class TestUtility {
 			// overwrite the existing file if different
 			if (path.toFile().exists()) {
 				compareImages(widget, image, path, loader);
-				screenshot.dispose();
+				image.dispose();
 				return;
 			}
 			loader.data = new ImageData[] { image.getImageData() };

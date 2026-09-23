@@ -345,8 +345,8 @@ public class IntegrationTest {
 		assertEquals(parent.id(), service.findTask(new net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey(
 				"github", "turesheim/eclipse-timekeeper", "183")).orElseThrow().id());
 
-		runOnUi(() -> TestUtility.takeScreenshot(screenshotsDir,
-				workweek.getViewReference().getPage().getWorkbenchWindow().getShell(),
+		// Capture the Workweek content rather than the surrounding Eclipse window.
+		runOnUi(() -> TestUtility.takeScreenshot(screenshotsDir, tree.widget.getParent(),
 				"native-task-tree.png"));
 	}
 
