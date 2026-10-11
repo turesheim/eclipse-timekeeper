@@ -72,7 +72,11 @@
 						<goals><goal>enforce</goal></goals>
 						<configuration>
 							<rules>
-								<requireMavenVersion><version>[3.9.9,)</version></requireMavenVersion>
+								<!-- Tycho 5.0.4 creates classifiers for nested JARs that Maven 3.10 rejects. -->
+								<requireMavenVersion>
+									<version>[3.9.9,3.10)</version>
+									<message>Use ./mvnw (mvnw.cmd on Windows) for the supported Maven version.</message>
+								</requireMavenVersion>
 								<requireJavaVersion><version>[21,)</version></requireJavaVersion>
 							</rules>
 						</configuration>

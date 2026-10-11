@@ -24,7 +24,7 @@ import org.eclipse.swt.dnd.Transfer;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.handlers.HandlerUtil;
 
-import net.resheim.eclipse.timekeeper.db.model.Task;
+import net.resheim.eclipse.timekeeper.domain.Task;
 
 public class CopyTaskDetailsToHTML extends AbstractHandler implements IHandler {
 
@@ -40,14 +40,14 @@ public class CopyTaskDetailsToHTML extends AbstractHandler implements IHandler {
 
 	public void copyTaskAsHTML(Task task) {
 		StringBuilder sb = new StringBuilder();
-		String taskKey = task.getTaskId();
+		String taskKey = task.externalReferences().stream().map(reference -> reference.externalId()).sorted().findFirst().orElse(null);
 		if (taskKey != null) {
-			sb.append("<a href=\"" + task.getTaskUrl() + "\">");
+			sb.append("<a href=\"" + task.url().orElse("") + "\">");
 			sb.append(taskKey);
 			sb.append("</a>");
 			sb.append(": ");
 		}
-		sb.append(task.getTaskSummary());
+		sb.append(task.summary());
 		HTMLTransfer textTransfer = HTMLTransfer.getInstance();
 		TextTransfer tt = TextTransfer.getInstance();
 		Clipboard clipboard = new Clipboard(Display.getCurrent());

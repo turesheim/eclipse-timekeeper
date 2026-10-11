@@ -30,7 +30,8 @@ Export-Package: net.resheim.eclipse.timekeeper.internal;x-friends:="net.resheim.
  net.resheim.eclipse.timekeeper.ui.commands,
  net.resheim.eclipse.timekeeper.ui.export,
  net.resheim.eclipse.timekeeper.ui.preferences,
- net.resheim.eclipse.timekeeper.ui.views
+ net.resheim.eclipse.timekeeper.ui.views,
+ net.resheim.eclipse.timekeeper.ui.tasks;x-friends:="net.resheim.eclipse.timekeeper.test"
 Automatic-Module-Name: net.resheim.eclipse.timekeeper.ui
 Import-Package: org.osgi.service.prefs,
  org.osgi.util.tracker

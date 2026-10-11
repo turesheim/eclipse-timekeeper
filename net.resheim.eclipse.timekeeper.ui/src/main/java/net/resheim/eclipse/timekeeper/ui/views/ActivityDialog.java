@@ -1,0 +1,159 @@
+/*******************************************************************************
+ * Copyright © 2026 Torkild U. Resheim
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * which accompanies this distribution, and is available at
+ * http://www.eclipse.org/legal/epl-v10.html
+ *
+ * Contributors:
+ *     Torkild U. Resheim - initial API and implementation
+ *******************************************************************************/
+package net.resheim.eclipse.timekeeper.ui.views;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.ResolverStyle;
+import java.util.Arrays;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.eclipse.jface.dialogs.IDialogConstants;
+import org.eclipse.jface.dialogs.TitleAreaDialog;
+import org.eclipse.jface.viewers.CheckboxTableViewer;
+import org.eclipse.jface.viewers.ArrayContentProvider;
+import org.eclipse.jface.viewers.LabelProvider;
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.layout.GridLayout;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.Text;
+
+import net.resheim.eclipse.timekeeper.domain.Activity;
+import net.resheim.eclipse.timekeeper.domain.LabelId;
+import net.resheim.eclipse.timekeeper.domain.OwnerId;
+import net.resheim.eclipse.timekeeper.domain.Task;
+import net.resheim.eclipse.timekeeper.domain.TaskId;
+import net.resheim.eclipse.timekeeper.service.Commands.CreateActivity;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateActivity;
+import net.resheim.eclipse.timekeeper.service.TimekeeperService;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
+
+/** Creates or edits a service-owned interval, including its calendar dates and labels. */
+final class ActivityDialog extends TitleAreaDialog {
+	private static final DateTimeFormatter FORMAT = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm")
+			.withResolverStyle(ResolverStyle.STRICT);
+	private final TimekeeperService service;
+	private final TaskId taskId;
+	private final Activity original;
+	private final LocalDate date;
+	private final ZoneId zone = TimekeeperUiPlugin.getCalendarZone();
+	private Text start;
+	private Text end;
+	private Text summary;
+	private CheckboxTableViewer labels;
+
+	ActivityDialog(Shell shell, TimekeeperService service, Task task, LocalDate date) {
+		this(shell, service, task.id(), null, date);
+	}
+	ActivityDialog(Shell shell, TimekeeperService service, Activity activity, LocalDate date) {
+		this(shell, service, activity.taskId(), activity, date);
+	}
+	private ActivityDialog(Shell shell, TimekeeperService service, TaskId taskId, Activity original, LocalDate date) {
+		super(shell);
+		this.service = service;
+		this.taskId = taskId;
+		this.original = original;
+		this.date = date;
+		setShellStyle(getShellStyle() | SWT.RESIZE);
+	}
+	@Override protected void configureShell(Shell shell) {
+		super.configureShell(shell);
+		shell.setText(original == null ? "New activity" : "Edit activity");
+	}
+	@Override protected Control createDialogArea(Composite parent) {
+		Composite area = (Composite) super.createDialogArea(parent);
+		setTitle(original == null ? "Record an activity" : "Edit recorded activity");
+		setMessage("Enter dates and times in " + zone + ". Leave End empty for an ongoing activity.");
+		Composite body = new Composite(area, SWT.NONE);
+		body.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+		body.setLayout(new GridLayout(2, false));
+		new Label(body, SWT.NONE).setText("Task");
+		new Label(body, SWT.NONE).setText(service.task(taskId).orElseThrow().summary());
+		summary = field(body, "Summary", original == null ? "" : original.summary());
+		start = field(body, "Start (yyyy-MM-dd HH:mm)", original == null ? FORMAT.format(date.atTime(9, 0))
+				: FORMAT.format(original.start().atZone(zone)));
+		end = field(body, "End (yyyy-MM-dd HH:mm)", original == null ? FORMAT.format(date.atTime(10, 0))
+				: original.end().map(value -> FORMAT.format(value.atZone(zone))).orElse(""));
+		new Label(body, SWT.NONE).setText("Labels");
+		labels = CheckboxTableViewer.newCheckList(body, SWT.BORDER | SWT.V_SCROLL);
+		GridData data = new GridData(SWT.FILL, SWT.FILL, true, true);
+		data.heightHint = 120;
+		labels.getTable().setLayoutData(data);
+		labels.getTable().setData("org.eclipse.swtbot.widget.key", "activity-labels");
+		labels.setContentProvider(ArrayContentProvider.getInstance());
+		labels.setLabelProvider(new LabelProvider() {
+			@Override public String getText(Object element) { return ((net.resheim.eclipse.timekeeper.domain.Label) element).name(); }
+		});
+		var available = service.labels();
+		labels.setInput(available);
+		if (original != null) labels.setCheckedElements(available.stream()
+				.filter(label -> original.labelIds().contains(label.id())).toArray());
+		return area;
+	}
+	private Text field(Composite parent, String caption, String value) {
+		new Label(parent, SWT.NONE).setText(caption);
+		Text text = new Text(parent, SWT.BORDER);
+		GridData data = new GridData(SWT.FILL, SWT.CENTER, true, false);
+		data.widthHint = 320;
+		text.setLayoutData(data);
+		text.setText(value);
+		text.addModifyListener(event -> setErrorMessage(null));
+		return text;
+	}
+	@Override protected void createButtonsForButtonBar(Composite parent) {
+		createButton(parent, IDialogConstants.OK_ID, "Save", true);
+		createButton(parent, IDialogConstants.CANCEL_ID, IDialogConstants.CANCEL_LABEL, false);
+	}
+	@Override protected void okPressed() {
+		try {
+			var from = endpoint(start.getText(), original == null ? Optional.empty() : Optional.of(original.start()));
+			Optional<java.time.Instant> until = end.getText().isBlank() ? Optional.empty()
+					: Optional.of(endpoint(end.getText(), original == null ? Optional.empty() : original.end()));
+			if (until.isEmpty() && from.isAfter(java.time.Instant.now())) {
+				throw new IllegalArgumentException("An ongoing activity cannot start in the future.");
+			}
+			Set<LabelId> selected = Arrays.stream(labels.getCheckedElements())
+					.map(value -> ((net.resheim.eclipse.timekeeper.domain.Label) value).id()).collect(Collectors.toSet());
+			if (original == null) {
+				service.createActivity(new CreateActivity(taskId, OwnerId.LOCAL, from, until, summary.getText(), selected));
+			} else {
+				service.updateActivity(new UpdateActivity(original.id(), original.version(), from, until, summary.getText(), selected));
+			}
+			super.okPressed();
+		} catch (RuntimeException failure) {
+			setErrorMessage(failureMessage(failure));
+		}
+	}
+	private java.time.Instant endpoint(String text, Optional<java.time.Instant> stored) {
+		String value = text.trim();
+		// The editor displays minutes; unchanged fields retain their original precision and offset.
+		return stored.filter(instant -> FORMAT.format(instant.atZone(zone)).equals(value))
+				.orElseGet(() -> LocalDateTime.parse(value, FORMAT).atZone(zone).toInstant());
+	}
+	static String failureMessage(RuntimeException failure) {
+		if (failure instanceof java.time.format.DateTimeParseException) return "Use a valid date and time in yyyy-MM-dd HH:mm format.";
+		if (failure instanceof net.resheim.eclipse.timekeeper.service.ServiceException problem
+				&& problem.code() == net.resheim.eclipse.timekeeper.domain.FailureCode.CONFLICT) {
+			if (problem.field().equals("activity")) return "This activity has changed. Close and reopen the editor before saving.";
+			if (problem.field().equals("ownerId")) return "Stop the current activity before starting another.";
+		}
+		return failure.getMessage();
+	}
+
+}

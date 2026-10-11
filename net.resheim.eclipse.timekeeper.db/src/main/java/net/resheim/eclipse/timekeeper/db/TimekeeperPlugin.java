@@ -886,6 +886,7 @@ public class TimekeeperPlugin extends Plugin {
 		}
 		Task ttask = getTask(task);
 		if (ttask != null) {
+			refreshActivityReference(ttask);
 			Activity activity = ttask.startActivity();
 			entityManager.persist(activity);
 			log.debug("Activating task '{}'", task);
@@ -896,6 +897,19 @@ public class TimekeeperPlugin extends Plugin {
 		}
 	}
 
+	/** Reloads a service-updated activity pointer without flushing stale workspace state first. */
+	private void refreshActivityReference(Task task) {
+		long stored = entityManager.createQuery("SELECT COUNT(t) FROM Task t WHERE t.id = :id", Long.class)
+				.setParameter("id", task.getId()).setFlushMode(javax.persistence.FlushModeType.COMMIT).getSingleResult();
+		if (stored == 0) return;
+		String previousActivity = task.getCurrentActivity().map(Activity::getId).orElse(null);
+		java.time.Instant previousTick = task.getTick();
+		entityManager.refresh(task);
+		if (previousTick != null && java.util.Objects.equals(previousActivity,
+				task.getCurrentActivity().map(Activity::getId).orElse(null))
+				&& (task.getTick() == null || previousTick.isAfter(task.getTick()))) task.setTick(previousTick);
+	}
+
 	/**
 	 * Ends the activity currently active on the given Mylyn task.
 	 * 
@@ -904,6 +918,7 @@ public class TimekeeperPlugin extends Plugin {
 	public void endMylynTask(ITask task) {
 		Task ttask = getTask(task);
 		if (ttask != null) {
+			refreshActivityReference(ttask);
 			Activity activity = ttask.endActivity();
 			if (activity == null) {
 				return;

@@ -2,6 +2,7 @@ package net.resheim.eclipse.timekeeper.db;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -10,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -82,6 +84,41 @@ class JpaServicePortsTest {
 		assertEquals(projectId, service.task(taskId).orElseThrow().projectId().orElseThrow());
 		assertEquals(taskId, service.task(subtaskId).orElseThrow().parentTaskId().orElseThrow());
 		assertEquals(activity.id(), service.activity(activity.id()).orElseThrow().id());
+	}
+
+	@Test
+	void editedStandaloneIntervalsSurviveRestartAndRenderThroughTheService() throws Exception {
+		manager = DatabaseStartup.open(url("edited-intervals"));
+		TimekeeperService service = service(new ArrayList<>());
+		var project = service.createProject(new CreateProject("Independent reporting"));
+		var task = service.createTask(new CreateTask(Optional.of(project.id()), "Unlinked report task", Optional.empty()));
+		var label = service.createLabel(new CreateLabel("Recorded work", Optional.of("64,128,192")));
+		Instant start = Instant.parse("2026-09-22T09:00:00Z");
+		var activity = service.createActivity(new CreateActivity(task.id(), OwnerId.LOCAL, start,
+				Optional.of(start.plusSeconds(3600)), "Initial interval", Set.of()));
+		activity = service.updateActivity(new net.resheim.eclipse.timekeeper.service.Commands.UpdateActivity(
+				activity.id(), activity.version(), start.minusSeconds(1800), Optional.of(start.plusSeconds(3600)),
+				"Edited interval", Set.of(label.id())));
+		var unassigned = service.createTask(new CreateTask(Optional.empty(), "Unassigned report task", Optional.empty()));
+		service.createActivity(new CreateActivity(unassigned.id(), OwnerId.LOCAL, start,
+				Optional.of(start.plusSeconds(600)), "Unassigned work", Set.of()));
+		DatabaseStartup.close(manager);
+		manager = DatabaseStartup.open(url("edited-intervals") + ";IFEXISTS=TRUE");
+		service = service(new ArrayList<>());
+		assertEquals(activity, service.activity(activity.id()).orElseThrow());
+		assertTrue(service.task(task.id()).orElseThrow().externalReferences().isEmpty());
+		for (String name : List.of("Basic HTML", "Default HTML")) {
+			String code = java.nio.file.Files.readString(Path.of("templates", name + ".html"));
+			var template = new net.resheim.eclipse.timekeeper.db.report.ReportTemplate(name,
+					net.resheim.eclipse.timekeeper.db.report.ReportTemplate.Type.HTML, code);
+			String rendered = new net.resheim.eclipse.timekeeper.db.report.TemplateExporter(template, ZoneOffset.UTC)
+					.getData(java.time.LocalDate.of(2026, 9, 21), service);
+			assertNotNull(rendered);
+			assertTrue(rendered.contains("Independent reporting"));
+			assertTrue(rendered.contains("Unlinked report task"));
+			assertTrue(rendered.contains("Unassigned report task"));
+			assertTrue(rendered.contains("No project"));
+		}
 	}
 
 	@Test

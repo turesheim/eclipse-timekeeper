@@ -51,7 +51,7 @@
 		</tr>
 		<#list tasks as task>		
 		<tr class="task-row">
-			<td>&nbsp;<#if task.url??><a href="${task.url}">${task.taskId}</a><#else>${task.taskId}</#if> :${task.taskSummary}</td>
+			<td>&nbsp;<#if task.taskUrl??><a href="${task.taskUrl}"><#if task.taskId??>${task.taskId}: </#if>${task.taskSummary}</a><#else><#if task.taskId??>${task.taskId}: </#if>${task.taskSummary}</#if></td>
 			<#list week.dates as date><td class="project-td">${formatDuration(date, task)}</td></#list>
 			<td class="sum-td">${formatDuration(week.getSum(task))}</td>
 		</tr>

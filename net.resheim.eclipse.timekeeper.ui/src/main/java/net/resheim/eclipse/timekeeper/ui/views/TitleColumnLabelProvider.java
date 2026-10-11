@@ -17,9 +17,9 @@ import org.eclipse.mylyn.tasks.ui.TaskElementLabelProvider;
 import org.eclipse.mylyn.tasks.ui.TasksUiImages;
 import org.eclipse.swt.graphics.Image;
 
-import net.resheim.eclipse.timekeeper.db.model.Activity;
-import net.resheim.eclipse.timekeeper.db.model.Project;
-import net.resheim.eclipse.timekeeper.db.model.Task;
+import net.resheim.eclipse.timekeeper.domain.Activity;
+import net.resheim.eclipse.timekeeper.domain.Project;
+import net.resheim.eclipse.timekeeper.domain.Task;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 /**
@@ -42,7 +42,7 @@ class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 			return CommonImages.getImage(TasksUiImages.CATEGORY);
 		}
 		if (element instanceof Task) {
-			ITask linked = ((Task) element).getMylynTask();
+			ITask linked = WorkWeekView.mylynTask((Task) element);
 			return linked == null ? CommonImages.getImage(TasksUiImages.TASK) : mylynLabels.getImage(linked);
 		}
 		return null;
@@ -57,20 +57,16 @@ class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 	@Override
 	public String getText(Object element) {
 		if (element instanceof Project) {
-			return ((Project) element).getName();
+			return ((Project) element).name();
 		}
 		if (element instanceof Task) {
 			Task task = (Task) element;
-			StringBuilder sb = new StringBuilder();
-			if (task.getTaskId() != null) {
-				sb.append(task.getTaskId());
-				sb.append(": ");
-			}
-			sb.append(task.getTaskSummary());
-			return sb.toString();
+			String externalId = task.externalReferences().stream()
+					.map(reference -> reference.externalId()).sorted().findFirst().orElse(null);
+			return externalId == null ? task.summary() : externalId + ": " + task.summary();
 		}
 		if (element instanceof Activity) {
-			return ((Activity) element).getSummary();
+			return ((Activity) element).summary();
 		}
 		if (element instanceof WeeklySummary) {
 			return "Daily total";
@@ -80,14 +76,20 @@ class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 
 	@Override
 	public String getToolTipText(Object element) {
+		if (element instanceof Task task) {
+			if (task.externalReferences().isEmpty()) return "Native Timekeeper task";
+			String references = task.externalReferences().stream().map(reference -> reference.providerId()
+					+ ": " + reference.externalId()).sorted().collect(java.util.stream.Collectors.joining("\n"));
+			return WorkWeekView.mylynTask(task) == null ? references + "\nNo linked Mylyn task is available." : references;
+		}
 		if (element instanceof Activity) {
 			Activity activity = (Activity) element;
 			StringBuilder sb = new StringBuilder();
 			sb.append("Started on ");
-			sb.append(activity.getStart().atZone(getZoneId()).toLocalDateTime());
-			if (activity.getEnd() != null) {
+			sb.append(activity.start().atZone(getZoneId()).toLocalDateTime());
+			if (activity.end().isPresent()) {
 				sb.append(", ended on ");
-				sb.append(activity.getEnd().atZone(getZoneId()).toLocalDateTime());
+				sb.append(activity.end().orElseThrow().atZone(getZoneId()).toLocalDateTime());
 			}
 			return sb.toString();
 		}

@@ -28,6 +28,10 @@ database baseline.
   and the standard Mylyn Task List: categories map to projects, local tasks map
   to tasks, and nested local tasks map to subtasks without requiring a connector.
   Workweek remains focused on activity tracking and reporting.
+- Routed Workweek display and activity creation, date/time editing, labels,
+  start/stop and deletion through immutable application-service snapshots.
+  Native project/task deletion is synchronized with Task List, and bundled
+  reports support tasks without external identifiers or projects.
 - Added guarded database initialization and future migration lifecycle
   infrastructure. Unsupported, unversioned and incomplete databases fail closed.
 - Verified workspace, shared `AUTO_SERVER`, explicit file and local H2 TCP

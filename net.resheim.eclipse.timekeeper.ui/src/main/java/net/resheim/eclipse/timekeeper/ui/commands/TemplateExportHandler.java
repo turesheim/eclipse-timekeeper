@@ -59,7 +59,7 @@ public class TemplateExportHandler extends AbstractHandler implements IHandler {
 			LocalDate firstDayOfWeek = ((WorkWeekView) activePart).getFirstDayOfWeek();
 			ReportTemplate template = templates.get(parameters.get(COMMAND_PARAMETER_TEMPLATE_NAME));
 			TemplateExporter export = new TemplateExporter(template, TimekeeperUiPlugin.getCalendarZone());
-			String result = export.getData(firstDayOfWeek);
+			String result = export.getData(firstDayOfWeek, TimekeeperUiPlugin.getDefault().getTimekeeperService());
 			if (result != null) {
 				// save to file or copy to clipboard
 				boolean save = Boolean.parseBoolean(parameters.getOrDefault(COMMAND_PARAMETER_FILE, "false"));

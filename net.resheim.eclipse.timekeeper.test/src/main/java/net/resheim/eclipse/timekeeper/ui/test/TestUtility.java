@@ -89,7 +89,9 @@ public class TestUtility {
 		int width = b.width;
 		int height = b.height;
 		
-		Rectangle m = widget.getDisplay().map(widget.getParent(), null, b);
+		Rectangle m = widget instanceof org.eclipse.swt.widgets.Shell
+				? new Rectangle(widget.getLocation().x, widget.getLocation().y, width, height)
+				: widget.getDisplay().map(widget.getParent(), null, b);
 		final Image screenshot = new Image(widget.getDisplay(), width, height);
 		
 		GC gc = new GC(widget.getDisplay());

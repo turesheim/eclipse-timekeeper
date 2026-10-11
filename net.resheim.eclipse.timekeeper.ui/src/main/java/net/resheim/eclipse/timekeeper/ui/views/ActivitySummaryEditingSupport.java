@@ -11,51 +11,35 @@
 
 package net.resheim.eclipse.timekeeper.ui.views;
 
+import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.viewers.CellEditor;
 import org.eclipse.jface.viewers.EditingSupport;
 import org.eclipse.jface.viewers.TextCellEditor;
 import org.eclipse.jface.viewers.TreeViewer;
+import net.resheim.eclipse.timekeeper.domain.Activity;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateActivity;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
-import net.resheim.eclipse.timekeeper.db.model.Activity;
-
-/**
- * Enables editing of the activity summary.
- *
- * @author Torkild U. Resheim
- */
+/** Writes the displayed snapshot through the client API with optimistic version checks. */
 class ActivitySummaryEditingSupport extends EditingSupport {
-
-	public ActivitySummaryEditingSupport(TreeViewer viewer) {
+	private final WeekViewContentProvider content;
+	ActivitySummaryEditingSupport(TreeViewer viewer, WeekViewContentProvider content) {
 		super(viewer);
+		this.content = content;
 	}
-
-	@Override
-	protected CellEditor getCellEditor(Object element) {
+	@Override protected CellEditor getCellEditor(Object element) {
 		return new TextCellEditor(((TreeViewer) getViewer()).getTree());
 	}
-
-	@Override
-	protected boolean canEdit(Object element) {
-		if (element instanceof Activity) {
-			return true;
+	@Override protected boolean canEdit(Object element) { return element instanceof Activity; }
+	@Override protected Object getValue(Object element) { return ((Activity) element).summary(); }
+	@Override protected void setValue(Object element, Object value) {
+		Activity activity = (Activity) element;
+		try {
+			TimekeeperUiPlugin.getDefault().getTimekeeperService().updateActivity(new UpdateActivity(
+					activity.id(), activity.version(), activity.start(), activity.end(), value.toString(), activity.labelIds()));
+		} catch (RuntimeException failure) {
+			MessageDialog.openError(getViewer().getControl().getShell(), "Could not edit activity", ActivityDialog.failureMessage(failure));
 		}
-		return false;
+		content.databaseStateChanged();
 	}
-
-	@Override
-	protected Object getValue(Object element) {
-		if (element instanceof Activity) {
-			return ((Activity) element).getSummary();
-		}
-		return "";
-	}
-
-	@Override
-	protected void setValue(Object element, Object value) {
-		if (element instanceof Activity) {
-			((Activity) element).setSummary(value.toString());
-			getViewer().update(element, null);
-		}
-	}
-
 }

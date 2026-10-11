@@ -23,8 +23,7 @@ import org.eclipse.ui.IViewPart;
 import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.handlers.HandlerUtil;
 
-import net.resheim.eclipse.timekeeper.db.model.Activity;
-import net.resheim.eclipse.timekeeper.domain.ActivityId;
+import net.resheim.eclipse.timekeeper.domain.Activity;
 import net.resheim.eclipse.timekeeper.domain.LabelId;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateActivity;
 import net.resheim.eclipse.timekeeper.ui.ActivityLabelMenu;
@@ -45,7 +44,7 @@ public class ToggleLabelCommand extends AbstractHandler {
 		Object obj = ((IStructuredSelection) selection).getFirstElement();
 		if (obj instanceof Activity activity) {
 			var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
-			var current = service.activity(new ActivityId(UUID.fromString(activity.getId()))).orElseThrow();
+			var current = service.activity(activity.id()).orElseThrow();
 			LabelId labelId = new LabelId(UUID.fromString(id));
 			var labels = new HashSet<>(current.labelIds());
 			if (!labels.add(labelId)) labels.remove(labelId);

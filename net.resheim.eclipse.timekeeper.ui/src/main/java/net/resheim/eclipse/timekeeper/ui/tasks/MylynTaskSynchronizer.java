@@ -66,7 +66,13 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 	private final TaskList taskList;
 	private final Display display;
 	private final Preferences mappings;
+	private boolean running;
+	private boolean restoreAfterDeletionFailure;
 	private boolean applying;
+	private final Set<TaskId> deletedTasks = new HashSet<>();
+	private final Set<ProjectId> deletedProjects = new HashSet<>();
+	private Set<TaskId> knownBackendTasks = Set.of();
+	private Set<ProjectId> knownBackendProjects = Set.of();
 	private boolean scheduled;
 	private boolean mylynDirty = true;
 	private boolean backendDirty = true;
@@ -79,12 +85,14 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 	}
 
 	public void start() {
+		running = true;
 		taskList.addChangeListener(this);
 		TimekeeperPlugin.getDefault().addListener(this);
 		schedule(true, true);
 	}
 
 	public void stop() {
+		running = false;
 		TimekeeperPlugin.getDefault().removeListener(this);
 		taskList.removeChangeListener(this);
 	}
@@ -96,7 +104,13 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 
 	@Override
 	public void containersChanged(Set<TaskContainerDelta> deltas) {
-		if (!applying && deltas.stream().anyMatch(delta -> !delta.isTransient())) schedule(true, false);
+		if (!running || applying) return;
+		for (TaskContainerDelta delta : deltas) {
+			if (delta.getKind() != TaskContainerDelta.Kind.DELETED) continue;
+			if (delta.getElement() instanceof LocalTask task) mappedTask(task).ifPresent(deletedTasks::add);
+			if (delta.getElement() instanceof AbstractTaskCategory category) mappedProject(category).ifPresent(deletedProjects::add);
+		}
+		if (deltas.stream().anyMatch(delta -> !delta.isTransient())) schedule(true, false);
 	}
 
 	private void schedule(boolean fromMylyn, boolean fromBackend) {
@@ -109,14 +123,17 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 
 	private void reconcile() {
 		scheduled = false;
-		if (display.isDisposed() || !TimekeeperPlugin.getDefault().isReady()) return;
+		if (!running || display.isDisposed() || !TimekeeperPlugin.getDefault().isReady()) return;
 		boolean importMylyn = mylynDirty;
 		boolean exportBackend = backendDirty;
 		mylynDirty = false;
 		backendDirty = false;
 		applying = true;
 		try {
-			if (importMylyn) synchronizeMylynToBackend();
+			if (importMylyn) {
+				applyDeletions();
+				synchronizeMylynToBackend();
+			}
 			if (exportBackend || importMylyn) synchronizeBackendToMylyn();
 		} catch (RuntimeException failure) {
 			TimekeeperUiPlugin.getDefault().getLog().log(new Status(IStatus.ERROR,
@@ -125,6 +142,42 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 			applying = false;
 			if (mylynDirty || backendDirty) schedule(false, false);
 		}
+	}
+
+	private void applyDeletions() {
+		for (TaskId id : Set.copyOf(deletedTasks)) {
+			service.task(id).filter(task -> task.externalReferences().isEmpty()).ifPresent(task -> {
+				try {
+					service.deleteTask(new net.resheim.eclipse.timekeeper.service.Commands.DeleteTask(id, task.version()));
+				} catch (net.resheim.eclipse.timekeeper.service.ServiceException failure) {
+					// Recorded history is preserved; the projection is restored below.
+					showDeletionFailure(failure);
+				}
+			});
+		}
+		deletedTasks.clear();
+		for (ProjectId id : Set.copyOf(deletedProjects)) {
+			service.project(id).ifPresent(project -> {
+				try {
+					service.deleteProject(new net.resheim.eclipse.timekeeper.service.Commands.DeleteProject(id, project.version()));
+					mappings.remove(mappingKey(id));
+				} catch (net.resheim.eclipse.timekeeper.service.ServiceException failure) {
+					showDeletionFailure(failure);
+				}
+			});
+		}
+		deletedProjects.clear();
+		if (restoreAfterDeletionFailure) {
+			restoreAfterDeletionFailure = false;
+			// Repair the hierarchy before importing changes caused by Mylyn deletion.
+			synchronizeBackendToMylyn();
+		}
+	}
+
+	private void showDeletionFailure(RuntimeException failure) {
+		restoreAfterDeletionFailure = true;
+		org.eclipse.jface.dialogs.MessageDialog.openError(display.getActiveShell(),
+				"Could not delete Timekeeper record", failure.getMessage());
 	}
 
 	private void synchronizeMylynToBackend() {
@@ -193,6 +246,18 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 	private void synchronizeBackendToMylyn() {
 		Map<TaskId, Task> domainTasks = new HashMap<>();
 		service.tasks().forEach(task -> domainTasks.put(task.id(), task));
+		for (AbstractTask projected : List.copyOf(taskList.getAllTasks())) {
+			if (!(projected instanceof LocalTask)) continue;
+			mappedTask(projected).filter(id -> knownBackendTasks.contains(id) && !domainTasks.containsKey(id)).ifPresent(id -> taskList.deleteTask(projected));
+		}
+		Set<ProjectId> projectIds = service.projects().stream().map(Project::id).collect(java.util.stream.Collectors.toSet());
+		for (AbstractTaskCategory category : Set.copyOf(taskList.getTaskCategories())) {
+			mappedProject(category).filter(id -> knownBackendProjects.contains(id) && !projectIds.contains(id)).ifPresent(id -> {
+				taskList.deleteCategory(category);
+				mappings.remove(mappingKey(id));
+			});
+		}
+
 		Set<ProjectId> nativeProjects = new HashSet<>();
 		TimekeeperPlugin.getProjects().map(net.resheim.eclipse.timekeeper.db.model.Project::getServiceId)
 				.filter(java.util.Objects::nonNull).map(UUID::fromString).map(ProjectId::new)
@@ -231,6 +296,8 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 			}
 			mylynTasks.put(task.id(), mylynTask);
 		}
+		knownBackendTasks = Set.copyOf(domainTasks.keySet());
+		knownBackendProjects = Set.copyOf(projectIds);
 	}
 
 	private boolean isLocalTask(Task task) {
