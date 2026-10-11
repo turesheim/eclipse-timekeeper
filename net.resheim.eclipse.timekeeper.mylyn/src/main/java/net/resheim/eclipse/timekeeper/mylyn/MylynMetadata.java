@@ -27,6 +27,8 @@ public final class MylynMetadata {
 	public static final String KIND_GITHUB = "github", KIND_LOCAL = "local", KIND_BUGZILLA = "bugzilla",
 			KIND_JIRA = "jira";
 	public static final String ATTR_GROUPING = "net.resheim.eclipse.timekeeper.grouping";
+	public static final String GROUP_MYLYN_CATEGORY = "@mylyn-category";
+	public static final String JIRA_CUSTOM_FIELD_PREFIX = "attribute.jira.custom::";
 	public static final String ATTR_TIMEKEEPER_TASK_ID = "net.resheim.eclipse.timekeeper.task-id";
 	private static final String LOCAL_REPO_ID = "local", LOCAL_REPO_PREFIX = "local-";
 	private static final String LOCAL_REPO_KEY_ID = "net.resheim.eclipse.timekeeper.repo-id";
@@ -49,44 +51,56 @@ public final class MylynMetadata {
 	}
 
 	public static String getMylynProjectName(ITask task) {
-		String c = Optional.ofNullable(task.getConnectorKind()).orElse("mylyn");
+		String kind = task.getConnectorKind();
+		if (!KIND_JIRA.equals(kind) && !KIND_BUGZILLA.equals(kind))
+			return getMylynProjectName(task, null, null);
+		TaskRepository repository = TasksUi.getRepositoryManager().getRepository(kind, task.getRepositoryUrl());
+		TaskData data = null;
 		try {
-			switch (c) {
-			case KIND_GITHUB:
-			case KIND_LOCAL:
+			data = TasksUi.getTaskDataManager().getTaskData(task);
+		} catch (CoreException failure) {
+			log.warn("Could not read cached task data for grouping", failure);
+		}
+		if (repository == null && data != null)
+			repository = data.getAttributeMapper().getTaskRepository();
+		return getMylynProjectName(task, repository, data);
+	}
+
+	/** Resolve already loaded provider metadata without a network request. */
+	public static String getMylynProjectName(ITask task, TaskRepository repository, TaskData data) {
+		String kind = Optional.ofNullable(task.getConnectorKind()).orElse("mylyn");
+		if (KIND_LOCAL.equals(kind) || KIND_GITHUB.equals(kind))
+			return getParentContainerSummary(task);
+		String grouping = repository == null ? null : repository.getProperty(ATTR_GROUPING);
+		if (grouping != null && grouping.isBlank())
+			grouping = null;
+		if (KIND_JIRA.equals(kind)) {
+			if (GROUP_MYLYN_CATEGORY.equals(grouping))
 				return getParentContainerSummary(task);
-			// Bugzilla and JIRA users may want to group on different
-			// values.
-			case KIND_BUGZILLA:
-			case KIND_JIRA:
-				TaskData taskData = TasksUi.getTaskDataManager().getTaskData(task);
-				if (taskData != null) {
-					// This appears to be a pretty slow mechanism
-					TaskRepository taskRepository = taskData.getAttributeMapper().getTaskRepository();
-					String groupingAttribute = taskRepository.getProperty(ATTR_GROUPING);
-					// Use custom grouping if specified
-					if (groupingAttribute != null) {
-						TaskAttribute attribute = taskData.getRoot().getAttribute(groupingAttribute);
-						if (attribute != null && attribute.getValue() != null && !attribute.getValue().isBlank())
-							return attribute.getValue();
-					} else {
-						if (c.equals(KIND_BUGZILLA)) {
-							String product = task.getAttribute("product");
-							if (product != null && !product.isBlank())
-								return product;
-							return getParentContainerSummary(task);
-						}
-						return getParentContainerSummary(task);
-					}
-				}
-				break;
-			default:
-				break;
-			}
-		} catch (CoreException e) {
-			log.error("Could not obtain project name", e);
+			String attributeId = grouping == null ? TaskAttribute.PRODUCT : grouping.strip();
+			if (attributeId.startsWith("customfield_"))
+				attributeId = JIRA_CUSTOM_FIELD_PREFIX + attributeId;
+			return groupingValue(data, attributeId).orElse("None");
+		}
+		if (KIND_BUGZILLA.equals(kind) && data != null) {
+			if (grouping != null)
+				return groupingValue(data, grouping.strip()).orElse("<undetermined>");
+			String product = task.getAttribute("product");
+			return product != null && !product.isBlank() ? product : getParentContainerSummary(task);
 		}
 		return "<undetermined>";
+	}
+
+	private static Optional<String> groupingValue(TaskData data, String id) {
+		if (data == null)
+			return Optional.empty();
+		TaskAttribute attribute = data.getRoot().getAttribute(id);
+		if (attribute == null || attribute.getValues().stream().noneMatch(value -> value != null && !value.isBlank()))
+			return Optional.empty();
+		String value = data.getAttributeMapper().getValueLabels(attribute).stream()
+				.filter(label -> label != null && !label.isBlank()).map(String::strip).distinct()
+				.collect(java.util.stream.Collectors.joining(", "));
+		return value.isBlank() ? Optional.empty() : Optional.of(value);
 	}
 
 	public static String getRepositoryUrl(ITask task) {
