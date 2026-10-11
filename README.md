@@ -36,6 +36,20 @@ local task through Mylyn as usual; Timekeeper records its activities and shows
 the resulting time in Workweek. Native tasks participate in weekly totals,
 reports, and CSV export alongside connector-backed tasks.
 
+In Workweek, right-click a task and choose **New activity** to record time on
+any date. Enter start and end as `yyyy-MM-dd HH:mm` in the Eclipse host time
+zone, along with a summary and labels. Use **Start activity** for a new ongoing
+interval, then **Stop activity** on that interval. **Edit activity...** changes
+its dates, times, summary and labels; completed intervals can be deleted.
+These operations also work when a linked Mylyn task is unavailable. Timekeeper
+reports a conflict if another interval is already open or a record changed
+while it was being edited.
+
+Native projects and tasks can be renamed or deleted in Task List. Delete
+activities and subtasks before deleting their task, then remove its tasks
+before deleting the project; recorded history is preserved if deletion is
+refused. See the [native project/activity UI verification](baseline/STANDALONE-ACTIVITY-UI.md).
+
 The data is stored in an H2 SQL database, mapped to POJOs using the Java Persistence API with EclipseLink. Reports are generated using Apache FreeMarker. The database has an explicit schema version and initialization state; historical data migration is not supported.
 
 In the 2.0 data model, a Timekeeper task has its own UUID and can be created,

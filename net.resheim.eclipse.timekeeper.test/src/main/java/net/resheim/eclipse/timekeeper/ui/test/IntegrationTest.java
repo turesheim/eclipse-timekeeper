@@ -230,6 +230,11 @@ public class IntegrationTest {
 				Assert.assertNull(activity.getEnd());
 				activity.setSummary("Lifecycle activity");
 				activity.setStart(Instant.now().minusSeconds(120));
+				// Fixture edits must be durable before the Mylyn adapter reloads service-owned state.
+				var manager = TimekeeperPlugin.getDefault().getEntityManager();
+				manager.getTransaction().begin();
+				manager.persist(activity);
+				manager.getTransaction().commit();
 				TasksUi.getTaskActivityManager().deactivateTask(task);
 				assertTrue(tracked[0].getCurrentActivity().isEmpty());
 				assertNotNull(activity.getEnd());
@@ -281,6 +286,114 @@ public class IntegrationTest {
 		var menu = row.contextMenu("New activity");
 		assertTrue(menu.isEnabled());
 		menu.hide();
+	}
+
+	@Test
+	public void testServiceActivityIsReusedWhenMylynActivatesItsTask() throws Exception {
+		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
+		ITask[] previous = new ITask[1];
+		runOnUi(() -> {
+			previous[0] = TasksUi.getTaskActivityManager().getActiveTask();
+			if (previous[0] != null) TasksUi.getTaskActivityManager().deactivateTask(previous[0]);
+		});
+		var project = service.createProject(new CreateProject("Mixed activity checks"));
+		var task = service.createTask(new CreateTask(Optional.of(project.id()), "Mixed client task", Optional.empty()));
+		bot.waitUntil(new DefaultCondition() {
+			@Override public boolean test() { return mylynTask(task.id()).isPresent(); }
+			@Override public String getFailureMessage() { return "Native task did not reach Mylyn"; }
+		});
+		var activity = service.startActivity(new net.resheim.eclipse.timekeeper.service.Commands.StartActivity(
+				task.id(), net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL, "Started in Workweek", java.util.Set.of()));
+		try {
+			runOnUi(() -> TasksUi.getTaskActivityManager().activateTask(mylynTask(task.id()).orElseThrow()));
+			assertEquals(activity.id(), service.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL)
+					.orElseThrow().id());
+			var edited = service.updateActivity(new net.resheim.eclipse.timekeeper.service.Commands.UpdateActivity(
+					activity.id(), activity.version(), activity.start().minusSeconds(120), activity.end(),
+					"Edited in Workweek", activity.labelIds()));
+			runOnUi(() -> TasksUi.getTaskActivityManager().deactivateTask(mylynTask(task.id()).orElseThrow()));
+			var closed = service.activity(activity.id()).orElseThrow();
+			assertEquals(edited.start(), closed.start());
+			assertEquals(edited.summary(), closed.summary());
+			assertTrue(closed.end().isPresent());
+			assertTrue(service.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL).isEmpty());
+		} finally {
+			runOnUi(() -> {
+				ITask active = TasksUi.getTaskActivityManager().getActiveTask();
+				if (active != null) TasksUi.getTaskActivityManager().deactivateTask(active);
+			});
+			service.activity(activity.id()).ifPresent(value -> service.deleteActivity(
+					new net.resheim.eclipse.timekeeper.service.Commands.DeleteActivity(value.id(), value.version())));
+			service.deleteTask(new net.resheim.eclipse.timekeeper.service.Commands.DeleteTask(task.id(),
+					service.task(task.id()).orElseThrow().version()));
+			service.deleteProject(new net.resheim.eclipse.timekeeper.service.Commands.DeleteProject(project.id(),
+					service.project(project.id()).orElseThrow().version()));
+			runOnUi(() -> {
+				if (previous[0] != null) TasksUi.getTaskActivityManager().activateTask(previous[0]);
+			});
+		}
+	}
+
+	@Test
+	public void testNativeProjectAndTaskCrudThroughTaskList() throws Exception {
+		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
+		TaskCategory category = new TaskCategory("native-crud-checks", "Native CRUD checks");
+		LocalTask task = new LocalTask(String.valueOf(tl.getNextLocalTaskId()), "Task managed in Task List");
+		runOnUi(() -> {
+			tl.addCategory(category);
+			tl.addTask(task, category);
+		});
+		bot.waitUntil(new DefaultCondition() {
+			@Override public boolean test() { return task.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID) != null; }
+			@Override public String getFailureMessage() { return "Native task was not persisted"; }
+		});
+		var taskId = taskId(task);
+		var projectId = service.task(taskId).orElseThrow().projectId().orElseThrow();
+		prepareTaskListView().bot().tree().getTreeItem(category.getSummary()).expand().getNode(task.getSummary());
+		runOnUi(() -> {
+			tl.renameContainer(category, "Renamed native project");
+			task.setSummary("Renamed native task");
+			tl.notifyElementChanged(task);
+		});
+		bot.waitUntil(new DefaultCondition() {
+			@Override public boolean test() {
+				return service.project(projectId).map(value -> value.name().equals("Renamed native project")).orElse(false)
+						&& service.task(taskId).map(value -> value.summary().equals("Renamed native task")).orElse(false);
+			}
+			@Override public String getFailureMessage() { return "Native names were not updated"; }
+		});
+		LocalTask child = new LocalTask(String.valueOf(tl.getNextLocalTaskId()), "Protected subtask");
+		runOnUi(() -> tl.addTask(child, task));
+		bot.waitUntil(new DefaultCondition() {
+			@Override public boolean test() { return child.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID) != null; }
+			@Override public String getFailureMessage() { return "Native subtask was not persisted"; }
+		});
+		var childId = taskId(child);
+		runOnUi(() -> tl.deleteTask(task));
+		bot.shell("Could not delete Timekeeper record").activate();
+		bot.button("OK").click();
+		bot.waitUntil(new DefaultCondition() {
+			@Override public boolean test() {
+				return service.task(childId).map(value -> value.parentTaskId().equals(Optional.of(taskId))).orElse(false)
+						&& mylynTask(taskId).isPresent();
+			}
+			@Override public String getFailureMessage() { return "Refused deletion did not restore the native hierarchy"; }
+		});
+		runOnUi(() -> tl.deleteTask(child));
+		bot.waitUntil(new DefaultCondition() {
+			@Override public boolean test() { return service.task(childId).isEmpty(); }
+			@Override public String getFailureMessage() { return "Empty native subtask was not deleted"; }
+		});
+		runOnUi(() -> tl.deleteTask(mylynTask(taskId).orElseThrow()));
+		bot.waitUntil(new DefaultCondition() {
+			@Override public boolean test() { return service.task(taskId).isEmpty(); }
+			@Override public String getFailureMessage() { return "Empty native task was not deleted"; }
+		});
+		runOnUi(() -> tl.deleteCategory(category));
+		bot.waitUntil(new DefaultCondition() {
+			@Override public boolean test() { return service.project(projectId).isEmpty(); }
+			@Override public String getFailureMessage() { return "Empty native project was not deleted"; }
+		});
 	}
 
 	@Test

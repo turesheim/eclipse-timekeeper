@@ -189,6 +189,11 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 				if (task != null && ttask != null && ttask.getCurrentActivity().isPresent()) {
 					dialogIsOpen = true;
 					Instant lastActive = ttask.getTick();
+					if (lastActive == null) {
+						// A newly started activity may precede the first idle sample.
+						dialogIsOpen = false;
+						return;
+					}
 
 					// If the user have been idle, but not long enough to be
 					// considered AFK we will ask whether or not to add the

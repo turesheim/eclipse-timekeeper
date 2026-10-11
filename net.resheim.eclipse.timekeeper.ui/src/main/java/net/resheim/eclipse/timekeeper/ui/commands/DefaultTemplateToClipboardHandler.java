@@ -54,7 +54,7 @@ public class DefaultTemplateToClipboardHandler extends AbstractHandler {
 			LocalDate firstDayOfWeek = ((WorkWeekView) activePart).getFirstDayOfWeek();
 			ReportTemplate template = templates.get(defaultTemplate);
 			TemplateExporter export = new TemplateExporter(template, TimekeeperUiPlugin.getCalendarZone());
-			String result = export.getData(firstDayOfWeek);
+			String result = export.getData(firstDayOfWeek, TimekeeperUiPlugin.getDefault().getTimekeeperService());
 			if (result != null) {
 				Clipboard clipboard = new Clipboard(Display.getCurrent());
 				ByteArrayTransfer targetTransfer = getTransfer(template);
