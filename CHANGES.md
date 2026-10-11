@@ -32,6 +32,9 @@ database baseline.
   start/stop and deletion through immutable application-service snapshots.
   Native project/task deletion is synchronized with Task List, and bundled
   reports support tasks without external identifiers or projects.
+- Added native project and task creation, editing and deletion in Workweek,
+  including project assignment, task URLs and subtasks. New native records
+  do not create Mylyn objects unless Task List projection is enabled in preferences.
 - Added guarded database initialization and future migration lifecycle
   infrastructure. Unsupported, unversioned and incomplete databases fail closed.
 - Verified workspace, shared `AUTO_SERVER`, explicit file and local H2 TCP

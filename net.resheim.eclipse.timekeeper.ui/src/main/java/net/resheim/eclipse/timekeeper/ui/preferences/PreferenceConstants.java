@@ -22,4 +22,6 @@ public class PreferenceConstants {
 
 	public static final String DEACTIVATE_WHEN_AWAY = "deactivate_when_away";
 
+	public static final String PROJECT_NATIVE_TASKS = "project_native_tasks_to_mylyn";
+
 }
