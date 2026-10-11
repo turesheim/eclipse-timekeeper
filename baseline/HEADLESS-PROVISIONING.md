@@ -19,6 +19,11 @@ requests it. Headless provisioning does not need the application service or
 database; the normal UI service tracker still obtains it when the workbench
 starts.
 
+The optional Mylyn synchronizer also waits for a successful client read before
+its initial reconciliation. Connecting is an expected state; initial dirty
+flags and provider changes remain pending until the client can read the model.
+This avoids a misleading synchronization warning while the database opens.
+
 ## Installed-package evidence
 
 - The original main artifact, version `2.0.0.202610111346`, installed into a
@@ -36,9 +41,11 @@ starts.
 - A second workspace-free launch with `-listInstalledRoots` confirmed both
   corrected Timekeeper features and JiraConnector 6.0.0 remained installed.
 - `./mvnw -B -ntp verify -Dtycho.localArtifacts=ignore` passed the complete
-  local suite: 3 domain, 6 service, 81 database, 6 native-only UI and 20 Mylyn
+  local suite: 3 domain, 6 service, 81 database, 6 native-only UI and 21 Mylyn
   UI tests. Native CRUD/activity recording and provider reconnection continue
-  to work with delayed service activation.
+  to work with delayed service activation. The connecting-client regression
+  verifies no startup warning or premature projection, followed by automatic
+  synchronization when the client becomes available.
 
 Local evidence is retained under
 `/private/tmp/timekeeper-2-release-runtime/`: `jira-install.log` reproduces the
