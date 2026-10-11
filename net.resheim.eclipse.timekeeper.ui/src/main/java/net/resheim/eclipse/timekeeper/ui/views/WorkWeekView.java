@@ -526,11 +526,12 @@ public class WorkWeekView extends ViewPart {
 		Object obj = ((IStructuredSelection) selection).getFirstElement();
 		if (obj instanceof Task) {
 			manager.add(new Separator("task"));
-			ITask mylynTask = ((Task) obj).getMylynTask();
+			Task task = (Task) obj;
+			ITask mylynTask = task.getMylynTask();
 			if (mylynTask != null) {
 				manager.add(mylynTask.isActive() ? deactivateAction : activateAction);
+				manager.add(newActivityAction);
 			}
-			manager.add(newActivityAction);
 		}
 		if (obj instanceof Activity) {
 			manager.add(new Separator("labels"));
@@ -544,7 +545,7 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void fillLocalPullDown(IMenuManager manager) {
-		// Use to populate the local pulldown menu
+		// Projects and tasks are managed in Mylyn's Tasks view.
 	}
 
 	private void fillLocalToolBar(IToolBarManager manager) {
@@ -678,8 +679,9 @@ public class WorkWeekView extends ViewPart {
 			public void run() {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
-				if (obj instanceof Task && ((Task) obj).getMylynTask() != null) {
-					TasksUiUtil.openTask(((Task) obj).getMylynTask());
+				if (obj instanceof Task) {
+					Task task = (Task) obj;
+					if (task.getMylynTask() != null) TasksUiUtil.openTask(task.getMylynTask());
 				}
 			}
 		};

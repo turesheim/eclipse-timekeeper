@@ -43,6 +43,8 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 		LabelRepository, IdentifierSource, TransactionRunner {
 	private final Supplier<EntityManager> managers;
 	private final Object transactionLock = new Object();
+	private final ThreadLocal<EntityManager> transactionManagers = new ThreadLocal<>();
+	private List<Runnable> afterCommitActions;
 
 	public JpaServicePorts(Supplier<EntityManager> managers) {
 		this.managers = managers;
@@ -54,21 +56,55 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 
 	@Override
 	public <T> T required(Supplier<T> work) {
+		List<Runnable> committedActions = List.of();
+		T result;
 		synchronized (transactionLock) {
-			EntityManager manager = manager();
+			EntityManager manager = transactionManagers.get();
+			boolean owner = manager == null;
+			if (owner) {
+				EntityManager shared = sharedManager();
+				manager = shared.getEntityManagerFactory().createEntityManager();
+				transactionManagers.set(manager);
+			}
 			EntityTransaction transaction = manager.getTransaction();
-			boolean owner = !transaction.isActive();
-			if (owner) transaction.begin();
+			if (owner) {
+				transaction.begin();
+				afterCommitActions = new ArrayList<>();
+			}
 			try {
-				T result = work.get();
-				if (owner) transaction.commit();
-				return result;
+				result = work.get();
+				if (owner) {
+					transaction.commit();
+					committedActions = List.copyOf(afterCommitActions);
+				}
 			} catch (RuntimeException failure) {
 				if (owner && transaction.isActive()) transaction.rollback();
 				if (owner) manager.clear();
 				throw failure;
+			} finally {
+				if (owner) {
+					afterCommitActions = null;
+					transactionManagers.remove();
+					manager.close();
+				}
 			}
 		}
+		committedActions.forEach(Runnable::run);
+		return result;
+	}
+
+	/**
+	 * Runs an action after the current service-owned transaction has committed. If
+	 * there is no such transaction, the action runs immediately.
+	 */
+	public void afterCommit(Runnable action) {
+		synchronized (transactionLock) {
+			if (afterCommitActions != null) {
+				afterCommitActions.add(action);
+				return;
+			}
+		}
+		action.run();
 	}
 
 	@Override
@@ -132,6 +168,12 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 	}
 
 	@Override
+	public boolean existsByParent(TaskId taskId) {
+		return manager().createQuery("SELECT COUNT(t) FROM Task t WHERE t.parentTask.id = :id", Long.class)
+				.setParameter("id", taskId.value().toString()).getSingleResult() > 0;
+	}
+
+	@Override
 	public Task save(Task snapshot) {
 		EntityManager manager = manager();
 		String id = snapshot.id().value().toString();
@@ -146,6 +188,8 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 		entity.setTaskSummary(snapshot.summary());
 		entity.setTaskUrl(snapshot.url().orElse(null));
 		entity.setProject(snapshot.projectId().flatMap(this::findProject).orElse(null));
+		entity.setParentTask(snapshot.parentTaskId().map(value -> manager().find(
+				net.resheim.eclipse.timekeeper.db.model.Task.class, value.value().toString())).orElse(null));
 		synchronizeReferences(entity, snapshot.externalReferences());
 		manager.flush();
 		return task(entity);
@@ -153,7 +197,12 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 
 	@Override
 	public void delete(TaskId id) {
-		remove(net.resheim.eclipse.timekeeper.db.model.Task.class, id.value().toString());
+		net.resheim.eclipse.timekeeper.db.model.Task entity = manager().find(
+				net.resheim.eclipse.timekeeper.db.model.Task.class, id.value().toString());
+		if (entity == null) return;
+		entity.setProject(null);
+		entity.setParentTask(null);
+		manager().remove(entity);
 	}
 
 	@Override
@@ -271,6 +320,11 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 	@Override public LabelId newLabelId() { return new LabelId(UUID.randomUUID()); }
 
 	private EntityManager manager() {
+		EntityManager manager = transactionManagers.get();
+		return manager == null ? sharedManager() : manager;
+	}
+
+	private EntityManager sharedManager() {
 		EntityManager manager = managers.get();
 		if (manager == null || !manager.isOpen()) {
 			throw ServiceException.conflict("database", "Timekeeper database is not ready");
@@ -373,7 +427,9 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 		Set<ExternalTaskReference> references = entity.getExternalReferences().stream()
 				.map(value -> new ExternalTaskReference(value.getProviderId(), value.getRepositoryId(),
 						value.getExternalId(), value.getExternalUrl())).collect(java.util.stream.Collectors.toSet());
-		return new Task(new TaskId(UUID.fromString(entity.getId())), project, entity.getTaskSummary(),
+		Optional<TaskId> parent = Optional.ofNullable(entity.getParentTask())
+				.map(value -> new TaskId(UUID.fromString(value.getId())));
+		return new Task(new TaskId(UUID.fromString(entity.getId())), project, parent, entity.getTaskSummary(),
 				Optional.ofNullable(entity.getTaskUrl()), references, entity.getVersion());
 	}
 

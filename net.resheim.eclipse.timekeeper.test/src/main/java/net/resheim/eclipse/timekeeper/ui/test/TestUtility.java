@@ -70,7 +70,7 @@ public class TestUtility {
 		});
 		ITask task = new LocalTask(id, text);
 		tl.addTask(task, c);
-		return new Task(task);
+		return TimekeeperPlugin.getDefault().getTask(task);
 	}
 
 	/**
@@ -82,6 +82,8 @@ public class TestUtility {
 	 */
 	static void takeScreenshot(File screenshotsDir, final Control widget, String filename) {
 		log.info("Taking screenshot of " + widget);
+		widget.getShell().layout(true, true);
+		widget.getShell().update();
 		// Grab a screenshot of the dialog shell
 		final Rectangle b = widget.getBounds();
 		int width = b.width;
@@ -110,7 +112,7 @@ public class TestUtility {
 			// overwrite the existing file if different
 			if (path.toFile().exists()) {
 				compareImages(widget, image, path, loader);
-				screenshot.dispose();
+				image.dispose();
 				return;
 			}
 			loader.data = new ImageData[] { image.getImageData() };

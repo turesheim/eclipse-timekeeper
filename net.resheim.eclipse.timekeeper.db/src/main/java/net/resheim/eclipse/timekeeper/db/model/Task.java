@@ -78,7 +78,11 @@ public class Task implements Serializable {
 	@ManyToOne
 	@JoinColumn(name = "TASK_PROJECT")
 	private Project taskProject;
-	
+
+	@ManyToOne
+	@JoinColumn(name = "PARENT_TASK")
+	private Task parentTask;
+
 	@Column(name = "TASK_URL")
 	private String taskUrl;
 
@@ -269,6 +273,13 @@ public class Task implements Serializable {
 			taskLinkStatus = TaskLinkStatus.UNLINKED;
 			return;
 		}
+		if (id.equals(task.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID))) {
+			// A local Mylyn projection is the Eclipse representation of this task,
+			// not an external provider identity. Persistent fields are synchronized
+			// through the application service.
+			taskLinkStatus = TaskLinkStatus.LINKED;
+			return;
+		}
 		String providerId = task.getConnectorKind() == null ? "mylyn" : task.getConnectorKind();
 		String repositoryId = TimekeeperPlugin.getRepositoryUrl(task);
 		linkExternalTask(providerId, repositoryId, task.getTaskId(), task.getUrl());
@@ -278,8 +289,15 @@ public class Task implements Serializable {
 
 		// figure out the project name and set this
 		if (task instanceof AbstractTask) {
+			parentTask = null;
 			Set<AbstractTaskContainer> parentContainers = ((AbstractTask) task).getParentContainers();
 			parentContainers.forEach(p -> {
+				if (p instanceof AbstractTask parent) {
+					Task trackedParent = TimekeeperPlugin.getDefault().getTask(parent);
+					setParentTask(trackedParent);
+					if (trackedParent != null) setProject(trackedParent.getProject());
+					return;
+				}
 				String projectName = null;
 				// it's a remote task
 				if (p instanceof IRepositoryQuery) {
@@ -416,6 +434,14 @@ public class Task implements Serializable {
 
 	public Project getProject() {
 		return taskProject;
+	}
+
+	public Task getParentTask() {
+		return parentTask;
+	}
+
+	public void setParentTask(Task parentTask) {
+		this.parentTask = parentTask;
 	}
 
 	public void setProject(Project project) {

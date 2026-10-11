@@ -113,7 +113,9 @@ public class DefaultTimekeeperService implements TimekeeperService {
 		return tx(() -> {
 			required(command, "command");
 			command.projectId().ifPresent(this::requiredProject);
+			validateParent(command.projectId(), command.parentTaskId(), null);
 			Task created = ports.tasks().save(new Task(ports.identifiers().newTaskId(), command.projectId(),
+					command.parentTaskId(),
 					command.summary(), command.url(), Set.of(), 0));
 			publish(TASK, CREATED, created.id().value().toString());
 			return created;
@@ -127,7 +129,12 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			Task current = requiredTask(command.id());
 			version(current.version(), command.expectedVersion(), "task");
 			command.projectId().ifPresent(this::requiredProject);
-			Task updated = ports.tasks().save(current.update(command.projectId(), command.summary(), command.url()));
+			if (!current.projectId().equals(command.projectId()) && ports.tasks().existsByParent(current.id())) {
+				throw conflict("projectId", "a task with subtasks cannot move to another project");
+			}
+			validateParent(command.projectId(), command.parentTaskId(), current.id());
+			Task updated = ports.tasks().save(current.update(command.projectId(), command.parentTaskId(),
+					command.summary(), command.url()));
 			publish(TASK, UPDATED, updated.id().value().toString());
 			return updated;
 		});
@@ -142,10 +149,30 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			if (ports.activities().existsByTask(current.id())) {
 				throw conflict("task", "task still contains activities");
 			}
+			if (ports.tasks().existsByParent(current.id())) {
+				throw conflict("task", "task still contains subtasks");
+			}
 			ports.tasks().delete(current.id());
 			publish(TASK, DELETED, current.id().value().toString());
 			return null;
 		});
+	}
+
+	private void validateParent(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, TaskId taskId) {
+		if (parentTaskId.isEmpty()) return;
+		Task parent = requiredTask(parentTaskId.orElseThrow());
+		if (taskId != null && parent.id().equals(taskId)) {
+			throw conflict("parentTaskId", "a task cannot be its own parent");
+		}
+		if (projectId.isEmpty() || !projectId.equals(parent.projectId())) {
+			throw conflict("parentTaskId", "a subtask must belong to the same project as its parent");
+		}
+		for (Optional<TaskId> ancestor = parent.parentTaskId(); ancestor.isPresent();) {
+			if (taskId != null && ancestor.get().equals(taskId)) {
+				throw conflict("parentTaskId", "a task hierarchy cannot contain a cycle");
+			}
+			ancestor = requiredTask(ancestor.get()).parentTaskId();
+		}
 	}
 
 	@Override
@@ -270,6 +297,11 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			publish(ACTIVITY, UPDATED, updated.id().value().toString());
 			return updated;
 		});
+	}
+
+	@Override
+	public Optional<Activity> activeActivity(OwnerId ownerId) {
+		return tx(() -> ports.activities().findOpenByOwner(required(ownerId, "ownerId")));
 	}
 
 	@Override

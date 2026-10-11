@@ -6,11 +6,15 @@ import java.util.Optional;
 import java.util.Set;
 
 /** Immutable, provider-independent Timekeeper task aggregate state. */
-public record Task(TaskId id, Optional<ProjectId> projectId, String summary, Optional<String> url,
+public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary, Optional<String> url,
 		Set<ExternalTaskReference> externalReferences, long version) {
 	public Task {
 		id = Values.required(id, "taskId");
 		projectId = projectId == null ? Optional.empty() : projectId;
+		parentTaskId = parentTaskId == null ? Optional.empty() : parentTaskId;
+		if (parentTaskId.filter(id::equals).isPresent()) {
+			throw new DomainValidationException("parentTaskId", "a task cannot be its own parent");
+		}
 		summary = Values.required(summary, "summary");
 		url = url == null ? Optional.empty() : url.map(String::trim).filter(value -> !value.isEmpty());
 		externalReferences = Values.set(externalReferences, "externalReferences");
@@ -21,8 +25,14 @@ public record Task(TaskId id, Optional<ProjectId> projectId, String summary, Opt
 		version = Values.version(version);
 	}
 
-	public Task update(Optional<ProjectId> newProjectId, String newSummary, Optional<String> newUrl) {
-		return new Task(id, newProjectId, newSummary, newUrl, externalReferences, version + 1);
+	public Task(TaskId id, Optional<ProjectId> projectId, String summary, Optional<String> url,
+			Set<ExternalTaskReference> externalReferences, long version) {
+		this(id, projectId, Optional.empty(), summary, url, externalReferences, version);
+	}
+
+	public Task update(Optional<ProjectId> newProjectId, Optional<TaskId> newParentTaskId,
+			String newSummary, Optional<String> newUrl) {
+		return new Task(id, newProjectId, newParentTaskId, newSummary, newUrl, externalReferences, version + 1);
 	}
 
 	public Task link(ExternalTaskReference reference) {
@@ -30,13 +40,13 @@ public record Task(TaskId id, Optional<ProjectId> projectId, String summary, Opt
 		Set<ExternalTaskReference> updated = new LinkedHashSet<>(externalReferences);
 		updated.removeIf(candidate -> candidate.key().equals(reference.key()));
 		updated.add(reference);
-		return new Task(id, projectId, summary, url, updated, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, updated, version + 1);
 	}
 
 	public Task unlink(ExternalTaskReference reference) {
 		Values.required(reference, "externalReference");
 		Set<ExternalTaskReference> updated = new LinkedHashSet<>(externalReferences);
 		updated.removeIf(candidate -> candidate.key().equals(reference.key()));
-		return new Task(id, projectId, summary, url, updated, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, updated, version + 1);
 	}
 }

@@ -98,7 +98,7 @@ public class Project implements Comparable<Project>, Serializable {
 		this.name = title;
 	}
 
-	/** Creates a service-owned project while retaining the version-1 schema. */
+	/** Creates a service-owned project with a stable service identifier. */
 	public Project(String serviceId, String title) {
 		this(encode(title, serviceId));
 	}

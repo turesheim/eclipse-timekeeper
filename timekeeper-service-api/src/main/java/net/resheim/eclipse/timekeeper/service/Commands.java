@@ -20,18 +20,31 @@ public final class Commands {
 	public record UpdateProject(ProjectId id, long expectedVersion, String name) { }
 	public record DeleteProject(ProjectId id, long expectedVersion) { }
 
-	public record CreateTask(Optional<ProjectId> projectId, String summary, Optional<String> url) {
+	public record CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId,
+			String summary, Optional<String> url) {
 		public CreateTask {
 			projectId = optional(projectId);
+			parentTaskId = optional(parentTaskId);
 			url = optional(url);
+		}
+
+		public CreateTask(Optional<ProjectId> projectId, String summary, Optional<String> url) {
+			this(projectId, Optional.empty(), summary, url);
 		}
 	}
 
 	public record UpdateTask(TaskId id, long expectedVersion, Optional<ProjectId> projectId,
+			Optional<TaskId> parentTaskId,
 			String summary, Optional<String> url) {
 		public UpdateTask {
 			projectId = optional(projectId);
+			parentTaskId = optional(parentTaskId);
 			url = optional(url);
+		}
+
+		public UpdateTask(TaskId id, long expectedVersion, Optional<ProjectId> projectId,
+				String summary, Optional<String> url) {
+			this(id, expectedVersion, projectId, Optional.empty(), summary, url);
 		}
 	}
 

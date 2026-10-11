@@ -48,7 +48,7 @@ class DatabaseVersionTest {
 				DatabaseStartup.close(manager);
 			}
 			try (Connection connection = DriverManager.getConnection(url(name) + ";IFEXISTS=TRUE;ACCESS_MODE_DATA=r", "sa", "")) {
-				assertEquals(new DatabaseVersion.Stamp(1, "READY", "NEW"), DatabaseVersion.read(connection));
+				assertEquals(new DatabaseVersion.Stamp(2, "READY", "NEW"), DatabaseVersion.read(connection));
 			}
 		}
 	}
@@ -56,7 +56,7 @@ class DatabaseVersionTest {
 	@ParameterizedTest
 	@ValueSource(strings = {
 			"DELETE FROM TIMEKEEPER_SCHEMA",
-			"UPDATE TIMEKEEPER_SCHEMA SET VERSION=2",
+			"UPDATE TIMEKEEPER_SCHEMA SET VERSION=3",
 			"UPDATE TIMEKEEPER_SCHEMA SET VERSION=0",
 			"UPDATE TIMEKEEPER_SCHEMA SET STATE='CREATING'",
 			"UPDATE TIMEKEEPER_SCHEMA SET STATE='MIGRATING',ORIGIN='MIGRATION'",
@@ -96,7 +96,7 @@ class DatabaseVersionTest {
 		assertThrows(SQLException.class, () -> DatabaseStartup.open(url("database")));
 		assertThrows(SQLException.class, () -> DatabaseStartup.openMigrationTarget(url("database")));
 		try (Connection connection = connection()) {
-			assertEquals(new DatabaseVersion.Stamp(1, "MIGRATING", "MIGRATION"), DatabaseVersion.read(connection));
+			assertEquals(new DatabaseVersion.Stamp(2, "MIGRATING", "MIGRATION"), DatabaseVersion.read(connection));
 			assertEquals(DatabaseSchema.Kind.MIGRATING, DatabaseSchema.inspect(connection));
 		}
 		assertEquals(before, snapshot());
@@ -114,7 +114,7 @@ class DatabaseVersionTest {
 			DatabaseVersion.begin(connection, "NEW");
 			assertThrows(SQLException.class, () -> DatabaseVersion.schemaCreated(connection));
 			assertThrows(SQLException.class, () -> DatabaseVersion.migrationValidated(connection));
-			assertEquals(new DatabaseVersion.Stamp(1, "CREATING", "NEW"), DatabaseVersion.read(connection));
+			assertEquals(new DatabaseVersion.Stamp(2, "CREATING", "NEW"), DatabaseVersion.read(connection));
 		}
 	}
 
@@ -129,13 +129,13 @@ class DatabaseVersionTest {
 		try { CurrentModelFixture.verify(manager); }
 		finally { PersistenceHelper.close(manager); }
 		try (Connection connection = connection()) {
-			assertEquals(new DatabaseVersion.Stamp(1, "MIGRATING", "MIGRATION"), DatabaseVersion.read(connection));
+			assertEquals(new DatabaseVersion.Stamp(2, "MIGRATING", "MIGRATION"), DatabaseVersion.read(connection));
 			connection.setAutoCommit(false);
 			assertThrows(SQLException.class, () -> DatabaseVersion.migrationValidated(connection));
 			connection.rollback();
 			connection.setAutoCommit(true);
 			DatabaseVersion.migrationValidated(connection);
-			assertEquals(new DatabaseVersion.Stamp(1, "READY", "MIGRATION"), DatabaseVersion.read(connection));
+			assertEquals(new DatabaseVersion.Stamp(2, "READY", "MIGRATION"), DatabaseVersion.read(connection));
 			assertThrows(SQLException.class, () -> DatabaseVersion.migrationValidated(connection));
 		}
 		manager = DatabaseStartup.open(url("database") + ";IFEXISTS=TRUE");

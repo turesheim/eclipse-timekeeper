@@ -3,7 +3,7 @@
 ## 2.0.0 (unreleased)
 
 Timekeeper 2.0.0 updates the plug-in for Eclipse 2026-09 (4.41), Mylyn Tasks
-4.12 and Java 21. It establishes H2 2.5.250 schema version 1 as the supported
+4.12 and Java 21. It establishes H2 2.5.250 schema version 2 as the supported
 database baseline.
 
 ### Highlights
@@ -22,8 +22,12 @@ database baseline.
   immutable commands and snapshots, transactional repository ports, stable
   validation failures and in-memory-tested standalone CRUD and time tracking.
 - Added the embedded JPA service adapter and OSGi service registration, with
-  atomic rollback coverage and UI service lookup while retaining schema-v1
-  startup, backup and storage compatibility.
+  atomic rollback coverage and UI service lookup, plus schema-v2 startup,
+  backup and storage coverage.
+- Added bidirectional synchronization between native Timekeeper projects/tasks
+  and the standard Mylyn Task List: categories map to projects, local tasks map
+  to tasks, and nested local tasks map to subtasks without requiring a connector.
+  Workweek remains focused on activity tracking and reporting.
 - Added guarded database initialization and future migration lifecycle
   infrastructure. Unsupported, unversioned and incomplete databases fail closed.
 - Verified workspace, shared `AUTO_SERVER`, explicit file and local H2 TCP

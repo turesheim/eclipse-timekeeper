@@ -44,7 +44,7 @@ class FileStorageTest {
 	}
 
 	@Test
-	void frozenNativeTaskMappingRemainsReadableAndWritableWithoutSchemaChanges() throws Exception {
+	void currentNativeTaskMappingRemainsReadableAndWritable() throws Exception {
 		try (Connection connection = DriverManager.getConnection(url("original"), "sa", "");
 				var stream = FileStorageTest.class.getResourceAsStream("fixtures/current-native-model.sql")) {
 			assertNotNull(stream, "The frozen native-task schema fixture must be packaged");

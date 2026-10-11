@@ -8,6 +8,7 @@ import net.resheim.eclipse.timekeeper.domain.ActivityId;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
 import net.resheim.eclipse.timekeeper.domain.Label;
 import net.resheim.eclipse.timekeeper.domain.LabelId;
+import net.resheim.eclipse.timekeeper.domain.OwnerId;
 import net.resheim.eclipse.timekeeper.domain.Project;
 import net.resheim.eclipse.timekeeper.domain.ProjectId;
 import net.resheim.eclipse.timekeeper.domain.Task;
@@ -56,6 +57,7 @@ public interface TimekeeperService {
 
 	Activity startActivity(StartActivity command);
 	Activity stopActivity(StopActivity command);
+	Optional<Activity> activeActivity(OwnerId ownerId);
 	Activity createActivity(CreateActivity command);
 	Activity updateActivity(UpdateActivity command);
 	void deleteActivity(DeleteActivity command);

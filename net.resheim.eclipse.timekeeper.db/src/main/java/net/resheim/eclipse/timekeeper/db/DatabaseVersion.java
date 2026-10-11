@@ -9,7 +9,7 @@ import java.util.Set;
 /** Durable schema identity and initialization state, not a record of every data write. */
 final class DatabaseVersion {
 	static final String TABLE = "TIMEKEEPER_SCHEMA";
-	static final int CURRENT = 1;
+	static final int CURRENT = 2;
 	static final Set<String> COLUMNS = Set.of("ID", "VERSION", "STATE", "ORIGIN");
 	private static final Set<String> ORIGINS = Set.of("NEW", "MIGRATION");
 	private static final Set<String> STATES = Set.of("CREATING", "MIGRATING", "READY");
