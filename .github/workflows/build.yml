@@ -11,6 +11,27 @@ permissions:
   contents: read
 
 jobs:
+  Publication:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7.0.1
+    - name: Verify p2 packaging and release channels
+      run: python3 -m unittest discover -s scripts/tests -v
+    - name: Verify project website build
+      uses: actions/jekyll-build-pages@v1
+      with:
+        source: ./
+        destination: ./_site
+    - name: Verify update site assembly from published releases
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # Jekyll's Docker action writes root-owned output.
+        sudo chown -R "$(id -u):$(id -g)" _site
+        python3 scripts/p2_release.py site --repo "$GITHUB_REPOSITORY" --output _site
+        test -f _site/index.html
+        test -f _site/updates/compositeContent.xml
+
   Build:
     strategy:
       fail-fast: false
@@ -51,6 +72,7 @@ jobs:
 
     - name: Build with Maven (Windows idle detector)
       if: runner.os == 'Windows'
+      shell: pwsh
       run: .\mvnw.cmd -B -ntp clean verify "-Pother-os" "-Didle-platform-tests" "-Dtycho.localArtifacts=ignore" "-Dorg.eclipse.swtbot.search.timeout=20000" "-Dscreenshots=${{ github.workspace }}\images"
 
     - name: Upload test reports and screenshots

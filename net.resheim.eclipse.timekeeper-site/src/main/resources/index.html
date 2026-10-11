@@ -1,119 +1,33 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Eclipse Timekeeper Software Site</title>
-
-<!-- Latest compiled and minified CSS -->
-<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css"/>
-
-<!-- Optional theme -->
-<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap-theme.min.css"/>
-
-<!-- FontAwesome -->
-<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css"/>
-
-<!-- Latest compiled and minified JavaScript -->
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js"></script>
-<!--
-img {
-    box-shadow: 0px 0px 8px #888888;
-    margin: 8px;
-}
--->
-<style>
-
-.drag {
-	box-sizing: border-box;
-	clear: both;
-	color: rgb(51, 51, 51);
-	display: inline;
-	font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-	font-size: 14px;
-	height: auto;
-	line-height: 20px;
-	position: relative;
-	text-align: center;
-	width: auto;	
-}
-
-.btn {
-	-webkit-user-select: none;
-	background-image: none;
-	border-bottom-color: rgb(204, 204, 204);
-	border-bottom-left-radius: 4px;
-	border-bottom-right-radius: 4px;
-	border-bottom-style: solid;
-	border-bottom-width: 1px;
-	border-left-color: rgb(204, 204, 204);
-	border-left-style: solid;
-	border-left-width: 1px;
-	border-right-color: rgb(204, 204, 204);
-	border-right-style: solid;
-	border-right-width: 1px;
-	border-top-color: rgb(204, 204, 204);
-	border-top-left-radius: 4px;
-	border-top-right-radius: 4px;
-	border-top-style: solid;
-	border-top-width: 1px;
-	box-sizing: border-box;
-	color: rgb(68, 54, 133);
-	cursor: pointer;
-	display: inline-block;
-	font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-	font-size: 14px;
-	font-weight: bold;
-	height: 34px;
-	line-height: 20px;
-	margin-bottom: 0px;
-	padding-bottom: 6px;
-	padding-left: 12px;
-	padding-right: 12px;
-	padding-top: 6px;
-	text-align: center;
-	text-decoration: none;
-	text-transform: capitalize;
-	vertical-align: middle;
-	white-space: nowrap;
-	width: 86.515625px;	
-}
-
-.install {
-	-webkit-font-smoothing: antialiased;
-	-webkit-user-select: none;
-	box-sizing: border-box;
-	color: rgb(247, 148, 30);
-	cursor: pointer;
-	display: inline-block;
-	font-family: FontAwesome;
-	font-size: 14px;
-	font-style: normal;
-	font-variant: normal;
-	font-weight: normal;
-	height: 14px;
-	line-height: 14px;
-	text-align: center;
-	text-decoration: none;
-	text-rendering: auto;
-	text-transform: capitalize;
-	white-space: nowrap;
-	width: 13px;	
-}
-
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Timekeeper for Eclipse — software site</title>
+  <style>
+    body { max-width: 48rem; margin: 3rem auto; padding: 0 1rem;
+      font: 1rem/1.6 system-ui, sans-serif; color: #243247; }
+    h1 { line-height: 1.2; }
+    a { color: #185da8; }
+    code { overflow-wrap: anywhere; }
+  </style>
 </head>
 <body>
-	<div class="container">
-		<div class="jumbotron">
-			<h2>Timekeeper for Eclipse Software Site</h2>
-				<p>This is an Eclipse software site, also known as a Equinox p2 Repository. You are not allowed browse this resource but can install the plug-ins using the <i>Eclipse Marketplace Client</i>. Simply drag the <q>install</q> link below into the toolbar of an running Eclipse instance.</p>
-				<p>You may also click the link to get more information about how to use the <i>Eclipse Marketplace client</i>.</p>
-				<a href="http://marketplace.eclipse.org/marketplace-client-intro?mpc_install=2196325" class="drag" title="Drag to your running Eclipse workspace to install Timekeeper for Eclipse">
-					<span class="btn"><i class="install fa fa-download"></i> Install</span>
-					<div class="tooltip"><h3>Drag to Install!</h3>Drag to your running Eclipse workspace.</div>
-				</a>
-			</div>
-		</div>
-    </div><!-- /.container -->
+  <h1>Timekeeper for Eclipse</h1>
+  <p>This is an Eclipse software repository. To install this version, open
+    <strong>Help &gt; Install New Software… &gt; Add…</strong> in Eclipse
+    and paste this page's address into <strong>Location</strong>.</p>
+  <p>Select <strong>Timekeeper for Eclipse</strong> for project, task and
+    activity management. Select <strong>Timekeeper Mylyn integration</strong>
+    as well to track Mylyn tasks. Timekeeper 2.0 requires Eclipse 2026-09
+    (4.41) and Java 21. Keep the Eclipse 2026-09 software site enabled so
+    Eclipse can resolve dependencies.</p>
+  <p>For future stable updates, use:</p>
+  <p><a href="https://turesheim.github.io/eclipse-timekeeper/updates/">
+    <code>https://turesheim.github.io/eclipse-timekeeper/updates/</code></a></p>
+  <p>You can also download <code>timekeeper-p2.zip</code> from
+    <a href="https://github.com/turesheim/eclipse-timekeeper/releases">GitHub Releases</a>
+    and select <strong>Add… &gt; Archive…</strong>.</p>
+  <p><a href="https://turesheim.github.io/eclipse-timekeeper/">Documentation</a></p>
 </body>
 </html>

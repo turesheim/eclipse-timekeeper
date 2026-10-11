@@ -19,3 +19,5 @@ target/
 # OSX Metadata
 .DS_Store
 /images/
+/_site/
+__pycache__/
