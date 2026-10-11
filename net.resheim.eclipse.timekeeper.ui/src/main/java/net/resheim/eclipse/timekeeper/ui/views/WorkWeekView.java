@@ -45,13 +45,6 @@ import org.eclipse.jface.viewers.TreeViewerColumn;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.viewers.ViewerComparator;
 import org.eclipse.jface.window.ToolTip;
-import org.eclipse.mylyn.internal.tasks.core.ITaskListChangeListener;
-import org.eclipse.mylyn.internal.tasks.core.TaskContainerDelta;
-import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
-import org.eclipse.mylyn.tasks.core.ITask;
-import org.eclipse.mylyn.tasks.core.ITaskActivationListener;
-import org.eclipse.mylyn.tasks.ui.TasksUi;
-import org.eclipse.mylyn.tasks.ui.TasksUiUtil;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.ControlAdapter;
 import org.eclipse.swt.events.ControlEvent;
@@ -104,18 +97,7 @@ public class WorkWeekView extends ViewPart {
 
 		@Override
 		public int compare(Viewer viewer, Object e1, Object e2) {
-			if (e1 instanceof ITask && e2 instanceof ITask) {
-				String s1 = ((ITask) e1).getTaskId();
-				String s2 = ((ITask) e2).getTaskId();
-				try {
-					int i1 = Integer.parseInt(s1);
-					int i2 = Integer.parseInt(s2);
-					return i1 - i2;
-				} catch (NumberFormatException e) {
 
-				}
-				return s1.compareTo(s2);
-			}
 			if (e1 instanceof WeeklySummary) {
 				return 1;
 			}
@@ -123,39 +105,6 @@ public class WorkWeekView extends ViewPart {
 				return ((Activity) e1).start().compareTo(((Activity) e2).start());
 			}
 			return super.compare(viewer, e1, e2);
-		}
-
-	}
-
-	private final class TaskListener implements ITaskActivationListener, ITaskListChangeListener {
-
-		@Override
-		public void containersChanged(Set<TaskContainerDelta> arg0) {
-			updateAll();
-		}
-
-		@Override
-		public void preTaskActivated(ITask task) {
-			// Do nothing
-		}
-
-		@Override
-		public void preTaskDeactivated(ITask task) {
-			// Do nothing
-		}
-
-		@Override
-		public void taskActivated(ITask task) {
-			updateAll();
-		}
-
-		@Override
-		public void taskDeactivated(ITask task) {
-			updateAll();
-		}
-
-		private void updateAll() {
-			contentProvider.databaseStateChanged();
 		}
 
 	}
@@ -193,34 +142,27 @@ public class WorkWeekView extends ViewPart {
 		var active = TimekeeperUiPlugin.getDefault().getTimekeeperService()
 				.activeActivity(OwnerId.LOCAL);
 		if (active.isEmpty()) {
+			refreshActiveTask();
 			statusLabel.setText("");
 			return;
 		}
 		Activity activity = active.orElseThrow();
-		ITask mylyn = contentProvider.task(activity.taskId()).map(WorkWeekView::mylynTask).orElse(null);
 		Instant idleSince = TimekeeperUiPlugin.getDefault().getIdleSince();
-		if (mylyn != null && mylyn.isActive() && TimekeeperUiPlugin.getDefault().isIdle() && idleSince != null) {
+		if (TimekeeperUiPlugin.getDefault().isIdle() && idleSince != null) {
 			statusLabel.setText("Idle since " + timeFormat.format(idleSince));
 		} else {
 			long elapsed = Math.max(0, Duration.between(activity.start(), Instant.now()).toMillis());
 			statusLabel.setText(MessageFormat.format("Active since {0}, {1} elapsed", timeFormat.format(activity.start()),
 					DurationFormatUtils.formatDurationWords(elapsed, true, true)));
 		}
-		refreshActiveTask(mylyn);
+		refreshActiveTask();
 	}
 
-	private void refreshActiveTask(ITask activeTask) {
+	private void refreshActiveTask() {
 		if (!viewer.isCellEditorActive()) {
 			contentProvider.filter();
 			viewer.refresh();
 		}
-	}
-
-	static ITask mylynTask(Task task) {
-		return TasksUiPlugin.getTaskList().getAllTasks().stream()
-				.filter(candidate -> task.id().value().toString().equals(
-						candidate.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID)))
-				.findFirst().orElse(null);
 	}
 
 	private class ContentProvider extends WeekViewContentProvider {
@@ -278,7 +220,6 @@ public class WorkWeekView extends ViewPart {
 
 	private Action deleteAction;
 
-	private TaskListener taskListener;
 
 	private TreeViewer viewer;
 
@@ -452,9 +393,6 @@ public class WorkWeekView extends ViewPart {
 		hookContextMenu();
 		hookDoubleClickAction();
 		contributeToActionBars();
-		taskListener = new TaskListener();
-		TasksUi.getTaskActivityManager().addActivationListener(taskListener);
-		TasksUiPlugin.getTaskList().addChangeListener(taskListener);
 		viewer.setInput(getViewSite());
 		// Force a redraw so content is visible
 		main.pack();
@@ -503,8 +441,6 @@ public class WorkWeekView extends ViewPart {
 
 	@Override
 	public void dispose() {
-		TasksUi.getTaskActivityManager().removeActivationListener(taskListener);
-		TasksUiPlugin.getTaskList().removeChangeListener(taskListener);
 		activityLabelPainter.disposeImages();
 		super.dispose();
 	}
@@ -554,8 +490,8 @@ public class WorkWeekView extends ViewPart {
 					}
 				}
 			});
-			ITask mylyn = mylynTask(task);
-			if (mylyn != null) manager.add(mylyn.isActive() ? deactivateAction : activateAction);
+			TimekeeperUiPlugin.getDefault().getTaskIntegration().filter(integration -> integration.isLinked(task))
+					.ifPresent(integration -> manager.add(integration.isActive(task) ? deactivateAction : activateAction));
 			manager.add(newActivityAction);
 			manager.add(new Action("Start activity") {
 				@Override public void run() { perform(() -> {
@@ -714,7 +650,8 @@ public class WorkWeekView extends ViewPart {
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
 				if (obj instanceof Task) {
 					Task task = (Task) obj;
-					if (mylynTask(task) != null) TasksUiUtil.openTask(mylynTask(task));
+					var integration = TimekeeperUiPlugin.getDefault().getTaskIntegration().filter(value -> value.isLinked(task));
+					if (integration.isPresent()) integration.orElseThrow().open(task);
 					else editTask(task, task.projectId(), task.parentTaskId());
 				} else if (obj instanceof Project project) {
 					editProject(project);
@@ -729,7 +666,7 @@ public class WorkWeekView extends ViewPart {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
 				if (obj instanceof Task) {
-					TasksUi.getTaskActivityManager().deactivateTask(mylynTask((Task) obj));
+					TimekeeperUiPlugin.getDefault().getTaskIntegration().ifPresent(value -> value.deactivate(((Task) obj).id()));
 				}
 			}
 		};
@@ -741,7 +678,7 @@ public class WorkWeekView extends ViewPart {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
 				if (obj instanceof Task) {
-					TasksUi.getTaskActivityManager().activateTask(mylynTask((Task) obj));
+					TimekeeperUiPlugin.getDefault().getTaskIntegration().ifPresent(value -> value.activate((Task) obj));
 				}
 			}
 		};

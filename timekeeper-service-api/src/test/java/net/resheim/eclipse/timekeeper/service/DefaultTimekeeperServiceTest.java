@@ -78,6 +78,20 @@ class DefaultTimekeeperServiceTest {
 	}
 
 	@Test
+	void creationWithExternalIdentityIsAtomicAndRejectsDuplicateKeys() {
+		var reference = new ExternalTaskReference("jira", "https://jira.example", "TK-214", Optional.empty());
+		var command = new CreateTask(Optional.empty(), Optional.empty(), "Provider task", Optional.empty(), Set.of(reference));
+		Task created = service.createTask(command);
+		assertEquals(1, transactions.count);
+		assertEquals(Set.of(reference), created.externalReferences());
+		assertEquals(created, service.findTask(reference.key()).orElseThrow());
+		var failure = assertThrows(ServiceException.class, () -> service.createTask(command));
+		assertEquals(FailureCode.CONFLICT, failure.code());
+		assertEquals(List.of(created), service.tasks());
+		assertEquals(1, events.size());
+	}
+
+	@Test
 	void projectTaskAndLabelCrudUsesOneTransactionPerOperation() {
 		Project project = service.createProject(new CreateProject("Backend"));
 		project = service.updateProject(new UpdateProject(project.id(), 0, "Backend API"));

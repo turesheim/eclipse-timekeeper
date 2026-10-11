@@ -37,7 +37,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.DeleteProject;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteTask;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
-import net.resheim.eclipse.timekeeper.ui.tasks.MylynTaskSynchronizer;
+import net.resheim.eclipse.timekeeper.mylyn.MylynTaskSynchronizer;
 import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
 /** Exercises the real Workweek controls while no Mylyn projection exists. */
@@ -59,9 +59,7 @@ public class StandaloneActivityTest {
 			catch (Exception failure) { throw new AssertionError(failure); }
 		});
 		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
-		Field field = TimekeeperUiPlugin.class.getDeclaredField("mylynTaskSynchronizer");
-		field.setAccessible(true);
-		MylynTaskSynchronizer synchronizer = (MylynTaskSynchronizer) field.get(TimekeeperUiPlugin.getDefault());
+		MylynTaskSynchronizer synchronizer = net.resheim.eclipse.timekeeper.mylyn.MylynIntegration.getDefault().synchronizer();
 		ITask[] previous = new ITask[1];
 		onUi(() -> {
 			synchronizer.stop();
@@ -84,7 +82,7 @@ public class StandaloneActivityTest {
 				@Override public String getFailureMessage() { return "Unlinked task did not appear"; }
 			});
 			assertTrue(org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getTaskList().getAllTasks().stream()
-					.noneMatch(value -> task.id().value().toString().equals(value.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID))));
+					.noneMatch(value -> task.id().value().toString().equals(value.getAttribute(net.resheim.eclipse.timekeeper.mylyn.MylynMetadata.ATTR_TIMEKEEPER_TASK_ID))));
 			bot.treeWithId("workweek-editor-tree").getTreeItem(project.name()).getNode(task.summary())
 					.contextMenu("New activity").click();
 			bot.shell("New activity").activate();

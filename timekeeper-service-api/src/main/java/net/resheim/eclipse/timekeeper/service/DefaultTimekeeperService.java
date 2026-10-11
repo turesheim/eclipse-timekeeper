@@ -114,9 +114,14 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			required(command, "command");
 			command.projectId().ifPresent(this::requiredProject);
 			validateParent(command.projectId(), command.parentTaskId(), null);
+			for (ExternalTaskReference reference : command.externalReferences()) {
+				if (ports.tasks().findByExternalReference(reference.key()).isPresent()) {
+					throw conflict("externalReference", "external reference is linked to another task");
+				}
+			}
 			Task created = ports.tasks().save(new Task(ports.identifiers().newTaskId(), command.projectId(),
 					command.parentTaskId(),
-					command.summary(), command.url(), Set.of(), 0));
+					command.summary(), command.url(), command.externalReferences(), 0));
 			publish(TASK, CREATED, created.id().value().toString());
 			return created;
 		});

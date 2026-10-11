@@ -1,11 +1,12 @@
 # Timekeeper for Eclipse [![Build](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml/badge.svg)](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml)
 
-This is a simple time-tracking plug-in for local and connector-backed
-[Eclipse Mylyn](http://eclipse.org/mylyn/) Tasks.
+Timekeeper tracks time on native Eclipse projects and tasks. Optional
+[Eclipse Mylyn](https://eclipse.org/mylyn/) integration also tracks local and
+connector-backed tasks.
 
 ![Timekeeper Workweek view](resources/screenshots/workweek-view.png)
 
-Whenever a task is *activated* in Mylyn it will automatically show up in the **Workweek** view with a bold label, and the amount of time the task is active will be tracked. An *activity* will be added to the task, which is the entity keeping track of the time and a short note. Multiple activities can be added to each task.
+With the optional integration installed, whenever a task is *activated* in Mylyn it will automatically show up in the **Workweek** view with a bold label, and the amount of time the task is active will be tracked. An *activity* will be added to the task, which is the entity keeping track of the time and a short note. Multiple activities can be added to each task.
 
 When the task is *deactivated* the end time is registered on the activity and the active time is added to the total for the task on the particular day. It is also possible to manually edit the start and stop times by clicking into the cell.
 
@@ -30,7 +31,7 @@ new native records in Mylyn, enable **Show new Timekeeper projects and tasks in
 Mylyn Task List** in **Preferences > Timekeeper**. Existing Task List projections
 continue to synchronize when that option is off.
 
-The standard Mylyn **Task List** is also supported: categories represent
+With **Timekeeper Mylyn integration** installed, the standard Mylyn **Task List** is also supported: categories represent
 projects, local tasks represent root tasks, and nested local tasks represent
 subtasks. Creating, renaming, or moving those objects synchronizes their native
 Timekeeper records without requiring a repository connector.
@@ -104,13 +105,24 @@ Actions](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build
 Download the `p2-repository` artifact, extract it, and add the extracted directory
 in **Help > Install New Software... > Add... > Local...**.
 
-Timekeeper 2.0.0 requires Eclipse 2026-09 (4.41), Java 21 and Mylyn Tasks 4.12.
-Keep the Eclipse 2026-09 software site enabled during installation so p2 can
-resolve the complete Mylyn Tasks feature. Repository connectors such as Bugzilla
-are optional.
+Timekeeper 2.0.0 requires Eclipse 2026-09 (4.41) and Java 21. Select
+**Timekeeper for Eclipse** for native project, task and activity management.
+Mylyn is optional. Select **Timekeeper Mylyn integration** as well to track
+Mylyn task activation and use Task List projections. The integration requires
+Mylyn Tasks 4.12; keep the Eclipse 2026-09 software site enabled so p2 can
+resolve its complete feature. Repository connectors such as Bugzilla are optional.
 
-The release candidate has been installed and updated in a clean Eclipse 4.41
-runtime on macOS Apple Silicon. See the [installed-IDE acceptance
+The base UI, domain, client API and database contain no Mylyn API dependencies.
+Idle-time corrections use the client API for native and linked tasks. Returning
+from an extended absence stops tracking when **Automatically stop tracking when
+away** is enabled; otherwise it starts a new interval after excluding idle time.
+Open activities are owned by Timekeeper and remain open across restart, even if
+a linked provider task is absent or inactive. Stop or edit those intervals in
+Workweek when needed.
+
+Earlier release candidate builds were installed and updated in a clean Eclipse
+4.41 runtime on macOS Apple Silicon. The optional-adapter split is additionally
+verified in separate Eclipse test runtimes with and without Mylyn. See the [installed-IDE acceptance
 report](baseline/INSTALLED-IDE.md) for the verified behavior and the remaining
 upstream Mylyn Error Log blocker. This is not yet a release certification.
 

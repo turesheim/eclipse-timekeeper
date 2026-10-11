@@ -63,6 +63,7 @@ jobs:
           **/target/surefire-reports/
           **/target/test-reports/
           net.resheim.eclipse.timekeeper.test/target/work/data/.metadata/.log
+          net.resheim.eclipse.timekeeper.native-test/target/work/data/.metadata/.log
           net.resheim.eclipse.timekeeper.test/screenshots/
           images/
         if-no-files-found: warn

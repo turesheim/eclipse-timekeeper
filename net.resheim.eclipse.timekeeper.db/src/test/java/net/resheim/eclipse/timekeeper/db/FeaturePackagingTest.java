@@ -15,13 +15,25 @@ import org.w3c.dom.Document;
 /** Install-time requirements that bundle resolution in the test target can hide. */
 class FeaturePackagingTest {
 	@Test
-	void requiresTheCompleteCompatibleMylynTasksFeature() throws Exception {
+	void optionalAdapterRequiresTheCompleteMylynTasksFeatureAndBase() throws Exception {
+		try (var stream = getClass().getResourceAsStream("/packaging-fixture/mylyn/feature.xml")) {
+			assertNotNull(stream);
+			var feature = DocumentBuilderFactory.newDefaultInstance().newDocumentBuilder().parse(stream);
+			var xpath = XPathFactory.newDefaultInstance().newXPath();
+			String mylyn = "/feature/requires/import[@feature='org.eclipse.mylyn.tasks.feature']";
+			assertEquals("4.12.0", xpath.evaluate(mylyn + "/@version", feature));
+			assertEquals("compatible", xpath.evaluate(mylyn + "/@match", feature));
+			assertEquals("1", xpath.evaluate("count(/feature/requires/import[@feature='net.resheim.eclipse.timekeeper'])", feature));
+			assertEquals("1", xpath.evaluate("count(/feature/plugin[@id='net.resheim.eclipse.timekeeper.mylyn'])", feature));
+		}
+	}
+
+	@Test
+	void baseFeatureDoesNotRequireMylyn() throws Exception {
 		Document feature = feature();
 		var xpath = XPathFactory.newDefaultInstance().newXPath();
 		String requirement = "/feature/requires/import[@feature='org.eclipse.mylyn.tasks.feature']";
-		assertEquals("1", xpath.evaluate("count(" + requirement + ")", feature));
-		assertEquals("4.12.0", xpath.evaluate(requirement + "/@version", feature));
-		assertEquals("compatible", xpath.evaluate(requirement + "/@match", feature));
+		assertEquals("0", xpath.evaluate("count(" + requirement + ")", feature));
 	}
 
 	@Test
@@ -53,6 +65,7 @@ class FeaturePackagingTest {
 			assertNotNull(stream);
 			String manifest = new BufferedReader(new java.io.InputStreamReader(stream)).lines()
 					.reduce("", (left, right) -> left + "\n" + right);
+			org.junit.jupiter.api.Assertions.assertFalse(manifest.contains("org.eclipse.mylyn"));
 			assertTrue(manifest.contains("Service-Component: OSGI-INF/embedded-timekeeper-service.xml"));
 		}
 	}

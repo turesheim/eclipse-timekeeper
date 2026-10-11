@@ -68,6 +68,11 @@
 				<includes><include>feature.xml</include></includes>
 			</testResource>
 			<testResource>
+				<directory>${project.basedir}/../net.resheim.eclipse.timekeeper.mylyn-feature</directory>
+				<targetPath>packaging-fixture/mylyn</targetPath>
+				<includes><include>feature.xml</include></includes>
+			</testResource>
+			<testResource>
 				<directory>${project.basedir}/src/test/java</directory>
 			</testResource>
 		</testResources>

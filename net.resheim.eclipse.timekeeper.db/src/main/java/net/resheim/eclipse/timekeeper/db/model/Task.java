@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -40,13 +39,7 @@ import javax.persistence.Table;
 import javax.persistence.Transient;
 import javax.persistence.Version;
 
-import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
-import org.eclipse.mylyn.internal.tasks.core.AbstractTaskCategory;
-import org.eclipse.mylyn.internal.tasks.core.AbstractTaskContainer;
-import org.eclipse.mylyn.tasks.core.IRepositoryQuery;
-import org.eclipse.mylyn.tasks.core.ITask;
 
-import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.converters.InstantAttributeConverter;
 
 /**
@@ -105,17 +98,6 @@ public class Task implements Serializable {
 	@OrderBy("providerId ASC, repositoryId ASC, externalId ASC")
 	private List<ExternalTaskReference> externalReferences;
 	
-	/** Optional link to a Mylyn task */
-	@Transient
-	private transient ITask mylynTask;
-	
-	/**
-	 * Used to determine whether or not this task has been linked to a corresponding
-	 * Mylyn task or if an attempt has been made.
-	 */
-	@Transient
-	private transient TaskLinkStatus taskLinkStatus = TaskLinkStatus.UNDETERMINED;
-
 	public Task() {
 		activities = new ArrayList<>();
 		externalReferences = new ArrayList<>();
@@ -130,20 +112,6 @@ public class Task implements Serializable {
 	public Task(String id, String summary) {
 		this(summary);
 		this.id = id;
-	}
-
-	/**
-	 * Creates a new tracked task and associates the instance with the given Mylyn
-	 * task.
-	 * 
-	 * @param task the associated Mylyn task
-	 */
-	public Task(ITask task) {
-		this(task.getSummary());
-		linkWithMylynTask(task);
-		if (taskProject != null) {
-			taskProject.addTask(this);
-		}
 	}
 
 	public void addActivity(Activity activity) {
@@ -260,62 +228,6 @@ public class Task implements Serializable {
 		return tick;
 	}
 
-	/**
-	 * Associates given Mylyn Task with this instance.
-	 * 
-	 * @param task the Mylyn task
-	 */
-	public void linkWithMylynTask(ITask task) {
-		// associate this tracked task with the Mylyn task
-		this.mylynTask = task;
-		if (task == null) {
-			// Unlink without erasing the persisted identity or reporting metadata.
-			taskLinkStatus = TaskLinkStatus.UNLINKED;
-			return;
-		}
-		if (id.equals(task.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID))) {
-			// A local Mylyn projection is the Eclipse representation of this task,
-			// not an external provider identity. Persistent fields are synchronized
-			// through the application service.
-			taskLinkStatus = TaskLinkStatus.LINKED;
-			return;
-		}
-		String providerId = task.getConnectorKind() == null ? "mylyn" : task.getConnectorKind();
-		String repositoryId = TimekeeperPlugin.getRepositoryUrl(task);
-		linkExternalTask(providerId, repositoryId, task.getTaskId(), task.getUrl());
-		taskUrl = task.getUrl();
-		taskSummary = task.getSummary();
-		taskLinkStatus = TaskLinkStatus.LINKED;
-
-		// figure out the project name and set this
-		if (task instanceof AbstractTask) {
-			parentTask = null;
-			Set<AbstractTaskContainer> parentContainers = ((AbstractTask) task).getParentContainers();
-			parentContainers.forEach(p -> {
-				if (p instanceof AbstractTask parent) {
-					Task trackedParent = TimekeeperPlugin.getDefault().getTask(parent);
-					setParentTask(trackedParent);
-					if (trackedParent != null) setProject(trackedParent.getProject());
-					return;
-				}
-				String projectName = null;
-				// it's a remote task
-				if (p instanceof IRepositoryQuery) {
-					projectName = TimekeeperPlugin.getMylynProjectName(task);
-				}
-				// it's a local task
-				if (p instanceof AbstractTaskCategory) {
-					projectName = p.getSummary();
-				}
-				// the project is probably already in the database
-				Project project = TimekeeperPlugin.getProject(projectName);
-				if (project == null) {
-					project = TimekeeperPlugin.createAndSaveProject(task);
-				}
-				this.setProject(project);
-			});
-		}
-	}
 
 	/** Adds or refreshes an optional external identity for this Timekeeper task. */
 	public ExternalTaskReference linkExternalTask(String providerId, String repositoryId, String externalId,
@@ -394,7 +306,7 @@ public class Task implements Serializable {
 	public String getRepositoryUrl() {
 		String repositoryUrl = firstExternalReference().map(ExternalTaskReference::getRepositoryId).orElse(null);
 		if (repositoryUrl != null && repositoryUrl.startsWith("local-")) {
-			return TimekeeperPlugin.KIND_LOCAL;
+			return "local";
 		}
 		return repositoryUrl;
 	}
@@ -403,8 +315,8 @@ public class Task implements Serializable {
 	 * Compatibility accessor returning the first external task identifier in stable
 	 * provider/repository/ID order. If it's a
 	 * local task, only the number will be returned and one would have to use the
-	 * repository to correctly identify the {@link ITask} instance. If the task is
-	 * linked to a Mylyn task, this task's identifier will be returned.
+	 * repository to correctly identify the external task. If the task is
+	 * linked to an external task, that task's identifier will be returned.
 	 * 
 	 * @return the task identifier
 	 */
@@ -421,16 +333,6 @@ public class Task implements Serializable {
 		return version;
 	}
 
-	/**
-	 * Returns the referenced {@link ITask} if available. If not, it can be obtained
-	 * from {@link TimekeeperPlugin#getMylynTask(Task)} which will examine the
-	 * Mylyn task repository.
-	 * 
-	 * @return the {@link ITask} or <code>null</code>
-	 */
-	public ITask getMylynTask() {
-		return mylynTask;
-	}
 
 	public Project getProject() {
 		return taskProject;
@@ -451,13 +353,7 @@ public class Task implements Serializable {
 		if (this.taskProject != null) this.taskProject.addTask(this);
 	}
 	
-	public TaskLinkStatus getTaskLinkStatus() {
-		return taskLinkStatus;
-	}
 
-	public void setTaskLinkStatus(TaskLinkStatus taskLinkStatus) {
-		this.taskLinkStatus = taskLinkStatus;
-	}
 
 	public String toString() {
 		StringBuilder sb = new StringBuilder();

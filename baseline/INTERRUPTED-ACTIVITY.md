@@ -1,5 +1,12 @@
 # Installed interrupted-activity acceptance
 
+The checks below describe the pre-adapter implementation. Since #214, open
+activities belong to Timekeeper and remain open regardless of an optional
+provider's activation state. Database startup no longer guesses an end time from
+Mylyn; native users may stop or correct the interval through Workweek. Exact
+activity identity and history still persist across restart. See
+[the optional adapter boundary](STANDALONE-ACTIVITY-UI.md#optional-adapter-boundary-214).
+
 Verified September 21, 2026, on Eclipse Platform 4.41, Temurin Java 21 and
 macOS Cocoa aarch64. All workspaces and databases were disposable synthetic
 copies under `/private/tmp/timekeeper-installed.RaDTib`; no personal database

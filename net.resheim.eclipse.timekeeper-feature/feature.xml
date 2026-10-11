@@ -18,10 +18,6 @@
       %license
    </license>
 
-   <!-- Bundle resolution alone omits Tasks search/index contributions. -->
-   <requires>
-      <import feature="org.eclipse.mylyn.tasks.feature" version="4.12.0" match="compatible"/>
-   </requires>
 
    <plugin
          id="net.resheim.eclipse.timekeeper.ui"

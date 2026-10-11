@@ -29,8 +29,27 @@
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.16.0</version>
+				<executions>
+					<execution>
+						<id>compile-plain-java-tests</id>
+						<phase>test-compile</phase>
+						<goals><goal>testCompile</goal></goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>3.5.5</version>
+				<executions>
+					<execution>
+						<id>run-plain-java-tests</id>
+						<phase>test</phase>
+						<goals><goal>test</goal></goals>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>

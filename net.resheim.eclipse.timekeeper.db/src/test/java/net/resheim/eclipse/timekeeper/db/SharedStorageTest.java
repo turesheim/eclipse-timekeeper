@@ -21,8 +21,6 @@ import java.util.List;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityTransaction;
 
-import org.eclipse.mylyn.internal.tasks.core.LocalTask;
-import org.eclipse.mylyn.tasks.core.ITask;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -36,112 +34,10 @@ public class SharedStorageTest {
 	
 	private EntityManager entityManager;
 	
-	public static final String KEY_VALUELIST_ID = "net.resheim.eclipse.timekeeper"; //$NON-NLS-1$
-
-	public static final String KV_SEPARATOR = "="; //$NON-NLS-1$
-
-	public static final String PAIR_SEPARATOR = ";"; //$NON-NLS-1$
-
-	//------------------------------------------------------------------------
-	// Migration test
-	//------------------------------------------------------------------------
-	static long remainder = 0;
-	
-
-	synchronized static void accumulateTime(ITask task, String dateString, long millis) {
-		millis = millis + remainder;
-		long seconds = millis / 1000;
-		remainder = millis - (seconds * 1000);
-		if (seconds == 0) {
-			return;
-		}
-		String accumulatedString = getValue(task, dateString);
-		if (accumulatedString != null) {
-			long accumulated = Long.parseLong(accumulatedString);
-			accumulated = accumulated + seconds;
-			setValue(task, dateString, Long.toString(accumulated));
-		} else {
-			setValue(task, dateString, Long.toString(seconds));
-		}
-	}
-
-	/**
-	 * 
-	 * @param task
-	 * @param key date "start" or "tick"
-	 * @return
-	 */
-	public static String getValue(ITask task, String key) {
-		String attribute = task.getAttribute(KEY_VALUELIST_ID);
-		if (attribute == null) {
-			return null;
-		} else {
-			String[] split = attribute.split(PAIR_SEPARATOR);
-			for (String string : split) {
-				if (string.length() > 0) {
-					String[] kv = string.split(KV_SEPARATOR);
-					if (kv[0].equals(key)) {
-						return kv[1];
-					}
-				}
-			}
-		}
-		return null;
-	}
-
-	/**
-	 * Sets a value in the Mylyn database for the specified task.
-	 *
-	 * @param task
-	 *            the task to set a value for
-	 * @param key
-	 *            the key for the value
-	 * @param value
-	 *            the value associated with the key
-	 */
-	public static void setValue(ITask task, String key, String value) {
-		StringBuilder sb = new StringBuilder();
-		String attribute = task.getAttribute(KEY_VALUELIST_ID);
-		if (attribute == null || attribute.length() == 0) {
-			sb.append(key);
-			sb.append('=');
-			sb.append(value);
-		} else {
-			String[] split = attribute.split(PAIR_SEPARATOR);
-			boolean found = false;
-			for (int i = 0; i < split.length; i++) {
-				String string = split[i];
-				String[] kv = string.split(KV_SEPARATOR);
-				if (kv[0].equals(key)) {
-					kv[1] = value;
-					found = true;
-				}
-				if (kv.length == 2) {
-					sb.append(kv[0]);
-					sb.append('=');
-					sb.append(kv[1]);
-					if (i < split.length - 1) {
-						sb.append(';');
-					}
-				}
-			}
-			if (!found) {
-				sb.append(';');
-				sb.append(key);
-				sb.append('=');
-				sb.append(value);
-	
-			}
-		}
-		task.setAttribute(KEY_VALUELIST_ID, sb.toString());
-	}
-	
-	private LocalTask mylynTask;
 
 	@Before
 	public void before() {
 		entityManager = PersistenceHelper.getEntityManager();
-		mylynTask = new LocalTask("1", "TestmylynTask");
 	}
 
 	@After
@@ -161,7 +57,7 @@ public class SharedStorageTest {
 
 	@Test
 	public void testSimpleTaskPersistence() {
-		Task ttask = new Task(mylynTask);
+		Task ttask = new Task("Test task");
 		Instant now = Instant.now();
 		Activity a = new Activity(ttask,now);
 		ttask.addActivity(a);
@@ -189,7 +85,7 @@ public class SharedStorageTest {
 	 */
 	@Test
 	public void testTrackedTask_getDuration() {
-		Task task = new Task(mylynTask);
+		Task task = new Task("Test task");
 
 		Instant start = Instant.parse("2016-03-14T22:00:00Z");
 		Instant start2 = Instant.parse("2016-03-16T00:00:00Z");

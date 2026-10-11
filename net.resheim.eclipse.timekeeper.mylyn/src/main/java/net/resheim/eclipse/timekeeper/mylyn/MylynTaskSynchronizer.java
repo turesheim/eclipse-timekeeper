@@ -8,7 +8,7 @@
  * Contributors:
  *     Torkild U. Resheim - initial API and implementation
  *******************************************************************************/
-package net.resheim.eclipse.timekeeper.ui.tasks;
+package net.resheim.eclipse.timekeeper.mylyn;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -39,8 +39,6 @@ import org.eclipse.swt.widgets.Display;
 import org.osgi.service.prefs.BackingStoreException;
 import org.osgi.service.prefs.Preferences;
 
-import net.resheim.eclipse.timekeeper.db.DatabaseChangeListener;
-import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
 import net.resheim.eclipse.timekeeper.domain.Project;
@@ -56,12 +54,13 @@ import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 import net.resheim.eclipse.timekeeper.ui.preferences.PreferenceConstants;
 
 /**
- * Keeps the embedded Eclipse task list and the provider-neutral Timekeeper model
- * aligned for existing projections. New standalone records are projected only
- * when the user enables Task List integration; native editing does not need Mylyn objects.
+ * Keeps the embedded Eclipse task list and the provider-neutral Timekeeper
+ * model aligned for existing projections. New standalone records are projected
+ * only when the user enables Task List integration; native editing does not
+ * need Mylyn objects.
  */
 @SuppressWarnings("restriction")
-public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITaskListChangeListener, IPropertyChangeListener {
+public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPropertyChangeListener {
 	private static final String PROJECT_HANDLE_PREFIX = "timekeeper-project-";
 	private static final String PROJECT_MAPPING_PREFIX = "mylyn-project-";
 
@@ -78,8 +77,10 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 	private Set<ProjectId> knownBackendProjects = Set.of();
 	private Set<TaskId> knownProjectedTasks = Set.of();
 	private boolean scheduled;
+	private final Runnable backendPoll = this::pollBackend;
 	private boolean mylynDirty = true;
 	private boolean backendDirty = true;
+	private String lastFailure;
 
 	public MylynTaskSynchronizer(TimekeeperService service, Display display) {
 		this.service = service;
@@ -89,70 +90,111 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 	}
 
 	public void start() {
-		if (running) return;
+		if (running)
+			return;
 		running = true;
 		TimekeeperUiPlugin.getDefault().getPreferenceStore().addPropertyChangeListener(this);
 		taskList.addChangeListener(this);
-		TimekeeperPlugin.getDefault().addListener(this);
+		display.timerExec(1000, backendPoll);
 		schedule(true, true);
 	}
 
 	public void stop() {
-		if (!running) return;
+		if (!running)
+			return;
 		running = false;
+		if (!display.isDisposed())
+			display.timerExec(-1, backendPoll);
 		TimekeeperUiPlugin.getDefault().getPreferenceStore().removePropertyChangeListener(this);
-		TimekeeperPlugin.getDefault().removeListener(this);
+
 		taskList.removeChangeListener(this);
 	}
 
-	@Override public void propertyChange(PropertyChangeEvent event) {
-		if (event.getProperty().equals(PreferenceConstants.PROJECT_NATIVE_TASKS)) schedule(false, true);
-	}
-
 	@Override
-	public void databaseStateChanged() {
-		schedule(false, true);
+	public void propertyChange(PropertyChangeEvent event) {
+		if (event.getProperty().equals(PreferenceConstants.PROJECT_NATIVE_TASKS))
+			schedule(false, true);
 	}
 
 	@Override
 	public void containersChanged(Set<TaskContainerDelta> deltas) {
-		if (!running || applying) return;
+		if (!running || applying)
+			return;
 		for (TaskContainerDelta delta : deltas) {
-			if (delta.getKind() != TaskContainerDelta.Kind.DELETED) continue;
-			if (delta.getElement() instanceof LocalTask task) mappedTask(task).ifPresent(deletedTasks::add);
-			if (delta.getElement() instanceof AbstractTaskCategory category) mappedProject(category).ifPresent(deletedProjects::add);
+			if (delta.getKind() != TaskContainerDelta.Kind.DELETED)
+				continue;
+			if (delta.getElement() instanceof LocalTask task)
+				mappedTask(task).ifPresent(deletedTasks::add);
+			if (delta.getElement() instanceof AbstractTaskCategory category)
+				mappedProject(category).ifPresent(deletedProjects::add);
 		}
-		if (deltas.stream().anyMatch(delta -> !delta.isTransient())) schedule(true, false);
+		if (deltas.stream().anyMatch(delta -> !delta.isTransient()))
+			schedule(true, false);
 	}
 
 	private void schedule(boolean fromMylyn, boolean fromBackend) {
 		mylynDirty |= fromMylyn;
 		backendDirty |= fromBackend;
-		if (scheduled || display.isDisposed()) return;
+		if (scheduled || display.isDisposed())
+			return;
 		scheduled = true;
 		display.asyncExec(this::reconcile);
 	}
 
 	private void reconcile() {
 		scheduled = false;
-		if (!running || display.isDisposed() || !TimekeeperPlugin.getDefault().isReady()) return;
+		if (!running || display.isDisposed())
+			return;
 		boolean importMylyn = mylynDirty;
 		boolean exportBackend = backendDirty;
 		mylynDirty = false;
 		backendDirty = false;
 		applying = true;
+		boolean succeeded = false;
 		try {
 			if (importMylyn) {
 				applyDeletions();
 				synchronizeMylynToBackend();
 			}
-			if (exportBackend || importMylyn) synchronizeBackendToMylyn();
+			if (exportBackend || importMylyn)
+				synchronizeBackendToMylyn();
+			succeeded = true;
+			lastFailure = null;
 		} catch (RuntimeException failure) {
-			TimekeeperUiPlugin.getDefault().getLog().log(new Status(IStatus.ERROR,
-					TimekeeperUiPlugin.PLUGIN_ID, "Could not synchronize Timekeeper and Mylyn tasks", failure));
+			mylynDirty |= importMylyn;
+			backendDirty |= exportBackend;
+			String description = failure.getClass().getName() + ": " + failure.getMessage();
+			if (!description.equals(lastFailure)) {
+				TimekeeperUiPlugin.getDefault().getLog().log(new Status(IStatus.WARNING, MylynIntegration.PLUGIN_ID,
+						"Could not synchronize Mylyn through the Timekeeper client; retrying", failure));
+				lastFailure = description;
+			}
 		} finally {
 			applying = false;
-			if (mylynDirty || backendDirty) schedule(false, false);
+			if (succeeded && (mylynDirty || backendDirty))
+				schedule(false, false);
+		}
+	}
+
+	private List<Task> lastTasks = List.of();
+	private List<Project> lastProjects = List.of();
+
+	private void pollBackend() {
+		if (!running || display.isDisposed())
+			return;
+		try {
+			var tasks = service.tasks();
+			var projects = service.projects();
+			if (mylynDirty || backendDirty || !tasks.equals(lastTasks) || !projects.equals(lastProjects)) {
+				lastTasks = tasks;
+				lastProjects = projects;
+				schedule(false, true);
+			}
+		} catch (RuntimeException unavailable) {
+			// The client may be temporarily disconnected; retry on the next poll.
+		} finally {
+			if (running && !display.isDisposed())
+				display.timerExec(1000, backendPoll);
 		}
 	}
 
@@ -160,7 +202,8 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 		for (TaskId id : Set.copyOf(deletedTasks)) {
 			service.task(id).filter(task -> task.externalReferences().isEmpty()).ifPresent(task -> {
 				try {
-					service.deleteTask(new net.resheim.eclipse.timekeeper.service.Commands.DeleteTask(id, task.version()));
+					service.deleteTask(
+							new net.resheim.eclipse.timekeeper.service.Commands.DeleteTask(id, task.version()));
 				} catch (net.resheim.eclipse.timekeeper.service.ServiceException failure) {
 					// Recorded history is preserved; the projection is restored below.
 					showDeletionFailure(failure);
@@ -171,7 +214,8 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 		for (ProjectId id : Set.copyOf(deletedProjects)) {
 			service.project(id).ifPresent(project -> {
 				try {
-					service.deleteProject(new net.resheim.eclipse.timekeeper.service.Commands.DeleteProject(id, project.version()));
+					service.deleteProject(
+							new net.resheim.eclipse.timekeeper.service.Commands.DeleteProject(id, project.version()));
 					mappings.remove(mappingKey(id));
 				} catch (net.resheim.eclipse.timekeeper.service.ServiceException failure) {
 					showDeletionFailure(failure);
@@ -199,18 +243,18 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 		}
 
 		Map<ITask, Task> synchronizedTasks = new HashMap<>();
-		List<AbstractTask> localTasks = taskList.getAllTasks().stream()
-				.filter(LocalTask.class::isInstance)
-				.sorted(Comparator.comparingInt(this::depth))
-				.toList();
-		for (AbstractTask task : localTasks) ensureTask(task, projects, synchronizedTasks);
+		List<AbstractTask> localTasks = taskList.getAllTasks().stream().filter(LocalTask.class::isInstance)
+				.sorted(Comparator.comparingInt(this::depth)).toList();
+		for (AbstractTask task : localTasks)
+			ensureTask(task, projects, synchronizedTasks);
 	}
 
 	private Project ensureProject(AbstractTaskCategory category) {
 		Optional<ProjectId> mappedId = mappedProject(category);
-		Project project = mappedId.flatMap(service::project).orElseGet(() -> service.projects().stream()
-				.filter(candidate -> candidate.name().equals(category.getSummary())).findFirst()
-				.orElseGet(() -> service.createProject(new CreateProject(category.getSummary()))));
+		Project project = mappedId.flatMap(service::project)
+				.orElseGet(() -> service.projects().stream()
+						.filter(candidate -> candidate.name().equals(category.getSummary())).findFirst()
+						.orElseGet(() -> service.createProject(new CreateProject(category.getSummary()))));
 		remember(project.id(), category);
 		if (!project.name().equals(category.getSummary())) {
 			project = service.updateProject(new UpdateProject(project.id(), project.version(), category.getSummary()));
@@ -218,24 +262,24 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 		return project;
 	}
 
-	private Task ensureTask(AbstractTask mylynTask, Map<String, Project> projects,
-			Map<ITask, Task> synchronizedTasks) {
+	private Task ensureTask(AbstractTask mylynTask, Map<String, Project> projects, Map<ITask, Task> synchronizedTasks) {
 		Task known = synchronizedTasks.get(mylynTask);
-		if (known != null) return known;
+		if (known != null)
+			return known;
 
-		Optional<Task> parent = parentTask(mylynTask)
-				.filter(LocalTask.class::isInstance)
+		Optional<Task> parent = parentTask(mylynTask).filter(LocalTask.class::isInstance)
 				.map(value -> ensureTask(value, projects, synchronizedTasks));
-		Optional<ProjectId> requestedProjectId = parent.flatMap(Task::projectId).or(() -> category(mylynTask)
-				.map(value -> projects.computeIfAbsent(value.getHandleIdentifier(), ignored -> ensureProject(value)))
-				.map(Project::id));
+		Optional<ProjectId> requestedProjectId = parent.flatMap(Task::projectId)
+				.or(() -> category(mylynTask).map(
+						value -> projects.computeIfAbsent(value.getHandleIdentifier(), ignored -> ensureProject(value)))
+						.map(Project::id));
 		ExternalTaskReference reference = externalReference(mylynTask);
-		Task current = mappedTask(mylynTask).flatMap(service::task)
-				.or(() -> service.findTask(reference.key()))
+		Task current = mappedTask(mylynTask).flatMap(service::task).or(() -> service.findTask(reference.key()))
 				.orElseGet(() -> service.createTask(new CreateTask(requestedProjectId, parent.map(Task::id),
 						mylynTask.getSummary(), Optional.ofNullable(mylynTask.getUrl()))));
 		Optional<ProjectId> projectId = requestedProjectId;
-		if (projectId.isEmpty()) projectId = current.projectId();
+		if (projectId.isEmpty())
+			projectId = current.projectId();
 
 		Optional<TaskId> parentId = parent.map(Task::id);
 		Optional<String> url = Optional.ofNullable(mylynTask.getUrl()).filter(value -> !value.isBlank());
@@ -245,12 +289,12 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 				current = service.updateTask(new UpdateTask(current.id(), current.version(), projectId, parentId,
 						mylynTask.getSummary(), url));
 			} catch (RuntimeException failure) {
-				throw new IllegalStateException("Could not synchronize Mylyn task '" + mylynTask.getSummary()
-						+ "' (" + current.id() + ") from project " + current.projectId()
-						+ " to " + projectId + " and parent " + parentId, failure);
+				throw new IllegalStateException("Could not synchronize Mylyn task '" + mylynTask.getSummary() + "' ("
+						+ current.id() + ") from project " + current.projectId() + " to " + projectId + " and parent "
+						+ parentId, failure);
 			}
 		}
-		mylynTask.setAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID, current.id().value().toString());
+		mylynTask.setAttribute(MylynMetadata.ATTR_TIMEKEEPER_TASK_ID, current.id().value().toString());
 		synchronizedTasks.put(mylynTask, current);
 		return current;
 	}
@@ -259,24 +303,31 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 		Map<TaskId, Task> domainTasks = new HashMap<>();
 		service.tasks().forEach(task -> domainTasks.put(task.id(), task));
 		for (AbstractTask projected : List.copyOf(taskList.getAllTasks())) {
-			if (!(projected instanceof LocalTask)) continue;
-			mappedTask(projected).filter(id -> knownBackendTasks.contains(id) && !domainTasks.containsKey(id)).ifPresent(id -> taskList.deleteTask(projected));
+			if (!(projected instanceof LocalTask))
+				continue;
+			mappedTask(projected).filter(id -> knownBackendTasks.contains(id) && !domainTasks.containsKey(id))
+					.ifPresent(id -> taskList.deleteTask(projected));
 		}
-		Set<ProjectId> projectIds = service.projects().stream().map(Project::id).collect(java.util.stream.Collectors.toSet());
+		Set<ProjectId> projectIds = service.projects().stream().map(Project::id)
+				.collect(java.util.stream.Collectors.toSet());
 		for (AbstractTaskCategory category : Set.copyOf(taskList.getTaskCategories())) {
-			mappedProject(category).filter(id -> knownBackendProjects.contains(id) && !projectIds.contains(id)).ifPresent(id -> {
-				taskList.deleteCategory(category);
-				mappings.remove(mappingKey(id));
-			});
+			mappedProject(category).filter(id -> knownBackendProjects.contains(id) && !projectIds.contains(id))
+					.ifPresent(id -> {
+						taskList.deleteCategory(category);
+						mappings.remove(mappingKey(id));
+					});
 		}
 
 		Map<TaskId, AbstractTask> mylynTasks = indexedMylynTasks();
-		boolean includeNew = TimekeeperUiPlugin.getDefault().getPreferenceStore().getBoolean(PreferenceConstants.PROJECT_NATIVE_TASKS);
+		boolean includeNew = TimekeeperUiPlugin.getDefault().getPreferenceStore()
+				.getBoolean(PreferenceConstants.PROJECT_NATIVE_TASKS);
 		Set<TaskId> projected = domainTasks.values().stream().filter(this::isLocalTask)
-				.filter(task -> includeNew || mylynTasks.containsKey(task.id()) || knownProjectedTasks.contains(task.id())
-						|| task.externalReferences().stream().anyMatch(reference -> TimekeeperPlugin.KIND_LOCAL.equals(reference.providerId())))
+				.filter(task -> task.externalReferences().isEmpty()
+						? includeNew || mylynTasks.containsKey(task.id()) || knownProjectedTasks.contains(task.id())
+						: mylynTasks.containsKey(task.id()))
 				.map(Task::id).collect(java.util.stream.Collectors.toSet());
-		// A projected child needs its native ancestors to preserve the actual hierarchy.
+		// A projected child needs its native ancestors to preserve the actual
+		// hierarchy.
 		for (TaskId id : List.copyOf(projected)) {
 			Task current = domainTasks.get(id);
 			Set<TaskId> visited = new HashSet<>();
@@ -287,21 +338,23 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 			}
 		}
 		Set<ProjectId> nativeProjects = new HashSet<>();
-		if (includeNew) TimekeeperPlugin.getProjects().map(net.resheim.eclipse.timekeeper.db.model.Project::getServiceId)
-				.filter(java.util.Objects::nonNull).map(UUID::fromString).map(ProjectId::new).forEach(nativeProjects::add);
+		if (includeNew)
+			service.projects().stream().map(Project::id).forEach(nativeProjects::add);
 		service.projects().stream().filter(project -> mappings.get(mappingKey(project.id()), null) != null)
 				.map(Project::id).forEach(nativeProjects::add);
 		domainTasks.values().stream().filter(task -> projected.contains(task.id())).map(Task::projectId)
 				.flatMap(Optional::stream).forEach(nativeProjects::add);
 		Map<ProjectId, AbstractTaskCategory> categories = new HashMap<>();
 		for (Project project : service.projects()) {
-			if (nativeProjects.contains(project.id())) categories.put(project.id(), ensureCategory(project));
+			if (nativeProjects.contains(project.id()))
+				categories.put(project.id(), ensureCategory(project));
 		}
 
 		List<Task> ordered = new ArrayList<>(domainTasks.values());
 		ordered.sort(Comparator.comparingInt(task -> depth(task, domainTasks)));
 		for (Task task : ordered) {
-			if (!projected.contains(task.id())) continue;
+			if (!projected.contains(task.id()))
+				continue;
 			AbstractTask mylynTask = mylynTasks.get(task.id());
 			if (mylynTask == null) {
 				mylynTask = findByReference(task).orElse(null);
@@ -309,14 +362,15 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 			if (mylynTask == null) {
 				mylynTask = new LocalTask(String.valueOf(taskList.getNextLocalTaskId()), task.summary());
 			}
-			mylynTask.setAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID, task.id().value().toString());
+			mylynTask.setAttribute(MylynMetadata.ATTR_TIMEKEEPER_TASK_ID, task.id().value().toString());
 			mylynTask.setSummary(task.summary());
 			mylynTask.setUrl(task.url().orElse(null));
 			AbstractTaskContainer parent = task.parentTaskId().map(mylynTasks::get)
 					.<AbstractTaskContainer>map(value -> value)
 					.orElseGet(() -> task.projectId().map(categories::get).orElse(null));
 			// A null parent moves a local task to Mylyn's unmatched container as well.
-			if (!taskList.addTask(mylynTask, parent)) taskList.notifyElementChanged(mylynTask);
+			if (!taskList.addTask(mylynTask, parent))
+				taskList.notifyElementChanged(mylynTask);
 			mylynTasks.put(task.id(), mylynTask);
 		}
 		knownBackendTasks = Set.copyOf(domainTasks.keySet());
@@ -326,7 +380,7 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 
 	private boolean isLocalTask(Task task) {
 		return task.externalReferences().isEmpty() || task.externalReferences().stream()
-				.anyMatch(reference -> TimekeeperPlugin.KIND_LOCAL.equals(reference.providerId()));
+				.anyMatch(reference -> MylynMetadata.KIND_LOCAL.equals(reference.providerId()));
 	}
 
 	private AbstractTaskCategory ensureCategory(Project project) {
@@ -334,8 +388,7 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 		AbstractTaskCategory category = handle == null ? null : taskList.getContainerForHandle(handle);
 		if (category == null) {
 			category = taskList.getTaskCategories().stream()
-					.filter(candidate -> candidate.getSummary().equals(project.name()))
-					.findFirst().orElse(null);
+					.filter(candidate -> candidate.getSummary().equals(project.name())).findFirst().orElse(null);
 		}
 		if (category == null) {
 			category = new TaskCategory(PROJECT_HANDLE_PREFIX + project.id().value(), project.name());
@@ -349,7 +402,8 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 
 	private Map<TaskId, AbstractTask> indexedMylynTasks() {
 		Map<TaskId, AbstractTask> result = new HashMap<>();
-		for (AbstractTask task : taskList.getAllTasks()) mappedTask(task).ifPresent(id -> result.put(id, task));
+		for (AbstractTask task : taskList.getAllTasks())
+			mappedTask(task).ifPresent(id -> result.put(id, task));
 		return result;
 	}
 
@@ -365,12 +419,14 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 
 	private ExternalTaskReference externalReference(ITask task) {
 		String provider = task.getConnectorKind() == null ? "mylyn" : task.getConnectorKind();
-		return new ExternalTaskReference(provider, TimekeeperPlugin.getRepositoryUrl(task), task.getTaskId(), task.getUrl());
+		return new ExternalTaskReference(provider, MylynMetadata.getRepositoryUrl(task), task.getTaskId(),
+				task.getUrl());
 	}
 
 	private Optional<TaskId> mappedTask(ITask task) {
-		String value = task.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID);
-		if (value == null) return Optional.empty();
+		String value = task.getAttribute(MylynMetadata.ATTR_TIMEKEEPER_TASK_ID);
+		if (value == null)
+			return Optional.empty();
 		try {
 			return Optional.of(new TaskId(UUID.fromString(value)));
 		} catch (IllegalArgumentException malformed) {
@@ -397,8 +453,8 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 		try {
 			mappings.flush();
 		} catch (BackingStoreException failure) {
-			TimekeeperUiPlugin.getDefault().getLog().log(new Status(IStatus.WARNING,
-					TimekeeperUiPlugin.PLUGIN_ID, "Could not store the Mylyn category mapping", failure));
+			TimekeeperUiPlugin.getDefault().getLog().log(new Status(IStatus.WARNING, TimekeeperUiPlugin.PLUGIN_ID,
+					"Could not store the Mylyn category mapping", failure));
 		}
 	}
 
@@ -407,7 +463,8 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 	}
 
 	private Optional<AbstractTask> parentTask(ITask task) {
-		if (!(task instanceof AbstractTask concrete)) return Optional.empty();
+		if (!(task instanceof AbstractTask concrete))
+			return Optional.empty();
 		return concrete.getParentContainers().stream().filter(AbstractTask.class::isInstance)
 				.map(AbstractTask.class::cast).findFirst();
 	}
@@ -418,7 +475,8 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 		while (current instanceof AbstractTask concrete && visited.add(current)) {
 			Optional<AbstractTaskCategory> category = concrete.getParentContainers().stream()
 					.filter(AbstractTaskCategory.class::isInstance).map(AbstractTaskCategory.class::cast).findFirst();
-			if (category.isPresent() && category.get() instanceof TaskCategory) return category;
+			if (category.isPresent() && category.get() instanceof TaskCategory)
+				return category;
 			current = concrete.getParentContainers().stream().filter(AbstractTask.class::isInstance)
 					.map(AbstractTask.class::cast).findFirst().orElse(null);
 		}
@@ -431,7 +489,8 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 		ITask current = task;
 		while (current != null && visited.add(current)) {
 			current = parentTask(current).orElse(null);
-			if (current != null) depth++;
+			if (current != null)
+				depth++;
 		}
 		return depth;
 	}
@@ -442,7 +501,8 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 		Task current = task;
 		while (current.parentTaskId().isPresent() && visited.add(current.id())) {
 			current = tasks.get(current.parentTaskId().orElseThrow());
-			if (current == null) break;
+			if (current == null)
+				break;
 			depth++;
 		}
 		return depth;
