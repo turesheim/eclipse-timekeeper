@@ -45,7 +45,10 @@ jobs:
       - name: Add verified release repositories and update channels
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/p2_release.py site --repo "$GITHUB_REPOSITORY" --output _site
+        run: |
+          # Jekyll's Docker action writes root-owned output.
+          sudo chown -R "$(id -u):$(id -g)" _site
+          python3 scripts/p2_release.py site --repo "$GITHUB_REPOSITORY" --output _site
 
       - name: Upload website and p2 repositories
         uses: actions/upload-pages-artifact@v4
