@@ -118,7 +118,9 @@ Task List synchronization polls client snapshots once per second, preserves
 pending changes across temporary client failures, and cancels its poll on stop.
 Idle corrections use immutable activity snapshots and expected versions;
 concurrent edits leave the activity untouched and report a conflict. The detector
-timer and display filters are removed on UI shutdown.
+timer and display filters are removed on UI shutdown. The sampler captures the
+workbench Display and tolerates disposal races without creating a new Display
+on its background thread.
 
 `net.resheim.eclipse.timekeeper.mylyn.feature` depends on the base Timekeeper
 feature and the complete Mylyn Tasks feature. The base feature has no Mylyn

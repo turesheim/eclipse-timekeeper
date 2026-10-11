@@ -30,6 +30,7 @@ import org.eclipse.jface.resource.ImageRegistry;
 import org.eclipse.jface.util.IPropertyChangeListener;
 import org.eclipse.jface.util.PropertyChangeEvent;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.SWTException;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
@@ -293,34 +294,41 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 			detector = new GenericIdleTimeDetector();
 		}
 
+		final Display display = PlatformUI.getWorkbench().getDisplay();
 		timer = new Timer("Timekeeper", true);
 		timer.scheduleAtFixedRate(new TimerTask() {
 			@Override
 			public void run() {
-				if (!PlatformUI.getWorkbench().isClosing()) {
+				if (!display.isDisposed() && !PlatformUI.getWorkbench().isClosing()) {
 					long idleTimeMillis = detector.getIdleTimeMillis();
-					Display.getDefault().asyncExec(() -> {
-						if (plugin != TimekeeperUiPlugin.this || PlatformUI.getWorkbench().isClosing())
-							return;
-						var active = activeActivity();
-						if (active.isEmpty()) {
-							sampledActivity = null;
-							lastActiveTime = null;
+					try {
+						display.asyncExec(() -> {
+							if (plugin != TimekeeperUiPlugin.this || PlatformUI.getWorkbench().isClosing())
+								return;
+							var active = activeActivity();
+							if (active.isEmpty()) {
+								sampledActivity = null;
+								lastActiveTime = null;
+								lastIdleTimeMillis = idleTimeMillis;
+								return;
+							}
+							Activity activity = active.orElseThrow();
+							if (!activity.id().equals(sampledActivity)) {
+								sampledActivity = activity.id();
+								lastActiveTime = activity.start();
+							} else if (idleTimeMillis < lastIdleTimeMillis
+									&& lastIdleTimeMillis > consideredIdleThreshold) {
+								handleReactivation(idleTimeMillis);
+							} else if (idleTimeMillis < consideredIdleThreshold) {
+								lastActiveTime = Instant.now().minusMillis(Math.max(0, idleTimeMillis));
+							}
 							lastIdleTimeMillis = idleTimeMillis;
-							return;
-						}
-						Activity activity = active.orElseThrow();
-						if (!activity.id().equals(sampledActivity)) {
-							sampledActivity = activity.id();
-							lastActiveTime = activity.start();
-						} else if (idleTimeMillis < lastIdleTimeMillis
-								&& lastIdleTimeMillis > consideredIdleThreshold) {
-							handleReactivation(idleTimeMillis);
-						} else if (idleTimeMillis < consideredIdleThreshold) {
-							lastActiveTime = Instant.now().minusMillis(Math.max(0, idleTimeMillis));
-						}
-						lastIdleTimeMillis = idleTimeMillis;
-					});
+						});
+					} catch (SWTException shutdown) {
+						// Disposal can race the background sample's asyncExec submission.
+						if (shutdown.code != SWT.ERROR_DEVICE_DISPOSED)
+							throw shutdown;
+					}
 				}
 			}
 		}, SHORT_INTERVAL, SHORT_INTERVAL);
@@ -337,7 +345,6 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 				lastIdleTimeMillis = idleTimeMillis;
 			}
 		};
-		final Display display = PlatformUI.getWorkbench().getDisplay();
 		display.syncExec(new Runnable() {
 			@Override
 			public void run() {
