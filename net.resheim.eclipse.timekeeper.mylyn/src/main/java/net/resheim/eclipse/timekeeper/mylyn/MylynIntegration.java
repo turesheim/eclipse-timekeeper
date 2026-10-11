@@ -172,6 +172,35 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 	}
 
 	@Override
+	public Optional<String> displayId(Task task) {
+		if (task.externalReferences().stream().noneMatch(ref -> MylynMetadata.KIND_JIRA.equals(ref.providerId())))
+			return Optional.empty();
+		return linked(task).filter(external -> MylynMetadata.KIND_JIRA.equals(external.getConnectorKind()))
+				.flatMap(external -> Optional.ofNullable(external.getTaskKey())
+						.filter(key -> !key.isBlank() && !key.equals(external.getTaskId()))
+						.or(() -> Optional.ofNullable(external.getUrl()).flatMap(this::jiraKeyFromUrl)))
+				.or(() -> task.externalReferences().stream()
+						.filter(ref -> MylynMetadata.KIND_JIRA.equals(ref.providerId()))
+						.flatMap(ref -> ref.externalUrl().stream()).sorted().map(this::jiraKeyFromUrl)
+						.flatMap(Optional::stream).findFirst());
+	}
+
+	private Optional<String> jiraKeyFromUrl(String url) {
+		try {
+			String path = java.net.URI.create(url).getPath();
+			if (path == null)
+				return Optional.empty();
+			int index = path.lastIndexOf("/browse/");
+			if (index < 0)
+				return Optional.empty();
+			String key = path.substring(index + "/browse/".length());
+			return key.isBlank() || key.contains("/") ? Optional.empty() : Optional.of(key);
+		} catch (IllegalArgumentException malformed) {
+			return Optional.empty();
+		}
+	}
+
+	@Override
 	public boolean isLinked(Task task) {
 		return linked(task).isPresent();
 	}

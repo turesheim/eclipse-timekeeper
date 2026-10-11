@@ -55,8 +55,10 @@ class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 		}
 		if (element instanceof Task) {
 			Task task = (Task) element;
-			String externalId = task.externalReferences().stream()
-					.map(reference -> reference.externalId()).sorted().findFirst().orElse(null);
+			String externalId = task.externalReferences().isEmpty() ? null
+					: TimekeeperUiPlugin.getDefault().getTaskIntegration().flatMap(value -> value.displayId(task))
+							.or(() -> task.externalReferences().stream()
+									.map(reference -> reference.externalId()).sorted().findFirst()).orElse(null);
 			return externalId == null ? task.summary() : externalId + ": " + task.summary();
 		}
 		if (element instanceof Activity) {

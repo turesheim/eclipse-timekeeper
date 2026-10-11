@@ -74,6 +74,37 @@ such as day and workweek totals require an explicit time zone; the Eclipse clien
 uses the host system zone. This keeps persisted data independent of the process
 time zone while making daylight-saving and week-boundary behavior deterministic.
 
+## Jira connector
+
+Jira is available through **Timekeeper Mylyn integration** and the separate
+[JiraConnector](https://github.com/gnl42/JiraConnector) plugin. Keep the Eclipse
+2026-09 dependency site enabled, install the optional Timekeeper feature, then
+add `https://gnl42.github.io/JiraConnector-update/` in **Help > Install New
+Software...** and select **Mylyn Tasks Connector: Jira**. Restart Eclipse before
+adding a Jira repository in **Task Repositories**. Timekeeper does not handle
+Jira credentials; use the connector's repository settings.
+
+The compatibility candidate is JiraConnector **6.0.0.202605160149** on Java 21,
+Eclipse 4.41 and Mylyn 4.12. Installation and Timekeeper metadata/tracking
+fixtures are verified; live Jira Cloud/Data Center queries and authentication
+remain unverified. The known Mylyn theme-parser Error Log entry also remains
+open. See the [Jira acceptance report](baseline/JIRA-COMPATIBILITY.md).
+
+The Jira repository settings include a **Timekeeper** section. New issues are
+grouped by **Jira project**, **Mylyn category**, or a **Custom field**. Enter a
+custom field ID such as `customfield_10001`, or its full Mylyn attribute ID,
+`attribute.jira.custom::customfield_10001`. Project and option display names
+are used rather than numeric values; a missing, empty or unavailable field
+groups the issue under **None**. Existing Timekeeper project assignments are
+preserved when grouping settings change.
+
+Workweek displays the Jira issue key, such as `TK-42`, while the numeric issue
+ID preserves its Timekeeper identity when an issue is moved or renamed. If the
+issue disappears from Task List, the optional adapter can still derive its key
+from the stored Jira browse URL. Recorded time remains editable and available
+to labels, reports and CSV export. Timekeeper activities are not sent to Jira
+worklogs.
+
 ## Database configuration
 
 The Database configuration page in preferences (**Timekeeper > Database**) allows you to configure where the database for the running Eclipse instance should be kept. The default is to place it in the shared location, under `.timekeeper` in your home folder. But you can also use a workspace relative path, or even a H2 server if you have one running.
