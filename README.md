@@ -98,12 +98,28 @@ rollback mechanism.
 
 ## Installing
 
-The latest **public release** is available from the [Eclipse
-Marketplace](https://marketplace.eclipse.org/content/timekeeper-eclipse). Build
-artifacts for the 2.0.0 release candidate are available from [GitHub
-Actions](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml).
-Download the `p2-repository` artifact, extract it, and add the extracted directory
-in **Help > Install New Software... > Add... > Local...**.
+Published releases are hosted on GitHub Pages. In **Help > Install New
+Software... > Add...**, use this stable update-site URL:
+
+    https://turesheim.github.io/eclipse-timekeeper/updates/
+
+The site becomes installable when the first release using the new publication
+workflow is published. Prereleases use a separate opt-in channel:
+
+    https://turesheim.github.io/eclipse-timekeeper/updates/preview/
+
+For a specific release, use `updates/releases/<tag>/` under the same base URL,
+for example `https://turesheim.github.io/eclipse-timekeeper/updates/releases/v2.0.0/`.
+Each release also provides a `timekeeper-p2.zip` asset and SHA-256 checksum on
+[GitHub Releases](https://github.com/turesheim/eclipse-timekeeper/releases).
+Download the ZIP and select **Add... > Archive...**, or extract it and select
+**Add... > Local...**. These assets do not require a GitHub login to download.
+
+Before publication, candidate builds remain available as the `p2-repository`
+artifact from [GitHub Actions](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml).
+Extract the artifact and select **Add... > Local...**. The older public release
+is also listed on the [Eclipse Marketplace](https://marketplace.eclipse.org/content/timekeeper-eclipse).
+See [release publication](RELEASING.md) for the workflow and retry procedure.
 
 Timekeeper 2.0.0 requires Eclipse 2026-09 (4.41) and Java 21. Select
 **Timekeeper for Eclipse** for native project, task and activity management.

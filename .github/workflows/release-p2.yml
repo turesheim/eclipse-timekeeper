@@ -1,0 +1,95 @@
+name: Release p2 repository
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published release tag to build or retry (for example v2.0.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-p2-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Check out publication tools
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Validate published release and existing assets
+        id: release
+        run: python3 scripts/p2_release.py prepare --repo "$GITHUB_REPOSITORY" --tag "$RELEASE_TAG"
+
+      - name: Check out release tag
+        if: steps.release.outputs.reuse != 'true'
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          path: release-source
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        if: steps.release.outputs.reuse != 'true'
+        uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+          cache-dependency-path: |
+            release-source/**/pom.xml
+            release-source/**/META-INF/MANIFEST.MF
+            release-source/default.target
+            release-source/.mvn/wrapper/maven-wrapper.properties
+
+      - name: Install Xvfb
+        if: steps.release.outputs.reuse != 'true'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Build and test the tagged source
+        if: steps.release.outputs.reuse != 'true'
+        working-directory: release-source
+        run: xvfb-run --auto-servernum --server-args="-screen 0, 1024x768x24" ./mvnw -B -ntp clean verify -Pother-os -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=20000
+
+      - name: Package and validate p2 repository
+        if: steps.release.outputs.reuse != 'true'
+        run: |
+          python3 scripts/p2_release.py package \
+            --repository release-source/net.resheim.eclipse.timekeeper-site/target/repository \
+            --tag "$RELEASE_TAG" --commit "$(git -C release-source rev-parse HEAD)" \
+            --output "$RUNNER_TEMP/release-assets"
+
+      - name: Attach repository and checksum to release
+        if: steps.release.outputs.reuse != 'true'
+        run: |
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            "$RUNNER_TEMP/release-assets/timekeeper-p2.zip" \
+            "$RUNNER_TEMP/release-assets/timekeeper-p2.zip.sha256"
+
+      - name: Upload test reports and Error Logs
+        if: always() && steps.release.outputs.reuse != 'true'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: release-test-results
+          include-hidden-files: true
+          if-no-files-found: warn
+          path: |
+            release-source/**/target/surefire-reports/
+            release-source/**/target/test-reports/
+            release-source/**/target/work/data/.metadata/.log
