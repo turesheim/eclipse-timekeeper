@@ -20,6 +20,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.WeekFields;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 
 import org.apache.commons.lang3.time.DurationFormatUtils;
@@ -37,6 +38,7 @@ import org.eclipse.jface.viewers.DoubleClickEvent;
 import org.eclipse.jface.viewers.IDoubleClickListener;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.TreeColumnViewerLabelProvider;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.TreeViewerColumn;
@@ -83,6 +85,8 @@ import net.resheim.eclipse.timekeeper.domain.OwnerId;
 import net.resheim.eclipse.timekeeper.service.Commands.StartActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.StopActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteActivity;
+import net.resheim.eclipse.timekeeper.service.Commands.DeleteProject;
+import net.resheim.eclipse.timekeeper.service.Commands.DeleteTask;
 import net.resheim.eclipse.timekeeper.ui.ActivityLabelPainter;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
@@ -265,6 +269,8 @@ public class WorkWeekView extends ViewPart {
 	private Action currentWeekAction;
 
 	private Action newActivityAction;
+	private Action newProjectAction;
+	private Action newTaskAction;
 
 	private Action nextWeekAction;
 
@@ -510,9 +516,44 @@ public class WorkWeekView extends ViewPart {
 		manager.add(previousWeekAction);
 		manager.add(currentWeekAction);
 		manager.add(nextWeekAction);
+		manager.add(new Separator("create"));
+		manager.add(newProjectAction);
+		manager.add(newTaskAction);
 		Object selected = ((IStructuredSelection) viewer.getSelection()).getFirstElement();
+		if (selected instanceof Project project) {
+			manager.add(new Separator("project"));
+			manager.add(new Action("Edit project...") {
+				@Override public void run() { editProject(project); }
+			});
+			manager.add(new Action("Delete project...") {
+				@Override public void run() {
+					if (org.eclipse.jface.dialogs.MessageDialog.openConfirm(getSite().getShell(), "Delete project",
+							"Delete project '" + project.name() + "'?")) {
+						perform(() -> TimekeeperUiPlugin.getDefault().getTimekeeperService()
+								.deleteProject(new DeleteProject(project.id(), project.version())));
+					}
+				}
+			});
+		}
 		if (selected instanceof Task task) {
 			manager.add(new Separator("task"));
+			Action newSubtask = new Action("New subtask...") {
+				@Override public void run() { editTask(null, task.projectId(), Optional.of(task.id())); }
+			};
+			newSubtask.setEnabled(task.projectId().isPresent());
+			manager.add(newSubtask);
+			manager.add(new Action("Edit task...") {
+				@Override public void run() { editTask(task, task.projectId(), task.parentTaskId()); }
+			});
+			manager.add(new Action("Delete task...") {
+				@Override public void run() {
+					if (org.eclipse.jface.dialogs.MessageDialog.openConfirm(getSite().getShell(), "Delete task",
+							"Delete task '" + task.summary() + "'?")) {
+						perform(() -> TimekeeperUiPlugin.getDefault().getTimekeeperService()
+								.deleteTask(new DeleteTask(task.id(), task.version())));
+					}
+				}
+			});
 			ITask mylyn = mylynTask(task);
 			if (mylyn != null) manager.add(mylyn.isActive() ? deactivateAction : activateAction);
 			manager.add(newActivityAction);
@@ -556,11 +597,14 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void fillLocalPullDown(IMenuManager manager) {
-		// Projects and tasks are managed in Mylyn's Tasks view.
+		manager.add(newProjectAction);
+		manager.add(newTaskAction);
 	}
 
 	private void fillLocalToolBar(IToolBarManager manager) {
 		manager.add(new Separator("additions"));
+		manager.add(newProjectAction);
+		manager.add(newTaskAction);
 		manager.add(new Separator("navigation"));
 		manager.add(previousWeekAction);
 		manager.add(currentWeekAction);
@@ -606,6 +650,21 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void makeActions() {
+		newProjectAction = new Action("New project...") {
+			@Override public void run() { editProject(null); }
+		};
+		newProjectAction.setToolTipText("Create a Timekeeper project");
+		newProjectAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages().getImageDescriptor(ISharedImages.IMG_OBJ_FOLDER));
+		newTaskAction = new Action("New task...") {
+			@Override public void run() {
+				Object selected = ((IStructuredSelection) viewer.getSelection()).getFirstElement();
+				Optional<net.resheim.eclipse.timekeeper.domain.ProjectId> projectId = selected instanceof Project project
+						? Optional.of(project.id()) : selected instanceof Task task ? task.projectId() : Optional.empty();
+				editTask(null, projectId, Optional.empty());
+			}
+		};
+		newTaskAction.setToolTipText("Create a Timekeeper task");
+		newTaskAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages().getImageDescriptor(ISharedImages.IMG_OBJ_FILE));
 		// browse to previous week
 		previousWeekAction = new Action() {
 			@Override
@@ -656,6 +715,9 @@ public class WorkWeekView extends ViewPart {
 				if (obj instanceof Task) {
 					Task task = (Task) obj;
 					if (mylynTask(task) != null) TasksUiUtil.openTask(mylynTask(task));
+					else editTask(task, task.projectId(), task.parentTaskId());
+				} else if (obj instanceof Project project) {
+					editProject(project);
 				}
 			}
 		};
@@ -710,6 +772,23 @@ public class WorkWeekView extends ViewPart {
 		deleteAction.setImageDescriptor(
 				PlatformUI.getWorkbench().getSharedImages().getImageDescriptor(ISharedImages.IMG_TOOL_DELETE));
 
+	}
+
+	private void editProject(Project original) {
+		ProjectDialog dialog = new ProjectDialog(getSite().getShell(), TimekeeperUiPlugin.getDefault().getTimekeeperService(), original);
+		if (dialog.open() == org.eclipse.jface.window.Window.OK) {
+			refreshAll();
+			viewer.setSelection(new StructuredSelection(dialog.savedProject()), true);
+		}
+	}
+
+	private void editTask(Task original, Optional<net.resheim.eclipse.timekeeper.domain.ProjectId> projectId,
+			Optional<net.resheim.eclipse.timekeeper.domain.TaskId> parentId) {
+		TaskDialog dialog = new TaskDialog(getSite().getShell(), TimekeeperUiPlugin.getDefault().getTimekeeperService(), original, projectId, parentId);
+		if (dialog.open() == org.eclipse.jface.window.Window.OK) {
+			refreshAll();
+			viewer.setSelection(new StructuredSelection(dialog.savedTask()), true);
+		}
 	}
 
 	/**

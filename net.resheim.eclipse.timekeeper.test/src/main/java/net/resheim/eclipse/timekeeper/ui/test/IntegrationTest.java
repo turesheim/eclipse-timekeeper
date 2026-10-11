@@ -60,6 +60,8 @@ import org.eclipse.ui.actions.ActionFactory;
 import org.eclipse.ui.dialogs.PreferencesUtil;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Before;
+import org.junit.After;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -73,6 +75,7 @@ import net.resheim.eclipse.timekeeper.domain.TaskId;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateTask;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
+import net.resheim.eclipse.timekeeper.ui.preferences.PreferenceConstants;
 import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
 @SuppressWarnings("restriction")
@@ -98,6 +101,19 @@ public class IntegrationTest {
 	private static File screenshotsDir;
 	
 	private static TaskList tl;
+	private boolean previousProjection;
+
+	@Before public void enableOptionalTaskListProjection() throws Exception {
+		runOnUi(() -> {
+			var preferences = TimekeeperUiPlugin.getDefault().getPreferenceStore();
+			previousProjection = preferences.getBoolean(PreferenceConstants.PROJECT_NATIVE_TASKS);
+			preferences.setValue(PreferenceConstants.PROJECT_NATIVE_TASKS, true);
+		});
+	}
+	@After public void restoreTaskListProjectionPreference() throws Exception {
+		runOnUi(() -> TimekeeperUiPlugin.getDefault().getPreferenceStore()
+				.setValue(PreferenceConstants.PROJECT_NATIVE_TASKS, previousProjection));
+	}
 	
 	// TODO: Put this to work
 //	RunListener rl = new RunListener() {
@@ -419,6 +435,36 @@ public class IntegrationTest {
 		assertTrue(mylynParent.getParentContainers().stream()
 				.anyMatch(container -> "Backend-created project".equals(container.getSummary())));
 		assertTrue(service.task(parent.id()).orElseThrow().externalReferences().isEmpty());
+		// Native edits can remove a projected child's project/parent without leaving stale containers.
+		var currentChild = service.task(child.id()).orElseThrow();
+		service.updateTask(new net.resheim.eclipse.timekeeper.service.Commands.UpdateTask(currentChild.id(), currentChild.version(),
+				Optional.empty(), Optional.empty(), currentChild.summary(), currentChild.url()));
+		bot.waitUntil(new DefaultCondition() {
+			@Override public boolean test() {
+				return mylynChild.getParentContainers().stream().noneMatch(container -> container instanceof AbstractTask
+						|| container instanceof TaskCategory);
+			}
+			@Override public String getFailureMessage() { return "Native move left a stale projected parent/category"; }
+		});
+		runOnUi(() -> TimekeeperUiPlugin.getDefault().getPreferenceStore().setValue(PreferenceConstants.PROJECT_NATIVE_TASKS, false));
+		var newParent = service.createTask(new CreateTask(Optional.of(project.id()), "New native parent", Optional.empty()));
+		currentChild = service.task(child.id()).orElseThrow();
+		service.updateTask(new net.resheim.eclipse.timekeeper.service.Commands.UpdateTask(currentChild.id(), currentChild.version(),
+				Optional.of(project.id()), Optional.of(newParent.id()), currentChild.summary(), currentChild.url()));
+		bot.waitUntil(new DefaultCondition() {
+			@Override public boolean test() {
+				return mylynTask(newParent.id()).map(value -> mylynChild.getParentContainers().contains(value)).orElse(false);
+			}
+			@Override public String getFailureMessage() { return "Existing projection did not include its new native ancestor"; }
+		});
+		currentChild = service.task(child.id()).orElseThrow();
+		service.updateTask(new net.resheim.eclipse.timekeeper.service.Commands.UpdateTask(currentChild.id(), currentChild.version(),
+				Optional.of(project.id()), Optional.of(parent.id()), currentChild.summary(), currentChild.url()));
+		bot.waitUntil(new DefaultCondition() {
+			@Override public boolean test() { return mylynChild.getParentContainers().contains(mylynParent); }
+			@Override public String getFailureMessage() { return "Projected child did not return to its original parent"; }
+		});
+		runOnUi(() -> TimekeeperUiPlugin.getDefault().getPreferenceStore().setValue(PreferenceConstants.PROJECT_NATIVE_TASKS, true));
 
 		TaskCategory mylynProject = new TaskCategory("mylyn-created-project", "Created in Mylyn");
 		LocalTask mylynCreatedParent = new LocalTask("4101", "Created in the Tasks view");

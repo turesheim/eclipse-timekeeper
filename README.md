@@ -15,26 +15,33 @@ See the <a href="../../wiki">wiki</a>  for more about usage.
 
 ## Native Timekeeper tasks
 
-In Eclipse, a native Timekeeper task is an ordinary Mylyn **Local Task**; it
-does not require a task-repository connector. Use the standard **Task List**
-view to create and maintain the hierarchy:
+Use the **Workweek** toolbar to create a **New project...** or **New task...**.
+Right-click a project or task to edit or delete it. A task has a summary, an
+optional URL and project, and an optional parent task in that project. Use
+**New subtask...** on a task to extend its hierarchy. Editing a task lets you
+move it between projects or choose **No project** for an independent task;
+move or delete its subtasks first before moving their parent to another project.
 
-- a Mylyn task category represents a Timekeeper project;
-- a local task in that category represents a root Timekeeper task; and
-- a local task placed below another local task represents a subtask.
+![Creating a native Timekeeper task in Workweek](resources/screenshots/standalone-task-dialog.png)
 
-The normal Mylyn commands remain the editing UI. Creating, renaming, or moving
-these categories and local tasks is synchronized into the Timekeeper backend.
-The reverse direction works as well: a project or native task created through
-the backend is materialized in Eclipse as a Mylyn category or local task, with
-the same task/subtask structure.
+These records belong to Timekeeper and are available before any time has been
+recorded. Creating them does not create a Mylyn task or category. To also show
+new native records in Mylyn, enable **Show new Timekeeper projects and tasks in
+Mylyn Task List** in **Preferences > Timekeeper**. Existing Task List projections
+continue to synchronize when that option is off.
+
+The standard Mylyn **Task List** is also supported: categories represent
+projects, local tasks represent root tasks, and nested local tasks represent
+subtasks. Creating, renaming, or moving those objects synchronizes their native
+Timekeeper records without requiring a repository connector.
 
 ![Native project, task, and subtask in the Mylyn Task List](resources/screenshots/native-task-tree.png)
 
-The **Workweek** view is reserved for time tracking and reporting. Activate the
-local task through Mylyn as usual; Timekeeper records its activities and shows
-the resulting time in Workweek. Native tasks participate in weekly totals,
+Activate a linked local task through Mylyn as usual, or start an activity
+directly in Workweek. Native tasks participate in weekly totals,
 reports, and CSV export alongside connector-backed tasks.
+
+![Native project, tasks and recorded time in Workweek](resources/screenshots/standalone-workweek.png)
 
 In Workweek, right-click a task and choose **New activity** to record time on
 any date. Enter start and end as `yyyy-MM-dd HH:mm` in the Eclipse host time
@@ -45,7 +52,7 @@ These operations also work when a linked Mylyn task is unavailable. Timekeeper
 reports a conflict if another interval is already open or a record changed
 while it was being edited.
 
-Native projects and tasks can be renamed or deleted in Task List. Delete
+Native projects and tasks can be renamed or deleted in Workweek or Task List. Delete
 activities and subtasks before deleting their task, then remove its tasks
 before deleting the project; recorded history is preserved if deletion is
 refused. See the [native project/activity UI verification](baseline/STANDALONE-ACTIVITY-UI.md).

@@ -1,13 +1,29 @@
 # Native project and activity UI through the service boundary
 
-Issue #213 continues the native task hierarchy design merged in #225. Projects
-and tasks are managed in the standard Mylyn Task List: categories represent
-projects and local tasks represent native tasks and subtasks. These are
-Timekeeper-owned records, independent of repository connectors. Workweek is the
-activity and reporting surface.
+Issue #213 provides native project, task and activity management in Workweek.
+The standard Mylyn Task List integration from #225 remains available alongside
+the native editors. Timekeeper-owned records need no Mylyn object or repository
+connector.
 
 ## Delivered behavior
 
+- **New project...** and **New task...** are available in the Workweek toolbar
+  and context menu, including an empty installation. **Edit project...** renames
+  a project. **Edit task...** edits its summary, optional URL, project and parent.
+  **New subtask...** defaults to the selected parent and its project. A task may
+  have no project; subtasks require the same project as their parent. The parent
+  picker excludes the task itself and all its descendants.
+- Native dialogs read immutable snapshots and save with their original versions
+  through `TimekeeperService`. Invalid values and stale saves leave the dialog
+  open and preserve stored data. External references remain intact when editing
+  a task and are displayed even when the provider task is unavailable.
+- **Delete project...** and **Delete task...** require confirmation and respect
+  service guards for recorded activities and children. Empty records can be
+  deleted; failed deletion preserves the record and explains the refusal.
+- New native records do not create Mylyn tasks or categories by default. The
+  user can enable Task List projection in preferences. Previously linked native
+  records and Task List-created records continue to synchronize, and refused
+  Task List deletion still restores the existing projection.
 - Creating and renaming native categories/tasks uses the application service.
   Deleting an empty native task or project now deletes its service record.
   The service refuses deletion while activities, subtasks or tasks remain;
@@ -45,15 +61,22 @@ Verified October 11, 2026 on Temurin Java 21 / macOS aarch64 with a clean build:
 ./mvnw -B -ntp clean verify -Dtycho.localArtifacts=ignore
 ```
 
-The database/report suites cover an edited standalone interval with labels,
-close/reopen equality, both bundled HTML templates and unassigned tasks. SWTBot
-exercises native project/task creation, rename and deletion in Task List, plus
-activity creation, validation, stale-save refusal, editing, CSV export, start,
-stop and deletion with the Mylyn synchronizer stopped and no projected task.
-Summary-only edits preserve sub-minute timestamp precision. A separate integration case verifies that Mylyn reuses a service-started
+The database/report suites cover edited standalone projects, tasks and intervals
+with labels, close/reopen equality, both bundled HTML templates and unassigned
+tasks. SWTBot exercises project, task, subtask and completed activity creation
+through Workweek with the production synchronizer running, while asserting that
+no Mylyn category or task is created. It also checks rename, task URLs, project
+and parent changes, unassigned tasks, validation, stale project/task saves,
+guarded deletion and CSV export. Separate activity coverage checks editing,
+stale saves, start/stop, labels and deletion without a Mylyn projection.
+An unavailable external provider case verifies that task edits retain external
+references, identity and recorded history. Optional Task List integration
+retains native CRUD, hierarchy and project/parent move coverage, including a
+new native ancestor for an already projected child when projection is off.
+Summary-only edits preserve sub-minute timestamp precision. A separate case verifies that Mylyn reuses a service-started
 activity and preserves edited times and summary on deactivation.
 
-All 80 database/report tests and 16 Eclipse UI tests passed. The build also
+All 80 database/report tests and 18 Eclipse UI tests passed. The build also
 assembled the p2 update site and installation archive.
 
 The first Linux PR build failed before tests during dependency collection after
@@ -69,10 +92,10 @@ regressions remain active. Temporary synthetic storage is used throughout.
 
 ## Remaining architectural scope
 
-The project/task editing surface follows #225. The older acceptance wording in
-#213 about creating projects/tasks without a Mylyn UI object needs to be
-reconciled with that chosen design before closing the issue. #214 retains the
-optional Mylyn adapter and full activation/idle-path extraction. #220 retains
+#213's native creation and editing workflow is implemented. #214 retains the
+optional adapter bundle and full activation/idle-path extraction, including
+removing mandatory Mylyn bundle dependencies from persistence and the base UI.
+#220 retains
 remote client execution, cancellation and network error behavior. This change
 uses the embedded client service; cross-platform CI provides separate evidence
 from the local macOS run. The dependency Error Log release blocker in

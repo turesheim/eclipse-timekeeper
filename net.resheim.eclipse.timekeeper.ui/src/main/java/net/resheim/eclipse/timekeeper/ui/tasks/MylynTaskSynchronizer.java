@@ -23,6 +23,8 @@ import java.util.UUID;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.preferences.InstanceScope;
+import org.eclipse.jface.util.IPropertyChangeListener;
+import org.eclipse.jface.util.PropertyChangeEvent;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTaskCategory;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTaskContainer;
@@ -51,14 +53,15 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
 import net.resheim.eclipse.timekeeper.service.TimekeeperService;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
+import net.resheim.eclipse.timekeeper.ui.preferences.PreferenceConstants;
 
 /**
  * Keeps the embedded Eclipse task list and the provider-neutral Timekeeper model
- * aligned. Mylyn remains the editing UI: a Timekeeper project is represented by
- * a task category and an unconnected Timekeeper task by a Mylyn local task.
+ * aligned for existing projections. New standalone records are projected only
+ * when the user enables Task List integration; native editing does not need Mylyn objects.
  */
 @SuppressWarnings("restriction")
-public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITaskListChangeListener {
+public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITaskListChangeListener, IPropertyChangeListener {
 	private static final String PROJECT_HANDLE_PREFIX = "timekeeper-project-";
 	private static final String PROJECT_MAPPING_PREFIX = "mylyn-project-";
 
@@ -73,6 +76,7 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 	private final Set<ProjectId> deletedProjects = new HashSet<>();
 	private Set<TaskId> knownBackendTasks = Set.of();
 	private Set<ProjectId> knownBackendProjects = Set.of();
+	private Set<TaskId> knownProjectedTasks = Set.of();
 	private boolean scheduled;
 	private boolean mylynDirty = true;
 	private boolean backendDirty = true;
@@ -85,16 +89,24 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 	}
 
 	public void start() {
+		if (running) return;
 		running = true;
+		TimekeeperUiPlugin.getDefault().getPreferenceStore().addPropertyChangeListener(this);
 		taskList.addChangeListener(this);
 		TimekeeperPlugin.getDefault().addListener(this);
 		schedule(true, true);
 	}
 
 	public void stop() {
+		if (!running) return;
 		running = false;
+		TimekeeperUiPlugin.getDefault().getPreferenceStore().removePropertyChangeListener(this);
 		TimekeeperPlugin.getDefault().removeListener(this);
 		taskList.removeChangeListener(this);
+	}
+
+	@Override public void propertyChange(PropertyChangeEvent event) {
+		if (event.getProperty().equals(PreferenceConstants.PROJECT_NATIVE_TASKS)) schedule(false, true);
 	}
 
 	@Override
@@ -258,22 +270,38 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 			});
 		}
 
+		Map<TaskId, AbstractTask> mylynTasks = indexedMylynTasks();
+		boolean includeNew = TimekeeperUiPlugin.getDefault().getPreferenceStore().getBoolean(PreferenceConstants.PROJECT_NATIVE_TASKS);
+		Set<TaskId> projected = domainTasks.values().stream().filter(this::isLocalTask)
+				.filter(task -> includeNew || mylynTasks.containsKey(task.id()) || knownProjectedTasks.contains(task.id())
+						|| task.externalReferences().stream().anyMatch(reference -> TimekeeperPlugin.KIND_LOCAL.equals(reference.providerId())))
+				.map(Task::id).collect(java.util.stream.Collectors.toSet());
+		// A projected child needs its native ancestors to preserve the actual hierarchy.
+		for (TaskId id : List.copyOf(projected)) {
+			Task current = domainTasks.get(id);
+			Set<TaskId> visited = new HashSet<>();
+			while (current != null && current.parentTaskId().isPresent() && visited.add(current.id())) {
+				TaskId parentId = current.parentTaskId().orElseThrow();
+				projected.add(parentId);
+				current = domainTasks.get(parentId);
+			}
+		}
 		Set<ProjectId> nativeProjects = new HashSet<>();
-		TimekeeperPlugin.getProjects().map(net.resheim.eclipse.timekeeper.db.model.Project::getServiceId)
-				.filter(java.util.Objects::nonNull).map(UUID::fromString).map(ProjectId::new)
-				.forEach(nativeProjects::add);
-		domainTasks.values().stream().filter(this::isLocalTask).map(Task::projectId)
+		if (includeNew) TimekeeperPlugin.getProjects().map(net.resheim.eclipse.timekeeper.db.model.Project::getServiceId)
+				.filter(java.util.Objects::nonNull).map(UUID::fromString).map(ProjectId::new).forEach(nativeProjects::add);
+		service.projects().stream().filter(project -> mappings.get(mappingKey(project.id()), null) != null)
+				.map(Project::id).forEach(nativeProjects::add);
+		domainTasks.values().stream().filter(task -> projected.contains(task.id())).map(Task::projectId)
 				.flatMap(Optional::stream).forEach(nativeProjects::add);
 		Map<ProjectId, AbstractTaskCategory> categories = new HashMap<>();
 		for (Project project : service.projects()) {
 			if (nativeProjects.contains(project.id())) categories.put(project.id(), ensureCategory(project));
 		}
 
-		Map<TaskId, AbstractTask> mylynTasks = indexedMylynTasks();
 		List<Task> ordered = new ArrayList<>(domainTasks.values());
 		ordered.sort(Comparator.comparingInt(task -> depth(task, domainTasks)));
 		for (Task task : ordered) {
-			if (!isLocalTask(task)) continue;
+			if (!projected.contains(task.id())) continue;
 			AbstractTask mylynTask = mylynTasks.get(task.id());
 			if (mylynTask == null) {
 				mylynTask = findByReference(task).orElse(null);
@@ -287,17 +315,13 @@ public final class MylynTaskSynchronizer implements DatabaseChangeListener, ITas
 			AbstractTaskContainer parent = task.parentTaskId().map(mylynTasks::get)
 					.<AbstractTaskContainer>map(value -> value)
 					.orElseGet(() -> task.projectId().map(categories::get).orElse(null));
-			if (taskList.getTask(mylynTask.getRepositoryUrl(), mylynTask.getTaskId()) == null) {
-				taskList.addTask(mylynTask, parent);
-			} else if (parent != null && !mylynTask.getParentContainers().contains(parent)) {
-				taskList.addTask(mylynTask, parent);
-			} else {
-				taskList.notifyElementChanged(mylynTask);
-			}
+			// A null parent moves a local task to Mylyn's unmatched container as well.
+			if (!taskList.addTask(mylynTask, parent)) taskList.notifyElementChanged(mylynTask);
 			mylynTasks.put(task.id(), mylynTask);
 		}
 		knownBackendTasks = Set.copyOf(domainTasks.keySet());
 		knownBackendProjects = Set.copyOf(projectIds);
+		knownProjectedTasks = Set.copyOf(mylynTasks.keySet());
 	}
 
 	private boolean isLocalTask(Task task) {

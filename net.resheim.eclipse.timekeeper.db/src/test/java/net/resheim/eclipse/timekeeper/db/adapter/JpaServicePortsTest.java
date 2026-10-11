@@ -90,8 +90,12 @@ class JpaServicePortsTest {
 	void editedStandaloneIntervalsSurviveRestartAndRenderThroughTheService() throws Exception {
 		manager = DatabaseStartup.open(url("edited-intervals"));
 		TimekeeperService service = service(new ArrayList<>());
-		var project = service.createProject(new CreateProject("Independent reporting"));
-		var task = service.createTask(new CreateTask(Optional.of(project.id()), "Unlinked report task", Optional.empty()));
+		var project = service.createProject(new CreateProject("Original project"));
+		project = service.updateProject(new net.resheim.eclipse.timekeeper.service.Commands.UpdateProject(
+				project.id(), project.version(), "Independent reporting"));
+		var task = service.createTask(new CreateTask(Optional.of(project.id()), "Original task", Optional.empty()));
+		task = service.updateTask(new UpdateTask(task.id(), task.version(), task.projectId(),
+				"Unlinked report task", Optional.of("https://example.test/renamed")));
 		var label = service.createLabel(new CreateLabel("Recorded work", Optional.of("64,128,192")));
 		Instant start = Instant.parse("2026-09-22T09:00:00Z");
 		var activity = service.createActivity(new CreateActivity(task.id(), OwnerId.LOCAL, start,
@@ -102,10 +106,14 @@ class JpaServicePortsTest {
 		var unassigned = service.createTask(new CreateTask(Optional.empty(), "Unassigned report task", Optional.empty()));
 		service.createActivity(new CreateActivity(unassigned.id(), OwnerId.LOCAL, start,
 				Optional.of(start.plusSeconds(600)), "Unassigned work", Set.of()));
+		// Creating an activity can advance its task's optimistic version.
+		task = service.task(task.id()).orElseThrow();
 		DatabaseStartup.close(manager);
 		manager = DatabaseStartup.open(url("edited-intervals") + ";IFEXISTS=TRUE");
 		service = service(new ArrayList<>());
 		assertEquals(activity, service.activity(activity.id()).orElseThrow());
+		assertEquals(project, service.project(project.id()).orElseThrow());
+		assertEquals(task, service.task(task.id()).orElseThrow());
 		assertTrue(service.task(task.id()).orElseThrow().externalReferences().isEmpty());
 		for (String name : List.of("Basic HTML", "Default HTML")) {
 			String code = java.nio.file.Files.readString(Path.of("templates", name + ".html"));
