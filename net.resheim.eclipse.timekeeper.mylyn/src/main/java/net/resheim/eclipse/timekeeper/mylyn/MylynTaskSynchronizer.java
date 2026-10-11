@@ -77,6 +77,7 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 	private Set<ProjectId> knownBackendProjects = Set.of();
 	private Set<TaskId> knownProjectedTasks = Set.of();
 	private boolean scheduled;
+	private boolean backendAvailable;
 	private final Runnable backendPoll = this::pollBackend;
 	private boolean mylynDirty = true;
 	private boolean backendDirty = true;
@@ -93,10 +94,14 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 		if (running)
 			return;
 		running = true;
+		backendAvailable = false;
+		mylynDirty = true;
+		backendDirty = true;
 		TimekeeperUiPlugin.getDefault().getPreferenceStore().addPropertyChangeListener(this);
 		taskList.addChangeListener(this);
 		display.timerExec(1000, backendPoll);
-		schedule(true, true);
+		// The embedded database (or a remote client) may still be connecting.
+		// Keep the initial dirty flags until a successful client read.
 	}
 
 	public void stop() {
@@ -143,7 +148,7 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 
 	private void reconcile() {
 		scheduled = false;
-		if (!running || display.isDisposed())
+		if (!running || display.isDisposed() || !backendAvailable)
 			return;
 		boolean importMylyn = mylynDirty;
 		boolean exportBackend = backendDirty;
@@ -185,12 +190,14 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 		try {
 			var tasks = service.tasks();
 			var projects = service.projects();
+			backendAvailable = true;
 			if (mylynDirty || backendDirty || !tasks.equals(lastTasks) || !projects.equals(lastProjects)) {
 				lastTasks = tasks;
 				lastProjects = projects;
 				schedule(false, true);
 			}
 		} catch (RuntimeException unavailable) {
+			backendAvailable = false;
 			// The client may be temporarily disconnected; retry on the next poll.
 		} finally {
 			if (running && !display.isDisposed())

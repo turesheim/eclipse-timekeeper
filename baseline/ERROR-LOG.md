@@ -4,6 +4,23 @@ Reviewed September 22, 2026 against Eclipse Platform 4.41, Mylyn 4.12,
 Temurin 21.0.12.1 and macOS aarch64. The current `main` commit was
 `6f0cf237a15a8271fa578892521c18183dac9558`.
 
+## October 11 installed-package recheck
+
+The Mylyn theme-parser finding was reproduced in a fresh Eclipse Platform
+4.41 / Java 21 installation with Mylyn 4.12, Timekeeper's optional integration
+and JiraConnector `6.0.0.202605160149`. Opening Task List logged the same
+`NumberFormatException` in `E4ThemeColor.getRGBFromCssString`, called by
+`GradientToolTip` during `TaskListToolTip` creation. The clean workspace log is
+retained locally at
+`/private/tmp/timekeeper-2-release-runtime/jira/workspace/.metadata/.log`.
+It remains an open dependency-error acceptance gate for the optional
+integration; successful p2 resolution and automated tests do not close it.
+
+The base feature installed and opened Workweek without Mylyn. The optional
+installation additionally exposed headless service activation and a connecting
+client synchronization warning; the corrections and regression evidence are
+recorded in [HEADLESS-PROVISIONING.md](HEADLESS-PROVISIONING.md).
+
 ## Evidence
 
 - All retained installed-IDE logs under

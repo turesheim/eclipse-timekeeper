@@ -20,6 +20,7 @@ import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.domain.OwnerId;
 import net.resheim.eclipse.timekeeper.mylyn.MylynIntegration;
 import net.resheim.eclipse.timekeeper.mylyn.MylynMetadata;
+import net.resheim.eclipse.timekeeper.mylyn.MylynTaskSynchronizer;
 import net.resheim.eclipse.timekeeper.service.Commands.*;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
@@ -30,6 +31,79 @@ import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
  */
 @SuppressWarnings("restriction")
 public class MylynAdapterTest {
+	@Test
+	public void synchronizationWaitsForConnectingClientAndResumesWithoutWarning() throws Exception {
+		var bot = new SWTWorkbenchBot();
+		bot.waitUntil(new DefaultCondition() {
+			@Override public boolean test() { return TimekeeperPlugin.getDefault().isReady(); }
+			@Override public String getFailureMessage() { return "Database not ready"; }
+		});
+		var plugin = TimekeeperUiPlugin.getDefault();
+		var service = plugin.getTimekeeperService();
+		var original = MylynIntegration.getDefault().synchronizer();
+		var available = new java.util.concurrent.atomic.AtomicBoolean();
+		var attempts = new java.util.concurrent.atomic.AtomicInteger();
+		var warnings = new java.util.concurrent.CopyOnWriteArrayList<org.eclipse.core.runtime.IStatus>();
+		org.eclipse.core.runtime.ILogListener listener = (status, bundle) -> {
+			if (status.getPlugin().equals(MylynIntegration.PLUGIN_ID)
+					&& status.getMessage().contains("Could not synchronize Mylyn"))
+				warnings.add(status);
+		};
+		var connecting = (net.resheim.eclipse.timekeeper.service.TimekeeperService) java.lang.reflect.Proxy
+				.newProxyInstance(service.getClass().getClassLoader(),
+						new Class<?>[] { net.resheim.eclipse.timekeeper.service.TimekeeperService.class },
+						(proxy, method, args) -> {
+							if (!available.get()) {
+								attempts.incrementAndGet();
+								throw net.resheim.eclipse.timekeeper.service.ServiceException.conflict("database",
+										"Timekeeper database is not ready");
+							}
+							try {
+								return method.invoke(service, args);
+							} catch (java.lang.reflect.InvocationTargetException failure) {
+								throw failure.getCause();
+							}
+						});
+		MylynTaskSynchronizer[] probe = new MylynTaskSynchronizer[1];
+		boolean[] previous = new boolean[1];
+		onUi(original::stop);
+		var task = service.createTask(new CreateTask(Optional.empty(), "Available after connecting", Optional.empty()));
+		org.eclipse.core.runtime.Platform.addLogListener(listener);
+		try {
+			onUi(() -> {
+				var preferences = plugin.getPreferenceStore();
+				String key = net.resheim.eclipse.timekeeper.ui.preferences.PreferenceConstants.PROJECT_NATIVE_TASKS;
+				previous[0] = preferences.getBoolean(key);
+				preferences.setValue(key, true);
+				probe[0] = new MylynTaskSynchronizer(connecting, PlatformUI.getWorkbench().getDisplay());
+				probe[0].start();
+			});
+			bot.waitUntil(new DefaultCondition() {
+				@Override public boolean test() { return attempts.get() > 0; }
+				@Override public String getFailureMessage() { return "Client was not polled"; }
+			});
+			assertTrue("Connecting is an expected state", warnings.isEmpty());
+			assertTrue("No projection before the client connects", MylynIntegration.getDefault().linked(task).isEmpty());
+			available.set(true);
+			bot.waitUntil(new DefaultCondition() {
+				@Override public boolean test() {
+					return MylynIntegration.getDefault().linked(task).isPresent();
+				}
+				@Override public String getFailureMessage() { return "Synchronization did not resume"; }
+			});
+			assertTrue(warnings.isEmpty());
+		} finally {
+			onUi(() -> {
+				if (probe[0] != null) probe[0].stop();
+				plugin.getPreferenceStore().setValue(
+						net.resheim.eclipse.timekeeper.ui.preferences.PreferenceConstants.PROJECT_NATIVE_TASKS, previous[0]);
+				original.start();
+			});
+			org.eclipse.core.runtime.Platform.removeLogListener(listener);
+			service.task(task.id()).ifPresent(current -> service.deleteTask(new DeleteTask(current.id(), current.version())));
+		}
+	}
+
 	@Test
 	public void reconnectReusesNativeIdentityAndPreservesHistory() throws Exception {
 		var bot = new SWTWorkbenchBot();
