@@ -42,7 +42,7 @@ activity and reporting surface.
 Verified October 11, 2026 on Temurin Java 21 / macOS aarch64 with a clean build:
 
 ```sh
-mvn -B -ntp clean verify -Dtycho.localArtifacts=ignore
+./mvnw -B -ntp clean verify -Dtycho.localArtifacts=ignore
 ```
 
 The database/report suites cover an edited standalone interval with labels,
@@ -55,6 +55,14 @@ activity and preserves edited times and summary on deactivation.
 
 All 80 database/report tests and 16 Eclipse UI tests passed. The build also
 assembled the p2 update site and installation archive.
+
+The first Linux PR build failed before tests during dependency collection after
+the runner image upgraded Maven to 3.10.0. Reproducing locally with 3.10.0 and
+`-e` identified the rejected Tycho 5.0.4 nested-JAR classifiers
+`lib/h2-2.5.250.jar` and `lib/freemarker-2.3.35.jar`. The Apache Maven wrapper pins
+3.9.16 for all CI jobs and local builds, with a distribution SHA-256 checksum.
+The Maven version rule refuses 3.10 and later with instructions to use the
+wrapper until that compatibility issue is resolved.
 
 The existing database safety, hierarchy, reporting, preference, idle and UI
 regressions remain active. Temporary synthetic storage is used throughout.
