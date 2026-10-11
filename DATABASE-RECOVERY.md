@@ -1,6 +1,6 @@
 # Database baseline, backups and future migrations
 
-The Eclipse 2026-09 upgrade establishes **H2 2.5.250, schema version 1** as the
+Timekeeper 2.0 establishes **H2 2.5.250, schema version 2** as the
 supported baseline. Historical H2 databases, unversioned databases, and Mylyn
 attribute storage are not migration inputs. The maintainer removed historical
 migration support because there are no users depending on those formats.
@@ -23,8 +23,8 @@ plugin does not rewrite stored JDBC URLs or silently switch to another database.
 
 ## Backing up and restoring the current baseline
 
-1. Deactivate active tasks, then stop every Eclipse instance and H2 server using
-   the database. Copy the closed `.mv.db` file into independent backup storage.
+1. Stop open activities in Workweek, then stop every Eclipse instance and H2
+   server using the database. Copy the closed `.mv.db` file into independent backup storage.
    Keep the original location, JDBC URL and matching plugin/H2 version recorded.
    Never copy an open database file.
 2. To test a backup, copy it to a **new** directory. Use the same H2 2.5.250
@@ -35,14 +35,17 @@ plugin does not rewrite stored JDBC URLs or silently switch to another database.
    configuration. Keep work added since the backup separate: it is not merged.
 
 Closed-file copy, restart and SQL export/restore have automated synthetic
-coverage. The obsolete CSV import/export path is **not** a database backup or
-rollback mechanism. Installed-IDE acceptance remains in the upgrade plan.
+coverage. Current-schema CSV import/export is a convenience interchange format,
+**not** a database backup, historical migration or rollback mechanism. It covers
+projects, tasks, activities, labels, external references and their relationships;
+it does not replace the closed-file backup procedure above. Installed-IDE
+acceptance remains in the upgrade plan.
 
 ## Infrastructure retained for future migrations
 
 `DatabaseVersion` records a singleton schema `VERSION`, `STATE` and `ORIGIN`.
-Version 1 is the starting point for future supported migrations, not a claim of
-compatibility with old experimental version-1 files.
+Version 2 is the current starting point for future supported migrations. Earlier
+experimental version-1 files are unsupported and are not upgraded automatically.
 
 - New database: `CREATING / NEW` → `READY / NEW` after schema verification.
 - Future migration target: `CREATING / MIGRATION` → `MIGRATING / MIGRATION`

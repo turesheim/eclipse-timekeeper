@@ -133,9 +133,10 @@ not three independent unique constraints.
 
 ## Eclipse and Mylyn projection
 
-The Mylyn representation is a projection of this model and does not add tables
-to the schema. When Timekeeper runs inside Eclipse, the synchronizer applies the
-following mapping:
+The optional Mylyn representation is a projection of this model and does not
+add tables to the schema. Native projects and tasks can be managed directly in
+Workweek without Mylyn. With Timekeeper Mylyn integration installed, the
+synchronizer applies the following mapping:
 
 | Timekeeper model | Mylyn Task List | Stable mapping |
 | --- | --- | --- |
@@ -146,9 +147,10 @@ following mapping:
 A Mylyn local task is the Eclipse form of a native Timekeeper task, not an
 external task reference. It therefore needs no task-repository connector and no
 row in `EXTERNAL_TASK_REFERENCE`. Changes made with the normal Mylyn category
-and local-task commands are written through `TimekeeperService`; backend-created
-projects and native tasks are projected back into the Task List. The Workweek
-view consumes activities and totals and is not a second project/task editor.
+and local-task commands are written through `TimekeeperService`. New native
+projects and tasks are projected into Task List when the corresponding
+preference is enabled; existing projections continue to synchronize when it is
+disabled. Workweek provides native project, task and activity editing directly.
 
 Connector-backed Mylyn tasks continue to use `EXTERNAL_TASK_REFERENCE`, keyed
 by connector kind, repository and provider task ID. The stable native task UUID
