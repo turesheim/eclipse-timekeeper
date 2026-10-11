@@ -53,6 +53,23 @@ class JpaServicePortsTest {
 	}
 
 	@Test
+	void createsTaskAndExternalIdentityInOneCommitWithoutOrphansOnCollision() throws Exception {
+		manager = DatabaseStartup.open(url("external-create"));
+		var events = new ArrayList<TimekeeperEvent>();
+		var service = service(events);
+		var reference = new ExternalTaskReference("jira", "https://jira.example", "TK-214", Optional.empty());
+		var command = new CreateTask(Optional.empty(), Optional.empty(), "Imported task", Optional.empty(), Set.of(reference));
+		var task = service.createTask(command);
+		assertEquals(task, service.findTask(reference.key()).orElseThrow());
+		assertThrows(ServiceException.class, () -> service.createTask(command));
+		assertEquals(List.of(task), service.tasks());
+		assertEquals(1, events.size());
+		DatabaseStartup.close(manager);
+		manager = DatabaseStartup.open(url("external-create"));
+		assertEquals(task, service(new ArrayList<>()).findTask(reference.key()).orElseThrow());
+	}
+
+	@Test
 	void persistsTheServiceModelAtomicallyAndKeepsIdentityAcrossRestart() throws Exception {
 		manager = DatabaseStartup.open(url("service"));
 		var events = new ArrayList<TimekeeperEvent>();

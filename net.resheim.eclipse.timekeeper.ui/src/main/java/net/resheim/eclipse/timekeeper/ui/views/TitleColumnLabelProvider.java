@@ -11,10 +11,6 @@
 
 package net.resheim.eclipse.timekeeper.ui.views;
 
-import org.eclipse.mylyn.commons.ui.CommonImages;
-import org.eclipse.mylyn.tasks.core.ITask;
-import org.eclipse.mylyn.tasks.ui.TaskElementLabelProvider;
-import org.eclipse.mylyn.tasks.ui.TasksUiImages;
 import org.eclipse.swt.graphics.Image;
 
 import net.resheim.eclipse.timekeeper.domain.Activity;
@@ -31,7 +27,6 @@ class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 		super(contentProvider);
 	}
 
-	private final TaskElementLabelProvider mylynLabels = new TaskElementLabelProvider();
 
 	@Override
 	public Image getImage(Object element) {
@@ -39,18 +34,17 @@ class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 			return TimekeeperUiPlugin.getDefault().getImageRegistry().get(TimekeeperUiPlugin.OBJ_ACTIVITY);
 		}
 		if (element instanceof Project) {
-			return CommonImages.getImage(TasksUiImages.CATEGORY);
+			return org.eclipse.ui.PlatformUI.getWorkbench().getSharedImages().getImage(org.eclipse.ui.ISharedImages.IMG_OBJ_FOLDER);
 		}
 		if (element instanceof Task) {
-			ITask linked = WorkWeekView.mylynTask((Task) element);
-			return linked == null ? CommonImages.getImage(TasksUiImages.TASK) : mylynLabels.getImage(linked);
+			return TimekeeperUiPlugin.getDefault().getTaskIntegration().map(value -> value.image((Task) element))
+					.orElseGet(() -> org.eclipse.ui.PlatformUI.getWorkbench().getSharedImages().getImage(org.eclipse.ui.ISharedImages.IMG_OBJ_FILE));
 		}
 		return null;
 	}
 
 	@Override
 	public void dispose() {
-		mylynLabels.dispose();
 		super.dispose();
 	}
 
@@ -80,7 +74,7 @@ class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 			if (task.externalReferences().isEmpty()) return "Native Timekeeper task";
 			String references = task.externalReferences().stream().map(reference -> reference.providerId()
 					+ ": " + reference.externalId()).sorted().collect(java.util.stream.Collectors.joining("\n"));
-			return WorkWeekView.mylynTask(task) == null ? references + "\nNo linked Mylyn task is available." : references;
+			return TimekeeperUiPlugin.getDefault().getTaskIntegration().filter(value -> value.isLinked(task)).isEmpty() ? references + "\nNo linked external task is available." : references;
 		}
 		if (element instanceof Activity) {
 			Activity activity = (Activity) element;

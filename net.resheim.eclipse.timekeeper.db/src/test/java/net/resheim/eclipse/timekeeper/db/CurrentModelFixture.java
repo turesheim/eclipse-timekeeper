@@ -118,7 +118,6 @@ final class CurrentModelFixture {
 		}
 		for (Task task : tasks) {
 			assertNotNull(task.getId());
-			assertNull(task.getMylynTask(), "Reports must not require a Mylyn link");
 			assertNotNull(task.getProject());
 			assertTrue(task.getProject().getTasks().contains(task));
 			assertEquals(1, task.getExternalReferences().size());

@@ -29,9 +29,8 @@ import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.jface.resource.ImageRegistry;
 import org.eclipse.jface.util.IPropertyChangeListener;
 import org.eclipse.jface.util.PropertyChangeEvent;
-import org.eclipse.mylyn.tasks.core.ITask;
-import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.SWTException;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
@@ -43,8 +42,12 @@ import org.osgi.framework.BundleContext;
 import org.osgi.util.tracker.ServiceTracker;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.model.Activity;
-import net.resheim.eclipse.timekeeper.db.model.Task;
+import net.resheim.eclipse.timekeeper.domain.Activity;
+import net.resheim.eclipse.timekeeper.domain.OwnerId;
+import net.resheim.eclipse.timekeeper.domain.ActivityId;
+import net.resheim.eclipse.timekeeper.service.Commands.StartActivity;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateActivity;
+import net.resheim.eclipse.timekeeper.ui.tasks.TaskIntegration;
 import net.resheim.eclipse.timekeeper.internal.idle.GenericIdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.IdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.MacIdleTimeDetector;
@@ -52,7 +55,6 @@ import net.resheim.eclipse.timekeeper.internal.idle.WindowsIdleTimeDetector;
 import net.resheim.eclipse.timekeeper.internal.idle.X11IdleTimeDetector;
 import net.resheim.eclipse.timekeeper.service.TimekeeperService;
 import net.resheim.eclipse.timekeeper.ui.preferences.PreferenceConstants;
-import net.resheim.eclipse.timekeeper.ui.tasks.MylynTaskSynchronizer;
 
 @SuppressWarnings("restriction")
 public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyChangeListener {
@@ -61,14 +63,16 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	public static final String IMG_TOOL_CURRENT = "IMG_TOOL_CURRENT";
 
 	/**
-	 * Previous value of the number of milliseconds the system has been
-	 * considered idle.
+	 * Previous value of the number of milliseconds the system has been considered
+	 * idle.
 	 */
 	private static long lastIdleTimeMillis;
 
 	private static TimekeeperUiPlugin plugin;
 	private ServiceTracker<TimekeeperService, TimekeeperService> serviceTracker;
-	private MylynTaskSynchronizer mylynTaskSynchronizer;
+	private ServiceTracker<TaskIntegration, TaskIntegration> integrationTracker;
+	private Timer timer;
+	private ActivityId sampledActivity;
 
 	public static final String PLUGIN_ID = "net.resheim.eclipse.timekeeper.ui"; //$NON-NLS-1$
 
@@ -77,7 +81,9 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	 */
 	private static final int SHORT_INTERVAL = 1000;
 
-	/** Embedded-mode policy: calendar reports and editing use the Eclipse host zone. */
+	/**
+	 * Embedded-mode policy: calendar reports and editing use the Eclipse host zone.
+	 */
 	private static final ZoneId CALENDAR_ZONE = ZoneId.systemDefault();
 
 	public static ZoneId getCalendarZone() {
@@ -85,8 +91,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	}
 
 	private static String formatInstant(Instant instant) {
-		return DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US)
-				.withZone(CALENDAR_ZONE).format(instant);
+		return DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US).withZone(CALENDAR_ZONE).format(instant);
 	}
 
 	/**
@@ -98,11 +103,25 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 		return plugin;
 	}
 
-	/** Returns the persistence-neutral application service registered by the embedded adapter. */
+	/**
+	 * Returns the persistence-neutral application service registered by the
+	 * embedded adapter.
+	 */
 	public TimekeeperService getTimekeeperService() {
 		TimekeeperService service = serviceTracker == null ? null : serviceTracker.getService();
-		if (service == null) throw new IllegalStateException("Timekeeper service is not available");
+		if (service == null)
+			throw new IllegalStateException("Timekeeper service is not available");
 		return service;
+	}
+
+	public Optional<TaskIntegration> getTaskIntegration() {
+		return Optional.ofNullable(integrationTracker == null ? null : integrationTracker.getService());
+	}
+
+	private Optional<Activity> activeActivity() {
+		if (!TimekeeperPlugin.getDefault().isReady())
+			return Optional.empty();
+		return getTimekeeperService().activeActivity(OwnerId.LOCAL);
 	}
 
 	@Override
@@ -127,19 +146,19 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	protected Instant lastActiveTime;
 
 	/**
-	 * The number of milliseconds before user is considered idle. Controlled by
-	 * a preference setting.
+	 * The number of milliseconds before user is considered idle. Controlled by a
+	 * preference setting.
 	 */
 	private static long consideredIdleThreshold;
 
 	/**
-	 * The number of milliseconds before user is considered away. Controlled by
-	 * a preference setting.
+	 * The number of milliseconds before user is considered away. Controlled by a
+	 * preference setting.
 	 */
 	private static long afkInterval;
 
 	/**
-	 * Deactivate active Mylyn task when the user is considered away. Controlled
+	 * Stop tracking and deactivate the optional external task when away. Controlled
 	 * by a preference setting.
 	 */
 	private static boolean afkDeactivate;
@@ -151,8 +170,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	 * Returns a list of weekday names and dates, using the default locale to
 	 * determine the first day of the week (Sunday or Monday).
 	 *
-	 * @param date
-	 *            starting date
+	 * @param date starting date
 	 * @return an array with weekday names and dates
 	 */
 	public String[] getHeadings(LocalDate date) {
@@ -170,8 +188,8 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	}
 
 	/**
-	 * Must be called by the UI-thread. Handles that the session has been idle
-	 * and just reactivated.
+	 * Must be called by the UI-thread. Handles that the session has been idle and
+	 * just reactivated.
 	 *
 	 * @param idleTimeMillis
 	 */
@@ -182,110 +200,73 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 		}
 		synchronized (this) {
 			if (idleTimeMillis < lastIdleTimeMillis && lastIdleTimeMillis > consideredIdleThreshold) {
-				// If we have an active task
-				ITask task = TasksUi.getTaskActivityManager().getActiveTask();
-				Task ttask = TimekeeperPlugin.getDefault().getTask(task);
-				// and we have recorded a starting point
-				if (task != null && ttask != null && ttask.getCurrentActivity().isPresent()) {
-					dialogIsOpen = true;
-					Instant lastActive = ttask.getTick();
-					if (lastActive == null) {
-						// A newly started activity may precede the first idle sample.
-						dialogIsOpen = false;
-						return;
-					}
-
-					// If the user have been idle, but not long enough to be
-					// considered AFK we will ask whether or not to add the
-					// idle time to the total.
+				var active = activeActivity();
+				if (active.isEmpty() || lastActiveTime == null || !active.get().id().equals(sampledActivity))
+					return;
+				Activity activity = active.orElseThrow();
+				Instant lastActive = lastActiveTime.isBefore(activity.start()) ? activity.start() : lastActiveTime;
+				dialogIsOpen = true;
+				try {
 					if (lastIdleTimeMillis < afkInterval) {
 						String time = DurationFormatUtils.formatDuration(lastIdleTimeMillis, "H:mm:ss", true);
-						StringBuilder sb = new StringBuilder();
-						if (task.getTaskKey() != null) {
-							sb.append(task.getTaskKey());
-							sb.append(": ");
-						}
-						sb.append(task.getSummary());
 						MessageDialog md = new MessageDialog(Display.getCurrent().getActiveShell(),
 								"Disregard idle time?", null,
 								MessageFormat.format(
 										"The computer has been idle since {0}, more than {1}. Stop current activity and set end time to last active time? A new activity will be started from now.",
-										formatInstant(lastActive),
-										time),
+										formatInstant(lastActive), time),
 								MessageDialog.QUESTION, new String[] { "No", "Yes" }, 1);
-						int open = md.open();
-						dialogIsOpen = false;
-						if (open == 1) {
-							// set time to the last activity detected
-							ttask.endActivity(lastActive);
-							// and create a new activity
-							ttask.startActivity();
+						if (md.open() == 1) {
+							closeIdleActivity(activity, lastActive);
+							getTimekeeperService().startActivity(
+									new StartActivity(activity.taskId(), activity.ownerId(), "", java.util.Set.of()));
 						}
 					} else {
-						// If the user has been idle long enough to be
-						// considered away, the idle time will be ignored
-						ttask.endActivity(lastActive);
-						String duration = DurationFormatUtils.formatDuration(lastIdleTimeMillis, "H:mm:ss", true);
+						closeIdleActivity(activity, lastActive);
 						if (afkDeactivate) {
-							TasksUi.getTaskActivityManager().deactivateTask(ttask.getMylynTask());
+							getTaskIntegration().ifPresent(integration -> integration.deactivate(activity.taskId()));
 							MessageDialog.openInformation(Display.getCurrent().getActiveShell(),
 									"Activity automatically stopped",
 									MessageFormat.format(
 											"You have been away for too long ({0}) and tracking of the current activity was automatically ended on {1}.",
-											duration, formatInstant(lastActive)));
+											DurationFormatUtils.formatDuration(lastIdleTimeMillis, "H:mm:ss", true),
+											formatInstant(lastActive)));
+						} else {
+							getTimekeeperService().startActivity(
+									new StartActivity(activity.taskId(), activity.ownerId(), "", java.util.Set.of()));
 						}
 					}
+				} catch (net.resheim.eclipse.timekeeper.service.ServiceException failure) {
+					MessageDialog.openError(Display.getCurrent().getActiveShell(), "Could not update idle activity",
+							failure.getMessage());
+				} finally {
+					dialogIsOpen = false;
 				}
+
 			}
 		}
 	}
 
 	/**
-	 * Returns <code>true</code> if the session is considered idle. Note that if
-	 * no task is active, the session will never be considered idle.
+	 * Returns <code>true</code> if the session is considered idle. Note that if no
+	 * task is active, the session will never be considered idle.
 	 *
 	 * @return <code>true</code> if idle
 	 */
 	public boolean isIdle() {
-		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
-		if (task != null && lastActiveTime != null) {
-			return lastIdleTimeMillis > consideredIdleThreshold;
-		}
-		return false;
+		return lastActiveTime != null && activeActivity().isPresent() && lastIdleTimeMillis > consideredIdleThreshold;
 	}
 
-	/**
-	 * Returns the current active time, or <code>null</code> if a task has not
-	 * been started yet.
-	 *
-	 * @return the active time or <code>null</code>
-	 */
 	public Instant getActiveSince() {
-		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
-		if (task != null) {
-			Task trackedTask = TimekeeperPlugin.getDefault().getTask(task);
-			if (trackedTask != null) {
-				Optional<Activity> currentActivity = trackedTask.getCurrentActivity();
-				if (currentActivity.isPresent()) {
-					return currentActivity.get().getStart();
-				}
-			}
-		}
-		return null;
+		return activeActivity().map(Activity::start).orElse(null);
 	}
 
-	/**
-	 * Returns the estimated time the user stopped activty, or <code>null</code>
-	 * if a task has not been started.
-	 *
-	 * @return the estimated time when user stopped activity
-	 */
 	public Instant getIdleSince() {
-		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
-		if (task != null && lastActiveTime != null) {
-			return lastActiveTime.minusMillis(consideredIdleThreshold);
-		}
-		return null;
+		return activeActivity().isPresent() && lastActiveTime != null ? lastActiveTime : null;
+	}
+
+	private void closeIdleActivity(Activity activity, Instant lastActive) {
+		getTimekeeperService().updateActivity(new UpdateActivity(activity.id(), activity.version(), activity.start(),
+				Optional.of(lastActive), activity.summary(), activity.labelIds()));
 	}
 
 	private void installTaxameter() {
@@ -313,27 +294,41 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 			detector = new GenericIdleTimeDetector();
 		}
 
-		Timer timer = new Timer("Timekeeper", true);
+		final Display display = PlatformUI.getWorkbench().getDisplay();
+		timer = new Timer("Timekeeper", true);
 		timer.scheduleAtFixedRate(new TimerTask() {
 			@Override
 			public void run() {
-				if (!PlatformUI.getWorkbench().isClosing()) {
+				if (!display.isDisposed() && !PlatformUI.getWorkbench().isClosing()) {
 					long idleTimeMillis = detector.getIdleTimeMillis();
-					// get the currently active Mylyn task if any
-					ITask task = TasksUi.getTaskActivityManager().getActiveTask();
-					if (null != task) {
-						if (idleTimeMillis < lastIdleTimeMillis && lastIdleTimeMillis > consideredIdleThreshold) {
-							// has been idle for too long, but is now activated
-							Display.getDefault().syncExec(() -> handleReactivation(idleTimeMillis));
-						} else if (lastIdleTimeMillis < consideredIdleThreshold) {
-							lastActiveTime = Instant.now();
-							Task trtask = TimekeeperPlugin.getDefault().getTask(task);
-							if (trtask != null) {
-								trtask.setTick(lastActiveTime);
+					try {
+						display.asyncExec(() -> {
+							if (plugin != TimekeeperUiPlugin.this || PlatformUI.getWorkbench().isClosing())
+								return;
+							var active = activeActivity();
+							if (active.isEmpty()) {
+								sampledActivity = null;
+								lastActiveTime = null;
+								lastIdleTimeMillis = idleTimeMillis;
+								return;
 							}
-						}
+							Activity activity = active.orElseThrow();
+							if (!activity.id().equals(sampledActivity)) {
+								sampledActivity = activity.id();
+								lastActiveTime = activity.start();
+							} else if (idleTimeMillis < lastIdleTimeMillis
+									&& lastIdleTimeMillis > consideredIdleThreshold) {
+								handleReactivation(idleTimeMillis);
+							} else if (idleTimeMillis < consideredIdleThreshold) {
+								lastActiveTime = Instant.now().minusMillis(Math.max(0, idleTimeMillis));
+							}
+							lastIdleTimeMillis = idleTimeMillis;
+						});
+					} catch (SWTException shutdown) {
+						// Disposal can race the background sample's asyncExec submission.
+						if (shutdown.code != SWT.ERROR_DEVICE_DISPOSED)
+							throw shutdown;
 					}
-					lastIdleTimeMillis = idleTimeMillis;
 				}
 			}
 		}, SHORT_INTERVAL, SHORT_INTERVAL);
@@ -350,7 +345,6 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 				lastIdleTimeMillis = idleTimeMillis;
 			}
 		};
-		final Display display = PlatformUI.getWorkbench().getDisplay();
 		display.syncExec(new Runnable() {
 			@Override
 			public void run() {
@@ -366,9 +360,8 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 		plugin = this;
 		serviceTracker = new ServiceTracker<>(context, TimekeeperService.class, null);
 		serviceTracker.open();
-		mylynTaskSynchronizer = new MylynTaskSynchronizer(getTimekeeperService(),
-				PlatformUI.getWorkbench().getDisplay());
-		mylynTaskSynchronizer.start();
+		integrationTracker = new ServiceTracker<>(context, TaskIntegration.class, null);
+		integrationTracker.open();
 		consideredIdleThreshold = getPreferenceStore().getLong(PreferenceConstants.MINUTES_IDLE) * 60_000l;
 		afkInterval = getPreferenceStore().getLong(PreferenceConstants.MINUTES_AWAY) * 60_000l;
 		afkDeactivate = getPreferenceStore().getBoolean(PreferenceConstants.DEACTIVATE_WHEN_AWAY);
@@ -378,9 +371,18 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 
 	@Override
 	public void stop(BundleContext context) throws Exception {
-		if (mylynTaskSynchronizer != null) mylynTaskSynchronizer.stop();
-		mylynTaskSynchronizer = null;
-		if (serviceTracker != null) serviceTracker.close();
+		if (timer != null)
+			timer.cancel();
+		Display display = PlatformUI.getWorkbench().getDisplay();
+		if (!display.isDisposed() && reactivationListener != null)
+			display.syncExec(() -> {
+				display.removeFilter(SWT.KeyUp, reactivationListener);
+				display.removeFilter(SWT.MouseUp, reactivationListener);
+			});
+		if (integrationTracker != null)
+			integrationTracker.close();
+		if (serviceTracker != null)
+			serviceTracker.close();
 		serviceTracker = null;
 		plugin = null;
 		getPreferenceStore().removePropertyChangeListener(this);
@@ -397,15 +399,6 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 		}
 		if (event.getProperty().equals(PreferenceConstants.DEACTIVATE_WHEN_AWAY)) {
 			afkDeactivate = Boolean.parseBoolean(event.getNewValue().toString());
-		}
-	}
-
-	public static Task getActiveTrackedTask() {
-		ITask task = TasksUi.getTaskActivityManager().getActiveTask();
-		if (task != null) {
-			return TimekeeperPlugin.getDefault().getTask(task);
-		} else {
-			return null;
 		}
 	}
 

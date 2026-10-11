@@ -2,7 +2,7 @@
 
 Issue #213 provides native project, task and activity management in Workweek.
 The standard Mylyn Task List integration from #225 remains available alongside
-the native editors. Timekeeper-owned records need no Mylyn object or repository
+the native editors when the optional adapter is installed. Timekeeper-owned records need no Mylyn object or repository
 connector.
 
 ## Delivered behavior
@@ -76,8 +76,15 @@ new native ancestor for an already projected child when projection is off.
 Summary-only edits preserve sub-minute timestamp precision. A separate case verifies that Mylyn reuses a service-started
 activity and preserves edited times and summary on deactivation.
 
-All 80 database/report tests and 18 Eclipse UI tests passed. The build also
-assembled the p2 update site and installation archive.
+The #213 build passed 80 database/report tests and 18 Eclipse UI tests.
+The #214 adapter split adds a separate Eclipse runtime with no Mylyn bundles;
+it runs the same native CRUD and unavailable-provider scenarios plus idle-return,
+away-policy and optimistic-conflict tests. The adapter runtime also verifies
+external-key reconnection and duplicate/late activation events. The clean #214
+build passed 116 tests: 3 domain, 6 service, 81 database/report/packaging, 6
+without-Mylyn UI and 20 adapter/UI tests. Plain Java tests are explicitly bound
+to the normal Tycho build so CI runs them too. The build assembles separate base
+and Mylyn features in one p2 update site.
 
 The first Linux PR build failed before tests during dependency collection after
 the runner image upgraded Maven to 3.10.0. Reproducing locally with 3.10.0 and
@@ -90,13 +97,39 @@ wrapper until that compatibility issue is resolved.
 The existing database safety, hierarchy, reporting, preference, idle and UI
 regressions remain active. Temporary synthetic storage is used throughout.
 
+## Optional adapter boundary (#214)
+
+`net.resheim.eclipse.timekeeper.mylyn` owns all production Mylyn imports,
+activation listeners, provider metadata, Task List synchronization and linked
+images/open actions. It uses `TimekeeperService` exclusively to read or mutate
+Timekeeper data. The base UI discovers the optional `TaskIntegration` OSGi
+service and works without it. The database no longer links JPA entities to Mylyn
+objects or closes open activities based on provider activation state. Native
+tracking remains authoritative when an external task is absent or inactive.
+
+Creating a task with initial external references commits native identity and
+provider links together. Reconnection resolves the stable provider/repository/task
+key before a projection UUID, preserving recorded history. Late deactivation is
+limited to the task that owns the service's current local activity. Deleted
+external local tasks are not recreated; protected native projections still use
+the service's deletion guards.
+
+Task List synchronization polls client snapshots once per second, preserves
+pending changes across temporary client failures, and cancels its poll on stop.
+Idle corrections use immutable activity snapshots and expected versions;
+concurrent edits leave the activity untouched and report a conflict. The detector
+timer and display filters are removed on UI shutdown. The sampler captures the
+workbench Display and tolerates disposal races without creating a new Display
+on its background thread.
+
+`net.resheim.eclipse.timekeeper.mylyn.feature` depends on the base Timekeeper
+feature and the complete Mylyn Tasks feature. The base feature has no Mylyn
+requirement. Native-only installations hide the Task List projection preference.
+
 ## Remaining architectural scope
 
-#213's native creation and editing workflow is implemented. #214 retains the
-optional adapter bundle and full activation/idle-path extraction, including
-removing mandatory Mylyn bundle dependencies from persistence and the base UI.
-#220 retains
-remote client execution, cancellation and network error behavior. This change
-uses the embedded client service; cross-platform CI provides separate evidence
-from the local macOS run. The dependency Error Log release blocker in
-`ERROR-LOG.md` remains separate.
+#213 and #214's native editing and optional adapter boundaries are implemented.
+#220 retains remote client execution, cancellation and network error presentation.
+These changes use the embedded client implementation; they do not claim an
+implemented HTTP transport. The existing upstream Mylyn Error Log release blocker
+in `ERROR-LOG.md` remains separate.

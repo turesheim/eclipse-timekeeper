@@ -35,7 +35,8 @@ import org.eclipse.swt.widgets.Display;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.model.Activity;
-import net.resheim.eclipse.timekeeper.db.model.Task;
+import net.resheim.eclipse.timekeeper.domain.Task;
+import net.resheim.eclipse.timekeeper.mylyn.MylynIntegration;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 @SuppressWarnings("restriction")
@@ -49,16 +50,10 @@ public class TestUtility {
 		ZonedDateTime now = Instant.now().atZone(TimekeeperUiPlugin.getCalendarZone());
 		TemporalField fieldISO = WeekFields.of(Locale.getDefault()).dayOfWeek();
 		Instant start = now.with(fieldISO, dayOfWeek).toInstant();
-		Activity a = new Activity(ttask, start);
-		a.setSummary(text);
-		ttask.addActivity(a);
-		a.setStart(start.minus(Duration.ofHours(1)));
-		a.setEnd(start);
-		// save the new task (do we really need to)?
-		EntityTransaction transaction = TimekeeperPlugin.getDefault().getEntityManager().getTransaction();
-		transaction.begin();
-		TimekeeperPlugin.getDefault().getEntityManager().persist(ttask);
-		transaction.commit();
+		TimekeeperUiPlugin.getDefault().getTimekeeperService().createActivity(
+				new net.resheim.eclipse.timekeeper.service.Commands.CreateActivity(ttask.id(),
+						net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL, start.minus(Duration.ofHours(1)),
+						Optional.of(start), text, java.util.Set.of()));
 	}
 
 	static Task createTask(TaskList tl, String category, String id, String text) {
@@ -70,7 +65,7 @@ public class TestUtility {
 		});
 		ITask task = new LocalTask(id, text);
 		tl.addTask(task, c);
-		return TimekeeperPlugin.getDefault().getTask(task);
+		return MylynIntegration.getDefault().resolve(task);
 	}
 
 	/**

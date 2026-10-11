@@ -16,23 +16,17 @@ import java.io.ObjectInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Base64;
-import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import javax.persistence.EntityManager;
 import javax.persistence.EntityTransaction;
 import javax.persistence.PersistenceException;
-import javax.persistence.TypedQuery;
 
 import org.eclipse.core.resources.ISaveContext;
 import org.eclipse.core.resources.ISaveParticipant;
@@ -50,16 +44,6 @@ import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.core.runtime.preferences.IScopeContext;
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.jface.preference.IPreferenceStore;
-import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
-import org.eclipse.mylyn.internal.tasks.core.AbstractTaskCategory;
-import org.eclipse.mylyn.internal.tasks.core.AbstractTaskContainer;
-import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
-import org.eclipse.mylyn.tasks.core.IRepositoryManager;
-import org.eclipse.mylyn.tasks.core.ITask;
-import org.eclipse.mylyn.tasks.core.TaskRepository;
-import org.eclipse.mylyn.tasks.core.data.TaskAttribute;
-import org.eclipse.mylyn.tasks.core.data.TaskData;
-import org.eclipse.mylyn.tasks.ui.TasksUi;
 import org.eclipse.osgi.service.datalocation.Location;
 import org.eclipse.ui.preferences.ScopedPreferenceStore;
 import org.osgi.framework.BundleContext;
@@ -68,11 +52,8 @@ import org.slf4j.LoggerFactory;
 
 import net.resheim.eclipse.timekeeper.db.model.Activity;
 import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
-import net.resheim.eclipse.timekeeper.db.model.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.db.model.Project;
-import net.resheim.eclipse.timekeeper.db.model.ProjectType;
 import net.resheim.eclipse.timekeeper.db.model.Task;
-import net.resheim.eclipse.timekeeper.db.model.TaskLinkStatus;
 import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
 
 /**
@@ -101,9 +82,6 @@ public class TimekeeperPlugin extends Plugin {
 	public static final String PREF_REPORT_TEMPLATES = "report-templates";
 	public static final String PREF_DEFAULT_TEMPLATE = "default-template";
 
-	/** Identifier used when storing Timekeeper data in the Mylyn Task */
-	public static final String KEY_VALUELIST_ID = "net.resheim.eclipse.timekeeper"; //$NON-NLS-1$
-
 	private static TimekeeperPlugin instance;
 
 	private static volatile EntityManager entityManager = null;
@@ -111,31 +89,6 @@ public class TimekeeperPlugin extends Plugin {
 	private static Job saveDatabaseJob;
 
 	private static final ListenerList<DatabaseChangeListener> listeners = new ListenerList<>();
-
-	/** Task repository kind identifier for Bugzilla. */
-	public static final String KIND_BUGZILLA = "bugzilla"; //$NON-NLS-1$
-	/** Task repository kind identifier for GitHub. */
-	public static final String KIND_GITHUB = "github"; //$NON-NLS-1$
-	/** Task repository kind identifier for JIRA. */
-	public static final String KIND_JIRA = "jira"; //$NON-NLS-1$
-	/** Task repository kind identifier for local tasks. */
-	public static final String KIND_LOCAL = "local"; //$NON-NLS-1$
-	/** Repository attribute ID for custom grouping field. */
-	public static final String ATTR_GROUPING = KEY_VALUELIST_ID + ".grouping"; //$NON-NLS-1$
-	/** Stable Timekeeper task UUID stored on a projected Mylyn task. */
-	public static final String ATTR_TIMEKEEPER_TASK_ID = KEY_VALUELIST_ID + ".task-id"; //$NON-NLS-1$
-
-	private static final String LOCAL_REPO_ID = "local";
-	// Persisted Timekeeper repository identity; preserve this prefix across Mylyn upgrades.
-	private static final String LOCAL_REPO_PREFIX = LOCAL_REPO_ID + "-";
-
-	private static final String LOCAL_REPO_KEY_ID = "net.resheim.eclipse.timekeeper.repo-id"; //$NON-NLS-1$
-	
-	/**
-	 * Some features connected to Mylyn has no knowledge of Timekeeper tasks and in
-	 * order to avoid excessive lookups in the database, we utilise a simple cache.
-	 */
-	private static Map<ITask, Task> linkCache = new HashMap<>();
 
 	public void addListener(DatabaseChangeListener listener) {
 		listeners.add(listener);
@@ -190,7 +143,6 @@ public class TimekeeperPlugin extends Plugin {
 					}
 				}
 				candidate = DatabaseStartup.open(jdbcUrl);
-				cleanTaskActivities(candidate);
 				initializeDefaultLabels(candidate);
 				synchronized (this) {
 					if (stopping) {
@@ -298,61 +250,6 @@ public class TimekeeperPlugin extends Plugin {
 		ResourcesPlugin.getWorkspace().addSaveParticipant(BUNDLE_ID, saveParticipant);
 	}
 
-	/**
-	 * In some cases the Mylyn task can be deactivated without the tracked task
-	 * being properly updated. This can happen for instance when the workbench is
-	 * closed before the database has been updated. In this case some guesswork is
-	 * applied using data from Mylyn.
-	 */
-	private void cleanTaskActivities(EntityManager manager) {
-		EntityTransaction transaction = manager.getTransaction();
-		boolean activeTransaction = transaction.isActive();
-		if (!activeTransaction) transaction.begin();
-		try {
-			TypedQuery<Task> createQuery = manager.createQuery("SELECT t FROM Task t", Task.class);
-			List<Task> resultList = createQuery.getResultList();
-			for (Task trackedTask : resultList) {
-				Optional<Activity> current = trackedTask.getCurrentActivity();
-				if (current.isEmpty()) continue;
-				ITask task = trackedTask.getMylynTask() == null ? getMylynTask(trackedTask)
-						: trackedTask.getMylynTask();
-				// The ITask may not exist in this workspace. An active task must keep
-				// its activity open so tracking can continue after a restart.
-				if (task == null || TasksUi.getTaskActivityManager().isActive(task)) continue;
-
-				Activity activity = current.get();
-				Instant now = Instant.now();
-				long elapsedTime = 0;
-				Instant tick = trackedTask.getTick();
-				if (tick == null || tick.isBefore(activity.getStart())) {
-					Calendar start = Calendar.getInstance();
-					start.setTimeInMillis(activity.getStart().toEpochMilli());
-					Calendar end = Calendar.getInstance();
-					end.setTimeInMillis(now.toEpochMilli());
-					elapsedTime = TasksUi.getTaskActivityManager().getElapsedTime(task, start, end);
-				}
-				Instant end = recoveredActivityEnd(activity.getStart(), tick, now, elapsedTime);
-				trackedTask.endActivity(end);
-				manager.persist(activity);
-				manager.persist(trackedTask);
-			}
-			if (!activeTransaction) transaction.commit();
-		} catch (RuntimeException e) {
-			if (!activeTransaction && transaction.isActive()) transaction.rollback();
-			throw e;
-		}
-	}
-
-	static Instant recoveredActivityEnd(Instant start, Instant tick,
-			Instant now, long elapsedTimeMillis) {
-		Instant latestValidEnd = now.isBefore(start) ? start : now;
-		Instant recovered = tick != null && !tick.isBefore(start)
-				? tick
-				: start.plusMillis(elapsedTimeMillis);
-		if (recovered.isBefore(start)) return start;
-		return recovered.isAfter(latestValidEnd) ? latestValidEnd : recovered;
-	}
-
 	@Override
 	public synchronized void stop(BundleContext context) throws Exception {
 		stopping = true;
@@ -362,96 +259,10 @@ public class TimekeeperPlugin extends Plugin {
 			DatabaseStartup.close(entityManager);
 		} finally {
 			entityManager = null;
-			linkCache.clear();
 			super.stop(context);
 		}
 	}
 
-	/**
-	 * Returns the Timekeeper {@link Task} associated with the given Mylyn
-	 * task. If no such task exists it will be created.
-	 * 
-	 * @param task the Mylyn task
-	 * @return a {@link Task} associated with the Mylyn task
-	 * @throws InterruptedException
-	 */
-	public Task getTask(ITask task) {
-		// the UI will typically attempt to get some task details before the database is ready 
-		if (entityManager == null || task == null) {
-			return null;
-		}
-		if (linkCache.containsKey(task)) {
-			return linkCache.get(task);
-		}
-		Task found = null;
-		String timekeeperId = task.getAttribute(ATTR_TIMEKEEPER_TASK_ID);
-		if (timekeeperId != null) {
-			try {
-				found = entityManager.find(Task.class, UUID.fromString(timekeeperId).toString());
-			} catch (IllegalArgumentException malformed) {
-				// Fall back to the provider/repository/task identity below.
-			}
-		}
-		String providerId = task.getConnectorKind() == null ? "mylyn" : task.getConnectorKind();
-		String repositoryId = TimekeeperPlugin.getRepositoryUrl(task);
-		if (found == null) {
-			List<Task> matches = entityManager.createNamedQuery("ExternalTaskReference.findTask", Task.class)
-					.setParameter("providerId", providerId)
-					.setParameter("repositoryId", repositoryId)
-					.setParameter("externalId", task.getTaskId())
-					.setMaxResults(1)
-					.getResultList();
-			found = matches.isEmpty() ? null : matches.get(0);
-		}
-		if (found == null) {
-			// no such tracked task exists, create one
-			Task tt = new Task(task);
-			entityManager.persist(tt);
-			task.setAttribute(ATTR_TIMEKEEPER_TASK_ID, tt.getId());
-			linkCache.put(task, tt);
-			return tt;
-		} else {
-			log.info("Task '{}' was not linked with Mylyn task", found);
-			// make sure there is a link between the two tasks, this would be the case if the tracked task was just
-			// loaded from the database
-			if (found.getTaskLinkStatus().equals(TaskLinkStatus.UNDETERMINED)) { 
-				found.linkWithMylynTask(task);
-				entityManager.persist(found);
-			}
-			task.setAttribute(ATTR_TIMEKEEPER_TASK_ID, found.getId());
-			linkCache.put(task, found);
-			return found;
-		}
-	}
-
-	/**
-	 * Returns the Mylyn {@link ITask} associated with the given {@link Task}
-	 * task. If no such task exists <code>null</code> will be returned.
-	 * 
-	 * @param task the time tracked task
-	 * @return a Mylyn task or <code>null</code>
-	 */
-	public static ITask getMylynTask(Task task) {
-		ITask projected = TasksUiPlugin.getTaskList().getAllTasks().stream()
-				.filter(candidate -> task.getId().equals(candidate.getAttribute(ATTR_TIMEKEEPER_TASK_ID)))
-				.findFirst().orElse(null);
-		if (projected != null) return projected;
-		// get the repository then find the task. Seems like the Mylyn API is
-		// a bit limited in this area as I could not find something more usable
-		List<TaskRepository> repositories = TasksUi.getRepositoryManager().getAllRepositories();
-		for (ExternalTaskReference reference : task.getExternalReferences()) {
-			String repositoryUrl = reference.getRepositoryId();
-			if (repositoryUrl.startsWith(LOCAL_REPO_PREFIX)) repositoryUrl = LOCAL_REPO_ID;
-			String selectedRepositoryUrl = repositoryUrl;
-			Optional<TaskRepository> repository = repositories.stream()
-					.filter(candidate -> candidate.getRepositoryUrl().equals(selectedRepositoryUrl)).findFirst();
-			if (repository.isPresent()) {
-				ITask linked = TasksUi.getRepositoryModel().getTask(repository.get(), reference.getExternalId());
-				if (linked != null) return linked;
-			}
-		}
-		return null;
-	}
 
 	/**
 	 * Exports Timekeeper projects, tasks, activities, their relations, and optional
@@ -567,8 +378,7 @@ public class TimekeeperPlugin extends Plugin {
 					+ "(SELECT * FROM CSVREAD('" + externalReferences + "'));").executeUpdate();
 			entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE;").executeUpdate();
 			transaction.commit();
-			// Refresh task state without detaching objects still used by Mylyn and the
-			// Workweek view.
+			// Refresh cached task state after importing persisted records.
 			List<Task> restoredTasks = entityManager.createQuery("SELECT t FROM Task t", Task.class).getResultList();
 			for (Task restoredTask : restoredTasks) entityManager.refresh(restoredTask);
 			return projectTypesImported + projectsImported + tasksImported + activitiesImported + referencesImported;
@@ -645,68 +455,6 @@ public class TimekeeperPlugin extends Plugin {
 		};
 	}
 
-	/**
-	 * Returns the name of the container holding the supplied task.
-	 *
-	 * @param task task to find the name for
-	 * @return the name of the task
-	 */
-	public static String getParentContainerSummary(ITask task) {
-		Set<ITask> visited = new java.util.HashSet<>();
-		ITask current = task;
-		while (current instanceof AbstractTask concrete && visited.add(current)) {
-			Optional<AbstractTaskContainer> category = concrete.getParentContainers().stream()
-					.filter(AbstractTaskCategory.class::isInstance).findFirst();
-			if (category.isPresent()) return category.orElseThrow().getSummary();
-			current = concrete.getParentContainers().stream().filter(AbstractTask.class::isInstance)
-					.map(AbstractTask.class::cast).findFirst().orElse(null);
-		}
-		// FIXME: Should return null
-		return "Uncategorized";
-	}
-
-	/**
-	 * Returns the project name for the task if it can be determined.
-	 *
-	 * @param task the task to get the project name for
-	 * @return the project name or "&lt;undetermined&gt;"
-	 */
-	public static String getMylynProjectName(ITask task) {
-		String c = task.getConnectorKind();
-		try {
-			switch (c) {
-			case KIND_GITHUB:
-			case KIND_LOCAL:
-				return getParentContainerSummary(task);
-			// Bugzilla and JIRA users may want to group on different
-			// values.
-			case KIND_BUGZILLA:
-			case KIND_JIRA:
-				TaskData taskData = TasksUi.getTaskDataManager().getTaskData(task);
-				if (taskData != null) {
-					// This appears to be a pretty slow mechanism
-					TaskRepository taskRepository = taskData.getAttributeMapper().getTaskRepository();
-					String groupingAttribute = taskRepository.getProperty(ATTR_GROUPING);
-					// Use custom grouping if specified
-					if (groupingAttribute != null) {
-						TaskAttribute attribute = taskData.getRoot().getAttribute(groupingAttribute);
-						return attribute.getValue();
-					} else {
-						if (c.equals(KIND_BUGZILLA)) {
-							return task.getAttribute("product"); //$NON-NLS-1$
-						}
-						return getParentContainerSummary(task);
-					}
-				}
-				break;
-			default:
-				break;
-			}
-		} catch (CoreException e) {
-			log.error("Could not obtain project name", e);
-		}
-		return "<undetermined>";
-	}
 	
 	public static Project getProject(String title) {
 		if (title == null) return null;
@@ -720,37 +468,9 @@ public class TimekeeperPlugin extends Plugin {
 		return entityManager.createNamedQuery("Project.findAll", Project.class).getResultStream();
 	}
 	
-	/**
-	 * Creates a new {@link Project} based on information obtained from the Mylyn task. A {@link ProjectType} will also
-	 * be created if it does not already exist.
-	 *  
-	 * @param task
-	 * @return
-	 */
-	public static Project createAndSaveProject(ITask task) {
-		EntityTransaction transaction = entityManager.getTransaction();
-		boolean activeTransaction = transaction.isActive();
-		String name = getMylynProjectName(task);
-		String typeId = task.getConnectorKind();
-		ProjectType type = entityManager.find(ProjectType.class, typeId);
-		if (!activeTransaction) {
-			transaction.begin();
-		}
-		if (type == null) {
-			type = new ProjectType(typeId);
-			entityManager.persist(type);
-		}
-		Project project = new Project(type, name);
-		entityManager.persist(project);
-		if (!activeTransaction) {
-			transaction.commit();
-		}
-		return project;
-		
-	}
 
 	/**
-	 * Return all tracked tasks, those that are associated with a Mylyn task will have the proper assignment.
+	 * Return tracked tasks with recorded time in the specified week.
 	 * 
 	 * @return a stream of tasks
 	 */
@@ -761,8 +481,7 @@ public class TimekeeperPlugin extends Plugin {
 		return entityManager.createNamedQuery("Task.findAll", Task.class)
 				.getResultStream()
 				// TODO: Move filtering to database
-				.filter(tt -> hasData(tt, startDate, zoneId))
-				.map(TimekeeperPlugin::linkWithMylynTask);
+				.filter(tt -> hasData(tt, startDate, zoneId));
 	}
 	
 	private static boolean hasData/* this week */(Task task, LocalDate startDate, ZoneId zoneId) {
@@ -812,26 +531,6 @@ public class TimekeeperPlugin extends Plugin {
 			transaction.commit();
 		}
 	}
-	/**
-	 * Links the given task with a Mylyn task if found in any of the workspace task
-	 * repositories. If a local task could not be found the tracked task will be
-	 * flagged as unlinked for the current workspace.
-	 * 
-	 * @param tt the tracked task
-	 * @return the modified tracked task
-	 */
-	private static Task linkWithMylynTask(Task tt) {
-		ITask linked = getMylynTask(tt);
-		if (linked != null) {
-			tt.linkWithMylynTask(linked);
-			tt.setTaskLinkStatus(TaskLinkStatus.LINKED);
-		} else {
-			// Keep historical records usable when their Mylyn task was deleted.
-			tt.linkWithMylynTask(null);
-			tt.setTaskLinkStatus(TaskLinkStatus.UNLINKED);
-		}
-		return tt;
-	}
 
 	/**
 	 * Provides means of setting the {@link EntityManager} of the plug-in. This
@@ -869,100 +568,6 @@ public class TimekeeperPlugin extends Plugin {
 		return templates;
 	}
 
-	/**
-	 * Creates a new tracked task associated with the Mylyn task if the prior is not
-	 * present, and starts a new activity.
-	 * 
-	 * @param task the Mylyn task to start
-	 */
-	public void startMylynTask(ITask task) {
-		if (entityManager == null) {
-			return;
-		}
-		EntityTransaction transaction = entityManager.getTransaction();
-		boolean activeTransaction = transaction.isActive();
-		if (!activeTransaction) {
-			transaction.begin();
-		}
-		Task ttask = getTask(task);
-		if (ttask != null) {
-			refreshActivityReference(ttask);
-			Activity activity = ttask.startActivity();
-			entityManager.persist(activity);
-			log.debug("Activating task '{}'", task);
-			notifyListeners();
-		}
-		if (!activeTransaction) {
-			transaction.commit();
-		}
-	}
 
-	/** Reloads a service-updated activity pointer without flushing stale workspace state first. */
-	private void refreshActivityReference(Task task) {
-		long stored = entityManager.createQuery("SELECT COUNT(t) FROM Task t WHERE t.id = :id", Long.class)
-				.setParameter("id", task.getId()).setFlushMode(javax.persistence.FlushModeType.COMMIT).getSingleResult();
-		if (stored == 0) return;
-		String previousActivity = task.getCurrentActivity().map(Activity::getId).orElse(null);
-		java.time.Instant previousTick = task.getTick();
-		entityManager.refresh(task);
-		if (previousTick != null && java.util.Objects.equals(previousActivity,
-				task.getCurrentActivity().map(Activity::getId).orElse(null))
-				&& (task.getTick() == null || previousTick.isAfter(task.getTick()))) task.setTick(previousTick);
-	}
-
-	/**
-	 * Ends the activity currently active on the given Mylyn task.
-	 * 
-	 * @param task the Mylyn task to start
-	 */
-	public void endMylynTask(ITask task) {
-		Task ttask = getTask(task);
-		if (ttask != null) {
-			refreshActivityReference(ttask);
-			Activity activity = ttask.endActivity();
-			if (activity == null) {
-				return;
-			}
-			EntityTransaction transaction = entityManager.getTransaction();
-			boolean activeTransaction = transaction.isActive();
-			if (!activeTransaction) {
-				transaction.begin();
-			}
-			entityManager.persist(activity);
-			if (!activeTransaction) {
-				transaction.commit();
-			}
-			log.debug("Deactivating task '{}'", task);
-			notifyListeners();
-		}
-	}
-
-	/**
-	 * This method will return the repository URL for tasks in repositories that are
-	 * not local. If the task is in a local repository, the Timekeeper repository
-	 * identifier is returned if it exists. If it does not exist, it will be
-	 * created, associated with the repository and returned.
-	 * 
-	 * @param task the task to get the repository URL for
-	 * @return the repository URL or {@link UUID}
-	 */
-	public static String getRepositoryUrl(ITask task) {
-		String url = task.getRepositoryUrl();
-		if (TimekeeperPlugin.LOCAL_REPO_ID.equals(task.getRepositoryUrl())) {
-			IRepositoryManager repositoryManager = TasksUi.getRepositoryManager();
-			if (repositoryManager == null) { // may happen during testing
-				return TimekeeperPlugin.LOCAL_REPO_ID;
-			}
-			TaskRepository repository = repositoryManager.getRepository(task.getConnectorKind(),
-					task.getRepositoryUrl());
-			String id = repository.getProperty(TimekeeperPlugin.LOCAL_REPO_KEY_ID);
-			if (id == null) {
-				id = LOCAL_REPO_PREFIX + UUID.randomUUID().toString();
-				repository.setProperty(TimekeeperPlugin.LOCAL_REPO_KEY_ID, id);
-			}
-			url = id;
-		}
-		return url;
-	}
 
 }

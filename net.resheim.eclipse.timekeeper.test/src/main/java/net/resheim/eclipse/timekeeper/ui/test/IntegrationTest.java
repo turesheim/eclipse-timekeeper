@@ -68,9 +68,10 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
-import net.resheim.eclipse.timekeeper.db.model.Task;
-import net.resheim.eclipse.timekeeper.db.model.Activity;
-import net.resheim.eclipse.timekeeper.db.model.TaskLinkStatus;
+import net.resheim.eclipse.timekeeper.domain.Task;
+import net.resheim.eclipse.timekeeper.mylyn.MylynIntegration;
+import net.resheim.eclipse.timekeeper.mylyn.MylynMetadata;
+import net.resheim.eclipse.timekeeper.domain.Activity;
 import net.resheim.eclipse.timekeeper.domain.TaskId;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateTask;
@@ -168,7 +169,7 @@ public class IntegrationTest {
 			TestUtility.createActivity(1, ttask, "Rig test plug-in and make it take screenshots");
 			TestUtility.createActivity(1, ttask, "Add tests for the 'Workweek' view");
 			TestUtility.createActivity(3, ttask, "Add test for the preferences dialog");
-			TasksUi.getTaskActivityManager().activateTask(ttask.getMylynTask());
+			TasksUi.getTaskActivityManager().activateTask(MylynIntegration.getDefault().linked(ttask).orElseThrow());
 			bot.sleep(500);
 			Task ttask_1 = TestUtility.createTask(tl, "Eclipse Science", "1", "Eclipse Science web site");
 			TestUtility.createActivity(3, ttask_1, "Send out e-mail about GitHub repo");
@@ -222,8 +223,8 @@ public class IntegrationTest {
 				} catch (IllegalAccessException e) {
 					throw new AssertionError(e);
 				}
-				ITask task = TestUtility.createTask(tl, "Lifecycle checks", "3001",
-						"Track an activity").getMylynTask();
+				ITask task = MylynIntegration.getDefault().linked(TestUtility.createTask(tl, "Lifecycle checks", "3001",
+						"Track an activity")).orElseThrow();
 				TasksUi.getTaskActivityManager().activateTask(task);
 				try {
 					lastActiveTime.set(TimekeeperUiPlugin.getDefault(), null);
@@ -239,24 +240,18 @@ public class IntegrationTest {
 				} catch (ReflectiveOperationException e) {
 					throw new AssertionError(e);
 				}
-				tracked[0] = TimekeeperPlugin.getDefault().getTask(task);
-				assertEquals("Lifecycle checks", tracked[0].getProject().getName());
-				Activity activity = tracked[0].getCurrentActivity().orElseThrow();
-				assertEquals(1, tracked[0].getActivities().size());
-				Assert.assertNull(activity.getEnd());
-				activity.setSummary("Lifecycle activity");
-				activity.setStart(Instant.now().minusSeconds(120));
-				// Fixture edits must be durable before the Mylyn adapter reloads service-owned state.
-				var manager = TimekeeperPlugin.getDefault().getEntityManager();
-				manager.getTransaction().begin();
-				manager.persist(activity);
-				manager.getTransaction().commit();
+				var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
+				tracked[0] = MylynIntegration.getDefault().resolve(task);
+				assertEquals("Lifecycle checks", service.project(tracked[0].projectId().orElseThrow()).orElseThrow().name());
+				Activity activity = service.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL).orElseThrow();
+				assertTrue(activity.end().isEmpty());
+				service.updateActivity(new net.resheim.eclipse.timekeeper.service.Commands.UpdateActivity(activity.id(), activity.version(),
+						Instant.now().minusSeconds(120), activity.end(), "Lifecycle activity", activity.labelIds()));
 				TasksUi.getTaskActivityManager().deactivateTask(task);
-				assertTrue(tracked[0].getCurrentActivity().isEmpty());
-				assertNotNull(activity.getEnd());
-				assertTrue(activity.getEnd().isAfter(activity.getStart()));
-				// Duplicate deactivation must not try to persist a null activity.
-				TimekeeperPlugin.getDefault().endMylynTask(task);
+				assertTrue(service.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL).isEmpty());
+				var closed = service.activity(activity.id()).orElseThrow();
+				assertTrue(closed.end().orElseThrow().isAfter(closed.start()));
+				MylynIntegration.getDefault().deactivated(task);
 			});
 			int today = LocalDate.now().get(WeekFields.of(Locale.getDefault()).dayOfWeek());
 			var project = bot.treeWithId("workweek-editor-tree").getTreeItem("Lifecycle checks");
@@ -285,14 +280,12 @@ public class IntegrationTest {
 		runOnUi(() -> {
 			Task historical = TestUtility.createTask(tl, "Historical records", "9002", "Keep recorded time");
 			TestUtility.createActivity(1, historical, "Recorded before deletion");
-			tl.deleteTask(historical.getMylynTask());
-			LocalDate first = LocalDate.now().with(WeekFields.of(Locale.getDefault()).dayOfWeek(), 1);
-			Task reloaded = TimekeeperPlugin.getTasks(first, TimekeeperUiPlugin.getCalendarZone())
-					.filter(t -> "9002".equals(t.getTaskId())).findFirst().orElseThrow();
-			Assert.assertNull(reloaded.getMylynTask());
-			assertEquals(TaskLinkStatus.UNLINKED, reloaded.getTaskLinkStatus());
-			assertEquals("Keep recorded time", reloaded.getTaskSummary());
-			assertEquals("Historical records", reloaded.getProject().getName());
+			tl.deleteTask(MylynIntegration.getDefault().linked(historical).orElseThrow());
+			Task reloaded = TimekeeperUiPlugin.getDefault().getTimekeeperService().task(historical.id()).orElseThrow();
+			assertTrue(MylynIntegration.getDefault().linked(reloaded).isEmpty());
+			assertEquals("Keep recorded time", reloaded.summary());
+			assertEquals("Historical records", TimekeeperUiPlugin.getDefault().getTimekeeperService()
+					.project(reloaded.projectId().orElseThrow()).orElseThrow().name());
 		});
 		bot.activePart().toolbarButton("Show current week").click();
 		var row = bot.treeWithId("workweek-editor-tree").getTreeItem("Historical records")
@@ -302,6 +295,8 @@ public class IntegrationTest {
 		var menu = row.contextMenu("New activity");
 		assertTrue(menu.isEnabled());
 		menu.hide();
+		runOnUi(() -> assertTrue("Deleted external local tasks must not be recreated by the adapter",
+				tl.getAllTasks().stream().noneMatch(task -> "9002".equals(task.getTaskId()))));
 	}
 
 	@Test
@@ -360,7 +355,7 @@ public class IntegrationTest {
 			tl.addTask(task, category);
 		});
 		bot.waitUntil(new DefaultCondition() {
-			@Override public boolean test() { return task.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID) != null; }
+			@Override public boolean test() { return task.getAttribute(net.resheim.eclipse.timekeeper.mylyn.MylynMetadata.ATTR_TIMEKEEPER_TASK_ID) != null; }
 			@Override public String getFailureMessage() { return "Native task was not persisted"; }
 		});
 		var taskId = taskId(task);
@@ -381,7 +376,7 @@ public class IntegrationTest {
 		LocalTask child = new LocalTask(String.valueOf(tl.getNextLocalTaskId()), "Protected subtask");
 		runOnUi(() -> tl.addTask(child, task));
 		bot.waitUntil(new DefaultCondition() {
-			@Override public boolean test() { return child.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID) != null; }
+			@Override public boolean test() { return child.getAttribute(net.resheim.eclipse.timekeeper.mylyn.MylynMetadata.ATTR_TIMEKEEPER_TASK_ID) != null; }
 			@Override public String getFailureMessage() { return "Native subtask was not persisted"; }
 		});
 		var childId = taskId(child);
@@ -430,7 +425,7 @@ public class IntegrationTest {
 		AbstractTask mylynParent = mylynTask(parent.id()).orElseThrow();
 		AbstractTask mylynChild = mylynTask(child.id()).orElseThrow();
 		assertTrue(mylynParent instanceof LocalTask);
-		assertEquals(TimekeeperPlugin.KIND_LOCAL, mylynParent.getConnectorKind());
+		assertEquals(net.resheim.eclipse.timekeeper.mylyn.MylynMetadata.KIND_LOCAL, mylynParent.getConnectorKind());
 		assertTrue(mylynChild.getParentContainers().contains(mylynParent));
 		assertTrue(mylynParent.getParentContainers().stream()
 				.anyMatch(container -> "Backend-created project".equals(container.getSummary())));
@@ -476,8 +471,8 @@ public class IntegrationTest {
 		});
 		bot.waitUntil(new DefaultCondition() {
 			@Override public boolean test() {
-				return mylynCreatedParent.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID) != null
-						&& mylynCreatedChild.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID) != null;
+				return mylynCreatedParent.getAttribute(net.resheim.eclipse.timekeeper.mylyn.MylynMetadata.ATTR_TIMEKEEPER_TASK_ID) != null
+						&& mylynCreatedChild.getAttribute(net.resheim.eclipse.timekeeper.mylyn.MylynMetadata.ATTR_TIMEKEEPER_TASK_ID) != null;
 			}
 			@Override public String getFailureMessage() { return "Mylyn tasks were not replicated into Timekeeper"; }
 		});
@@ -513,12 +508,12 @@ public class IntegrationTest {
 
 	private static Optional<AbstractTask> mylynTask(TaskId id) {
 		return tl.getAllTasks().stream().filter(task -> id.value().toString()
-				.equals(task.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID))).findFirst();
+				.equals(task.getAttribute(net.resheim.eclipse.timekeeper.mylyn.MylynMetadata.ATTR_TIMEKEEPER_TASK_ID))).findFirst();
 	}
 
 	private static TaskId taskId(ITask task) {
 		return new TaskId(java.util.UUID.fromString(
-				task.getAttribute(TimekeeperPlugin.ATTR_TIMEKEEPER_TASK_ID)));
+				task.getAttribute(net.resheim.eclipse.timekeeper.mylyn.MylynMetadata.ATTR_TIMEKEEPER_TASK_ID)));
 	}
 
 	private static void runOnUi(Runnable action) throws Exception {

@@ -27,7 +27,6 @@ class TaskActivityTest {
 		assertTrue(first.getExternalReferences().isEmpty());
 		assertNull(first.getRepositoryUrl());
 		assertNull(first.getTaskId());
-		assertNull(first.getMylynTask());
 	}
 
 	@Test
@@ -60,20 +59,4 @@ class TaskActivityTest {
 		assertTrue(task.getCurrentActivity().isEmpty());
 	}
 
-	@Test
-	void interruptedActivityRecoveryUsesLastTickAndNeverEndsInTheFuture() {
-		Instant start = Instant.parse("2026-09-21T14:28:38Z");
-		Instant now = start.plusSeconds(600);
-
-		assertEquals(start.plusSeconds(420),
-				TimekeeperPlugin.recoveredActivityEnd(start, start.plusSeconds(420), now, 0));
-		assertEquals(now,
-				TimekeeperPlugin.recoveredActivityEnd(start, now.plusSeconds(1_200), now, 0));
-		assertEquals(start.plusSeconds(240),
-				TimekeeperPlugin.recoveredActivityEnd(start, start.minusSeconds(60), now, 240_000));
-		assertEquals(now,
-				TimekeeperPlugin.recoveredActivityEnd(start, null, now, 900_000));
-		assertEquals(start,
-				TimekeeperPlugin.recoveredActivityEnd(start, start.plusSeconds(420), start.minusSeconds(60), 0));
-	}
 }

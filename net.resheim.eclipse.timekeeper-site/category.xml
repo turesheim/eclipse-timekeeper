@@ -3,9 +3,10 @@
    <feature id="net.resheim.eclipse.timekeeper">
       <category name="main"/>
    </feature>
+   <feature id="net.resheim.eclipse.timekeeper.mylyn.feature"><category name="main"/></feature>
    <category-def name="main" label="Timekeeper for Eclipse">
       <description>
-         An extension of Mylyn Tasks that tracks the time a task is active and presents the result in a view. Notes can be added and the time used can be adjusted. The result can be exported to various formats.
+         Tracks time on native projects and tasks, with optional Mylyn integration and presents the result in a view. Notes can be added and the time used can be adjusted. The result can be exported to various formats.
       </description>
    </category-def>
 </site>

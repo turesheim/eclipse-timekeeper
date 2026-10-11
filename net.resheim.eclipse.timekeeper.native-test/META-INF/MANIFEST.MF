@@ -1,0 +1,15 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Timekeeper without Mylyn tests
+Bundle-SymbolicName: net.resheim.eclipse.timekeeper.native-test;singleton:=true
+Bundle-Version: 2.0.0.qualifier
+Bundle-RequiredExecutionEnvironment: JavaSE-21
+Bundle-ActivationPolicy: lazy
+Require-Bundle: org.eclipse.swtbot.go,
+ net.resheim.eclipse.timekeeper.db,
+ net.resheim.eclipse.timekeeper.ui,
+ net.resheim.eclipse.timekeeper.service,
+ net.resheim.eclipse.timekeeper.domain,
+ org.eclipse.core.resources,
+ org.eclipse.ui.ide
+Export-Package: net.resheim.eclipse.timekeeper.nativeui.test;x-friends:="net.resheim.eclipse.timekeeper.test"

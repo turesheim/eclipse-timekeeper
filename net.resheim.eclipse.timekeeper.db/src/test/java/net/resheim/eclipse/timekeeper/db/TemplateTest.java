@@ -33,10 +33,6 @@ import java.util.stream.Stream;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityTransaction;
 
-import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
-import org.eclipse.mylyn.internal.tasks.core.LocalTask;
-import org.eclipse.mylyn.internal.tasks.core.TaskCategory;
-import org.eclipse.mylyn.internal.tasks.core.TaskList;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -145,20 +141,21 @@ public class TemplateTest {
 	private Set<Task> createTestTasks() {
 		int vi = 0;
 		int si = 0;
-		TaskList tl = new TaskList();
-		TaskCategory[] projects = new TaskCategory[] {
-			new TaskCategory("project-a", "Project A"),
-			new TaskCategory("project-b", "Project B")
+		var type = new net.resheim.eclipse.timekeeper.db.model.ProjectType("synthetic");
+		var projects = new net.resheim.eclipse.timekeeper.db.model.Project[] {
+			new net.resheim.eclipse.timekeeper.db.model.Project(type, "Project A"),
+			new net.resheim.eclipse.timekeeper.db.model.Project(type, "Project B")
 		};
-		tl.addCategory(projects[0]);
-		tl.addCategory(projects[1]);
+		entityManager.getTransaction().begin();
+		entityManager.persist(type);
+		for (var project : projects) entityManager.persist(project);
+		entityManager.getTransaction().commit();
 		Set<Task> tasks = new HashSet<>();
 		// for each day of the week, create one task
 		for (int i = 1; i < 7; i++) {
-			AbstractTask mylynTask = new LocalTask(String.valueOf(i), "Task #" + i);
-//			tasks.add(mylynTask);
-			tl.addTask(mylynTask, projects[i%2]);
-			Task task = new Task(mylynTask);
+			Task task = new Task("Task #" + i);
+			task.setProject(projects[i%2]);
+			task.linkExternalTask("synthetic", "local", String.valueOf(i), null);
 			// for each task, create one activity 
 			for (int d = 1; d < 3 + (d%i); d++) {
 				int offset = d + i - 2;
