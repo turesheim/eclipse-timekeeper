@@ -56,6 +56,14 @@ public final class EclipseBackend implements AutoCloseable {
     public ZoneId zone() {return metadata==null ? ZoneId.systemDefault() : metadata.profile().zone();}
     public String identity() {return !remoteMode ? "embedded" : remote==null ? "remote:unavailable" : "remote:"+remote.endpoint()+":"+(metadata==null ? "connecting" : metadata.profile().owner().value());}
     public TimekeeperService service() {return !remoteMode ? embedded.get() : facade;}
+    public int exportCsv(java.nio.file.Path folder) throws java.io.IOException {
+        if(Display.getCurrent()!=null || remote==null) throw new IllegalStateException("Remote transfer requires an available background client");
+        return remote.exportCsv(folder);
+    }
+    public int importCsv(java.nio.file.Path folder,java.nio.file.Path journalFolder) throws java.io.IOException {
+        if(Display.getCurrent()!=null || remote==null) throw new IllegalStateException("Remote transfer requires an available background client");
+        return remote.importCsv(folder,journalFolder);
+    }
     public void addListener(DatabaseChangeListener listener) {listeners.add(listener);if(!remoteMode) TimekeeperPlugin.getDefault().addListener(listener);}
     public void removeListener(DatabaseChangeListener listener) {listeners.remove(listener);if(!remoteMode) TimekeeperPlugin.getDefault().removeListener(listener);}
     private void changed() {for(var listener:listeners) listener.databaseStateChanged();}
@@ -127,7 +135,9 @@ public final class EclipseBackend implements AutoCloseable {
                     }
                     ui(()->{if(!monitor.isCanceled() && !closed) {success.accept(value);changed();}});return Status.OK_STATUS;
                 } catch(RuntimeException error) {
-                    if(!(error instanceof RemoteFailure problem) || !Set.of(RemoteFailure.Kind.CONFLICT,RemoteFailure.Kind.VALIDATION,RemoteFailure.Kind.NOT_FOUND).contains(problem.kind())) ready=false;status=error.getMessage();ui(()->{if(!closed) {failure.accept(error);changed();}});return Status.CANCEL_STATUS;
+                    if(error instanceof RemoteFailure problem && Set.of(RemoteFailure.Kind.AUTHENTICATION,RemoteFailure.Kind.OFFLINE,RemoteFailure.Kind.TIMEOUT,RemoteFailure.Kind.UNAVAILABLE,RemoteFailure.Kind.CANCELLED).contains(problem.kind())) ready=false;
+                    status=error.getMessage()==null ? "The operation could not be completed." : error.getMessage();
+                    ui(()->{if(!closed) {failure.accept(error);changed();}});return Status.CANCEL_STATUS;
                 } finally {worker=null;jobs.remove(this);Thread.interrupted();}
             }
             @Override protected void canceling() {Thread thread=worker;if(thread!=null) thread.interrupt();}

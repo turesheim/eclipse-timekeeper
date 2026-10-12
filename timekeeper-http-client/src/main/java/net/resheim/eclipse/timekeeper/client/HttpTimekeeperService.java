@@ -164,6 +164,20 @@ public final class HttpTimekeeperService implements TimekeeperService,AutoClosea
     }
     public JsonObject exportData() {return request("GET","/data/export",null).body().getAsJsonObject();}
     public JsonObject importData(JsonObject data) {return request("POST","/data/import",data,Map.of("Idempotency-Key",UUID.randomUUID().toString())).body().getAsJsonObject();}
+    public int exportCsv(java.nio.file.Path folder) throws IOException {return CsvSnapshot.write(exportData(),folder);}
+    /** The same unresolved payload, backend and owner reuse their command key across restarts. */
+    public int importCsv(java.nio.file.Path folder,java.nio.file.Path journalFolder) throws IOException {
+        JsonObject data=CsvSnapshot.read(folder);
+        var journal=new ImportJournal(journalFolder,base.toString(),profile().owner().value(),data.toString());
+        String key=journal.pending();
+        try {
+            JsonObject result=request("POST","/data/import",data,Map.of("Idempotency-Key",key)).body().getAsJsonObject();
+            journal.acknowledged(key);return result.getAsJsonArray("ids").size();
+        } catch(RemoteFailure failure) {
+            if(Set.of(RemoteFailure.Kind.AUTHENTICATION,RemoteFailure.Kind.FORBIDDEN,RemoteFailure.Kind.VALIDATION,RemoteFailure.Kind.CONFLICT,RemoteFailure.Kind.NOT_FOUND).contains(failure.kind())) journal.acknowledged(key);
+            throw failure;
+        }
+    }
     public JsonObject changes(long after,int waitSeconds) {return request("GET","/changes?after="+after+"&waitSeconds="+waitSeconds,null).body().getAsJsonObject();}
     @Override public void close() {http.shutdownNow();}
 }

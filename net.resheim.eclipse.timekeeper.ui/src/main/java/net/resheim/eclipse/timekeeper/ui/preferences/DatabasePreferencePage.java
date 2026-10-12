@@ -12,6 +12,7 @@
 package net.resheim.eclipse.timekeeper.ui.preferences;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -42,6 +43,7 @@ import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.preferences.ScopedPreferenceStore;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
 public class DatabasePreferencePage extends FieldEditorPreferencePage implements IWorkbenchPreferencePage {
@@ -53,15 +55,21 @@ public class DatabasePreferencePage extends FieldEditorPreferencePage implements
 	@Override
 	protected void createFieldEditors() {
 
-		addField(new RadioGroupFieldEditor(TimekeeperPlugin.PREF_DATABASE_LOCATION, "Database location", 1,
+		RadioGroupFieldEditor location = new RadioGroupFieldEditor(TimekeeperPlugin.PREF_DATABASE_LOCATION, "Database location", 1,
 				new String[][] {
 			{ "Shared (in ~/.timekeeper/)", TimekeeperPlugin.PREF_DATABASE_LOCATION_SHARED },
 			{ "Relative to workspace (in .timekeeper/)", TimekeeperPlugin.PREF_DATABASE_LOCATION_WORKSPACE },
 			{ "Specified by JDBC URL", TimekeeperPlugin.PREF_DATABASE_LOCATION_URL },
-		}, getFieldEditorParent(), true));
+		}, getFieldEditorParent(), true);
+		addField(location);
 
-		addField(new JdbcUrlFieldEditor(TimekeeperPlugin.PREF_DATABASE_URL, Messages.DatabasePreferences_URL,
-				getFieldEditorParent()));
+		JdbcUrlFieldEditor url = new JdbcUrlFieldEditor(TimekeeperPlugin.PREF_DATABASE_URL, Messages.DatabasePreferences_URL,
+				getFieldEditorParent());
+		addField(url);
+		if (TimekeeperUiPlugin.getDefault().isRemote()) {
+			location.setEnabled(false, getFieldEditorParent());url.setEnabled(false, getFieldEditorParent());
+			setDescription("Server mode uses the selected account. Local database settings take effect in local mode after restart.");
+		}
 
 		Group g2 = new Group(getFieldEditorParent(), SWT.SHADOW_ETCHED_IN);
 		g2.setText(Messages.DatabasePreferences_ExportImportTitle);
@@ -106,6 +114,23 @@ public class DatabasePreferencePage extends FieldEditorPreferencePage implements
 				if (open!=null){
 					Path location = Paths.get(open);
 					Shell shell = g.getShell();
+					var plugin = TimekeeperUiPlugin.getDefault();
+					if (plugin.isRemote()) {
+						Path exported = location.resolve("Timekeeper-export-" + java.util.UUID.randomUUID());
+						button.setEnabled(false);
+						plugin.runRead("Export Timekeeper server data", () -> {
+							try { return plugin.exportRemoteCsv(exported); }
+							catch (IOException failure) { throw new UncheckedIOException(failure); }
+						}, count -> {
+							if (!button.isDisposed()) button.setEnabled(true);
+							if (!shell.isDisposed()) MessageDialog.openInformation(shell, Messages.DatabasePreferences_DataExported,
+									String.format("Exported %d records to %s", count, exported));
+						}, failure -> {
+							if (!button.isDisposed()) button.setEnabled(true);
+							if (!shell.isDisposed()) MessageDialog.openError(shell, Messages.DatabasePreferences_ExportError, transferMessage(failure));
+						});
+						return;
+					}
 					Job job = Job.create("Export Timekeeper database", (ICoreRunnable) monitor -> {
 						try {
 							int count = TimekeeperPlugin.getDefault().exportTo(location);
@@ -114,8 +139,9 @@ public class DatabasePreferencePage extends FieldEditorPreferencePage implements
 										String.format(Messages.DatabasePreferences_ExportMessage, count));
 							});
 						} catch (IOException e1) {
-							MessageDialog.openError(shell, Messages.DatabasePreferences_ExportError,
-									e1.getMessage());
+						shell.getDisplay().asyncExec(() -> {
+							if (!shell.isDisposed()) MessageDialog.openError(shell, Messages.DatabasePreferences_ExportError, e1.getMessage());
+						});
 						}
 					});
 					job.schedule();
@@ -153,6 +179,24 @@ public class DatabasePreferencePage extends FieldEditorPreferencePage implements
 				if (open != null) {
 					Path location = Paths.get(open);
 					Shell shell = composite.getShell();
+					var plugin = TimekeeperUiPlugin.getDefault();
+					if (plugin.isRemote()) {
+						if (!MessageDialog.openConfirm(shell, "Import server data",
+								"Import this Timekeeper domain CSV export into the signed-in server account? Projects, tasks, labels and activities receive new IDs. Existing records are kept.")) return;
+						button.setEnabled(false);
+						plugin.runOperation("Import Timekeeper server data", () -> {
+							try { return plugin.importRemoteCsv(location); }
+							catch (IOException failure) { throw new UncheckedIOException(failure); }
+						}, count -> {
+							if (!button.isDisposed()) button.setEnabled(true);
+							if (!shell.isDisposed()) MessageDialog.openInformation(shell, Messages.DatabasePreferences_DataImported,
+									String.format(Messages.DatabasePreferences_CreatedMessage, count));
+						}, failure -> {
+							if (!button.isDisposed()) button.setEnabled(true);
+							if (!shell.isDisposed()) MessageDialog.openError(shell, Messages.DatabasePreferences_ImportError, transferMessage(failure));
+						});
+						return;
+					}
 					IViewPart showView = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage()
 							.findView(WorkWeekView.VIEW_ID);
 					Job job = Job.create("Import Timekeeper database", (ICoreRunnable) monitor -> {
@@ -186,6 +230,11 @@ public class DatabasePreferencePage extends FieldEditorPreferencePage implements
 				TimekeeperPlugin.BUNDLE_ID);
 		setPreferenceStore(preferenceStore);
 		preferenceStore.addPropertyChangeListener(this);
+	}
+
+	private static String transferMessage(RuntimeException failure) {
+		String message = failure instanceof UncheckedIOException io ? io.getCause().getMessage() : failure.getMessage();
+		return message == null ? "The transfer could not be completed." : message;
 	}
 
 }

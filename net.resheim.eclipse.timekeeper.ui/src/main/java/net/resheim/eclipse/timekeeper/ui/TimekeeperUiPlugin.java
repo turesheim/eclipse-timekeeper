@@ -121,6 +121,10 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
     public void addBackendListener(net.resheim.eclipse.timekeeper.db.DatabaseChangeListener listener) {backend.addListener(listener);}
     public void removeBackendListener(net.resheim.eclipse.timekeeper.db.DatabaseChangeListener listener) {backend.removeListener(listener);}
     public void refreshBackend() {backend.refresh();}
+    public int exportRemoteCsv(java.nio.file.Path folder) throws java.io.IOException {return backend.exportCsv(folder);}
+    public int importRemoteCsv(java.nio.file.Path folder) throws java.io.IOException {
+        return backend.importCsv(folder,getStateLocation().toFile().toPath().resolve("pending-imports"));
+    }
     public Activity activateRemoteInWorker(net.resheim.eclipse.timekeeper.domain.TaskId task) {return backend.activateInWorker(task);}
     public void activateRemoteTask(net.resheim.eclipse.timekeeper.domain.TaskId task,Optional<Activity> observed) {backend.activate(task,observed);}
     public <T> org.eclipse.core.runtime.jobs.Job runOperation(String name,java.util.function.Supplier<T> action,

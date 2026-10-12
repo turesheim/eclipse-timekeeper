@@ -15,6 +15,54 @@ import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
 @QuarkusTest
 class HttpClientIntegrationTest {
     @TestHTTPResource URI server;
+    @org.junit.jupiter.api.io.TempDir java.nio.file.Path temporary;
+    @Test void csvTransferPreservesRelationshipsAndPrecisionWithFreshOwnedIds() throws Exception {
+        String name="CSV "+UUID.randomUUID();
+        try(var source=new HttpTimekeeperService(server,()->"test-a",Duration.ofSeconds(3));
+                var target=new HttpTimekeeperService(server,()->"test-b",Duration.ofSeconds(3))) {
+            var project=source.createProject(new CreateProject(name+" project"));
+            var parent=source.createTask(new CreateTask(Optional.of(project.id()),name+" parent",Optional.empty()));
+            var reference=new ExternalTaskReference("jira","https://jira.invalid",UUID.randomUUID().toString(),Optional.of("https://jira.invalid/browse/TK-1"));
+            var child=source.createTask(new CreateTask(Optional.of(project.id()),Optional.of(parent.id()),name+", \"child\"\næøå",Optional.empty(),Set.of(reference)));
+            var label=source.createLabel(new CreateLabel(name+" label",Optional.of("10,20,30")));
+            Instant start=Instant.parse("2026-10-12T08:00:00.123456789Z"),end=Instant.parse("2026-10-12T09:00:00.987654321Z");
+            var activity=source.createActivity(new CreateActivity(child.id(),OwnerId.LOCAL,start,Optional.of(end),"",Set.of(label.id())));
+            var before=target.metadata();
+            var csv=temporary.resolve("export with spaces");assertTrue(source.exportCsv(csv)>=5);
+            assertTrue(target.importCsv(csv,temporary.resolve("journal"))>=5);
+            var imported=target.findTask(reference.key()).orElseThrow();
+            assertNotEquals(child.id(),imported.id());assertEquals(child.summary(),imported.summary());
+            assertEquals(Set.of(reference),imported.externalReferences());
+            var importedParent=target.task(imported.parentTaskId().orElseThrow()).orElseThrow();
+            assertEquals(parent.summary(),importedParent.summary());assertNotEquals(parent.id(),importedParent.id());
+            assertEquals(importedParent.projectId(),imported.projectId());
+            assertEquals(project.name(),target.project(imported.projectId().orElseThrow()).orElseThrow().name());
+            var report=target.activities(new ActivityQuery(start,end,Optional.of(OwnerId.LOCAL),Optional.of(imported.id()),Optional.empty(),ZoneId.of("Europe/Oslo")));
+            assertEquals(Duration.between(start,end),report.total());
+            var recorded=report.activities().getFirst();assertNotEquals(activity.id(),recorded.id());
+            assertEquals(target.profile().owner(),recorded.ownerId());assertTrue(recorded.manual());
+            assertEquals(start,recorded.start());assertEquals(Optional.of(end),recorded.end());
+            var importedLabel=target.label(recorded.labelIds().iterator().next()).orElseThrow();
+            assertNotEquals(label.id(),importedLabel.id());assertEquals(label.name(),importedLabel.name());assertEquals(label.color(),importedLabel.color());
+            assertTrue(source.task(imported.id()).isEmpty());
+            var accepted=target.exportData();long revision=target.metadata().revision();
+            assertEquals(RemoteFailure.Kind.CONFLICT,assertThrows(RemoteFailure.class,()->target.importCsv(csv,temporary.resolve("journal"))).kind());
+            assertEquals(accepted,target.exportData());assertEquals(revision,target.metadata().revision());
+            // The fixture is isolated, and cleanup preserves records that predate this import.
+            var oldTasks=before.tasks().stream().map(Task::id).collect(java.util.stream.Collectors.toSet());
+            var oldProjects=before.projects().stream().map(Project::id).collect(java.util.stream.Collectors.toSet());
+            var oldLabels=before.labels().stream().map(Label::id).collect(java.util.stream.Collectors.toSet());
+            target.deleteActivity(new DeleteActivity(recorded.id(),recorded.version()));
+            target.deleteTask(new DeleteTask(imported.id(),imported.version()));target.deleteTask(new DeleteTask(importedParent.id(),importedParent.version()));
+            target.deleteLabel(new DeleteLabel(importedLabel.id(),importedLabel.version()));
+            var importedProject=target.project(imported.projectId().orElseThrow()).orElseThrow();target.deleteProject(new DeleteProject(importedProject.id(),importedProject.version()));
+            assertTrue(target.tasks().stream().allMatch(task->oldTasks.contains(task.id())));
+            assertTrue(target.projects().stream().allMatch(item->oldProjects.contains(item.id())));
+            assertTrue(target.labels().stream().allMatch(item->oldLabels.contains(item.id())));
+            source.deleteActivity(new DeleteActivity(activity.id(),activity.version()));source.deleteTask(new DeleteTask(child.id(),child.version()));
+            source.deleteTask(new DeleteTask(parent.id(),parent.version()));source.deleteLabel(new DeleteLabel(label.id(),label.version()));source.deleteProject(new DeleteProject(project.id(),project.version()));
+        }
+    }
     @Test void javaClientPerformsOwnedCrudTrackingReportsAndProviderLinking() {
         try(var client=new HttpTimekeeperService(server,()->"test-a",Duration.ofSeconds(3))) {
             var project=client.createProject(new CreateProject("HTTP client "+UUID.randomUUID()));
