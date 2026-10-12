@@ -47,6 +47,7 @@ import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 public abstract class WeekViewContentProvider implements ITreeContentProvider, DatabaseChangeListener {
 	public static final WeeklySummary WEEKLY_SUMMARY = new WeeklySummary();
 	private LocalDate firstDayOfWeek;
+	private boolean showAllTasks = true;
 	private final ZoneId zoneId;
 	protected Set<Task> filtered = Collections.emptySet();
 	private Map<ProjectId, Project> projects = Map.of();
@@ -60,6 +61,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	protected WeekViewContentProvider(ZoneId zoneId) { this.zoneId = zoneId; }
 	ZoneId getZoneId() { return zoneId; }
 	public Set<Task> getFiltered() { return filtered; }
+	public void setShowAllTasks(boolean showAllTasks) { this.showAllTasks = showAllTasks; }
 	public Optional<Task> task(TaskId id) { return Optional.ofNullable(tasks.get(id)); }
 	public List<Label> labels(Activity activity) {
 		return activity.labelIds().stream().map(labels::get).filter(java.util.Objects::nonNull).toList();
@@ -119,9 +121,8 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 		activities = service.activities(new ActivityQuery(firstDayOfWeek.atStartOfDay(zoneId).toInstant(),
 				firstDayOfWeek.plusDays(7).atStartOfDay(zoneId).toInstant(), Optional.empty(), Optional.empty(),
 				Optional.empty(), zoneId)).activities();
-		Set<TaskId> visible = activities.stream().map(Activity::taskId).collect(Collectors.toSet());
-		// Native tasks stay available before their first activity is recorded.
-		tasks.values().stream().filter(task -> task.externalReferences().isEmpty()).map(Task::id).forEach(visible::add);
+		Set<TaskId> visible = showAllTasks ? new java.util.HashSet<>(tasks.keySet())
+				: activities.stream().map(Activity::taskId).collect(Collectors.toSet());
 		for (TaskId id : List.copyOf(visible)) {
 			Task task = tasks.get(id);
 			Set<TaskId> visited = new java.util.HashSet<>();

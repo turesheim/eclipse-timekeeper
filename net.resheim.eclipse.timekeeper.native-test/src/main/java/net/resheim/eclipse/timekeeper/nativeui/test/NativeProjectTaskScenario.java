@@ -51,6 +51,88 @@ import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 @RunWith(SWTBotJunit4ClassRunner.class)
 public abstract class NativeProjectTaskScenario {
 	@Test
+	public void workweekTaskFilterIncludesInactiveTasksAndPreservesTotals() throws Exception {
+		SWTWorkbenchBot bot = new SWTWorkbenchBot();
+		await(bot, () -> TimekeeperPlugin.getDefault().isReady(), "Database is not ready");
+		var preferences = TimekeeperUiPlugin.getDefault().getPreferenceStore();
+		boolean previous = preferences.getBoolean(PreferenceConstants.SHOW_ALL_TASKS);
+		onUi(() -> preferences.setValue(PreferenceConstants.SHOW_ALL_TASKS, true));
+		reopenWorkweek();
+		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
+		var project = service.createProject(new CreateProject("Task filter project"));
+		var parent = service.createTask(new CreateTask(Optional.of(project.id()), "Parent without direct time", Optional.empty()));
+		var child = service.createTask(new CreateTask(Optional.of(project.id()), Optional.of(parent.id()),
+				"Child with time this week", Optional.empty()));
+		var idle = service.createTask(new CreateTask(Optional.of(project.id()), "Native without time", Optional.empty()));
+		var linked = service.createTask(new CreateTask(Optional.of(project.id()), Optional.empty(),
+				"Linked with old time", Optional.empty(), java.util.Set.of(
+						new net.resheim.eclipse.timekeeper.domain.ExternalTaskReference("fixture", "https://example.test", "OLD-160", Optional.empty()))));
+		var never = service.createTask(new CreateTask(Optional.of(project.id()), Optional.empty(),
+				"Linked without time", Optional.empty(), java.util.Set.of(
+						new net.resheim.eclipse.timekeeper.domain.ExternalTaskReference("fixture", "https://example.test", "NEW-160", Optional.empty()))));
+		var unassigned = service.createTask(new CreateTask(Optional.empty(), "Unassigned without time", Optional.empty()));
+		LocalDate firstDay = LocalDate.now(TimekeeperUiPlugin.getCalendarZone())
+				.with(WeekFields.of(Locale.getDefault()).dayOfWeek(), 1);
+		var start = firstDay.atTime(9, 0).atZone(TimekeeperUiPlugin.getCalendarZone()).toInstant();
+		var current = service.createActivity(new CreateActivity(child.id(), net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL,
+				start, Optional.of(start.plusSeconds(3600)), "This week's time", java.util.Set.of()));
+		var oldStart = firstDay.minusWeeks(1).atTime(9, 0).atZone(TimekeeperUiPlugin.getCalendarZone()).toInstant();
+		var history = service.createActivity(new CreateActivity(linked.id(), net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL,
+				oldStart, Optional.of(oldStart.plusSeconds(3600)), "Last week's time", java.util.Set.of()));
+		String toggle = "Show all tasks, including those without time in the displayed week";
+		try {
+			var view = bot.viewByTitle("Workweek");
+			view.setFocus();
+			view.toolbarButton("Show current week").click();
+			assertTrue(preferences.getDefaultBoolean(PreferenceConstants.SHOW_ALL_TASKS));
+			assertTrue(view.toolbarToggleButton(toggle).isChecked());
+			assertTrue(taskRowExists(bot, project.name(), idle.summary()));
+			assertTrue(taskRowExists(bot, project.name(), "OLD-160: " + linked.summary()));
+			assertTrue(taskRowExists(bot, project.name(), "NEW-160: " + never.summary()));
+			assertTrue(rowExists(bot, unassigned.summary()));
+			assertEquals("1:00", view.bot().treeWithId("workweek-editor-tree").getTreeItem(project.name()).cell(1));
+			view.toolbarToggleButton(toggle).deselect();
+			await(bot, () -> !taskRowExists(bot, project.name(), idle.summary()), "Inactive native task is still displayed");
+			assertFalse(taskRowExists(bot, project.name(), "OLD-160: " + linked.summary()));
+			assertFalse(taskRowExists(bot, project.name(), "NEW-160: " + never.summary()));
+			assertFalse(rowExists(bot, unassigned.summary()));
+			var parentRow = parentRow(bot, project.name(), parent.summary()).expand();
+			assertEquals(child.summary(), parentRow.getNode(child.summary()).getText());
+			assertEquals("1:00", parentRow.getNode(child.summary()).cell(1));
+			assertEquals("1:00", view.bot().treeWithId("workweek-editor-tree").getTreeItem(project.name()).cell(1));
+			assertFalse(preferences.getBoolean(PreferenceConstants.SHOW_ALL_TASKS));
+			reopenWorkweek();
+			view = bot.viewByTitle("Workweek");
+			assertFalse("The choice must survive view recreation", view.toolbarToggleButton(toggle).isChecked());
+			assertFalse(taskRowExists(bot, project.name(), idle.summary()));
+			view.toolbarButton("Show previous week").click();
+			assertTrue(taskRowExists(bot, project.name(), "OLD-160: " + linked.summary()));
+			assertFalse(taskRowExists(bot, project.name(), parent.summary()));
+			assertEquals("1:00", view.bot().treeWithId("workweek-editor-tree").getTreeItem(project.name()).cell(1));
+			view.toolbarToggleButton(toggle).select();
+			assertTrue(taskRowExists(bot, project.name(), idle.summary()));
+			assertTrue(taskRowExists(bot, project.name(), "NEW-160: " + never.summary()));
+			view.toolbarButton("Show current week").click();
+			assertEquals("1:00", view.bot().treeWithId("workweek-editor-tree").getTreeItem(project.name()).cell(1));
+			assertEquals(current, service.activity(current.id()).orElseThrow());
+			assertEquals(history, service.activity(history.id()).orElseThrow());
+		} finally {
+			cleanup(service, project, java.util.List.of(parent.id(), child.id(), idle.id(), linked.id(), never.id(), unassigned.id()));
+			onUi(() -> preferences.setValue(PreferenceConstants.SHOW_ALL_TASKS, previous));
+			reopenWorkweek();
+		}
+	}
+
+	private static void reopenWorkweek() throws Exception {
+		onUi(() -> {
+			var page = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
+			var view = page.findView(WorkWeekView.VIEW_ID);
+			if (view != null) page.hideView(view);
+		});
+		showWorkweek();
+	}
+
+	@Test
 	public void activityNameRequiresSelectionBeforeEditing() throws Exception {
 		verifyActivityCellActivation(0);
 	}
