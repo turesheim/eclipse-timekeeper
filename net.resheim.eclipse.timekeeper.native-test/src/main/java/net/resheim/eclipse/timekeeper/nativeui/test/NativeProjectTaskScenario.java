@@ -23,6 +23,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 
 import org.eclipse.core.runtime.Platform;
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.widgets.Event;
+import org.eclipse.swt.widgets.Text;
+import org.eclipse.swt.widgets.Tree;
 import org.eclipse.swtbot.eclipse.finder.SWTWorkbenchBot;
 import org.eclipse.swtbot.swt.finder.waits.DefaultCondition;
 import org.eclipse.ui.PlatformUI;
@@ -46,6 +50,131 @@ import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
  */
 @RunWith(SWTBotJunit4ClassRunner.class)
 public abstract class NativeProjectTaskScenario {
+	@Test
+	public void activityNameRequiresSelectionBeforeEditing() throws Exception {
+		verifyActivityCellActivation(0);
+	}
+
+	@Test
+	public void activityTimeRequiresSelectionBeforeEditing() throws Exception {
+		verifyActivityCellActivation(1);
+	}
+
+	/** Runs with and without the optional Mylyn adapter, including Linux CI. */
+	private void verifyActivityCellActivation(int column) throws Exception {
+		SWTWorkbenchBot bot = new SWTWorkbenchBot();
+		await(bot, () -> TimekeeperPlugin.getDefault().isReady(), "Database is not ready");
+		showWorkweek();
+		bot.viewByTitle("Workweek").setFocus();
+		bot.viewByTitle("Workweek").toolbarButton("Show current week").click();
+		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
+		var project = service.createProject(new CreateProject("Activity selection " + column));
+		var task = service.createTask(new CreateTask(Optional.of(project.id()), "Select before editing", Optional.empty()));
+		LocalDate firstDay = LocalDate.now(TimekeeperUiPlugin.getCalendarZone())
+				.with(WeekFields.of(Locale.getDefault()).dayOfWeek(), 1);
+		var start = firstDay.atTime(9, 0).atZone(TimekeeperUiPlugin.getCalendarZone()).toInstant();
+		var activity = service.createActivity(new CreateActivity(task.id(), net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL,
+				start, Optional.of(start.plusSeconds(3600)), "First activity", java.util.Set.of()));
+		service.createActivity(new CreateActivity(task.id(), net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL,
+				start.plusSeconds(3600), Optional.of(start.plusSeconds(7200)), "Other activity", java.util.Set.of()));
+		Tree tree = bot.viewByTitle("Workweek").bot().treeWithId("workweek-editor-tree").widget;
+		try {
+			var parent = parentRow(bot, project.name(), task.summary()).expand();
+			var row = parent.getNode(activity.summary());
+			onUi(tree::deselectAll);
+			row.click(column);
+			onUi(() -> {
+				assertNull("First click must only select", cellEditor(tree));
+				assertEquals(activity.id(), ((net.resheim.eclipse.timekeeper.domain.Activity)
+						tree.getSelection()[0].getData()).id());
+			});
+			parent.getNode("Other activity").click(column);
+			onUi(() -> assertNull("Switching rows must only select", cellEditor(tree)));
+			row.click(column);
+			onUi(() -> assertNull("Returning to a previously selected row must only select", cellEditor(tree)));
+			row.click(column);
+			String original = column == 0 ? activity.summary() : "09:00-10:00";
+			String changed = column == 0 ? "Edited activity name" : "09:15-10:30";
+			onUi(() -> {
+				Text editor = cellEditor(tree);
+				assertNotNull("Second click must edit the clicked cell", editor);
+				assertEquals(original, editor.getText());
+				editor.setText(changed);
+				key(editor, SWT.CR);
+			});
+			var saved = service.activity(activity.id()).orElseThrow();
+			assertEquals(column == 0 ? changed : activity.summary(), saved.summary());
+			assertEquals(column == 0 ? activity.start() : start.plusSeconds(900), saved.start());
+			assertEquals(column == 0 ? activity.end() : Optional.of(start.plusSeconds(5400)), saved.end());
+			await(bot, () -> {
+				try { return parentRow(bot, project.name(), task.summary()).expand().getNode(saved.summary()) != null; }
+				catch (RuntimeException missing) { return false; }
+			}, "Saved activity is not displayed");
+			row = parentRow(bot, project.name(), task.summary()).expand().getNode(saved.summary());
+			// Focus the time or name cell with a selection-only click, then edit with either Enter key.
+			onUi(tree::deselectAll);
+			row.click(column);
+			for (int enter : new int[] { SWT.CR, SWT.KEYPAD_CR }) {
+				onUi(() -> {
+					assertNull(cellEditor(tree));
+					key(tree, enter);
+					Text editor = cellEditor(tree);
+					assertNotNull("Enter must edit the focused selected cell", editor);
+					assertEquals(changed, editor.getText());
+					editor.setText(column == 0 ? "Cancelled name" : "08:00-11:00");
+					key(editor, SWT.ESC);
+					assertNull("Escape must close the editor", cellEditor(tree));
+				});
+				assertEquals("Escape must preserve the saved activity", saved, service.activity(activity.id()).orElseThrow());
+			}
+			row.doubleClick(column);
+			onUi(() -> {
+				assertNotNull("A quick second click must also edit", cellEditor(tree));
+				key(cellEditor(tree), SWT.ESC);
+			});
+			onUi(() -> {
+				var bounds = tree.getSelection()[0].getBounds(column);
+				Event mouse = new Event();
+				mouse.x = bounds.x + bounds.width / 2;
+				mouse.y = bounds.y + bounds.height / 2;
+				mouse.button = 3;
+				mouse.count = 1;
+				tree.notifyListeners(SWT.MouseDown, mouse);
+				assertNull("Right-click must not edit", cellEditor(tree));
+				mouse.button = 1;
+				mouse.stateMask = SWT.SHIFT;
+				tree.notifyListeners(SWT.MouseDown, mouse);
+				assertNull("Selection modifiers must not edit", cellEditor(tree));
+			});
+			var other = parentRow(bot, project.name(), task.summary()).expand().getNode("Other activity");
+			var selected = row;
+			onUi(() -> {
+				tree.setSelection(new org.eclipse.swt.widgets.TreeItem[] { selected.widget, other.widget });
+				key(tree, SWT.CR);
+				assertNull("Enter with multiple rows selected must not edit", cellEditor(tree));
+			});
+		} finally {
+			onUi(() -> { Text editor = cellEditor(tree); if (editor != null) key(editor, SWT.ESC); });
+			cleanup(service, project, java.util.List.of(task.id()));
+		}
+	}
+
+	private static Text cellEditor(Tree tree) {
+		return java.util.Arrays.stream(tree.getChildren()).filter(Text.class::isInstance).map(Text.class::cast)
+				.filter(Text::isVisible).findFirst().orElse(null);
+	}
+
+	private static void key(org.eclipse.swt.widgets.Control control, int keyCode) {
+		Event event = new Event();
+		event.keyCode = keyCode;
+		event.character = keyCode == SWT.KEYPAD_CR ? SWT.CR : (char) keyCode;
+		control.notifyListeners(SWT.KeyDown, event);
+		control.notifyListeners(SWT.KeyUp, event);
+		if (control instanceof Text && (keyCode == SWT.CR || keyCode == SWT.KEYPAD_CR)) {
+			control.notifyListeners(SWT.DefaultSelection, new Event());
+		}
+	}
+
 	@Test
 	public void createEditAndDeleteNativeHierarchyThroughWorkweek() throws Exception {
 		SWTWorkbenchBot bot = new SWTWorkbenchBot();
