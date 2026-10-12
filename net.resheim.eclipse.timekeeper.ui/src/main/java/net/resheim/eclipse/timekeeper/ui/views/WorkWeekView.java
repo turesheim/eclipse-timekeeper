@@ -300,7 +300,7 @@ public class WorkWeekView extends ViewPart {
 		gdStatusLabel.verticalAlignment = SWT.BEGINNING;
 		statusLabel.setLayoutData(gdStatusLabel);
 
-		viewer = new TreeViewer(main, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION);
+		viewer = new ActivityTreeViewer(main, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION);
 
 		// Make the tree view provide selections
 		getSite().setSelectionProvider(viewer);
