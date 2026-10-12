@@ -35,6 +35,15 @@ issue-key display. See the [Jira acceptance report](baseline/JIRA-COMPATIBILITY.
 for evidence and limits. Timekeeper delegates credentials to the connector and
 does not send activities to Jira worklogs.
 
+## Client/server work for 2.0
+
+The complete client/server deployment is required before 2.0 publication:
+versioned REST API/ownership, Quarkus server, remote Eclipse operation, web
+frontend and client synchronization. See [#187](https://github.com/turesheim/eclipse-timekeeper/issues/187)
+and the [HTTP API contract](api/README.md) for the design and acceptance boundaries.
+The contract does not certify a delivered remote backend; the embedded mode
+remains the current implementation.
+
 ## Database configuration
 
 Choose shared, workspace-relative or explicit H2 storage in **Preferences >

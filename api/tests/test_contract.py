@@ -1,0 +1,165 @@
+"""Validate the published contract and representative client/error boundaries."""
+import copy
+import json
+from pathlib import Path
+import unittest
+
+from jsonschema import Draft202012Validator, FormatChecker
+from openapi_spec_validator import validate
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT202012
+
+CONTRACT = json.loads((Path(__file__).parents[1] / 'openapi.json').read_text())
+URI = 'urn:timekeeper:openapi:v1'
+REGISTRY = Registry().with_resource(URI, Resource.from_contents(
+    CONTRACT, default_specification=DRAFT202012))
+ID = '00000000-0000-4000-8000-000000000001'
+
+
+def validator(name):
+    return Draft202012Validator({'$ref': f'{URI}#/components/schemas/{name}'},
+                                registry=REGISTRY, format_checker=FormatChecker())
+
+
+class ContractTest(unittest.TestCase):
+    def test_complete_openapi_document(self):
+        validate(CONTRACT)
+        for schema in CONTRACT['components']['schemas'].values():
+            Draft202012Validator.check_schema(schema)
+
+    def test_all_private_operations_require_token_and_permission(self):
+        self.assertEqual([{'bearerAuth': []}], CONTRACT['security'])
+        ids = []
+        for path, item in CONTRACT['paths'].items():
+            for method in ('get', 'post', 'put', 'delete'):
+                if method not in item:
+                    continue
+                operation = item[method]
+                ids.append(operation['operationId'])
+                if path == '/openapi.json':
+                    self.assertEqual([], operation['security'])
+                    continue
+                self.assertNotIn('security', operation)
+                self.assertEqual('read' if method == 'get' else 'write',
+                                 operation['x-required-permission'])
+                self.assertIn('401', operation['responses'])
+                self.assertIn('403', operation['responses'])
+                for parameter in item.get('parameters', []) + operation.get('parameters', []):
+                    if '$ref' in parameter:
+                        parameter = CONTRACT['components']['parameters'][parameter['$ref'].split('/')[-1]]
+                    self.assertNotEqual('ownerId', parameter['name'])
+        self.assertEqual(len(ids), len(set(ids)))
+
+    def test_owner_and_version_injection_are_rejected(self):
+        inputs = {
+            'ProjectInput': {'name': 'Project'},
+            'TaskInput': {'summary': 'Task', 'projectId': None, 'parentTaskId': None, 'url': None},
+            'LabelInput': {'name': 'Billable', 'color': '#19ABcd'},
+            'ActivityInput': {'taskId': ID, 'start': '2026-10-12T08:00:00.123456789Z',
+                              'end': None, 'summary': '', 'labelIds': []},
+            'StartActivityInput': {'taskId': ID, 'summary': '', 'labelIds': [],
+                                   'expectedActiveId': None, 'expectedActiveVersion': None},
+            'ProfileInput': {'zoneId': 'Europe/Oslo'},
+        }
+        for name, body in inputs.items():
+            with self.subTest(schema=name):
+                validator(name).validate(body)
+                for field, value in [('ownerId', 'other'), ('version', 100), ('id', ID), ('manual', False)]:
+                    self.assertFalse(validator(name).is_valid({**body, field: value}))
+                for field in body:
+                    missing = dict(body)
+                    del missing[field]
+                    self.assertFalse(validator(name).is_valid(missing))
+
+    def test_timestamp_precision_and_zone_boundary(self):
+        for value in ['2026-03-29T00:00:00Z', '2026-03-29T00:00:00.123456789Z']:
+            validator('Instant').validate(value)
+        for value in ['2026-03-29T02:00:00+02:00', '2026-03-29T02:00:00',
+                      '2026-02-30T00:00:00Z', '2026-03-29T00:00:00.1234567890Z']:
+            self.assertFalse(validator('Instant').is_valid(value), value)
+        for duration in ['PT0S', 'PT23H', 'PT25H', 'PT0.000000001S']:
+            validator('Duration').validate(duration)
+        for duration in ['-PT1S', 'PT', 'P1DT', 'PT0.1234567890S']:
+            self.assertFalse(validator('Duration').is_valid(duration))
+
+    def test_bad_colors_blank_names_duplicate_labels(self):
+        for color in ['blue', '#FFAA', '#FFAA0000', 'FFAA00']:
+            self.assertFalse(validator('Color').is_valid(color))
+        for name in ['', '   ', '\n\t']:
+            self.assertFalse(validator('Name').is_valid(name))
+        body = {'taskId': ID, 'start': '2026-10-12T08:00:00Z', 'end': None,
+                'summary': '', 'labelIds': [ID, ID]}
+        self.assertFalse(validator('ActivityInput').is_valid(body))
+        body['labelIds'] = [ID]
+        validator('ActivityInput').validate(body)
+
+    def test_versioned_mutations_and_durable_commands(self):
+        for path, item in CONTRACT['paths'].items():
+            for method in ('put', 'delete'):
+                if method in item:
+                    op = item[method]
+                    self.assertIn({'$ref': '#/components/parameters/IfMatch'}, op['parameters'])
+                    self.assertIn('412', op['responses'])
+                    self.assertIn('428', op['responses'])
+        for path in ['/activities/start', '/activities/{id}/stop', '/data/import']:
+            self.assertIn({'$ref': '#/components/parameters/IdempotencyKey'},
+                          CONTRACT['paths'][path]['post']['parameters'])
+            self.assertIn('409', CONTRACT['paths'][path]['post']['responses'])
+        schema = CONTRACT['components']['parameters']['IfMatch']['schema']
+        check = Draft202012Validator(schema)
+        for tag in ['"0"', '"12"']:
+            check.validate(tag)
+        for tag in ['*', 'W/"1"', '""', '1', '"1", "2"', '"space tag"']:
+            self.assertFalse(check.is_valid(tag), tag)
+
+    def test_specified_problem_responses_are_valid(self):
+        for status, response in CONTRACT['components']['responses'].items():
+            example = response['content']['application/problem+json']['example']
+            validator('Problem').validate(example)
+            self.assertEqual(int(status), example['status'])
+        validator('Problem').validate({'type': 'urn:timekeeper:problem:future',
+                                       'title': 'Future problem', 'status': 409,
+                                       'code': 'FUTURE_CONFLICT', 'futureField': True})
+        self.assertIn('WWW-Authenticate', CONTRACT['components']['responses']['401']['headers'])
+
+    def test_new_response_fields_are_compatible(self):
+        value = {'id': ID, 'ownerId': 'alice', 'version': 0, 'name': 'Project',
+                 'futureField': {'value': 1}}
+        validator('Project').validate(value)
+        self.assertFalse(validator('ProjectInput').is_valid({'name': 'Project', 'futureField': 1}))
+        validator('ExternalReferenceSnapshot').validate({'providerId': 'jira',
+            'repositoryId': 'https://jira.invalid', 'externalId': '123',
+            'externalUrl': None, 'futureField': True})
+        for version in [-1, 1.5, 9007199254740992]:
+            self.assertFalse(validator('Version').is_valid(version))
+
+    def test_portable_snapshot_rejects_owner_and_persistence_fields(self):
+        value = {'format': 'timekeeper-domain-v1', 'zoneId': 'UTC',
+                 'projects': [{'id': ID, 'name': 'Project'}], 'tasks': [],
+                 'labels': [], 'activities': []}
+        validator('TransferSnapshot').validate(value)
+        for field in ['ownerId', 'version', 'persistenceContext', 'databaseTable']:
+            changed = copy.deepcopy(value)
+            changed['projects'][0][field] = 'injected'
+            self.assertFalse(validator('TransferSnapshot').is_valid(changed))
+        changed = copy.deepcopy(value)
+        changed['format'] = 'legacy-h2'
+        self.assertFalse(validator('TransferSnapshot').is_valid(changed))
+
+    def test_every_reference_and_relation_workflow_is_present(self):
+        expected = {
+            'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
+            'createTask', 'updateTask', 'deleteTask', 'getTask', 'listTasks',
+            'linkExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',
+            'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
+            'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
+            'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',
+            'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi',
+        }
+        operations = {v['operationId'] for item in CONTRACT['paths'].values()
+                      for key, v in item.items() if key in ('get', 'put', 'post', 'delete')}
+        self.assertEqual(expected, operations)
+
+
+if __name__ == '__main__':
+    unittest.main()
