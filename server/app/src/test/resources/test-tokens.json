@@ -1,0 +1,1 @@
+[{"ownerId": "a", "sha256": "d7ef9a39720870db13b85251d2f81938233b8417e9ef596c773638c5d38fd60c", "permissions": ["read", "write"]}, {"ownerId": "b", "sha256": "afba2a391fafa9cdf6ca56f8efe1d251dcc3829546026c10f2694c0b2c759a32", "permissions": ["read", "write"]}, {"ownerId": "a", "sha256": "879735fccd74cf3d64936bc9cf84ef64c5f6cd97d9f9a58bbf131fddd9999624", "permissions": ["read"]}]

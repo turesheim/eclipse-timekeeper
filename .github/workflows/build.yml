@@ -25,6 +25,44 @@ jobs:
     - name: Validate OpenAPI and client/schema boundaries
       run: python -m unittest discover -s api/tests -v
 
+  Server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@v7.0.1
+    - uses: actions/setup-java@v6.0.1
+      with:
+        distribution: temurin
+        java-version: 21
+        cache: maven
+        cache-dependency-path: |
+          server/**/pom.xml
+          .mvn/wrapper/maven-wrapper.properties
+    - uses: actions/setup-python@v7.0.0
+      with:
+        python-version: '3.13'
+    - name: Install HTTP contract validators
+      run: python -m pip install -r api/tests/requirements.txt
+    - name: Build and test standalone Quarkus server
+      run: ./mvnw -B -ntp -f server/pom.xml clean verify
+    - name: Package candidate server distribution
+      run: python server/scripts/package_server.py --output server/target/distribution --commit "$GITHUB_SHA"
+    - name: Verify packaged HTTP server, durable restart and authorization
+      run: python server/scripts/acceptance.py --distribution server/target/distribution/timekeeper-server.zip
+    - name: Upload server reports and acceptance evidence
+      if: always()
+      uses: actions/upload-artifact@v7.0.1
+      with:
+        name: server-test-results
+        path: |
+          server/**/target/surefire-reports/
+          server/target/acceptance/
+    - name: Upload complete server distribution
+      uses: actions/upload-artifact@v7.0.1
+      with:
+        name: timekeeper-server
+        path: server/target/distribution/
+
   Publication:
     runs-on: ubuntu-latest
     steps:

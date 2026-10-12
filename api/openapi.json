@@ -120,6 +120,9 @@
           },
           "503": {
             "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
           }
         },
         "requestBody": {
@@ -234,6 +237,9 @@
           },
           "503": {
             "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
           }
         },
         "parameters": [
@@ -423,6 +429,9 @@
           },
           "503": {
             "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
           }
         },
         "requestBody": {
@@ -538,6 +547,9 @@
           },
           "503": {
             "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
           }
         },
         "parameters": [
@@ -702,6 +714,9 @@
           },
           "503": {
             "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
           }
         },
         "requestBody": {
@@ -816,6 +831,9 @@
           },
           "503": {
             "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
           }
         },
         "parameters": [
@@ -1020,6 +1038,9 @@
           },
           "503": {
             "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
           }
         },
         "parameters": [
@@ -1273,6 +1294,9 @@
           },
           "503": {
             "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
           }
         },
         "requestBody": {
@@ -1387,6 +1411,9 @@
           },
           "503": {
             "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
           }
         },
         "parameters": [
@@ -1568,6 +1595,9 @@
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
               }
             }
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
           }
         },
         "description": "Compare expectedActiveId/version with the current open interval under an owner lock. Null/null requires no open interval. Mismatch: 409 ACTIVE_STATE_CHANGED without changes. Same task: return the existing interval with 200. Different task: stop it and create the successor using one server-clock instant, in one transaction. Replay a successful command before rechecking active state.",
@@ -1752,6 +1782,9 @@
           },
           "503": {
             "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
           }
         },
         "parameters": [
@@ -3356,7 +3389,7 @@
         }
       },
       "413": {
-        "description": "Request or portable export exceeds the documented transfer limit.",
+        "description": "Request exceeds the global 20 MiB HTTP body limit, or portable transfer exceeds 10,000 records per type / 20 MiB export.",
         "content": {
           "application/problem+json": {
             "schema": {
