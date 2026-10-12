@@ -35,7 +35,7 @@ final class RemoteOwnerBindingScenario {
                 assertTrue(RemoteTestSupport.onUi(()->TimekeeperUiPlugin.getDefault().getTimekeeperService().task(task.id()).isPresent()));
                 var failure=assertThrows(RemoteFailure.class,()->original.createProject(new CreateProject("Must not appear in another owner")));
                 assertEquals(RemoteFailure.Kind.AUTHENTICATION,failure.kind());assertEquals("OWNER_CHANGED",failure.code());
-                assertEquals(RemoteFailure.Kind.AUTHENTICATION,assertThrows(RemoteFailure.class,original::exportData).kind());
+                assertEquals(RemoteFailure.Kind.AUTHENTICATION,assertThrows(RemoteFailure.class,()->original.exportCsv(RemoteBootstrap.fixtureFolder().resolve("owner-rejected-export"))).kind());
                 controls.button("OK").click();
                 RemoteTestSupport.waitFor(()->{
                     try {return controls.button("OK").isEnabled() && RemoteTestSupport.onUi(()->visibleMessage(shell.widget,"The account for this session has changed. Start a new session with the intended account."));}
