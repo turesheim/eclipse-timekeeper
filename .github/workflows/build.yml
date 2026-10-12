@@ -96,7 +96,9 @@ jobs:
       uses: actions/upload-artifact@v7.0.1
       with:
         name: web-acceptance
-        path: web/test-results/
+        path: |
+          web/test-results/
+          web/target/server.log
 
   Remote-Eclipse:
     needs: Server
