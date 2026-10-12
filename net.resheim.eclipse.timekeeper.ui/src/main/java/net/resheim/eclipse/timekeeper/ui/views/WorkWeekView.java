@@ -216,6 +216,8 @@ public class WorkWeekView extends ViewPart {
 	private Action newProjectAction;
 	private Action newTaskAction;
 	private Action showAllTasksAction;
+	private Action collapseAllAction;
+	private Action expandAllAction;
 
 	private Action nextWeekAction;
 
@@ -542,6 +544,9 @@ public class WorkWeekView extends ViewPart {
 		manager.add(newTaskAction);
 		manager.add(new Separator("filter"));
 		manager.add(showAllTasksAction);
+		manager.add(new Separator("tree"));
+		manager.add(collapseAllAction);
+		manager.add(expandAllAction);
 	}
 
 	private void fillLocalToolBar(IToolBarManager manager) {
@@ -554,6 +559,9 @@ public class WorkWeekView extends ViewPart {
 		manager.add(nextWeekAction);
 		manager.add(new Separator("filter"));
 		manager.add(showAllTasksAction);
+		manager.add(new Separator("tree"));
+		manager.add(collapseAllAction);
+		manager.add(expandAllAction);
 	}
 
 	private String getFormattedPeriod(long seconds) {
@@ -606,6 +614,18 @@ public class WorkWeekView extends ViewPart {
 		showAllTasksAction.setChecked(TimekeeperUiPlugin.getDefault().getPreferenceStore()
 				.getBoolean(PreferenceConstants.SHOW_ALL_TASKS));
 		showAllTasksAction.setToolTipText("Show all tasks, including those without time in the displayed week");
+		collapseAllAction = new Action("Collapse all") {
+			@Override public void run() { viewer.collapseAll(); }
+		};
+		collapseAllAction.setToolTipText("Collapse all projects and tasks");
+		collapseAllAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
+				.getImageDescriptor(ISharedImages.IMG_ELCL_COLLAPSEALL));
+		expandAllAction = new Action("Expand all") {
+			@Override public void run() { viewer.expandAll(); }
+		};
+		expandAllAction.setToolTipText("Expand all projects and tasks");
+		expandAllAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
+				.getImageDescriptor(ISharedImages.IMG_ELCL_EXPANDALL));
 		newProjectAction = new Action("New project...") {
 			@Override public void run() { editProject(null); }
 		};
@@ -764,12 +784,9 @@ public class WorkWeekView extends ViewPart {
 	 */
 	public void refreshAll() {
 		viewer.getContentProvider().inputChanged(viewer, viewer.getInput(), null);
-		viewer.expandAll();
 	}
 
-	// XXX: Don't do expandAll() but be more targeted
 	public void refresh(Object element) {
 		viewer.getContentProvider().inputChanged(viewer, viewer.getInput(), null);
-		viewer.expandAll();
 	}
 }

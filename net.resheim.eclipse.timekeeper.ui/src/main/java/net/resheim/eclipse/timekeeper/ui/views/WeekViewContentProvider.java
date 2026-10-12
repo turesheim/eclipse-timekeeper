@@ -171,8 +171,8 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 						return;
 					}
 					filter();
+					// Refresh retains the user's expanded/collapsed rows.
 					viewer.refresh();
-					if (viewer instanceof TreeViewer tree) tree.expandAll();
 				}
 			});
 		} catch (SWTException e) {
