@@ -20,6 +20,11 @@ import net.resheim.eclipse.timekeeper.client.HttpTimekeeperService;
 import net.resheim.eclipse.timekeeper.domain.TaskId;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
 import net.resheim.eclipse.timekeeper.ui.client.EclipseBackend;
+import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
+import org.eclipse.jface.dialogs.TitleAreaDialog;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Text;
+import org.eclipse.swtbot.eclipse.finder.SWTWorkbenchBot;
 
 /** Real HTTP and Eclipse Jobs; the fixture models a restored server revision. */
 public class RemoteChangeJobTest {
@@ -44,13 +49,76 @@ public class RemoteChangeJobTest {
                     RestoredServer.ID,1,Optional.empty(),Optional.empty(),"Reviewed restored task",Optional.empty())),
                     value->saved.countDown(),error->{failure.set(error);saved.countDown();});
             assertTrue(saved.await(5,TimeUnit.SECONDS));assertNull(failure.get());
-            assertEquals("\"task-1\"",server.putTag.get());assertEquals(1,server.writes.get());
+            assertEquals("\"reset-task-1\"",server.putTag.get());assertEquals(1,server.writes.get());
             assertTrue(server.pollingAgain.await(5,TimeUnit.SECONDS));
             backend.close();
             assertTrue("Close must interrupt the outstanding long poll",watcher.join(3000,null));
             assertEquals(Job.NONE,watcher.getState());
             assertNull(server.failure.get());
         }
+    }
+
+    @Test public void sameVersionResetPreservesNativeDraftUntilReopenedAndReviewed() throws Exception {
+        Display display=PlatformUI.getWorkbench().getDisplay();
+        var plugin=TimekeeperUiPlugin.getDefault();
+        var field=TimekeeperUiPlugin.class.getDeclaredField("backend");field.setAccessible(true);
+        await(()->{
+            try {return field.get(plugin)!=null;}catch(IllegalAccessException error) {throw new AssertionError(error);}
+        },"Original isolated UI backend");
+        var original=(EclipseBackend)field.get(plugin);AtomicReference<TitleAreaDialog> dialog=new AtomicReference<>();
+        try(var server=new RestoredServer();
+                var client=new HttpTimekeeperService(server.url(),()->"isolated-test-token",Duration.ofSeconds(15));
+                var backend=new EclipseBackend(()->{throw new AssertionError("Embedded fallback");},client,display)) {
+            await(backend::ready,"Initial dialog snapshot");
+            assertEquals(2,client.task(RestoredServer.ID).orElseThrow().version());
+            onUi(display,()->{try {field.set(plugin,backend);}catch(IllegalAccessException error) {throw new AssertionError(error);}return true;});
+            openTaskDialog(display,backend,dialog);
+            var bot=new SWTWorkbenchBot();var shell=bot.shell("Edit task");var controls=shell.bot();
+            controls.textWithLabel("Summary").setText("Unreviewed old draft");
+            assertTrue(server.polling.await(5,TimeUnit.SECONDS));
+            server.restore(2,"Changed fields after restore");
+            await(()->onUi(display,()->backend.ready() && backend.service().task(RestoredServer.ID)
+                    .filter(task->task.version()==2 && task.summary().equals("Changed fields after restore")).isPresent()),"Same-version restored snapshot");
+            assertEquals("Unreviewed old draft",controls.textWithLabel("Summary").getText());
+            controls.button("OK").click();
+            await(()->server.writes.get()>0 || onUi(display,()->!shell.widget.isDisposed() && visibleMessage(shell.widget,
+                    "This record has changed. Close and reopen the editor before saving.")),"Old editor must reject the changed same-version record");
+            assertEquals("Unreviewed draft must not send an update after reset",0,server.writes.get());
+            assertEquals("Changed fields after restore",server.summary);assertTrue(controls.button("OK").isEnabled());
+            assertEquals("Unreviewed old draft",controls.textWithLabel("Summary").getText());controls.button("Cancel").click();
+            openTaskDialog(display,backend,dialog);
+            var reviewed=bot.shell("Edit task");assertEquals("Changed fields after restore",reviewed.bot().textWithLabel("Summary").getText());
+            reviewed.bot().textWithLabel("Summary").setText("Explicitly reviewed save");reviewed.bot().button("OK").click();
+            await(()->!reviewed.isOpen(),"Reviewed native editor did not save");
+            assertEquals(1,server.writes.get());assertEquals("Explicitly reviewed save",server.summary);
+            assertEquals("\"reset-task-2\"",server.putTag.get());assertNull(server.failure.get());
+        } finally {
+            onUi(display,()->{
+                if(dialog.get()!=null && dialog.get().getShell()!=null && !dialog.get().getShell().isDisposed()) dialog.get().close();
+                try {field.set(plugin,original);}catch(IllegalAccessException error) {throw new AssertionError(error);}return true;
+            });
+        }
+    }
+
+    private static void openTaskDialog(Display display,EclipseBackend backend,AtomicReference<TitleAreaDialog> dialog) {
+        onUi(display,()->{
+            try {
+                var type=TimekeeperUiPlugin.getDefault().getBundle().loadClass("net.resheim.eclipse.timekeeper.ui.views.TaskDialog");
+                var constructor=type.getDeclaredConstructor(org.eclipse.swt.widgets.Shell.class,
+                        net.resheim.eclipse.timekeeper.service.TimekeeperService.class,net.resheim.eclipse.timekeeper.domain.Task.class,Optional.class,Optional.class);
+                constructor.setAccessible(true);
+                var form=(TitleAreaDialog)constructor.newInstance(PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell(),
+                        backend.service(),backend.service().task(RestoredServer.ID).orElseThrow(),Optional.empty(),Optional.empty());
+                dialog.set(form);form.create();form.getShell().open();return true;
+            } catch(Exception error) {throw new AssertionError(error);}
+        });
+    }
+    private static boolean visibleMessage(Composite parent,String expected) {
+        for(var child:parent.getChildren()) {
+            if(child instanceof Text text && text.isVisible() && text.getText().trim().equals(expected)) return true;
+            if(child instanceof Composite composite && visibleMessage(composite,expected)) return true;
+        }
+        return false;
     }
 
     private static boolean onUi(Display display,BooleanSupplier action) {
@@ -72,6 +140,7 @@ public class RemoteChangeJobTest {
         final ExecutorService workers=Executors.newVirtualThreadPerTaskExecutor();
         final ServerSocket socket=new ServerSocket(0,50,InetAddress.getByName("127.0.0.1"));
         volatile int revision=2,version=2;
+        volatile String summary="Restored task";
         RestoredServer() throws IOException {
             workers.submit(()->{
                 while(!socket.isClosed()) {
@@ -81,8 +150,10 @@ public class RemoteChangeJobTest {
             });
         }
         URI url() {return URI.create("http://127.0.0.1:"+socket.getLocalPort());}
-        void restore() {version=1;revision=1;restored.countDown();}
-        private String task() {return "{\"id\":\""+ID.value()+"\",\"version\":"+version+",\"projectId\":null,\"parentTaskId\":null,\"summary\":\"Restored task\",\"url\":null,\"externalReferences\":[]}";}
+        void restore() {restore(1,"Restored task");}
+        void restore(int restoredVersion,String restoredSummary) {version=restoredVersion;revision=1;summary=restoredSummary;restored.countDown();}
+        private String tag() {return "\""+(restored.getCount()==0 ? "reset-task-" : "task-")+version+"\"";}
+        private String task() {return "{\"id\":\""+ID.value()+"\",\"version\":"+version+",\"projectId\":null,\"parentTaskId\":null,\"summary\":\""+summary+"\",\"url\":null,\"externalReferences\":[]}";}
         private void serve(Socket connection) {
             try(connection) {
                 connection.setSoTimeout(5000);
@@ -90,7 +161,9 @@ public class RemoteChangeJobTest {
                 String[] request=input.readLine().split(" ");Map<String,String> headers=new HashMap<>();String line;
                 while(!(line=input.readLine()).isEmpty()) {int colon=line.indexOf(':');headers.put(line.substring(0,colon).toLowerCase(Locale.ROOT),line.substring(colon+1).trim());}
                 int length=Integer.parseInt(headers.getOrDefault("content-length","0"));
-                while(length>0) {int read=input.read(new char[length]);if(read<0) throw new EOFException();length-=read;}
+                char[] characters=new char[length];int offset=0;
+                while(offset<length) {int read=input.read(characters,offset,length-offset);if(read<0) throw new EOFException();offset+=read;}
+                String requestBody=new String(characters);
                 assertEquals("Bearer isolated-test-token",headers.get("authorization"));
                 URI uri=URI.create(request[1]);String path=uri.getPath();int status=200;String body,etag=null;
                 if(path.equals("/api/v1/changes")) {
@@ -102,9 +175,12 @@ public class RemoteChangeJobTest {
                 else if(path.equals("/api/v1/activities/active")) {status=204;body="";}
                 else if(path.equals("/api/v1/tasks/"+ID.value())) {
                     if(request[0].equals("PUT")) {
-                        putTag.set(headers.get("if-match"));assertEquals("\"task-1\"",putTag.get());writes.incrementAndGet();version++;revision++;
+                        putTag.set(headers.get("if-match"));assertEquals(tag(),putTag.get());
+                        // Fixture drafts are deliberately plain ASCII, without JSON escapes.
+                        var name=java.util.regex.Pattern.compile("\"summary\":\"([^\"]*)\"").matcher(requestBody);assertTrue(name.find());
+                        summary=name.group(1);writes.incrementAndGet();version++;revision++;
                     }
-                    body=task();etag="\"task-"+version+"\"";
+                    body=task();etag=tag();
                 } else if(Set.of("/api/v1/tasks","/api/v1/projects","/api/v1/labels").contains(path))
                     body="{\"items\":["+(path.endsWith("/tasks") ? task() : "")+"],\"revision\":"+revision+",\"nextCursor\":null}";
                 else throw new AssertionError("Unexpected fixture route: "+path);

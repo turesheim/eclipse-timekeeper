@@ -11,12 +11,18 @@ import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 /** Preserve the form until the selected backend acknowledges a save. */
 abstract class AsyncRecordDialog extends TitleAreaDialog {
     private Job pending;
-    protected AsyncRecordDialog(Shell shell) {super(shell);}
+    private final net.resheim.eclipse.timekeeper.service.TimekeeperService service;
+    private final Object original;
+    protected AsyncRecordDialog(Shell shell,net.resheim.eclipse.timekeeper.service.TimekeeperService service,Object original) {
+        super(shell);this.service=service;this.original=original;
+    }
     protected <T> void save(String title,Supplier<T> operation,Consumer<T> saved) {
         if(pending!=null) return;
         getDialogArea().setEnabled(false);
         getButton(IDialogConstants.OK_ID).setEnabled(false);setErrorMessage(null);
-        pending=TimekeeperUiPlugin.getDefault().runOperation(title,operation,value->{
+        pending=TimekeeperUiPlugin.getDefault().runOperation(title,()->{
+            RecordDialogErrors.verifyRemoteSnapshot(service,original);return operation.get();
+        },value->{
             pending=null;if(getShell()==null || getShell().isDisposed()) return;
             saved.accept(value);AsyncRecordDialog.super.okPressed();
         },failure->{

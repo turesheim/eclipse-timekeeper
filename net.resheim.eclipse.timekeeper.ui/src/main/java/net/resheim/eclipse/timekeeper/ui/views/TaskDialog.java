@@ -54,7 +54,7 @@ final class TaskDialog extends AsyncRecordDialog {
 
 	TaskDialog(Shell shell, TimekeeperService service, Task original,
 			Optional<ProjectId> projectId, Optional<TaskId> parentId) {
-		super(shell);
+		super(shell,service,original);
 		this.service = service;
 		this.original = original;
 		this.initialProject = original == null ? projectId : original.projectId();
