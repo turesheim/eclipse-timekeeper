@@ -1,5 +1,5 @@
 #!/bin/sh
-# Consistent logical backup through the current primary, plus the token registry.
+# Consistent logical backup plus the token registry.
 set -eu
 cd "$(dirname "$0")"
 # shellcheck source=/dev/null
@@ -10,7 +10,7 @@ mkdir -p "$backup_dir"
 chmod 700 "$backup_dir"
 docker compose run --rm --no-deps -T --entrypoint sh maintenance -ec '
   export PGPASSWORD="$(cat /run/secrets/timekeeper_database_password)"
-  exec pg_dump -h gateway -U timekeeper -d timekeeper --format=custom
+  exec pg_dump -h postgres -U timekeeper -d timekeeper --format=custom
 ' > "$backup_dir/database.dump.tmp"
 mv "$backup_dir/database.dump.tmp" "$backup_dir/database.dump"
 cp "$state_dir/config/tokens.json" "$backup_dir/tokens.json"

@@ -8,8 +8,7 @@ from pathlib import Path
 import secrets
 
 HERE = Path(__file__).resolve().parent
-SECRET_NAMES = ('postgres_admin_password', 'postgres_replication_password',
-                'patroni_api_password', 'timekeeper_database_password')
+SECRET_NAMES = ('postgres_admin_password', 'timekeeper_database_password')
 
 
 def configuration():
@@ -35,6 +34,8 @@ def main():
     state = (args.state_dir or Path(configuration().get('TIMEKEEPER_STATE_DIR', HERE / 'state'))).resolve()
     credentials = state / 'secrets'
     if any((state / f'postgres-{i}' / 'data' / 'PG_VERSION').exists() for i in (1, 2, 3)):
+        parser.error('Existing HA data requires a logical backup and restore into a new state directory; see README.md')
+    if any((state / 'postgres').rglob('PG_VERSION')):
         missing = [name for name in SECRET_NAMES if not (credentials / name).is_file()]
         if missing:
             parser.error('Existing database requires its original secrets; restore them instead of generating replacements')
@@ -65,10 +66,8 @@ def main():
         print(token)
     else:
         print('Existing token registry preserved.')
-    for name in ('postgres-1', 'postgres-2', 'postgres-3', 'etcd-1', 'etcd-2', 'etcd-3', 'backups'):
+    for name in ('postgres', 'backups'):
         (state / name).mkdir(parents=True, exist_ok=True)
-        if name.startswith('etcd-'):
-            (state / name).chmod(0o700)
     env_file = HERE / '.env'
     if not env_file.exists():
         env_file.write_text(f'TIMEKEEPER_STATE_DIR={state}\nTIMEKEEPER_BIND_ADDRESS=127.0.0.1\nTIMEKEEPER_HTTP_PORT=8080\n')
