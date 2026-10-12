@@ -52,12 +52,13 @@ The completed embedded foundation in #211 does not complete these follow-ups.
 | Combined feature acceptance | Merged-main Linux CI passed 142 tests, including both native runtimes, real Mylyn switching, installed JiraConnector and second-process restart. The earlier local candidate receipt below is historical evidence. | Verified on merged main |
 | Client/server deployment (#187) | Required for 2.0: versioned API/ownership (#217), Quarkus server (#218), remote Eclipse client (#220), standalone web frontend (#221), and owner-scoped change notification/synchronization (#219). Both clients must use server authority, reject cross-owner access and handle stale/concurrent operations. | Open |
 | Optional Mylyn Error Log (#243) | The installed Task List symbolic-color parser error remains open in [ERROR-LOG.md](baseline/ERROR-LOG.md). [#243](https://github.com/turesheim/eclipse-timekeeper/issues/243) records reproduction, local patch validation and official-fix acceptance. Upstream follow-up is deferred; no experimental Mylyn bundle is distributed. Consume an official correction and recheck a clean installed workspace. | Open |
-| Live Jira acceptance (#230) | The released connector is installed and exercised automatically against synthetic REST responses. Live Jira Cloud/Data Center deployment/authentication combinations remain unverified. Record the requested live checks and a fresh installed-IDE Error Log before claiming support. | Open |
+| Jira acceptance (#230) | The maintainer checked the acceptance criteria and [closed #230 with “Tested OK”](https://github.com/turesheim/eclipse-timekeeper/issues/230#issuecomment-6123692190). Automatic evidence uses the released connector with synthetic REST responses. The exact manually tested Jira deployment/authentication combination is not recorded; do not infer certification of all combinations. The separate Mylyn Error Log gate is #243. | Accepted by maintainer |
+| Default planning label (#245) | Include planning in an appropriate default label. Preserve user-customized labels and existing records. | Open |
 | Final tagged build and release artifacts | Build the accepted commit through [release-p2.yml](.github/workflows/release-p2.yml). Record the actual tag, commit, feature version, test results, archive URL, checksum and provenance, plus client/server deliverables. Current candidate artifacts do not meet this gate. | Open |
 | Public GitHub p2 installation | After publication and Pages deployment, install from the public stable channel in a clean Eclipse 4.41 / Java 21, without GitHub authentication. Check base and optional features, restart, embedded/remote settings and synthetic records. Also verify the archive path and the retained release-specific site. | Open |
 
 Do not publish a release candidate or final release merely because individual
-PR checks are green. Full client/server delivery, installed/live acceptance,
+PR checks are green. Full client/server delivery, installed acceptance,
 the Error Log and final artifact checkboxes remain separate release gates.
 
 ### Combined candidate receipt
