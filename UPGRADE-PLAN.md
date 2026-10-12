@@ -7,14 +7,17 @@ Goal: Timekeeper can be installed and used in Eclipse IDE 2026-09
 Historical data migrations are explicitly out of scope.
 This was the latest stable Eclipse release when the plan was created.
 
-Status: PRs #185/#186/#188/#189/#191/#192/#193/#194/#195/#196 are merged into `main`,
-with PR #196's Linux/Xvfb CI passing. Normal storage uses H2 2.5.250.
-The maintainer has removed historical migration support from scope: no one
-depends on those formats. Schema versioning and guarded target lifecycle hooks
-remain for future migrations. Clean installed-IDE creation, update and restart
-are verified on macOS Apple Silicon; broader runtime acceptance remains open.
-Earlier migration reports are historical, not active
-support promises. Test enablement from steps 4/5 was brought forward.
+Current checkpoint: October 12, 2026. Timekeeper 2.0 requires Eclipse 4.41 and
+Java 21 and uses **H2 2.5.250 / schema version 2**. The native domain, service,
+project/task/activity UI and optional Mylyn adapter from #211 are implemented.
+Historical migration support remains out of scope; experimental schema-1 files
+are unsupported and are not upgraded automatically.
+
+The dated results below preserve the original upgrade evidence, including the
+earlier schema-1 installed sessions and test totals. They are not evidence of a
+final 2.0 build or current publication. Use the checkpoint below for remaining
+release gates and [DATABASE-RECOVERY.md](DATABASE-RECOVERY.md) for current storage
+and backup policy.
 See the [scope-change report](baseline/MIGRATION-SIMPLIFICATION.md).
 See the [original baseline](baseline/README.md),
 [step 2 results](baseline/BUILD-UPGRADE.md) and
@@ -27,6 +30,57 @@ See the [original baseline](baseline/README.md),
 [interrupted-activity acceptance](baseline/INTERRUPTED-ACTIVITY.md) and
 [Error Log acceptance](baseline/ERROR-LOG.md).
 The [database policy](DATABASE-RECOVERY.md) documents current backups and the future migration contract.
+
+## Current 2.0 release gates
+
+At this checkpoint, main is
+[`8a5afbe`](https://github.com/turesheim/eclipse-timekeeper/commit/8a5afbee06deef9b4d7fde2240c768eb5a23b421).
+[Main CI 38235192647](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38235192647)
+passed publication, Linux, macOS and Windows jobs. Its Linux reports contain
+135 tests with no failures, errors or skips. The `v2.0.0` release remains a
+draft with no assets; no 2.0 RC has been published.
+
+| Gate | Evidence and remaining work | Status |
+| --- | --- | --- |
+| Workweek labels (#235) | [PR #240](https://github.com/turesheim/eclipse-timekeeper/pull/240), head `5320d096f968c86946f973776cdc8c803f9a45f9`; all CI jobs passed and Linux ran 139 tests. Needs review and merge. | Open |
+| Native task activation (#234) | [PR #241](https://github.com/turesheim/eclipse-timekeeper/pull/241), head `0f4650a936e67b0662b878583ee8e9fe5721e23f`; all CI jobs passed and Linux ran 138 tests. Needs review and merge. | Open |
+| Combined feature acceptance | The two recorded PR heads merge cleanly. A local clean build with `jira-connector-tests` passed 142 tests, including both native runtimes, real Mylyn switching, installed JiraConnector and second-process restart. See the candidate receipt below. | Verified locally; repeat on merged main |
+| 2.0 scope | #211 explicitly assigns client/server work to 3.0, while #187, #217 and #220 are assigned to the 2.0 milestone. The maintainer must reconcile the release scope and milestone assignments before the RC checklist can be final. | Unresolved |
+| Optional Mylyn Error Log | The installed Task List symbolic-color parser error remains open in [ERROR-LOG.md](baseline/ERROR-LOG.md). Official Mylyn main at `7d925aead8681ce5d5e68797745cd4d33d9698b2` still parses an unrecognized symbolic `#org-...` value as hex. A locally tested patch is prepared, but is not submitted upstream or included in Timekeeper. Consume an upstream correction and recheck a clean installed workspace. | Open |
+| Live Jira acceptance (#230) | The released connector is installed and exercised automatically against synthetic REST responses. Live Jira Cloud/Data Center deployment/authentication combinations remain unverified. Record the requested live checks and a fresh installed-IDE Error Log before claiming support. | Open |
+| Final tagged build and release artifacts | Build the accepted commit through [release-p2.yml](.github/workflows/release-p2.yml). Record the actual tag, commit, feature version, test results, archive URL, checksum and provenance. Current candidate artifacts do not meet this gate. | Open |
+| Public GitHub p2 installation | After publication and Pages deployment, install from the public stable channel in a clean Eclipse 4.41 / Java 21, without GitHub authentication. Check base and optional features, restart, settings and synthetic records. Also verify the archive path and the retained release-specific site. | Open |
+
+Do not publish a release candidate or final release merely because individual
+PR checks are green. Pending reviews, scope clarification and installed/live
+acceptance remain separate gates. The Error Log and final artifact checkboxes
+in step 6 stay open.
+
+### Combined candidate receipt
+
+The local integration checkout merges the recorded #240 and #241 heads onto
+the main commit above. Its source tree is
+`c074019ea2ce95cf1a181780ff4ffda7aa0029be`; local merge commit
+`cc63376d85fbe72152c5ceb1589a4bff28e9d674` is not a published release or tag.
+
+```sh
+./mvnw -B -ntp -s /private/tmp/timekeeper-clean-settings.xml clean verify \
+  -Pjira-connector-tests -Dtycho.localArtifacts=ignore
+```
+
+Verified October 12 on Temurin 21 / macOS aarch64: **142 tests, zero failures,
+errors or skips**. The settings file contains a minimal Maven configuration
+without private repository mirrors. The two feature groups are the base
+Timekeeper feature and optional Mylyn feature, both `2.0.0.202610121114`.
+The production repository passed `scripts/p2_release.py`'s repository validator;
+all declared artifacts exist and no Timekeeper test bundles are included.
+
+Candidate archive:
+`net.resheim.eclipse.timekeeper-site/target/net.resheim.eclipse.timekeeper-2.0.0.202610121114.zip`.
+SHA-256:
+`4b7d12f10cf80e156e9d31f9d4d9e1d1998762778a4b7d4358d04632636260d3`.
+It exists only in the temporary local acceptance checkout and is not attached to
+the release draft. Rebuild from the accepted tag before producing final assets.
 
 ## Following this plan
 
@@ -166,7 +220,7 @@ Do not add published-release fixtures or legacy migration recipes for this relea
 - [x] Preserve the current Task/activity/project/label model and reporting.
 - [x] Use EclipseLink 2.7.16 / javax.persistence 2.2.1; no Jakarta migration is needed.
 - [x] Use H2 2.5.250 as the only database engine.
-- [x] Establish schema version 1 as the supported baseline; initialize only empty databases.
+- [x] Establish the current schema version 2 as the supported baseline; initialize only empty databases.
 - [x] Reject unknown/unversioned schemas and malformed versions without changing them.
 - [x] Persist initialization/migration state and refuse incomplete targets at normal startup.
 - [x] Retain generic empty migration-target creation and explicit validated completion.
@@ -208,7 +262,7 @@ See [migration simplification](baseline/MIGRATION-SIMPLIFICATION.md) and the
 remain 2 projects, 3 tasks, 5 activities, 2 labels, 3 assignments and 19,800 seconds
 for the current synthetic fixture. Next: remaining automated and cross-platform acceptance.
 
-The latest clean build passes 64 database/report/packaging tests and 10 UI/integration
+The September storage-baseline build passed 64 database/report/packaging tests and 10 UI/integration
 tests. Current-schema CSV export coverage is active again. Removed historical
 tests are no longer applicable, not skipped tests.
 
@@ -310,7 +364,7 @@ pass in the UI harness, and installed interrupted-activity scenarios are verifie
 | Exact Mylyn version and required connectors | Mylyn 4.12 Tasks; Bugzilla no longer mandatory; local lifecycle verified in step 3 |
 | Minimum Java version and tested runtime | Java 21; build tested with Temurin 21.0.12.1 |
 | EclipseLink/JPA version and possible Jakarta migration | EclipseLink 2.7.16 / javax.persistence 2.2.1; no namespace migration for test enablement |
-| H2 and migration scope | H2 2.5.250 / schema 1; no historical migrations; future lifecycle infrastructure retained |
+| H2 and migration scope | H2 2.5.250 / schema 2; no historical migrations; experimental schema 1 is unsupported; future lifecycle infrastructure retained |
 | Supported operating systems and architectures | macOS aarch64 fully exercised; Linux x86_64/X11 full CI; Windows x86_64 build/native idle smoke; see platform acceptance for limitations |
 | New Timekeeper version | 2.0.0; build qualifiers remain until publication |
 
