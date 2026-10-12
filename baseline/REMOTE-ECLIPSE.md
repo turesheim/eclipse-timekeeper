@@ -111,6 +111,42 @@ no failures, errors or skips. CI must be rechecked for the scope commit. The
 server reactor remains covered by the 52-test CSV checkpoint; scope changes do
 not change the standalone server implementation.
 
+## Installed native acceptance checkpoint, 2026-10-12
+
+`net.resheim.eclipse.timekeeper.remote-test` now provisions Eclipse Platform and
+the Timekeeper base feature using `p2Installed`, without Mylyn. Its bootstrap
+checks the isolated keyring/password arguments, stores an encrypted fixture
+token, selects remote mode before Timekeeper startup, and launches the complete
+checksum-verified server ZIP. It then delegates to the actual IDE application.
+
+The two phases use distinct Eclipse and server JVMs. Installed Workweek controls
+create project/task records, edit the task, start/stop tracking, and edit a
+precise activity. A rejected interval update keeps the dialog and draft open
+and leaves the server record unchanged. CSV transfer uses the selected client's
+remote wrapper; the native folder chooser and preference-page transfer buttons
+are not automated by this test.
+
+The restart phase decrypts the stored token and verifies the same project/task/
+activity IDs and exact instants. Both phases assert that the app's entity
+manager remains null, local database readiness stays false, and the valid local
+fixture file retains its original SHA-256. The local database is explicitly
+prepared and closed by the fixture before UI launch; it is not the app's
+connection. No user IDE, keyring, credentials or database are selected.
+
+Local full command with `jira-connector-tests,remote-client-tests clean verify`:
+**159 main tests and two separate restart tests**, no failures, errors or skips.
+The two restart reports cover Jira and the new remote runtime respectively.
+The remote receipt records server PIDs `59420,59442`, distribution SHA-256
+`bb0a9b5d12a3ea4527d87d087db8d7ad13ae1c40b43a90e0eef4a5be51762ad8`, both
+phases passed, and unchanged local file SHA-256
+`b45159cf74e5e89b0a41447adbd14abf803affa0df4be7cc6ba71818fa9486ea`.
+
+CI's new `Remote-Eclipse` job consumes the Server job's distribution and runs
+the installed phases under Xvfb. It uploads credential-free receipts/reports
+and runtime logs, excluding the fixture password, keyring and token registry.
+The new job must pass on the acceptance commit before this evidence is used as
+CI acceptance. See [the test README](../net.resheim.eclipse.timekeeper.remote-test/README.md).
+
 ## Remaining before #220 can be completed
 
 - Verify the server CSV preference-page flow in the installed Eclipse runtime,
@@ -118,12 +154,13 @@ not change the standalone server implementation.
   database files.
 - Verify the scoped Mylyn mappings in the installed remote runtime, including
   actual backend/account switches and late activation/deactivation events.
-- Exercise the complete installed Eclipse flow against the actual packaged
-  server, both without Mylyn and with Mylyn activation/deactivation, including
-  secure storage, restart, remote edits, labels, reports and tracking.
-- Prove the local database stays closed and existing local files stay unchanged
-  in remote mode, including authentication, timeout, cancellation and conflict
-  failures. Verify that form drafts survive each failure.
+- Exercise installed Mylyn activation/deactivation against the packaged server,
+  plus the remaining native label/report/preference UI flows and token-setting
+  writer/account-switch acceptance. Basic installed native editing, tracking,
+  encrypted-token reading and restart are covered above.
+- Repeat closed-local-storage and form-draft checks through authentication,
+  offline, timeout, cancellation and optimistic-conflict failures. The normal
+  and rejected-validation installed paths are covered above.
 - Complete uncertain-command and form-draft acceptance for the installed
   client; retain the atomic import and owner-scoped retry evidence above.
 
