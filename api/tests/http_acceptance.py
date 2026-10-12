@@ -282,6 +282,12 @@ class HttpAcceptance(unittest.TestCase):
             query = urlencode({k: reference[k] for k in ['providerId', 'repositoryId', 'externalId']})
             found, _ = self.call('GET', '/tasks/by-external-reference?' + query, owner=owner)
             self.assertEqual(linked['id'], found['id'])
+        before, _ = self.call('GET', '/tasks?' + urlencode({'q': self.prefix + ' rejected create'}))
+        self.call('POST', '/tasks', body={'projectId': None, 'parentTaskId': None,
+                  'summary': self.prefix + ' rejected create', 'url': None,
+                  'externalReferences': [reference]}, status=409, code='CONFLICT')
+        after, _ = self.call('GET', '/tasks?' + urlencode({'q': self.prefix + ' rejected create'}))
+        self.assertEqual(before, after)
         duplicate = self.create('tasks', {'projectId': None, 'parentTaskId': None,
                                          'summary': self.prefix + ' duplicate', 'url': None})
         _, duplicate_headers = self.call('GET', '/tasks/' + duplicate['id'])

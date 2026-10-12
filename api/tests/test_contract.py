@@ -71,6 +71,16 @@ class ContractTest(unittest.TestCase):
                     del missing[field]
                     self.assertFalse(validator(name).is_valid(missing))
 
+    def test_atomic_provider_linking_is_available_at_task_creation(self):
+        body = {'summary': 'Jira issue', 'projectId': None, 'parentTaskId': None, 'url': None}
+        validator('TaskCreateInput').validate(body)
+        reference = {'providerId': 'jira', 'repositoryId': 'https://jira.invalid',
+                     'externalId': '123', 'externalUrl': None}
+        validator('TaskCreateInput').validate({**body, 'externalReferences': [reference]})
+        self.assertFalse(validator('TaskCreateInput').is_valid({**body, 'externalReferences': [reference, reference]}))
+        self.assertFalse(validator('TaskInput').is_valid({**body, 'externalReferences': [reference]}))
+        self.assertFalse(validator('TaskCreateInput').is_valid({**body, 'ownerId': 'other'}))
+
     def test_timestamp_precision_and_zone_boundary(self):
         for value in ['2026-03-29T00:00:00Z', '2026-03-29T00:00:00.123456789Z']:
             validator('Instant').validate(value)

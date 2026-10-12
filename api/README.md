@@ -83,7 +83,11 @@ parent. Self-parenting, cycles, and moving a task with children to another proje
 are conflicts (409). Deleting a project containing tasks, a task with children
 or activities, or a label assigned to activities returns 409; no implicit cascade
 loses recorded time. All referenced projects/tasks/labels must be owned.
-External references are updated separately from the editable task fields.
+External references may be included atomically at task creation (the optional
+`externalReferences` defaults to an empty list) and are subsequently updated
+separately from the editable task fields. A reference conflict at creation must
+not leave an orphan task. After an ambiguous provider-linked create, reconcile
+through the external-reference lookup instead of creating a duplicate.
 
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
@@ -135,14 +139,16 @@ Stop uses the server clock and If-Match; stopping an already ended interval with
 its current version returns it unchanged with 200.
 
 Start, stop and import require an `Idempotency-Key` UUID. The namespace is per
-owner across these operations. Persist the semantic request fingerprint (method,
+owner across these operations. Persist the parsed request fingerprint (method,
 canonical path, normalized JSON and original If-Match) and successful HTTP
 status/body/ETag/Location with the changes in the same transaction. Authenticated
 same-owner retries with the same fingerprint return **the original response**
 without another change/event, including after restart and when the original
 If-Match or observed active state has become stale. Reusing a key for different
 input returns 409 `IDEMPOTENCY_KEY_REUSED` without changes. Normalize JSON object
-key order; arrays retain order. Validate the complete request before executing;
+key order and insignificant JSON whitespace; arrays retain order and scalar
+values remain exact. A changed scalar or array is different input even if a
+domain normalization would ultimately produce the same stored value. Validate the complete request before executing;
 failed requests leave no receipt and can be retried after correction. Concurrent
 identical requests must share one committed result; an in-memory cache alone is
 insufficient. Authorization is rechecked on every retry, including permission

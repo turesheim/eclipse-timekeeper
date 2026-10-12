@@ -430,11 +430,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TaskInput"
+                "$ref": "#/components/schemas/TaskCreateInput"
               }
             }
           }
-        }
+        },
+        "description": "Create the task and optional externalReferences atomically. Missing externalReferences means an empty list. Any identity already linked within this owner returns 409 without creating an orphan task. On an ambiguous response with a provider identity, reconcile through findTaskByExternalReference."
       }
     },
     "/tasks/{id}": {
@@ -3134,6 +3135,60 @@
           "externalUrl"
         ],
         "additionalProperties": true
+      },
+      "TaskCreateInput": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parentTaskId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Url"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "externalReferences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalReference"
+            },
+            "uniqueItems": true,
+            "maxItems": 500,
+            "default": []
+          }
+        },
+        "required": [
+          "projectId",
+          "parentTaskId",
+          "summary",
+          "url"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {
