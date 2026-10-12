@@ -34,32 +34,37 @@ The [database policy](DATABASE-RECOVERY.md) documents current backups and the fu
 ## Current 2.0 release gates
 
 At this checkpoint, main is
-[`8a5afbe`](https://github.com/turesheim/eclipse-timekeeper/commit/8a5afbee06deef9b4d7fde2240c768eb5a23b421).
-[Main CI 38235192647](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38235192647)
-passed publication, Linux, macOS and Windows jobs. Its Linux reports contain
-135 tests with no failures, errors or skips. The `v2.0.0` release remains a
-draft with no assets; no 2.0 RC has been published.
+[`baa407b`](https://github.com/turesheim/eclipse-timekeeper/commit/baa407b7ad268b6b042810bdeab6c048a0a8a1fa).
+[Main CI 38243900341](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38243900341)
+passed publication, Linux, macOS and Windows jobs. Its downloaded Linux reports
+contain **142 tests with no failures, errors or skips**. Workweek label rendering
+(#235 / #240) and direct native task activation (#234 / #241) are merged.
+The `v2.0.0` release remains a draft with no assets; no 2.0 RC has been published.
+
+The maintainer decided on October 12 to complete the **full client/server
+scope before 2.0.0**. #187 and all five children belong to the 2.0 milestone.
+The completed embedded foundation in #211 does not complete these follow-ups.
 
 | Gate | Evidence and remaining work | Status |
 | --- | --- | --- |
-| Workweek labels (#235) | [PR #240](https://github.com/turesheim/eclipse-timekeeper/pull/240), head `5320d096f968c86946f973776cdc8c803f9a45f9`; all CI jobs passed and Linux ran 139 tests. Needs review and merge. | Open |
-| Native task activation (#234) | [PR #241](https://github.com/turesheim/eclipse-timekeeper/pull/241), head `0f4650a936e67b0662b878583ee8e9fe5721e23f`; all CI jobs passed and Linux ran 138 tests. Needs review and merge. | Open |
-| Combined feature acceptance | The two recorded PR heads merge cleanly. A local clean build with `jira-connector-tests` passed 142 tests, including both native runtimes, real Mylyn switching, installed JiraConnector and second-process restart. See the candidate receipt below. | Verified locally; repeat on merged main |
-| 2.0 scope | #211 explicitly assigns client/server work to 3.0, while #187, #217 and #220 are assigned to the 2.0 milestone. The maintainer must reconcile the release scope and milestone assignments before the RC checklist can be final. | Unresolved |
-| Optional Mylyn Error Log | The installed Task List symbolic-color parser error remains open in [ERROR-LOG.md](baseline/ERROR-LOG.md). Official Mylyn main at `7d925aead8681ce5d5e68797745cd4d33d9698b2` still parses an unrecognized symbolic `#org-...` value as hex. A locally tested patch is prepared, but is not submitted upstream or included in Timekeeper. Consume an upstream correction and recheck a clean installed workspace. | Open |
-| Live Jira acceptance (#230) | The released connector is installed and exercised automatically against synthetic REST responses. Live Jira Cloud/Data Center deployment/authentication combinations remain unverified. Record the requested live checks and a fresh installed-IDE Error Log before claiming support. | Open |
-| Final tagged build and release artifacts | Build the accepted commit through [release-p2.yml](.github/workflows/release-p2.yml). Record the actual tag, commit, feature version, test results, archive URL, checksum and provenance. Current candidate artifacts do not meet this gate. | Open |
-| Public GitHub p2 installation | After publication and Pages deployment, install from the public stable channel in a clean Eclipse 4.41 / Java 21, without GitHub authentication. Check base and optional features, restart, settings and synthetic records. Also verify the archive path and the retained release-specific site. | Open |
+| Workweek labels (#235) | [PR #240](https://github.com/turesheim/eclipse-timekeeper/pull/240) is merged; rendering and image-lifecycle regressions run in both native runtimes. | Complete |
+| Native task activation (#234) | [PR #241](https://github.com/turesheim/eclipse-timekeeper/pull/241) is merged; direct menu activation/deactivation and native/Mylyn switching regressions pass. | Complete |
+| Combined feature acceptance | Merged-main Linux CI passed 142 tests, including both native runtimes, real Mylyn switching, installed JiraConnector and second-process restart. The earlier local candidate receipt below is historical evidence. | Verified on merged main |
+| Client/server deployment (#187) | Required for 2.0: versioned API/ownership (#217), Quarkus server (#218), remote Eclipse client (#220), standalone web frontend (#221), and owner-scoped change notification/synchronization (#219). Both clients must use server authority, reject cross-owner access and handle stale/concurrent operations. | Open |
+| Optional Mylyn Error Log (#243) | The installed Task List symbolic-color parser error remains open in [ERROR-LOG.md](baseline/ERROR-LOG.md). [#243](https://github.com/turesheim/eclipse-timekeeper/issues/243) records reproduction, local patch validation and official-fix acceptance. Upstream follow-up is deferred; no experimental Mylyn bundle is distributed. Consume an official correction and recheck a clean installed workspace. | Open |
+| Jira acceptance (#230) | The maintainer checked the acceptance criteria and [closed #230 with “Tested OK”](https://github.com/turesheim/eclipse-timekeeper/issues/230#issuecomment-6123692190). Automatic evidence uses the released connector with synthetic REST responses. The exact manually tested Jira deployment/authentication combination is not recorded; do not infer certification of all combinations. The separate Mylyn Error Log gate is #243. | Accepted by maintainer |
+| Default planning label (#245) | Include planning in an appropriate default label. Preserve user-customized labels and existing records. | Open |
+| Final tagged build and release artifacts | Build the accepted commit through [release-p2.yml](.github/workflows/release-p2.yml). Record the actual tag, commit, feature version, test results, archive URL, checksum and provenance, plus client/server deliverables. Current candidate artifacts do not meet this gate. | Open |
+| Public GitHub p2 installation | After publication and Pages deployment, install from the public stable channel in a clean Eclipse 4.41 / Java 21, without GitHub authentication. Check base and optional features, restart, embedded/remote settings and synthetic records. Also verify the archive path and the retained release-specific site. | Open |
 
 Do not publish a release candidate or final release merely because individual
-PR checks are green. Pending reviews, scope clarification and installed/live
-acceptance remain separate gates. The Error Log and final artifact checkboxes
-in step 6 stay open.
+PR checks are green. Full client/server delivery, installed acceptance,
+the Error Log and final artifact checkboxes remain separate release gates.
 
 ### Combined candidate receipt
 
 The local integration checkout merges the recorded #240 and #241 heads onto
-the main commit above. Its source tree is
+main `8a5afbee06deef9b4d7fde2240c768eb5a23b421` (before the squash merges). Its source tree is
 `c074019ea2ce95cf1a181780ff4ffda7aa0029be`; local merge commit
 `cc63376d85fbe72152c5ceb1589a4bff28e9d674` is not a published release or tag.
 

@@ -25,15 +25,27 @@ Install **Timekeeper Mylyn integration** and the separate
 `https://gnl42.github.io/JiraConnector-update/`. Keep the Eclipse 2026-09
 software site enabled and restart before adding a Jira repository.
 
-The compatibility candidate is JiraConnector **6.0.0.202605160149** on Java 21,
-Eclipse 4.41 and Mylyn 4.12. Actual installation and Timekeeper metadata/tracking
-fixtures are verified; live Jira queries/authentication and the upstream Mylyn
-Error Log gate remain open. The
+JiraConnector **6.0.0.202605160149** is tested on Java 21, Eclipse 4.41 and
+Mylyn 4.12. Actual installation and Timekeeper metadata/tracking fixtures are
+verified, and the maintainer [accepted and closed #230](https://github.com/turesheim/eclipse-timekeeper/issues/230#issuecomment-6123692190)
+with “Tested OK”. The exact manually tested Jira deployment/authentication
+combination is not recorded; this does not certify every Cloud/Data Center setup.
+The separate [Mylyn Error Log gate (#243)](https://github.com/turesheim/eclipse-timekeeper/issues/243)
+remains open. The
 [connector guide](https://github.com/turesheim/eclipse-timekeeper/wiki/Supported-repository-types)
 explains project/category/custom-field grouping, the **None** fallback and
 issue-key display. See the [Jira acceptance report](baseline/JIRA-COMPATIBILITY.md)
 for evidence and limits. Timekeeper delegates credentials to the connector and
 does not send activities to Jira worklogs.
+
+## Client/server work for 2.0
+
+The complete client/server deployment is required before 2.0 publication:
+versioned REST API/ownership, Quarkus server, remote Eclipse operation, web
+frontend and client synchronization. See [#187](https://github.com/turesheim/eclipse-timekeeper/issues/187)
+and the [HTTP API contract](api/README.md) for the design and acceptance boundaries.
+The contract does not certify a delivered remote backend; the embedded mode
+remains the current implementation.
 
 ## Database configuration
 
