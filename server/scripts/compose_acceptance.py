@@ -87,6 +87,19 @@ def main():
                 pass
         raise AssertionError('No Patroni member is reachable')
 
+    def wait_container_healthy(member, timeout=120):
+        identifier = compose('ps', '-q', member).strip()
+        if not identifier:
+            raise AssertionError(f'Expected running Compose member {member}')
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            result = subprocess.run(['docker', 'inspect', '--format', '{{.State.Health.Status}}', identifier],
+                                    capture_output=True, text=True)
+            if result.returncode == 0 and result.stdout.strip() == 'healthy':
+                return
+            time.sleep(.5)
+        raise AssertionError(f'Compose member {member} did not recover its container health')
+
     receipt = {'httpContractCases': 0, 'twoReplicas': False, 'primaryFailover': False,
                'primaryCrashFailover': False,
                'serverFailover': False, 'durableRestart': False, 'backupRestore': False,
@@ -169,6 +182,10 @@ def main():
         receipt['primaryCrashFailover'] = True
         print('SIGKILL primary loss preserved acknowledged data and command replay: PASS', flush=True)
         compose('start', crash_leader)
+        # Existing unhealthy dependencies make Compose --wait fail immediately;
+        # let the restarted member and the gateway's sampled health catch up.
+        wait_container_healthy(crash_leader)
+        wait_container_healthy('gateway')
         compose('up', '-d', '--wait', '--wait-timeout', '120')
         compose('stop', 'api-1')
         wait_ready()
