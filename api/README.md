@@ -74,7 +74,8 @@ flags through normal CRUD. Input length/range/format failures return 422.
 Names are trimmed and must contain a non-whitespace character. Optional URLs
 are absolute URIs; labels use null or `#RRGGBB`. Unknown query parameters return
 400 rather than accidentally widening a query. Invalid JSON and malformed
-headers/UUID path parameters are 400. Unsupported media types are 415. Successful
+headers/UUID path parameters are 400. Unsupported media types are 415. Request bodies over 20 MiB return 413 before
+JSON processing; transfer limits also apply to exported snapshots. Successful
 JSON is `application/json`; errors are `application/problem+json` with matching
 HTTP/body status and stable `code`. Clients branch on status/code, not prose.
 
