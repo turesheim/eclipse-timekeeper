@@ -157,7 +157,7 @@ public class StandaloneActivityTest {
 					.expand().getNode(edited.summary()).contextMenu("Delete activity").click();
 			assertTrue(service.activity(created.id()).isEmpty());
 			bot.treeWithId("workweek-editor-tree").getTreeItem(project.name()).getNode(task.summary())
-					.contextMenu("Start activity").click();
+					.contextMenu("Activate task").click();
 			Activity ongoing = service.activeActivity(OwnerId.LOCAL).orElseThrow();
 			assertEquals(task.id(), ongoing.taskId());
 			bot.treeWithId("workweek-editor-tree").getTreeItem(project.name()).getNode(task.summary())

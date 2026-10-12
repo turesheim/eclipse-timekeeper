@@ -51,6 +51,87 @@ import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 @RunWith(SWTBotJunit4ClassRunner.class)
 public abstract class NativeProjectTaskScenario {
 	@Test
+	public void nativeTasksActivateAndSwitchWithoutActivityDialog() throws Exception {
+		SWTWorkbenchBot bot = new SWTWorkbenchBot();
+		await(bot, () -> TimekeeperPlugin.getDefault().isReady(), "Database is not ready");
+		var preferences = TimekeeperUiPlugin.getDefault().getPreferenceStore();
+		boolean previousShowAll = preferences.getBoolean(PreferenceConstants.SHOW_ALL_TASKS);
+		onUi(() -> preferences.setValue(PreferenceConstants.SHOW_ALL_TASKS, true));
+		reopenWorkweek();
+		var view = bot.viewByTitle("Workweek");
+		view.setFocus();
+		view.toolbarButton("Show current week").click();
+		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
+		var previous = service.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL);
+		var previousTask = previous.flatMap(activity -> service.task(activity.taskId()));
+		var integration = TimekeeperUiPlugin.getDefault().getTaskIntegration();
+		boolean previouslyLinkedActive = previousTask.filter(task -> integration
+				.filter(value -> value.isActive(task)).isPresent()).isPresent();
+		if (previouslyLinkedActive) onUi(() -> integration.orElseThrow().deactivate(previousTask.orElseThrow().id()));
+		previous.flatMap(activity -> service.activity(activity.id())).filter(activity -> activity.end().isEmpty())
+				.ifPresent(activity -> service.stopActivity(new StopActivity(activity.id(), activity.version())));
+		var project = service.createProject(new CreateProject("Direct activation project"));
+		var first = service.createTask(new CreateTask(Optional.of(project.id()), "First native activation", Optional.empty()));
+		var second = service.createTask(new CreateTask(Optional.of(project.id()), "Second native activation", Optional.empty()));
+		try {
+			assertUnprojected(project, first, second);
+			var before = java.time.Instant.now();
+			parentRow(bot, project.name(), first.summary()).contextMenu("Activate task").click();
+			var initial = service.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL).orElseThrow();
+			assertEquals(first.id(), initial.taskId());
+			assertFalse(initial.start().isBefore(before.minusMillis(1)));
+			assertFalse(initial.start().isAfter(java.time.Instant.now().plusMillis(1)));
+			assertFalse(initial.manual());
+			onUi(() -> {
+				assertTrue(java.util.Arrays.stream(PlatformUI.getWorkbench().getDisplay().getShells())
+						.noneMatch(shell -> shell.isVisible() && (shell.getText().equals("New activity")
+								|| shell.getText().equals("Edit activity"))));
+				assertTrue((parentRow(bot, project.name(), first.summary()).widget.getFont(0).getFontData()[0].getStyle() & SWT.BOLD) != 0);
+			});
+			parentRow(bot, project.name(), first.summary()).expand().getItems()[0].contextMenu("Edit activity...").click();
+			bot.shell("Edit activity").activate();
+			bot.textWithLabel("Summary").setText("Edited while tracking");
+			bot.button("Save").click();
+			var edited = service.activity(initial.id()).orElseThrow();
+			assertEquals("Edited while tracking", edited.summary());
+			assertEquals(initial.start(), edited.start());
+			assertTrue(edited.end().isEmpty());
+			parentRow(bot, project.name(), second.summary()).contextMenu("Activate task").click();
+			var successor = service.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL).orElseThrow();
+			assertEquals(second.id(), successor.taskId());
+			var closed = service.activity(initial.id()).orElseThrow();
+			assertTrue(closed.end().isPresent());
+			assertEquals(edited.summary(), closed.summary());
+			view.toolbarButton("Show previous week").click();
+			parentRow(bot, project.name(), second.summary()).contextMenu("Deactivate task").click();
+			assertTrue(service.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL).isEmpty());
+			assertTrue(service.activity(successor.id()).orElseThrow().end().isPresent());
+			view.toolbarButton("Show current week").click();
+			// A task can become active after its menu was opened. Activation must
+			// reuse that interval rather than reporting a conflict or duplicating it.
+			var pendingActivation = parentRow(bot, project.name(), second.summary()).contextMenu("Activate task");
+			var concurrent = service.startActivity(new StartActivity(second.id(),
+					net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL, "Already activated", java.util.Set.of()));
+			pendingActivation.click();
+			assertEquals(concurrent, service.activeActivity(net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL).orElseThrow());
+			parentRow(bot, project.name(), second.summary()).contextMenu("Deactivate task").click();
+			parentRow(bot, project.name(), second.summary()).contextMenu("New activity").click();
+			bot.shell("New activity").activate();
+			bot.button("Cancel").click();
+			assertEquals(2, service.activities(query(second)).activities().size());
+		} finally {
+			cleanup(service, project, java.util.List.of(first.id(), second.id()));
+			previous.ifPresent(original -> service.activity(original.id()).ifPresent(current ->
+					service.updateActivity(new UpdateActivity(current.id(), current.version(), original.start(),
+							original.end(), original.summary(), original.labelIds()))));
+			if (previouslyLinkedActive) onUi(() -> integration.orElseThrow().activate(previousTask.orElseThrow()));
+			onUi(() -> preferences.setValue(PreferenceConstants.SHOW_ALL_TASKS, previousShowAll));
+			reopenWorkweek();
+			bot.viewByTitle("Workweek").toolbarButton("Show current week").click();
+		}
+	}
+
+	@Test
 	public void workweekTaskFilterIncludesInactiveTasksAndPreservesTotals() throws Exception {
 		SWTWorkbenchBot bot = new SWTWorkbenchBot();
 		await(bot, () -> TimekeeperPlugin.getDefault().isReady(), "Database is not ready");

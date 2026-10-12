@@ -232,6 +232,11 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 				.ifPresent(TasksUi.getTaskActivityManager()::deactivateTask);
 	}
 
+	@Override
+	public void deactivateActiveTask() {
+		TasksUi.getTaskActivityManager().deactivateActiveTask();
+	}
+
 	public void reportFailure(RuntimeException failure) {
 		getLog().log(new Status(IStatus.ERROR, PLUGIN_ID, "Mylyn tracking failed", failure));
 	}
