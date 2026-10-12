@@ -16,20 +16,20 @@ public class RemoteNativeTest {
         RemoteTestSupport.ready();RemoteTestSupport.showWorkweek();
         var bot=new SWTWorkbenchBot();var view=bot.viewByTitle("Workweek");view.setFocus();
         try(var api=RemoteTestSupport.client()) {
-            view.toolbarButton("Create a Timekeeper project").click();bot.shell("New project").activate();
-            bot.textWithLabel("Name").setText("Installed remote project");bot.shell("New project").bot().button("OK").click();
+            view.toolbarButton("Create a Timekeeper project").click();
+            bot.shell("New project").bot().textWithLabel("Name").setText("Installed remote project");bot.shell("New project").bot().button("OK").click();
             RemoteTestSupport.waitFor(()->api.projects().stream().anyMatch(p->p.name().equals("Installed remote project")),"Project was not stored remotely");
             var createdProject=api.projects().stream().filter(p->p.name().equals("Installed remote project")).findFirst().orElseThrow();
             var project=createdProject;
             RemoteTestSupport.waitFor(()->{try {return view.bot().treeWithId("workweek-editor-tree").getTreeItem(project.name())!=null;}catch(RuntimeException loading) {return false;}},"Remote project did not appear");
             view.bot().treeWithId("workweek-editor-tree").getTreeItem(project.name()).select();
-            view.toolbarButton("Create a Timekeeper task").click();bot.shell("New task").activate();
-            bot.textWithLabel("Summary").setText("Installed remote task");bot.shell("New task").bot().button("OK").click();
+            view.toolbarButton("Create a Timekeeper task").click();
+            bot.shell("New task").bot().textWithLabel("Summary").setText("Installed remote task");bot.shell("New task").bot().button("OK").click();
             RemoteTestSupport.waitFor(()->api.tasks().stream().anyMatch(t->t.summary().equals("Installed remote task")),"Task was not stored remotely");
             var createdTask=api.tasks().stream().filter(t->t.summary().equals("Installed remote task")).findFirst().orElseThrow();assertEquals(Optional.of(project.id()),createdTask.projectId());
             RemoteTestSupport.waitFor(()->{try {return view.bot().treeWithId("workweek-editor-tree").getTreeItem(project.name()).expand().getNode(createdTask.summary())!=null;}catch(RuntimeException loading) {return false;}},"Created task did not appear");
             view.bot().treeWithId("workweek-editor-tree").getTreeItem(project.name()).getNode(createdTask.summary()).contextMenu("Edit task...").click();
-            bot.shell("Edit task").activate();bot.textWithLabel("Summary").setText("Edited remote task");bot.textWithLabel("URL (optional)").setText("https://example.invalid/remote-task");
+            bot.shell("Edit task").bot().textWithLabel("Summary").setText("Edited remote task");bot.shell("Edit task").bot().textWithLabel("URL (optional)").setText("https://example.invalid/remote-task");
             bot.shell("Edit task").bot().button("OK").click();
             RemoteTestSupport.waitFor(()->api.task(createdTask.id()).orElseThrow().summary().equals("Edited remote task"),"Task edit was not stored remotely");
             var task=api.task(createdTask.id()).orElseThrow();assertEquals(createdTask.id(),task.id());assertEquals(Optional.of("https://example.invalid/remote-task"),task.url());
@@ -54,11 +54,11 @@ public class RemoteNativeTest {
             RemoteTestSupport.onUi(()->{TimekeeperUiPlugin.getDefault().refreshBackend();return null;});
             RemoteTestSupport.waitFor(()->{try {return view.bot().treeWithId("workweek-editor-tree").getTreeItem(project.name()).expand().getNode(task.summary()).expand().getNode("Precise remote interval")!=null;}catch(RuntimeException loading) {return false;}},"Precise interval did not appear in Workweek");
             view.bot().treeWithId("workweek-editor-tree").getTreeItem(project.name()).getNode(task.summary()).getNode("Precise remote interval").contextMenu("Edit activity...").click();
-            bot.shell("Edit activity").activate();bot.textWithLabel("Summary").setText("Edited precise interval");
-            bot.textWithLabel("End (yyyy-MM-dd HH:mm)").setText(date+" 07:00");bot.shell("Edit activity").bot().button("Save").click();
-            RemoteTestSupport.waitFor(()->TimekeeperUiPlugin.getDefault().backendStatus().contains("server rejected") && bot.shell("Edit activity").bot().button("Save").isEnabled(),"Rejected interval did not restore the editor");
-            assertEquals(manual,api.activity(manual.id()).orElseThrow());assertEquals("Edited precise interval",bot.textWithLabel("Summary").getText());
-            bot.textWithLabel("End (yyyy-MM-dd HH:mm)").setText(date+" 09:00");bot.shell("Edit activity").bot().button("Save").click();
+            var activityEditor=bot.shell("Edit activity").bot();activityEditor.textWithLabel("Summary").setText("Edited precise interval");
+            activityEditor.textWithLabel("End (yyyy-MM-dd HH:mm)").setText(date+" 07:00");activityEditor.button("Save").click();
+            RemoteTestSupport.waitFor(()->TimekeeperUiPlugin.getDefault().backendStatus().contains("server rejected") && activityEditor.button("Save").isEnabled(),"Rejected interval did not restore the editor");
+            assertEquals(manual,api.activity(manual.id()).orElseThrow());assertEquals("Edited precise interval",activityEditor.textWithLabel("Summary").getText());
+            activityEditor.textWithLabel("End (yyyy-MM-dd HH:mm)").setText(date+" 09:00");activityEditor.button("Save").click();
             RemoteTestSupport.waitFor(()->api.activity(manual.id()).orElseThrow().summary().equals("Edited precise interval"),"Activity edit was not stored remotely");
             var edited=api.activity(manual.id()).orElseThrow();assertEquals(from,edited.start());assertEquals(Optional.of(until),edited.end());
             var exported=RemoteBootstrap.folder.resolve("csv-export");
@@ -70,5 +70,12 @@ public class RemoteNativeTest {
             RemoteBootstrap.proof.setProperty("phase.native","passed");RemoteBootstrap.writeProof();
         }
         RemoteTestSupport.ready();
+        RemoteTestSupport.onUi(()->{
+            var page=org.eclipse.ui.PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
+            var closed=(net.resheim.eclipse.timekeeper.ui.views.WorkWeekView)page.findView(net.resheim.eclipse.timekeeper.ui.views.WorkWeekView.VIEW_ID);
+            assertNotNull(closed);page.hideView(closed);
+            // A queued editor completion must tolerate its view having already closed.
+            closed.refreshAll();closed.refresh(null);return null;
+        });
     }
 }

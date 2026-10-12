@@ -14,4 +14,5 @@ Require-Bundle: net.resheim.eclipse.timekeeper.remote-test,
  org.eclipse.swtbot.go,
  org.eclipse.mylyn.tasks.core,
  org.eclipse.mylyn.tasks.ui,
- org.eclipse.ui.ide
+ org.eclipse.ui.ide,
+ org.eclipse.equinox.security

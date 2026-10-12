@@ -39,6 +39,9 @@
         <execution><id>remote-mylyn-restart</id><phase>verify</phase><goals><goal>test</goal></goals>
           <configuration><deleteOsgiDataDirectory>false</deleteOsgiDataDirectory><includes><include>**/RemoteMylynRestartTest.java</include></includes><reportsDirectory>${project.build.directory}/surefire-reports-restart</reportsDirectory></configuration>
         </execution>
+        <execution><id>remote-mylyn-account</id><phase>verify</phase><goals><goal>test</goal></goals>
+          <configuration><deleteOsgiDataDirectory>false</deleteOsgiDataDirectory><includes><include>**/RemoteMylynAccountTest.java</include></includes><reportsDirectory>${project.build.directory}/surefire-reports-account</reportsDirectory></configuration>
+        </execution>
       </executions>
     </plugin>
   </plugins></build>

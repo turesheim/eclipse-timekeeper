@@ -30,11 +30,14 @@ public final class RemoteBootstrap implements IApplication {
     static Path folder;
     static URI serverUrl;
     static String token;
+    private static String accountAToken,accountBToken;
     static Properties proof;
     public static Properties receipt() {return proof;}
     public static Path fixtureFolder() {return folder;}
     public static URI endpoint() {return serverUrl;}
     public static String fixtureToken() {return token;}
+    public static String accountAToken() {return accountAToken;}
+    public static String accountBToken() {return accountBToken;}
     @Override public Object start(IApplicationContext context) throws Exception {
         folder=Path.of(System.getProperty("timekeeper.remote.fixture")).toAbsolutePath();Files.createDirectories(folder);
         requireArgument("-eclipse.keyring",folder.resolve("secure.storage"));
@@ -45,7 +48,12 @@ public final class RemoteBootstrap implements IApplication {
             var secure=SecurePreferencesFactory.getDefault();if(secure==null) throw new IllegalStateException("Fixture secure storage unavailable");
             var node=secure.node("/net.resheim.eclipse.timekeeper/backend");
             token=node.get("token","");
-            if(token.isEmpty()) {token=randomSecret();node.put("token",token,true);secure.flush();}
+            if(token.isEmpty()) {token=randomSecret();node.put("token",token,true);}
+            accountAToken=node.get("fixture-token-a","");
+            if(accountAToken.isEmpty()) {accountAToken=token;node.put("fixture-token-a",accountAToken,true);}
+            accountBToken=node.get("fixture-token-b","");
+            if(accountBToken.isEmpty()) {accountBToken=randomSecret();node.put("fixture-token-b",accountBToken,true);}
+            secure.flush();
             proof=new Properties();Path evidence=folder.resolve("proof.properties");
             if(Files.exists(evidence)) try(var input=Files.newInputStream(evidence)) {proof.load(input);}
             Path distribution=Path.of(System.getProperty("timekeeper.remote.distribution"));
@@ -67,7 +75,7 @@ public final class RemoteBootstrap implements IApplication {
                 }
             }
             Path registry=folder.resolve("server-tokens.json");
-            Files.writeString(registry,"[{\"ownerId\":\"remote-owner-a\",\"sha256\":\""+hash(token.getBytes(StandardCharsets.UTF_8))+"\",\"permissions\":[\"read\",\"write\"]}]",StandardCharsets.UTF_8);
+            Files.writeString(registry,"["+principal("remote-owner-a",accountAToken)+","+principal("remote-owner-b",accountBToken)+"]",StandardCharsets.UTF_8);
             int port;
             if(proof.containsKey("server.port")) port=Integer.parseInt(proof.getProperty("server.port"));
             else try(var socket=new ServerSocket(0)) {port=socket.getLocalPort();}
@@ -122,5 +130,8 @@ public final class RemoteBootstrap implements IApplication {
         return HexFormat.of().formatHex(digest.digest());
     }
     private static String hash(byte[] value) throws Exception {return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value));}
+    private static String principal(String owner,String secret) throws Exception {
+        return "{\"ownerId\":\""+owner+"\",\"sha256\":\""+hash(secret.getBytes(StandardCharsets.UTF_8))+"\",\"permissions\":[\"read\",\"write\"]}";
+    }
     private static String randomSecret() {byte[] bytes=new byte[32];new SecureRandom().nextBytes(bytes);return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);}
 }

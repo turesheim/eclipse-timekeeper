@@ -31,5 +31,35 @@ public class RemoteMylynRestartTest {
             RemoteBootstrap.receipt().setProperty("phase.mylyn.restart","passed");RemoteBootstrap.writeProof();
         }
         RemoteTestSupport.readyWithMylyn();
+        selectSecondAccount();
+    }
+    private static void selectSecondAccount() throws Exception {
+        var ui=net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin.getDefault();
+        String runningIdentity=ui.backendIdentity();
+        var originalId=new TaskId(UUID.fromString(RemoteBootstrap.receipt().getProperty("mylyn.first")));
+        assertTrue(RemoteTestSupport.onUi(()->ui.getTimekeeperService().task(originalId).isPresent()));
+        var bot=new org.eclipse.swtbot.eclipse.finder.SWTWorkbenchBot();
+        org.eclipse.ui.PlatformUI.getWorkbench().getDisplay().asyncExec(()->org.eclipse.ui.dialogs.PreferencesUtil
+            .createPreferenceDialogOn(org.eclipse.ui.PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell(),
+                "net.resheim.eclipse.timekeeper.ui.preferences.backend",null,null).open());
+        var preferences=bot.shell("Preferences");
+        var controls=preferences.bot();
+        assertTrue(controls.radio("Timekeeper server").isSelected());
+        assertEquals(RemoteBootstrap.endpoint().toString(),controls.textWithId("backend-url").getText());
+        controls.textWithId("backend-token").setText(RemoteBootstrap.accountBToken());
+        controls.button("Apply and Close").click();
+        bot.shell("Restart Eclipse").bot().button("OK").click();
+        RemoteTestSupport.waitFor(()->!preferences.isOpen(),"Backend preferences did not close");
+        var secure=org.eclipse.equinox.security.storage.SecurePreferencesFactory.getDefault().node("/net.resheim.eclipse.timekeeper/backend");
+        // Avoid assertions that could include either credential in a failure report.
+        assertTrue("New account token was not saved by the preference page",RemoteBootstrap.accountBToken().equals(secure.get("token","")));
+        assertTrue(secure.isEncrypted("token"));
+        assertEquals("Applying a token must wait for restart before switching runtime identity",runningIdentity,ui.backendIdentity());
+        assertTrue(RemoteTestSupport.onUi(()->ui.getTimekeeperService().task(originalId).isPresent()));
+        try(var original=RemoteTestSupport.client()) {
+            assertEquals("remote-owner-a",original.profile().owner().value());
+            RemoteBootstrap.receipt().setProperty("mylyn.account-a.revision",String.valueOf(original.metadata().revision()));
+        }
+        RemoteBootstrap.receipt().setProperty("phase.mylyn.account-selected","passed");RemoteBootstrap.writeProof();
     }
 }

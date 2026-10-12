@@ -177,12 +177,52 @@ local file SHA-256
 It uses the same server ZIP SHA-256 as the earlier native checkpoint.
 
 The CI job now includes both remote modules and their reports/receipts, while
-excluding private keyring/password/token files. CI must be verified on the
-Mylyn acceptance commit. The preceding `c9fbd45` commit passed all seven jobs in
-[run 38281235190](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38281235190),
-including the repaired Windows test and installed native acceptance.
+excluding private keyring/password/token files. The `7060c6f` Mylyn acceptance
+commit passed all seven jobs in
+[run 38283968133](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38283968133).
+The downloaded installed reports confirm both native phases and both Mylyn
+phases passed with no failures, errors or skips. Mylyn's CI receipt records
+server PIDs `4268,4407`; the native receipt records `3966,4121`.
 These functional checks do not clear the separate Mylyn theme/Error Log gate
 in #243. See [the Mylyn test README](../net.resheim.eclipse.timekeeper.remote-mylyn-test/README.md).
+
+## Installed account-switch acceptance checkpoint, 2026-10-12
+
+The Mylyn restart phase now opens the real backend preference page and saves
+account B's token using the password field and **Apply and Close**. It verifies
+the page persisted an encrypted credential and displayed the restart notice;
+the running client remains account A until restart. The fixture uses two fixed
+owner/hash entries, so the second account cannot be simulated by remapping the
+original owner to a different token.
+
+A third Eclipse/server process retains the same workspace and must authenticate
+as `remote-owner-b`. Its initial projects/tasks/labels and active interval are
+empty. The account A projection retains its saved marker but cannot resolve in
+B. Account B creates records with the same visible names, receives a distinct
+projection and remote task UUID, and starts/stops through the actual Mylyn
+activity manager. A late account A deactivation must leave B's interval
+unchanged. A's metadata revision and both original intervals remain identical.
+All phases keep the app entity manager null and local database checksum
+unchanged. This covers switching accounts on one endpoint; it does not yet
+cover changing the server endpoint or switching embedded/remote mode.
+
+The selected clean reactor (`remote-client-tests` with the CI module list)
+passed **105 main tests, two restart tests and one account-switch test**, with
+no failures/errors/skips. The Mylyn receipt records PIDs `63148,63157,63161`,
+all four phase markers passed, account A revision `9`, and preserved local
+SHA-256 `6e98ac48606e2b6ab30d5ee6db2b718987e7007a92b7b506517875b1e7bcd6ae`.
+The server ZIP checksum is unchanged from the preceding local checkpoint.
+The CI artifact list now includes the third execution's account report and
+continues to exclude credentials. CI verification of this new commit is pending.
+
+A subsequent broader local macOS run failed in existing native tests on
+window-activation timeouts; it is retained as a failed run, and the remaining
+modules were skipped. The remote dialogs now address controls in their own
+shells rather than requiring OS focus. The native remote scenario also closes
+Workweek before invoking both refresh entry points, covering a disposed-view
+exception observed when a modal editor returned during test shutdown. The
+production refresh entry point safely returns after its viewer is disposed.
+Full Linux/Xvfb CI must verify the broader regression for this commit.
 
 ## Remaining before #220 can be completed
 
@@ -190,9 +230,9 @@ in #243. See [the Mylyn test README](../net.resheim.eclipse.timekeeper.remote-my
   including cancellation, restart after a lost response and unchanged local
   database files.
 - Verify the scoped Mylyn mappings in the installed remote runtime, including
-  actual backend/account switches and late activation/deactivation events.
-- Exercise remaining native label/report/preference UI flows and token-setting
-  writer/account-switch acceptance. Installed native and Mylyn editing/tracking,
+  server-endpoint and embedded/remote switches. Account switching and late
+  activation/deactivation events are covered above.
+- Exercise remaining native label/report/preference UI flows. Installed native and Mylyn editing/tracking,
   encrypted-token reading and marker-preserving restart are covered above.
 - Repeat closed-local-storage and form-draft checks through authentication,
   offline, timeout, cancellation and optimistic-conflict failures. The normal

@@ -822,10 +822,13 @@ public class WorkWeekView extends ViewPart {
 	 * Typically after importing a number of records.
 	 */
 	public void refreshAll() {
+        // A modal editor can return after its view was closed during workbench shutdown.
+        if (viewer == null || viewer.getControl().isDisposed() || viewer.getContentProvider() == null)
+            return;
 		viewer.getContentProvider().inputChanged(viewer, viewer.getInput(), null);
 	}
 
 	public void refresh(Object element) {
-		viewer.getContentProvider().inputChanged(viewer, viewer.getInput(), null);
+        refreshAll();
 	}
 }
