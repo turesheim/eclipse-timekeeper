@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>net.resheim.eclipse.timekeeper</groupId><artifactId>net.resheim.eclipse.timekeeper-parent</artifactId><version>2.0.0-SNAPSHOT</version></parent>
+  <artifactId>net.resheim.eclipse.timekeeper.remote-mylyn-test</artifactId>
+  <packaging>eclipse-test-plugin</packaging>
+  <properties>
+    <timekeeper.remote.distribution>${project.basedir}/../server/target/distribution/timekeeper-server.zip</timekeeper.remote.distribution>
+    <remote.vmargs>-Xmx1024m -Dtimekeeper.remote.distribution=${timekeeper.remote.distribution} -Dtimekeeper.remote.fixture=${project.build.directory}/acceptance-data -Dorg.eclipse.swtbot.search.timeout=15000</remote.vmargs>
+  </properties>
+  <profiles><profile><id>macosx</id><activation><os><family>mac</family></os></activation>
+    <properties><remote.vmargs>-XstartOnFirstThread -Xmx1024m -Dtimekeeper.remote.distribution=${timekeeper.remote.distribution} -Dtimekeeper.remote.fixture=${project.build.directory}/acceptance-data -Dorg.eclipse.swtbot.search.timeout=15000</remote.vmargs></properties>
+  </profile></profiles>
+  <build><plugins>
+    <plugin><groupId>org.eclipse.tycho</groupId><artifactId>target-platform-configuration</artifactId>
+      <configuration><target>
+        <artifact><groupId>net.resheim.eclipse.timekeeper</groupId><artifactId>net.resheim.eclipse.timekeeper-parent</artifactId><version>2.0.0-SNAPSHOT</version><classifier>default</classifier></artifact>
+        <file>${project.basedir}/../net.resheim.eclipse.timekeeper.remote-test/remote.target</file>
+      </target><dependency-resolution><optionalDependencies>ignore</optionalDependencies><extraRequirements>
+        <requirement><type>eclipse-feature</type><id>net.resheim.eclipse.timekeeper.mylyn.feature</id><versionRange>0.0.0</versionRange></requirement>
+        <requirement><type>eclipse-feature</type><id>net.resheim.eclipse.timekeeper</id><versionRange>0.0.0</versionRange></requirement>
+        <requirement><type>p2-installable-unit</type><id>org.eclipse.platform.ide</id><versionRange>0.0.0</versionRange></requirement>
+      </extraRequirements></dependency-resolution></configuration>
+    </plugin>
+    <plugin><groupId>org.eclipse.tycho</groupId><artifactId>tycho-surefire-plugin</artifactId><version>${tycho.version}</version>
+      <configuration>
+        <forkedProcessTimeoutInSeconds>420</forkedProcessTimeoutInSeconds><failIfNoTests>true</failIfNoTests>
+        <testRuntime>p2Installed</testRuntime><install>
+          <iu><id>org.eclipse.platform.ide</id></iu><iu><id>net.resheim.eclipse.timekeeper.feature.group</id></iu><iu><id>net.resheim.eclipse.timekeeper.mylyn.feature.feature.group</id></iu>
+        </install>
+        <argLine>${remote.vmargs}</argLine>
+        <appArgLine>-eclipse.keyring "${project.build.directory}/acceptance-data/secure.storage" -eclipse.password "${project.build.directory}/acceptance-data/master.password"</appArgLine>
+        <useUIHarness>true</useUIHarness><useUIThread>false</useUIThread>
+        <product>org.eclipse.platform.ide</product><application>net.resheim.eclipse.timekeeper.remote-test.bootstrap</application>
+      </configuration>
+      <executions>
+        <execution><id>default-test</id><configuration><includes><include>**/RemoteMylynTest.java</include></includes></configuration></execution>
+        <execution><id>remote-mylyn-restart</id><phase>verify</phase><goals><goal>test</goal></goals>
+          <configuration><deleteOsgiDataDirectory>false</deleteOsgiDataDirectory><includes><include>**/RemoteMylynRestartTest.java</include></includes><reportsDirectory>${project.build.directory}/surefire-reports-restart</reportsDirectory></configuration>
+        </execution>
+      </executions>
+    </plugin>
+  </plugins></build>
+</project>

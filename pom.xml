@@ -170,7 +170,10 @@
 	<profiles>
         <profile>
             <id>remote-client-tests</id>
-            <modules><module>net.resheim.eclipse.timekeeper.remote-test</module></modules>
+            <modules>
+                <module>net.resheim.eclipse.timekeeper.remote-test</module>
+                <module>net.resheim.eclipse.timekeeper.remote-mylyn-test</module>
+            </modules>
         </profile>
 		<profile>
 			<id>jira-connector-tests</id>

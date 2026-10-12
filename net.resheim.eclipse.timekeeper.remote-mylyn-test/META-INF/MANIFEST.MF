@@ -1,0 +1,17 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Timekeeper installed remote Mylyn acceptance tests
+Bundle-SymbolicName: net.resheim.eclipse.timekeeper.remote-mylyn-test;singleton:=true
+Bundle-Version: 2.0.0.qualifier
+Bundle-RequiredExecutionEnvironment: JavaSE-21
+Bundle-ActivationPolicy: lazy
+Require-Bundle: net.resheim.eclipse.timekeeper.remote-test,
+ net.resheim.eclipse.timekeeper.mylyn,
+ net.resheim.eclipse.timekeeper.ui,
+ net.resheim.eclipse.timekeeper.domain,
+ net.resheim.eclipse.timekeeper.service,
+ net.resheim.eclipse.timekeeper.http,
+ org.eclipse.swtbot.go,
+ org.eclipse.mylyn.tasks.core,
+ org.eclipse.mylyn.tasks.ui,
+ org.eclipse.ui.ide

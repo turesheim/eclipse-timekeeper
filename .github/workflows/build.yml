@@ -81,7 +81,7 @@ jobs:
     - name: Install Xvfb
       run: sudo apt-get update && sudo apt-get install -y xvfb
     - name: Verify installed Eclipse against the packaged server and restart
-      run: xvfb-run --server-args="-screen 0, 1280x900x24" --auto-servernum ./mvnw -B -ntp clean verify -Premote-client-tests -pl .,timekeeper-domain,timekeeper-service-api,timekeeper-http-client,net.resheim.eclipse.timekeeper.db,net.resheim.eclipse.timekeeper.ui,net.resheim.eclipse.timekeeper-feature,net.resheim.eclipse.timekeeper.remote-test -Dtycho.localArtifacts=ignore
+      run: xvfb-run --server-args="-screen 0, 1280x900x24" --auto-servernum ./mvnw -B -ntp clean verify -Premote-client-tests -pl .,timekeeper-domain,timekeeper-service-api,timekeeper-http-client,net.resheim.eclipse.timekeeper.db,net.resheim.eclipse.timekeeper.ui,net.resheim.eclipse.timekeeper-feature,net.resheim.eclipse.timekeeper.mylyn,net.resheim.eclipse.timekeeper.mylyn-feature,net.resheim.eclipse.timekeeper.remote-test,net.resheim.eclipse.timekeeper.remote-mylyn-test -Dtycho.localArtifacts=ignore
     - name: Upload installed remote acceptance evidence
       if: always()
       uses: actions/upload-artifact@v7.0.1
@@ -95,6 +95,12 @@ jobs:
           net.resheim.eclipse.timekeeper.remote-test/target/acceptance-data/server-*.log
           net.resheim.eclipse.timekeeper.remote-test/target/work/**/.metadata/.log
           net.resheim.eclipse.timekeeper.remote-test/target/work/**/configuration/*.log
+          net.resheim.eclipse.timekeeper.remote-mylyn-test/target/surefire-reports/
+          net.resheim.eclipse.timekeeper.remote-mylyn-test/target/surefire-reports-restart/
+          net.resheim.eclipse.timekeeper.remote-mylyn-test/target/acceptance-data/proof.properties
+          net.resheim.eclipse.timekeeper.remote-mylyn-test/target/acceptance-data/server-*.log
+          net.resheim.eclipse.timekeeper.remote-mylyn-test/target/work/**/.metadata/.log
+          net.resheim.eclipse.timekeeper.remote-mylyn-test/target/work/**/configuration/*.log
 
   Publication:
     runs-on: ubuntu-latest

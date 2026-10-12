@@ -36,7 +36,7 @@
       <executions>
         <execution><id>default-test</id><configuration><includes><include>**/RemoteNativeTest.java</include></includes></configuration></execution>
         <execution><id>remote-restart</id><phase>verify</phase><goals><goal>test</goal></goals>
-          <configuration><includes><include>**/RemoteRestartTest.java</include></includes><reportsDirectory>${project.build.directory}/surefire-reports-restart</reportsDirectory></configuration>
+          <configuration><deleteOsgiDataDirectory>false</deleteOsgiDataDirectory><includes><include>**/RemoteRestartTest.java</include></includes><reportsDirectory>${project.build.directory}/surefire-reports-restart</reportsDirectory></configuration>
         </execution>
       </executions>
     </plugin>

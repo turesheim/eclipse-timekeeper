@@ -147,6 +147,43 @@ and runtime logs, excluding the fixture password, keyring and token registry.
 The new job must pass on the acceptance commit before this evidence is used as
 CI acceptance. See [the test README](../net.resheim.eclipse.timekeeper.remote-test/README.md).
 
+## Installed Mylyn acceptance checkpoint, 2026-10-12
+
+The new `remote-mylyn-test` module provisions the official optional Mylyn
+feature and uses the same isolated, checksum-verified packaged-server
+bootstrap. Real Task List/Task Activity Manager activation events start, switch
+and stop the linked remote UUIDs. A late deactivation is followed by a queued
+observation and must leave the successor unchanged.
+
+The first phase marks the actual Task List element, waits for Mylyn's official
+externalization/save operation and persistent preferences, then exits. The
+restart phase retains the workspace and requires that marker on the reconnected
+projection. It reuses the original remote task UUID, creates a new interval,
+and verifies both earlier intervals remain unchanged. Recreating a new Task
+List element cannot satisfy the marker assertion. Both phases retain the null
+app entity manager and unchanged original local-file checksum assertions.
+
+An initial test run revealed that Tycho clears its OSGi data directory before
+each execution by default. Restart executions now explicitly retain that
+workspace; this models an actual restart rather than a new workspace. The
+first-phase save is awaited before the test harness terminates the process.
+
+Local full command with `jira-connector-tests,remote-client-tests clean verify`:
+**160 main tests and three separate restart tests**, no failures, errors or
+skips. The Mylyn receipt records server PIDs `61367,61373`, both Mylyn phases
+passed, the preserved projection marker, original remote IDs, and unchanged
+local file SHA-256
+`88ce3969ff579e515bfc38569f12c3dc984ebf668d6c039c02b0811b4e6e02bb`.
+It uses the same server ZIP SHA-256 as the earlier native checkpoint.
+
+The CI job now includes both remote modules and their reports/receipts, while
+excluding private keyring/password/token files. CI must be verified on the
+Mylyn acceptance commit. The preceding `c9fbd45` commit passed all seven jobs in
+[run 38281235190](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38281235190),
+including the repaired Windows test and installed native acceptance.
+These functional checks do not clear the separate Mylyn theme/Error Log gate
+in #243. See [the Mylyn test README](../net.resheim.eclipse.timekeeper.remote-mylyn-test/README.md).
+
 ## Remaining before #220 can be completed
 
 - Verify the server CSV preference-page flow in the installed Eclipse runtime,
@@ -154,10 +191,9 @@ CI acceptance. See [the test README](../net.resheim.eclipse.timekeeper.remote-te
   database files.
 - Verify the scoped Mylyn mappings in the installed remote runtime, including
   actual backend/account switches and late activation/deactivation events.
-- Exercise installed Mylyn activation/deactivation against the packaged server,
-  plus the remaining native label/report/preference UI flows and token-setting
-  writer/account-switch acceptance. Basic installed native editing, tracking,
-  encrypted-token reading and restart are covered above.
+- Exercise remaining native label/report/preference UI flows and token-setting
+  writer/account-switch acceptance. Installed native and Mylyn editing/tracking,
+  encrypted-token reading and marker-preserving restart are covered above.
 - Repeat closed-local-storage and form-draft checks through authentication,
   offline, timeout, cancellation and optimistic-conflict failures. The normal
   and rejected-validation installed paths are covered above.

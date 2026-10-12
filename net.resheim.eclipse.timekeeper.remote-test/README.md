@@ -23,7 +23,9 @@ tracking start/stop, activity editing with rejected-save draft preservation,
 exact timestamp retention, and CSV transfer through the selected client. CSV
 folder selection and its preference-page buttons are not automated yet.
 The second phase launches a new Eclipse JVM and a new server JVM, decrypts the
-stored token, and verifies the original resource IDs and exact instants.
+stored token, and verifies the original resource IDs and exact instants. The
+restart execution retains the first workspace rather than letting Tycho clear
+it before the second phase.
 
 Run from the repository root after preparing a packaged server ZIP and sidecar:
 
@@ -34,7 +36,7 @@ Run from the repository root after preparing a packaged server ZIP and sidecar:
 ```
 
 CI's `Remote-Eclipse` job downloads the verified distribution from the Server
-job and runs these phases under Xvfb. It uploads reports, server/runtime logs and
+job and runs these phases plus the optional Mylyn module under Xvfb. It uploads reports, server/runtime logs and
 the credential-free `proof.properties`; secure storage, the password file and
 token registry are excluded from uploaded evidence.
 

@@ -31,6 +31,10 @@ public final class RemoteBootstrap implements IApplication {
     static URI serverUrl;
     static String token;
     static Properties proof;
+    public static Properties receipt() {return proof;}
+    public static Path fixtureFolder() {return folder;}
+    public static URI endpoint() {return serverUrl;}
+    public static String fixtureToken() {return token;}
     @Override public Object start(IApplicationContext context) throws Exception {
         folder=Path.of(System.getProperty("timekeeper.remote.fixture")).toAbsolutePath();Files.createDirectories(folder);
         requireArgument("-eclipse.keyring",folder.resolve("secure.storage"));
@@ -112,7 +116,7 @@ public final class RemoteBootstrap implements IApplication {
         for(int i=0;i<args.length-1;i++) if(args[i].equals(name) && Path.of(args[i+1]).toAbsolutePath().equals(expected)) return;
         throw new IllegalStateException("Isolated secure storage argument missing: "+name);
     }
-    static void writeProof() throws Exception {try(var output=Files.newOutputStream(folder.resolve("proof.properties"))) {proof.store(output,"Credential-free installed remote acceptance");}}
+    public static void writeProof() throws Exception {try(var output=Files.newOutputStream(folder.resolve("proof.properties"))) {proof.store(output,"Credential-free installed remote acceptance");}}
     static String hash(Path file) throws Exception {
         var digest=MessageDigest.getInstance("SHA-256");try(var input=Files.newInputStream(file)) {byte[] block=new byte[65536];for(int count;(count=input.read(block))!=-1;) digest.update(block,0,count);}
         return HexFormat.of().formatHex(digest.digest());

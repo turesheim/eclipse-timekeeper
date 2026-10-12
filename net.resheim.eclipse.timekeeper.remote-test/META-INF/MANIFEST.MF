@@ -16,4 +16,5 @@ Require-Bundle: org.eclipse.swtbot.go,
  net.resheim.eclipse.timekeeper.service,
  net.resheim.eclipse.timekeeper.http
 Import-Package: javax.persistence;version="2.2.0"
+Export-Package: net.resheim.eclipse.timekeeper.remote.test;x-friends:="net.resheim.eclipse.timekeeper.remote-mylyn-test"
 
