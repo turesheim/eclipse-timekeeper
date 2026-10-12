@@ -37,7 +37,7 @@ postgresql:
   listen: 0.0.0.0:5432
   data_dir: /var/lib/postgresql/data
   bin_dir: /usr/lib/postgresql/18/bin
-  pgpass: /var/lib/postgresql/.pgpass
+  pgpass: /tmp/patroni.pgpass
   basebackup:
     checkpoint: fast
   authentication:

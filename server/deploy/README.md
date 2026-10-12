@@ -164,6 +164,10 @@ It does not delete images or data and does not modify the PostgreSQL/etcd
 cluster. Retain the previous images for rollback and enable task failure
 notifications. The `edge` channel is for tested development builds; choose a
 release channel/tag for a deployment that should change only on release.
+On DSM, choose `root` as the task user, or a deployment user with Docker access
+and rights to the state directory. Authenticate to a private registry as that
+same task user. The bootstrap container also runs as root so it can create the
+private host directories and initialize their permissions.
 If a task was forcibly killed and left `state/update.lock`, verify that no updater
 is running before removing that empty lock directory and rerunning the task.
 
@@ -199,7 +203,8 @@ python3 -m venv /tmp/timekeeper-compose-venv
 
 The test creates its own project, credentials, ports and state directories. It
 checks both server replicas, all twelve HTTP contract cases, concurrent tracking,
-long Unicode provider identities, exact nanoseconds, primary/server failover,
+long Unicode provider identities, exact nanoseconds, graceful and SIGKILL
+primary failover, server failover,
 durable command replay, backup/restore and a complete container teardown/restart.
 It also publishes temporary images to an isolated local registry and verifies
 rolling replacement and automatic rollback of a deliberately broken image.

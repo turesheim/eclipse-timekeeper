@@ -67,6 +67,8 @@ def main():
         print('Existing token registry preserved.')
     for name in ('postgres-1', 'postgres-2', 'postgres-3', 'etcd-1', 'etcd-2', 'etcd-3', 'backups'):
         (state / name).mkdir(parents=True, exist_ok=True)
+        if name.startswith('etcd-'):
+            (state / name).chmod(0o700)
     env_file = HERE / '.env'
     if not env_file.exists():
         env_file.write_text(f'TIMEKEEPER_STATE_DIR={state}\nTIMEKEEPER_BIND_ADDRESS=127.0.0.1\nTIMEKEEPER_HTTP_PORT=8080\n')

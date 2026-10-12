@@ -56,8 +56,11 @@ def main():
     command = ['docker', 'compose', '-p', project]
 
     def compose(*arguments, input=None):
-        return subprocess.run(command + list(arguments), cwd=deployment, env=environment,
-                              input=input, text=True, check=True, capture_output=True).stdout
+        result = subprocess.run(command + list(arguments), cwd=deployment, env=environment,
+                                input=input, text=True, capture_output=True)
+        if result.returncode:
+            raise RuntimeError(f'Compose {arguments[0]} failed: {result.stderr}')
+        return result.stdout
 
     base = f'http://127.0.0.1:{port}'
     contract.BASE_URL, contract.TOKENS = base + '/api/v1', tokens
@@ -80,11 +83,12 @@ def main():
         for member in ('postgres-1', 'postgres-2', 'postgres-3'):
             try:
                 return json.loads(compose('exec', '-T', member, 'curl', '-fsS', 'http://localhost:8008/cluster'))
-            except subprocess.CalledProcessError:
+            except RuntimeError:
                 pass
         raise AssertionError('No Patroni member is reachable')
 
     receipt = {'httpContractCases': 0, 'twoReplicas': False, 'primaryFailover': False,
+               'primaryCrashFailover': False,
                'serverFailover': False, 'durableRestart': False, 'backupRestore': False,
                'rollingUpdate': False, 'failedUpdateRollback': False}
     registry_container = project + '-registry'
@@ -148,6 +152,23 @@ def main():
         receipt['primaryFailover'] = True
         print('Primary failover preserved data and exact command replay: PASS', flush=True)
         compose('start', leader)
+        compose('up', '-d', '--wait', '--wait-timeout', '120')
+        # Abrupt primary loss must preserve acknowledged writes, not only graceful switchover.
+        expected, _ = client.call('GET', '/data/export')
+        crash_leader = next(member['name'] for member in cluster()['members'] if member['role'] == 'leader')
+        crash_container = compose('ps', '-q', crash_leader).strip()
+        subprocess.run(['docker', 'update', '--restart=no', crash_container], check=True, capture_output=True)
+        compose('kill', '-s', 'SIGKILL', crash_leader)
+        wait_ready()
+        actual, _ = client.call('GET', '/data/export')
+        client.assertEqual(expected, actual)
+        replay, replay_headers = client.call('POST', '/activities/' + active['id'] + '/stop', headers=stop_key)
+        client.assertEqual(stopped, replay)
+        client.assertEqual(stopped_headers['ETag'], replay_headers['ETag'])
+        client.create('projects', {'name': 'Write after abrupt primary loss'})
+        receipt['primaryCrashFailover'] = True
+        print('SIGKILL primary loss preserved acknowledged data and command replay: PASS', flush=True)
+        compose('start', crash_leader)
         compose('up', '-d', '--wait', '--wait-timeout', '120')
         compose('stop', 'api-1')
         wait_ready()
