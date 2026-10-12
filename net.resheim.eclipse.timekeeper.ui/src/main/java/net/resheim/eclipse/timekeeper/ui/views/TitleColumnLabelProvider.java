@@ -22,9 +22,11 @@ import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
  * Provides decorations for the task and activity information column.
  */
 class TitleColumnLabelProvider extends TimeColumnLabelProvider {
+	private final WeekViewContentProvider contentProvider;
 
 	public TitleColumnLabelProvider(WeekViewContentProvider contentProvider) {
 		super(contentProvider);
+		this.contentProvider = contentProvider;
 	}
 
 
@@ -86,6 +88,12 @@ class TitleColumnLabelProvider extends TimeColumnLabelProvider {
 			if (activity.end().isPresent()) {
 				sb.append(", ended on ");
 				sb.append(activity.end().orElseThrow().atZone(getZoneId()).toLocalDateTime());
+			}
+			var labels = contentProvider.labels(activity);
+			if (!labels.isEmpty()) {
+				sb.append("\nLabels: ");
+				sb.append(labels.stream().map(net.resheim.eclipse.timekeeper.domain.Label::name)
+						.collect(java.util.stream.Collectors.joining(", ")));
 			}
 			return sb.toString();
 		}

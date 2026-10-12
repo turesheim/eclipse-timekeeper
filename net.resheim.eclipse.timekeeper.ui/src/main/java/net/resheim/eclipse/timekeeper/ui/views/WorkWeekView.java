@@ -347,18 +347,18 @@ public class WorkWeekView extends ViewPart {
 			@Override
 			public void handleEvent(Event event) {
 				TreeItem treeItem = (TreeItem) event.item;
-				int width = tree.getColumn(0).getWidth();
 				if (treeItem.getData() instanceof Activity && event.index == 0) {
+					var bounds = treeItem.getBounds(0);
 					int offset = 0;
 					List<net.resheim.eclipse.timekeeper.domain.Label> labels = contentProvider.labels((Activity) treeItem.getData());
 					for (var label : labels) {
 						Image image = activityLabelPainter.getLabelImage(label, 16, true);
-						int x = width - image.getBounds().width;
+						int x = bounds.x + bounds.width - image.getBounds().width;
 						int itemHeight = tree.getItemHeight();
 						int imageHeight = image.getBounds().height;
 						int y = event.y + (itemHeight - imageHeight) / 2;
 						event.gc.drawImage(image, x + offset, y);
-						offset -= 6;
+						offset -= 12;
 					}
 				}
 			}

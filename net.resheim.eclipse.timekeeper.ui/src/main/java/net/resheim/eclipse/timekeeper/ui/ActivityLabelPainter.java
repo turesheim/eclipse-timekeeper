@@ -12,7 +12,6 @@
 package net.resheim.eclipse.timekeeper.ui;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
@@ -43,11 +42,7 @@ public class ActivityLabelPainter {
 		private String lastColor;
 	}
 
-	private static HashMap<Object, ActivityLabelImage> images;
-
-	public ActivityLabelPainter() {
-		images = new HashMap<>();
-	}
+	private final HashMap<Object, ActivityLabelImage> images = new HashMap<>();
 
 	private Object generateKey(final Object... params) {
 		final List<Object> key = new ArrayList<>();
@@ -67,11 +62,11 @@ public class ActivityLabelPainter {
 
 	private Image getLabelImage(Object keySource, String labelColor, int size, boolean outline) {
 
-		Object key = generateKey(keySource, Boolean.valueOf(outline));
+		Object key = generateKey(keySource, Integer.valueOf(size), Boolean.valueOf(outline));
 
 		if (images.containsKey(key)) {
 			ActivityLabelImage activityLabelImage = images.get(key);
-			if (activityLabelImage.lastColor.equals(labelColor)) {
+			if (!activityLabelImage.image.isDisposed() && activityLabelImage.lastColor.equals(labelColor)) {
 				return activityLabelImage.image;
 			} else {
 				// color has changed, dispose of the old image and continue
@@ -91,33 +86,49 @@ public class ActivityLabelPainter {
 		int y_offset = (size / 4) + 1; // the +1 is to adjust for the outline
 		int diameter = size - (size / 2);
 
-		// create transparent base image
+		// Do not rely on GC drawing to update an ImageData alpha channel on every platform.
+		// Draw into opaque images and derive alpha from a separate grayscale mask.
 		Image base = new Image(display, size, size);
-		ImageData imageData = base.getImageData();
-		imageData.setAlpha(0, 0, 0);
-		Arrays.fill(imageData.alphaData, (byte) 0);
-
-		// create the label image using the transparent base
-		Image image = new Image(display, imageData);
-		GC gc = new GC(image);
+		Image mask = new Image(display, size, size);
+		GC gc = new GC(base);
+		GC maskGc = new GC(mask);
 		gc.setLineWidth(0);
 		gc.setAntialias(SWT.ON);
 		gc.setAdvanced(true);
+		maskGc.setLineWidth(0);
+		maskGc.setAntialias(SWT.ON);
+		maskGc.setAdvanced(true);
 
 		// fill a circle with the label color
 		gc.setBackground(color);
+		gc.fillRectangle(0, 0, size, size);
 		gc.fillOval(x_offset, y_offset, diameter, diameter);
+		maskGc.setBackground(display.getSystemColor(SWT.COLOR_BLACK));
+		maskGc.fillRectangle(0, 0, size, size);
+		maskGc.setBackground(display.getSystemColor(SWT.COLOR_WHITE));
+		maskGc.fillOval(x_offset, y_offset, diameter, diameter);
 
 		// draw outline around the label circle
 		if (outline) {
 			Color outlineColor = display.getSystemColor(SWT.COLOR_WHITE);
 			gc.setForeground(outlineColor);
 			gc.drawOval(x_offset - 1, y_offset - 1, diameter + 1, diameter + 1);
+			maskGc.setForeground(outlineColor);
+			maskGc.drawOval(x_offset - 1, y_offset - 1, diameter + 1, diameter + 1);
 		}
 
-		// release resources
-		base.dispose();
 		gc.dispose();
+		maskGc.dispose();
+		ImageData imageData = base.getImageData();
+		ImageData maskData = mask.getImageData();
+		for (int y = 0; y < size; y++) {
+			for (int x = 0; x < size; x++) {
+				imageData.setAlpha(x, y, maskData.palette.getRGB(maskData.getPixel(x, y)).red);
+			}
+		}
+		Image image = new Image(display, imageData);
+		base.dispose();
+		mask.dispose();
 		color.dispose();
 
 		// store image in cache
@@ -133,6 +144,7 @@ public class ActivityLabelPainter {
 		for (ActivityLabelImage image : images.values()) {
 			image.image.dispose();
 		}
+		images.clear();
 	}
 
 }

@@ -221,6 +221,12 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 
 		fAppearanceColorTableViewer.setLabelProvider(new LabelProvider() {
 			@Override
+			public void dispose() {
+				painter.disposeImages();
+				super.dispose();
+			}
+
+			@Override
 			public Image getImage(Object element) {
 				return painter.getLabelImage((ActivityLabel) element,
 						fAppearanceColorTableViewer.getTable().getItemHeight(), false);
