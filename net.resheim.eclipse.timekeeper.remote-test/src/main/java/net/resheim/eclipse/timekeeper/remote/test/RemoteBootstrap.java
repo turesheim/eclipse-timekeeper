@@ -32,7 +32,7 @@ public final class RemoteBootstrap implements IApplication {
     static Path folder;
     static URI serverUrl;
     static String token;
-    private static String accountAToken,accountBToken;
+    private static String accountAToken,accountBToken,observerBToken;
     static Properties proof;
     public static Properties receipt() {return proof;}
     public static Path fixtureFolder() {return folder;}
@@ -40,6 +40,7 @@ public final class RemoteBootstrap implements IApplication {
     public static String fixtureToken() {return token;}
     public static String accountAToken() {return accountAToken;}
     public static String accountBToken() {return accountBToken;}
+    public static String observerBToken() {return observerBToken;}
     @Override public Object start(IApplicationContext context) throws Exception {
         folder=Path.of(System.getProperty("timekeeper.remote.fixture")).toAbsolutePath();Files.createDirectories(folder);
         requireArgument("-eclipse.keyring",folder.resolve("secure.storage"));
@@ -55,6 +56,8 @@ public final class RemoteBootstrap implements IApplication {
             if(accountAToken.isEmpty()) {accountAToken=token;node.put("fixture-token-a",accountAToken,true);}
             accountBToken=node.get("fixture-token-b","");
             if(accountBToken.isEmpty()) {accountBToken=randomSecret();node.put("fixture-token-b",accountBToken,true);}
+            observerBToken=node.get("fixture-observer-b","");
+            if(observerBToken.isEmpty()) {observerBToken=randomSecret();node.put("fixture-observer-b",observerBToken,true);}
             secure.flush();
             proof=new Properties();Path evidence=folder.resolve("proof.properties");
             if(Files.exists(evidence)) try(var input=Files.newInputStream(evidence)) {proof.load(input);}
@@ -77,7 +80,7 @@ public final class RemoteBootstrap implements IApplication {
                 }
             }
             Path registry=folder.resolve("server-tokens.json");
-            Files.writeString(registry,"["+principal("remote-owner-a",accountAToken)+","+principal("remote-owner-b",accountBToken)+"]",StandardCharsets.UTF_8);
+            Files.writeString(registry,"["+principal("remote-owner-a",accountAToken)+","+principal("remote-owner-b",accountBToken)+","+principal("remote-owner-b",observerBToken)+"]",StandardCharsets.UTF_8);
             int port;
             if(proof.containsKey("server.port")) port=Integer.parseInt(proof.getProperty("server.port"));
             else try(var socket=new ServerSocket(0)) {port=socket.getLocalPort();}
@@ -210,7 +213,7 @@ public final class RemoteBootstrap implements IApplication {
     private static void updateRegistry(boolean enabled,boolean writable) throws Exception {
         Path temporary=Files.createTempFile(folder,"server-tokens-",".json");
         try {
-            Files.writeString(temporary,"["+principal("remote-owner-a",accountAToken)+(enabled ? ","+principal("remote-owner-b",accountBToken,writable) : "")+"]",StandardCharsets.UTF_8);
+            Files.writeString(temporary,"["+principal("remote-owner-a",accountAToken)+(enabled ? ","+principal("remote-owner-b",accountBToken,writable) : "")+","+principal("remote-owner-b",observerBToken)+"]",StandardCharsets.UTF_8);
             Files.move(temporary,folder.resolve("server-tokens.json"),java.nio.file.StandardCopyOption.ATOMIC_MOVE,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         } finally {Files.deleteIfExists(temporary);}
     }

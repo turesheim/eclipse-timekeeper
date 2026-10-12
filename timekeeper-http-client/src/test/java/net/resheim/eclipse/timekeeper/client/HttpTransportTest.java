@@ -116,6 +116,43 @@ class HttpTransportTest {
         }
     }
 
+    @Test void changePagesCarryOrderedCursorsAndSignalMissingHistory() throws Exception {
+        AtomicReference<String> response=new AtomicReference<>("{\"items\":[{\"sequence\":5},{\"sequence\":6}],\"nextSequence\":6,\"hasMore\":false}");
+        try(Fixture server=new Fixture(exchange->{
+            assertEquals("Bearer "+TOKEN,exchange.getRequestHeaders().getFirst("Authorization"));
+            assertEquals("after=4&waitSeconds=5",exchange.getRequestURI().getQuery());reply(exchange,200,response.get());
+        });var client=server.client(Duration.ofSeconds(2))) {
+            assertEquals(new HttpTimekeeperService.ChangeBatch(6,true,false),client.changeBatch(4,5));
+            response.set("{\"items\":[],\"nextSequence\":4,\"hasMore\":true}");
+            assertEquals(new HttpTimekeeperService.ChangeBatch(4,false,true),client.changeBatch(4,5));
+        }
+    }
+    @Test void invalidChangeCursorCannotAdvanceTheClientOrExposeAResponse() throws Exception {
+        try(Fixture server=new Fixture(exchange->reply(exchange,200,"{\"items\":[{\"sequence\":5},{\"sequence\":4}],\"nextSequence\":4,\"hasMore\":false,\"detail\":\""+TOKEN+"\"}"));
+                var client=server.client(Duration.ofSeconds(2))) {
+            var failure=assertThrows(RemoteFailure.class,()->client.changeBatch(4,0));
+            assertEquals(RemoteFailure.Kind.UNAVAILABLE,failure.kind());assertEquals("INVALID_CHANGE_PAGE",failure.code());assertSafe(failure);
+        }
+    }
+    @Test void fullResynchronizationDropsEtagsFromBeforeARevisionReset() throws Exception {
+        String id="77777777-7777-4777-8777-777777777777";
+        AtomicInteger revision=new AtomicInteger(2);
+        try(Fixture server=new Fixture(exchange->{
+            int current=revision.get();String tag="\"task-"+current+"\"";
+            if(exchange.getRequestMethod().equals("PUT")) {
+                if(!tag.equals(exchange.getRequestHeaders().getFirst("If-Match"))) {reply(exchange,412,"{\"code\":\"STALE_VERSION\"}");return;}
+                current=revision.incrementAndGet();tag="\"task-"+current+"\"";
+            }
+            exchange.getResponseHeaders().set("ETag",tag);
+            reply(exchange,200,"{\"id\":\""+id+"\",\"ownerId\":\"owner-test\",\"version\":"+current+",\"projectId\":null,\"parentTaskId\":null,\"summary\":\"Restored task\",\"url\":null,\"externalReferences\":[]}");
+        });var client=server.client(Duration.ofSeconds(2))) {
+            var taskId=new net.resheim.eclipse.timekeeper.domain.TaskId(java.util.UUID.fromString(id));
+            assertEquals(2,client.task(taskId).orElseThrow().version());revision.set(1);
+            var command=new net.resheim.eclipse.timekeeper.service.Commands.UpdateTask(taskId,1,java.util.Optional.empty(),java.util.Optional.empty(),"Reviewed restored task",java.util.Optional.empty());
+            assertEquals(RemoteFailure.Kind.CONFLICT,assertThrows(RemoteFailure.class,()->client.updateTask(command)).kind());
+            client.invalidateVersions();assertEquals(2,client.updateTask(command).version());
+        }
+    }
     private static void assertSafe(RemoteFailure failure) {
         assertFalse(failure.getMessage().contains(TOKEN));
         assertNull(failure.getCause(), "Transport internals must not expose a response or credential");

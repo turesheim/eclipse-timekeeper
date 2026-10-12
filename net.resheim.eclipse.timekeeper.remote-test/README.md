@@ -40,8 +40,11 @@ job and runs these phases plus the optional Mylyn module under Xvfb. It uploads 
 the credential-free `proof.properties`; secure storage, the password file and
 token registry are excluded from uploaded evidence.
 
-Still required before #220 is complete: installed optional Mylyn activation,
-real backend/account switching, authentication/offline/timeout/cancellation and
-optimistic-conflict form acceptance, and uncertain-command/deletion outcomes.
-#219 concurrent client notification/reconnect and #221 web UI remain required
+The optional Mylyn module covers installed activation, restart, account-token
+switching, task-editor failure preservation and selected uncertain-update
+outcomes. It also verifies automatic peer-change refresh and reconnect; see
+[its README](../net.resheim.eclipse.timekeeper.remote-mylyn-test/README.md).
+Still required before #220 is complete: endpoint and embedded/remote switches,
+remaining native preference flows, other form failures and uncertain-command/
+deletion outcomes. #219 web synchronization and #221 web UI remain required
 before the 2.0 release.
