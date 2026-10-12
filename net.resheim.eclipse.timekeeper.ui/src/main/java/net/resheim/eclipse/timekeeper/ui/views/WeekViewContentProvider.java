@@ -64,7 +64,8 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	public void setShowAllTasks(boolean showAllTasks) { this.showAllTasks = showAllTasks; }
 	public Optional<Task> task(TaskId id) { return Optional.ofNullable(tasks.get(id)); }
 	public List<Label> labels(Activity activity) {
-		return activity.labelIds().stream().map(labels::get).filter(java.util.Objects::nonNull).toList();
+		return activity.labelIds().stream().map(labels::get).filter(java.util.Objects::nonNull)
+				.sorted(java.util.Comparator.comparing(Label::name).thenComparing(label -> label.id().value())).toList();
 	}
 
 	@Override public void dispose() {

@@ -133,6 +133,159 @@ public abstract class NativeProjectTaskScenario {
 	}
 
 	@Test
+	public void labelImagesRemainVisibleWhenOtherOwnersClose() throws Exception {
+		onUi(() -> {
+			var label = new net.resheim.eclipse.timekeeper.domain.Label(
+					new net.resheim.eclipse.timekeeper.domain.LabelId(java.util.UUID.randomUUID()),
+					"Visible label", Optional.of("210,55,55"), 0);
+			var viewPainter = new net.resheim.eclipse.timekeeper.ui.ActivityLabelPainter();
+			var otherPainter = new net.resheim.eclipse.timekeeper.ui.ActivityLabelPainter();
+			try {
+				var viewImage = viewPainter.getLabelImage(label, 16, true);
+				var data = viewImage.getImageData();
+				assertTrue("The label center must be opaque", data.getAlpha(8, 9) > 0);
+				assertEquals("The image corners must remain transparent", 0, data.getAlpha(0, 0));
+				assertEquals(new org.eclipse.swt.graphics.RGB(210, 55, 55), data.palette.getRGB(data.getPixel(8, 9)));
+				otherPainter.getLabelImage(label, 16, true);
+				otherPainter.disposeImages();
+				assertFalse("Another owner's disposal must not hide Workweek labels",
+						viewPainter.getLabelImage(label, 16, true).isDisposed());
+				assertSame(viewImage, viewPainter.getLabelImage(label, 16, true));
+				assertEquals(24, viewPainter.getLabelImage(label, 24, true).getBounds().width);
+				viewPainter.disposeImages();
+				assertTrue(viewImage.isDisposed());
+				assertFalse("A disposed cache must be safe to reuse", viewPainter.getLabelImage(label, 16, true).isDisposed());
+			} finally {
+				viewPainter.disposeImages();
+				otherPainter.disposeImages();
+			}
+		});
+	}
+
+	@Test
+	public void workweekDisplaysAssignedLabelsAfterMenuPreferencesAndReopen() throws Exception {
+		SWTWorkbenchBot bot = new SWTWorkbenchBot();
+		await(bot, () -> TimekeeperPlugin.getDefault().isReady(), "Database is not ready");
+		showWorkweek();
+		bot.viewByTitle("Workweek").toolbarButton("Show current week").click();
+		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
+		var project = service.createProject(new CreateProject("Label display project"));
+		var task = service.createTask(new CreateTask(Optional.of(project.id()), "Label display task", Optional.empty()));
+		var red = service.createLabel(new CreateLabel("Acceptance red", Optional.of("210,55,55")));
+		var blue = service.createLabel(new CreateLabel("Acceptance blue", Optional.of("45,90,210")));
+		var start = LocalDate.now(TimekeeperUiPlugin.getCalendarZone()).atTime(9, 0)
+				.atZone(TimekeeperUiPlugin.getCalendarZone()).toInstant();
+		var activity = service.createActivity(new CreateActivity(task.id(), net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL,
+				start, Optional.of(start.plusSeconds(3600)), "Visible activity labels", java.util.Set.of(red.id(), blue.id())));
+		try {
+			assertRenderedLabels(bot, project, task, activity.summary(), new org.eclipse.swt.graphics.RGB(210, 55, 55),
+					new org.eclipse.swt.graphics.RGB(45, 90, 210));
+			screenshot(bot, "", "standalone-workweek-labels.png");
+			PlatformUI.getWorkbench().getDisplay().asyncExec(() -> org.eclipse.ui.dialogs.PreferencesUtil
+					.createPreferenceDialogOn(PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell(),
+							"net.resheim.eclipse.timekeeper.ui.preferences.LabelPreferences", null, null).open());
+			bot.shell("Preferences").activate();
+			var labelTable = bot.table().widget;
+			onUi(() -> assertTrue(java.util.Arrays.stream(labelTable.getItems())
+					.anyMatch(item -> item.getText().equals(red.name()))));
+			bot.button("Cancel").click();
+			assertRenderedLabels(bot, project, task, activity.summary(), new org.eclipse.swt.graphics.RGB(210, 55, 55),
+					new org.eclipse.swt.graphics.RGB(45, 90, 210));
+			parentRow(bot, project.name(), task.summary()).expand().getNode(activity.summary()).contextMenu(red.name()).click();
+			await(bot, () -> !service.activity(activity.id()).orElseThrow().labelIds().contains(red.id()),
+					"The label menu did not remove the label");
+			assertEquals(java.util.Set.of(blue.id()), service.activity(activity.id()).orElseThrow().labelIds());
+			assertRenderedLabels(bot, project, task, activity.summary(), new org.eclipse.swt.graphics.RGB(45, 90, 210));
+			parentRow(bot, project.name(), task.summary()).expand().getNode(activity.summary()).contextMenu(red.name()).click();
+			await(bot, () -> service.activity(activity.id()).orElseThrow().labelIds().contains(red.id()),
+					"The label menu did not restore the label");
+			service.updateLabel(new UpdateLabel(blue.id(), blue.version(), blue.name(), Optional.of("40,180,90")));
+			onUi(() -> ((WorkWeekView) PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage()
+					.findView(WorkWeekView.VIEW_ID)).refreshAll());
+			assertRenderedLabels(bot, project, task, activity.summary(), new org.eclipse.swt.graphics.RGB(210, 55, 55),
+					new org.eclipse.swt.graphics.RGB(40, 180, 90));
+			reopenWorkweek();
+			assertRenderedLabels(bot, project, task, activity.summary(), new org.eclipse.swt.graphics.RGB(210, 55, 55),
+					new org.eclipse.swt.graphics.RGB(40, 180, 90));
+		} finally {
+			cleanup(service, project, java.util.List.of(task.id()));
+			for (var label : java.util.List.of(red, blue)) {
+				service.label(label.id()).ifPresent(value -> service.deleteLabel(new DeleteLabel(value.id(), value.version())));
+			}
+		}
+	}
+
+	private static void assertRenderedLabels(SWTWorkbenchBot bot, Project project, Task task, String summary,
+			org.eclipse.swt.graphics.RGB... colors) throws Exception {
+		SWTWorkbenchBot workbenchBot = bot;
+		bot.waitUntil(new DefaultCondition() {
+			private Throwable lastFailure;
+			@Override public boolean test() throws Exception {
+				try {
+					captureRenderedLabels(workbenchBot, project, task, summary, colors);
+					return true;
+				} catch (java.util.concurrent.ExecutionException failure) {
+					if (!(failure.getCause() instanceof AssertionError)) throw failure;
+					lastFailure = failure.getCause();
+					return false;
+				}
+			}
+			@Override public String getFailureMessage() { return "Label rendering did not settle: " + lastFailure; }
+		}, 5000);
+	}
+
+	private static void captureRenderedLabels(SWTWorkbenchBot bot, Project project, Task task, String summary,
+			org.eclipse.swt.graphics.RGB... colors) throws Exception {
+		var row = parentRow(bot, project.name(), task.summary()).expand().getNode(summary);
+		row.select();
+		Tree tree = bot.viewByTitle("Workweek").bot().treeWithId("workweek-editor-tree").widget;
+		onUi(() -> {
+			tree.deselectAll();
+			tree.redraw();
+			tree.update();
+			var image = new org.eclipse.swt.graphics.Image(tree.getDisplay(), tree.getSize().x, tree.getSize().y);
+			var gc = new org.eclipse.swt.graphics.GC(tree);
+			try {
+				gc.copyArea(image, 0, 0);
+				var data = image.getImageData();
+				var bounds = row.widget.getBounds(0);
+				// Cocoa GC.copyArea captures the enclosing scroll view, including its header;
+				// TreeItem bounds are relative to the outline view below that header.
+				if ("cocoa".equals(SWT.getPlatform())) bounds.y += tree.getHeaderHeight();
+				bounds = bounds.intersection(new org.eclipse.swt.graphics.Rectangle(0, 0, data.width, data.height));
+				// Inspect only the marker area, avoiding the activity icon and text.
+				bounds.x += Math.max(0, bounds.width - 32);
+				bounds.width = Math.min(32, bounds.width);
+				var loader = new org.eclipse.swt.graphics.ImageLoader();
+				loader.data = new org.eclipse.swt.graphics.ImageData[] { data };
+				var directory = Path.of(System.getProperty("screenshots", System.getProperty("java.io.tmpdir")));
+				try { Files.createDirectories(directory); }
+				catch (java.io.IOException failure) { throw new AssertionError(failure); }
+				loader.save(directory.resolve("workweek-label-pixels.png").toString(), SWT.IMAGE_PNG);
+				for (var color : colors) {
+					int pixels = 0;
+					for (int y = bounds.y; y < bounds.y + bounds.height; y++) {
+						for (int x = bounds.x; x < bounds.x + bounds.width; x++) {
+							var actual = data.palette.getRGB(data.getPixel(x, y));
+							// Cocoa snapshots convert through the display's color profile. The
+							// painter test checks exact RGB; here we check visible colored areas.
+							int tolerance = "cocoa".equals(SWT.getPlatform()) ? 60 : 0;
+							if (Math.abs(color.red - actual.red) <= tolerance
+									&& Math.abs(color.green - actual.green) <= tolerance
+									&& Math.abs(color.blue - actual.blue) <= tolerance) pixels++;
+						}
+					}
+					assertTrue("The activity row " + bounds + " must visibly paint label color " + color + ", found " + pixels,
+							pixels >= 8);
+				}
+			} finally {
+				gc.dispose();
+				image.dispose();
+			}
+		});
+	}
+
+	@Test
 	public void collapseAndExpandWorkweekPreserveStateAcrossRefresh() throws Exception {
 		SWTWorkbenchBot bot = new SWTWorkbenchBot();
 		await(bot, () -> TimekeeperPlugin.getDefault().isReady(), "Database is not ready");

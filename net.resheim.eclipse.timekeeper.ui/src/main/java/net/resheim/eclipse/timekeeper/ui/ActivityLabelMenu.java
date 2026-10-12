@@ -45,6 +45,12 @@ public class ActivityLabelMenu extends CompoundContributionItem implements IWork
 	}
 
 	@Override
+	public void dispose() {
+		super.dispose();
+		if (labelPainter != null) labelPainter.disposeImages();
+	}
+
+	@Override
 	protected IContributionItem[] getContributionItems() {
 		return TimekeeperUiPlugin.getDefault().getTimekeeperService().labels().stream()
 				.map(this::addToMenu).toArray(IContributionItem[]::new);
