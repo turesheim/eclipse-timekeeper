@@ -1,0 +1,8 @@
+.git
+**/target
+**/.metadata
+**/.env
+**/secrets
+**/data
+**/backups
+**/__pycache__
