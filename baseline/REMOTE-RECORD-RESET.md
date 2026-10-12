@@ -53,6 +53,15 @@ packaged Server ZIP SHA-256 is
 Shared module counts across reactors overlap and are not summed. This new commit
 still requires its own full CI verification.
 
+The first CI Linux run failed waiting for polling when a previous native test
+left Workweek open. Its report loads were unsupported by the small socket
+fixture and made that temporary backend unavailable. The fixture now serves
+empty activity pages/reports, and the reset test explicitly opens Workweek and
+restores its earlier visibility/cache afterward. All five focused Job tests
+passed with that state. The broad local macOS UI run had dialog-activation
+timeouts, so it does not certify the full native suite; Linux CI must recheck
+the corrected fixture.
+
 Parent `81e205a` passed all seven Build jobs in
 [run 38316380367](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38316380367)
 and Server containers verification in

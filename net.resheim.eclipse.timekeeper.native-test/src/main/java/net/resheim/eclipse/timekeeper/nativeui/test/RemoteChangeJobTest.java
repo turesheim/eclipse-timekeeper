@@ -35,7 +35,7 @@ public class RemoteChangeJobTest {
                 var backend=new EclipseBackend(()->{throw new AssertionError("Embedded fallback");},client,display)) {
             await(backend::ready,"Initial remote snapshot");
             assertEquals(2,client.task(RestoredServer.ID).orElseThrow().version());
-            assertTrue(server.polling.await(5,TimeUnit.SECONDS));
+            assertTrue("Change watcher did not start: "+server.failure.get(),server.polling.await(5,TimeUnit.SECONDS));
             var watcher=Arrays.stream(Job.getJobManager().find(null))
                     .filter(job->job.getName().equals("Watch Timekeeper changes")).findFirst().orElseThrow();
             CountDownLatch heartbeat=new CountDownLatch(1);display.asyncExec(heartbeat::countDown);
@@ -66,6 +66,13 @@ public class RemoteChangeJobTest {
             try {return field.get(plugin)!=null;}catch(IllegalAccessException error) {throw new AssertionError(error);}
         },"Original isolated UI backend");
         var original=(EclipseBackend)field.get(plugin);AtomicReference<TitleAreaDialog> dialog=new AtomicReference<>();
+        AtomicBoolean workweekWasOpen=new AtomicBoolean();
+        onUi(display,()->{
+            var page=PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
+            workweekWasOpen.set(page.findView(net.resheim.eclipse.timekeeper.ui.views.WorkWeekView.VIEW_ID)!=null);
+            try {page.showView(net.resheim.eclipse.timekeeper.ui.views.WorkWeekView.VIEW_ID);}catch(org.eclipse.ui.PartInitException error) {throw new AssertionError(error);}
+            return true;
+        });
         try(var server=new RestoredServer();
                 var client=new HttpTimekeeperService(server.url(),()->"isolated-test-token",Duration.ofSeconds(15));
                 var backend=new EclipseBackend(()->{throw new AssertionError("Embedded fallback");},client,display)) {
@@ -75,7 +82,7 @@ public class RemoteChangeJobTest {
             openTaskDialog(display,backend,dialog);
             var bot=new SWTWorkbenchBot();var shell=bot.shell("Edit task");var controls=shell.bot();
             controls.textWithLabel("Summary").setText("Unreviewed old draft");
-            assertTrue(server.polling.await(5,TimeUnit.SECONDS));
+            assertTrue("Change watcher did not start: "+server.failure.get(),server.polling.await(5,TimeUnit.SECONDS));
             server.restore(2,"Changed fields after restore");
             await(()->onUi(display,()->backend.ready() && backend.service().task(RestoredServer.ID)
                     .filter(task->task.version()==2 && task.summary().equals("Changed fields after restore")).isPresent()),"Same-version restored snapshot");
@@ -95,7 +102,11 @@ public class RemoteChangeJobTest {
         } finally {
             onUi(display,()->{
                 if(dialog.get()!=null && dialog.get().getShell()!=null && !dialog.get().getShell().isDisposed()) dialog.get().close();
-                try {field.set(plugin,original);}catch(IllegalAccessException error) {throw new AssertionError(error);}return true;
+                try {field.set(plugin,original);}catch(IllegalAccessException error) {throw new AssertionError(error);}
+                var page=PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
+                var view=(net.resheim.eclipse.timekeeper.ui.views.WorkWeekView)page.findView(net.resheim.eclipse.timekeeper.ui.views.WorkWeekView.VIEW_ID);
+                if(view!=null) {if(workweekWasOpen.get()) view.refreshAll();else page.hideView(view);}
+                return true;
             });
         }
     }
@@ -173,6 +184,10 @@ public class RemoteChangeJobTest {
                     else {pollingAgain.countDown();closed.await(10,TimeUnit.SECONDS);body="{\"items\":[],\"nextSequence\":"+after+",\"hasMore\":false}";}
                 } else if(path.equals("/api/v1/me")) body="{\"ownerId\":\"fixture-owner\",\"zoneId\":\"UTC\",\"version\":0}";
                 else if(path.equals("/api/v1/activities/active")) {status=204;body="";}
+                // Other UI tests can leave Workweek open; its read-only report loads must
+                // remain valid while this isolated backend is temporarily selected.
+                else if(path.equals("/api/v1/activities")) body="{\"items\":[],\"revision\":"+revision+",\"nextCursor\":null}";
+                else if(path.equals("/api/v1/reports/activities")) body="{\"revision\":"+revision+",\"generatedAt\":\"2026-10-13T00:00:00Z\",\"total\":\"PT0S\",\"days\":[]}";
                 else if(path.equals("/api/v1/tasks/"+ID.value())) {
                     if(request[0].equals("PUT")) {
                         putTag.set(headers.get("if-match"));assertEquals(tag(),putTag.get());
