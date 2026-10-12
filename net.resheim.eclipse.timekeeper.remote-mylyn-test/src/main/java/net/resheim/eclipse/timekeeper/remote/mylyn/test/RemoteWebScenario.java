@@ -69,6 +69,7 @@ final class RemoteWebScenario {
             peer.command(Map.of("action","start"));
             RemoteTestSupport.waitFor(()->{try {return tree.getTreeItem(project.name()).getNode(accepted.summary()).contextMenu("Deactivate task").isEnabled();}catch(RuntimeException pending) {return false;}},"Browser start did not update native Deactivate action");
             var webActive=api.activeActivity(OwnerId.LOCAL).orElseThrow();assertEquals(task.id(),webActive.taskId());assertEquals(Set.of(label.id()),webActive.labelIds());
+            RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->TimekeeperUiPlugin.getDefault().getTimekeeperService().activeActivity(OwnerId.LOCAL).filter(webActive::equals).isPresent());}catch(Exception pending) {return false;}},"Browser start did not reach actual installed activity snapshot");
             tree.getTreeItem(project.name()).getNode(accepted.summary()).contextMenu("Deactivate task").click();
             RemoteTestSupport.waitFor(()->api.activeActivity(OwnerId.LOCAL).isEmpty(),"Native action did not stop browser-started interval");peer.command(Map.of("action","observe-stopped"));
             var ownReport=api.activities(taskQuery);assertEquals(3,ownReport.activities().size());awaitReport(taskQuery,ownReport.total());
@@ -116,6 +117,8 @@ final class RemoteWebScenario {
             var builder=new ProcessBuilder("node",root.resolve("web/tests/eclipse-peer.js").toString()).directory(root.toFile());
             builder.environment().put("TIMEKEEPER_WEB_URL",RemoteBootstrap.endpoint().toString().replaceFirst("/api/v1/?$",""));
             builder.environment().put("TIMEKEEPER_WEB_TOKEN",RemoteBootstrap.observerBToken());
+            builder.environment().put("TIMEKEEPER_WEB_FAILURE_IMAGE",RemoteBootstrap.fixtureFolder().resolve("browser-peer-failure.png").toString());
+            builder.environment().put("TIMEKEEPER_WEB_FAILURE_TEXT",RemoteBootstrap.fixtureFolder().resolve("browser-peer-failure.txt").toString());
             builder.redirectError(RemoteBootstrap.fixtureFolder().resolve("browser-peer.log").toFile());process=builder.start();
             input=new BufferedWriter(new OutputStreamWriter(process.getOutputStream(),StandardCharsets.UTF_8));output=new BufferedReader(new InputStreamReader(process.getInputStream(),StandardCharsets.UTF_8));
             RemoteBootstrap.receipt().setProperty("web.browser-driver.pid",Long.toString(process.pid()));
@@ -126,7 +129,7 @@ final class RemoteWebScenario {
             assertEquals("Browser peer action "+values.get("action")+" failed: "+reply,"{\"ok\":true}",reply);
         }
         @Override public void close() throws Exception {
-            try {if(process.isAlive()) {input.write("{\"action\":\"quit\"}\n");input.flush();if(!process.waitFor(10,TimeUnit.SECONDS)) {process.descendants().forEach(ProcessHandle::destroy);process.destroy();if(!process.waitFor(5,TimeUnit.SECONDS)) process.destroyForcibly();}}}
+            try {if(process.isAlive()) {input.write("{\"action\":\"quit\"}\n");input.flush();input.close();if(!process.waitFor(10,TimeUnit.SECONDS)) {process.descendants().forEach(ProcessHandle::destroy);process.destroy();if(!process.waitFor(5,TimeUnit.SECONDS)) process.destroyForcibly();}}}
             finally {reader.shutdownNow();input.close();output.close();}
             assertFalse("Browser driver did not exit",process.isAlive());assertEquals("Browser driver reported a failed action",0,process.exitValue());
         }

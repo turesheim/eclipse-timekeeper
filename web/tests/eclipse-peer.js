@@ -2,6 +2,7 @@
 // The line protocol carries synthetic record names/times, never credentials.
 import {chromium, expect} from '@playwright/test';
 import {createInterface} from 'node:readline';
+import {writeFile} from 'node:fs/promises';
 import {durationText} from '../src/model.js';
 
 const browser = await chromium.launch();
@@ -72,8 +73,11 @@ async function command(input) {
       break;
     case 'cleanup':
       await tab('Workweek');
-      while (await page.locator('#activities tr').filter({hasText:record.task}).count()) {
-        await page.locator('#activities tr').filter({hasText:record.task}).first().getByRole('button', {name:'Delete', exact:true}).click(); await save('Delete');
+      const rows = page.locator('#activities tr').filter({hasText:record.task});
+      while (await rows.count()) {
+        const before = await rows.count();
+        await rows.first().getByRole('button', {name:'Delete', exact:true}).click(); await save('Delete');
+        await expect(rows).toHaveCount(before - 1);
       }
       for (const [tabName, container, name] of [['Tasks','tasks',record.task], ['Projects','projects',record.project], ['Labels','labels',record.label]]) {
         await tab(tabName); await page.locator(`#${container} tr`).filter({hasText:name}).getByRole('button', {name:'Delete', exact:true}).click(); await save('Delete');
@@ -82,13 +86,16 @@ async function command(input) {
     default: throw new Error('Unknown browser peer action');
   }
 }
+const lines = createInterface({input:process.stdin});
 try {
-  for await (const line of createInterface({input:process.stdin})) {
+  for await (const line of lines) {
     const input = JSON.parse(line); if (input.action === 'quit') break;
-    try { await command(input); process.stdout.write('{"ok":true}\n'); }
+    try { await command(input); process.stderr.write('Browser phase passed: ' + input.action + '\n'); process.stdout.write('{"ok":true}\n'); }
     catch (error) {
-      const message = String(error.message).replaceAll(process.env.TIMEKEEPER_WEB_TOKEN, '[redacted]').slice(0, 800);
+      await page.screenshot({path:process.env.TIMEKEEPER_WEB_FAILURE_IMAGE, fullPage:true});
+      await writeFile(process.env.TIMEKEEPER_WEB_FAILURE_TEXT, await page.locator('body').innerText());
+      const message = String(error.message).replaceAll(process.env.TIMEKEEPER_WEB_TOKEN, '[redacted]').slice(0, 4000);
       process.stdout.write(JSON.stringify({ok:false, message}) + '\n'); process.exitCode = 1; break;
     }
   }
-} finally { await browser.close(); }
+} finally { lines.close(); process.stdin.destroy(); await browser.close(); }

@@ -152,6 +152,7 @@ jobs:
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/acceptance-data/proof.properties
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/acceptance-data/server-*.log
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/acceptance-data/browser-peer.log
+          net.resheim.eclipse.timekeeper.remote-mylyn-test/target/acceptance-data/browser-peer-failure.*
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/work/**/.metadata/.log
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/work/**/configuration/*.log
 
