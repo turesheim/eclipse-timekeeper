@@ -28,6 +28,14 @@ projections and remote UUIDs, then checks that account A's revision and history
 are unchanged. Both fixture credentials are encrypted in the isolated keyring;
 the registry contains only their hashes and fixed owner mappings.
 
+The account-B phase also deletes a projected task with recorded time and its
+nonempty project category through the real Task List. Both server conflicts
+must display an error and restore the task/category hierarchy without changing
+server revision or history. A later empty-task deletion must succeed, proving
+the rejected deletions no longer block reconciliation. This covers definitive
+conflict rejection; authentication/permission/transport and uncertain deletion
+outcomes still require installed acceptance.
+
 `remote-client-tests` includes both native-only and Mylyn modules. CI's
 `Remote-Eclipse` job runs all five installed phases and uploads reports and
 credential-free receipts/logs. The fixture password, keyring and token registry

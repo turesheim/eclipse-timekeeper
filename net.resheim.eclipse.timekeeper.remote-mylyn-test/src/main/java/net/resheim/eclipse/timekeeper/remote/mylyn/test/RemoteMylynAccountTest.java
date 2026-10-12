@@ -54,6 +54,7 @@ public class RemoteMylynAccountTest {
             RemoteTestSupport.waitFor(barrier::get,"Foreign event barrier did not finish");assertEquals(active,api.activeActivity(OwnerId.LOCAL).orElseThrow());
             RemoteTestSupport.onUi(()->{TasksUi.getTaskActivityManager().deactivateTask(projection);return null;});
             RemoteTestSupport.waitFor(()->api.activeActivity(OwnerId.LOCAL).isEmpty(),"Account B deactivation did not stop tracking");
+            verifyRejectedDeletions(api,project,task,active.id());
             assertEquals(1,api.projects().size());assertEquals(1,api.tasks().size());
             assertEquals(previous,original.metadata());assertEquals(history,original.activity(history.id()).orElseThrow());assertEquals(successor,original.activity(successor.id()).orElseThrow());
             assertEquals(3,RemoteBootstrap.receipt().getProperty("server.pids").split(",").length);
@@ -61,5 +62,38 @@ public class RemoteMylynAccountTest {
             RemoteBootstrap.receipt().setProperty("phase.mylyn.account","passed");RemoteBootstrap.writeProof();
         }
         RemoteTestSupport.readyWithMylyn();
+    }
+    private static void verifyRejectedDeletions(HttpTimekeeperService api,Project project,Task task,ActivityId intervalId) throws Exception {
+        var list=org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getTaskList();
+        var bot=new org.eclipse.swtbot.eclipse.finder.SWTWorkbenchBot();
+        var interval=api.activity(intervalId).orElseThrow();assertTrue(interval.end().isPresent());
+        var before=api.metadata();
+        var projected=MylynIntegration.getDefault().linked(task).orElseThrow();
+        RemoteTestSupport.onUi(()->{list.deleteTask(projected);return null;});
+        bot.shell("Could not delete Timekeeper record").bot().button("OK").click();
+        RemoteTestSupport.waitFor(()->MylynIntegration.getDefault().linked(task).isPresent(),"Rejected task deletion did not restore its projection");
+        assertEquals(before,api.metadata());assertEquals(interval,api.activity(intervalId).orElseThrow());
+
+        String categoryHandle=net.resheim.eclipse.timekeeper.mylyn.MylynBackendScope.current().category(project.id());
+        var category=(org.eclipse.mylyn.internal.tasks.core.TaskCategory)list.getContainerForHandle(categoryHandle);
+        assertNotNull(category);
+        RemoteTestSupport.onUi(()->{list.deleteCategory(category);return null;});
+        bot.shell("Could not delete Timekeeper record").bot().button("OK").click();
+        RemoteTestSupport.waitFor(()->list.getContainerForHandle(categoryHandle)!=null && MylynIntegration.getDefault().linked(task).isPresent(),"Rejected project deletion did not restore its category/task hierarchy");
+        assertEquals(before,api.metadata());assertEquals(interval,api.activity(intervalId).orElseThrow());
+        var restored=MylynIntegration.getDefault().linked(task).orElseThrow();
+        assertTrue(list.getContainerForHandle(categoryHandle).getChildren().contains(restored));
+
+        // A subsequent successful deletion proves rejected commands do not keep blocking the queue.
+        var empty=api.createTask(new CreateTask(Optional.of(project.id()),"Disposable remote deletion witness",Optional.empty()));
+        RemoteTestSupport.onUi(()->{TimekeeperUiPlugin.getDefault().refreshBackend();return null;});
+        RemoteTestSupport.waitFor(()->MylynIntegration.getDefault().linked(empty).isPresent(),"Witness task did not project after rejected deletions");
+        var disposable=MylynIntegration.getDefault().linked(empty).orElseThrow();
+        RemoteTestSupport.onUi(()->{list.deleteTask(disposable);return null;});
+        RemoteTestSupport.waitFor(()->api.task(empty.id()).isEmpty(),"Rejected deletions blocked a later valid deletion");
+        RemoteTestSupport.waitFor(()->MylynIntegration.getDefault().linked(empty).isEmpty() && TimekeeperUiPlugin.getDefault().isBackendReady(),"Valid deletion did not finish refreshing the UI");
+        assertEquals(project,api.project(project.id()).orElseThrow());assertEquals(task,api.task(task.id()).orElseThrow());
+        assertEquals(interval,api.activity(intervalId).orElseThrow());
+        RemoteBootstrap.receipt().setProperty("phase.mylyn.deletion","passed");RemoteBootstrap.writeProof();
     }
 }

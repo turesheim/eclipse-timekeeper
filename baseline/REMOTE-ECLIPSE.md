@@ -213,7 +213,9 @@ all four phase markers passed, account A revision `9`, and preserved local
 SHA-256 `6e98ac48606e2b6ab30d5ee6db2b718987e7007a92b7b506517875b1e7bcd6ae`.
 The server ZIP checksum is unchanged from the preceding local checkpoint.
 The CI artifact list now includes the third execution's account report and
-continues to exclude credentials. CI verification of this new commit is pending.
+continues to exclude credentials. The account-switch commit `abf2dfb` passed
+all seven jobs in [run 38286650257](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38286650257),
+including the full Linux/Xvfb regression and installed-Eclipse job.
 
 A subsequent broader local macOS run failed in existing native tests on
 window-activation timeouts; it is retained as a failed run, and the remaining
@@ -222,7 +224,42 @@ shells rather than requiring OS focus. The native remote scenario also closes
 Workweek before invoking both refresh entry points, covering a disposed-view
 exception observed when a modal editor returned during test shutdown. The
 production refresh entry point safely returns after its viewer is disposed.
-Full Linux/Xvfb CI must verify the broader regression for this commit.
+The account-switch commit subsequently passed the full Linux/Xvfb regression
+and all other CI jobs in run 38286650257.
+
+## Installed rejected-deletion checkpoint, 2026-10-12
+
+The installed account-B phase now deletes a projected task with recorded time
+and its nonempty project category using the actual Mylyn Task List. Before the
+fix, the test failed waiting for the deletion-error dialog; the installed Error
+Log showed `RemoteFailure` from `deleteTask` and synchronization retrying. The
+server conflict had escaped a handler that only caught local service failures.
+
+The synchronizer now treats remote `CONFLICT` as a rejected deletion, restores
+the hierarchy from the selected service before importing Mylyn changes, and
+removes that rejected command from the pending set. Other transport failures
+continue to propagate and retain pending deletion intent for reconciliation.
+The Mylyn bundle explicitly declares the HTTP-client dependency used for the
+typed failure check.
+
+After the fix, the same installed test passes both task and project rejection,
+requires the original remote UUIDs/hierarchy, and compares server metadata
+revision and interval content before/after. A subsequent empty-task deletion
+must succeed and disappear from both the server and Task List; protected
+records/history and the foreign account remain unchanged.
+
+The selected clean reactor passed **105 main tests, two restart tests and one
+account/deletion test**, without failures/errors/skips. The receipt records
+server PIDs `63795,63801,63806`, all five Mylyn phase markers passed, and preserved
+local SHA-256 `b8efa78553b602433e5f7eb0c38d2cfea84a732e738ffe41ce2bf23864d99dc2`.
+The same checksum-verified packaged server was used for the failing and passing
+runs. CI for this fix remains pending. The preceding `abf2dfb` commit's full
+Linux regression and separate installed-Eclipse job both passed, along with
+all other jobs in run 38286650257.
+
+This covers definitive server-conflict rejection and later valid deletion.
+Permission/authentication/offline/timeout/cancellation/unknown deletion outcomes
+remain open; they are not inferred from this test.
 
 ## Remaining before #220 can be completed
 
@@ -238,7 +275,10 @@ Full Linux/Xvfb CI must verify the broader regression for this commit.
   offline, timeout, cancellation and optimistic-conflict failures. The normal
   and rejected-validation installed paths are covered above.
 - Complete uncertain-command and form-draft acceptance for the installed
-  client; retain the atomic import and owner-scoped retry evidence above.
+  client, including uncertain/authentication/permission/transport deletion
+  outcomes. Definitive conflict-rejected task/project deletions and subsequent
+  valid deletions are covered above; retain the atomic import and owner-scoped
+  retry evidence.
 
 Concurrent client notifications and reconnect acceptance remain required in
 [#219](https://github.com/turesheim/eclipse-timekeeper/issues/219); the web client

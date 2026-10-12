@@ -35,6 +35,8 @@ import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.swt.widgets.Display;
 
+import net.resheim.eclipse.timekeeper.client.RemoteFailure;
+import net.resheim.eclipse.timekeeper.service.ServiceException;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
 import net.resheim.eclipse.timekeeper.domain.Project;
@@ -220,9 +222,9 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 				try {
 					service.deleteTask(
 							new net.resheim.eclipse.timekeeper.service.Commands.DeleteTask(id, task.version()));
-				} catch (net.resheim.eclipse.timekeeper.service.ServiceException failure) {
+				} catch (RuntimeException failure) {
 					// Recorded history is preserved; the projection is restored below.
-					showDeletionFailure(failure);
+					handleDeletionFailure(failure);
 				}
 			});
             deletedTasks.remove(id);
@@ -233,8 +235,8 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 					service.deleteProject(
 							new net.resheim.eclipse.timekeeper.service.Commands.DeleteProject(id, project.version()));
 					scope().forget(id);
-				} catch (net.resheim.eclipse.timekeeper.service.ServiceException failure) {
-					showDeletionFailure(failure);
+				} catch (RuntimeException failure) {
+					handleDeletionFailure(failure);
 				}
 			});
             deletedProjects.remove(id);
@@ -245,6 +247,16 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 			synchronizeBackendToMylyn();
 		}
 	}
+
+    private void handleDeletionFailure(RuntimeException failure) {
+        if (failure instanceof ServiceException
+                || failure instanceof RemoteFailure remote && remote.kind() == RemoteFailure.Kind.CONFLICT) {
+            showDeletionFailure(failure);
+            return;
+        }
+        // An unknown transport outcome must retain the pending deletion for reconciliation.
+        throw failure;
+    }
 
 	private void showDeletionFailure(RuntimeException failure) {
 		restoreAfterDeletionFailure = true;
