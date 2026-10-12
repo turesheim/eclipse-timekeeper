@@ -497,16 +497,8 @@ public class WorkWeekView extends ViewPart {
 					}
 				}
 			});
-			TimekeeperUiPlugin.getDefault().getTaskIntegration().filter(integration -> integration.isLinked(task))
-					.ifPresent(integration -> manager.add(integration.isActive(task) ? deactivateAction : activateAction));
+			manager.add(isTaskActive(task) ? deactivateAction : activateAction);
 			manager.add(newActivityAction);
-			manager.add(new Action("Start activity") {
-				@Override public void run() { perform(() -> {
-					TimekeeperUiPlugin.getDefault().getTimekeeperService().startActivity(
-							new StartActivity(task.id(),
-									OwnerId.LOCAL, "", Set.of()));
-				}); }
-			});
 		}
 		if (selected instanceof Activity activity) {
 			manager.add(new Separator("labels"));
@@ -537,6 +529,40 @@ public class WorkWeekView extends ViewPart {
 			org.eclipse.jface.dialogs.MessageDialog.openError(getSite().getShell(), "Timekeeper", ActivityDialog.failureMessage(failure));
 			refreshAll();
 		}
+	}
+
+	private boolean isTaskActive(Task task) {
+		var plugin = TimekeeperUiPlugin.getDefault();
+		return plugin.getTimekeeperService().activeActivity(OwnerId.LOCAL)
+				.filter(activity -> activity.taskId().equals(task.id())).isPresent()
+				|| plugin.getTaskIntegration().filter(integration -> integration.isActive(task)).isPresent();
+	}
+
+	private void activateTask(Task task) {
+		var plugin = TimekeeperUiPlugin.getDefault();
+		var service = plugin.getTimekeeperService();
+		Task current = service.task(task.id()).orElseThrow();
+		var linked = plugin.getTaskIntegration().filter(integration -> integration.isLinked(current));
+		if (linked.isPresent()) {
+			linked.orElseThrow().activate(current);
+			return;
+		}
+		// Provider activation can outlive an interval stopped directly in Workweek.
+		plugin.getTaskIntegration().ifPresent(integration -> integration.deactivateActiveTask());
+		var active = service.activeActivity(OwnerId.LOCAL);
+		if (active.filter(activity -> activity.taskId().equals(current.id())).isPresent()) return;
+		active.ifPresent(activity -> service.stopActivity(new StopActivity(activity.id(), activity.version())));
+		service.startActivity(new StartActivity(current.id(), OwnerId.LOCAL, "", Set.of()));
+	}
+
+	private void deactivateTask(Task task) {
+		var plugin = TimekeeperUiPlugin.getDefault();
+		plugin.getTaskIntegration().filter(integration -> integration.isLinked(task))
+				.ifPresent(integration -> integration.deactivate(task.id()));
+		plugin.getTimekeeperService().activeActivity(OwnerId.LOCAL)
+				.filter(activity -> activity.taskId().equals(task.id()))
+				.ifPresent(activity -> plugin.getTimekeeperService()
+						.stopActivity(new StopActivity(activity.id(), activity.version())));
 	}
 
 	private void fillLocalPullDown(IMenuManager manager) {
@@ -706,7 +732,7 @@ public class WorkWeekView extends ViewPart {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
 				if (obj instanceof Task) {
-					TimekeeperUiPlugin.getDefault().getTaskIntegration().ifPresent(value -> value.deactivate(((Task) obj).id()));
+					perform(() -> deactivateTask((Task) obj));
 				}
 			}
 		};
@@ -718,7 +744,7 @@ public class WorkWeekView extends ViewPart {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
 				if (obj instanceof Task) {
-					TimekeeperUiPlugin.getDefault().getTaskIntegration().ifPresent(value -> value.activate((Task) obj));
+					perform(() -> activateTask((Task) obj));
 				}
 			}
 		};

@@ -32,6 +32,86 @@ import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 @SuppressWarnings("restriction")
 public class MylynAdapterTest {
 	@Test
+	public void workweekSwitchesBetweenNativeAndLinkedTaskActivation() throws Exception {
+		var bot = new SWTWorkbenchBot();
+		bot.waitUntil(new DefaultCondition() {
+			@Override public boolean test() { return TimekeeperPlugin.getDefault().isReady(); }
+			@Override public String getFailureMessage() { return "Database not ready"; }
+		});
+		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
+		var priorActivity = service.activeActivity(OwnerId.LOCAL);
+		org.eclipse.mylyn.tasks.core.ITask[] priorMylyn = new org.eclipse.mylyn.tasks.core.ITask[1];
+		var first = service.createTask(new CreateTask(Optional.empty(), "Linked activation bridge", Optional.empty()));
+		var second = service.createTask(new CreateTask(Optional.empty(), "Native activation bridge", Optional.empty()));
+		var list = org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getTaskList();
+		var projection = new LocalTask(String.valueOf(list.getNextLocalTaskId()), first.summary());
+		projection.setAttribute(MylynMetadata.ATTR_TIMEKEEPER_TASK_ID, first.id().value().toString());
+		try {
+			onUi(() -> {
+				priorMylyn[0] = TasksUi.getTaskActivityManager().getActiveTask();
+				if (priorMylyn[0] != null) TasksUi.getTaskActivityManager().deactivateTask(priorMylyn[0]);
+				service.activeActivity(OwnerId.LOCAL).ifPresent(activity ->
+						service.stopActivity(new StopActivity(activity.id(), activity.version())));
+				list.addTask(projection, list.getDefaultCategory());
+				try {
+					var window = PlatformUI.getWorkbench().getActiveWorkbenchWindow();
+					window.getShell().setSize(1100, 750);
+					window.getShell().forceActive();
+					window.getActivePage().showView(net.resheim.eclipse.timekeeper.ui.views.WorkWeekView.VIEW_ID);
+				} catch (Exception failure) { throw new AssertionError(failure); }
+			});
+			var view = bot.viewByTitle("Workweek");
+			view.setFocus();
+			view.toolbarButton("Show current week").click();
+			assertTrue(MylynIntegration.getDefault().isLinked(first));
+			assertFalse(MylynIntegration.getDefault().isLinked(second));
+			view.bot().treeWithId("workweek-editor-tree").getTreeItem(first.summary()).contextMenu("Activate task").click();
+			var linkedInterval = service.activeActivity(OwnerId.LOCAL).orElseThrow();
+			assertEquals(first.id(), linkedInterval.taskId());
+			assertTrue(projection.isActive());
+			view.bot().treeWithId("workweek-editor-tree").getTreeItem(second.summary()).contextMenu("Activate task").click();
+			var nativeInterval = service.activeActivity(OwnerId.LOCAL).orElseThrow();
+			assertEquals(second.id(), nativeInterval.taskId());
+			assertTrue(service.activity(linkedInterval.id()).orElseThrow().end().isPresent());
+			assertFalse("The previous Mylyn task must be deactivated", projection.isActive());
+			assertNull(TasksUi.getTaskActivityManager().getActiveTask());
+			view.bot().treeWithId("workweek-editor-tree").getTreeItem(first.summary()).contextMenu("Activate task").click();
+			assertEquals(first.id(), service.activeActivity(OwnerId.LOCAL).orElseThrow().taskId());
+			assertTrue(service.activity(nativeInterval.id()).orElseThrow().end().isPresent());
+			assertTrue(projection.isActive());
+			view.bot().treeWithId("workweek-editor-tree").getTreeItem(first.summary()).contextMenu("Deactivate task").click();
+			assertFalse(projection.isActive());
+			assertTrue(service.activeActivity(OwnerId.LOCAL).isEmpty());
+			view.bot().treeWithId("workweek-editor-tree").getTreeItem(first.summary()).contextMenu("Activate task").click();
+			var manuallyStopped = service.activeActivity(OwnerId.LOCAL).orElseThrow();
+			// Stopping an interval through the service does not change Mylyn's flag.
+			service.stopActivity(new StopActivity(manuallyStopped.id(), manuallyStopped.version()));
+			assertTrue(projection.isActive());
+			view.bot().treeWithId("workweek-editor-tree").getTreeItem(second.summary()).contextMenu("Activate task").click();
+			assertEquals(second.id(), service.activeActivity(OwnerId.LOCAL).orElseThrow().taskId());
+			assertFalse("Native activation must clear Mylyn even when its interval was already stopped", projection.isActive());
+			assertNull(TasksUi.getTaskActivityManager().getActiveTask());
+			view.bot().treeWithId("workweek-editor-tree").getTreeItem(second.summary()).contextMenu("Deactivate task").click();
+			assertTrue(service.activeActivity(OwnerId.LOCAL).isEmpty());
+		} finally {
+			onUi(() -> { if (projection.isActive()) TasksUi.getTaskActivityManager().deactivateTask(projection); });
+			for (var task : java.util.List.of(first, second)) {
+				service.activities(new ActivityQuery(Instant.EPOCH, Instant.now().plusSeconds(60), Optional.empty(),
+						Optional.of(task.id()), Optional.empty(), TimekeeperUiPlugin.getCalendarZone())).activities()
+						.forEach(activity -> service.deleteActivity(new DeleteActivity(activity.id(), activity.version())));
+				service.task(task.id()).ifPresent(current -> service.deleteTask(new DeleteTask(current.id(), current.version())));
+			}
+			onUi(() -> {
+				if (list.getAllTasks().contains(projection)) list.deleteTask(projection);
+				priorActivity.ifPresent(original -> service.activity(original.id()).ifPresent(current ->
+						service.updateActivity(new UpdateActivity(current.id(), current.version(), original.start(),
+								original.end(), original.summary(), original.labelIds()))));
+				if (priorMylyn[0] != null) TasksUi.getTaskActivityManager().activateTask(priorMylyn[0]);
+			});
+		}
+	}
+
+	@Test
 	public void synchronizationWaitsForConnectingClientAndResumesWithoutWarning() throws Exception {
 		var bot = new SWTWorkbenchBot();
 		bot.waitUntil(new DefaultCondition() {

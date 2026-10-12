@@ -40,9 +40,14 @@ connector.
 - **Edit activity...** changes dates, times, summary and labels. Inline summary
   and time editing also use the service. Invalid intervals and stale versions
   leave persisted values unchanged and explain how to continue.
-- **Start activity**, **Stop activity** and **Delete activity** use service-owned
-  transactions. Only completed activities offer the delete action. Starting
-  while the local owner already has an open activity reports a conflict.
+- **Activate task** starts tracking directly for native and linked tasks without
+  opening an activity editor. Switching native tasks closes the previous local
+  owner's interval and clears a linked provider's activation state. Repeating
+  native activation reuses an already open interval for that task.
+  **Deactivate task** stops its current interval even when Workweek shows a
+  different week. **New activity** and **Edit activity...** retain their dialogs.
+  **Stop activity** and **Delete activity** use service-owned transactions; only
+  completed activities offer the delete action.
 - Active status and bold rows use service activity state. Mylyn activation
   reuses the same current activity and observes its persisted pointer after
   service changes; switching tasks closes a service-started interval first.
@@ -96,6 +101,21 @@ wrapper until that compatibility issue is resolved.
 
 The existing database safety, hierarchy, reporting, preference, idle and UI
 regressions remain active. Temporary synthetic storage is used throughout.
+
+### Native activation acceptance (#234)
+
+Verified October 12, 2026 on Java 21 / macOS aarch64 with
+`clean verify -Pjira-connector-tests -Dtycho.localArtifacts=ignore`: 138 tests
+passed, including installed JiraConnector acceptance and second-process restart.
+The native activation scenario runs both without Mylyn and with the optional
+adapter. It covers immediate clock-based start without a dialog, bold active
+rows, editing an open interval, task switching, deactivation from a different
+displayed week, reuse when activation occurs while a menu is open, and retaining
+the manual activity dialog. The adapter scenario switches through the real
+Mylyn activation manager in both directions and clears an activation flag whose
+interval was stopped manually. Its added assertion reproduced the stale flag
+before the correction. The original native scenario failed because its
+**Activate task** menu entry was absent.
 
 ## Optional adapter boundary (#214)
 

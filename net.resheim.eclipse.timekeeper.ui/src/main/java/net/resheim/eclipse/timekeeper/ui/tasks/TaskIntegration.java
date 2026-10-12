@@ -25,4 +25,7 @@ public interface TaskIntegration {
 	void activate(Task task);
 
 	void deactivate(TaskId taskId);
+
+	/** Clear the provider's current activation even if its tracked interval has ended. */
+	void deactivateActiveTask();
 }
