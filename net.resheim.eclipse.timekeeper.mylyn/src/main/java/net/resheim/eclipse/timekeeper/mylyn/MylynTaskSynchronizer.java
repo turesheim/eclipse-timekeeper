@@ -290,8 +290,8 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 						.filter(candidate -> candidate.name().equals(category.getSummary())).findFirst()
 						.orElseGet(() -> service.createProject(new CreateProject(category.getSummary()))));
 		remember(project.id(), category);
-		if (!project.name().equals(category.getSummary())) {
-			project = service.updateProject(new UpdateProject(project.id(), project.version(), category.getSummary()));
+		if (!project.name().equals(category.getSummary()) && !scope().projectProjectionUnchanged(project.id(),category.getSummary())) {
+			project = service.updateProject(new UpdateProject(project.id(), scope().projectProjectionVersion(project.id(),project.version()), category.getSummary()));
 		}
 		return project;
 	}
@@ -317,10 +317,12 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 
 		Optional<TaskId> parentId = parent.map(Task::id);
 		Optional<String> url = Optional.ofNullable(mylynTask.getUrl()).filter(value -> !value.isBlank());
-		if (!current.projectId().equals(projectId) || !current.parentTaskId().equals(parentId)
-				|| !current.summary().equals(mylynTask.getSummary()) || !current.url().equals(url)) {
+        String sourceState=scope().taskState(projectId,parentId,mylynTask.getSummary(),url);
+		if ((!current.projectId().equals(projectId) || !current.parentTaskId().equals(parentId)
+				|| !current.summary().equals(mylynTask.getSummary()) || !current.url().equals(url))
+                && !scope().taskProjectionUnchanged(mylynTask,sourceState)) {
 			try {
-				current = service.updateTask(new UpdateTask(current.id(), current.version(), projectId, parentId,
+				current = service.updateTask(new UpdateTask(current.id(), scope().taskProjectionVersion(mylynTask,current.version()), projectId, parentId,
 						mylynTask.getSummary(), url));
 			} catch (RuntimeException failure) {
 				throw new IllegalStateException("Could not synchronize Mylyn task '" + mylynTask.getSummary() + "' ("
@@ -402,6 +404,7 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 			AbstractTaskContainer parent = task.parentTaskId().map(mylynTasks::get)
 					.<AbstractTaskContainer>map(value -> value)
 					.orElseGet(() -> task.projectId().map(categories::get).orElse(null));
+            scope().rememberProjection(mylynTask,task);
 			// A null parent moves a local task to Mylyn's unmatched container as well.
 			if (!taskList.addTask(mylynTask, parent))
 				taskList.notifyElementChanged(mylynTask);
@@ -433,6 +436,7 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 			taskList.renameContainer(category, project.name());
 		}
 		remember(project.id(), category);
+        scope().rememberProjection(project);
 		return category;
 	}
 

@@ -26,13 +26,13 @@ public final class MylynBackendScope {
     private static final String LEGACY_SCOPE="legacy-embedded-scope";
     private static volatile MylynBackendScope current;
     private final String identity,scope;
-    private final Preferences root,projects,categoryScopes;
+    private final Preferences root,projects,categoryScopes,baselines;
     private final boolean legacyAllowed;
 
     public MylynBackendScope(String identity,boolean embedded) {
         this.identity=identity;scope=hash(identity);
         root=InstanceScope.INSTANCE.getNode(TimekeeperUiPlugin.PLUGIN_ID).node("mylyn-projects");
-        projects=root.node("backends").node(scope).node("projects");categoryScopes=root.node("category-scopes");
+        projects=root.node("backends").node(scope).node("projects");baselines=root.node("backends").node(scope).node("baselines");categoryScopes=root.node("category-scopes");
         synchronized(MylynBackendScope.class) {
             if(embedded && root.get(LEGACY_SCOPE,null)==null) {root.put(LEGACY_SCOPE,scope);flush(root);}
         }
@@ -108,7 +108,36 @@ public final class MylynBackendScope {
         projects.put(project.value().toString(),category.getHandleIdentifier());
         categoryScopes.put(hash(category.getHandleIdentifier()),scope);flush(root);
     }
-    public void forget(ProjectId project) {projects.remove(project.value().toString());flush(root);}
+    String taskState(Optional<ProjectId> project,Optional<TaskId> parent,String summary,Optional<String> url) {
+        return state(project.map(id->id.value().toString()).orElse(null),parent.map(id->id.value().toString()).orElse(null),summary,url.orElse(null));
+    }
+    boolean taskProjectionUnchanged(ITask task,String proposedState) {
+        return proposedState.equals(task.getAttribute("timekeeper.projection-state."+scope));
+    }
+    long taskProjectionVersion(ITask task,long fallback) {
+        try {long value=Long.parseLong(task.getAttribute("timekeeper.projection-version."+scope));return value>=0 ? value : fallback;}
+        catch(IllegalArgumentException malformed) {return fallback;}
+    }
+    void rememberProjection(ITask projection,net.resheim.eclipse.timekeeper.domain.Task task) {
+        projection.setAttribute("timekeeper.projection-state."+scope,taskState(task.projectId(),task.parentTaskId(),task.summary(),task.url()));
+        projection.setAttribute("timekeeper.projection-version."+scope,String.valueOf(task.version()));
+    }
+    boolean projectProjectionUnchanged(ProjectId id,String name) {
+        return state(name).equals(baselines.get(id.value()+".state",null));
+    }
+    long projectProjectionVersion(ProjectId id,long fallback) {
+        long value=baselines.getLong(id.value()+".version",fallback);return value>=0 ? value : fallback;
+    }
+    void rememberProjection(net.resheim.eclipse.timekeeper.domain.Project project) {
+        String key=project.id().value().toString(),value=state(project.name());
+        if(value.equals(baselines.get(key+".state",null)) && project.version()==baselines.getLong(key+".version",-1)) return;
+        baselines.put(key+".state",value);baselines.putLong(key+".version",project.version());flush(root);
+    }
+    private static String state(String... fields) {
+        var encoding=java.util.Base64.getUrlEncoder().withoutPadding();
+        return hash(java.util.Arrays.stream(fields).map(value->value==null ? "~" : encoding.encodeToString(value.getBytes(StandardCharsets.UTF_8))).collect(java.util.stream.Collectors.joining(".")));
+    }
+    public void forget(ProjectId project) {projects.remove(project.value().toString());baselines.remove(project.value()+".state");baselines.remove(project.value()+".version");flush(root);}
     public String categoryHandle(ProjectId project) {return "timekeeper-project-"+scope+"-"+project.value();}
     private static void flush(Preferences preferences) {
         try {preferences.flush();}

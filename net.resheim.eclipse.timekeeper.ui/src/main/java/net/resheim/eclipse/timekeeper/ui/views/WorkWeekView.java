@@ -792,7 +792,8 @@ public class WorkWeekView extends ViewPart {
 
 	private void editProject(Project original) {
 		ProjectDialog dialog = new ProjectDialog(getSite().getShell(), TimekeeperUiPlugin.getDefault().getTimekeeperService(), original);
-		if (dialog.open() == org.eclipse.jface.window.Window.OK) {
+		if (dialog.open() == org.eclipse.jface.window.Window.OK && dialog.savedProject() != null
+                && !viewer.getControl().isDisposed()) {
 			refreshAll();
 			viewer.setSelection(new StructuredSelection(dialog.savedProject()), true);
 		}
@@ -801,7 +802,8 @@ public class WorkWeekView extends ViewPart {
 	private void editTask(Task original, Optional<net.resheim.eclipse.timekeeper.domain.ProjectId> projectId,
 			Optional<net.resheim.eclipse.timekeeper.domain.TaskId> parentId) {
 		TaskDialog dialog = new TaskDialog(getSite().getShell(), TimekeeperUiPlugin.getDefault().getTimekeeperService(), original, projectId, parentId);
-		if (dialog.open() == org.eclipse.jface.window.Window.OK) {
+		if (dialog.open() == org.eclipse.jface.window.Window.OK && dialog.savedTask() != null
+                && !viewer.getControl().isDisposed()) {
 			refreshAll();
 			viewer.setSelection(new StructuredSelection(dialog.savedTask()), true);
 		}

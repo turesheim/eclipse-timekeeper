@@ -62,7 +62,7 @@ public class RemoteMylynTest {
             if(TimekeeperUiPlugin.getDefault().getPreferenceStore() instanceof org.eclipse.jface.preference.IPersistentPreferenceStore persistent) persistent.save();
             var proof=RemoteBootstrap.receipt();proof.setProperty("mylyn.first",first.id().value().toString());proof.setProperty("mylyn.second",second.id().value().toString());
             proof.setProperty("mylyn.original",original.id().value().toString());proof.setProperty("mylyn.successor",successor.id().value().toString());
-            proof.setProperty("mylyn.marker",marker);proof.setProperty("phase.mylyn","passed");RemoteBootstrap.writeProof();
+            proof.setProperty("mylyn.second.handle",secondProjection.getHandleIdentifier());proof.setProperty("mylyn.marker",marker);proof.setProperty("phase.mylyn","passed");RemoteBootstrap.writeProof();
         }
         RemoteTestSupport.readyWithMylyn();
     }

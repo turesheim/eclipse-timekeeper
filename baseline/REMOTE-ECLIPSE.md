@@ -334,11 +334,64 @@ The selected clean reactor passed **105 main tests, two restart tests and one
 account/failure test**, without failures/errors/skips. The receipt records PIDs
 `67109,67120,67126`, authentication and conflict markers passed, and preserved
 local SHA-256 `df4d438f1993c4c6e636057fb16cfb60506034303208c8255b39493012ff9f43`. The same checksum-verified packaged
-server was used. CI for this new extension remains pending.
+server was used. The `ac3ce33` extension's Remote-Eclipse job failed in
+[run 38291647914](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38291647914),
+while the other six jobs passed. The downloaded report timed out on a rejected
+save check that depended on mutable shared backend status. This failure remains
+recorded; the next checkpoint corrects that test condition and adds real
+offline/restart coverage.
 
 These checks cover token revocation/recovery and optimistic task-editor
 conflicts through manual refresh. Other editors, offline/timeout/cancellation,
 unknown commands and automatic concurrent-client notification remain open.
+
+## Offline recovery and durable projection checkpoint, 2026-10-12
+
+The installed account-B task scenario stops the actual packaged server while an
+editor has an unsaved summary/URL draft. The failed save must keep its fields
+enabled, its draft unchanged and its own error visible, with remote readiness
+false and local entity manager/readiness/file unchanged. A separate Mylyn task
+is deleted while disconnected. A new server process uses the same data and
+port; server metadata and both tasks must be unchanged before the retry. The
+same still-open editor then saves with one version increment, the pending
+Mylyn deletion completes, and a subsequent actual Task List edit still
+synchronizes with exactly one additional version increment.
+
+This scenario exposed a real lost-update bug. The native draft was committed
+as version 1, but reconciliation of the unrelated Mylyn deletion imported the
+unchanged old projection fields back as version 2. A read-only inspection of
+only the stopped disposable test database confirmed the old summary/URL in the
+version-2 record. No user database was read or changed.
+
+Task projections now persist their last exported editable-state hash and
+expected version in attributes scoped by backend/account. Project categories
+persist the equivalent hash/version in scoped preferences. Unchanged projection
+fields yield to newer backend data; real Mylyn changes use their captured
+expected version instead of adopting the version just fetched from the backend.
+The restart bootstrap changes the second server task while Eclipse is stopped.
+The next launch must retain its original Task List handle and display that new
+server value without incrementing its version again. The installed restart and
+post-reconnect Mylyn-edit checks both pass.
+
+The rejected-save wait now checks the editor's own visible error and enabled
+Save button. The receipt's `test.task.shared-status-drift=observed` confirms that
+another job changed shared backend status while the editor's error remained
+available. Draft/value/version assertions remain intact. Workweek also guards
+project/task selection after a modal editor returns during view shutdown;
+missing saved records or disposed controls are not selected.
+
+The final selected clean reactor passed **105 main tests, two restart tests and
+one account/failure test**, with no failures/errors/skips. The receipt records
+Eclipse-fork server PIDs `72732,72738,72745`, recovery PID
+`72757`, persisted-baseline/offline/authentication/conflict
+markers passed, and unchanged local SHA-256 `9881fed149073869cf30f91e67dbe21cad7be2c896679e38237087bee866d377`.
+The packaged server ZIP checksum is unchanged. CI for this corrective commit
+is pending, including the full optional Mylyn regression.
+
+This covers task-editor offline recovery, pending empty-task deletion,
+between-launch server edits and real Mylyn edits afterward. Other editors,
+timeout/cancellation and unknown-command outcomes remain open; automatic
+notification and broader reconnect/missed-event behavior remain in #219.
 
 ## Remaining before #220 can be completed
 

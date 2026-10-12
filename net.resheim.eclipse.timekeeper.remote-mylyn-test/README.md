@@ -58,6 +58,27 @@ loads the competing values and permits an explicitly reviewed save. Stale
 record editors now show the matching close/reopen instruction. Temporary tasks
 are removed and prior data/history remain unchanged.
 
+Offline acceptance stops the actual packaged-server process while a native
+task draft remains open. The failed save preserves its enabled fields and
+error; local storage stays closed. A Mylyn deletion made while disconnected
+remains pending. Restart uses the same server database/port and records a new
+recovery PID separately from the Eclipse-fork PIDs. Server metadata is unchanged
+before retry; the same editor then saves once and the pending deletion completes.
+A subsequent real Task List edit must still synchronize with one version
+increment.
+
+The failure scenario exposed Mylyn importing unchanged old projection fields
+over a newly saved native task. Projections now retain scoped state hashes and
+expected versions (task attributes and project preferences). Unchanged source
+fields do not overwrite newer backend data; actual Mylyn edits use the version
+they were projected from. The restart fixture edits the second task on the
+server before Eclipse starts, then requires the original saved Task List handle
+and unchanged new server version. This proves the baseline survives restart.
+
+Editor error checks inspect the editor's own visible message and enabled Save
+button. They do not depend on the mutable shared backend status; the fixture
+records when another job changes that status during rejection.
+
 `remote-client-tests` includes both native-only and Mylyn modules. CI's
 `Remote-Eclipse` job runs all five installed phases and uploads reports and
 credential-free receipts/logs. The fixture password, keyring and token registry

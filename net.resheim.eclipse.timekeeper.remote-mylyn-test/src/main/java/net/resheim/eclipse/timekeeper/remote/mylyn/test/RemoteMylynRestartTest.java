@@ -17,6 +17,13 @@ public class RemoteMylynRestartTest {
             RemoteTestSupport.waitFor(()->MylynIntegration.getDefault()!=null && MylynIntegration.getDefault().linked(first).isPresent(),"Persisted remote Mylyn projection was not reconnected");
             var projection=MylynIntegration.getDefault().linked(first).orElseThrow();
             assertEquals(RemoteBootstrap.receipt().getProperty("mylyn.marker"),projection.getAttribute("timekeeper.remote.restart-marker"));
+            var second=api.task(new TaskId(UUID.fromString(RemoteBootstrap.receipt().getProperty("mylyn.second")))).orElseThrow();
+            long changedVersion=Long.parseLong(RemoteBootstrap.receipt().getProperty("mylyn.between-launch-version"));
+            assertEquals("Server edit between Eclipse launches",second.summary());assertEquals(changedVersion,second.version());
+            RemoteTestSupport.waitFor(()->MylynIntegration.getDefault().linked(second).filter(t->t.getSummary().equals(second.summary())).isPresent(),"Persisted projection overwrote or failed to display a server edit made between launches");
+            assertEquals(RemoteBootstrap.receipt().getProperty("mylyn.second.handle"),MylynIntegration.getDefault().linked(second).orElseThrow().getHandleIdentifier());
+            assertEquals(second,api.task(second.id()).orElseThrow());
+            RemoteBootstrap.receipt().setProperty("phase.mylyn.persisted-baseline","passed");
             var original=api.activity(new ActivityId(UUID.fromString(RemoteBootstrap.receipt().getProperty("mylyn.original")))).orElseThrow();
             var successor=api.activity(new ActivityId(UUID.fromString(RemoteBootstrap.receipt().getProperty("mylyn.successor")))).orElseThrow();
             assertTrue(original.end().isPresent());assertTrue(successor.end().isPresent());

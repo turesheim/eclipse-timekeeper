@@ -27,6 +27,7 @@ import org.eclipse.equinox.security.storage.SecurePreferencesFactory;
 public final class RemoteBootstrap implements IApplication {
     private IApplication delegate;
     private Process server;
+    private static RemoteBootstrap active;
     static Path folder;
     static URI serverUrl;
     static String token;
@@ -80,20 +81,14 @@ public final class RemoteBootstrap implements IApplication {
             if(proof.containsKey("server.port")) port=Integer.parseInt(proof.getProperty("server.port"));
             else try(var socket=new ServerSocket(0)) {port=socket.getLocalPort();}
             serverUrl=URI.create("http://127.0.0.1:"+port);
-            Files.createDirectories(folder.resolve("server data"));
-            var builder=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",extracted.resolve("timekeeper-server/quarkus-run.jar").toString());
-            builder.environment().put("TIMEKEEPER_SERVER_DB_URL","jdbc:h2:"+folder.resolve("server data/timekeeper"));
-            builder.environment().put("TIMEKEEPER_SERVER_TOKENS_FILE",registry.toString());builder.environment().put("QUARKUS_HTTP_PORT",String.valueOf(port));
-            builder.redirectErrorStream(true).redirectOutput(folder.resolve("server-"+System.nanoTime()+".log").toFile());
-            server=builder.start();
-            try(var http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build()) {
-                long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(25);boolean ready=false;
-                while(System.nanoTime()<deadline && server.isAlive()) {
-                    try {ready=http.send(HttpRequest.newBuilder(serverUrl.resolve("/q/health/ready")).timeout(Duration.ofSeconds(1)).GET().build(),HttpResponse.BodyHandlers.discarding()).statusCode()==200;}
-                    catch(java.io.IOException unavailable) { }
-                    if(ready) break;Thread.sleep(50);
+            active=this;launchServer();
+            if("passed".equals(proof.getProperty("phase.mylyn")) && !proof.containsKey("mylyn.between-launch-version")) {
+                try(var api=new net.resheim.eclipse.timekeeper.client.HttpTimekeeperService(serverUrl,()->accountAToken,Duration.ofSeconds(5))) {
+                    var id=new net.resheim.eclipse.timekeeper.domain.TaskId(java.util.UUID.fromString(proof.getProperty("mylyn.second")));
+                    var original=api.task(id).orElseThrow();
+                    var edited=api.updateTask(new net.resheim.eclipse.timekeeper.service.Commands.UpdateTask(id,original.version(),original.projectId(),original.parentTaskId(),"Server edit between Eclipse launches",original.url()));
+                    proof.setProperty("mylyn.between-launch-version",String.valueOf(edited.version()));writeProof();
                 }
-                if(!ready) throw new IllegalStateException("Packaged server did not become ready; see isolated fixture logs");
             }
             var preferences=InstanceScope.INSTANCE.getNode("net.resheim.eclipse.timekeeper.db");
             preferences.put("backend-mode","remote");preferences.put("backend-url",serverUrl.toString());preferences.flush();
@@ -112,6 +107,35 @@ public final class RemoteBootstrap implements IApplication {
             }
             throw new IllegalStateException("Installed IDE application is missing");
         } finally {stopServer();}
+    }
+    private void launchServer() throws Exception {
+        Files.createDirectories(folder.resolve("server data"));
+        var builder=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",folder.resolve("distribution/timekeeper-server/quarkus-run.jar").toString());
+        builder.environment().put("TIMEKEEPER_SERVER_DB_URL","jdbc:h2:"+folder.resolve("server data/timekeeper"));
+        builder.environment().put("TIMEKEEPER_SERVER_TOKENS_FILE",folder.resolve("server-tokens.json").toString());builder.environment().put("QUARKUS_HTTP_PORT",String.valueOf(serverUrl.getPort()));
+        builder.redirectErrorStream(true).redirectOutput(folder.resolve("server-"+System.nanoTime()+".log").toFile());
+        server=builder.start();
+        try(var http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build()) {
+            long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(25);boolean ready=false;
+            while(System.nanoTime()<deadline && server.isAlive()) {
+                try {ready=http.send(HttpRequest.newBuilder(serverUrl.resolve("/q/health/ready")).timeout(Duration.ofSeconds(1)).GET().build(),HttpResponse.BodyHandlers.discarding()).statusCode()==200;}
+                catch(java.io.IOException unavailable) { }
+                if(ready) break;Thread.sleep(50);
+            }
+            if(!ready) throw new IllegalStateException("Packaged server did not become ready; see isolated fixture logs");
+        }
+    }
+    public static long stopFixtureServer() {
+        long pid=active.server.pid();active.stopServer();
+        if(active.server.isAlive()) throw new IllegalStateException("Fixture server did not stop");
+        return pid;
+    }
+    public static long restartFixtureServer() throws Exception {
+        if(active.server!=null && active.server.isAlive()) throw new IllegalStateException("Fixture server is still running");
+        active.launchServer();
+        String previous=proof.getProperty("server.recovery-pids","");
+        proof.setProperty("server.recovery-pids",previous.isEmpty() ? String.valueOf(active.server.pid()) : previous+","+active.server.pid());writeProof();
+        return active.server.pid();
     }
     @Override public void stop() {if(delegate!=null) delegate.stop();stopServer();}
     private void stopServer() {
