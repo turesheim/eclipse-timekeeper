@@ -16,6 +16,7 @@ public class PreferenceInitializer extends AbstractPreferenceInitializer {
 		store.setDefault(PreferenceConstants.MINUTES_AWAY, 30);
 		store.setDefault(PreferenceConstants.DEACTIVATE_WHEN_AWAY, true);
 		store.setDefault(PreferenceConstants.PROJECT_NATIVE_TASKS, false);
+		store.setDefault(PreferenceConstants.SHOW_ALL_TASKS, true);
 		// Database defaults are initialized by the startup worker after schema checks.
 	}
 

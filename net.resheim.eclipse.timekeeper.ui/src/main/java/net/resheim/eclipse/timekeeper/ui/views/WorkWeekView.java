@@ -25,6 +25,7 @@ import java.util.Set;
 
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.eclipse.jface.action.Action;
+import org.eclipse.jface.action.IAction;
 import org.eclipse.jface.action.IMenuListener;
 import org.eclipse.jface.action.IMenuManager;
 import org.eclipse.jface.action.IToolBarManager;
@@ -81,6 +82,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.DeleteActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteProject;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteTask;
 import net.resheim.eclipse.timekeeper.ui.ActivityLabelPainter;
+import net.resheim.eclipse.timekeeper.ui.preferences.PreferenceConstants;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 @SuppressWarnings("restriction")
@@ -213,6 +215,7 @@ public class WorkWeekView extends ViewPart {
 	private Action newActivityAction;
 	private Action newProjectAction;
 	private Action newTaskAction;
+	private Action showAllTasksAction;
 	private Action collapseAllAction;
 	private Action expandAllAction;
 
@@ -307,6 +310,8 @@ public class WorkWeekView extends ViewPart {
 		// Make the tree view provide selections
 		getSite().setSelectionProvider(viewer);
 		contentProvider = new ContentProvider();
+		contentProvider.setShowAllTasks(TimekeeperUiPlugin.getDefault().getPreferenceStore()
+				.getBoolean(PreferenceConstants.SHOW_ALL_TASKS));
 		TimekeeperPlugin.getDefault().addListener(contentProvider);
 		viewer.setContentProvider(contentProvider);
 		GridData layoutData = GridDataFactory.fillDefaults().grab(true, true).span(3, 1).create();
@@ -537,6 +542,8 @@ public class WorkWeekView extends ViewPart {
 	private void fillLocalPullDown(IMenuManager manager) {
 		manager.add(newProjectAction);
 		manager.add(newTaskAction);
+		manager.add(new Separator("filter"));
+		manager.add(showAllTasksAction);
 		manager.add(new Separator("tree"));
 		manager.add(collapseAllAction);
 		manager.add(expandAllAction);
@@ -550,6 +557,8 @@ public class WorkWeekView extends ViewPart {
 		manager.add(previousWeekAction);
 		manager.add(currentWeekAction);
 		manager.add(nextWeekAction);
+		manager.add(new Separator("filter"));
+		manager.add(showAllTasksAction);
 		manager.add(new Separator("tree"));
 		manager.add(collapseAllAction);
 		manager.add(expandAllAction);
@@ -594,6 +603,17 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void makeActions() {
+		showAllTasksAction = new Action("Show all tasks", IAction.AS_CHECK_BOX) {
+			@Override public void run() {
+				contentProvider.setShowAllTasks(isChecked());
+				TimekeeperUiPlugin.getDefault().getPreferenceStore()
+						.setValue(PreferenceConstants.SHOW_ALL_TASKS, isChecked());
+				refreshAll();
+			}
+		};
+		showAllTasksAction.setChecked(TimekeeperUiPlugin.getDefault().getPreferenceStore()
+				.getBoolean(PreferenceConstants.SHOW_ALL_TASKS));
+		showAllTasksAction.setToolTipText("Show all tasks, including those without time in the displayed week");
 		collapseAllAction = new Action("Collapse all") {
 			@Override public void run() { viewer.collapseAll(); }
 		};

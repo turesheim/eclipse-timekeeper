@@ -24,4 +24,6 @@ public class PreferenceConstants {
 
 	public static final String PROJECT_NATIVE_TASKS = "project_native_tasks_to_mylyn";
 
+	public static final String SHOW_ALL_TASKS = "show_all_workweek_tasks";
+
 }
