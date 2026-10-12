@@ -32,6 +32,66 @@ import net.resheim.eclipse.timekeeper.ui.preferences.PreferenceConstants;
 /** Real Task List synchronization against independent databases, with owner/backend switching. */
 @SuppressWarnings("restriction")
 public class MylynBackendScopeTest {
+    @Test public void projectRenameDoesNotMakeTheFollowingTaskEditStale() throws Exception {
+        var bot=new SWTWorkbenchBot();
+        await(bot,()->TimekeeperUiPlugin.getDefault()!=null && TimekeeperUiPlugin.getDefault().isBackendReady(),"Backend not ready");
+        String nonce=UUID.randomUUID().toString();
+        EntityManager manager=DatabaseStartup.open("jdbc:h2:mem:projection_version_"+nonce);
+        var service=new DefaultTimekeeperService(new JpaServicePorts(()->manager).ports(event->{}));
+        var project=service.createProject(new CreateProject("Original project"));
+        var task=service.createTask(new CreateTask(Optional.of(project.id()),"Original task",Optional.empty()));
+        var scope=new MylynBackendScope("embedded:projection-version-"+nonce,false);
+        var list=new TaskList();var display=PlatformUI.getWorkbench().getDisplay();
+        var sync=new MylynTaskSynchronizer(service,display,()->scope,list);
+        var original=MylynIntegration.getDefault().synchronizer();
+        var warnings=new java.util.concurrent.CopyOnWriteArrayList<org.eclipse.core.runtime.IStatus>();
+        org.eclipse.core.runtime.ILogListener listener=(status,bundle)->{
+            if(status.getPlugin().equals(MylynIntegration.PLUGIN_ID) && status.getMessage().contains("Could not synchronize Mylyn")) warnings.add(status);
+        };
+        boolean[] previous=new boolean[1];
+        try {
+            onUi(()->{
+                original.stop();
+                var preferences=TimekeeperUiPlugin.getDefault().getPreferenceStore();
+                previous[0]=preferences.getBoolean(PreferenceConstants.PROJECT_NATIVE_TASKS);
+                preferences.setValue(PreferenceConstants.PROJECT_NATIVE_TASKS,true);sync.start();
+            });
+            await(bot,()->projection(list,scope,task).isPresent(),"Task was not projected");
+            var projected=projection(list,scope,task).orElseThrow();
+            var category=list.getContainerForHandle(scope.category(project.id()));
+            onUi(()->{
+                list.renameContainer(category,"Renamed project");
+                projected.setSummary("Renamed task");list.notifyElementChanged(projected);
+            });
+            await(bot,()->service.project(project.id()).orElseThrow().name().equals("Renamed project")
+                    && service.task(task.id()).orElseThrow().summary().equals("Renamed task"),
+                    "Project rename left the following Task List edit on a stale task version");
+            assertEquals(1,service.projects().size());assertEquals(1,service.tasks().size());
+            assertEquals(Optional.of(task.id()),scope.task(projected));
+            // A further edit must use the acknowledged version, not the original baseline.
+            onUi(()->{projected.setSummary("Edited again");list.notifyElementChanged(projected);});
+            await(bot,()->service.task(task.id()).orElseThrow().summary().equals("Edited again"),"A subsequent task edit remained stale");
+            // Real competing changes must still reject the captured projection version.
+            onUi(sync::stop);
+            var prior=service.task(task.id()).orElseThrow();
+            var competing=service.updateTask(new net.resheim.eclipse.timekeeper.service.Commands.UpdateTask(
+                    prior.id(),prior.version(),prior.projectId(),prior.parentTaskId(),"Independent backend edit",prior.url()));
+            org.eclipse.core.runtime.Platform.addLogListener(listener);
+            onUi(()->{projected.setSummary("Competing Mylyn draft");list.notifyElementChanged(projected);sync.start();});
+            await(bot,()->!warnings.isEmpty(),"A real competing task edit did not report a conflict");
+            assertEquals(competing,service.task(task.id()).orElseThrow());
+            assertEquals("Competing Mylyn draft",projected.getSummary());
+            assertTrue(warnings.get(0).getException().getCause() instanceof net.resheim.eclipse.timekeeper.service.ServiceException);
+        } finally {
+            onUi(()->{
+                sync.stop();
+                TimekeeperUiPlugin.getDefault().getPreferenceStore().setValue(PreferenceConstants.PROJECT_NATIVE_TASKS,previous[0]);original.start();
+            });
+            org.eclipse.core.runtime.Platform.removeLogListener(listener);
+            var factory=manager.getEntityManagerFactory();manager.close();factory.close();
+        }
+    }
+
     @Test public void ownerAndServerSwitchingDoesNotCopyOrModifyForeignProjections() throws Exception {
         var bot=new SWTWorkbenchBot();
         bot.waitUntil(new DefaultCondition() {

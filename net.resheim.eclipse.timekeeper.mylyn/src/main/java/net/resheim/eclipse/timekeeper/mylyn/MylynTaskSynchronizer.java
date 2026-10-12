@@ -291,8 +291,9 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 						.orElseGet(() -> service.createProject(new CreateProject(category.getSummary()))));
 		remember(project.id(), category);
 		if (!project.name().equals(category.getSummary()) && !scope().projectProjectionUnchanged(project.id(),category.getSummary())) {
-			project = service.updateProject(new UpdateProject(project.id(), scope().projectProjectionVersion(project.id(),project.version()), category.getSummary()));
+            project = service.updateProject(new UpdateProject(project.id(), scope().projectProjectionVersion(project), category.getSummary()));
 		}
+        if(project.name().equals(category.getSummary())) scope().rememberProjection(project);
 		return project;
 	}
 
@@ -322,7 +323,7 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 				|| !current.summary().equals(mylynTask.getSummary()) || !current.url().equals(url))
                 && !scope().taskProjectionUnchanged(mylynTask,sourceState)) {
 			try {
-				current = service.updateTask(new UpdateTask(current.id(), scope().taskProjectionVersion(mylynTask,current.version()), projectId, parentId,
+                current = service.updateTask(new UpdateTask(current.id(), scope().taskProjectionVersion(mylynTask,current), projectId, parentId,
 						mylynTask.getSummary(), url));
 			} catch (RuntimeException failure) {
 				throw new IllegalStateException("Could not synchronize Mylyn task '" + mylynTask.getSummary() + "' ("
@@ -331,6 +332,10 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 			}
 		}
 		scope().remember(mylynTask,current.id(),current.externalReferences().isEmpty());
+        // A successful import is a new baseline even if a later record aborts this pass.
+        // Do not mark an unchanged, stale projection as matching newer backend fields.
+        if(sourceState.equals(scope().taskState(current.projectId(),current.parentTaskId(),current.summary(),current.url())))
+            scope().rememberProjection(mylynTask,current);
 		synchronizedTasks.put(mylynTask, current);
 		return current;
 	}

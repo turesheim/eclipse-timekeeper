@@ -114,9 +114,13 @@ public final class MylynBackendScope {
     boolean taskProjectionUnchanged(ITask task,String proposedState) {
         return proposedState.equals(task.getAttribute("timekeeper.projection-state."+scope));
     }
-    long taskProjectionVersion(ITask task,long fallback) {
-        try {long value=Long.parseLong(task.getAttribute("timekeeper.projection-version."+scope));return value>=0 ? value : fallback;}
-        catch(IllegalArgumentException malformed) {return fallback;}
+    long taskProjectionVersion(ITask projection,net.resheim.eclipse.timekeeper.domain.Task current) {
+        // Embedded project renames and tracking can advance the JPA version without
+        // changing fields editable in Mylyn. Those changes can be safely retained.
+        if(taskProjectionUnchanged(projection,taskState(current.projectId(),current.parentTaskId(),current.summary(),current.url())))
+            return current.version();
+        try {long value=Long.parseLong(projection.getAttribute("timekeeper.projection-version."+scope));return value>=0 ? value : current.version();}
+        catch(IllegalArgumentException malformed) {return current.version();}
     }
     void rememberProjection(ITask projection,net.resheim.eclipse.timekeeper.domain.Task task) {
         projection.setAttribute("timekeeper.projection-state."+scope,taskState(task.projectId(),task.parentTaskId(),task.summary(),task.url()));
@@ -125,8 +129,9 @@ public final class MylynBackendScope {
     boolean projectProjectionUnchanged(ProjectId id,String name) {
         return state(name).equals(baselines.get(id.value()+".state",null));
     }
-    long projectProjectionVersion(ProjectId id,long fallback) {
-        long value=baselines.getLong(id.value()+".version",fallback);return value>=0 ? value : fallback;
+    long projectProjectionVersion(net.resheim.eclipse.timekeeper.domain.Project current) {
+        if(projectProjectionUnchanged(current.id(),current.name())) return current.version();
+        long value=baselines.getLong(current.id().value()+".version",current.version());return value>=0 ? value : current.version();
     }
     void rememberProjection(net.resheim.eclipse.timekeeper.domain.Project project) {
         String key=project.id().value().toString(),value=state(project.name());
