@@ -17,4 +17,4 @@ Require-Bundle: net.resheim.eclipse.timekeeper.ui,
 Import-Package: org.osgi.util.tracker,
  org.osgi.service.prefs,
  org.slf4j;version="[2.0.0,3.0.0)"
-Export-Package: net.resheim.eclipse.timekeeper.mylyn;x-friends:="net.resheim.eclipse.timekeeper.test"
+Export-Package: net.resheim.eclipse.timekeeper.mylyn;x-friends:="net.resheim.eclipse.timekeeper.test,net.resheim.eclipse.timekeeper.jira-test"

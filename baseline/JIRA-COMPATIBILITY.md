@@ -4,6 +4,20 @@ Issue [#230](https://github.com/turesheim/eclipse-timekeeper/issues/230),
 checked October 11, 2026 on macOS aarch64. Jira remains an optional Mylyn
 provider; the base Timekeeper feature does not require the connector.
 
+## October 12 automatic connector acceptance
+
+The `jira-connector-tests` profile now provisions the actual released Jira
+feature with Timekeeper in an Eclipse Platform p2 test installation. It checks
+real REST authentication/query/issue parsing, the task editor, Mylyn activation,
+custom fields, offline editing/reporting and reconnection against a strict local
+REST fixture. A separate Eclipse process verifies file-backed history and native
+identity after restart. The clean local suite passes 127 tests.
+
+See [automatic Jira acceptance](JIRA-AUTOMATED-ACCEPTANCE.md) for commands,
+request traces, installed-version evidence and coverage boundaries. This extends
+the earlier object fixtures; it does not certify a deployed Cloud/Data Center
+service or resolve the separate upstream Mylyn Error Log gate.
+
 ## Installed baseline
 
 | Component | Verified version |
