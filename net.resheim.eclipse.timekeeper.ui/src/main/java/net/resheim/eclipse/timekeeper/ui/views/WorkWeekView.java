@@ -213,6 +213,8 @@ public class WorkWeekView extends ViewPart {
 	private Action newActivityAction;
 	private Action newProjectAction;
 	private Action newTaskAction;
+	private Action collapseAllAction;
+	private Action expandAllAction;
 
 	private Action nextWeekAction;
 
@@ -535,6 +537,9 @@ public class WorkWeekView extends ViewPart {
 	private void fillLocalPullDown(IMenuManager manager) {
 		manager.add(newProjectAction);
 		manager.add(newTaskAction);
+		manager.add(new Separator("tree"));
+		manager.add(collapseAllAction);
+		manager.add(expandAllAction);
 	}
 
 	private void fillLocalToolBar(IToolBarManager manager) {
@@ -545,6 +550,9 @@ public class WorkWeekView extends ViewPart {
 		manager.add(previousWeekAction);
 		manager.add(currentWeekAction);
 		manager.add(nextWeekAction);
+		manager.add(new Separator("tree"));
+		manager.add(collapseAllAction);
+		manager.add(expandAllAction);
 	}
 
 	private String getFormattedPeriod(long seconds) {
@@ -586,6 +594,18 @@ public class WorkWeekView extends ViewPart {
 	}
 
 	private void makeActions() {
+		collapseAllAction = new Action("Collapse all") {
+			@Override public void run() { viewer.collapseAll(); }
+		};
+		collapseAllAction.setToolTipText("Collapse all projects and tasks");
+		collapseAllAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
+				.getImageDescriptor(ISharedImages.IMG_ELCL_COLLAPSEALL));
+		expandAllAction = new Action("Expand all") {
+			@Override public void run() { viewer.expandAll(); }
+		};
+		expandAllAction.setToolTipText("Expand all projects and tasks");
+		expandAllAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
+				.getImageDescriptor(ISharedImages.IMG_ELCL_EXPANDALL));
 		newProjectAction = new Action("New project...") {
 			@Override public void run() { editProject(null); }
 		};
@@ -744,12 +764,9 @@ public class WorkWeekView extends ViewPart {
 	 */
 	public void refreshAll() {
 		viewer.getContentProvider().inputChanged(viewer, viewer.getInput(), null);
-		viewer.expandAll();
 	}
 
-	// XXX: Don't do expandAll() but be more targeted
 	public void refresh(Object element) {
 		viewer.getContentProvider().inputChanged(viewer, viewer.getInput(), null);
-		viewer.expandAll();
 	}
 }

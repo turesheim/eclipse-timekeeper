@@ -254,8 +254,16 @@ public class IntegrationTest {
 				MylynIntegration.getDefault().deactivated(task);
 			});
 			int today = LocalDate.now().get(WeekFields.of(Locale.getDefault()).dayOfWeek());
+			bot.waitUntil(new DefaultCondition() {
+				@Override public boolean test() {
+					try { return bot.treeWithId("workweek-editor-tree").getTreeItem("Lifecycle checks")
+							.expand().getNode("3001: Track an activity").expand().getNode("Lifecycle activity") != null; }
+					catch (RuntimeException missing) { return false; }
+				}
+				@Override public String getFailureMessage() { return "Tracked lifecycle activity is not displayed"; }
+			});
 			var project = bot.treeWithId("workweek-editor-tree").getTreeItem("Lifecycle checks");
-			var task = project.getNode("3001: Track an activity");
+			var task = project.getNode("3001: Track an activity").expand();
 			assertEquals("0:02", project.cell(today));
 			assertEquals("0:02", task.cell(today));
 			assertEquals("0:02", task.getNode("Lifecycle activity").cell(today));

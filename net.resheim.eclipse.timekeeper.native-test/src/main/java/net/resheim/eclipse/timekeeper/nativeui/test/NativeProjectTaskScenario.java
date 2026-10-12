@@ -51,6 +51,46 @@ import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 @RunWith(SWTBotJunit4ClassRunner.class)
 public abstract class NativeProjectTaskScenario {
 	@Test
+	public void collapseAndExpandWorkweekPreserveStateAcrossRefresh() throws Exception {
+		SWTWorkbenchBot bot = new SWTWorkbenchBot();
+		await(bot, () -> TimekeeperPlugin.getDefault().isReady(), "Database is not ready");
+		showWorkweek();
+		var view = bot.viewByTitle("Workweek");
+		view.setFocus();
+		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
+		var project = service.createProject(new CreateProject("Tree toolbar project"));
+		var task = service.createTask(new CreateTask(Optional.of(project.id()), "Tree toolbar task", Optional.empty()));
+		Project[] refreshProof = new Project[1];
+		try {
+			// JFace may reuse TreeItems for other roots when refresh changes sorting.
+			java.util.function.Supplier<org.eclipse.swtbot.swt.finder.widgets.SWTBotTreeItem> row =
+					() -> view.bot().treeWithId("workweek-editor-tree").getTreeItem(project.name());
+			row.get();
+			view.toolbarButton("Expand all projects and tasks").click();
+			await(bot, () -> row.get().isExpanded(), "Expand all did not open the project");
+			assertEquals(task.summary(), row.get().getNode(task.summary()).getText());
+			view.toolbarButton("Collapse all projects and tasks").click();
+			await(bot, () -> !row.get().isExpanded(), "Collapse all did not close the project");
+			// A new root makes the asynchronous database refresh observable.
+			refreshProof[0] = service.createProject(new CreateProject("Tree refresh proof"));
+			view.bot().treeWithId("workweek-editor-tree").getTreeItem(refreshProof[0].name());
+			assertFalse("Database updates must retain collapsed rows", row.get().isExpanded());
+			onUi(() -> {
+				var workweek = (WorkWeekView) PlatformUI.getWorkbench().getActiveWorkbenchWindow()
+						.getActivePage().findView(WorkWeekView.VIEW_ID);
+				workweek.refreshAll();
+			});
+			assertFalse("Explicit refresh must retain collapsed rows", row.get().isExpanded());
+			view.toolbarButton("Expand all projects and tasks").click();
+			await(bot, () -> row.get().isExpanded(), "Expand all did not reopen the refreshed project");
+			assertEquals(task.summary(), row.get().getNode(task.summary()).getText());
+		} finally {
+			cleanup(service, project, java.util.List.of(task.id()));
+			if (refreshProof[0] != null) service.deleteProject(new DeleteProject(refreshProof[0].id(), refreshProof[0].version()));
+		}
+	}
+
+	@Test
 	public void activityNameRequiresSelectionBeforeEditing() throws Exception {
 		verifyActivityCellActivation(0);
 	}
