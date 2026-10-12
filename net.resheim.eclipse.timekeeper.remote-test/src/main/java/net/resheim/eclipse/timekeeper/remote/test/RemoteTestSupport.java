@@ -38,6 +38,15 @@ public final class RemoteTestSupport {
         assertEquals("Remote backend selected; embedded storage is closed.",TimekeeperPlugin.getDefault().getDatabaseStatus().getMessage());
         assertEquals(RemoteBootstrap.proof.getProperty("native.sha256"),RemoteBootstrap.hash(RemoteBootstrap.folder.resolve("native-local.mv.db")));
     }
+    public static Object applicationConnection() {return TimekeeperPlugin.getDefault().getEntityManager();}
+    public static void embeddedStorage() {
+        assertFalse(TimekeeperUiPlugin.getDefault().isRemote());
+        assertNotNull(TimekeeperPlugin.getDefault().getEntityManager());
+        assertTrue(TimekeeperPlugin.getDefault().isReady());
+    }
+    public static org.eclipse.core.runtime.preferences.IEclipsePreferences backendPreferences() {
+        return org.eclipse.core.runtime.preferences.InstanceScope.INSTANCE.getNode(TimekeeperPlugin.BUNDLE_ID);
+    }
     public static HttpTimekeeperService client() {return new HttpTimekeeperService(RemoteBootstrap.serverUrl,()->RemoteBootstrap.token,Duration.ofSeconds(5));}
     public static void showWorkweek() throws Exception {
         onUi(()->{

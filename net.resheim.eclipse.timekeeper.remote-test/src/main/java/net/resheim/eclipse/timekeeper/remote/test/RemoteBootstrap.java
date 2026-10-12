@@ -26,17 +26,20 @@ import org.eclipse.equinox.security.storage.SecurePreferencesFactory;
 /** Prepares isolated credentials/configuration before any Timekeeper UI startup, then runs the IDE. */
 public final class RemoteBootstrap implements IApplication {
     private IApplication delegate;
-    private Process server,replyGate;
+    private Process server,alternate,replyGate;
     private int upstreamPort;
     private static RemoteBootstrap active;
     static Path folder;
     static URI serverUrl;
+    private static URI alternateUrl,selectedUrl;
     static String token;
     private static String accountAToken,accountBToken,observerBToken;
     static Properties proof;
     public static Properties receipt() {return proof;}
     public static Path fixtureFolder() {return folder;}
     public static URI endpoint() {return serverUrl;}
+    public static URI alternateEndpoint() {return alternateUrl;}
+    public static URI selectedEndpoint() {return selectedUrl;}
     public static String fixtureToken() {return token;}
     public static String accountAToken() {return accountAToken;}
     public static String accountBToken() {return accountBToken;}
@@ -86,6 +89,16 @@ public final class RemoteBootstrap implements IApplication {
             else try(var socket=new ServerSocket(0)) {port=socket.getLocalPort();}
             serverUrl=URI.create("http://127.0.0.1:"+port);
             active=this;launchServer();
+            if(Boolean.getBoolean("timekeeper.remote.switch-tests")) {
+                int alternatePort;
+                if(proof.containsKey("server.alternate-port")) alternatePort=Integer.parseInt(proof.getProperty("server.alternate-port"));
+                else try(var socket=new ServerSocket(0)) {alternatePort=socket.getLocalPort();}
+                alternateUrl=URI.create("http://127.0.0.1:"+alternatePort);
+                alternate=launch("alternate",alternatePort,folder.resolve("alternate server data/timekeeper"));
+                proof.setProperty("server.alternate-port",String.valueOf(alternatePort));
+                String pids=proof.getProperty("server.alternate-pids","");
+                proof.setProperty("server.alternate-pids",pids.isEmpty() ? String.valueOf(alternate.pid()) : pids+","+alternate.pid());
+            }
             if("passed".equals(proof.getProperty("phase.mylyn")) && !proof.containsKey("mylyn.between-launch-version")) {
                 try(var api=new net.resheim.eclipse.timekeeper.client.HttpTimekeeperService(serverUrl,()->accountAToken,Duration.ofSeconds(5))) {
                     var id=new net.resheim.eclipse.timekeeper.domain.TaskId(java.util.UUID.fromString(proof.getProperty("mylyn.second")));
@@ -95,12 +108,23 @@ public final class RemoteBootstrap implements IApplication {
                 }
             }
             var preferences=InstanceScope.INSTANCE.getNode("net.resheim.eclipse.timekeeper.db");
-            preferences.put("backend-mode","remote");preferences.put("backend-url",serverUrl.toString());preferences.flush();
+            if(!proof.containsKey("backend.initialized")) {
+                preferences.put("backend-mode","remote");preferences.put("backend-url",serverUrl.toString());preferences.flush();
+                proof.setProperty("backend.initialized","true");
+            }
+            boolean embedded="embedded".equals(preferences.get("backend-mode","remote"));
+            selectedUrl=URI.create(preferences.get("backend-url",serverUrl.toString()));
             System.setProperty("net.resheim.eclipse.timekeeper.db.url","jdbc:h2:"+folder.resolve("native-local"));
             // Reflection prevents class linkage from activating the DB plug-in before configuration.
             Class.forName("net.resheim.eclipse.timekeeper.remote.test.NativeDatabaseFixture").getMethod("prepare",Path.class).invoke(null,folder);
             String localHash=hash(folder.resolve("native-local.mv.db"));
-            if(proof.containsKey("native.sha256") && !localHash.equals(proof.getProperty("native.sha256"))) throw new IllegalStateException("The local fixture changed between Eclipse launches");
+            if(!embedded && proof.containsKey("native.sha256") && !localHash.equals(proof.getProperty("native.sha256"))) {
+                if(!"embedded".equals(proof.getProperty("backend.last-runtime-mode")) || !"passed".equals(proof.getProperty("phase.backend.local")))
+                    throw new IllegalStateException("The local fixture changed between remote Eclipse launches");
+                proof.setProperty("native.after-embedded.sha256",localHash);
+            }
+            if(!proof.containsKey("native.initial.sha256")) proof.setProperty("native.initial.sha256",localHash);
+            proof.setProperty("backend.last-runtime-mode",embedded ? "embedded" : "remote");
             proof.setProperty("native.sha256",localHash);proof.setProperty("distribution.sha256",checksum);proof.setProperty("server.port",String.valueOf(port));
             String previousPids=proof.getProperty("server.pids","");proof.setProperty("server.pids",previousPids.isEmpty() ? String.valueOf(server.pid()) : previousPids+","+server.pid());writeProof();
             for(var application:Platform.getExtensionRegistry().getConfigurationElementsFor("org.eclipse.core.runtime.applications")) {
@@ -110,24 +134,28 @@ public final class RemoteBootstrap implements IApplication {
                 }
             }
             throw new IllegalStateException("Installed IDE application is missing");
-        } finally {stopReplyGate();stopServer();}
+        } finally {stopReplyGate();stopServer();stopAlternate();}
     }
     private void launchServer() throws Exception {
-        Files.createDirectories(folder.resolve("server data"));
+        server=launch("main",upstreamPort==0 ? serverUrl.getPort() : upstreamPort,folder.resolve("server data/timekeeper"));
+    }
+    private Process launch(String name,int port,Path database) throws Exception {
+        Files.createDirectories(database.getParent());
         var builder=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",folder.resolve("distribution/timekeeper-server/quarkus-run.jar").toString());
-        builder.environment().put("TIMEKEEPER_SERVER_DB_URL","jdbc:h2:"+folder.resolve("server data/timekeeper"));
-        builder.environment().put("TIMEKEEPER_SERVER_TOKENS_FILE",folder.resolve("server-tokens.json").toString());builder.environment().put("QUARKUS_HTTP_PORT",String.valueOf(upstreamPort==0 ? serverUrl.getPort() : upstreamPort));
-        builder.redirectErrorStream(true).redirectOutput(folder.resolve("server-"+System.nanoTime()+".log").toFile());
-        server=builder.start();
+        builder.environment().put("TIMEKEEPER_SERVER_DB_URL","jdbc:h2:"+database);
+        builder.environment().put("TIMEKEEPER_SERVER_TOKENS_FILE",folder.resolve("server-tokens.json").toString());builder.environment().put("QUARKUS_HTTP_PORT",String.valueOf(port));
+        builder.redirectErrorStream(true).redirectOutput(folder.resolve("server-"+name+"-"+System.nanoTime()+".log").toFile());
+        Process process=builder.start();
         try(var http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build()) {
             long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(25);boolean ready=false;
-            while(System.nanoTime()<deadline && server.isAlive()) {
-                try {ready=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+(upstreamPort==0 ? serverUrl.getPort() : upstreamPort)+"/q/health/ready")).timeout(Duration.ofSeconds(1)).GET().build(),HttpResponse.BodyHandlers.discarding()).statusCode()==200;}
+            while(System.nanoTime()<deadline && process.isAlive()) {
+                try {ready=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/q/health/ready")).timeout(Duration.ofSeconds(1)).GET().build(),HttpResponse.BodyHandlers.discarding()).statusCode()==200;}
                 catch(java.io.IOException unavailable) { }
                 if(ready) break;Thread.sleep(50);
             }
-            if(!ready) throw new IllegalStateException("Packaged server did not become ready; see isolated fixture logs");
+            if(!ready) {process.destroyForcibly();throw new IllegalStateException("Packaged server did not become ready; see isolated fixture logs");}
         }
+        return process;
     }
     public static long stopFixtureServer() {
         long pid=active.server.pid();active.stopServer();
@@ -141,7 +169,12 @@ public final class RemoteBootstrap implements IApplication {
         proof.setProperty("server.recovery-pids",previous.isEmpty() ? String.valueOf(active.server.pid()) : previous+","+active.server.pid());writeProof();
         return active.server.pid();
     }
-    @Override public void stop() {if(delegate!=null) delegate.stop();stopReplyGate();stopServer();}
+    @Override public void stop() {if(delegate!=null) delegate.stop();stopReplyGate();stopServer();stopAlternate();}
+    private void stopAlternate() {
+        if(alternate==null) return;alternate.destroy();
+        try {if(!alternate.waitFor(5,TimeUnit.SECONDS)) {alternate.destroyForcibly();alternate.waitFor(5,TimeUnit.SECONDS);}}
+        catch(InterruptedException interrupted) {alternate.destroyForcibly();Thread.currentThread().interrupt();}
+    }
     public static void enableReplyGate() throws Exception {
         if(active.replyGate!=null) throw new IllegalStateException("Reply gate is already active");
         stopFixtureServer();try(var socket=new ServerSocket(0)) {active.upstreamPort=socket.getLocalPort();}

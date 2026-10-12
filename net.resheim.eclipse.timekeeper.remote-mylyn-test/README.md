@@ -116,13 +116,30 @@ Mylyn projections. Receipts record `phase.changes.owner-scope`,
 `phase.changes.reconnect`.
 
 `remote-client-tests` includes both native-only and Mylyn modules. CI's
-`Remote-Eclipse` job runs all five installed phases and uploads reports and
+`Remote-Eclipse` job runs all nine installed phases and uploads reports and
 credential-free receipts/logs. The fixture password, keyring and token registry
 are excluded. The known upstream theme-color/Error Log issue #243 is still a
 separate release gate; these functional tests do not certify a clean Error Log.
 
-Still required in #220: switching server endpoints and local/remote backends,
-remaining native label/report/CSV preference flows, and form preservation
+Four further JVMs retain the workspace through server A/account B, a second
+server with the same account, embedded storage, server A again and embedded
+storage again. All selections use the actual backend preference page and restart
+notice. Applying settings must retain the running identity, task snapshot and
+connection until restart. The second server and local database must not receive
+copies of the first server's tasks. Workweek creates same-named native records
+in each backend; Mylyn activation records time only against that backend's UUID
+and owner. Foreign projections reject resolution. Returning to the first server
+and local storage must reuse the saved projection handles and random markers,
+record IDs and exact intervals. Both inactive servers retain their state.
+
+The embedded phase deliberately opens and updates the existing local fixture.
+Its new checksum is accepted only after successful embedded acceptance and must
+stay unchanged when server mode is selected again. All remote phases keep the
+app connection null; both isolated server processes stop on runtime exit. The
+bootstrap honors persisted backend settings after its first initialization.
+See [backend-switch acceptance](../baseline/REMOTE-BACKEND-SWITCH.md).
+
+Still required in #220: remaining native label/report/CSV preference flows, and form preservation
 through authentication/offline/timeout/cancellation/conflict failures, including
 uncertain-command and failed-deletion outcomes. The Eclipse portion of #219 is
 covered by the synchronization checkpoint; web synchronization and #221 web UI

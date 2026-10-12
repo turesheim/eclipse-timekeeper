@@ -98,6 +98,10 @@ jobs:
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/surefire-reports/
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/surefire-reports-restart/
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/surefire-reports-account/
+          net.resheim.eclipse.timekeeper.remote-mylyn-test/target/surefire-reports-server/
+          net.resheim.eclipse.timekeeper.remote-mylyn-test/target/surefire-reports-local/
+          net.resheim.eclipse.timekeeper.remote-mylyn-test/target/surefire-reports-return/
+          net.resheim.eclipse.timekeeper.remote-mylyn-test/target/surefire-reports-local-restart/
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/acceptance-data/proof.properties
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/acceptance-data/server-*.log
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/work/**/.metadata/.log

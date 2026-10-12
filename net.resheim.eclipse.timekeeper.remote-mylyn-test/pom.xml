@@ -7,10 +7,10 @@
   <packaging>eclipse-test-plugin</packaging>
   <properties>
     <timekeeper.remote.distribution>${project.basedir}/../server/target/distribution/timekeeper-server.zip</timekeeper.remote.distribution>
-    <remote.vmargs>-Xmx1024m -Dtimekeeper.remote.distribution=${timekeeper.remote.distribution} -Dtimekeeper.remote.fixture=${project.build.directory}/acceptance-data -Dorg.eclipse.swtbot.search.timeout=15000</remote.vmargs>
+    <remote.vmargs>-Xmx1024m -Dtimekeeper.remote.switch-tests=true -Dtimekeeper.remote.distribution=${timekeeper.remote.distribution} -Dtimekeeper.remote.fixture=${project.build.directory}/acceptance-data -Dorg.eclipse.swtbot.search.timeout=15000</remote.vmargs>
   </properties>
   <profiles><profile><id>macosx</id><activation><os><family>mac</family></os></activation>
-    <properties><remote.vmargs>-XstartOnFirstThread -Xmx1024m -Dtimekeeper.remote.distribution=${timekeeper.remote.distribution} -Dtimekeeper.remote.fixture=${project.build.directory}/acceptance-data -Dorg.eclipse.swtbot.search.timeout=15000</remote.vmargs></properties>
+    <properties><remote.vmargs>-XstartOnFirstThread -Xmx1024m -Dtimekeeper.remote.switch-tests=true -Dtimekeeper.remote.distribution=${timekeeper.remote.distribution} -Dtimekeeper.remote.fixture=${project.build.directory}/acceptance-data -Dorg.eclipse.swtbot.search.timeout=15000</remote.vmargs></properties>
   </profile></profiles>
   <build><plugins>
     <plugin><groupId>org.eclipse.tycho</groupId><artifactId>target-platform-configuration</artifactId>
@@ -41,6 +41,18 @@
         </execution>
         <execution><id>remote-mylyn-account</id><phase>verify</phase><goals><goal>test</goal></goals>
           <configuration><deleteOsgiDataDirectory>false</deleteOsgiDataDirectory><includes><include>**/RemoteMylynAccountTest.java</include></includes><reportsDirectory>${project.build.directory}/surefire-reports-account</reportsDirectory></configuration>
+        </execution>
+        <execution><id>remote-mylyn-server</id><phase>verify</phase><goals><goal>test</goal></goals>
+          <configuration><deleteOsgiDataDirectory>false</deleteOsgiDataDirectory><includes><include>**/RemoteServerSwitchTest.java</include></includes><reportsDirectory>${project.build.directory}/surefire-reports-server</reportsDirectory></configuration>
+        </execution>
+        <execution><id>remote-mylyn-local</id><phase>verify</phase><goals><goal>test</goal></goals>
+          <configuration><deleteOsgiDataDirectory>false</deleteOsgiDataDirectory><includes><include>**/RemoteLocalSwitchTest.java</include></includes><reportsDirectory>${project.build.directory}/surefire-reports-local</reportsDirectory></configuration>
+        </execution>
+        <execution><id>remote-mylyn-return</id><phase>verify</phase><goals><goal>test</goal></goals>
+          <configuration><deleteOsgiDataDirectory>false</deleteOsgiDataDirectory><includes><include>**/RemoteReturnSwitchTest.java</include></includes><reportsDirectory>${project.build.directory}/surefire-reports-return</reportsDirectory></configuration>
+        </execution>
+        <execution><id>remote-mylyn-local-restart</id><phase>verify</phase><goals><goal>test</goal></goals>
+          <configuration><deleteOsgiDataDirectory>false</deleteOsgiDataDirectory><includes><include>**/RemoteLocalRestartTest.java</include></includes><reportsDirectory>${project.build.directory}/surefire-reports-local-restart</reportsDirectory></configuration>
         </execution>
       </executions>
     </plugin>
