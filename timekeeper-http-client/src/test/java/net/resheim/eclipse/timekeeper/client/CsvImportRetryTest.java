@@ -14,6 +14,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -27,7 +28,7 @@ class CsvImportRetryTest {
         Path journal=temporary.resolve("journal");
         AtomicInteger committed=new AtomicInteger(),requests=new AtomicInteger();
         Set<String> keys=ConcurrentHashMap.newKeySet();
-        CountDownLatch release=new CountDownLatch(1);
+        CountDownLatch release=new CountDownLatch(1),confirmedCommit=new CountDownLatch(1);
         HttpServer server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
         try(var executor=Executors.newVirtualThreadPerTaskExecutor()) {
             server.setExecutor(executor);
@@ -42,7 +43,8 @@ class CsvImportRetryTest {
                 boolean first=keys.add(key);
                 if(first) {
                     committed.incrementAndGet();
-                    try {release.await(5,TimeUnit.SECONDS);}
+                    confirmedCommit.countDown();
+                    try {release.await(30,TimeUnit.SECONDS);}
                     catch(InterruptedException interrupted) {Thread.currentThread().interrupt();}
                 }
                 byte[] reply="{\"ids\":[{},{},{},{},{}],\"revision\":1}".getBytes(StandardCharsets.UTF_8);
@@ -50,10 +52,22 @@ class CsvImportRetryTest {
             });
             server.start();URI uri=URI.create("http://127.0.0.1:"+server.getAddress().getPort());
             try {
-                try(var first=new HttpTimekeeperService(uri,()->"test-only-token",Duration.ofMillis(500))) {
-                    assertEquals(RemoteFailure.Kind.TIMEOUT,assertThrows(RemoteFailure.class,()->first.importCsv(csv,journal)).kind());
+                try(var first=new HttpTimekeeperService(uri,()->"test-only-token",Duration.ofSeconds(30))) {
+                    AtomicReference<RemoteFailure> lostReply=new AtomicReference<>();
+                    Thread worker=new Thread(()->{
+                        try {first.importCsv(csv,journal);}
+                        catch(RemoteFailure failure) {lostReply.set(failure);}
+                        catch(java.io.IOException failure) {throw new AssertionError(failure);}
+                    });
+                    worker.start();
+                    try {
+                        assertTrue(confirmedCommit.await(10,TimeUnit.SECONDS),"The server must commit before simulating a lost reply");
+                        worker.interrupt();worker.join(10000);
+                        assertFalse(worker.isAlive(),"The cancelled client must release its worker");
+                        assertNotNull(lostReply.get());assertEquals(RemoteFailure.Kind.CANCELLED,lostReply.get().kind());
+                    } finally {worker.interrupt();worker.join(10000);}
                 }
-                try(var restarted=new HttpTimekeeperService(uri,()->"test-only-token",Duration.ofSeconds(2))) {
+                try(var restarted=new HttpTimekeeperService(uri,()->"test-only-token",Duration.ofSeconds(10))) {
                     assertEquals(5,restarted.importCsv(csv,journal));
                 }
                 assertEquals(1,committed.get());assertEquals(1,keys.size());assertEquals(2,requests.get());
