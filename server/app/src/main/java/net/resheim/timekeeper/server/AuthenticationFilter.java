@@ -19,6 +19,11 @@ public class AuthenticationFilter implements ContainerRequestFilter {
         var headers=request.getHeaders().get("Authorization");
         if (headers==null || headers.size()!=1) throw new ApiFailure(401,"UNAUTHENTICATED");
         var principal=tokens.authenticate(headers.getFirst());
+        var expected=request.getHeaders().get(OwnerBinding.HEADER);
+        if(expected!=null) {
+            if(expected.size()!=1) throw ApiFailure.badRequest();
+            if(!principal.owner().equals(OwnerBinding.decode(expected.getFirst()))) throw new ApiFailure(401,"OWNER_CHANGED");
+        }
         boolean read=java.util.Set.of("GET","HEAD","OPTIONS").contains(request.getMethod());
         if (!principal.permissions().contains(read ? "read" : "write")) throw new ApiFailure(403,"FORBIDDEN");
         identity.set(principal);

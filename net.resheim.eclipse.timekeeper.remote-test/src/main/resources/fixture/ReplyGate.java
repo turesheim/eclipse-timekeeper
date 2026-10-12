@@ -40,7 +40,7 @@ public class ReplyGate {
                     return;
                 }
                 var request=HttpRequest.newBuilder(URI.create(upstream+exchange.getRequestURI().toASCIIString())).timeout(Duration.ofSeconds(30));
-                for(String header:Set.of("Authorization","Accept","Content-Type","If-Match","Idempotency-Key")) {
+                for(String header:Set.of("Authorization","Accept","Content-Type","If-Match","Idempotency-Key","X-Timekeeper-Owner")) {
                     String value=exchange.getRequestHeaders().getFirst(header);if(value!=null) request.header(header,value);
                 }
                 byte[] body=exchange.getRequestBody().readAllBytes();
@@ -53,6 +53,7 @@ public class ReplyGate {
                 }
                 response.headers().firstValue("Content-Type").ifPresent(value->exchange.getResponseHeaders().set("Content-Type",value));
                 response.headers().firstValue("ETag").ifPresent(value->exchange.getResponseHeaders().set("ETag",value));
+                response.headers().firstValue("X-Timekeeper-Owner").ifPresent(value->exchange.getResponseHeaders().set("X-Timekeeper-Owner",value));
                 exchange.sendResponseHeaders(response.statusCode(),response.body().length==0 ? -1 : response.body().length);
                 if(response.body().length>0) exchange.getResponseBody().write(response.body());
             } catch(Exception failure) {

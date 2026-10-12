@@ -14,6 +14,16 @@ import io.quarkus.test.junit.QuarkusTest;
 @QuarkusTest
 class HttpProtocolTest {
     @TestHTTPResource URI baseUri;
+    @Test void ownerBindingIsOptionalAndCannotGrantForeignPermissions() {
+        given().header("Authorization","Bearer test-a").get("/api/v1/me").then().statusCode(200).header("X-Timekeeper-Owner",equalTo("YQ"));
+        given().header("Authorization","Bearer test-a").header("X-Timekeeper-Owner","YQ").get("/api/v1/projects").then().statusCode(200);
+        given().header("Authorization","Bearer test-a").header("X-Timekeeper-Owner","Yg").get("/api/v1/projects").then().statusCode(401).body("code",equalTo("OWNER_CHANGED"));
+        given().header("Authorization","Bearer test-read").header("X-Timekeeper-Owner","YQ").contentType("application/json").body("{\"name\":\"Read only\"}")
+                .post("/api/v1/projects").then().statusCode(403).body("code",equalTo("FORBIDDEN"));
+        for(String malformed:java.util.List.of("%%","YQ=","_w","YR"))
+            given().header("Authorization","Bearer test-a").header("X-Timekeeper-Owner",malformed).get("/api/v1/me").then().statusCode(400).body("code",equalTo("BAD_REQUEST"));
+        given().header("Authorization","Bearer test-a").header("X-Timekeeper-Owner","YQ","YQ").get("/api/v1/me").then().statusCode(400);
+    }
     @Test void malformedJsonAndUnsupportedContentTypeUseProblemResponses() {
         given().header("Authorization","Bearer test-a").contentType("application/json").body("{")
                 .post("/api/v1/projects").then().statusCode(400).contentType("application/problem+json").body("code",equalTo("BAD_REQUEST"));

@@ -21,7 +21,8 @@ public class ChangeResource {
         String owner=identity.owner();long deadline=System.nanoTime()+wait*1_000_000_000L;
         while(true) {
             var principal=tokens.authenticate(headers.getHeaderString("Authorization"));
-            if(!principal.owner().equals(owner) || !principal.permissions().contains("read")) throw ApiFailure.unauthorized(true);
+            if(!principal.owner().equals(owner)) throw new ApiFailure(401,"OWNER_CHANGED");
+            if(!principal.permissions().contains("read")) throw ApiFailure.unauthorized(true);
             ObjectNode page=store.transaction(owner,() -> page(after,limit));
             if(!page.get("items").isEmpty() || System.nanoTime()>=deadline) return new ApiReplies(200,page,null,null).response();
             // Release connection/owner lock while waiting; cancellation does not mutate data.
