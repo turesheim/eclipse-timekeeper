@@ -46,6 +46,18 @@ retain those records until the user explicitly deletes them; the explicit task
 and project deletions must then succeed. The unchanged fixture keyring/account
 and closed local database are checked throughout.
 
+The same retained account-B runtime also exercises token revocation and
+optimistic task-editor conflicts. Revocation leaves the draft and enabled
+summary/URL fields intact while marking the connection unavailable; local
+storage stays closed even in that failure state. Restoring authorization lets
+the same still-open editor save once. A second independent HTTP client changes
+another task while its editor has a draft. Rejected stale saves must preserve
+both the draft and competing record. A cache refresh must not upgrade the
+opened editor's captured version; a repeat save still conflicts. Cancel/reopen
+loads the competing values and permits an explicitly reviewed save. Stale
+record editors now show the matching close/reopen instruction. Temporary tasks
+are removed and prior data/history remain unchanged.
+
 `remote-client-tests` includes both native-only and Mylyn modules. CI's
 `Remote-Eclipse` job runs all five installed phases and uploads reports and
 credential-free receipts/logs. The fixture password, keyring and token registry

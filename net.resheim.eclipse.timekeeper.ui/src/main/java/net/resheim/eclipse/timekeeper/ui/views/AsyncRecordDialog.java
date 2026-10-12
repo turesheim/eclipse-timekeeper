@@ -22,7 +22,7 @@ abstract class AsyncRecordDialog extends TitleAreaDialog {
         },failure->{
             pending=null;if(getShell()==null || getShell().isDisposed()) return;
             getDialogArea().setEnabled(true);
-            getButton(IDialogConstants.OK_ID).setEnabled(true);setErrorMessage(RecordDialogErrors.message(failure));
+            getButton(IDialogConstants.OK_ID).setEnabled(true);setErrorMessage(RecordDialogErrors.editorMessage(failure));
         });
     }
     @Override protected void cancelPressed() {if(pending!=null) pending.cancel();super.cancelPressed();}

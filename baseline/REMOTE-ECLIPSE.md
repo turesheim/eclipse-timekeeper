@@ -295,11 +295,50 @@ records PIDs `65482,65487,65492`, all Mylyn phase markers passed, and preserved
 local SHA-256 `4cfb8d6981b953219bc2f559f839a183dd75b79670de0d2c759bfd58ab7981b0`.
 The same packaged server ZIP was used in the before/after runs. The preceding
 conflict fix passed all seven CI jobs and its downloaded installed reports;
-CI for this read-only extension remains pending.
+The read-only extension `a6395e6` passed all seven jobs in
+[run 38290019269](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38290019269).
+Its downloaded reports confirm all five installed phases and the permission
+marker.
 
 This covers permission denial in the native task editor and Mylyn task/project
 deletions. Other editor/operation permission paths, authentication failures and
 unknown transport outcomes remain open.
+
+## Installed authentication/conflict checkpoint, 2026-10-12
+
+The account-B installed phase now exercises two more task-editor failure
+paths using the real packaged server. Revoking B's token in the fixture registry
+causes HTTP authentication failure while A remains authorized. The task editor
+must stay open with its summary/URL draft and enabled fields, display the sign-in
+message and mark the connection unavailable. The app entity manager remains
+null, local readiness false and the original local file checksum unchanged.
+After authorization is restored, server metadata and the original task must
+still be identical. Saving the same still-open draft then succeeds once with
+exactly one version increment and reaches the original Mylyn projection.
+
+A second independent HTTP client updates another task while its native editor
+has an unsaved draft. Saving the old version must leave both draft fields and
+the competing server record unchanged. Refreshing the cache while that editor
+remains open must preserve the draft and must not upgrade its captured expected
+version: repeating Save still conflicts. Cancel/reopen loads the competing
+version; an explicitly reviewed save then increments that version exactly once.
+Both temporary fixture tasks are removed, while prior account data/history and
+local storage remain unchanged.
+
+Stale-version errors in record editors now explain that the editor must be
+closed and reopened before saving. This mapping applies specifically to remote
+`CONFLICT` with `STALE_VERSION`; other conflict types keep their existing
+messages. The generic transport/Workweek status message is unchanged.
+
+The selected clean reactor passed **105 main tests, two restart tests and one
+account/failure test**, without failures/errors/skips. The receipt records PIDs
+`67109,67120,67126`, authentication and conflict markers passed, and preserved
+local SHA-256 `df4d438f1993c4c6e636057fb16cfb60506034303208c8255b39493012ff9f43`. The same checksum-verified packaged
+server was used. CI for this new extension remains pending.
+
+These checks cover token revocation/recovery and optimistic task-editor
+conflicts through manual refresh. Other editors, offline/timeout/cancellation,
+unknown commands and automatic concurrent-client notification remain open.
 
 ## Remaining before #220 can be completed
 
@@ -313,7 +352,9 @@ unknown transport outcomes remain open.
   encrypted-token reading and marker-preserving restart are covered above.
 - Repeat closed-local-storage and form-draft checks through authentication,
   offline, timeout, cancellation and optimistic-conflict failures. The normal
-  and rejected-validation installed paths are covered above.
+  and rejected-validation installed paths are covered above. Native task
+  permission/token-revocation/conflict paths and recovery are also covered;
+  the other editor/operation paths remain open.
 - Complete uncertain-command and form-draft acceptance for the installed
   client, including uncertain/authentication/permission/transport deletion
   outcomes. Definitive conflict-rejected task/project deletions and subsequent

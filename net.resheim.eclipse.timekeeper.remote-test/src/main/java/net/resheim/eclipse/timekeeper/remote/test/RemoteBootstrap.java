@@ -135,10 +135,12 @@ public final class RemoteBootstrap implements IApplication {
         return "{\"ownerId\":\""+owner+"\",\"sha256\":\""+hash(secret.getBytes(StandardCharsets.UTF_8))+"\",\"permissions\":[\"read\""+(writable ? ",\"write\"" : "")+"]}";
     }
     /** Changes only the disposable fixture's registry; the live server reloads it per request. */
-    public static void setAccountBWritable(boolean writable) throws Exception {
+    public static void setAccountBWritable(boolean writable) throws Exception {updateRegistry(true,writable);}
+    public static void setAccountBEnabled(boolean enabled) throws Exception {updateRegistry(enabled,true);}
+    private static void updateRegistry(boolean enabled,boolean writable) throws Exception {
         Path temporary=Files.createTempFile(folder,"server-tokens-",".json");
         try {
-            Files.writeString(temporary,"["+principal("remote-owner-a",accountAToken)+","+principal("remote-owner-b",accountBToken,writable)+"]",StandardCharsets.UTF_8);
+            Files.writeString(temporary,"["+principal("remote-owner-a",accountAToken)+(enabled ? ","+principal("remote-owner-b",accountBToken,writable) : "")+"]",StandardCharsets.UTF_8);
             Files.move(temporary,folder.resolve("server-tokens.json"),java.nio.file.StandardCopyOption.ATOMIC_MOVE,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         } finally {Files.deleteIfExists(temporary);}
     }
