@@ -56,6 +56,7 @@ jobs:
             release-source/**/pom.xml
             release-source/**/META-INF/MANIFEST.MF
             release-source/default.target
+            release-source/net.resheim.eclipse.timekeeper.jira-test/jira.target
             release-source/.mvn/wrapper/maven-wrapper.properties
 
       - name: Install Xvfb
@@ -65,7 +66,7 @@ jobs:
       - name: Build and test the tagged source
         if: steps.release.outputs.reuse != 'true'
         working-directory: release-source
-        run: xvfb-run --auto-servernum --server-args="-screen 0, 1024x768x24" ./mvnw -B -ntp clean verify -Pother-os -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=20000
+        run: xvfb-run --auto-servernum --server-args="-screen 0, 1024x768x24" ./mvnw -B -ntp clean verify -Pother-os,jira-connector-tests -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=20000
 
       - name: Package and validate p2 repository
         if: steps.release.outputs.reuse != 'true'
@@ -91,5 +92,10 @@ jobs:
           if-no-files-found: warn
           path: |
             release-source/**/target/surefire-reports/
+            release-source/**/target/surefire-reports-restart/
             release-source/**/target/test-reports/
             release-source/**/target/work/data/.metadata/.log
+            release-source/net.resheim.eclipse.timekeeper.jira-test/target/work/**/.metadata/.log
+            release-source/net.resheim.eclipse.timekeeper.jira-test/target/work/**/configuration/*.log
+            release-source/net.resheim.eclipse.timekeeper.jira-test/target/acceptance-data/*.txt
+            release-source/net.resheim.eclipse.timekeeper.jira-test/target/acceptance-data/*.properties

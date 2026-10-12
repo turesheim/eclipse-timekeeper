@@ -9,6 +9,11 @@ import net.resheim.eclipse.timekeeper.domain.TaskId;
  * the client API.
  */
 public interface TaskIntegration {
+	/** Human-readable provider key; independent of the stable external ID. */
+	default java.util.Optional<String> displayId(Task task) {
+		return java.util.Optional.empty();
+	}
+
 	boolean isLinked(Task task);
 
 	boolean isActive(Task task);

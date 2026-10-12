@@ -6,81 +6,43 @@ connector-backed tasks.
 
 ![Timekeeper Workweek view](resources/screenshots/workweek-view.png)
 
-With the optional integration installed, whenever a task is *activated* in Mylyn it will automatically show up in the **Workweek** view with a bold label, and the amount of time the task is active will be tracked. An *activity* will be added to the task, which is the entity keeping track of the time and a short note. Multiple activities can be added to each task.
+Open **Workweek** to create projects, tasks and subtasks, start or stop tracking,
+and record or edit activities on any date. Native records belong to Timekeeper
+and are available without Mylyn or a repository account. Optional Mylyn
+integration tracks task activation and synchronizes Task List projections.
 
-When the task is *deactivated* the end time is registered on the activity and the active time is added to the total for the task on the particular day. It is also possible to manually edit the start and stop times by clicking into the cell.
+The [2.0 user guide](https://github.com/turesheim/eclipse-timekeeper/wiki/Timekeeper-2.0-User-Guide)
+covers native editing, summaries and labels, weekly reports, Task List
+synchronization and idle-time correction. See the
+[Wiki home](https://github.com/turesheim/eclipse-timekeeper/wiki) for publication
+status and earlier-release documentation. The Wiki describes candidate features
+explicitly while 2.0 acceptance remains open.
 
-The context menu and toolbar buttons can be used to browse back and forward by one week. The current locale is used to determine week numbers. Left of the navigation buttons there is a button for copying and exporting the displayed workweek in various formats. The export definitions can be modified or new ones can be added using [Freemarker](https://freemarker.apache.org) templates found in the preference settings. 
+## Jira connector
 
-See the <a href="../../wiki">wiki</a>  for more about usage.
+Install **Timekeeper Mylyn integration** and the separate
+[JiraConnector](https://github.com/gnl42/JiraConnector) plugin from
+`https://gnl42.github.io/JiraConnector-update/`. Keep the Eclipse 2026-09
+software site enabled and restart before adding a Jira repository.
 
-## Native Timekeeper tasks
-
-Use the **Workweek** toolbar to create a **New project...** or **New task...**.
-Right-click a project or task to edit or delete it. A task has a summary, an
-optional URL and project, and an optional parent task in that project. Use
-**New subtask...** on a task to extend its hierarchy. Editing a task lets you
-move it between projects or choose **No project** for an independent task;
-move or delete its subtasks first before moving their parent to another project.
-
-![Creating a native Timekeeper task in Workweek](resources/screenshots/standalone-task-dialog.png)
-
-These records belong to Timekeeper and are available before any time has been
-recorded. Creating them does not create a Mylyn task or category. To also show
-new native records in Mylyn, enable **Show new Timekeeper projects and tasks in
-Mylyn Task List** in **Preferences > Timekeeper**. Existing Task List projections
-continue to synchronize when that option is off.
-
-With **Timekeeper Mylyn integration** installed, the standard Mylyn **Task List** is also supported: categories represent
-projects, local tasks represent root tasks, and nested local tasks represent
-subtasks. Creating, renaming, or moving those objects synchronizes their native
-Timekeeper records without requiring a repository connector.
-
-![Native project, task, and subtask in the Mylyn Task List](resources/screenshots/native-task-tree.png)
-
-Activate a linked local task through Mylyn as usual, or start an activity
-directly in Workweek. Native tasks participate in weekly totals,
-reports, and CSV export alongside connector-backed tasks.
-
-![Native project, tasks and recorded time in Workweek](resources/screenshots/standalone-workweek.png)
-
-In Workweek, right-click a task and choose **New activity** to record time on
-any date. Enter start and end as `yyyy-MM-dd HH:mm` in the Eclipse host time
-zone, along with a summary and labels. Use **Start activity** for a new ongoing
-interval, then **Stop activity** on that interval. **Edit activity...** changes
-its dates, times, summary and labels; completed intervals can be deleted.
-These operations also work when a linked Mylyn task is unavailable. Timekeeper
-reports a conflict if another interval is already open or a record changed
-while it was being edited.
-
-Native projects and tasks can be renamed or deleted in Workweek or Task List. Delete
-activities and subtasks before deleting their task, then remove its tasks
-before deleting the project; recorded history is preserved if deletion is
-refused. See the [native project/activity UI verification](baseline/STANDALONE-ACTIVITY-UI.md).
-
-The data is stored in an H2 SQL database, mapped to POJOs using the Java Persistence API with EclipseLink. Reports are generated using Apache FreeMarker. The database has an explicit schema version and initialization state; historical data migration is not supported.
-
-In the 2.0 data model, a Timekeeper task has its own UUID and can be created,
-edited and persisted without Eclipse. The Eclipse projection stores that UUID
-on its Mylyn local task; it is not an external connector identity. Jira, GitHub
-and future providers are optional external references, and each
-provider/repository/task tuple can be linked to only one Timekeeper task.
-Recorded activities carry an explicit owner identity. The embedded Eclipse
-client uses the stable owner `local`, while a future service can supply
-authenticated user or service identities.
-
-Activity and heartbeat timestamps are stored as UTC instants. Calendar operations
-such as day and workweek totals require an explicit time zone; the Eclipse client
-uses the host system zone. This keeps persisted data independent of the process
-time zone while making daylight-saving and week-boundary behavior deterministic.
+The compatibility candidate is JiraConnector **6.0.0.202605160149** on Java 21,
+Eclipse 4.41 and Mylyn 4.12. Actual installation and Timekeeper metadata/tracking
+fixtures are verified; live Jira queries/authentication and the upstream Mylyn
+Error Log gate remain open. The
+[connector guide](https://github.com/turesheim/eclipse-timekeeper/wiki/Supported-repository-types)
+explains project/category/custom-field grouping, the **None** fallback and
+issue-key display. See the [Jira acceptance report](baseline/JIRA-COMPATIBILITY.md)
+for evidence and limits. Timekeeper delegates credentials to the connector and
+does not send activities to Jira worklogs.
 
 ## Database configuration
 
-The Database configuration page in preferences (**Timekeeper > Database**) allows you to configure where the database for the running Eclipse instance should be kept. The default is to place it in the shared location, under `.timekeeper` in your home folder. But you can also use a workspace relative path, or even a H2 server if you have one running.
-
-<img src="resources/screenshots/preferences-database.png" alt="Timekeeper database preferences" width="50%"/>
-
-Multiple instances of the Timekeeper can share the database as it utilizes a H2 feature called mixed mode. This will automatically start a server instance on port 9090 if more connections are needed.
+Choose shared, workspace-relative or explicit H2 storage in **Preferences >
+Timekeeper > Database**. The default is shared storage under `.timekeeper` in
+your home directory; restart after changing the location. See the
+[installation and storage guide](https://github.com/turesheim/eclipse-timekeeper/wiki/Installing-Timekeeper-2.0)
+for the user workflow. Database instances use H2 mixed mode; concurrent edits
+to the same task are unsupported. See [multi-instance acceptance](baseline/CONCURRENT-INSTANCES.md).
 
 The Eclipse 2026-09 upgrade uses **H2 2.5.250 with schema version 2** as its
 supported database baseline. Start with new storage; historical H2 files,
@@ -178,6 +140,20 @@ or H2 version. Current-schema backup and restore instructions are in the
 Use JDK 21. Clone the project and from the root execute:
 
     ./mvnw -B -ntp clean verify -Dtycho.localArtifacts=ignore
+
+The Linux CI and release builds also enable `-Pjira-connector-tests`. This
+installs the pinned JiraConnector 6 feature into a dedicated p2 test runtime,
+uses a loopback REST fixture for Basic/Bearer authentication, queries, the issue
+editor and activity tracking, then starts a second Eclipse process to verify
+file-backed history and reconnection. Run it locally with:
+
+    ./mvnw -B -ntp clean verify -Pjira-connector-tests -Dtycho.localArtifacts=ignore
+
+On Linux, run under Xvfb as in CI. Jira is a test-only dependency and is not
+added to either Timekeeper release feature. The fixture requires no account or
+secrets. Passing these tests does not certify live Jira Cloud/Data Center
+configuration or clear the upstream Mylyn Error Log gate. See the
+[automated Jira acceptance report](baseline/JIRA-AUTOMATED-ACCEPTANCE.md).
 
 On Windows, use `mvnw.cmd`. The Apache Maven wrapper downloads and uses Maven
 3.9.16, the same version used by CI. Maven 3.10 rejects nested-JAR classifiers

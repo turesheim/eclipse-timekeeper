@@ -52,6 +52,7 @@ jobs:
           **/pom.xml
           **/META-INF/MANIFEST.MF
           default.target
+          net.resheim.eclipse.timekeeper.jira-test/jira.target
           .mvn/wrapper/maven-wrapper.properties
 
     - name: Show build tool versions
@@ -64,7 +65,7 @@ jobs:
 
     - name: Build with Maven (Linux/X11)
       if: runner.os == 'Linux'
-      run: xvfb-run --server-args="-screen 0, 1024x768x24" --auto-servernum ./mvnw -B -ntp clean verify -Pother-os -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=20000 -Dscreenshots=${{ github.workspace }}/images
+      run: xvfb-run --server-args="-screen 0, 1024x768x24" --auto-servernum ./mvnw -B -ntp clean verify -Pother-os,jira-connector-tests -Dtycho.localArtifacts=ignore -Dorg.eclipse.swtbot.search.timeout=20000 -Dscreenshots=${{ github.workspace }}/images
 
     - name: Build with Maven (macOS idle detector)
       if: runner.os == 'macOS'
@@ -83,9 +84,14 @@ jobs:
         include-hidden-files: true
         path: |
           **/target/surefire-reports/
+          **/target/surefire-reports-restart/
           **/target/test-reports/
           net.resheim.eclipse.timekeeper.test/target/work/data/.metadata/.log
           net.resheim.eclipse.timekeeper.native-test/target/work/data/.metadata/.log
+          net.resheim.eclipse.timekeeper.jira-test/target/work/**/.metadata/.log
+          net.resheim.eclipse.timekeeper.jira-test/target/work/**/configuration/*.log
+          net.resheim.eclipse.timekeeper.jira-test/target/acceptance-data/*.txt
+          net.resheim.eclipse.timekeeper.jira-test/target/acceptance-data/*.properties
           net.resheim.eclipse.timekeeper.test/screenshots/
           images/
         if-no-files-found: warn

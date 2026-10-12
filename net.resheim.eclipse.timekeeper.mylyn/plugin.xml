@@ -3,4 +3,7 @@
 <plugin>
  <extension point="org.eclipse.ui.startup"><startup class="net.resheim.eclipse.timekeeper.mylyn.MylynIntegration"/></extension>
  <extension point="org.eclipse.mylyn.tasks.core.taskActivationListeners"><listener class="net.resheim.eclipse.timekeeper.mylyn.TaskActivationListener" id="net.resheim.eclipse.timekeeper.taskActivationListener"/></extension>
+ <extension point="org.eclipse.mylyn.tasks.ui.taskRepositoryPageContribution">
+  <taskRepositoryPageContribution id="net.resheim.eclipse.timekeeper.mylyn.jiraGrouping" connectorKind="jira" class="net.resheim.eclipse.timekeeper.mylyn.JiraGroupingContribution"/>
+ </extension>
 </plugin>

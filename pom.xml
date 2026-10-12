@@ -166,4 +166,13 @@
 		<module>net.resheim.eclipse.timekeeper-site</module>
 	</modules>
 
+	<profiles>
+		<profile>
+			<id>jira-connector-tests</id>
+			<modules>
+				<module>net.resheim.eclipse.timekeeper.jira-test</module>
+			</modules>
+		</profile>
+	</profiles>
+
 </project>
