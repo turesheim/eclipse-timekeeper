@@ -31,7 +31,7 @@ function decodeOwner(value) {
 }
 export class Api {
   #token; #owner = null; #requests = new Set(); #closed = false;
-  constructor(token, fetcher = fetch) { this.#token = token; this.fetcher = fetcher; }
+  constructor(token, fetcher = (...args) => globalThis.fetch(...args)) { this.#token = token; this.fetcher = fetcher; }
   get owner() { return this.#owner; }
   close() { this.#closed = true; this.#token = ''; for (const request of this.#requests) request.abort(); }
   async request(path, {method = 'GET', body, etag, key, timeout = 15000} = {}) {

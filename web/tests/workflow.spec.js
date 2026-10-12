@@ -4,6 +4,8 @@ import {readFile, writeFile, rename} from 'node:fs/promises';
 const token = process.env.TIMEKEEPER_WEB_TOKEN;
 const readToken = process.env.TIMEKEEPER_WEB_READ_TOKEN;
 async function signIn(page, credential = token) {
+  page.on('response', response => { const path = new URL(response.url()).pathname; if (path.startsWith('/api/')) console.log('API response:', path, response.status(), 'owner-header:', !!response.headers()['x-timekeeper-owner']); });
+  page.on('console', message => { if (message.type() === 'error') console.log('Browser error:', message.text().replace(/Bearer \S+/g, 'Bearer [redacted]')); });
   await page.goto('/web/'); await page.getByLabel('Access token').fill(credential); await page.getByRole('button', {name:'Sign in', exact:true}).click();
   await expect(page.locator('#status')).toHaveText('Up to date');
 }

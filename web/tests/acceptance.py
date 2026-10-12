@@ -21,6 +21,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--distribution', type=Path, required=True)
     parser.add_argument('--java', default='java')
+    parser.add_argument('--grep', help='Run selected browser tests for diagnosis')
     args = parser.parse_args()
     digest = hashlib.sha256(args.distribution.read_bytes()).hexdigest()
     if args.distribution.with_suffix('.zip.sha256').read_text().split()[0] != digest:
@@ -42,7 +43,9 @@ def main():
             sock.bind(('127.0.0.1', 0)); port = sock.getsockname()[1]
         base = f'http://127.0.0.1:{port}'
         environment = {**os.environ, 'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:' + str(data / 'database'), 'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry)}
-        with (output / 'server.log').open('w') as log:
+        server_log = ROOT / 'web/target/server.log'
+        server_log.parent.mkdir(parents=True, exist_ok=True)
+        with server_log.open('w') as log:
             process = subprocess.Popen([args.java, '-Dquarkus.http.port=' + str(port), '-jar', str(data / 'timekeeper-server/quarkus-run.jar')], env=environment, stdout=log, stderr=subprocess.STDOUT)
             try:
                 deadline = time.monotonic() + 30
@@ -58,7 +61,8 @@ def main():
                 with urlopen(base + '/web/', timeout=3) as response:
                     if b'id="login-form"' not in response.read(): raise AssertionError('Missing bundled web client')
                     if "frame-ancestors 'none'" not in response.headers.get('Content-Security-Policy',''): raise AssertionError('Missing web security policy')
-                result = subprocess.run(['npm', 'run', 'test:browser'], cwd=ROOT / 'web', env={**environment, 'TIMEKEEPER_WEB_URL':base, 'TIMEKEEPER_WEB_TOKEN':tokens[0], 'TIMEKEEPER_WEB_READ_TOKEN':tokens[1], 'TIMEKEEPER_WEB_REGISTRY':str(registry)}, timeout=600)
+                command = ['npm', 'run', 'test:browser'] + (['--', '--grep', args.grep] if args.grep else [])
+                result = subprocess.run(command, cwd=ROOT / 'web', env={**environment, 'TIMEKEEPER_WEB_URL':base, 'TIMEKEEPER_WEB_TOKEN':tokens[0], 'TIMEKEEPER_WEB_READ_TOKEN':tokens[1], 'TIMEKEEPER_WEB_REGISTRY':str(registry)}, timeout=600)
                 if result.returncode: raise RuntimeError('Browser acceptance failed')
                 (output / 'acceptance.json').write_text(json.dumps({'distributionSha256':digest, 'sourceCommit':manifest['commit'], 'serverPid':process.pid, 'browser':'chromium', 'passed':True}, indent=2) + '\n')
             finally:
