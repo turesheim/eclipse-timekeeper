@@ -13,7 +13,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 class ServerSchemaTest {
     @TempDir Path directory;
     String url() {return "jdbc:h2:"+directory.resolve("server");}
-    @ParameterizedTest @ValueSource(strings={"jdbc:h2:mem:","jdbc:h2:file:","jdbc:other:db", "jdbc:h2:mem:db;INIT=CREATE TABLE dangerous(id INT)", "jdbc:h2:mem:db;WRITE_DELAY=500", "jdbc:h2:mem:db;ACCESS_MODE_DATA=r"})
+    @ParameterizedTest @ValueSource(strings={"jdbc:h2:mem:","jdbc:h2:file:","jdbc:other:db", "jdbc:h2:mem:db;INIT=CREATE TABLE dangerous(id INT)", "jdbc:h2:mem:db;WRITE_DELAY=500", "jdbc:h2:mem:db;ACCESS_MODE_DATA=r",
+        "jdbc:postgresql://db:5432/", "jdbc:postgresql://db:5432/server?user=postgres", "jdbc:postgresql://db:5432/server;INIT=SQL"})
     void rejectsUnsafeStartupSettingsBeforeOpeningStorage(String url) {
         assertThrows(IllegalArgumentException.class,() -> DatabaseConfiguration.validate(url));
     }

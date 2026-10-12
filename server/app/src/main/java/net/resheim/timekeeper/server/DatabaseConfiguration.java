@@ -4,6 +4,12 @@ package net.resheim.timekeeper.server;
 public final class DatabaseConfiguration {
     private DatabaseConfiguration() { }
     public static void validate(String url) {
+        if (url != null && url.startsWith("jdbc:postgresql://")) {
+            // Credentials and connection settings belong in datasource configuration.
+            if (!url.matches("jdbc:postgresql://[A-Za-z0-9_.-]+:[0-9]+/[A-Za-z0-9_-]+"))
+                throw new IllegalArgumentException("An explicit PostgreSQL host, port and database are required");
+            return;
+        }
         if(url==null || !url.startsWith("jdbc:h2:") || url.substring(8).isBlank()) throw new IllegalArgumentException("An explicit named H2 database is required");
         String[] parts=url.substring(8).split(";",-1);
         if(parts[0].equals("mem:") || parts[0].equals("file:")) throw new IllegalArgumentException("An explicit named H2 database is required");
@@ -18,4 +24,5 @@ public final class DatabaseConfiguration {
             if(!supported) throw new IllegalArgumentException("Unsupported server JDBC setting");
         }
     }
+    public static boolean postgres(String url) { return url.startsWith("jdbc:postgresql:"); }
 }

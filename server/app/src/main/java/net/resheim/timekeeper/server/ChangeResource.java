@@ -1,7 +1,6 @@
 package net.resheim.timekeeper.server;
 
 import java.sql.SQLException;
-import java.time.OffsetDateTime;
 
 import io.smallrye.common.annotation.Blocking;
 import jakarta.inject.Inject;
@@ -36,7 +35,7 @@ public class ChangeResource {
         try(var statement=store.statement("SELECT sequence,entity_type,entity_id,change_type,occurred_at FROM tk_change WHERE owner_id=? AND sequence>? ORDER BY sequence FETCH FIRST ? ROWS ONLY",store.owner(),after,limit+1);var rows=statement.executeQuery()) {
             while(rows.next()) {
                 if(items.size()==limit) break;
-                var item=JsonValues.object();next=rows.getLong(1);item.put("sequence",next);item.put("entityType",rows.getString(2));item.put("entityId",rows.getString(3));item.put("changeType",rows.getString(4));item.put("occurredAt",rows.getObject(5,OffsetDateTime.class).toInstant().toString());items.add(item);
+                var item=JsonValues.object();next=rows.getLong(1);item.put("sequence",next);item.put("entityType",rows.getString(2));item.put("entityId",rows.getString(3));item.put("changeType",rows.getString(4));item.put("occurredAt",store.timestamp(rows,5).toString());items.add(item);
             }
         } catch(SQLException e) {throw new ApiFailure(503,"UNAVAILABLE");}
         result.put("nextSequence",next);result.put("hasMore",next<head);return result;

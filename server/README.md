@@ -31,6 +31,14 @@ when finished. Logs and a credential-free receipt are under
 
 ## Configure and run
 
+For Synology Container Manager, use the complete [Docker Compose deployment](deploy/README.md).
+It supplies two PostgreSQL-backed server replicas, a three-node PostgreSQL/Patroni
+cluster, persistent host storage, health checks, backups and rolling API updates.
+The JVM distribution below continues to default to H2. PostgreSQL images are
+built with the `postgresql` Quarkus profile; the database kind is fixed at build
+time. PostgreSQL storage uses its own canonical schema and is not an H2 file
+migration. Its bootstrap is transactional and serialized across server replicas.
+
 Use a separate empty server database; the embedded Eclipse schema 2 and
 historical databases are unsupported. The server never copies or merges embedded
 data automatically. Set an explicit JDBC URL and a token registry file:
