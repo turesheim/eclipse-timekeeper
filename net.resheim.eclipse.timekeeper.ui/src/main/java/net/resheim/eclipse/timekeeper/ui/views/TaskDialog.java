@@ -38,7 +38,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
 import net.resheim.eclipse.timekeeper.service.TimekeeperService;
 
 /** Task editing uses native identities; an external provider is optional. */
-final class TaskDialog extends TitleAreaDialog {
+final class TaskDialog extends AsyncRecordDialog {
 	private record ProjectChoice(Optional<ProjectId> id, String name) { }
 	private record ParentChoice(Optional<TaskId> id, String name) { }
 	private final TimekeeperService service;
@@ -158,16 +158,12 @@ final class TaskDialog extends TitleAreaDialog {
 		}
 		return result;
 	}
-	@Override protected void okPressed() {
-		try {
-			Optional<TaskId> parent = ((ParentChoice) parentTask.getStructuredSelection().getFirstElement()).id();
-			Optional<String> link = Optional.of(url.getText().trim()).filter(value -> !value.isEmpty());
-			saved = original == null ? service.createTask(new CreateTask(projectId(), parent, summary.getText(), link))
-					: service.updateTask(new UpdateTask(original.id(), original.version(), projectId(), parent, summary.getText(), link));
-			super.okPressed();
-		} catch (RuntimeException failure) {
-			setErrorMessage(RecordDialogErrors.message(failure));
-		}
-	}
+    @Override protected void okPressed() {
+        Optional<TaskId> parent=((ParentChoice)parentTask.getStructuredSelection().getFirstElement()).id();
+        Optional<ProjectId> selectedProject=projectId();String entered=summary.getText();
+        Optional<String> link=Optional.of(url.getText().trim()).filter(value -> !value.isEmpty());
+        save("Save Timekeeper task",()-> original==null ? service.createTask(new CreateTask(selectedProject,parent,entered,link))
+                : service.updateTask(new UpdateTask(original.id(),original.version(),selectedProject,parent,entered,link)),value -> saved=value);
+    }
 	Task savedTask() { return saved; }
 }

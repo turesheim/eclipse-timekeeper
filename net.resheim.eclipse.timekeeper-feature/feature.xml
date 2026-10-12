@@ -89,4 +89,5 @@
          version="0.0.0"
          unpack="false"/>
 
+   <plugin id="net.resheim.eclipse.timekeeper.http" version="0.0.0" download-size="0" install-size="0" unpack="false"/>
 </feature>

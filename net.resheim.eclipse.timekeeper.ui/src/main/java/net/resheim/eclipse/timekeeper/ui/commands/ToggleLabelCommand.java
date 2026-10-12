@@ -48,11 +48,11 @@ public class ToggleLabelCommand extends AbstractHandler {
 			LabelId labelId = new LabelId(UUID.fromString(id));
 			var labels = new HashSet<>(current.labelIds());
 			if (!labels.add(labelId)) labels.remove(labelId);
-			service.updateActivity(new UpdateActivity(current.id(), current.version(), current.start(), current.end(),
-					current.summary(), labels));
-			IWorkbenchPage page = HandlerUtil.getActiveWorkbenchWindow(event).getActivePage();
-			IViewPart view = page.findView(WorkWeekView.VIEW_ID);
-			((WorkWeekView) view).refresh(activity);
+            var command=new UpdateActivity(current.id(),current.version(),current.start(),current.end(),current.summary(),labels);
+            IWorkbenchPage page=HandlerUtil.getActiveWorkbenchWindow(event).getActivePage();
+            TimekeeperUiPlugin.getDefault().runOperation("Update activity label",()->service.updateActivity(command),saved->{
+                var view=page.findView(WorkWeekView.VIEW_ID);if(view instanceof WorkWeekView week) week.refresh(activity);
+            },failure->org.eclipse.jface.dialogs.MessageDialog.openError(page.getWorkbenchWindow().getShell(),"Could not update label",failure.getMessage()));
 		}
 		return null;
 	}

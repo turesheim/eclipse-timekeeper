@@ -74,6 +74,14 @@ public class TimekeeperPlugin extends Plugin {
 	public static final String BUNDLE_ID = "net.resheim.eclipse.timekeeper.db"; //$NON-NLS-1$
 
 	/* Preferences */
+    public static final String PREF_BACKEND_MODE = "backend-mode";
+    public static final String PREF_BACKEND_URL = "backend-url";
+    public static boolean remoteConfigured() {
+        return "remote".equals(Platform.getPreferencesService().getString(BUNDLE_ID,PREF_BACKEND_MODE,"embedded",new IScopeContext[] {InstanceScope.INSTANCE}));
+    }
+    public static String backendUrl() {
+        return Platform.getPreferencesService().getString(BUNDLE_ID,PREF_BACKEND_URL,"",new IScopeContext[] {InstanceScope.INSTANCE});
+    }
 	public static final String PREF_DATABASE_URL = "database-url";
 	public static final String PREF_DATABASE_LOCATION = "database-location";
 	public static final String PREF_DATABASE_LOCATION_SHARED = "shared";
@@ -244,6 +252,10 @@ public class TimekeeperPlugin extends Plugin {
 		instance = this;
 		stopping = false;
 		databaseStatus = new Status(IStatus.INFO, BUNDLE_ID, "Connecting to the Timekeeper database.");
+        if (remoteConfigured()) {
+            databaseStatus = new Status(IStatus.INFO,BUNDLE_ID,"Remote backend selected; embedded storage is closed.");
+            return;
+        }
 		createSaveJob();
 		connectToDatabase();
 		ISaveParticipant saveParticipant = new WorkspaceSaveParticipant();

@@ -136,4 +136,8 @@
       </initializer>
    </extension>
 
+   <extension point="org.eclipse.ui.preferencePages">
+      <page id="net.resheim.eclipse.timekeeper.ui.preferences.backend" name="Backend" category="net.resheim.eclipse.timekeeper.ui.preferences.TimekeeperPreferences"
+            class="net.resheim.eclipse.timekeeper.ui.preferences.BackendPreferencePage"/>
+   </extension>
 </plugin>

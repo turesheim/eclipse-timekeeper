@@ -132,16 +132,24 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 	}
 
 	public void activated(ITask external) {
+        var ui=TimekeeperUiPlugin.getDefault();
+        if(ui.isRemote() && org.eclipse.swt.widgets.Display.getCurrent()!=null) {
+            ui.runOperation("Track Mylyn task",()->{activated(external);return null;},value->{},this::reportFailure);return;
+        }
 		Task task = resolve(external);
 		var service = service();
 		var active = service.activeActivity(OwnerId.LOCAL);
 		if (active.filter(activity -> activity.taskId().equals(task.id())).isPresent())
 			return;
-		active.ifPresent(activity -> service.stopActivity(new StopActivity(activity.id(), activity.version())));
-		service.startActivity(new StartActivity(task.id(), OwnerId.LOCAL, "", Set.of()));
+        if(ui.isRemote()) ui.activateRemoteInWorker(task.id());
+        else {active.ifPresent(activity -> service.stopActivity(new StopActivity(activity.id(),activity.version())));service.startActivity(new StartActivity(task.id(),OwnerId.LOCAL,"",Set.of()));}
 	}
 
 	public void deactivated(ITask external) {
+        var ui=TimekeeperUiPlugin.getDefault();
+        if(ui.isRemote() && org.eclipse.swt.widgets.Display.getCurrent()!=null) {
+            ui.runOperation("Stop Mylyn task",()->{deactivated(external);return null;},value->{},this::reportFailure);return;
+        }
 		// A late/duplicate deactivation must neither create a task nor stop its
 		// successor.
 		var service = service();
@@ -238,6 +246,7 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 	}
 
 	public void reportFailure(RuntimeException failure) {
+        if(TimekeeperUiPlugin.getDefault().isRemote() && org.eclipse.swt.widgets.Display.getCurrent()!=null) org.eclipse.jface.dialogs.MessageDialog.openError(org.eclipse.swt.widgets.Display.getCurrent().getActiveShell(),"Mylyn tracking failed",failure.getMessage());
 		getLog().log(new Status(IStatus.ERROR, PLUGIN_ID, "Mylyn tracking failed", failure));
 	}
 

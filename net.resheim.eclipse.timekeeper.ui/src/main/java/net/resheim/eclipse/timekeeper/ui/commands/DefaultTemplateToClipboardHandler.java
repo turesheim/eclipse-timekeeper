@@ -19,21 +19,12 @@ import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.jface.preference.IPreferenceStore;
-import org.eclipse.swt.dnd.ByteArrayTransfer;
-import org.eclipse.swt.dnd.Clipboard;
-import org.eclipse.swt.dnd.HTMLTransfer;
-import org.eclipse.swt.dnd.RTFTransfer;
-import org.eclipse.swt.dnd.TextTransfer;
-import org.eclipse.swt.dnd.Transfer;
-import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.IWorkbenchPart;
 import org.eclipse.ui.handlers.HandlerUtil;
 import org.eclipse.ui.preferences.ScopedPreferenceStore;
 
 import net.resheim.eclipse.timekeeper.db.TimekeeperPlugin;
 import net.resheim.eclipse.timekeeper.db.report.ReportTemplate;
-import net.resheim.eclipse.timekeeper.db.report.TemplateExporter;
-import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
 /**
@@ -53,37 +44,9 @@ public class DefaultTemplateToClipboardHandler extends AbstractHandler {
 			String defaultTemplate = store.getString(TimekeeperPlugin.PREF_DEFAULT_TEMPLATE);
 			LocalDate firstDayOfWeek = ((WorkWeekView) activePart).getFirstDayOfWeek();
 			ReportTemplate template = templates.get(defaultTemplate);
-			TemplateExporter export = new TemplateExporter(template, TimekeeperUiPlugin.getCalendarZone());
-			String result = export.getData(firstDayOfWeek, TimekeeperUiPlugin.getDefault().getTimekeeperService());
-			if (result != null) {
-				Clipboard clipboard = new Clipboard(Display.getCurrent());
-				ByteArrayTransfer targetTransfer = getTransfer(template);
-				Transfer[] transfers = new Transfer[] { targetTransfer };
-				Object[] data = new Object[] { result };
-				clipboard.setContents(data, transfers);
-				clipboard.dispose();
-			}
+			TemplateExportHandler.export(activePart, template, firstDayOfWeek, false);
 		}
 		return null;
-	}
-
-	/**
-	 * Figure out and return the appropriate transfer type. The default is
-	 * {@link TextTransfer}.
-	 *
-	 * @param template
-	 *            the report template
-	 * @return the transfer type
-	 */
-	private ByteArrayTransfer getTransfer(ReportTemplate template) {
-		switch (template.getType()) {
-		case HTML:
-			return HTMLTransfer.getInstance();
-		case RTF:
-			return RTFTransfer.getInstance();
-		default:
-			return TextTransfer.getInstance();
-		}
 	}
 
 }

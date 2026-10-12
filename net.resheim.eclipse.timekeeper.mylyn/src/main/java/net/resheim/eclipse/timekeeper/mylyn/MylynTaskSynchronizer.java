@@ -68,11 +68,13 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 	private final TaskList taskList;
 	private final Display display;
 	private final Preferences mappings;
-	private boolean running;
+	private volatile boolean running;
+    private volatile Thread worker;
+    private volatile boolean busy;
 	private boolean restoreAfterDeletionFailure;
-	private boolean applying;
-	private final Set<TaskId> deletedTasks = new HashSet<>();
-	private final Set<ProjectId> deletedProjects = new HashSet<>();
+	private volatile boolean applying;
+	private final Set<TaskId> deletedTasks = java.util.concurrent.ConcurrentHashMap.newKeySet();
+	private final Set<ProjectId> deletedProjects = java.util.concurrent.ConcurrentHashMap.newKeySet();
 	private Set<TaskId> knownBackendTasks = Set.of();
 	private Set<ProjectId> knownBackendProjects = Set.of();
 	private Set<TaskId> knownProjectedTasks = Set.of();
@@ -123,7 +125,7 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 
 	@Override
 	public void containersChanged(Set<TaskContainerDelta> deltas) {
-		if (!running || applying)
+		if (!running || (applying && (worker==null || Thread.currentThread()==worker)))
 			return;
 		for (TaskContainerDelta delta : deltas) {
 			if (delta.getKind() != TaskContainerDelta.Kind.DELETED)
@@ -138,6 +140,7 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 	}
 
 	private void schedule(boolean fromMylyn, boolean fromBackend) {
+        if(Display.getCurrent()!=display) {if(!display.isDisposed()) display.asyncExec(()->schedule(fromMylyn,fromBackend));return;}
 		mylynDirty |= fromMylyn;
 		backendDirty |= fromBackend;
 		if (scheduled || display.isDisposed())
@@ -147,6 +150,11 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 	}
 
 	private void reconcile() {
+        if(TimekeeperUiPlugin.getDefault().isRemote() && Display.getCurrent()!=null) {
+            scheduled=false;if(busy || !backendAvailable || !running) return;busy=true;
+            TimekeeperUiPlugin.getDefault().runOperation("Synchronize Mylyn tasks",()->{worker=Thread.currentThread();try {reconcile();return null;}finally {worker=null;}},
+                value->{busy=false;if(mylynDirty || backendDirty) schedule(false,false);},failure->{busy=false;mylynDirty=true;backendDirty=true;});return;
+        }
 		scheduled = false;
 		if (!running || display.isDisposed() || !backendAvailable)
 			return;
@@ -188,6 +196,7 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 		if (!running || display.isDisposed())
 			return;
 		try {
+            if(!TimekeeperUiPlugin.getDefault().isBackendReady()) {backendAvailable=false;return;}
 			var tasks = service.tasks();
 			var projects = service.projects();
 			backendAvailable = true;
@@ -239,8 +248,8 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 
 	private void showDeletionFailure(RuntimeException failure) {
 		restoreAfterDeletionFailure = true;
-		org.eclipse.jface.dialogs.MessageDialog.openError(display.getActiveShell(),
-				"Could not delete Timekeeper record", failure.getMessage());
+        Runnable error=()->org.eclipse.jface.dialogs.MessageDialog.openError(display.getActiveShell(),"Could not delete Timekeeper record",failure.getMessage());
+        if(Display.getCurrent()==display) error.run();else display.asyncExec(error);
 	}
 
 	private void synchronizeMylynToBackend() {
