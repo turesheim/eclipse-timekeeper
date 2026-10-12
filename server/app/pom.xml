@@ -10,6 +10,7 @@
     <dependency><groupId>${project.groupId}</groupId><artifactId>timekeeper-service</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest-jackson</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-jdbc-h2</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-jdbc-postgresql</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-agroal</artifactId></dependency>
     <dependency><groupId>com.h2database</groupId><artifactId>h2</artifactId><version>2.5.250</version></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-smallrye-health</artifactId></dependency>

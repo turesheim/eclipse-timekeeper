@@ -1,0 +1,12 @@
+# Source-checkout build override. Synology uses the published images in compose.yaml.
+services:
+  api-1:
+    build: {context: ../.., dockerfile: server/Dockerfile}
+  api-2:
+    build: {context: ../.., dockerfile: server/Dockerfile}
+  postgres-1:
+    build: {context: ../.., dockerfile: server/deploy/postgres/Dockerfile}
+  postgres-2:
+    build: {context: ../.., dockerfile: server/deploy/postgres/Dockerfile}
+  postgres-3:
+    build: {context: ../.., dockerfile: server/deploy/postgres/Dockerfile}

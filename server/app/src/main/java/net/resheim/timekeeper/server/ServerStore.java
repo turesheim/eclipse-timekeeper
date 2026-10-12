@@ -37,7 +37,9 @@ public class ServerStore {
         try (var connection = datasource.getConnection()) {
             ServerSchema.initializeOrValidate(connection);
             // Apply only after validation: an acknowledged commit must survive process kill.
-            try(var statement=connection.createStatement()) {statement.execute("SET WRITE_DELAY 0");}
+            if (!postgres()) {
+                try(var statement=connection.createStatement()) {statement.execute("SET WRITE_DELAY 0");}
+            }
         }
     }
     public <T> T transaction(String owner, Supplier<T> work) {
@@ -50,7 +52,8 @@ public class ServerStore {
             connection.setAutoCommit(false);
             try {
                 // Provision a configured token owner without overwriting existing preferences.
-                try (var insert = connection.prepareStatement("INSERT INTO tk_owner(id,zone_id,version,revision,cursor_secret) VALUES(?,'UTC',0,0,?)")) {
+                try (var insert = connection.prepareStatement("INSERT INTO tk_owner(id,zone_id,version,revision,cursor_secret) VALUES(?,'UTC',0,0,?)"
+                        + (postgres() ? " ON CONFLICT (id) DO NOTHING" : ""))) {
                     insert.setString(1,owner);
                     byte[] secret=new byte[32];new java.security.SecureRandom().nextBytes(secret);insert.setString(2,java.util.HexFormat.of().formatHex(secret));
                     try { insert.executeUpdate(); } catch (SQLException e) { if (!"23505".equals(e.getSQLState())) throw e; }
@@ -131,7 +134,13 @@ public class ServerStore {
             task.projectId().ifPresent(project -> relation(type,id,"project","PROJECT",project.value()));
             task.parentTaskId().ifPresent(parent -> relation(type,id,"parent","TASK",parent.value()));
             update("DELETE FROM tk_external_reference WHERE owner_id=? AND entity_type='TASK' AND task_id=?",owner(),id);
-            task.externalReferences().forEach(reference -> update("INSERT INTO tk_external_reference(owner_id,provider_id,repository_id,external_id,entity_type,task_id) VALUES(?,?,?,?,'TASK',?)",owner(),reference.providerId(),reference.repositoryId(),reference.externalId(),id));
+            task.externalReferences().forEach(reference -> {
+                if (postgres()) update("INSERT INTO tk_external_reference(owner_id,provider_id,repository_id,external_id,entity_type,task_id,reference_key) VALUES(?,?,?,?,'TASK',?,?)",
+                        owner(),reference.providerId(),reference.repositoryId(),reference.externalId(),id,
+                        referenceKey(reference.providerId(),reference.repositoryId(),reference.externalId()));
+                else update("INSERT INTO tk_external_reference(owner_id,provider_id,repository_id,external_id,entity_type,task_id) VALUES(?,?,?,?,'TASK',?)",
+                        owner(),reference.providerId(),reference.repositoryId(),reference.externalId(),id);
+            });
         }
         if (value instanceof Activity activity) {
             relation(type,id,"task","TASK",activity.taskId().value());
@@ -157,7 +166,12 @@ public class ServerStore {
         catch (SQLException e) { throw databaseFailure(e); }
     }
     Optional<JsonNode> byReference(ExternalTaskReferenceKey reference) {
-        try (var statement = statement("SELECT task_id FROM tk_external_reference WHERE owner_id=? AND provider_id=? AND repository_id=? AND external_id=?",owner(),reference.providerId(),reference.repositoryId(),reference.externalId()); var rows = statement.executeQuery()) {
+        String sql="SELECT task_id FROM tk_external_reference WHERE owner_id=? AND provider_id=? AND repository_id=? AND external_id=?"
+                + (postgres() ? " AND reference_key=?" : "");
+        Object[] parameters=postgres()
+                ? new Object[]{owner(),reference.providerId(),reference.repositoryId(),reference.externalId(),referenceKey(reference.providerId(),reference.repositoryId(),reference.externalId())}
+                : new Object[]{owner(),reference.providerId(),reference.repositoryId(),reference.externalId()};
+        try (var statement = statement(sql,parameters); var rows = statement.executeQuery()) {
             return rows.next() ? find("TASK",rows.getObject(1,UUID.class)) : Optional.empty();
         } catch (SQLException e) { throw databaseFailure(e); }
     }
@@ -172,7 +186,19 @@ public class ServerStore {
         long sequence = revision()+1;
         if (sequence>9007199254740991L) throw new IllegalStateException("Sequence exhausted");
         update("UPDATE tk_owner SET revision=? WHERE id=?",sequence,owner());
-        update("INSERT INTO tk_change(owner_id,sequence,entity_type,entity_id,change_type,occurred_at) VALUES(?,?,?,?,?,?)",owner(),sequence,type,id,change,OffsetDateTime.ofInstant(now(),ZoneOffset.UTC));
+        update("INSERT INTO tk_change(owner_id,sequence,entity_type,entity_id,change_type,occurred_at) VALUES(?,?,?,?,?,?)",owner(),sequence,type,id,change,timestamp(now()));
+    }
+    private boolean postgres() { return DatabaseConfiguration.postgres(jdbcUrl); }
+    private String referenceKey(String provider, String repository, String external) {
+        // Bound index size without truncating the full Unicode identity; lookups also compare all fields.
+        return hash(MAPPER.createArrayNode().add(provider).add(repository).add(external).toString());
+    }
+    Object timestamp(Instant value) {
+        // PostgreSQL timestamps have microsecond precision; preserve the API's nanoseconds.
+        return postgres() ? value.toString() : OffsetDateTime.ofInstant(value,ZoneOffset.UTC);
+    }
+    Instant timestamp(java.sql.ResultSet rows, int column) throws SQLException {
+        return postgres() ? Instant.parse(rows.getString(column)) : rows.getObject(column,OffsetDateTime.class).toInstant();
     }
     public TimekeeperService service() {
         String owner = owner(); ScopedPorts ports = new ScopedPorts(owner);

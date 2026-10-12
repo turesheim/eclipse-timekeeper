@@ -14,8 +14,11 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import javax.persistence.EntityManager;
 
@@ -28,6 +31,16 @@ import org.junit.jupiter.params.provider.ValueSource;
 import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
 
 class DatabaseStartupTest {
+	private static final Map<String, String> DEFAULT_LABELS = Map.of(
+			"Production issue", "244,103,88",
+			"Testing", "245,166,81",
+			"Prototyping", "246,208,90",
+			"Planning", "255,0,255",
+			"Programming", "87,206,105",
+			"Debugging", "177,111,209",
+			"Communication", "66,136,243",
+			"Meeting", "156,156,160");
+
 	@TempDir Path directory;
 
 	@Test
@@ -36,7 +49,7 @@ class DatabaseStartupTest {
 		try {
 			TimekeeperPlugin.initializeDefaultLabels(manager);
 			TimekeeperPlugin.initializeDefaultLabels(manager);
-			assertEquals(7L, manager.createQuery("SELECT COUNT(l) FROM ActivityLabel l", Long.class).getSingleResult());
+			assertEquals(DEFAULT_LABELS, labels(manager));
 			manager.getTransaction().begin();
 			manager.persist(new ActivityLabel("Custom label", "1,2,3"));
 			manager.getTransaction().commit();
@@ -46,7 +59,9 @@ class DatabaseStartupTest {
 		manager = DatabaseStartup.open(url() + ";IFEXISTS=TRUE");
 		try {
 			TimekeeperPlugin.initializeDefaultLabels(manager);
-			assertEquals(8L, manager.createQuery("SELECT COUNT(l) FROM ActivityLabel l", Long.class).getSingleResult());
+			Map<String, String> expected = new HashMap<>(DEFAULT_LABELS);
+			expected.put("Custom label", "1,2,3");
+			assertEquals(expected, labels(manager));
 		} finally {
 			DatabaseStartup.close(manager);
 		}
@@ -60,7 +75,7 @@ class DatabaseStartupTest {
 		EntityManager manager = DatabaseStartup.open("jdbc:h2:mem:startup_" + UUID.randomUUID());
 		try {
 			TimekeeperPlugin.initializeDefaultLabels(manager);
-			assertEquals(7, manager.createNamedQuery("ActivityLabel.findAll", ActivityLabel.class).getResultList().size());
+			assertEquals(DEFAULT_LABELS, labels(manager));
 		} finally {
 			DatabaseStartup.close(manager);
 		}
@@ -120,6 +135,11 @@ class DatabaseStartupTest {
 	void rejectsInitCommandBeforeOpeningAnyDatabase() {
 		assertThrows(SQLException.class, () -> DatabaseStartup.open(url() + ";INIT=CREATE TABLE UNEXPECTED(ID INT)"));
 		assertFalse(Files.exists(directory.resolve("database.mv.db")));
+	}
+
+	private Map<String, String> labels(EntityManager manager) {
+		return manager.createNamedQuery("ActivityLabel.findAll", ActivityLabel.class).getResultList().stream()
+				.collect(Collectors.toMap(ActivityLabel::getName, ActivityLabel::getColor));
 	}
 
 	private void run(Connection connection, String resource) throws Exception {

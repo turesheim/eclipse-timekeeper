@@ -1,4 +1,6 @@
 *.class
+server/deploy/.env
+server/deploy/state/
 
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/

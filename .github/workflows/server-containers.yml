@@ -1,0 +1,118 @@
+name: Server containers
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-containers-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: server/**/pom.xml
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Build and test the H2 server
+        run: ./mvnw -B -ntp -f server/pom.xml clean verify
+      - name: Test PostgreSQL schema and concurrent bootstrap
+        env:
+          TIMEKEEPER_TEST_PG_URL: jdbc:postgresql://127.0.0.1:55432/postgres
+          TIMEKEEPER_TEST_PG_USER: postgres
+          TIMEKEEPER_TEST_PG_PASSWORD: isolated-ci-test
+        run: |
+          docker run -d --name timekeeper-pg-test -e POSTGRES_PASSWORD=isolated-ci-test -p 127.0.0.1:55432:5432 postgres:18.6-bookworm
+          for attempt in $(seq 1 60); do
+            if docker exec timekeeper-pg-test pg_isready -U postgres; then break; fi
+            echo "Waiting for isolated PostgreSQL (attempt $attempt)"
+            sleep 1
+          done
+          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT -Dsurefire.failIfNoSpecifiedTests=false
+          docker rm -f timekeeper-pg-test
+      - name: Build actual deployment images
+        run: |
+          docker build -t timekeeper-server:test -f server/Dockerfile .
+          docker build -t timekeeper-postgres:test -f server/deploy/postgres/Dockerfile .
+      - name: Verify HTTP contracts, failover, backups and durable restart
+        run: |
+          python -m pip install -r api/tests/requirements.txt
+          python server/scripts/compose_acceptance.py
+      - name: Package the Synology deployment bundle
+        run: |
+          tar -czf timekeeper-compose.tar.gz -C server/deploy \
+            compose.yaml .env.example haproxy.cfg setup.py backup.sh restore.sh update.sh README.md
+          docker tag timekeeper-server:test "timekeeper-server:sha-$GITHUB_SHA"
+          docker tag timekeeper-postgres:test "timekeeper-postgres:sha-$GITHUB_SHA"
+          docker save "timekeeper-server:sha-$GITHUB_SHA" "timekeeper-postgres:sha-$GITHUB_SHA" | gzip > timekeeper-images-linux-amd64.tar.gz
+          sha256sum timekeeper-compose.tar.gz timekeeper-images-linux-amd64.tar.gz > checksums.sha256
+          printf 'TIMEKEEPER_SERVER_IMAGE=timekeeper-server:sha-%s\nTIMEKEEPER_POSTGRES_IMAGE=timekeeper-postgres:sha-%s\n' "$GITHUB_SHA" "$GITHUB_SHA" > images.env
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: server-compose-evidence
+          path: |
+            server/**/target/surefire-reports/
+            server/target/compose-acceptance/
+            timekeeper-compose.tar.gz
+            timekeeper-images-linux-amd64.tar.gz
+            checksums.sha256
+            images.env
+
+  publish:
+    needs: verify
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: eclipse-timekeeper-server
+            dockerfile: server/Dockerfile
+          - image: eclipse-timekeeper-postgres
+            dockerfile: server/deploy/postgres/Dockerfile
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: docker/setup-qemu-action@v4.4.0
+      - uses: docker/setup-buildx-action@v4.4.1
+      - uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v6.2.0
+        id: metadata
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=edge,enable={{is_default_branch}}
+            type=sha,format=long
+            type=semver,pattern={{version}}
+      - uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max

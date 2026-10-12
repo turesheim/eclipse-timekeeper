@@ -42,7 +42,8 @@ def package(output, tag, commit):
             if source.is_symlink() or 'test-tokens' in name or '/surefire-reports/' in name:
                 raise ValueError('Unexpected distribution input')
             if name == 'timekeeper-server/README.md':
-                target.writestr(name, source.read_text().replace('(../api/README.md)', '(API-POLICY.md)'))
+                target.writestr(name, source.read_text().replace('(../api/README.md)', '(API-POLICY.md)')
+                               .replace('(deploy/README.md)', f'(https://github.com/turesheim/eclipse-timekeeper/blob/{commit}/server/deploy/README.md)'))
             else:
                 target.write(source, name)
         target.writestr('timekeeper-server/timekeeper-release.json', json.dumps(manifest, indent=2) + '\n')

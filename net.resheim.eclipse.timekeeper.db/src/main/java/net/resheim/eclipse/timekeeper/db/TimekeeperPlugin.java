@@ -202,7 +202,7 @@ public class TimekeeperPlugin extends Plugin {
 		}
 		String[][] defaults = {
 				{ "Production issue", "244,103,88" }, { "Testing", "245,166,81" },
-				{ "Prototyping", "246,208,90" }, { "Programming", "87,206,105" },
+				{ "Prototyping", "246,208,90" },{ "Planning", "255,0,255" }, { "Programming", "87,206,105" },
 				{ "Debugging", "177,111,209" }, { "Communication", "66,136,243" },
 				{ "Meeting", "156,156,160" } };
 		manager.getTransaction().begin();

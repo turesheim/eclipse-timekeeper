@@ -1,8 +1,6 @@
 package net.resheim.timekeeper.server;
 
 import java.sql.SQLException;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -24,7 +22,7 @@ public class CommandReceipts {
             }
         } catch(SQLException e) { throw new ApiFailure(503,"UNAVAILABLE"); }
         ApiReplies result=work.get();
-        store.update("INSERT INTO tk_receipt(owner_id,command_id,fingerprint,status,body,etag,location,created_at) VALUES(?,?,?,?,?,?,?,?)",store.owner(),id,fingerprint,result.status(),result.body().toString(),result.etag(),result.location(),OffsetDateTime.ofInstant(store.now(),ZoneOffset.UTC));
+        store.update("INSERT INTO tk_receipt(owner_id,command_id,fingerprint,status,body,etag,location,created_at) VALUES(?,?,?,?,?,?,?,?)",store.owner(),id,fingerprint,result.status(),result.body().toString(),result.etag(),result.location(),store.timestamp(store.now()));
         return result;
     }
 }

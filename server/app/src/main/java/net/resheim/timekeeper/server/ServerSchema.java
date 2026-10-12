@@ -28,6 +28,10 @@ public final class ServerSchema {
         }
     }
     public static void initializeOrValidate(Connection connection) throws Exception {
+        if (connection.getMetaData().getDatabaseProductName().equals("PostgreSQL")) {
+            PostgresSchema.initializeOrValidate(connection);
+            return;
+        }
         if(tables(connection).isEmpty()) {
             create(connection);
             validateShape(connection);
@@ -55,6 +59,10 @@ public final class ServerSchema {
         return result;
     }
     public static void validate(Connection connection) throws SQLException {
+        if (connection.getMetaData().getDatabaseProductName().equals("PostgreSQL")) {
+            PostgresSchema.validate(connection);
+            return;
+        }
         validateShape(connection);
         try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT id,schema_version,state FROM tk_schema")) {
             if(!rows.next() || rows.getInt(1)!=1 || rows.getInt(2)!=1 || !"READY".equals(rows.getString(3)) || rows.next()) throw new SQLException("Unsupported or incomplete server schema version");
