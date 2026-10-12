@@ -250,7 +250,8 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 
     private void handleDeletionFailure(RuntimeException failure) {
         if (failure instanceof ServiceException
-                || failure instanceof RemoteFailure remote && remote.kind() == RemoteFailure.Kind.CONFLICT) {
+                || failure instanceof RemoteFailure remote && (remote.kind() == RemoteFailure.Kind.CONFLICT
+                    || remote.kind() == RemoteFailure.Kind.FORBIDDEN)) {
             showDeletionFailure(failure);
             return;
         }

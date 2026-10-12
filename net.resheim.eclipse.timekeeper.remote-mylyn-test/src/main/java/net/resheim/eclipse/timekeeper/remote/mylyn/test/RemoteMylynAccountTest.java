@@ -55,6 +55,7 @@ public class RemoteMylynAccountTest {
             RemoteTestSupport.onUi(()->{TasksUi.getTaskActivityManager().deactivateTask(projection);return null;});
             RemoteTestSupport.waitFor(()->api.activeActivity(OwnerId.LOCAL).isEmpty(),"Account B deactivation did not stop tracking");
             verifyRejectedDeletions(api,project,task,active.id());
+            verifyReadOnlyDeletions(api,project);
             assertEquals(1,api.projects().size());assertEquals(1,api.tasks().size());
             assertEquals(previous,original.metadata());assertEquals(history,original.activity(history.id()).orElseThrow());assertEquals(successor,original.activity(successor.id()).orElseThrow());
             assertEquals(3,RemoteBootstrap.receipt().getProperty("server.pids").split(",").length);
@@ -95,5 +96,78 @@ public class RemoteMylynAccountTest {
         assertEquals(project,api.project(project.id()).orElseThrow());assertEquals(task,api.task(task.id()).orElseThrow());
         assertEquals(interval,api.activity(intervalId).orElseThrow());
         RemoteBootstrap.receipt().setProperty("phase.mylyn.deletion","passed");RemoteBootstrap.writeProof();
+    }
+    private static void verifyReadOnlyDeletions(HttpTimekeeperService api,Project project) throws Exception {
+        var list=org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getTaskList();
+        var bot=new org.eclipse.swtbot.eclipse.finder.SWTWorkbenchBot();
+        var task=api.createTask(new CreateTask(Optional.of(project.id()),"Read-only deletion task",Optional.empty()));
+        var emptyProject=api.createProject(new CreateProject("Read-only deletion project"));
+        RemoteTestSupport.onUi(()->{TimekeeperUiPlugin.getDefault().refreshBackend();return null;});
+        RemoteTestSupport.waitFor(()->MylynIntegration.getDefault().linked(task).isPresent()
+            && net.resheim.eclipse.timekeeper.mylyn.MylynBackendScope.current().category(emptyProject.id())!=null,"Read-only fixtures were not projected");
+        var before=api.metadata();
+        RemoteBootstrap.setAccountBWritable(false);
+        try {
+            verifyReadOnlyTaskEditor(api,project,task);
+            var projection=MylynIntegration.getDefault().linked(task).orElseThrow();
+            RemoteTestSupport.onUi(()->{list.deleteTask(projection);return null;});
+            dismissPermissionRejection(bot);
+            RemoteTestSupport.waitFor(()->MylynIntegration.getDefault().linked(task).isPresent(),"Permission-rejected task deletion did not restore its projection");
+            assertEquals(before,api.metadata());
+            String handle=net.resheim.eclipse.timekeeper.mylyn.MylynBackendScope.current().category(emptyProject.id());
+            var category=(org.eclipse.mylyn.internal.tasks.core.TaskCategory)list.getContainerForHandle(handle);assertNotNull(category);
+            RemoteTestSupport.onUi(()->{list.deleteCategory(category);return null;});
+            dismissPermissionRejection(bot);
+            RemoteTestSupport.waitFor(()->list.getContainerForHandle(handle)!=null,"Permission-rejected project deletion did not restore its category");
+            assertEquals(before,api.metadata());
+            RemoteTestSupport.readyWithMylyn();
+        } finally {RemoteBootstrap.setAccountBWritable(true);}
+
+        // New backend data forces another reconciliation after writes become available.
+        // A stale queued deletion must not silently remove either restored record.
+        var witness=api.createTask(new CreateTask(Optional.of(project.id()),"Write-permission recovery witness",Optional.empty()));
+        RemoteTestSupport.onUi(()->{TimekeeperUiPlugin.getDefault().refreshBackend();return null;});
+        RemoteTestSupport.waitFor(()->MylynIntegration.getDefault().linked(witness).isPresent(),"Reconciliation did not recover after write permission returned");
+        assertEquals(task,api.task(task.id()).orElseThrow());assertEquals(emptyProject,api.project(emptyProject.id()).orElseThrow());
+        var restored=MylynIntegration.getDefault().linked(task).orElseThrow();
+        var disposable=MylynIntegration.getDefault().linked(witness).orElseThrow();
+        RemoteTestSupport.onUi(()->{list.deleteTask(restored);list.deleteTask(disposable);return null;});
+        RemoteTestSupport.waitFor(()->api.task(task.id()).isEmpty() && api.task(witness.id()).isEmpty(),"Explicit task deletions did not succeed after permission recovery");
+        String handle=net.resheim.eclipse.timekeeper.mylyn.MylynBackendScope.current().category(emptyProject.id());
+        var category=(org.eclipse.mylyn.internal.tasks.core.TaskCategory)list.getContainerForHandle(handle);assertNotNull(category);
+        RemoteTestSupport.onUi(()->{list.deleteCategory(category);return null;});
+        RemoteTestSupport.waitFor(()->api.project(emptyProject.id()).isEmpty(),"Explicit project deletion did not succeed after permission recovery");
+        RemoteBootstrap.receipt().setProperty("phase.mylyn.permission","passed");RemoteBootstrap.writeProof();
+    }
+    private static void verifyReadOnlyTaskEditor(HttpTimekeeperService api,Project project,Task task) throws Exception {
+        var bot=new org.eclipse.swtbot.eclipse.finder.SWTWorkbenchBot();
+        var tree=bot.viewByTitle("Workweek").bot().treeWithId("workweek-editor-tree");
+        RemoteTestSupport.waitFor(()->{
+            if(!TimekeeperUiPlugin.getDefault().isBackendReady()) return false;
+            try {return tree.getTreeItem(project.name()).expand().getNode(task.summary())!=null;}
+            catch(RuntimeException loading) {return false;}
+        },"Read-only task did not appear in Workweek");
+        tree.getTreeItem(project.name()).getNode(task.summary()).contextMenu("Edit task...").click();
+        var shell=bot.shell("Edit task");var editor=shell.bot();
+        String draft="Unsaved read-only task draft";editor.textWithLabel("Summary").setText(draft);editor.button("OK").click();
+        RemoteTestSupport.waitFor(()->editor.button("OK").isEnabled()
+            && TimekeeperUiPlugin.getDefault().backendStatus().contains("does not permit"),"Permission-rejected editor did not release the form");
+        assertTrue(shell.isOpen());assertTrue(editor.textWithLabel("Summary").isEnabled());
+        assertEquals(draft,editor.textWithLabel("Summary").getText());
+        assertTrue("Editor did not display the permission error",RemoteTestSupport.onUi(()->hasVisibleText(shell.widget,"This token does not permit the requested change.")));
+        assertEquals(task,api.task(task.id()).orElseThrow());editor.button("Cancel").click();
+        RemoteTestSupport.waitFor(()->!shell.isOpen(),"Cancelled read-only draft did not close");
+    }
+    private static boolean hasVisibleText(org.eclipse.swt.widgets.Composite parent,String expected) {
+        for(var child:parent.getChildren()) {
+            if(child instanceof org.eclipse.swt.widgets.Text text && text.isVisible() && text.getText().trim().equals(expected)) return true;
+            if(child instanceof org.eclipse.swt.widgets.Composite composite && hasVisibleText(composite,expected)) return true;
+        }
+        return false;
+    }
+    private static void dismissPermissionRejection(org.eclipse.swtbot.eclipse.finder.SWTWorkbenchBot bot) {
+        var dialog=bot.shell("Could not delete Timekeeper record").bot();
+        assertTrue(dialog.label("This token does not permit the requested change.").isVisible());
+        dialog.button("OK").click();
     }
 }

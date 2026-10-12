@@ -33,8 +33,18 @@ nonempty project category through the real Task List. Both server conflicts
 must display an error and restore the task/category hierarchy without changing
 server revision or history. A later empty-task deletion must succeed, proving
 the rejected deletions no longer block reconciliation. This covers definitive
-conflict rejection; authentication/permission/transport and uncertain deletion
+conflict rejection; authentication/transport, other permission paths and uncertain deletion
 outcomes still require installed acceptance.
+
+The account-B phase then atomically removes write permission from the live
+fixture registry. A Workweek task save must show the permission error, preserve
+the enabled draft fields, leave the dialog open, and leave the server record
+unchanged. Deleting an empty task and empty project through Mylyn must show the
+same permission rejection and restore their projections without changing
+server revision. After write permission returns, another reconciliation must
+retain those records until the user explicitly deletes them; the explicit task
+and project deletions must then succeed. The unchanged fixture keyring/account
+and closed local database are checked throughout.
 
 `remote-client-tests` includes both native-only and Mylyn modules. CI's
 `Remote-Eclipse` job runs all five installed phases and uploads reports and

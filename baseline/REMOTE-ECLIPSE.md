@@ -253,13 +253,53 @@ account/deletion test**, without failures/errors/skips. The receipt records
 server PIDs `63795,63801,63806`, all five Mylyn phase markers passed, and preserved
 local SHA-256 `b8efa78553b602433e5f7eb0c38d2cfea84a732e738ffe41ce2bf23864d99dc2`.
 The same checksum-verified packaged server was used for the failing and passing
-runs. CI for this fix remains pending. The preceding `abf2dfb` commit's full
+runs. The conflict fix `046e3d2` passed all seven jobs in
+[run 38287925395](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38287925395).
+Downloaded reports confirm all five installed phases. The native CI receipt
+records server PIDs `4024,4185`; the Mylyn receipt records `4335,4477,4618` and
+the additional deletion phase passed. The preceding `abf2dfb` commit's full
 Linux regression and separate installed-Eclipse job both passed, along with
 all other jobs in run 38286650257.
 
 This covers definitive server-conflict rejection and later valid deletion.
 Permission/authentication/offline/timeout/cancellation/unknown deletion outcomes
 remain open; they are not inferred from this test.
+
+## Installed read-only acceptance checkpoint, 2026-10-12
+
+The live fixture token registry can now atomically remove account B's write
+permission without changing its token, owner or endpoint. Before the fix,
+Mylyn task deletion failed waiting for the error/restoration dialog and logged
+`RemoteFailure` with the permission-denied message. HTTP `FORBIDDEN` now follows
+the rejected-deletion path, alongside `CONFLICT`; unknown transport failures
+still propagate and keep pending intent for reconciliation.
+
+The installed account-B phase covers a Workweek task editor save with only read
+permission: the dialog stays open, fields become enabled again, the user's draft
+is unchanged, the permission error is visibly displayed, and the server task
+is identical to its pre-save value. The test then cancels that draft.
+The editor message is inspected in its actual SWT Text control, normalizing
+JFace's leading presentation whitespace.
+
+Mylyn deletion of an empty task and an empty project must show the specific
+permission error and restore both projections without changing server metadata
+revision. After write permission returns, a new backend task forces another
+reconciliation; the previously rejected records must still exist. Only explicit
+subsequent task/project deletions may remove them, and those deletions must
+succeed. All phases keep encrypted credentials, account separation, null app
+entity manager and unchanged original local database file.
+
+The selected clean reactor passed **105 main tests, two restart tests and one
+account/deletion/permission test**, with no failures/errors/skips. The receipt
+records PIDs `65482,65487,65492`, all Mylyn phase markers passed, and preserved
+local SHA-256 `4cfb8d6981b953219bc2f559f839a183dd75b79670de0d2c759bfd58ab7981b0`.
+The same packaged server ZIP was used in the before/after runs. The preceding
+conflict fix passed all seven CI jobs and its downloaded installed reports;
+CI for this read-only extension remains pending.
+
+This covers permission denial in the native task editor and Mylyn task/project
+deletions. Other editor/operation permission paths, authentication failures and
+unknown transport outcomes remain open.
 
 ## Remaining before #220 can be completed
 
