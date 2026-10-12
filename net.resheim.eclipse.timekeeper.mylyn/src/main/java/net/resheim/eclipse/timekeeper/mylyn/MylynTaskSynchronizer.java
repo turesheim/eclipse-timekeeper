@@ -285,10 +285,10 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 
 	private Project ensureProject(AbstractTaskCategory category) {
 		Optional<ProjectId> mappedId = mappedProject(category);
-		Project project = mappedId.flatMap(service::project)
-				.orElseGet(() -> service.projects().stream()
-						.filter(candidate -> candidate.name().equals(category.getSummary())).findFirst()
-						.orElseGet(() -> service.createProject(new CreateProject(category.getSummary()))));
+        Project project;
+        if(mappedId.isPresent()) project=service.project(mappedId.orElseThrow()).orElseThrow(()->ServiceException.notFound("project",mappedId.orElseThrow()));
+        else project=service.projects().stream().filter(candidate->candidate.name().equals(category.getSummary())).findFirst()
+            .orElseGet(()->service.createProject(new CreateProject(category.getSummary())));
 		remember(project.id(), category);
 		if (!project.name().equals(category.getSummary()) && !scope().projectProjectionUnchanged(project.id(),category.getSummary())) {
             project = service.updateProject(new UpdateProject(project.id(), scope().projectProjectionVersion(project), category.getSummary()));
@@ -309,9 +309,11 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 						value -> projects.computeIfAbsent(value.getHandleIdentifier(), ignored -> ensureProject(value)))
 						.map(Project::id));
 		ExternalTaskReference reference = externalReference(mylynTask);
-		Task current = mappedTask(mylynTask).flatMap(service::task).or(() -> service.findTask(reference.key()))
-				.orElseGet(() -> service.createTask(new CreateTask(requestedProjectId, parent.map(Task::id),
-						mylynTask.getSummary(), Optional.ofNullable(mylynTask.getUrl()))));
+        Optional<TaskId> mappedId=mappedTask(mylynTask);
+        Task current=mappedId.flatMap(service::task).or(()->service.findTask(reference.key())).orElseGet(()->{
+            if(mappedId.isPresent()) throw ServiceException.notFound("task",mappedId.orElseThrow());
+            return service.createTask(new CreateTask(requestedProjectId,parent.map(Task::id),mylynTask.getSummary(),Optional.ofNullable(mylynTask.getUrl())));
+        });
 		Optional<ProjectId> projectId = requestedProjectId;
 		if (projectId.isEmpty())
 			projectId = current.projectId();

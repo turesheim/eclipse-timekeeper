@@ -79,6 +79,26 @@ Editor error checks inspect the editor's own visible message and enabled Save
 button. They do not depend on the mutable shared backend status; the fixture
 records when another job changes that status during rejection.
 
+The final account-B phase source-launches a disposable loopback reply gate in
+a separate Java process. The real server moves behind it while Eclipse retains
+its configured endpoint. The gate forwards one PUT, observes the real successful
+response, then withholds that response. One scenario reaches the normal client
+request timeout; another cancels the actual Eclipse save Job after confirmed
+commit. Both keep the editor open with enabled unchanged draft fields and the
+appropriate error, while the server retains exactly one committed update. After
+refresh, repeating Save from the original editor must conflict rather than
+upgrade its expected version or overwrite the committed record. The fixtures
+are then removed. No credentials/request/response bodies are logged. The gate
+source is packaged only in the acceptance-test bundle, and both child processes
+are stopped on exit.
+
+Mapped tasks/projects that disappear between synchronization reads are never
+recreated automatically. Mylyn version adoption is permitted only when the
+fresh backend editable-state hash still equals the projected baseline; this
+handles legacy JPA project-renaming version side effects while preserving newer
+changed backend fields. The existing Mylyn test bundle validates its normal
+rename/CRUD/activation/connecting/scope workflows alongside remote acceptance.
+
 `remote-client-tests` includes both native-only and Mylyn modules. CI's
 `Remote-Eclipse` job runs all five installed phases and uploads reports and
 credential-free receipts/logs. The fixture password, keyring and token registry

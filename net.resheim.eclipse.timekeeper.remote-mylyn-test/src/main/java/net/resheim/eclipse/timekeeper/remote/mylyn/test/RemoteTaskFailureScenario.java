@@ -27,6 +27,9 @@ final class RemoteTaskFailureScenario {
         authentication(api,project);
         optimisticConflict(api,project);
         offline(api,project);
+        RemoteBootstrap.enableReplyGate();
+        uncertainUpdate(api,project,false);
+        uncertainUpdate(api,project,true);
     }
     private static void authentication(HttpTimekeeperService api,Project project) throws Exception {
         var task=api.createTask(new CreateTask(Optional.of(project.id()),"Authentication task fixture",Optional.empty()));
@@ -115,6 +118,39 @@ final class RemoteTaskFailureScenario {
         var edited=api.task(saved.id()).orElseThrow();assertEquals(saved.version()+1,edited.version());assertEquals(Optional.of("https://example.invalid/mylyn-after-reconnect"),edited.url());
         settled(edited);remove(api,edited);
         RemoteBootstrap.receipt().setProperty("phase.task.offline","passed");RemoteBootstrap.writeProof();
+    }
+    private static void uncertainUpdate(HttpTimekeeperService api,Project project,boolean cancel) throws Exception {
+        String kind=cancel ? "Cancellation" : "Timeout";
+        var task=api.createTask(new CreateTask(Optional.of(project.id()),kind+" task fixture",Optional.empty()));
+        var shell=open(project,task);var editor=shell.bot();
+        String draft=kind+" draft committed before reply",url="https://example.invalid/"+kind.toLowerCase()+"-draft";
+        editor.textWithLabel("Summary").setText(draft);editor.textWithLabel("URL (optional)").setText(url);
+        RemoteBootstrap.holdNextTaskReply(task.id().value());
+        Task committed;
+        try {
+            editor.button("OK").click();RemoteBootstrap.awaitTaskReplyCommitted();
+            committed=api.task(task.id()).orElseThrow();assertEquals(task.version()+1,committed.version());assertEquals(draft,committed.summary());assertEquals(Optional.of(url),committed.url());
+            assertEquals(draft,editor.textWithLabel("Summary").getText());assertFalse(editor.button("OK").isEnabled());
+            if(cancel) {
+                var job=java.util.Arrays.stream(org.eclipse.core.runtime.jobs.Job.getJobManager().find(null))
+                    .filter(candidate->candidate.getName().equals("Save Timekeeper task") && candidate.getState()==org.eclipse.core.runtime.jobs.Job.RUNNING).findFirst().orElseThrow();
+                job.cancel();
+                String message="The request was cancelled. Refresh to confirm whether the server completed it.";
+                rejected(shell,message,message,draft,url);
+                RemoteTestSupport.waitFor(()->job.getState()==org.eclipse.core.runtime.jobs.Job.NONE,"Cancelled update job did not finish");
+                assertTrue(job.getResult().matches(org.eclipse.core.runtime.IStatus.CANCEL));
+            } else {
+                String message="The server request timed out. Refresh before repeating a change.";
+                rejected(shell,message,message,draft,url);
+            }
+            RemoteTestSupport.closedLocalStorage();assertEquals(committed,api.task(task.id()).orElseThrow());
+        } finally {RemoteBootstrap.releaseTaskReply();}
+        refresh();RemoteTestSupport.readyWithMylyn();
+        assertEquals(draft,editor.textWithLabel("Summary").getText());assertEquals(url,editor.textWithLabel("URL (optional)").getText());
+        editor.button("OK").click();rejected(shell,CONFLICT,STALE,draft,url);assertEquals(committed,api.task(task.id()).orElseThrow());
+        editor.button("Cancel").click();RemoteTestSupport.waitFor(()->!shell.isOpen(),"Uncertain update editor did not close after cancel");
+        settled(committed);remove(api,committed);
+        RemoteBootstrap.receipt().setProperty("phase.task."+(cancel ? "cancel-committed" : "timeout-committed"),"passed");RemoteBootstrap.writeProof();
     }
     private static SWTBotShell open(Project project,Task task) throws Exception {
         refresh();var bot=new SWTWorkbenchBot();var tree=bot.viewByTitle("Workweek").bot().treeWithId("workweek-editor-tree");

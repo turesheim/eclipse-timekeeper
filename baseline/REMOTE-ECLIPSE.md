@@ -385,13 +385,80 @@ one account/failure test**, with no failures/errors/skips. The receipt records
 Eclipse-fork server PIDs `72732,72738,72745`, recovery PID
 `72757`, persisted-baseline/offline/authentication/conflict
 markers passed, and unchanged local SHA-256 `9881fed149073869cf30f91e67dbe21cad7be2c896679e38237087bee866d377`.
-The packaged server ZIP checksum is unchanged. CI for this corrective commit
-is pending, including the full optional Mylyn regression.
+The packaged server ZIP checksum is unchanged. The corrective `4c2be05` commit's Remote-Eclipse job passed in
+[run 38296380161](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38296380161),
+but its broad Linux job failed. The other five jobs passed. The downloaded
+Linux log identified stale task versions during combined Mylyn project/task
+renaming; the next checkpoint fixes that regression.
 
 This covers task-editor offline recovery, pending empty-task deletion,
 between-launch server edits and real Mylyn edits afterward. Other editors,
 timeout/cancellation and unknown-command outcomes remain open; automatic
 notification and broader reconnect/missed-event behavior remain in #219.
+
+## Committed update timeout/cancellation checkpoint, 2026-10-12
+
+A disposable Java-source reply gate now runs in a separate loopback process.
+The actual packaged server remains responsible for authentication, persistence
+and response generation. The gate forwards one task PUT, observes the successful
+backend response, then withholds it from Eclipse. It never logs credentials or
+request/response bodies. Its source is packaged only in the test bundle, and
+both child processes are stopped at runtime exit.
+
+The installed task editor first reaches its normal request timeout, then a
+separate scenario cancels the actual running Eclipse save Job after confirmed
+server commit. Both must keep the editor open with enabled unchanged summary/URL
+draft and their specific error. The server must retain exactly one version
+increment with those same values. After explicit refresh, repeating Save from
+the original editor must remain stale and cannot overwrite or duplicate the
+committed update. The editor is cancelled and temporary fixtures are removed;
+prior records/history and closed local storage remain unchanged.
+
+A failed earlier local run reached both uncertainty markers but found an extra
+project at final cleanup. Read-only inspection of the disposable server showed
+a deleted project recreated under a fresh UUID. Synchronization previously
+checked a mapped record before import, then treated a second read's absence as
+a new-record request. Mapped task/project disappearance now produces not-found
+reconciliation instead of automatic creation, closing that race.
+
+The broad Linux regression found project/task rename in one Mylyn batch could
+stale the projected task version: the legacy JPA project rename changes task
+versions even when their canonical editable fields remain identical. Mylyn may
+now adopt that fresh version only after comparing the current editable-state
+hash to its stored baseline. Newer changed server fields still block stale
+writes; no unconditional version upgrade is introduced.
+
+The final installed selected reactor passed **105 main tests, two restart tests
+and one account/failure test**, no failures/errors/skips. Its receipt records
+Eclipse-fork PIDs `76551,76856,76862`, recovery PIDs
+`77077,77080`, reply-gate PID `77097`,
+committed timeout/cancellation and all preceding phase markers passed, and local
+SHA-256 `d83376b2f288a8e55e3eab4484b766325635e528a511b4bb6e15d2b3d4f9cec8` unchanged.
+The existing Mylyn integration class then passed all **10 tests**; the full
+existing Mylyn test bundle separately passed all **35 tests** without
+failures/errors/skips. These reruns retained their original assertions and
+included the rename/CRUD, projection, activation, connecting and account-scope
+cases that failed or followed the stale-version failure in CI. The initially prepared commit was not pushed: GitHub had received concurrent
+changes. Integration preserves `6ffa963`'s centralized editable-state version
+handling, successful-import baselines and dedicated regression test, as well as
+the `main` updates for planning labels and PostgreSQL/Docker deployment. The
+local additions retain reply-gate acceptance and mapped-deletion race guards.
+
+The integrated branch was retested against the current Server artifact from
+run 38299034375 (head `8e803fa`), with ZIP SHA-256
+`739e932b5196620eaa9175243593564b03edf109b37d63970b6e77de1f33b9eb`.
+It again passed 105 main tests, two restart tests and one account/failure test.
+The receipt records Eclipse-fork PIDs `80349,80398,80433`, recovery PIDs
+`80512,80528`, reply-gate PID `80529`, all previous phase markers passed, and local
+SHA-256 `cc8a96b00fd374cc38a93adfdaa31b4f938fcdf8afb3a43daee1647d1e61f04c`
+unchanged. The full Mylyn bundle, including the incoming regression, separately
+passed all **36 tests** without failures/errors/skips after integration. CI for
+the integrated commit remains pending.
+
+This certifies uncertain task PUT outcomes and their review/refresh behavior.
+Uncertain create/start/stop/import/delete outcomes and the remaining editor,
+backend-switch and preference flows remain open. It does not imply those cases
+are solved by optimistic task-update protection.
 
 ## Remaining before #220 can be completed
 

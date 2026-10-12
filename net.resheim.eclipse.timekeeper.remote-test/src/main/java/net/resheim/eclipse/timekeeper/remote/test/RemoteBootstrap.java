@@ -26,7 +26,8 @@ import org.eclipse.equinox.security.storage.SecurePreferencesFactory;
 /** Prepares isolated credentials/configuration before any Timekeeper UI startup, then runs the IDE. */
 public final class RemoteBootstrap implements IApplication {
     private IApplication delegate;
-    private Process server;
+    private Process server,replyGate;
+    private int upstreamPort;
     private static RemoteBootstrap active;
     static Path folder;
     static URI serverUrl;
@@ -106,19 +107,19 @@ public final class RemoteBootstrap implements IApplication {
                 }
             }
             throw new IllegalStateException("Installed IDE application is missing");
-        } finally {stopServer();}
+        } finally {stopReplyGate();stopServer();}
     }
     private void launchServer() throws Exception {
         Files.createDirectories(folder.resolve("server data"));
         var builder=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",folder.resolve("distribution/timekeeper-server/quarkus-run.jar").toString());
         builder.environment().put("TIMEKEEPER_SERVER_DB_URL","jdbc:h2:"+folder.resolve("server data/timekeeper"));
-        builder.environment().put("TIMEKEEPER_SERVER_TOKENS_FILE",folder.resolve("server-tokens.json").toString());builder.environment().put("QUARKUS_HTTP_PORT",String.valueOf(serverUrl.getPort()));
+        builder.environment().put("TIMEKEEPER_SERVER_TOKENS_FILE",folder.resolve("server-tokens.json").toString());builder.environment().put("QUARKUS_HTTP_PORT",String.valueOf(upstreamPort==0 ? serverUrl.getPort() : upstreamPort));
         builder.redirectErrorStream(true).redirectOutput(folder.resolve("server-"+System.nanoTime()+".log").toFile());
         server=builder.start();
         try(var http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build()) {
             long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(25);boolean ready=false;
             while(System.nanoTime()<deadline && server.isAlive()) {
-                try {ready=http.send(HttpRequest.newBuilder(serverUrl.resolve("/q/health/ready")).timeout(Duration.ofSeconds(1)).GET().build(),HttpResponse.BodyHandlers.discarding()).statusCode()==200;}
+                try {ready=http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+(upstreamPort==0 ? serverUrl.getPort() : upstreamPort)+"/q/health/ready")).timeout(Duration.ofSeconds(1)).GET().build(),HttpResponse.BodyHandlers.discarding()).statusCode()==200;}
                 catch(java.io.IOException unavailable) { }
                 if(ready) break;Thread.sleep(50);
             }
@@ -137,7 +138,52 @@ public final class RemoteBootstrap implements IApplication {
         proof.setProperty("server.recovery-pids",previous.isEmpty() ? String.valueOf(active.server.pid()) : previous+","+active.server.pid());writeProof();
         return active.server.pid();
     }
-    @Override public void stop() {if(delegate!=null) delegate.stop();stopServer();}
+    @Override public void stop() {if(delegate!=null) delegate.stop();stopReplyGate();stopServer();}
+    public static void enableReplyGate() throws Exception {
+        if(active.replyGate!=null) throw new IllegalStateException("Reply gate is already active");
+        stopFixtureServer();try(var socket=new ServerSocket(0)) {active.upstreamPort=socket.getLocalPort();}
+        restartFixtureServer();
+        Path source=folder.resolve("ReplyGate.java");
+        try(var input=RemoteBootstrap.class.getResourceAsStream("/fixture/ReplyGate.java")) {
+            if(input==null) throw new IllegalStateException("Fixture proxy source missing");Files.copy(input,source);
+        }
+        var builder=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"--add-modules=jdk.httpserver",source.toString(),"http://127.0.0.1:"+active.upstreamPort,String.valueOf(serverUrl.getPort()));
+        builder.redirectErrorStream(true).redirectOutput(folder.resolve("server-reply-gate.log").toFile());active.replyGate=builder.start();
+        long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(25);boolean ready=false;
+        while(active.replyGate.isAlive() && System.nanoTime()<deadline) {
+            try {ready=control("health",null).equals("ready");}catch(java.io.IOException starting) { }
+            if(ready) break;Thread.sleep(50);
+        }
+        if(!ready) throw new IllegalStateException("Fixture reply gate did not start");
+        proof.setProperty("server.reply-gate-pid",String.valueOf(active.replyGate.pid()));writeProof();
+    }
+    public static void holdNextTaskReply(java.util.UUID id) throws Exception {control("hold","/api/v1/tasks/"+id);}
+    public static void awaitTaskReplyCommitted() throws Exception {
+        long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
+        while(System.nanoTime()<deadline) {
+            String value=control("state",null);
+            if(value.startsWith("committed=")) {
+                if(!value.equals("committed=200")) throw new IllegalStateException("Fixture update was not acknowledged by the backend: "+value);
+                return;
+            }
+            Thread.sleep(25);
+        }
+        throw new IllegalStateException("Fixture did not observe a committed task update");
+    }
+    public static void releaseTaskReply() throws Exception {control("release","");}
+    private static String control(String operation,String value) throws Exception {
+        try(var http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build()) {
+            var request=HttpRequest.newBuilder(serverUrl.resolve("/__fixture/"+operation)).timeout(Duration.ofSeconds(2));
+            if(value==null) request.GET();else request.POST(HttpRequest.BodyPublishers.ofString(value,StandardCharsets.UTF_8));
+            var response=http.send(request.build(),HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if(response.statusCode()!=200) throw new IllegalStateException("Fixture proxy control failed");return response.body();
+        }
+    }
+    private void stopReplyGate() {
+        if(replyGate==null) return;replyGate.destroy();
+        try {if(!replyGate.waitFor(5,TimeUnit.SECONDS)) {replyGate.destroyForcibly();replyGate.waitFor(5,TimeUnit.SECONDS);}}
+        catch(InterruptedException interrupted) {replyGate.destroyForcibly();Thread.currentThread().interrupt();}
+    }
     private void stopServer() {
         if(server==null) return;server.destroy();
         try {if(!server.waitFor(5,TimeUnit.SECONDS)) {server.destroyForcibly();server.waitFor(5,TimeUnit.SECONDS);}}
