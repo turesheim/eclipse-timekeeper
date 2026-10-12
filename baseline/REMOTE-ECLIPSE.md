@@ -73,13 +73,51 @@ healthy server connection unavailable.
 
 Multi-platform CI must be rechecked for the CSV commit.
 
+The CSV commit `d7b442d8784e43dad59a8295f90181f2ad60b871` passed all six jobs in
+[CI run 38269524428](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38269524428).
+
+## Mylyn scope implementation checkpoint, 2026-10-12
+
+Task UUID mappings and project/category mappings are scoped by the selected
+backend and account. Native Task List projections retain their origin scope;
+foreign projections are excluded from synchronization and cannot be resolved
+for activation. Late deactivation of a foreign projection is ignored. Shared
+provider items retain separate UUID mappings for each scope.
+
+The embedded identity is captured from the database address actually opened,
+instead of pending settings. Remote endpoint/account components are encoded
+separately before hashing, so separator characters cannot alias another scope.
+Persisted scope metadata contains hashes and resource/category identifiers,
+without tokens. Legacy unscoped mappings are accepted once in local mode;
+missing UUIDs cannot cause an old projection to create a new backend record.
+Owned stale projections/categories are removed when their records disappear.
+
+Mylyn dirty flags use atomic claims so UI signals arriving during a background
+operation are retained. Remote synchronization failures reach the selected
+backend's error state and Workweek status instead of being treated as a
+successful save.
+
+`MylynBackendScopeTest` uses a real Mylyn Task List and two independent JPA
+databases. It switches owner and server scopes, checks separate categories with
+the same name, checks identical UUIDs on different servers, processes mixed
+foreign/owned edit and deletion batches, and removes stale projections without
+recreating their records. It also checks that the actual adapter rejects a
+foreign native projection before creating records. The test injects scope
+identities and services; it does **not** prove installed remote authentication
+or backend restart behavior.
+
+The full clean Eclipse/Mylyn/Jira regression command passed **158 tests** with
+no failures, errors or skips. CI must be rechecked for the scope commit. The
+server reactor remains covered by the 52-test CSV checkpoint; scope changes do
+not change the standalone server implementation.
+
 ## Remaining before #220 can be completed
 
 - Verify the server CSV preference-page flow in the installed Eclipse runtime,
   including cancellation, restart after a lost response and unchanged local
   database files.
-- Scope Mylyn projection identities and category mappings by backend and owner;
-  verify that changing backend never imports another backend's projections.
+- Verify the scoped Mylyn mappings in the installed remote runtime, including
+  actual backend/account switches and late activation/deactivation events.
 - Exercise the complete installed Eclipse flow against the actual packaged
   server, both without Mylyn and with Mylyn activation/deactivation, including
   secure storage, restart, remote edits, labels, reports and tracking.

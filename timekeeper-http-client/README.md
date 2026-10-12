@@ -10,6 +10,12 @@ encrypted storage. Server mode keeps the embedded database closed. A failed
 connection retains the last display snapshots and reports an error; use
 **Workweek → Reconnect / refresh backend** after resolving the problem.
 
+The optional Mylyn adapter stores separate mappings for each backend/account.
+Native Task List projections stay associated with their original scope; selecting
+another server or account does not import those projections. Return to their
+original backend to activate them. Provider tasks may be explicitly linked in
+another scope without reusing that scope's UUIDs.
+
 ## Server CSV transfer
 
 **Preferences → Timekeeper → Database** exports the signed-in server account

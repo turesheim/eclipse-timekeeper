@@ -2,7 +2,6 @@ package net.resheim.eclipse.timekeeper.mylyn;
 
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
@@ -75,6 +74,8 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 	private void ensureStarted() {
 		if (registration != null)
 			return;
+        var display=PlatformUI.getWorkbench().getDisplay();
+        if(org.eclipse.swt.widgets.Display.getCurrent()!=display) {if(!display.isDisposed()) display.syncExec(this::ensureStarted);return;}
 		var ui = TimekeeperUiPlugin.getDefault();
 		if (ui == null)
 			return;
@@ -94,6 +95,9 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 	 * projection UUID.
 	 */
 	public Task resolve(ITask external) {
+		var scope=MylynBackendScope.current();
+        if(scope==null) throw ServiceException.conflict("backend","Connect to the Timekeeper backend before activating a Task List item.");
+        if(scope.foreignProjection(external)) throw new IllegalStateException("This Task List projection belongs to another Timekeeper backend. Switch back to that backend.");
 		var service = service();
 		var reference = reference(external);
 		Optional<Task> found = service.findTask(reference.key()).or(() -> mapped(external).flatMap(service::task));
@@ -111,9 +115,12 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 							task.parentTaskId(), external.getSummary(), url));
 				}
 			}
-			external.setAttribute(MylynMetadata.ATTR_TIMEKEEPER_TASK_ID, task.id().value().toString());
+			scope.remember(external,task.id(),task.externalReferences().isEmpty());
 			return task;
 		}
+        if(external instanceof org.eclipse.mylyn.internal.tasks.core.LocalTask && !scope.maySynchronize(external)
+                && !"true".equals(external.getAttribute(MylynBackendScope.ATTR_PROVIDER_SOURCE)))
+            throw new IllegalStateException("This legacy Task List projection has no link to the selected backend. Switch back to its original local database.");
 		String name = MylynMetadata.getMylynProjectName(external);
 		Project project = service.projects().stream().filter(value -> value.name().equals(name)).findFirst()
 				.orElseGet(() -> service.createProject(new CreateProject(name)));
@@ -127,7 +134,7 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 			// Another client may have linked the same provider key concurrently.
 			created = service.findTask(reference.key()).orElseThrow(() -> collision);
 		}
-		external.setAttribute(MylynMetadata.ATTR_TIMEKEEPER_TASK_ID, created.id().value().toString());
+		scope.remember(external,created.id(),false);
 		return created;
 	}
 
@@ -147,6 +154,8 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 
 	public void deactivated(ITask external) {
         var ui=TimekeeperUiPlugin.getDefault();
+        var scope=MylynBackendScope.current();
+        if(scope==null || scope.foreignProjection(external)) return;
         if(ui.isRemote() && org.eclipse.swt.widgets.Display.getCurrent()!=null) {
             ui.runOperation("Stop Mylyn task",()->{deactivated(external);return null;},value->{},this::reportFailure);return;
         }
@@ -159,19 +168,16 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 	}
 
 	public Optional<ITask> linked(Task task) {
+		var scope=MylynBackendScope.current();
 		return TasksUiPlugin.getTaskList().getAllTasks().stream()
+                .filter(candidate -> scope!=null && !scope.foreignProjection(candidate))
 				.filter(candidate -> mapped(candidate).filter(task.id()::equals).isPresent() || task
 						.externalReferences().stream().anyMatch(ref -> ref.key().equals(reference(candidate).key())))
 				.map(ITask.class::cast).findFirst();
 	}
 
 	private Optional<TaskId> mapped(ITask task) {
-		try {
-			return Optional.ofNullable(task.getAttribute(MylynMetadata.ATTR_TIMEKEEPER_TASK_ID)).map(UUID::fromString)
-					.map(TaskId::new);
-		} catch (IllegalArgumentException malformed) {
-			return Optional.empty();
-		}
+        var scope=MylynBackendScope.current();return scope==null ? Optional.empty() : scope.task(task);
 	}
 
 	private ExternalTaskReference reference(ITask task) {

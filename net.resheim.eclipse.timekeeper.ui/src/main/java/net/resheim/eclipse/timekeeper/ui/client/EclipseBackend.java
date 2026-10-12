@@ -54,7 +54,14 @@ public final class EclipseBackend implements AutoCloseable {
     public boolean snapshotsAvailable() {return !remoteMode ? ready() : metadata!=null;}
     public String status() {return !remoteMode ? TimekeeperPlugin.getDefault().getDatabaseStatus().getMessage() : status;}
     public ZoneId zone() {return metadata==null ? ZoneId.systemDefault() : metadata.profile().zone();}
-    public String identity() {return !remoteMode ? "embedded" : remote==null ? "remote:unavailable" : "remote:"+remote.endpoint()+":"+(metadata==null ? "connecting" : metadata.profile().owner().value());}
+    public String identity() {
+        if(!remoteMode) return "embedded:"+TimekeeperPlugin.getDefault().databaseIdentity();
+        if(remote==null) return "remote:unavailable";
+        var encoding=java.util.Base64.getUrlEncoder().withoutPadding();
+        String endpoint=encoding.encodeToString(remote.endpoint().toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String owner=encoding.encodeToString((metadata==null ? "connecting" : metadata.profile().owner().value()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return "remote:"+endpoint+"."+owner;
+    }
     public TimekeeperService service() {return !remoteMode ? embedded.get() : facade;}
     public int exportCsv(java.nio.file.Path folder) throws java.io.IOException {
         if(Display.getCurrent()!=null || remote==null) throw new IllegalStateException("Remote transfer requires an available background client");

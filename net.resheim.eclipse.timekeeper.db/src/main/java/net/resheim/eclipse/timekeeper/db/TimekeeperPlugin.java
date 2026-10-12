@@ -93,6 +93,9 @@ public class TimekeeperPlugin extends Plugin {
 	private static TimekeeperPlugin instance;
 
 	private static volatile EntityManager entityManager = null;
+    private volatile String databaseIdentity = "connecting";
+    /** Opaque identity of the database actually opened, unaffected by pending preference changes. */
+    public String databaseIdentity() {return databaseIdentity;}
 
 	private static Job saveDatabaseJob;
 
@@ -151,6 +154,9 @@ public class TimekeeperPlugin extends Plugin {
 					}
 				}
 				candidate = DatabaseStartup.open(jdbcUrl);
+                String address = jdbcUrl.split(";", 2)[0];
+                String identity = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                        .digest(address.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
 				initializeDefaultLabels(candidate);
 				synchronized (this) {
 					if (stopping) {
@@ -158,6 +164,7 @@ public class TimekeeperPlugin extends Plugin {
 						return;
 					}
 					entityManager = candidate;
+                    databaseIdentity = identity;
 					databaseStatus = Status.OK_STATUS;
 				}
 			} catch (Exception failure) {
@@ -251,6 +258,7 @@ public class TimekeeperPlugin extends Plugin {
 		log.info("Starting TimekeeperPlugin");
 		instance = this;
 		stopping = false;
+        databaseIdentity = "connecting";
 		databaseStatus = new Status(IStatus.INFO, BUNDLE_ID, "Connecting to the Timekeeper database.");
         if (remoteConfigured()) {
             databaseStatus = new Status(IStatus.INFO,BUNDLE_ID,"Remote backend selected; embedded storage is closed.");

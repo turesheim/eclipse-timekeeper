@@ -141,7 +141,7 @@ public class WorkWeekView extends ViewPart {
 		boolean ready = TimekeeperUiPlugin.getDefault().isBackendReady();
 		newProjectAction.setEnabled(ready);
 		newTaskAction.setEnabled(ready);
-		if (!TimekeeperUiPlugin.getDefault().isBackendReady()) {
+		if (!ready || !TimekeeperUiPlugin.getDefault().backendStatus().isBlank()) {
 			statusLabel.setText(TimekeeperUiPlugin.getDefault().backendStatus());
 			return;
 		}
