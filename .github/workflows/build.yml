@@ -115,6 +115,16 @@ jobs:
       with:
         name: timekeeper-server
         path: server/target/distribution
+    - uses: actions/setup-node@v6
+      with:
+        node-version: 24
+        cache: npm
+        cache-dependency-path: web/package-lock.json
+    - name: Install browser peer for installed Eclipse acceptance
+      run: |
+        npm ci --ignore-scripts --prefix web
+        cd web
+        npx playwright install --with-deps chromium
     - name: Install Xvfb
       run: sudo apt-get update && sudo apt-get install -y xvfb
     - name: Verify installed Eclipse against the packaged server and restart
@@ -141,6 +151,7 @@ jobs:
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/surefire-reports-local-restart/
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/acceptance-data/proof.properties
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/acceptance-data/server-*.log
+          net.resheim.eclipse.timekeeper.remote-mylyn-test/target/acceptance-data/browser-peer.log
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/work/**/.metadata/.log
           net.resheim.eclipse.timekeeper.remote-mylyn-test/target/work/**/configuration/*.log
 
