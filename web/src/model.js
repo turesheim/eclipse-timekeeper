@@ -48,3 +48,8 @@ export function instantText(instant, zone) {
   if (!instant) return 'In progress';
   return new Intl.DateTimeFormat(undefined, {timeZone: zone, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'}).format(new Date(instant));
 }
+export function instantNanos(instant) {
+  const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?Z$/.exec(instant);
+  if (!match) throw new Error('Invalid UTC instant.');
+  return BigInt(Date.parse(match[1] + 'Z')) * 1000000n + BigInt((match[2] || '').padEnd(9, '0'));
+}

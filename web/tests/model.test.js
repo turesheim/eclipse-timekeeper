@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {dayStart, weekRange, durationNanos, durationText, dateInZone} from '../src/model.js';
+import {dayStart, weekRange, durationNanos, durationText, dateInZone, instantNanos} from '../src/model.js';
 test('Oslo report ranges include 23- and 25-hour days and Monday boundaries', () => {
   assert.equal(dayStart('2026-03-29', 'Europe/Oslo'), '2026-03-28T23:00:00.000Z');
   assert.equal(dayStart('2026-03-30', 'Europe/Oslo'), '2026-03-29T22:00:00.000Z');
@@ -19,4 +19,8 @@ test('report totals retain exact nanoseconds and arbitrarily long hours', () => 
   assert.equal(durationText('PT0.000000001S'), '0h 0m 0.000000001s');
   assert.equal(durationText('PT9007199254740993H'), '9007199254740993h 0m');
   assert.throws(() => durationNanos('private-token'), /Invalid/);
+});
+test('daily clipping compares instants, including exact boundaries and submilliseconds', () => {
+  assert.equal(instantNanos('2026-10-25T23:00:00Z'), instantNanos('2026-10-25T23:00:00.000Z'));
+  assert.equal(instantNanos('2026-10-25T23:00:00.000000001Z') - instantNanos('2026-10-25T23:00:00Z'), 1n);
 });

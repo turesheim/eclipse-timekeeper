@@ -4,8 +4,6 @@ import {readFile, writeFile, rename} from 'node:fs/promises';
 const token = process.env.TIMEKEEPER_WEB_TOKEN;
 const readToken = process.env.TIMEKEEPER_WEB_READ_TOKEN;
 async function signIn(page, credential = token) {
-  page.on('response', response => { const path = new URL(response.url()).pathname; if (path.startsWith('/api/')) console.log('API response:', path, response.status(), 'owner-header:', !!response.headers()['x-timekeeper-owner']); });
-  page.on('console', message => { if (message.type() === 'error') console.log('Browser error:', message.text().replace(/Bearer \S+/g, 'Bearer [redacted]')); });
   await page.goto('/web/'); await page.getByLabel('Access token').fill(credential); await page.getByRole('button', {name:'Sign in', exact:true}).click();
   await expect(page.locator('#status')).toHaveText('Up to date');
 }
@@ -32,7 +30,7 @@ test('core browser workflow manages records, tracks time, and preserves exact re
   await page.locator('#editor').getByLabel(label, {exact:true}).check(); await page.locator('#editor').getByRole('button', {name:'Start', exact:true}).click();
   await expect(page.locator('#editor')).not.toBeVisible(); await expect(page.locator('#active-title')).toHaveText(task);
   await page.getByRole('button', {name:'Stop tracking', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Stop', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible();
-  await page.getByRole('button', {name:'Time zone', exact:true}).click(); await page.getByLabel('Time zone', {exact:true}).fill('Europe/Oslo'); await save(page);
+  await page.getByRole('button', {name:'Time zone', exact:true}).click(); await page.getByRole('textbox', {name:'Time zone', exact:true}).fill('Europe/Oslo'); await save(page);
   await page.getByRole('button', {name:'Workweek', exact:true}).click(); await page.getByLabel('Week containing').fill('2026-10-25');
   await expect(page.locator('#zone-caption')).toContainText('2026-10-19'); await page.getByRole('button', {name:'Add time', exact:true}).click();
   await page.getByLabel('Task', {exact:true}).selectOption({label:task}); await page.getByLabel('Summary', {exact:true}).fill('Autumn DST');
@@ -73,7 +71,7 @@ test('read-only authorization and validation remain visible with the draft intac
   await signIn(page, readToken); await page.getByRole('button', {name:'Projects', exact:true}).click(); await page.getByRole('button', {name:'New project', exact:true}).click(); await page.getByLabel('Name', {exact:true}).fill('Read-only draft'); await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click();
   await expect(page.locator('#editor-error')).toContainText('permission'); await expect(page.getByLabel('Name', {exact:true})).toHaveValue('Read-only draft');
   await page.getByRole('button', {name:'Cancel', exact:true}).click(); await page.getByRole('button', {name:'Sign out', exact:true}).click(); await signIn(page);
-  await page.getByRole('button', {name:'Time zone', exact:true}).click(); await page.getByLabel('Time zone', {exact:true}).fill('Invalid/Zone'); await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click(); await expect(page.locator('#editor-error')).toContainText('Check'); await expect(page.getByLabel('Time zone', {exact:true})).toHaveValue('Invalid/Zone');
+  await page.getByRole('button', {name:'Time zone', exact:true}).click(); await page.getByRole('textbox', {name:'Time zone', exact:true}).fill('Invalid/Zone'); await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click(); await expect(page.locator('#editor-error')).toContainText('Check'); await expect(page.getByRole('textbox', {name:'Time zone', exact:true})).toHaveValue('Invalid/Zone');
 });
 test('lost start/stop replies retry the exact durable command only once', async ({page, request}) => {
   const task = await createTask(request); await signIn(page); await page.getByRole('button', {name:'Tasks', exact:true}).click();
@@ -109,4 +107,16 @@ test('sign-out and reload retain no token or account records in browser storage'
   expect(await page.evaluate(() => ({local:localStorage.length, session:sessionStorage.length}))).toEqual({local:0, session:0});
   await page.reload(); await expect(page.locator('#login')).toBeVisible(); await expect(page.locator('#workspace')).not.toBeVisible();
   await signIn(page); await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#tasks')).toBeEmpty();
+});
+test('offline reconnect catches missed peer writes without replacing an open draft', async ({page, request}) => {
+  const task = await createTask(request); await signIn(page); await page.getByRole('button', {name:'Tasks', exact:true}).click();
+  await page.locator('#tasks tr').filter({hasText:task.summary}).getByRole('button', {name:'Edit', exact:true}).click(); await page.getByLabel('Summary', {exact:true}).fill('Offline draft');
+  await page.route('**/api/v1/**', route => route.abort('failed'));
+  await expect(page.locator('#status')).toContainText('Reconnecting');
+  const read = await api(request, 'GET', '/tasks/' + task.id);
+  await api(request, 'PUT', '/tasks/' + task.id, {summary:'Missed peer ' + task.id, projectId:null, parentTaskId:null, url:null}, {'If-Match':read.headers().etag});
+  await expect(page.getByLabel('Summary', {exact:true})).toHaveValue('Offline draft');
+  await page.unroute('**/api/v1/**'); await expect(page.locator('#status')).toHaveText('Up to date'); await expect(page.locator('#tasks')).toContainText('Missed peer ' + task.id);
+  await expect(page.getByLabel('Summary', {exact:true})).toHaveValue('Offline draft');
+  await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click(); await expect(page.locator('#editor-error')).toContainText('This record changed');
 });

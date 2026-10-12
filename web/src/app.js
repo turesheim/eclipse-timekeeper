@@ -1,9 +1,15 @@
 import {Api, ApiError} from './api.js';
-import {addDays, dateInZone, dayStart, durationText, instantText, weekRange} from './model.js';
+import {addDays, dateInZone, dayStart, durationText, instantText, instantNanos, weekRange} from './model.js';
 
 const $ = id => document.getElementById(id);
 let api = null, snapshot = null, connected = false, refreshing = null, reloadAgain = false;
 let editor = null, selectedActivity = null, selectedDay = null;
+let watchSession = null;
+function startWatch(session) {
+  if (watchSession === session) return;
+  watchSession = session;
+  void watch(session).finally(() => { if (watchSession === session) watchSession = null; });
+}
 function element(tag, text, className) {
   const node = document.createElement(tag); if (text !== undefined) node.textContent = text;
   if (className) node.className = className; return node;
@@ -34,7 +40,7 @@ $('login-form').addEventListener('submit', async event => {
     const {data: profile} = await session.request('/me');
     $('week-date').value = dateInZone(Date.now(), profile.zoneId);
     api = session; $('login').hidden = true; $('workspace').hidden = false; $('session').hidden = false;
-    await refresh(); void watch(session);
+    await refresh(); startWatch(session);
   } catch (error) {
     if (api === session) { api = null; $('login').hidden = false; $('workspace').hidden = true; $('session').hidden = true; }
     session.close(); $('login-error').textContent = error instanceof ApiError ? error.message : 'Use HTTPS and a valid server time zone to sign in.';
@@ -47,7 +53,7 @@ $('sign-out').addEventListener('click', () => {
   for (const id of ['projects', 'tasks', 'labels', 'activities', 'days']) $(id).replaceChildren();
   $('owner').textContent = ''; $('token').focus();
 });
-$('refresh').addEventListener('click', () => { void refresh().catch(() => {}); });
+$('refresh').addEventListener('click', () => { const session = api; void refresh().then(() => { if (session === api) startWatch(session); }).catch(() => {}); });
 $('week-date').addEventListener('change', () => { selectedDay = null; void refresh().catch(() => {}); });
 
 async function refresh() {
@@ -126,7 +132,8 @@ function render() {
     pick.append(element('span', new Intl.DateTimeFormat(undefined, {weekday: 'short', timeZone: 'UTC'}).format(new Date(`${date}T12:00:00Z`))), element('span', date), element('strong', durationText(day?.total || 'PT0S')));
     card.append(pick); $('days').append(card);
   }
-  const activities = s.activities.filter(value => !selectedDay || (value.start < dayStart(addDays(selectedDay, 1), zone) && (!value.end || value.end > dayStart(selectedDay, zone))));
+  $('activities-heading').textContent = selectedDay ? `Activities — ${selectedDay}` : 'Activities';
+  const activities = s.activities.filter(value => !selectedDay || (instantNanos(value.start) < instantNanos(dayStart(addDays(selectedDay, 1), zone)) && (!value.end || instantNanos(value.end) > instantNanos(dayStart(selectedDay, zone)))));
   table('activities', ['Activity', 'Task', 'Start', 'End', 'Labels', 'Actions'], activities.map(value => {
     const node = row([value.summary || 'Activity', name(s.tasks, value.taskId, 'summary'), instantText(value.start, zone), instantText(value.end, zone), value.labelIds.map(id => name(s.labels, id)).join(', ') || '—'], [action('Edit', () => openRecord('activities', value.id)), action('Delete', () => openDelete('activities', value.id))]);
     node.tabIndex = 0; node.setAttribute('aria-selected', String(selectedActivity === value.id));
@@ -138,10 +145,12 @@ function render() {
 }
 function field(labelText, key, value = '', options = {}) {
   const label = element('label', labelText), input = element(options.choices ? 'select' : 'input'); input.name = key;
+  input.id = `field-${key}`; label.htmlFor = input.id; input.setAttribute('aria-label', labelText);
   if (options.choices) for (const [id, text] of options.choices) { const option = element('option', text); option.value = id; input.append(option); }
   else { input.type = options.type || 'text'; if (options.max) input.maxLength = options.max; }
   input.value = value ?? ''; input.required = !!options.required; label.append(input);
-  if (options.hint) label.append(element('p', options.hint, 'hint')); $('fields').append(label); return input;
+  if (options.hint) { const hint = element('p', options.hint, 'hint'); hint.id = `hint-${key}`; label.append(hint); input.setAttribute('aria-describedby', hint.id); }
+  $('fields').append(label); return input;
 }
 function labelFields(ids = []) {
   const group = element('fieldset'); group.append(element('legend', 'Labels'));
@@ -215,7 +224,7 @@ function values() {
 function freeze(state) { for (const input of $('fields').querySelectorAll('input,select')) input.disabled = state || (editor.collection === 'activities' && !!editor.id && input.name === 'taskId'); }
 $('editor-form').addEventListener('submit', async event => {
   event.preventDefault(); const current = editor;
-  if (!current || current.busy || current.session !== api || (!connected && !current.uncertain)) return;
+  if (!current || current.busy || current.session !== api) return;
   current.busy = true; $('save').disabled = true; $('cancel').disabled = true; $('editor-error').textContent = '';
   try {
     const body = current.uncertain ? current.payload : values();
