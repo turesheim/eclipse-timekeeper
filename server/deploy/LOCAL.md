@@ -1,4 +1,5 @@
 # Local Docker setup
 
 See the [local Docker setup guide](../../docs/operations/LOCAL-DOCKER.md).
-It includes private HTTPS access from other devices through Tailscale Serve.
+For private HTTPS access from other devices, use the
+[shared Tailscale access guide](../../docs/operations/TAILSCALE.md).

@@ -8,6 +8,7 @@ Documentation is grouped by responsibility:
 
 - Architecture: [data model](architecture/DATA-MODEL.md) and [API v1](architecture/API-V1.md).
 - Operations: [server](operations/SERVER.md), [local Docker setup](operations/LOCAL-DOCKER.md),
+  [Tailscale access](operations/TAILSCALE.md),
   [Eclipse connection](operations/ECLIPSE-CLIENT.md), [deployment](operations/DEPLOYMENT.md)
   and [database recovery](operations/DATABASE-RECOVERY.md).
 - Development: [repository layout](development/REPOSITORY.md),

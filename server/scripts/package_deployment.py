@@ -13,6 +13,7 @@ FILES = ('compose.yaml', '.env.example', 'haproxy.cfg', 'setup.py', 'backup.sh',
          'restore.sh', 'update.sh', 'postgres/bootstrap.sql')
 GUIDES = {'docs/operations/DEPLOYMENT.md': 'README.md',
           'docs/operations/LOCAL-DOCKER.md': 'LOCAL.md',
+          'docs/operations/TAILSCALE.md': 'TAILSCALE.md',
           'docs/operations/SERVER.md': 'SERVER.md',
           'docs/architecture/API-V1.md': 'API-POLICY.md'}
 
