@@ -80,7 +80,9 @@ final class UncertainTrackingScenario {
             operation.cancel();
         }
         String expected=cancel ? "The request was cancelled. Refresh to confirm whether the server completed it." : "The server request timed out. Refresh before repeating a change.";
-        var bot=new SWTWorkbenchBot();var shell=bot.shell(title);
+        var bot=new SWTWorkbenchBot();
+        RemoteTestSupport.waitFor(()->Arrays.stream(bot.shells()).anyMatch(shell->shell.getText().equals(title)),"Tracking failure dialog did not appear");
+        var shell=bot.shell(title);
         RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->message(shell.widget,expected));}catch(Exception pending) {return false;}},"Missing tracking outcome instruction");
         shell.bot().button("OK").click();
         if(operation!=null) {
