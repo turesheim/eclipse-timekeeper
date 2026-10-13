@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   workflow_run:
-    workflows: [Release p2 repository]
+    workflows: [Release p2 and server distributions]
     types: [completed]
   release:
     types: [edited, deleted]

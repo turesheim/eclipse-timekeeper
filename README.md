@@ -86,7 +86,9 @@ For a specific release, use `updates/releases/<tag>/` under the same base URL,
 for example `https://turesheim.github.io/eclipse-timekeeper/updates/releases/v2.0.0/`.
 Each release also provides a `timekeeper-p2.zip` asset and SHA-256 checksum on
 [GitHub Releases](https://github.com/turesheim/eclipse-timekeeper/releases).
-Download the ZIP and select **Add... > Archive...**, or extract it and select
+The release also includes `timekeeper-server.zip` and its checksum for the
+[server and bundled web client](server/README.md).
+Download the p2 ZIP and select **Add... > Archive...**, or extract it and select
 **Add... > Local...**. These assets do not require a GitHub login to download.
 
 Before publication, candidate builds remain available as the `p2-repository`
