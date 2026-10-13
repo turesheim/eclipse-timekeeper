@@ -16,6 +16,8 @@ import zipfile
 
 ARCHIVE = "timekeeper-p2.zip"
 CHECKSUM = ARCHIVE + ".sha256"
+SERVER_ARCHIVE = "timekeeper-server.zip"
+SERVER_CHECKSUM = SERVER_ARCHIVE + ".sha256"
 PROVENANCE = "timekeeper-release.json"
 FEATURE = "net.resheim.eclipse.timekeeper.feature.group"
 TAG = re.compile(r"v?(\d+)\.(\d+)\.(\d+)(?:-([A-Za-z0-9][A-Za-z0-9.-]*))?\Z")
@@ -167,12 +169,47 @@ def assemble_site(releases, output, download):
     (updates / "preview" / "index.html").write_text('<!doctype html><html lang="en"><meta charset="utf-8"><title>Timekeeper prereleases</title><h1>Timekeeper prereleases</h1><p>Use this page’s URL in Eclipse to install prereleases. <a href="../">Stable releases</a>.</p></html>\n', encoding="utf-8")
 
 
-def prepare(repo, tag):
+def complete_asset_state(release):
+    expected = {ARCHIVE, CHECKSUM, SERVER_ARCHIVE, SERVER_CHECKSUM}
+    found = {asset["name"] for asset in release.get("assets", [])} & expected
+    if found and found != expected:
+        raise ValueError(f"Incomplete release assets on {release['tag_name']}; restore or remove the partial upload before retrying")
+    return bool(found)
+
+
+def verify_complete_assets(assets, tag):
+    # Retain immutable uploads only after checking both distributions, including
+    # their shared source identity. No server binary is executed during reuse.
+    with tempfile.TemporaryDirectory() as temporary:
+        extracted = Path(temporary)
+        extract_verified(assets, extracted, tag)
+        p2_manifest = json.loads((extracted / PROVENANCE).read_text())
+    archive = assets / SERVER_ARCHIVE
+    checksum = (assets / SERVER_CHECKSUM).read_text().split()
+    if len(checksum) != 2 or checksum[1] != SERVER_ARCHIVE or checksum[0] != hashlib.sha256(archive.read_bytes()).hexdigest():
+        raise ValueError("Server release checksum does not match")
+    with zipfile.ZipFile(archive) as zipped:
+        if zipped.testzip() is not None:
+            raise ValueError("Invalid server release archive")
+        manifest = json.loads(zipped.read("timekeeper-server/" + PROVENANCE))
+        if manifest.get("kind") != "release" or manifest.get("tag") != tag or manifest.get("commit") != p2_manifest["commit"]:
+            raise ValueError("Server and p2 release provenance do not match")
+
+
+def prepare(repo, tag, require_server=False):
     release_version(tag)
     release = json.loads(gh("release", "view", tag, "--repo", repo, "--json", "isDraft,tagName,assets"))
     if release["isDraft"] or release["tagName"] != tag:
         raise ValueError("Only an already published release may be built")
-    reuse = asset_state({"tag_name": tag, "assets": release["assets"]})
+    state = {"tag_name": tag, "assets": release["assets"]}
+    reuse = complete_asset_state(state) if require_server else asset_state(state)
+    if reuse and require_server:
+        with tempfile.TemporaryDirectory() as temporary:
+            assets = Path(temporary)
+            gh("release", "download", tag, "--repo", repo, "--pattern", ARCHIVE,
+               "--pattern", CHECKSUM, "--pattern", SERVER_ARCHIVE,
+               "--pattern", SERVER_CHECKSUM, "--dir", str(assets))
+            verify_complete_assets(assets, tag)
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
         output.write(f"reuse={str(reuse).lower()}\n")
     if reuse:
@@ -195,6 +232,7 @@ def main():
     preflight = commands.add_parser("prepare")
     preflight.add_argument("--repo", required=True)
     preflight.add_argument("--tag", required=True)
+    preflight.add_argument("--require-server", action="store_true", help="Require and verify both p2 and server release assets")
     pack = commands.add_parser("package")
     pack.add_argument("--repository", required=True, type=Path)
     pack.add_argument("--tag", required=True)
@@ -205,7 +243,7 @@ def main():
     publish.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     if args.command == "prepare":
-        prepare(args.repo, args.tag)
+        prepare(args.repo, args.tag, args.require_server)
     elif args.command == "package":
         package(args.repository, args.tag, args.commit, args.output)
     else:
