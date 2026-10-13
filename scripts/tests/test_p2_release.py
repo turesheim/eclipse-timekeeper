@@ -159,7 +159,7 @@ class PublicationTest(unittest.TestCase):
         def github(*args):
             path=args[1]
             if path=="repos/owner/repo":return "main\n"
-            if "workflows/build.yml/runs" in path:return json.dumps({"workflow_runs":[run]})
+            if "workflows/build.yml/runs" in path:return json.dumps([{"workflow_runs":[run]}])
             if "/jobs" in path:return json.dumps({"jobs":jobs})
             if "/artifacts" in path:return json.dumps({"artifacts":[artifact]})
             self.fail("Unexpected API request: "+path)
@@ -270,6 +270,57 @@ class PublicationTest(unittest.TestCase):
         actual={p.relative_to(output).as_posix():p.read_bytes() for p in output.rglob("*") if p.is_file()}
         self.assertEqual(expected,actual)
         self.assertEqual("Project documentation",(output/"index.html").read_text())
+
+    def _documentation_site_fixture(self, expired=False):
+        run,jobs,artifact,archive,github,download=self._testing_fixture()
+        artifact["expired"]=expired
+        current={**run,"id":789,"head_sha":"b"*40}
+        skipped=[{**job,"conclusion":"skipped"} for job in jobs]
+        output=self.root/"documentation";output.mkdir();(output/"index.html").write_text("Updated README")
+        def api(*args):
+            path=args[1]
+            if path=="repos/owner/repo/actions/runs/789":return json.dumps(current)
+            if path=="repos/owner/repo/releases":return json.dumps([[]])
+            # Many lightweight documentation builds must not hide the older tested binary.
+            if "workflows/build.yml/runs" in path:
+                return json.dumps([{"workflow_runs":[current]*15},{"workflow_runs":[run]}])
+            if path.endswith("/789/jobs?per_page=100"):return json.dumps({"jobs":skipped})
+            return github(*args)
+        with patch.object(p2,"gh",side_effect=api),patch.object(p2,"download_testing_artifact",side_effect=download):
+            identity=p2.docs_site("owner/repo",output,"b"*40,789)
+        prepared=self.root/"documentation.zip"
+        with zipfile.ZipFile(prepared,"w") as zipped:
+            for path in output.rglob("*"):
+                if path.is_file():zipped.write(path,path.relative_to(output).as_posix())
+        site_artifact={**artifact,"id":457,"name":"website-update-site","expired":False,
+                       "digest":"sha256:"+hashlib.sha256(prepared.read_bytes()).hexdigest(),
+                       "workflow_run":{"id":789,"head_sha":"b"*40,"head_branch":"main"}}
+        def fetch_api(*args):
+            if args[1].endswith("/789/artifacts?per_page=100"):return json.dumps({"artifacts":[site_artifact]})
+            return api(*args)
+        def fetch(repo,artifact_id,destination):
+            self.assertEqual(457,artifact_id);shutil.copyfile(prepared,destination)
+        return output,identity,fetch_api,fetch
+
+    def test_documentation_build_keeps_previous_binary_identity_and_publishes_exact_site(self):
+        prepared,identity,api,fetch=self._documentation_site_fixture()
+        self.assertEqual("b"*40,identity["commit"])
+        self.assertEqual("a"*40,identity["testing"]["commit"])
+        self.assertEqual(123,identity["testing"]["run"])
+        deployed=self.root/"deployed"
+        with patch.object(p2,"gh",side_effect=api),patch.object(p2,"download_testing_artifact",side_effect=fetch):
+            self.assertEqual(identity,p2.fetch_site("owner/repo",deployed,789))
+        self.assertEqual("Updated README",(deployed/"index.html").read_text())
+        expected={p.relative_to(prepared).as_posix():p.read_bytes() for p in prepared.rglob("*") if p.is_file()}
+        actual={p.relative_to(deployed).as_posix():p.read_bytes() for p in deployed.rglob("*") if p.is_file()}
+        self.assertEqual(expected,actual)
+
+    def test_documentation_without_available_binary_has_explicit_empty_testing_channel(self):
+        prepared,identity,api,fetch=self._documentation_site_fixture(expired=True)
+        self.assertIsNone(identity["testing"])
+        with patch.object(p2,"gh",side_effect=api),patch.object(p2,"download_testing_artifact",side_effect=fetch):
+            p2.fetch_site("owner/repo",self.root/"deployed",789)
+        self.assertEqual([],ET.parse(prepared/"updates/testing/compositeContent.xml").findall("./children/child"))
 
     def test_pages_refuses_untrusted_runs_wrong_site_source_and_corrupt_artifacts(self):
         for change in ("pr","fork","incomplete","source","checksum"):

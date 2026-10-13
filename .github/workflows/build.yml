@@ -12,7 +12,21 @@ permissions:
   actions: read
 
 jobs:
+  Changes:
+    name: Select validation jobs
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
+    steps:
+    - uses: actions/checkout@v7.0.1
+      with:
+        fetch-depth: 0
+    - id: changes
+      run: python3 scripts/ci_changes.py
+
   API-contract:
+    needs: Changes
+    if: needs.Changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7.0.1
@@ -27,6 +41,8 @@ jobs:
       run: python -m unittest discover -s common/api/tests -v
 
   Server:
+    needs: Changes
+    if: needs.Changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -168,7 +184,14 @@ jobs:
 
   Publication:
     name: Build website and update site
-    needs: [Build, API-contract, Server, Web, Remote-Eclipse, Publication-tooling]
+    needs: [Changes, Build, API-contract, Server, Web, Remote-Eclipse, Publication-tooling]
+    if: >-
+      !cancelled() && needs.Changes.result == 'success' &&
+      needs.Publication-tooling.result == 'success' &&
+      (needs.Changes.outputs.code == 'false' ||
+       (needs.Build.result == 'success' && needs.API-contract.result == 'success' &&
+        needs.Server.result == 'success' && needs.Web.result == 'success' &&
+        needs.Remote-Eclipse.result == 'success'))
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7.0.1
@@ -178,6 +201,7 @@ jobs:
         source: ./
         destination: ./_site
     - name: Add verified current-matrix update site and release channels
+      if: needs.Changes.outputs.code == 'true'
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
@@ -188,6 +212,14 @@ jobs:
         test -f _site/index.html
         test -f _site/updates/compositeContent.xml
         test -f _site/updates/testing/compositeContent.xml
+    - name: Add existing tested update site to changed documentation
+      if: needs.Changes.outputs.code == 'false'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        sudo chown -R "$(id -u):$(id -g)" _site
+        python3 scripts/p2_release.py docs-site --repo "$GITHUB_REPOSITORY" \
+          --output _site --commit "$GITHUB_SHA" --run "$GITHUB_RUN_ID"
     - name: Upload complete website and update site
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: actions/upload-artifact@v7.0.1
@@ -197,6 +229,8 @@ jobs:
         if-no-files-found: error
 
   Build:
+    needs: Changes
+    if: needs.Changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:

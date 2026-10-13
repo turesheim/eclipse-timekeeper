@@ -222,14 +222,22 @@ def fetch_site(repo,output,run_id):
         identity=json.loads((prepared/"timekeeper-site.json").read_text())
         if identity.get("commit")!=run["head_sha"] or identity.get("run")!=run_id:
             raise ValueError("Prepared site source does not match the successful build")
+        testing=identity.get("testing") if identity.get("kind")=="documentation" else identity
         children=ET.parse(prepared/"updates/testing/compositeContent.xml").findall("./children/child")
+        if not (prepared/"index.html").is_file():
+            raise ValueError("Prepared website is missing")
+        if testing is None:
+            if children:
+                raise ValueError("Prepared site has an undeclared testing repository")
+            shutil.copytree(prepared,output,dirs_exist_ok=True)
+            return identity
         if len(children)!=1:
             raise ValueError("Prepared site has no unique testing repository")
         repository=(prepared/"updates/testing"/children[0].get("location","")).resolve()
         repository.relative_to(prepared.resolve())
-        if testing_repository_version(repository)!=identity.get("version") or not (prepared/"index.html").is_file():
+        if testing_repository_version(repository)!=testing.get("version"):
             raise ValueError("Prepared website or testing version is invalid")
-        if json.loads((repository/"timekeeper-build.json").read_text())!=identity:
+        if json.loads((repository/"timekeeper-build.json").read_text())!=testing:
             raise ValueError("Prepared site and p2 source identities differ")
         shutil.copytree(prepared,output,dirs_exist_ok=True)
     return identity
@@ -237,9 +245,10 @@ def fetch_site(repo,output,run_id):
 
 def add_testing_channel(repo, output):
     branch=gh("api",f"repos/{repo}","--jq",".default_branch").strip()
-    runs=json.loads(gh("api",f"repos/{repo}/actions/workflows/build.yml/runs",
+    pages=json.loads(gh("api",f"repos/{repo}/actions/workflows/build.yml/runs",
                       "--method","GET","-f",f"branch={branch}","-f","event=push",
-                      "-f","status=success","-f","per_page=10"))["workflow_runs"]
+                      "-f","status=success","-f","per_page=100","--paginate","--slurp"))
+    runs=[run for page in pages for run in page["workflow_runs"]]
     required={"API-contract","Server","Web","Build (ubuntu-latest)",
               "Build (macos-latest)","Build (windows-latest)"}
     for run in runs:
@@ -289,6 +298,18 @@ def add_testing_channel(repo, output):
         return provenance
     print("No complete verified main p2 artifact is available for the testing channel.")
     return None
+
+
+def docs_site(repo,output,commit,run_id):
+    run=json.loads(gh("api",f"repos/{repo}/actions/runs/{run_id}"))
+    if run["id"]!=run_id or (run["event"]=="push" and run["head_sha"]!=commit):
+        raise ValueError("Documentation source does not match its workflow run")
+    testing=site(repo,output,include_testing=True)
+    if not (output/"index.html").is_file():
+        raise ValueError("Build the project website before adding update repositories")
+    identity={"kind":"documentation","commit":commit,"run":run_id,"testing":testing}
+    (output/"timekeeper-site.json").write_text(json.dumps(identity,indent=2)+"\n")
+    return identity
 
 
 def composite(directory, name, children):
@@ -409,7 +430,7 @@ def site(repo, output, include_testing=False):
 
     assemble_site(releases, output, download)
     if include_testing:
-        add_testing_channel(repo, output)
+        return add_testing_channel(repo, output)
 
 
 def main():
@@ -439,6 +460,11 @@ def main():
     build.add_argument("--output", required=True, type=Path)
     build.add_argument("--commit", required=True)
     build.add_argument("--run", required=True, type=int)
+    docs = commands.add_parser("docs-site", help="Build changed documentation with existing verified p2 artifacts")
+    docs.add_argument("--repo", required=True)
+    docs.add_argument("--output", required=True, type=Path)
+    docs.add_argument("--commit", required=True)
+    docs.add_argument("--run", required=True, type=int)
     fetch = commands.add_parser("fetch-site", help="Fetch the site prepared by a successful main Build")
     fetch.add_argument("--repo", required=True)
     fetch.add_argument("--output", required=True, type=Path)
@@ -452,6 +478,8 @@ def main():
         check_site(args.repo, args.repository, args.output, args.commit, args.run)
     elif args.command == "build-site":
         build_site(args.repo,args.output,args.commit,args.run)
+    elif args.command == "docs-site":
+        docs_site(args.repo,args.output,args.commit,args.run)
     elif args.command == "fetch-site":
         fetch_site(args.repo,args.output,args.run)
     else:

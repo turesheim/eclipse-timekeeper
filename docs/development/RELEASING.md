@@ -34,8 +34,9 @@ so binary metadata and JARs are served without transformation.
 
 The **Website and p2 update site** workflow runs after a successful main Build
 workflow or release build, on release edits/deletions, and on manual dispatch. It
-always checks out the default branch and reconstructs the complete site from
-published release assets. Drafts and historical releases without the new asset
+always checks out the default branch. After a main Build it fetches that run's
+prepared site; other triggers reconstruct the site from published release
+assets and the latest qualifying main build. Drafts and historical releases without the new asset
 pair are excluded. Checksums, embedded release identity, feature version and
 the artifact inventory must validate before a Pages deployment can proceed.
 Failed builds or invalid assets leave the previously deployed site intact.
@@ -63,12 +64,23 @@ build/artifact-specific path; stable and preview channels remain release-only.
 checksum, p2 metadata, channel selection and documentation-link code in
 parallel. These are tests of this repository's tooling.
 
-**Build website and update site** depends on the complete build matrix, API,
+For code changes, **Build website and update site** depends on the complete build matrix, API,
 server, web, installed-client and tooling jobs. It builds the documentation
 with Jekyll, verifies and downloads `p2-repository` from that same run, adds
 the testing repository and published release channels, and uploads the complete
 `website-update-site` artifact on main pushes. `timekeeper-site.json` records
-its source/run and p2 identity. It does not substitute a previous main build.
+its source/run and p2 identity. Code builds do not substitute a previous main build.
+
+**Select validation jobs** compares a PR with its merge base, or a main push
+with its previous head. If every changed path is a Markdown file or under
+`docs/`, the platform matrix, API, server, web, installed-client and container
+jobs are skipped. Only the small packaging/channel tests and website assembly
+run. Documentation publication reuses the latest available fully tested main
+p2 artifact and released channels; it does not create or promote new binaries.
+The site receipt records the new documentation commit/run separately from the
+retained p2 commit/run. Pages still deploys the exact prepared site artifact.
+Tags, manually dispatched container builds, mixed code/documentation changes,
+workflow changes and unavailable diff history retain full validation.
 
 A main push starts Build. Pages waits for the complete successful workflow;
 there is no separate immediate push deployment. Its `workflow_run` trigger
@@ -79,7 +91,7 @@ source identity and complete p2 repository, and deploys it through **Publish
 website and update site**. The documentation and binaries are not rebuilt on
 that path. Release edits, release-workflow completion and explicit manual
 dispatch still reconstruct the release channels from verified assets and the
-latest qualifying main p2 build. Failed, skipped or PR builds cannot advance testing.
+latest qualifying main p2 build. Failed, documentation-only or PR builds cannot advance testing.
 If no qualifying unexpired artifact exists, its page explains that no testing
 build is available. It does not substitute an unchecked candidate. Action
 artifacts have finite retention; rerun main Build to repopulate an expired test
