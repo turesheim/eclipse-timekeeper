@@ -17,6 +17,7 @@ async function save(name = 'Save') {
 async function named(tabName, kind, name) {
   await tab(tabName); await page.getByRole('button', {name:'New ' + kind, exact:true}).click();
   await page.getByLabel('Name', {exact:true}).fill(name); await save();
+  await expect(page.locator(`#${tabName.toLowerCase()} tr`).filter({hasText:name})).toBeVisible();
 }
 async function zone(value) {
   await page.getByRole('button', {name:'Time zone', exact:true}).click();
@@ -94,6 +95,14 @@ try {
     catch (error) {
       await page.screenshot({path:process.env.TIMEKEEPER_WEB_FAILURE_IMAGE, fullPage:true});
       await writeFile(process.env.TIMEKEEPER_WEB_FAILURE_TEXT, await page.locator('body').innerText());
+      const records = {};
+      for (const collection of ['projects','labels']) {
+        try {
+          const response = await page.request.get(`/api/v1/${collection}`, {headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`}});
+          records[collection] = (await response.json()).items?.map(({id,name}) => ({id,name}));
+        } catch { records[collection] = 'diagnostic read failed'; }
+      }
+      await writeFile(process.env.TIMEKEEPER_WEB_FAILURE_RECORDS, JSON.stringify(records));
       const message = String(error.message).replaceAll(process.env.TIMEKEEPER_WEB_TOKEN, '[redacted]').slice(0, 4000);
       process.stdout.write(JSON.stringify({ok:false, message}) + '\n'); process.exitCode = 1; break;
     }

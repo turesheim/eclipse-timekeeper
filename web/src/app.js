@@ -234,6 +234,7 @@ $('editor-form').addEventListener('submit', async event => {
     await current.session.request(path, {method, body, etag: current.etag, key: current.key});
     if (current.session !== api || current !== editor) return;
     editor = null; $('editor').close(); $('fields').replaceChildren();
+    connected = false; readOnlyWhileDisconnected(); setStatus('Refreshing saved changes…');
     // Acknowledged saves remain successful even if the following read fails.
     await refresh().catch(() => {});
   } catch (error) {

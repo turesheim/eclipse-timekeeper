@@ -119,6 +119,7 @@ final class RemoteWebScenario {
             builder.environment().put("TIMEKEEPER_WEB_TOKEN",RemoteBootstrap.observerBToken());
             builder.environment().put("TIMEKEEPER_WEB_FAILURE_IMAGE",RemoteBootstrap.fixtureFolder().resolve("browser-peer-failure.png").toString());
             builder.environment().put("TIMEKEEPER_WEB_FAILURE_TEXT",RemoteBootstrap.fixtureFolder().resolve("browser-peer-failure.txt").toString());
+            builder.environment().put("TIMEKEEPER_WEB_FAILURE_RECORDS",RemoteBootstrap.fixtureFolder().resolve("browser-peer-failure-records.json").toString());
             builder.redirectError(RemoteBootstrap.fixtureFolder().resolve("browser-peer.log").toFile());process=builder.start();
             input=new BufferedWriter(new OutputStreamWriter(process.getOutputStream(),StandardCharsets.UTF_8));output=new BufferedReader(new InputStreamReader(process.getInputStream(),StandardCharsets.UTF_8));
             RemoteBootstrap.receipt().setProperty("web.browser-driver.pid",Long.toString(process.pid()));
