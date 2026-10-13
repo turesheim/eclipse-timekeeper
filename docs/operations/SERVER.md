@@ -8,9 +8,9 @@ no Eclipse Platform, workspace, SWT, Mylyn, OSGi or JPA dependency.
 
 The bundled web client is available at `/web/`; see [web client documentation](../development/WEB-CLIENT.md) for usage and browser tests.
 
-Remote Eclipse (#220), web frontend (#221) and client synchronization (#219)
-acceptance remain required before Timekeeper 2.0 publication. Server HTTP tests
-do not certify those clients or a published p2 installation.
+See [client/server acceptance](../verification/CLIENT-SERVER-ACCEPTANCE.md) for
+the inspected merged-main Eclipse, browser and synchronization receipts. Final
+tagged artifacts and public p2 installation remain separate release gates.
 
 ## Build and automatic acceptance
 
@@ -63,9 +63,20 @@ The database directory and registry are administrator-owned. Registry entries
 use `ownerId`, `sha256`, `permissions` (`read`, optionally `write`) and optional
 `expiresAt` (UTC timestamp). Owners are stable, nonblank IDs; `local` is reserved
 for embedded mode. Multiple generated tokens can belong to one owner. New
-owners receive a UTC profile on their first successful operation and can set an
+owners receive a UTC profile at startup, or on their first successful operation
+after being added to a running server, and can set an
 IANA reporting zone through `PUT /api/v1/me` with its ETag. API requests never
 select another owner.
+
+Each account starts with the same eight labels as embedded Eclipse:
+Production issue, Testing, Prototyping, Planning, Programming, Debugging,
+Communication and Meeting, with their standard colors. Labels have separate
+UUIDs for each owner. Server startup initializes an existing account only when
+its label set is empty; any nonempty set, including customized labels, is kept
+unchanged. Deleting all labels leaves the running account empty; restarting
+restores the defaults, matching embedded initialization. New owners added while
+running are initialized atomically on their first successful operation. Both
+deployments use the shared catalog in `common/timekeeper-domain`.
 
 Use `--read-only` or `--expires-at 2026-12-31T23:59:59Z` when generating a token.
 Rotate by adding a new token for the same owner, configuring the client, then

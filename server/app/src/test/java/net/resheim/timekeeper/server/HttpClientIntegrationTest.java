@@ -110,7 +110,8 @@ class HttpClientIntegrationTest {
             var oldLabels=before.labels().stream().map(Label::id).collect(java.util.stream.Collectors.toSet());
             target.deleteActivity(new DeleteActivity(recorded.id(),recorded.version()));
             target.deleteTask(new DeleteTask(imported.id(),imported.version()));target.deleteTask(new DeleteTask(importedParent.id(),importedParent.version()));
-            target.deleteLabel(new DeleteLabel(importedLabel.id(),importedLabel.version()));
+            for(var item:target.labels()) if(!oldLabels.contains(item.id()))
+                target.deleteLabel(new DeleteLabel(item.id(),item.version()));
             var importedProject=target.project(imported.projectId().orElseThrow()).orElseThrow();target.deleteProject(new DeleteProject(importedProject.id(),importedProject.version()));
             assertTrue(target.tasks().stream().allMatch(task->oldTasks.contains(task.id())));
             assertTrue(target.projects().stream().allMatch(item->oldProjects.contains(item.id())));

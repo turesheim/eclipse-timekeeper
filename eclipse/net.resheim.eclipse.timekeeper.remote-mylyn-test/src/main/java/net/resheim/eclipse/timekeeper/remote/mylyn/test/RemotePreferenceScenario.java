@@ -77,6 +77,14 @@ final class RemotePreferenceScenario {
             var finalInterval=api.activity(interval.id()).orElseThrow();api.deleteActivity(new DeleteActivity(finalInterval.id(),finalInterval.version()));
             var finalTask=api.task(task.id()).orElseThrow();api.deleteTask(new DeleteTask(finalTask.id(),finalTask.version()));
             var finalProject=api.project(project.id()).orElseThrow();api.deleteProject(new DeleteProject(finalProject.id(),finalProject.version()));
+            // The direct fixture deletes are acknowledged before the installed client's
+            // coalesced refresh completes. Open preferences only once its snapshot is ready.
+            var cleaned=api.metadata();
+            RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->{
+                var plugin=TimekeeperUiPlugin.getDefault();var service=plugin.getTimekeeperService();
+                return plugin.isBackendReady() && service.projects().equals(cleaned.projects())
+                        && service.tasks().equals(cleaned.tasks()) && service.labels().equals(cleaned.labels());
+            });}catch(Exception pending) {return false;}},"Final transfer cleanup did not reach the ready installed snapshot");
             var remove=open(LABELS);remove.bot().table().select(changed.name());remove.bot().button("Remove").click();remove.bot().table().select(emptyColor.name());remove.bot().button("Remove").click();remove.bot().button("Apply and Close").click();
             RemoteTestSupport.waitFor(()->!remove.isOpen(),"Label removal preferences did not acknowledge");assertTrue(api.label(changed.id()).isEmpty());assertTrue(api.label(emptyColor.id()).isEmpty());
             RemoteTestSupport.closedLocalStorage();RemoteBootstrap.receipt().setProperty("phase.native.label-preferences","passed");RemoteBootstrap.receipt().setProperty("phase.native.report-controls","passed");RemoteBootstrap.writeProof();

@@ -34,6 +34,10 @@ The [database policy](../operations/DATABASE-RECOVERY.md) documents current back
 For current release procedures, see [RELEASING.md](RELEASING.md). The
 checkpoint and historical results below retain the status recorded on their
 respective dates; current work is tracked in GitHub issues and pull requests.
+For the October 13 merged-main client/server result, see
+[client/server acceptance](../verification/CLIENT-SERVER-ACCEPTANCE.md). That report
+supersedes the client/server implementation status at the earlier checkpoint;
+the separate Error Log and publication gates remain open.
 
 ## Release gates recorded at the October 12 checkpoint
 

@@ -10,6 +10,30 @@ Timekeeper 2.0 is under development. See the [project documentation](docs/README
 and [user guide](https://github.com/turesheim/eclipse-timekeeper/wiki/Timekeeper-2.0-User-Guide)
 for capabilities and release status.
 
+## Install the Eclipse plugins
+
+The project website and update site are hosted together on GitHub Pages:
+
+```text
+https://turesheim.github.io/eclipse-timekeeper/updates/
+```
+
+1. In Eclipse, open **Help > Install New Software... > Add...**.
+2. Enter **Timekeeper** as the name and paste the URL above into **Location**.
+3. Select **Timekeeper for Eclipse**. Also select **Timekeeper Mylyn integration**
+   if you want Mylyn task activation and Task List integration.
+4. Complete the installation, restart Eclipse, and open
+   **Window > Show View > Other... > Timekeeper > Workweek**.
+
+Timekeeper 2.0 requires **Eclipse 2026-09 (4.41) and Java 21**. Keep the
+Eclipse 2026-09 software site enabled so Eclipse can resolve dependencies.
+Published prereleases use the separate [preview update site](https://turesheim.github.io/eclipse-timekeeper/updates/preview/).
+An empty channel means no matching release has been published; 2.0 is still
+under development. See the [installation guide](https://github.com/turesheim/eclipse-timekeeper/wiki/Installing-Timekeeper-2.0)
+for candidate builds and installing a downloaded p2 archive.
+
+## Repository
+
 | Directory | Responsibility |
 | --- | --- |
 | [common](common/README.md) | Shared Java domain, service API, HTTP client and OpenAPI contract |

@@ -200,14 +200,9 @@ public class TimekeeperPlugin extends Plugin {
 		if (manager.createQuery("SELECT COUNT(l) FROM ActivityLabel l", Long.class).getSingleResult() != 0) {
 			return;
 		}
-		String[][] defaults = {
-				{ "Production issue", "244,103,88" }, { "Testing", "245,166,81" },
-				{ "Prototyping", "246,208,90" },{ "Planning", "255,0,255" }, { "Programming", "87,206,105" },
-				{ "Debugging", "177,111,209" }, { "Communication", "66,136,243" },
-				{ "Meeting", "156,156,160" } };
 		manager.getTransaction().begin();
-		for (String[] label : defaults) {
-			manager.persist(new ActivityLabel(label[0], label[1]));
+		for (var label : net.resheim.eclipse.timekeeper.domain.DefaultLabels.definitions()) {
+			manager.persist(new ActivityLabel(label.name(), label.rgbColor()));
 		}
 		manager.getTransaction().commit();
 	}

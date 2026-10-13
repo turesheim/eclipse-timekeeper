@@ -29,6 +29,7 @@ import net.resheim.eclipse.timekeeper.service.Ports.*;
 @ApplicationScoped
 public class ServerStore {
     @Inject AgroalDataSource datasource;
+    @Inject TokenRegistry tokens;
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="quarkus.datasource.jdbc.url") String jdbcUrl;
     private final ThreadLocal<Context> context = new ThreadLocal<>();
     record Context(String owner, Connection connection, Instant now) { }
@@ -41,6 +42,20 @@ public class ServerStore {
                 try(var statement=connection.createStatement()) {statement.execute("SET WRITE_DELAY 0");}
             }
         }
+        initializeConfiguredOwners();
+    }
+    void initializeConfiguredOwners() {
+        for (String owner : tokens.load().stream().map(TokenRegistry.Token::owner).distinct().toList()) {
+            transaction(owner,() -> { initializeDefaultLabels(); return null; });
+        }
+    }
+    private void initializeDefaultLabels() {
+        if (!list("LABEL").isEmpty()) return;
+        var service=service();
+        for (var label : DefaultLabels.definitions()) {
+            service.createLabel(new net.resheim.eclipse.timekeeper.service.Commands.CreateLabel(
+                    label.name(),Optional.of(label.hexColor())));
+        }
     }
     public <T> T transaction(String owner, Supplier<T> work) {
         Context existing = context.get();
@@ -52,16 +67,18 @@ public class ServerStore {
             connection.setAutoCommit(false);
             try {
                 // Provision a configured token owner without overwriting existing preferences.
+                boolean created=false;
                 try (var insert = connection.prepareStatement("INSERT INTO tk_owner(id,zone_id,version,revision,cursor_secret) VALUES(?,'UTC',0,0,?)"
                         + (postgres() ? " ON CONFLICT (id) DO NOTHING" : ""))) {
                     insert.setString(1,owner);
                     byte[] secret=new byte[32];new java.security.SecureRandom().nextBytes(secret);insert.setString(2,java.util.HexFormat.of().formatHex(secret));
-                    try { insert.executeUpdate(); } catch (SQLException e) { if (!"23505".equals(e.getSQLState())) throw e; }
+                    try { created=insert.executeUpdate()!=0; } catch (SQLException e) { if (!"23505".equals(e.getSQLState())) throw e; }
                 }
                 try (var lock = connection.prepareStatement("SELECT revision FROM tk_owner WHERE id=? FOR UPDATE")) {
                     lock.setString(1,owner); try (var rows = lock.executeQuery()) { if (!rows.next()) throw new SQLException("Missing owner"); }
                 }
                 context.set(new Context(owner,connection,Instant.now()));
+                if (created) initializeDefaultLabels();
                 T result = work.get(); connection.commit(); return result;
             } catch (Throwable e) {
                 try { connection.rollback(); } catch (SQLException rollback) { e.addSuppressed(rollback); }

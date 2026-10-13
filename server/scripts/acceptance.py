@@ -117,6 +117,16 @@ def main():
                'revocationVerified': False, 'longPollVerified': False, 'distributionSha256': distribution_hash}
     try:
         start('first')
+        expected_labels = {'Production issue': '#F46758', 'Testing': '#F5A651',
+                           'Prototyping': '#F6D05A', 'Planning': '#FF00FF',
+                           'Programming': '#57CE69', 'Debugging': '#B16FD1',
+                           'Communication': '#4288F3', 'Meeting': '#9C9CA0'}
+        initial_labels = {}
+        for owner in ('a', 'b'):
+            page, _ = client.call('GET', '/labels', owner=owner)
+            client.assertEqual(expected_labels, {item['name']: item['color'] for item in page['items']})
+            initial_labels[owner] = {item['id'] for item in page['items']}
+        client.assertTrue(initial_labels['a'].isdisjoint(initial_labels['b']))
         suite = unittest.defaultTestLoader.loadTestsFromTestCase(contract.HttpAcceptance)
         result = unittest.TextTestRunner(verbosity=2).run(suite)
         if not result.wasSuccessful() or result.skipped:
@@ -203,6 +213,7 @@ def main():
         client.assertEqual(active, replay)
         client.assertEqual(active_headers['ETag'], headers['ETag'])
         receipt['restartVerified'] = True
+        receipt['defaultLabelsVerified'] = True
         stop_key = {**client.key(), 'If-Match': active_headers['ETag']}
         ended, ended_headers = client.call('POST', f'/activities/{active["id"]}/stop', headers=stop_key)
         stop(force=True)

@@ -1,0 +1,56 @@
+# Connect Eclipse to the Timekeeper server
+
+Install **Timekeeper for Eclipse** from the [update site](https://turesheim.github.io/eclipse-timekeeper/updates/).
+In **Help > Install New Software... > Add...**, paste that URL into **Location**,
+select the feature and restart. Add **Timekeeper Mylyn integration** if you want
+Task List integration. Timekeeper 2.0 requires Eclipse 2026-09 and Java 21;
+see the [installation guide](https://github.com/turesheim/eclipse-timekeeper/wiki/Installing-Timekeeper-2.0)
+for publication status and candidate installation.
+
+## Select the remote backend
+
+1. Obtain the server URL and a bearer token for your account from its operator.
+2. Open **Preferences > Timekeeper > Backend** and select **Timekeeper server**.
+3. Enter the server's API URL, ending in `/api/v1`, and the token.
+4. Apply the settings and restart Eclipse. Open **Window > Show View > Other... >
+   Timekeeper > Workweek**.
+
+Use `http://127.0.0.1:8080/api/v1` for a server on the same computer. Other hosts
+require HTTPS. The [local Docker guide](LOCAL-DOCKER.md#5-reach-the-test-server-through-tailscale)
+describes HTTPS access through Tailscale. The server remains the authority for
+records; selecting a backend does not copy or merge databases. Mylyn activation
+uses the selected backend after restart.
+
+## If the token cannot be saved
+
+Timekeeper encrypts tokens using Eclipse secure storage. A storage error occurs
+before the new backend settings are saved; resolve it and apply the settings
+again. The error now identifies a missing provider, unavailable master password,
+encryption/decryption failure, or an unwritable storage file.
+
+Open **Preferences > General > Security > Secure Storage**. On the **Passwords**
+tab, inspect the available master-password providers. On macOS, the operating
+system provider obtains its master password from the OS keyring; allow the
+corresponding Keychain prompt if it appears. If the provider malfunctions,
+Eclipse allows selecting another enabled provider for new entries. An existing
+encrypted entry still requires its original provider and master password.
+
+For a file-write error, use the **Contents** tab to find the storage location
+and check that your account can write it. Recover an existing master password
+using Eclipse's recovery option when it was configured. Deleting the shared
+secure-storage file removes other Eclipse credentials too, so preserve it when
+troubleshooting. Timekeeper does not fall back to plaintext preferences.
+
+See Eclipse's [secure-storage preferences](https://help.eclipse.org/latest/topic/org.eclipse.platform.doc.user/reference/ref-securestorage-prefs.htm)
+and [how secure storage works](https://help.eclipse.org/latest/topic/org.eclipse.platform.doc.user/reference/ref-securestorage-works.htm).
+
+## Conflicts and interrupted requests
+
+Changes from other clients refresh Workweek automatically. Open editors retain
+their original drafts and record version; if another client changes that
+record, close the editor, review the refreshed record and reopen it before
+saving. Authentication and connection errors appear in the client and preserve
+the server's data. After a request times out or is cancelled, follow its review
+instruction: a request may already have committed. Ordinary creates are not
+automatically repeated. Start/stop and CSV import use owner-bound command keys
+for the explicitly supported retry flows.
