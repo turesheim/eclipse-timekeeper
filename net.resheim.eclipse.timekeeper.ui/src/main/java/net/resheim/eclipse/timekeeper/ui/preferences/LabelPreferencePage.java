@@ -284,10 +284,11 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
         saving=true;closeAfterSave=close;getControl().setEnabled(false);setValid(false);if(getContainer()!=null) getContainer().updateButtons();
         plugin.runOperation("Save Timekeeper labels",()->{
             var service=plugin.getTimekeeperService();var ids=changes.stream().map(ActivityLabel::getId).collect(Collectors.toSet());
-            for(var entry:original.entrySet()) if(!ids.contains(entry.getKey())) {service.deleteLabel(new net.resheim.eclipse.timekeeper.service.Commands.DeleteLabel(entry.getValue().id(),entry.getValue().version()));deleted.add(entry.getKey());}
+            for(var entry:original.entrySet()) if(!ids.contains(entry.getKey())) {net.resheim.eclipse.timekeeper.ui.client.RemoteRecordSnapshots.verify(service,entry.getValue());service.deleteLabel(new net.resheim.eclipse.timekeeper.service.Commands.DeleteLabel(entry.getValue().id(),entry.getValue().version()));deleted.add(entry.getKey());}
             for(var row:changes) {
                 var saved=original.get(row.getId());var color=java.util.Optional.ofNullable(row.getColor());
                 if(saved!=null && saved.name().equals(row.getName()) && saved.color().equals(color)) continue;
+                net.resheim.eclipse.timekeeper.ui.client.RemoteRecordSnapshots.verify(service,saved);
                 var result=saved==null ? service.createLabel(new net.resheim.eclipse.timekeeper.service.Commands.CreateLabel(row.getName(),color))
                     : service.updateLabel(new net.resheim.eclipse.timekeeper.service.Commands.UpdateLabel(saved.id(),saved.version(),row.getName(),color));
                 progress.put(row.getId(),result);
@@ -315,7 +316,7 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
             var selection=editableLabels.stream().filter(row->row.getId().equals(id)).findFirst();
             fAppearanceColorTableViewer.setSelection(selection.map(StructuredSelection::new).orElse(StructuredSelection.EMPTY),true);
         }
-        if(failure!=null) {setErrorMessage(uncertainCreate ? net.resheim.eclipse.timekeeper.ui.client.RemoteOutcomes.REVIEW_CREATE : failure.getMessage());return;}
+        if(failure!=null) {setErrorMessage(uncertainCreate ? net.resheim.eclipse.timekeeper.ui.client.RemoteOutcomes.REVIEW_CREATE : net.resheim.eclipse.timekeeper.ui.client.RemoteRecordSnapshots.message(failure));return;}
         setErrorMessage(null);
         if(closeAfterSave && getShell()!=null && !getShell().isDisposed()) {
             var button=getShell().getDefaultButton();if(button!=null) button.notifyListeners(SWT.Selection,new org.eclipse.swt.widgets.Event());

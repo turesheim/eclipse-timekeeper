@@ -63,6 +63,7 @@ public class RemoteMylynAccountTest {
             RemotePreferenceScenario.run(api);
             RemoteRestoreScenario.run(api,project);
             UncertainCreateScenario.run(api,project);
+            RemoteLabelRestoreScenario.run(api);
             assertEquals(1,api.projects().size());assertEquals(1,api.tasks().size());
             assertEquals(previous,original.metadata());assertEquals(history,original.activity(history.id()).orElseThrow());assertEquals(successor,original.activity(successor.id()).orElseThrow());
             assertEquals(3,RemoteBootstrap.receipt().getProperty("server.pids").split(",").length);

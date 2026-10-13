@@ -64,7 +64,7 @@ final class RemotePreferenceScenario {
             var stale=open(LABELS);stale.bot().table().select(saved.name());stale.bot().textWithLabel("Label:").setText(prefix+" stale draft");
             var changed=peer.updateLabel(new UpdateLabel(saved.id(),saved.version(),prefix+" peer label",Optional.of("19,171,205")));awaitLabel(changed);
             stale.bot().button("Apply and Close").click();
-            RemoteTestSupport.waitFor(()->{try {return stale.bot().textWithLabel("Label:").isEnabled() && RemoteTestSupport.onUi(()->message(stale.widget,"The record or active task changed on the server. Refresh and review your changes."));}catch(Exception loading) {return false;}},"Concurrent label edit did not preserve its stale draft");
+            RemoteTestSupport.waitFor(()->{try {return stale.bot().textWithLabel("Label:").isEnabled() && RemoteTestSupport.onUi(()->message(stale.widget,"This record has changed. Close and reopen the editor before saving."));}catch(Exception loading) {return false;}},"Concurrent label edit did not preserve its stale draft");
             assertEquals(prefix+" stale draft",stale.bot().textWithLabel("Label:").getText());assertEquals(changed,api.label(changed.id()).orElseThrow());stale.bot().button("Cancel").click();
             RemoteTestSupport.waitFor(()->!stale.isOpen(),"Stale label preferences did not cancel");
             awaitTree(project,task,interval.summary());
