@@ -66,6 +66,7 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
     private Map<String,net.resheim.eclipse.timekeeper.domain.Label> baseline=Map.of();
     private boolean saving,dirty;
     private boolean closeAfterSave;
+    private boolean uncertainCreate;
 	private Button addButton;
 	private Button removeButton;
 
@@ -263,7 +264,7 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 
     @Override protected void performApply() {updateDatabase(false);}
     @Override public boolean performOk() {
-        if(!databaseLoaded || saving) return false;
+        if(!databaseLoaded || saving || uncertainCreate) return false;
         if(!changedLabels()) return true;
         if(net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin.getDefault().isRemote()) {updateDatabase(true);return false;}
         updateDatabase(false);return isValid();
@@ -275,9 +276,10 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
         });
     }
     private void updateDatabase(boolean close) {
-        if(!databaseLoaded || saving || !changedLabels()) return;
+        if(!databaseLoaded || saving || uncertainCreate || !changedLabels()) return;
         var plugin=net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin.getDefault();
         var changes=editableLabels.stream().map(ActivityLabel::new).toList();var original=Map.copyOf(baseline);
+        boolean creating=changes.stream().anyMatch(row->!original.containsKey(row.getId()));
         var progress=new java.util.concurrent.ConcurrentHashMap<String,net.resheim.eclipse.timekeeper.domain.Label>();var deleted=java.util.concurrent.ConcurrentHashMap.<String>newKeySet();
         saving=true;closeAfterSave=close;getControl().setEnabled(false);setValid(false);if(getContainer()!=null) getContainer().updateButtons();
         plugin.runOperation("Save Timekeeper labels",()->{
@@ -290,7 +292,10 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
                     : service.updateLabel(new net.resheim.eclipse.timekeeper.service.Commands.UpdateLabel(saved.id(),saved.version(),row.getName(),color));
                 progress.put(row.getId(),result);
             }return null;
-        },value->finished(progress,deleted,null),failure->finished(progress,deleted,failure));
+        },value->finished(progress,deleted,null),failure->{
+            uncertainCreate=creating && plugin.isRemote() && net.resheim.eclipse.timekeeper.ui.client.RemoteOutcomes.unknown(failure);
+            finished(progress,deleted,failure);
+        });
     }
     private void finished(Map<String,net.resheim.eclipse.timekeeper.domain.Label> progress,java.util.Set<String> deleted,RuntimeException failure) {
         if(getControl()==null || getControl().isDisposed()) return;
@@ -303,14 +308,14 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
             for(int i=0;i<editableLabels.size();i++) if(editableLabels.get(i).getId().equals(oldId)) {
                 var draft=editableLabels.get(i);editableLabels.set(i,new ActivityLabel(result.id().value().toString(),draft.getName(),draft.getColor()));break;
             }
-        });baseline=Map.copyOf(saved);saving=false;getControl().setEnabled(true);setValid(true);if(getContainer()!=null) getContainer().updateButtons();
+        });baseline=Map.copyOf(saved);saving=false;getControl().setEnabled(true);setValid(!uncertainCreate);if(getContainer()!=null) getContainer().updateButtons();
         fAppearanceColorTableViewer.refresh();
         if(selectedId!=null) {
             String id=selectedId;
             var selection=editableLabels.stream().filter(row->row.getId().equals(id)).findFirst();
             fAppearanceColorTableViewer.setSelection(selection.map(StructuredSelection::new).orElse(StructuredSelection.EMPTY),true);
         }
-        if(failure!=null) {setErrorMessage(failure.getMessage());return;}
+        if(failure!=null) {setErrorMessage(uncertainCreate ? net.resheim.eclipse.timekeeper.ui.client.RemoteOutcomes.REVIEW_CREATE : failure.getMessage());return;}
         setErrorMessage(null);
         if(closeAfterSave && getShell()!=null && !getShell().isDisposed()) {
             var button=getShell().getDefaultButton();if(button!=null) button.notifyListeners(SWT.Selection,new org.eclipse.swt.widgets.Event());
