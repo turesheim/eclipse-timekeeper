@@ -55,6 +55,20 @@ class WorkSessionTest {
         assertEquals(Duration.ofNanos(9), time.allocatedTime()); assertEquals(Duration.ofNanos(1), time.unallocatedTime());
         assertEquals(Duration.ofNanos(10), WorkSessionTime.calculate(session,List.of(),end).unallocatedTime());
     }
+    @Test void associationIsOptionalAndSurvivesActivityEditsAndStop() {
+        var session = session(Optional.empty()); var original = activity(START, Optional.empty());
+        assertTrue(original.workSessionId().isEmpty());
+        var associated = original.associate(session.id());
+        assertEquals(original.id(), associated.id()); assertEquals(1, associated.version());
+        assertEquals(Optional.of(session.id()), associated.workSessionId());
+        var edited = associated.edit(START, null, "Retrospective description", Set.of());
+        assertEquals(associated.workSessionId(), edited.workSessionId());
+        var stopped = edited.stop(START.plusSeconds(60));
+        assertEquals(associated.workSessionId(), stopped.workSessionId());
+        var standalone = stopped.associate(null);
+        assertTrue(standalone.workSessionId().isEmpty()); assertEquals(stopped.start(), standalone.start());
+        assertEquals(stopped.end(), standalone.end()); assertEquals(stopped.manual(), standalone.manual());
+    }
     @Test void invalidTimesDuplicateRowsAndCrossOwnerAssociationsAreRefused() {
         assertThrows(DomainValidationException.class, () -> session(Optional.of(START.minusNanos(1))));
         WorkSession.validateStart(START, START);

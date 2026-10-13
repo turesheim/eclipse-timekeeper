@@ -7,6 +7,8 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 import net.resheim.eclipse.timekeeper.domain.Activity;
+import net.resheim.eclipse.timekeeper.domain.WorkSession;
+import net.resheim.eclipse.timekeeper.domain.WorkSessionId;
 import net.resheim.eclipse.timekeeper.domain.ActivityId;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
 import net.resheim.eclipse.timekeeper.domain.Label;
@@ -49,6 +51,24 @@ public final class Ports {
 		Activity save(Activity activity);
 		void delete(ActivityId id);
 	}
+
+    public interface WorkSessionRepository {
+        Optional<WorkSession> find(WorkSessionId id);
+        Optional<WorkSession> findOpenWorkSessionByOwner(OwnerId ownerId);
+        List<WorkSession> findWorkSessions(OwnerId ownerId);
+        List<Activity> findSessionActivities(WorkSessionId id);
+        WorkSession save(WorkSession session);
+        void delete(WorkSessionId id);
+    }
+
+    public record WorkSessionPorts(WorkSessionRepository sessions, ActivityRepository activities,
+            Supplier<WorkSessionId> identifiers, TimeSource timeSource,
+            TransactionRunner transactions, EventSink events) {
+        public WorkSessionPorts {
+            if (sessions == null || activities == null || identifiers == null || timeSource == null
+                    || transactions == null || events == null) throw new IllegalArgumentException("work session ports must not be null");
+        }
+    }
 
 	public interface LabelRepository {
 		Optional<Label> find(LabelId id);

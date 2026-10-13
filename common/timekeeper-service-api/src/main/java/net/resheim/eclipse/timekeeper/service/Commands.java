@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import net.resheim.eclipse.timekeeper.domain.ActivityId;
+import net.resheim.eclipse.timekeeper.domain.WorkSessionId;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
 import net.resheim.eclipse.timekeeper.domain.LabelId;
@@ -97,6 +98,19 @@ public final class Commands {
 	}
 
 	public record DeleteActivity(ActivityId id, long expectedVersion) { }
+
+    public record StartWorkSession(OwnerId ownerId, String summary) { }
+    public record StopWorkSession(WorkSessionId id, long expectedVersion) { }
+    public record CreateWorkSession(OwnerId ownerId, Instant start, Optional<Instant> end, String summary) {
+        public CreateWorkSession { end = optional(end); }
+    }
+    public record UpdateWorkSession(WorkSessionId id, long expectedVersion, Instant start, Optional<Instant> end, String summary) {
+        public UpdateWorkSession { end = optional(end); }
+    }
+    public record DeleteWorkSession(WorkSessionId id, long expectedVersion) { }
+    public record AssociateWorkSession(ActivityId activityId, long expectedActivityVersion, Optional<WorkSessionId> workSessionId) {
+        public AssociateWorkSession { workSessionId = optional(workSessionId); }
+    }
 
 	private static <T> Optional<T> optional(Optional<T> value) {
 		return value == null ? Optional.empty() : value;

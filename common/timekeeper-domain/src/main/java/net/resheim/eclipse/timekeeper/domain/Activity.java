@@ -9,7 +9,8 @@ import java.util.Set;
 
 /** Immutable recorded interval owned by a user or service. */
 public record Activity(ActivityId id, TaskId taskId, OwnerId ownerId, Instant start,
-		Optional<Instant> end, String summary, Set<LabelId> labelIds, boolean manual, long version) {
+		Optional<Instant> end, String summary, Set<LabelId> labelIds, boolean manual, long version,
+        Optional<WorkSessionId> workSessionId) {
 	public Activity {
 		id = Values.required(id, "activityId");
 		taskId = Values.required(taskId, "taskId");
@@ -22,13 +23,25 @@ public record Activity(ActivityId id, TaskId taskId, OwnerId ownerId, Instant st
 		summary = summary == null ? "" : summary.trim();
 		labelIds = Values.set(labelIds, "labelIds");
 		version = Values.version(version);
+        workSessionId = workSessionId == null ? Optional.empty() : workSessionId;
 	}
+
+    /** Existing standalone activities have no session association. */
+    public Activity(ActivityId id, TaskId taskId, OwnerId ownerId, Instant start,
+            Optional<Instant> end, String summary, Set<LabelId> labelIds, boolean manual, long version) {
+        this(id, taskId, ownerId, start, end, summary, labelIds, manual, version, Optional.empty());
+    }
+
+    public Activity associate(WorkSessionId sessionId) {
+        return new Activity(id, taskId, ownerId, start, end, summary, labelIds, manual,
+                version + 1, Optional.ofNullable(sessionId));
+    }
 
 	public Activity stop(Instant stoppedAt) {
 		if (end.isPresent()) throw new DomainValidationException("activity", "activity is already stopped");
 		return new Activity(id, taskId, ownerId, start,
 				Optional.of(Values.required(stoppedAt, "stoppedAt")), summary, labelIds, manual,
-				version + 1);
+				version + 1, workSessionId);
 	}
 
 	/** Validate a recorded start against the owning backend's clock. */
@@ -42,7 +55,7 @@ public record Activity(ActivityId id, TaskId taskId, OwnerId ownerId, Instant st
 
 	public Activity edit(Instant newStart, Instant newEnd, String newSummary, Set<LabelId> newLabelIds) {
 		return new Activity(id, taskId, ownerId, newStart, Optional.ofNullable(newEnd), newSummary,
-				newLabelIds, true, version + 1);
+				newLabelIds, true, version + 1, workSessionId);
 	}
 
 	public Duration duration(LocalDate date, ZoneId zoneId, Instant asOf) {
