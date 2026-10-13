@@ -76,6 +76,8 @@ class DistributionDocumentationTest(unittest.TestCase):
                          'server/app/target/quarkus-app/quarkus/fixture.jar',
                          'common/api/openapi.json','server/scripts/create_token.py','LICENSE'):
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('Packaging fixture')
+            with zipfile.ZipFile(root/'server/app/target/quarkus-app/app/fixture.jar','w') as jar:
+                jar.writestr('timekeeper-build.properties', f'commit={COMMIT}\ndirty=false\n')
             # Exercise ZIP assembly with synthetic JVM files and the real operational guides.
             with patch.object(package_server,'ROOT',root),patch.object(package_server.subprocess,'check_output',side_effect=[COMMIT,'']), \
                     patch.object(package_server,'render_document',side_effect=lambda _,source,destinations,commit:render_document(ROOT,source,destinations,commit)):
