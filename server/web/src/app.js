@@ -121,6 +121,7 @@ function name(list, id, field = 'name') { const value = list.find(v => v.id === 
 function taskLabel(task) {
   if (!task) return element('span', 'Unassigned');
   const {title, url} = taskPresentation(task), node = element(url ? 'a' : 'span', title, 'task-title');
+  node.dataset.taskId = task.id;
   if (url) { node.href = url; node.target = '_blank'; node.rel = 'noopener noreferrer'; }
   return node;
 }
@@ -164,7 +165,7 @@ function renderWorkweek(s, zone) {
   const addActivity = (value, level) => {
     const title = element('span', undefined, 'activity-title'); title.append(element('span', value.summary || 'Activity'), element('small', `${instantText(value.start, zone)} → ${instantText(value.end, zone)}`));
     const node = row([titleCell(title, level), ...totals([value]), value.labelIds.map(id => name(s.labels, id)).join(', ') || '—'], [action('Edit', () => openRecord('activities', value.id)), action('Delete', () => openDelete('activities', value.id))]);
-    node.dataset.kind = 'activity'; node.dataset.activityId = value.id;
+    node.dataset.kind = 'activity'; node.dataset.activityId = value.id; node.dataset.taskId = value.taskId;
     if (s.active.data?.id === value.id) node.classList.add('active-activity');
     node.tabIndex = 0; node.setAttribute('aria-selected', String(selectedActivity === value.id));
     const select = () => { selectedActivity = value.id; for (const item of $('activities').querySelectorAll('tr[aria-selected]')) item.setAttribute('aria-selected', String(item === node)); };

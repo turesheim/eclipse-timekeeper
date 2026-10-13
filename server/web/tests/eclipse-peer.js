@@ -84,8 +84,10 @@ async function command(input) {
       await expect(page.locator('#activities')).toContainText(record.task);
       break;
     case 'cleanup':
+      await tab('Tasks');
+      const taskId = await page.locator('#tasks tr').filter({hasText:record.task}).locator('.task-title').getAttribute('data-task-id');
       await tab('Workweek');
-      const rows = page.locator('#activities tr').filter({hasText:record.task});
+      const rows = page.locator(`#activities tr[data-kind="activity"][data-task-id="${taskId}"]`);
       while (await rows.count()) {
         const before = await rows.count();
         await rows.first().getByRole('button', {name:'Delete', exact:true}).click(); await save('Delete');

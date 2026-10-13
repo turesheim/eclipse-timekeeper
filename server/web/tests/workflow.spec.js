@@ -143,6 +143,7 @@ test('workweek groups linked tasks under projects with seven day columns and con
   await expect(childRow.getByRole('link')).toHaveAttribute('href',githubUrl);
   await expect(childRow.getByRole('link')).toHaveAttribute('rel','noopener noreferrer');
   const intervalRow = table.locator(`tr[data-activity-id="${activity.id}"]`);
+  await expect(intervalRow).toHaveAttribute('data-task-id',child.id);
   await expect(intervalRow).toContainText('DST review '+suffix);
   await expect(page.locator('#week-total')).toHaveText('24h 59m 59s');
   await parentRow.getByRole('button',{name:'Collapse PLATFORM-3396: Clean registry '+suffix,exact:true}).click();
