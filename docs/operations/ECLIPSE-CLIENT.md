@@ -60,6 +60,15 @@ and [how secure storage works](https://help.eclipse.org/latest/topic/org.eclipse
 
 ## Conflicts and interrupted requests
 
+Workweek includes daily columns and **Weekly total** for projects, tasks
+(including subtasks) and activities. The **Collapse all** toolbar button hides
+activity rows while keeping the project/task outline visible; **Expand all**
+restores them. Under **Preferences > Timekeeper**, select **Show durations as
+decimal hours** to display, for example, 90 minutes as `1.50`. The same option is
+available in the Workweek view menu. It changes presentation immediately and
+persists for this Eclipse installation; clock-based activity editing and stored
+timestamps keep their original precision.
+
 Changes from other clients refresh Workweek automatically. Open editors retain
 their original drafts and record version; if another client changes that
 record, close the editor, review the refreshed record and reopen it before

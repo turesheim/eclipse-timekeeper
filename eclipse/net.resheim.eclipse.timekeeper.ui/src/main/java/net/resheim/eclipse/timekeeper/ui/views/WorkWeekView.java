@@ -227,12 +227,15 @@ public class WorkWeekView extends ViewPart {
     private Action decimalHoursAction;
     private boolean activitiesCollapsed;
     private final org.eclipse.jface.util.IPropertyChangeListener durationPreferenceListener=event->{
-        if(!PreferenceConstants.DECIMAL_HOURS.equals(event.getProperty()) || viewer==null || viewer.getControl().isDisposed()) return;
+        if(PreferenceConstants.DECIMAL_HOURS.equals(event.getProperty())) durationPreferenceChanged();
+    };
+    private void durationPreferenceChanged() {
+        if(viewer==null || viewer.getControl().isDisposed()) return;
         viewer.getControl().getDisplay().asyncExec(()->{
             if(viewer.getControl().isDisposed()) return;
             decimalHoursAction.setChecked(decimalHours());((ContentProvider)contentProvider).updateColumHeaders();viewer.refresh();
         });
-    };
+    }
 
 	private Action nextWeekAction;
 
@@ -459,7 +462,7 @@ public class WorkWeekView extends ViewPart {
     private void createWeeklyTotalColumn() {
         var column=createTableViewerColumn("Weekly total",80,8);column.getColumn().setAlignment(SWT.RIGHT);
         column.setLabelProvider(new TimeColumnLabelProvider(contentProvider) {
-            @Override public String getText(Object element) {return displayDuration(contentProvider.weeklyDuration(element));}
+            @Override public String getText(Object element) {return net.resheim.eclipse.timekeeper.domain.DurationDisplay.format(contentProvider.weeklyDuration(element),decimalHours());}
         });
     }
     private boolean decimalHours() {return TimekeeperUiPlugin.getDefault().getPreferenceStore().getBoolean(PreferenceConstants.DECIMAL_HOURS);}

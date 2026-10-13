@@ -15,6 +15,7 @@ public class RemoteNativeTest {
     @Test public void installedRemoteProjectTaskActivityTrackingAndCsvRoundTrip() throws Exception {
         RemoteTestSupport.ready();RemoteTestSupport.showWorkweek();
         BackendConnectionScenario.run();
+        WorkweekDisplayScenario.run();
         var bot=new SWTWorkbenchBot();var view=bot.viewByTitle("Workweek");view.setFocus();
         try(var api=RemoteTestSupport.client()) {
             view.toolbarButton("Create a Timekeeper project").click();

@@ -161,7 +161,7 @@ function renderWorkweek(s, zone) {
   const allActivities = node => [...node.activities, ...node.children.flatMap(allActivities)];
   const totals = activities => {
     const daily = dates.map(date => activities.reduce((sum, activity) => sum + activityDayNanos(activity, date, zone, s.report.generatedAt), 0n));
-    return [...daily, daily.reduce((sum, value) => sum + value, 0n)].map(value => value ? displayNanos(value) : '—');
+    return [...daily, daily.reduce((sum, value) => sum + value, 0n)].map((value, index) => value || index === 7 ? displayNanos(value) : '—');
   };
   const titleCell = (content, level, key, title) => {
     const node = element('div', undefined, 'tree-title'); node.style.setProperty('--level', level);
