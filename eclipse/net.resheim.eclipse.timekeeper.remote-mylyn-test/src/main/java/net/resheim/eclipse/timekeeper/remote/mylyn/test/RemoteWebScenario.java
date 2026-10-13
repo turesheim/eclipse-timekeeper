@@ -40,6 +40,7 @@ final class RemoteWebScenario {
             awaitSnapshot(task);awaitCalendarZone(zone);awaitReport(taskQuery,Duration.ofNanos(1));
             var bot=new SWTWorkbenchBot();var tree=bot.viewByTitle("Workweek").bot().treeWithId("workweek-editor-tree");
             awaitTree(project,task);
+            liveNativeLabel(peer,api,prefix);
             RemoteTestSupport.waitFor(()->{try {return tree.getTreeItem(project.name()).getNode(task.summary()).expand().getNode(manual.summary())!=null;}catch(RuntimeException loading) {return false;}},"Browser interval was not rendered in installed Workweek");
             tree.getTreeItem(project.name()).getNode(task.summary()).contextMenu("Edit task...").click();
             var shell=bot.shell("Edit task");var controls=shell.bot();String nativeDraft=prefix+" native draft";
@@ -87,6 +88,25 @@ final class RemoteWebScenario {
             RemoteTestSupport.waitFor(()->MylynIntegration.getDefault().linked(accepted).isEmpty(),"Browser deletion retained a Mylyn projection");awaitCalendarZone(originalZone);
             for(String flag:List.of("records","drafts","tracking","reports","cleanup")) RemoteBootstrap.receipt().setProperty("phase.web.eclipse."+flag,"passed");RemoteBootstrap.writeProof();
         }
+    }
+    private static void liveNativeLabel(BrowserPeer peer,HttpTimekeeperService api,String prefix) throws Exception {
+        String name=prefix+" native live label",draft=prefix+" browser label draft";
+        peer.command(Map.of("action","label-draft","draft",draft));
+        var preferences=openLabels();preferences.bot().button("Add").click();preferences.bot().textWithLabel("Label:").setText(name);
+        preferences.bot().button("Apply and Close").click();RemoteTestSupport.waitFor(()->!preferences.isOpen(),"Native label creation did not close after acknowledgement");
+        RemoteTestSupport.waitFor(()->api.labels().stream().anyMatch(label->label.name().equals(name)),"Native label was not stored on the server");
+        peer.command(Map.of("action","observe-label-choice","label",name,"draft",draft));
+        var remove=openLabels();remove.bot().table().select(name);remove.bot().button("Remove").click();remove.bot().button("Apply and Close").click();
+        RemoteTestSupport.waitFor(()->!remove.isOpen(),"Native live-label deletion did not close");
+        peer.command(Map.of("action","observe-deleted-label-choice","label",name,"draft",draft));
+        assertTrue(api.labels().stream().noneMatch(label->label.name().equals(name)));
+        RemoteBootstrap.receipt().setProperty("phase.web.eclipse.live-labels","passed");RemoteBootstrap.writeProof();
+    }
+    private static org.eclipse.swtbot.swt.finder.widgets.SWTBotShell openLabels() {
+        org.eclipse.ui.PlatformUI.getWorkbench().getDisplay().asyncExec(()->org.eclipse.ui.dialogs.PreferencesUtil.createPreferenceDialogOn(
+            org.eclipse.ui.PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell(),
+            "net.resheim.eclipse.timekeeper.ui.preferences.LabelPreferences",null,null).open());
+        return new SWTWorkbenchBot().shell("Preferences");
     }
     private static void awaitTree(Project project,Task task) {
         RemoteTestSupport.waitFor(()->{try {return new SWTWorkbenchBot().viewByTitle("Workweek").bot().treeWithId("workweek-editor-tree").getTreeItem(project.name()).expand().getNode(task.summary())!=null;}catch(RuntimeException loading) {return false;}},"Shared task did not appear in installed Workweek");
