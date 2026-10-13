@@ -294,6 +294,9 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
     }
     private void finished(Map<String,net.resheim.eclipse.timekeeper.domain.Label> progress,java.util.Set<String> deleted,RuntimeException failure) {
         if(getControl()==null || getControl().isDisposed()) return;
+        var selected=getSelectedAppearanceColorOption();
+        String selectedId=selected==null ? null : selected.getId();
+        if(selectedId!=null && progress.containsKey(selectedId)) selectedId=progress.get(selectedId).id().value().toString();
         Map<String,net.resheim.eclipse.timekeeper.domain.Label> saved=new java.util.HashMap<>(baseline);deleted.forEach(saved::remove);
         progress.forEach((oldId,result)->{
             saved.remove(oldId);saved.put(result.id().value().toString(),result);
@@ -301,8 +304,14 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
                 var draft=editableLabels.get(i);editableLabels.set(i,new ActivityLabel(result.id().value().toString(),draft.getName(),draft.getColor()));break;
             }
         });baseline=Map.copyOf(saved);saving=false;getControl().setEnabled(true);setValid(true);if(getContainer()!=null) getContainer().updateButtons();
+        fAppearanceColorTableViewer.refresh();
+        if(selectedId!=null) {
+            String id=selectedId;
+            var selection=editableLabels.stream().filter(row->row.getId().equals(id)).findFirst();
+            fAppearanceColorTableViewer.setSelection(selection.map(StructuredSelection::new).orElse(StructuredSelection.EMPTY),true);
+        }
         if(failure!=null) {setErrorMessage(failure.getMessage());return;}
-        setErrorMessage(null);fAppearanceColorTableViewer.refresh();
+        setErrorMessage(null);
         if(closeAfterSave && getShell()!=null && !getShell().isDisposed()) {
             var button=getShell().getDefaultButton();if(button!=null) button.notifyListeners(SWT.Selection,new org.eclipse.swt.widgets.Event());
         }

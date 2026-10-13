@@ -40,9 +40,16 @@ final class RemotePreferenceScenario {
             preferences.bot().table().select(emptyColor.name());
             assertEquals(emptyColor.name(),preferences.bot().textWithLabel("Label:").getText());
             preferences.bot().button("Add").click();preferences.bot().table().select("new label");
+            preferences.bot().textWithLabel("Label:").setText(prefix+" initial label");preferences.bot().button("Apply").click();
+            RemoteTestSupport.waitFor(()->api.labels().stream().anyMatch(l->l.name().equals(prefix+" initial label")),"Apply did not create the remote label");
+            RemoteTestSupport.waitFor(()->preferences.bot().textWithLabel("Label:").isEnabled(),"Apply lost its selected editable label");
+            assertTrue(preferences.isOpen());
+            var applied=api.labels().stream().filter(l->l.name().equals(prefix+" initial label")).findFirst().orElseThrow();
             preferences.bot().textWithLabel("Label:").setText(prefix+" label");preferences.bot().button("Apply and Close").click();
             RemoteTestSupport.waitFor(()->!preferences.isOpen(),"Remote label preference save did not close after acknowledgement");
             var label=api.labels().stream().filter(l->l.name().equals(prefix+" label")).findFirst().orElseThrow();assertEquals(Optional.of("0,0,0"),label.color());
+            assertEquals(applied.id(),label.id());assertEquals(applied.version()+1,label.version());
+            assertEquals("A display fallback must not change an unset stored color",emptyColor,api.label(emptyColor.id()).orElseThrow());
             awaitLabel(label);
             var rejected=open(LABELS);rejected.bot().table().select(label.name());rejected.bot().textWithLabel("Label:").setText(prefix+" retained draft");
             var before=api.metadata();RemoteBootstrap.setAccountBWritable(false);
