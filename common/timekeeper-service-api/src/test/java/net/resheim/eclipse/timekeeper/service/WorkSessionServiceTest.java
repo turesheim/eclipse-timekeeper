@@ -81,6 +81,7 @@ class WorkSessionServiceTest {
         public List<Activity> findSessionActivities(WorkSessionId id) {return activities.values().stream().filter(v->v.workSessionId().equals(Optional.of(id))).toList();}
         public WorkSession save(WorkSession session) {sessions.put(session.id(),session);return session;}
         public void delete(WorkSessionId id) {sessions.remove(id);}
+        public List<Activity> findAllActivities() {return List.copyOf(activities.values());}
         public Optional<Activity> find(ActivityId id) {return Optional.ofNullable(activities.get(id));}
         public Optional<Activity> findOpenByOwner(OwnerId owner) {return activities.values().stream().filter(v->v.ownerId().equals(owner)&&v.end().isEmpty()).findFirst();}
         public List<Activity> findOverlapping(Instant from,Instant to,Optional<OwnerId> owner,Optional<TaskId> task) {throw new UnsupportedOperationException();}

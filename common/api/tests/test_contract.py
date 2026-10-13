@@ -111,7 +111,7 @@ class ContractTest(unittest.TestCase):
                     self.assertIn({'$ref': '#/components/parameters/IfMatch'}, op['parameters'])
                     self.assertIn('412', op['responses'])
                     self.assertIn('428', op['responses'])
-        for path in ['/activities/start', '/activities/{id}/stop', '/data/import']:
+        for path in ['/activities/start', '/activities/{id}/stop', '/work-sessions/start', '/work-sessions/{id}/stop', '/data/import']:
             self.assertIn({'$ref': '#/components/parameters/IdempotencyKey'},
                           CONTRACT['paths'][path]['post']['parameters'])
             self.assertIn('409', CONTRACT['paths'][path]['post']['responses'])
@@ -164,6 +164,8 @@ class ContractTest(unittest.TestCase):
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
             'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',
+            'createWorkSession', 'getWorkSession', 'updateWorkSession', 'deleteWorkSession', 'listWorkSessions',
+            'getActiveWorkSession', 'startWorkSession', 'stopWorkSession', 'associateWorkSession', 'reportWorkSession',
             'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()

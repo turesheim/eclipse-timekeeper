@@ -318,7 +318,7 @@ public class DefaultTimekeeperService implements TimekeeperService {
 				if (!current.ownerId().equals(ownerId)) continue;
 				if (ActivityDailySegments.split(current, ports.timeSource().zone(ownerId), now).size() < 2) continue;
 				var changed = new Activity(current.id(), current.taskId(), current.ownerId(), current.start(), current.end(),
-						current.summary(), current.labelIds(), current.manual(), current.version() + 1);
+						current.summary(), current.labelIds(), current.manual(), current.version() + 1, current.workSessionId());
 				saveDailyActivities(changed, true, now);
 			}
 			return null;
@@ -364,7 +364,7 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			boolean original = index == retainedIndex;
 			var part = new Activity(original ? requested.id() : ActivityDailySegments.identifier(requested.id(), interval.start()), requested.taskId(),
 					requested.ownerId(), interval.start(), interval.end(), requested.summary(), requested.labelIds(),
-					requested.manual(), original ? requested.version() : 0);
+					requested.manual(), original ? requested.version() : 0, requested.workSessionId());
 			if (!original && ports.activities().find(part.id()).isPresent())
 				throw conflict("activity", "A daily activity already uses this interval. Edit that day's activity separately.");
 			part = ports.activities().save(part);
