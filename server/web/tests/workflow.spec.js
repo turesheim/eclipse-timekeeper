@@ -163,11 +163,12 @@ test('workweek groups linked tasks under projects with seven day columns and con
   await signIn(page); await page.getByLabel('Week containing').fill('2025-10-26');
   await expect(page.locator('#zone-caption')).toContainText('2025-10-20');
   const table = page.locator('#activities table');
-  await expect(table.locator('th')).toHaveCount(10);
+  await expect(table.locator('th')).toHaveCount(11);
   await expect(table.locator('tr[data-kind=project]').filter({hasText:project.name})).toContainText('24h 59m 59s');
   const parentRow = table.locator('tr[data-kind=task]').filter({hasText:'PLATFORM-3396: Clean registry '+suffix});
   await expect(parentRow.getByRole('link')).toHaveAttribute('href',jiraUrl);
   await expect(parentRow).toContainText('24h 59m 59s');
+  await expect(parentRow.locator('td').nth(8)).toHaveText('24h 59m 59s');
   const childRow = table.locator('tr[data-kind=task]').filter({hasText:'#17: Check registry '+suffix});
   await expect(childRow.getByRole('link')).toHaveAttribute('href',githubUrl);
   await expect(childRow.getByRole('link')).toHaveAttribute('rel','noopener noreferrer');
@@ -179,6 +180,12 @@ test('workweek groups linked tasks under projects with seven day columns and con
   await expect(intervalRow).toHaveCount(0); await expect(parentRow).toContainText('24h 59m 59s');
   await parentRow.getByRole('button',{name:'Expand PLATFORM-3396: Clean registry '+suffix,exact:true}).click();
   await expect(intervalRow).toBeVisible();
+  await page.getByRole('button',{name:'Hide activities',exact:true}).click();
+  await expect(intervalRow).toHaveCount(0);await expect(parentRow).toBeVisible();await expect(childRow).toBeVisible();
+  await page.getByRole('button',{name:'Show activities',exact:true}).click();await expect(intervalRow).toBeVisible();
+  await page.getByLabel('Duration format',{exact:true}).selectOption('decimal');
+  await expect(page.locator('#week-total')).toHaveText('25.00h');await expect(parentRow.locator('td').nth(8)).toHaveText('25.00h');
+  await page.getByLabel('Duration format',{exact:true}).selectOption('clock');
   await intervalRow.getByRole('button',{name:'Edit',exact:true}).click();
   await expect(page.getByLabel('Task',{exact:true})).toHaveValue(child.id);
   await expect(page.getByLabel('Start (UTC)',{exact:true})).toHaveValue('2025-10-25T22:00:00.123456789Z');

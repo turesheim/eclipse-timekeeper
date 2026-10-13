@@ -16,7 +16,12 @@ successful when a subsequent refresh fails.
 
 Reports use the account's IANA time zone and the server's exact daily/weekly
 totals. The default Workweek groups projects, tasks, subtasks and activities,
-with seven daily duration columns and expandable rows like the Eclipse view.
+with seven daily duration columns, a weekly total column and expandable rows
+like the Eclipse view. Task totals include their subtasks. **Hide activities**
+keeps the project/task outline visible; **Show activities** restores its rows.
+**Duration format** chooses conventional time or decimal hours for this browser
+session. Decimal hours use two places, rounded from each exact aggregate rather
+than adding rounded daily cells. Display options do not change recorded times.
 Daily and weekly summaries show whole seconds; stored times and calculations
 retain nanoseconds. Linked task titles include their external ID (the Jira browse
 key or GitHub issue number when available) and open the recorded HTTP/HTTPS issue

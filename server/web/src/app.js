@@ -1,11 +1,14 @@
 import {Api, ApiError} from './api.js';
-import {addDays, dateInZone, dayStart, durationText, instantText, instantNanos, weekRange, taskPresentation, activityDayNanos, nanosText, workweekGroups} from './model.js';
+import {addDays, dateInZone, dayStart, durationText, durationNanos, instantText, instantNanos, weekRange, taskPresentation, activityDayNanos, nanosText, decimalHoursText, workweekGroups} from './model.js';
 
 const $ = id => document.getElementById(id);
 let api = null, snapshot = null, connected = false, refreshing = null, reloadAgain = false;
 let editor = null, selectedActivity = null, selectedDay = null;
 let watchSession = null;
 const collapsed = new Set();
+let decimalHours = false, activitiesCollapsed = false;
+const displayNanos = value => decimalHours ? decimalHoursText(value) : nanosText(value);
+const displayDuration = value => decimalHours ? decimalHoursText(durationNanos(value)) : durationText(value);
 function startWatch(session) {
   if (watchSession === session) return;
   watchSession = session;
@@ -58,6 +61,9 @@ $('sign-out').addEventListener('click', () => {
 });
 $('refresh').addEventListener('click', () => { const session = api; void refresh().then(() => { if (session === api) startWatch(session); }).catch(() => {}); });
 $('week-date').addEventListener('change', () => { selectedDay = null; void refresh().catch(() => {}); });
+$('duration-format').addEventListener('change', () => {decimalHours = $('duration-format').value === 'decimal'; if (snapshot) render();});
+$('collapse-activities').addEventListener('click', () => {activitiesCollapsed = true; collapsed.clear(); if (snapshot) render();});
+$('expand-activities').addEventListener('click', () => {activitiesCollapsed = false; collapsed.clear(); if (snapshot) render();});
 
 async function refresh() {
   if (!api) return;
@@ -137,13 +143,13 @@ function render() {
   table('tasks', ['Task', 'Project', 'Parent', 'Actions'], s.tasks.map(value => row([taskLabel(value), name(s.projects, value.projectId), value.parentTaskId ? name(s.tasks, value.parentTaskId, 'summary') : '—'], [action('Start', () => openStart(value.id)), action('Edit', () => openRecord('tasks', value.id)), action('Delete', () => openDelete('tasks', value.id))])));
   table('labels', ['Name', 'Color', 'Actions'], s.labels.map(value => row([value.name, value.color || '—'], [action('Edit', () => openRecord('labels', value.id)), action('Delete', () => openDelete('labels', value.id))])));
   refreshLabelFields();
-  $('week-total').textContent = durationText(s.report.total); $('days').replaceChildren();
+  $('week-total').textContent = displayDuration(s.report.total); $('days').replaceChildren();
   for (let index = 0; index < 7; index++) {
     const date = addDays(s.dates.first, index), day = s.report.days.find(v => v.date === date);
     const card = element('div', undefined, `day${date === selectedDay ? ' selected' : ''}`);
     const pick = button('', () => { selectedDay = selectedDay === date ? null : date; render(); });
     pick.setAttribute('aria-pressed', String(selectedDay === date));
-    pick.append(element('span', new Intl.DateTimeFormat(undefined, {weekday: 'short', timeZone: 'UTC'}).format(new Date(`${date}T12:00:00Z`))), element('span', date), element('strong', durationText(day?.total || 'PT0S')));
+    pick.append(element('span', new Intl.DateTimeFormat(undefined, {weekday: 'short', timeZone: 'UTC'}).format(new Date(`${date}T12:00:00Z`))), element('span', date), element('strong', displayDuration(day?.total || 'PT0S')));
     card.append(pick); $('days').append(card);
   }
   $('activities-heading').textContent = selectedDay ? `Activities — ${selectedDay}` : 'Activities';
@@ -153,7 +159,10 @@ function renderWorkweek(s, zone) {
   const dates = Array.from({length: 7}, (_, index) => addDays(s.dates.first, index));
   const visible = value => !selectedDay || (instantNanos(value.start) < instantNanos(dayStart(addDays(selectedDay, 1), zone)) && (!value.end || instantNanos(value.end) > instantNanos(dayStart(selectedDay, zone))));
   const allActivities = node => [...node.activities, ...node.children.flatMap(allActivities)];
-  const totals = activities => dates.map(date => { const value = activities.reduce((sum, activity) => sum + activityDayNanos(activity, date, zone, s.report.generatedAt), 0n); return value ? nanosText(value) : '—'; });
+  const totals = activities => {
+    const daily = dates.map(date => activities.reduce((sum, activity) => sum + activityDayNanos(activity, date, zone, s.report.generatedAt), 0n));
+    return [...daily, daily.reduce((sum, value) => sum + value, 0n)].map((value, index) => value || index === 7 ? displayNanos(value) : '—');
+  };
   const titleCell = (content, level, key, title) => {
     const node = element('div', undefined, 'tree-title'); node.style.setProperty('--level', level);
     if (key) {
@@ -164,6 +173,7 @@ function renderWorkweek(s, zone) {
   };
   const rows = [];
   const addActivity = (value, level) => {
+    if (activitiesCollapsed) return;
     const title = element('span', undefined, 'activity-title'); title.append(element('span', value.summary || 'Activity'), element('small', `${instantText(value.start, zone)} → ${instantText(value.end, zone)}`));
     const node = row([titleCell(title, level), ...totals([value]), value.labelIds.map(id => name(s.labels, id)).join(', ') || '—'], [action('Edit', () => openRecord('activities', value.id)), action('Delete', () => openDelete('activities', value.id))]);
     node.dataset.kind = 'activity'; node.dataset.activityId = value.id; node.dataset.taskId = value.taskId;
@@ -189,7 +199,7 @@ function renderWorkweek(s, zone) {
     if (!collapsed.has(key)) for (const node of group.tasks) addTask(node, 1);
   }
   const headings = dates.map(date => new Intl.DateTimeFormat(undefined, {weekday: 'short', day: 'numeric', timeZone: 'UTC'}).format(new Date(`${date}T12:00:00Z`)));
-  table('activities', ['Activity', ...headings, 'Labels', 'Actions'], rows);
+  table('activities', ['Activity', ...headings, 'Weekly total', 'Labels', 'Actions'], rows);
   $('activities').querySelector('table')?.classList.add('workweek-table');
 }
 function field(labelText, key, value = '', options = {}) {
