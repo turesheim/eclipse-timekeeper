@@ -346,6 +346,8 @@ $('cancel').addEventListener('click', () => { if (editor?.busy) return; editor =
 $('editor').addEventListener('cancel', event => { if (editor?.busy) event.preventDefault(); else { editor = null; $('fields').replaceChildren(); } });
 window.addEventListener('pagehide', () => api?.close());
 iconButton($('refresh'), 'refresh', 'Refresh');
+iconButton($('collapse-activities'), 'collapse', 'Hide activities');
+iconButton($('expand-activities'), 'expand', 'Show activities');
 $('stop').prepend(icon('stop'));
 const remembered = savedToken();
 if (remembered) void signIn(remembered);

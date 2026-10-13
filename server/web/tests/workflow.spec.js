@@ -149,6 +149,15 @@ test('workweek groups linked tasks under projects with seven day columns and con
   const activity = await (await api(request,'POST','/activities',{taskId:child.id,summary:'DST review '+suffix,start:'2026-10-24T22:00:00.123456789Z',end:'2026-10-25T23:00:00Z',labelIds:[]})).json();
   await signIn(page); await page.getByLabel('Week containing').fill('2026-10-25');
   await expect(page.locator('#zone-caption')).toContainText('2026-10-19');
+  expect(await page.evaluate(async () => {
+    await document.fonts.load('900 18px "Font Awesome 7 Free"');
+    return [...document.fonts].some(font => font.family.includes('Font Awesome 7 Free') && font.status === 'loaded');
+  })).toBeTruthy();
+  const iconAction = page.locator('#activities tr[data-kind=task]').first().getByRole('button', {name:'Edit task', exact:true});
+  await expect(iconAction).toHaveAttribute('title', 'Edit task');
+  await expect(iconAction.locator('.icon')).toHaveAttribute('aria-hidden', 'true');
+  expect(await iconAction.evaluate(node => !node.textContent.includes('Edit task') && node.getBoundingClientRect().width >= 32)).toBeTruthy();
+  expect(await page.locator('.tree-toggle').first().evaluate(node => node.getBoundingClientRect().height >= 32)).toBeTruthy();
   const table = page.locator('#activities table');
   await expect(table.locator('th')).toHaveCount(11);
   await expect(table.locator('tr[data-kind=project]').filter({hasText:project.name})).toContainText('24h 59m 59s');
