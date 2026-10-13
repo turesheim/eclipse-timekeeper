@@ -79,7 +79,13 @@ and Server containers verification in
 [run 38313549045](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38313549045).
 Its downloaded installed evidence confirms all five phases and the four
 peer-synchronization markers. These are parent-commit results; CI must verify
-the new switching commit separately.
+the new switching commit separately. That verification subsequently passed:
+all seven Build jobs for `81e205a` in
+[run 38316380367](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38316380367)
+and Server containers verification in
+[run 38316380282](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38316380282).
+Downloaded reports confirm all nine installed phases and five backend-switch
+markers, with fixture secrets excluded from the artifact.
 
 ## Remaining release acceptance
 

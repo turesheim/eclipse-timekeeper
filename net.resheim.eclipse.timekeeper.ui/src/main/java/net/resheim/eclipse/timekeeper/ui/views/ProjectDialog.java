@@ -33,7 +33,7 @@ final class ProjectDialog extends AsyncRecordDialog {
 	private Project saved;
 
 	ProjectDialog(Shell shell, TimekeeperService service, Project original) {
-		super(shell);
+		super(shell,service,original);
 		this.service = service;
 		this.original = original;
 		setShellStyle(getShellStyle() | SWT.RESIZE);
