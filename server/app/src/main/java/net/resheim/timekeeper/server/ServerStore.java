@@ -189,6 +189,7 @@ public class ServerStore {
         if (value instanceof Activity activity) {
             relation(type,id,"task","TASK",activity.taskId().value());
             activity.labelIds().forEach(label -> relation(type,id,"label","LABEL",label.value()));
+            activity.workSessionId().ifPresent(session -> relation(type,id,"workSession","WORK_SESSION",session.value()));
             if (activity.end().isPresent()) update("DELETE FROM tk_active WHERE owner_id=? AND activity_id=?",owner(),id);
             else if (active().isEmpty()) update("INSERT INTO tk_active(owner_id,entity_type,activity_id) VALUES(?,'ACTIVITY',?)",owner(),id);
             else if (!active().orElseThrow().get("id").asText().equals(id.toString())) throw ApiFailure.conflict();
@@ -244,6 +245,12 @@ public class ServerStore {
     Instant timestamp(java.sql.ResultSet rows, int column) throws SQLException {
         return postgres() ? Instant.parse(rows.getString(column)) : rows.getObject(column,OffsetDateTime.class).toInstant();
     }
+    public WorkSessionService workSessionService() {
+        String owner=owner();var ports=new ScopedPorts(owner);
+        return new DefaultWorkSessionService(new WorkSessionPorts(ports.sessions(),ports.activities(),WorkSessionId::random,ServerStore.this::now,
+                new TransactionRunner() {public <T> T required(Supplier<T> work) {return transaction(owner,work);}},
+                event -> change(event.entityType().name(),event.changeType().name(),event.entityId())));
+    }
     public TimekeeperService service() {
         String owner = owner(); ScopedPorts ports = new ScopedPorts(owner);
         var ids = new IdentifierSource() {
@@ -287,6 +294,21 @@ public class ServerStore {
             public Label save(Label value) { check(); return ServerStore.this.save("LABEL",value); }
             public void delete(LabelId id) { check(); ServerStore.this.delete("LABEL",id.value()); }
         }; }
+        WorkSessionRepository sessions() {return new WorkSessionRepository() {
+            public Optional<WorkSession> find(WorkSessionId id) {return get("WORK_SESSION",id.value(),WorkSession.class);}
+            public Optional<WorkSession> findOpenWorkSessionByOwner(OwnerId owner) {
+                check();if(!boundOwner.equals(owner.value())) throw ApiFailure.notFound();
+                return all("WORK_SESSION",WorkSession.class).stream().filter(value -> value.end().isEmpty()).findFirst();
+            }
+            public List<WorkSession> findWorkSessions(OwnerId owner) {
+                check();if(!boundOwner.equals(owner.value())) throw ApiFailure.notFound();return all("WORK_SESSION",WorkSession.class);
+            }
+            public List<Activity> findSessionActivities(WorkSessionId id) {
+                check();return all("ACTIVITY",Activity.class).stream().filter(value -> value.workSessionId().equals(Optional.of(id))).toList();
+            }
+            public WorkSession save(WorkSession value) {check();return ServerStore.this.save("WORK_SESSION",value);}
+            public void delete(WorkSessionId id) {check();ServerStore.this.delete("WORK_SESSION",id.value());}
+        };}
         ActivityRepository activities() { return new ActivityRepository() {
             public List<Activity> findAllActivities() {return all("ACTIVITY",Activity.class);}
             public Optional<Activity> find(ActivityId id) { return get("ACTIVITY",id.value(),Activity.class); }
