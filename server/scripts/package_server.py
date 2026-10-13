@@ -8,6 +8,8 @@ import re
 import subprocess
 import zipfile
 
+from documentation import render_document
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -32,19 +34,24 @@ def package(output, tag, commit):
     manifest = {'format': 1, 'kind': 'candidate' if tag is None else 'release', 'tag': tag, 'commit': commit, 'java': 21,
                 'quarkus': '3.40.1', 'h2': '2.5.250', 'apiMajor': 1, 'serverSchema': 1}
     files = [(p, 'timekeeper-server/' + p.relative_to(app).as_posix()) for p in sorted(app.rglob('*')) if p.is_file()]
-    files += [(ROOT / 'server/README.md', 'timekeeper-server/README.md'),
-              (ROOT / 'api/openapi.json', 'timekeeper-server/openapi.json'),
-              (ROOT / 'api/README.md', 'timekeeper-server/API-POLICY.md'),
+    guides = {'docs/operations/SERVER.md': 'README.md',
+              'docs/architecture/API-V1.md': 'API-POLICY.md',
+              'docs/operations/DEPLOYMENT.md': 'DEPLOYMENT.md',
+              'docs/operations/LOCAL-DOCKER.md': 'LOCAL-DOCKER.md',
+              'docs/development/WEB-CLIENT.md': 'WEB-CLIENT.md'}
+    destinations = {**guides, 'common/api/openapi.json': 'openapi.json'}
+    files += [(ROOT / source, 'timekeeper-server/' + destination)
+              for source, destination in guides.items()]
+    files += [(ROOT / 'common/api/openapi.json', 'timekeeper-server/openapi.json'),
               (ROOT / 'server/scripts/create_token.py', 'timekeeper-server/create_token.py'),
               (ROOT / 'LICENSE', 'timekeeper-server/LICENSE')]
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as target:
         for source, name in files:
             if source.is_symlink() or 'test-tokens' in name or '/surefire-reports/' in name:
                 raise ValueError('Unexpected distribution input')
-            if name == 'timekeeper-server/README.md':
-                target.writestr(name, source.read_text().replace('(../api/README.md)', '(API-POLICY.md)')
-                               .replace('(deploy/README.md)', f'(https://github.com/turesheim/eclipse-timekeeper/blob/{commit}/server/deploy/README.md)')
-                               .replace('(../web/README.md)', f'(https://github.com/turesheim/eclipse-timekeeper/blob/{commit}/web/README.md)'))
+            relative = source.relative_to(ROOT).as_posix()
+            if relative in guides:
+                target.writestr(name, render_document(ROOT, relative, destinations, commit))
             else:
                 target.write(source, name)
         target.writestr('timekeeper-server/timekeeper-release.json', json.dumps(manifest, indent=2) + '\n')

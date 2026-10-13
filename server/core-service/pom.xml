@@ -9,7 +9,7 @@
     <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
   </dependencies>
   <build>
-    <sourceDirectory>${project.basedir}/../../timekeeper-service-api/src/main/java</sourceDirectory>
-    <testSourceDirectory>${project.basedir}/../../timekeeper-service-api/src/test/java</testSourceDirectory>
+    <sourceDirectory>${project.basedir}/../../common/timekeeper-service-api/src/main/java</sourceDirectory>
+    <testSourceDirectory>${project.basedir}/../../common/timekeeper-service-api/src/test/java</testSourceDirectory>
   </build>
 </project>
