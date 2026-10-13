@@ -142,6 +142,75 @@ class PublicationTest(unittest.TestCase):
         self.assertEqual("0", root.find("children").get("size"))
         self.assertIn("No release repositories", (self.root / "site/updates/index.html").read_text())
 
+    def _testing_fixture(self):
+        archive=self.root/"testing-artifact.zip"
+        with zipfile.ZipFile(archive,"w") as zipped:
+            for path in self.repository.rglob("*"):
+                if path.is_file():zipped.write(path,path.relative_to(self.repository).as_posix())
+        run={"id":123,"status":"completed","conclusion":"success","event":"push",
+             "head_branch":"main","path":".github/workflows/build.yml","head_sha":"a"*40,
+             "head_repository":{"full_name":"owner/repo"}}
+        jobs=[{"name":name,"status":"completed","conclusion":"success"} for name in (
+            "Publication","API-contract","Server","Web","Build (ubuntu-latest)",
+            "Build (macos-latest)","Build (windows-latest)","Installed client tests")]
+        artifact={"id":456,"name":"p2-repository","expired":False,
+                  "digest":"sha256:"+hashlib.sha256(archive.read_bytes()).hexdigest(),
+                  "workflow_run":{"id":123,"head_sha":"a"*40,"head_branch":"main"}}
+        def github(*args):
+            path=args[1]
+            if path=="repos/owner/repo":return "main\n"
+            if "workflows/build.yml/runs" in path:return json.dumps({"workflow_runs":[run]})
+            if "/jobs" in path:return json.dumps({"jobs":jobs})
+            if "/artifacts" in path:return json.dumps({"artifacts":[artifact]})
+            self.fail("Unexpected API request: "+path)
+        def download(repo,artifact_id,destination):
+            self.assertEqual(("owner/repo",456),(repo,artifact_id));shutil.copyfile(archive,destination)
+        return run,jobs,artifact,archive,github,download
+
+    def test_verified_main_matrix_artifact_populates_only_testing_channel(self):
+        run,jobs,artifact,archive,github,download=self._testing_fixture()
+        output=self.root/"site"
+        p2.assemble_site([],output,lambda *_:self.fail("No release download expected"))
+        with patch.object(p2,"gh",side_effect=github),patch.object(p2,"download_testing_artifact",side_effect=download):
+            result=p2.add_testing_channel("owner/repo",output)
+        self.assertEqual("a"*40,result["commit"])
+        self.assertEqual(self.version,result["version"])
+        children=ET.parse(output/"updates/testing/compositeContent.xml").findall("./children/child")
+        self.assertEqual(["builds/123-456"],[child.get("location") for child in children])
+        repository=output/"updates/testing"/children[0].get("location")
+        self.assertEqual(self.version,p2.validate_repository(repository,"v2.0.0"))
+        self.assertEqual(result,json.loads((repository/"timekeeper-build.json").read_text()))
+        self.assertEqual("0",ET.parse(output/"updates/compositeContent.xml").find("children").get("size"))
+        self.assertIn("unreleased main build",(output/"updates/testing/index.html").read_text())
+
+    def test_fork_pr_and_incomplete_matrix_cannot_supply_testing_site(self):
+        for change in ("fork","pr","failed","skipped-client"):
+            with self.subTest(change=change):
+                run,jobs,artifact,archive,github,download=self._testing_fixture()
+                if change=="fork":run["head_repository"]["full_name"]="fork/repo"
+                if change=="pr":run["event"]="pull_request"
+                if change=="failed":run["conclusion"]="failure"
+                if change=="skipped-client":jobs[-1]["conclusion"]="skipped"
+                with patch.object(p2,"gh",side_effect=github),patch.object(p2,"download_testing_artifact") as fetch:
+                    self.assertIsNone(p2.add_testing_channel("owner/repo",self.root/"site"))
+                    fetch.assert_not_called()
+
+    def test_testing_artifact_must_match_source_and_download_checksum(self):
+        for change in ("commit","checksum"):
+            with self.subTest(change=change):
+                run,jobs,artifact,archive,github,download=self._testing_fixture()
+                if change=="commit":artifact["workflow_run"]["head_sha"]="b"*40
+                else:
+                    with archive.open("ab") as stream:stream.write(b"corrupted")
+                with patch.object(p2,"gh",side_effect=github),patch.object(p2,"download_testing_artifact",side_effect=download):
+                    with self.assertRaisesRegex(ValueError,"does not match"):
+                        p2.add_testing_channel("owner/repo",self.root/"site")
+
+    def test_expired_main_artifact_keeps_testing_unavailable(self):
+        run,jobs,artifact,archive,github,download=self._testing_fixture();artifact["expired"]=True
+        with patch.object(p2,"gh",side_effect=github),patch.object(p2,"download_testing_artifact") as fetch:
+            self.assertIsNone(p2.add_testing_channel("owner/repo",self.root/"site"));fetch.assert_not_called()
+
     def complete_assets(self, commit="a" * 40, tag="v2.0.0"):
         assets = self.assets(tag)
         with zipfile.ZipFile(assets / p2.SERVER_ARCHIVE, "w") as archive:

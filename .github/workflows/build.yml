@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   API-contract:
@@ -101,6 +102,7 @@ jobs:
           server/web/target/server.log
 
   Remote-Eclipse:
+    name: Installed client tests
     needs: Server
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -173,7 +175,7 @@ jobs:
       run: |
         # Jekyll's Docker action writes root-owned output.
         sudo chown -R "$(id -u):$(id -g)" _site
-        python3 scripts/p2_release.py site --repo "$GITHUB_REPOSITORY" --output _site
+        python3 scripts/p2_release.py site --repo "$GITHUB_REPOSITORY" --output _site --include-testing
         test -f _site/index.html
         test -f _site/updates/compositeContent.xml
 
