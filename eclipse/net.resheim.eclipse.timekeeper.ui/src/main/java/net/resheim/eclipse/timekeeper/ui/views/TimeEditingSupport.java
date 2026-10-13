@@ -61,9 +61,7 @@ class TimeEditingSupport extends EditingSupport {
 			if (parts.length == 2 && end.isPresent()) {
 				end = Optional.of(endpoint(end.orElseThrow(), parts[1]));
 			}
-			if (end.isEmpty() && start.isAfter(java.time.Instant.now())) {
-				throw new IllegalArgumentException("An ongoing activity cannot start in the future.");
-			}
+			Activity.validateStart(start, java.time.Instant.now());
             var command=new UpdateActivity(activity.id(),activity.version(),start,end,activity.summary(),activity.labelIds());
             TimekeeperUiPlugin.getDefault().runOperation("Edit activity time",()->TimekeeperUiPlugin.getDefault().getTimekeeperService().updateActivity(command),saved->content.databaseStateChanged(),failure->
                 MessageDialog.openError(getViewer().getControl().getShell(),"Could not edit activity",ActivityDialog.failureMessage(failure)));

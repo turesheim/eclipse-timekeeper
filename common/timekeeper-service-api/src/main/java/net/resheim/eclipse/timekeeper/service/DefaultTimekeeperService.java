@@ -313,6 +313,7 @@ public class DefaultTimekeeperService implements TimekeeperService {
 	public Activity createActivity(CreateActivity command) {
 		return tx(() -> {
 			required(command, "command");
+			Activity.validateStart(command.start(), ports.timeSource().now());
 			Task task = requiredTask(command.taskId());
 			OwnerId owner = required(command.ownerId(), "ownerId");
 			validateLabels(command.labelIds());
@@ -331,6 +332,7 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			Activity current = requiredActivity(command.id());
 			version(current.version(), command.expectedVersion(), "activity");
 			validateLabels(command.labelIds());
+			Activity.validateStart(command.start(), ports.timeSource().now());
 			if (command.end().isEmpty()) ensureNoOpenActivity(current.ownerId(), current.id());
 			Activity updated = ports.activities().save(current.edit(command.start(), command.end().orElse(null),
 					command.summary(), command.labelIds()));

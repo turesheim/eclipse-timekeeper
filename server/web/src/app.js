@@ -247,7 +247,7 @@ async function openRecord(collection, id = null) {
   if (collection === 'activities') {
     const task = field('Task', 'taskId', value.taskId, {required: true, choices: [['', 'Choose task'], ...snapshot.tasks.map(v => [v.id, taskPresentation(v).title])]}); task.disabled = !!id;
     field('Summary', 'summary', value.summary, {max: 2000});
-    field('Start (UTC)', 'start', value.start || new Date().toISOString(), {required: true, hint: `UTC timestamp, e.g. 2026-10-13T08:30:00Z. Your reports use ${snapshot.profile.data.zoneId}. Up to nine fractional digits are preserved.`});
+    field('Start (UTC)', 'start', value.start || new Date().toISOString(), {required: true, hint: `UTC timestamp, e.g. 2026-10-13T08:30:00Z. Start cannot be in the future. Your reports use ${snapshot.profile.data.zoneId}. Up to nine fractional digits are preserved.`});
     field('End (UTC, blank while tracking)', 'end', value.end); labelFields(value.labelIds);
   }
   showEditor();

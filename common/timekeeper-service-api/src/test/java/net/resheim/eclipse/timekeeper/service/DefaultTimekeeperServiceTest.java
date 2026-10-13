@@ -230,6 +230,46 @@ class DefaultTimekeeperServiceTest {
 		assertEquals("taskId", missing.field());
 	}
 
+	@Test
+	void recordedStartsCannotExceedTheBackendClockEvenByOneNanosecond() {
+		Task task = service.createTask(new CreateTask(Optional.empty(), "Start boundary", Optional.empty()));
+		Instant future = time.now().plusNanos(1);
+		var before = List.copyOf(events);
+		for (Optional<Instant> end : List.of(Optional.<Instant>empty(), Optional.of(future.plusSeconds(1)))) {
+			var failure = assertThrows(DomainValidationException.class, () -> service.createActivity(
+					new CreateActivity(task.id(), OwnerId.LOCAL, future, end, "Future", Set.of())));
+			assertEquals(FailureCode.VALIDATION, failure.code());
+			assertEquals("start", failure.field());
+			assertTrue(store.activities.isEmpty());
+			assertEquals(before, events);
+		}
+		Activity accepted = service.createActivity(new CreateActivity(task.id(), OwnerId.LOCAL, time.now(),
+				Optional.of(time.now()), "Exact boundary", Set.of()));
+		assertEquals(time.now(), accepted.start());
+		time.advance(Duration.ofNanos(1));
+		Activity open = service.createActivity(new CreateActivity(task.id(), OwnerId.LOCAL, future,
+				Optional.empty(), "Clock advanced", Set.of()));
+		assertEquals(future, open.start());
+	}
+
+	@Test
+	void rejectedFutureEditsPreserveTheRecordVersionAndEvents() {
+		Task task = service.createTask(new CreateTask(Optional.empty(), "Edit boundary", Optional.empty()));
+		Activity original = service.createActivity(new CreateActivity(task.id(), OwnerId.LOCAL, time.now().minusSeconds(60),
+				Optional.of(time.now()), "Original", Set.of()));
+		var before = List.copyOf(events);
+		Instant future = time.now().plusNanos(1);
+		for (Optional<Instant> end : List.of(Optional.<Instant>empty(), Optional.of(future.plusSeconds(1)))) {
+			assertThrows(DomainValidationException.class, () -> service.updateActivity(new UpdateActivity(
+					original.id(), original.version(), future, end, "Must not change", Set.of())));
+			assertEquals(original, service.activity(original.id()).orElseThrow());
+			assertEquals(before, events);
+		}
+		Activity corrected = service.updateActivity(new UpdateActivity(original.id(), original.version(), time.now(),
+				Optional.of(time.now()), "Exact boundary", Set.of()));
+		assertEquals(original.version() + 1, corrected.version());
+	}
+
 	private ActivityQuery query(Instant from, Instant to) {
 		return new ActivityQuery(from, to, Optional.empty(), Optional.empty(), Optional.empty(), ZoneId.of("UTC"));
 	}

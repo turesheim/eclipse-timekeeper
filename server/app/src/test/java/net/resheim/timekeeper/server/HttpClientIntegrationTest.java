@@ -17,6 +17,34 @@ class HttpClientIntegrationTest {
     @TestHTTPResource URI server;
     @org.junit.jupiter.api.io.TempDir java.nio.file.Path temporary;
     @jakarta.inject.Inject TokenRegistry registry;
+    @Test void futureCreateUpdateAndImportLeaveOwnedDataAndRevisionUnchanged() {
+        try(var client=new HttpTimekeeperService(server,()->"test-a",Duration.ofSeconds(3))) {
+            var task=client.createTask(new CreateTask(Optional.empty(),"Future boundary "+UUID.randomUUID(),Optional.empty()));
+            Instant now=Instant.now(),future=now.plus(Duration.ofDays(1));
+            var activity=client.createActivity(new CreateActivity(task.id(),OwnerId.LOCAL,now.minusSeconds(60),Optional.of(now),"Original",Set.of()));
+            var snapshot=client.exportData();var before=client.metadata();
+            try {
+                for(Optional<Instant> end:List.of(Optional.<Instant>empty(),Optional.of(future.plusSeconds(60)))) {
+                    assertEquals("VALIDATION",assertThrows(RemoteFailure.class,()->client.createActivity(
+                            new CreateActivity(task.id(),OwnerId.LOCAL,future,end,"Future",Set.of()))).code());
+                    assertEquals("VALIDATION",assertThrows(RemoteFailure.class,()->client.updateActivity(
+                            new UpdateActivity(activity.id(),activity.version(),future,end,"Future edit",Set.of()))).code());
+                    assertEquals(snapshot,client.exportData());assertEquals(before,client.metadata());
+                }
+                var transfer=snapshot.deepCopy();
+                for(var row:transfer.getAsJsonArray("activities")) if(row.getAsJsonObject().get("id").getAsString().equals(activity.id().value().toString())) {
+                    row.getAsJsonObject().addProperty("start",future.toString());
+                    row.getAsJsonObject().addProperty("end",future.plusSeconds(60).toString());
+                }
+                assertEquals("VALIDATION",assertThrows(RemoteFailure.class,()->client.importData(transfer)).code());
+                assertEquals(snapshot,client.exportData());assertEquals(before,client.metadata());
+                assertEquals(activity,client.activity(activity.id()).orElseThrow());
+            } finally {
+                client.deleteActivity(new DeleteActivity(activity.id(),activity.version()));
+                client.deleteTask(new DeleteTask(task.id(),task.version()));
+            }
+        }
+    }
     @Test void anEmptyPageBindsUnicodeOwnersWithoutAPriorProfileRead() throws Exception {
         var actual=io.quarkus.arc.ClientProxy.unwrap(registry);String originalFile=actual.tokensFile;
         var file=temporary.resolve("unicode-owner-registry.json");

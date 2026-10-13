@@ -412,6 +412,39 @@ public abstract class NativeProjectTaskScenario {
 	}
 
 	@Test
+	public void futureActivityStartsKeepNativeDraftsAndStoredRecordsUnchanged() throws Exception {
+		var bot = new SWTWorkbenchBot();
+		await(bot, () -> TimekeeperPlugin.getDefault().isReady(), "Database is not ready");
+		showWorkweek();bot.viewByTitle("Workweek").toolbarButton("Show current week").click();
+		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
+		var project = service.createProject(new CreateProject("Future start project"));
+		var task = service.createTask(new CreateTask(Optional.of(project.id()), "Future start task", Optional.empty()));
+		var future = LocalDate.now(TimekeeperUiPlugin.getCalendarZone()).plusDays(1);
+		try {
+			parentRow(bot, project.name(), task.summary()).contextMenu("New activity").click();
+			var dialog = bot.shell("New activity");dialog.activate();
+			bot.textWithLabel("Summary").setText("Preserved future draft");
+			bot.textWithLabel("Start (yyyy-MM-dd HH:mm)").setText(future + " 09:00");
+			bot.textWithLabel("End (yyyy-MM-dd HH:mm)").setText(future + " 10:00");
+			bot.button("Save").click();
+			assertTrue(dialog.isOpen());
+			assertEquals("Preserved future draft",bot.textWithLabel("Summary").getText());
+			assertTrue(service.activities(query(task)).activities().isEmpty());
+			bot.button("Cancel").click();
+			var start = LocalDate.now(TimekeeperUiPlugin.getCalendarZone()).atStartOfDay(TimekeeperUiPlugin.getCalendarZone()).toInstant();
+			var activity = service.createActivity(new CreateActivity(task.id(),net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL,
+					start,Optional.of(start.plusSeconds(60)),"Original recorded time",java.util.Set.of()));
+			parentRow(bot, project.name(), task.summary()).expand().getNode(activity.summary()).contextMenu("Edit activity...").click();
+			var edit = bot.shell("Edit activity");edit.activate();
+			bot.textWithLabel("Start (yyyy-MM-dd HH:mm)").setText(future + " 09:00");
+			bot.textWithLabel("End (yyyy-MM-dd HH:mm)").setText(future + " 10:00");
+			bot.button("Save").click();
+			assertTrue(edit.isOpen());assertEquals(activity,service.activity(activity.id()).orElseThrow());
+			bot.button("Cancel").click();
+		} finally {cleanup(service,project,java.util.List.of(task.id()));}
+	}
+
+	@Test
 	public void activityTimeRequiresSelectionBeforeEditing() throws Exception {
 		verifyActivityCellActivation(1);
 	}
