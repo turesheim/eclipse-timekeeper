@@ -14,7 +14,12 @@ for publication status and candidate installation.
 1. Obtain the server URL and a bearer token for your account from its operator.
 2. Open **Preferences > Timekeeper > Backend** and select **Timekeeper server**.
 3. Enter the server's API URL, ending in `/api/v1`, and the token.
-4. Apply the settings and restart Eclipse. Open **Window > Show View > Other... >
+4. Click **Test connection** to check the entered URL and token without saving
+   them or changing the running backend. A successful test shows the account and
+   time zone. Authentication, connection and timeout failures appear on the page;
+   correct the fields and try again. The test runs in the background and makes
+   no changes to server records.
+5. Apply the settings and restart Eclipse. Open **Window > Show View > Other... >
    Timekeeper > Workweek**.
 
 Use `http://127.0.0.1:8080/api/v1` for a server on the same computer. Other hosts
