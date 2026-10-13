@@ -51,6 +51,12 @@ final class UncertainCreateScenario {
         var current=api.task(task.id()).orElseThrow();api.deleteTask(new DeleteTask(current.id(),current.version()));
         var createdProject=api.projects().stream().filter(p->p.name().equals(prefix+" project")).findFirst().orElseThrow();api.deleteProject(new DeleteProject(createdProject.id(),createdProject.version()));
         var label=api.labels().stream().filter(l->l.name().equals(prefix+" label")).findFirst().orElseThrow();api.deleteLabel(new DeleteLabel(label.id(),label.version()));
+        var cleaned=api.metadata();
+        RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->{
+            var service=TimekeeperUiPlugin.getDefault().getTimekeeperService();
+            return service.tasks().equals(cleaned.tasks()) && service.projects().equals(cleaned.projects())
+                && service.labels().equals(cleaned.labels()) && service.activeActivity(OwnerId.LOCAL).equals(cleaned.active());
+        });}catch(Exception refreshing) {return false;}},"Uncertain-create cleanup did not reach the installed canonical snapshot");
         RemoteTestSupport.closedLocalStorage();
         for(String kind:List.of("tasks","projects","activities","labels")) RemoteBootstrap.receipt().setProperty("phase.create.uncertain."+kind,"passed");RemoteBootstrap.writeProof();
     }
