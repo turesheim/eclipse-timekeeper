@@ -72,7 +72,9 @@ its source/run and p2 identity. It does not substitute a previous main build.
 
 A main push starts Build. Pages waits for the complete successful workflow;
 there is no separate immediate push deployment. Its `workflow_run` trigger
-then downloads that exact prepared website artifact, checks its GitHub SHA-256,
+deploys only a completed main build that still matches the default-branch head
+when the event arrives, so an older build finishing later is skipped. It
+downloads that exact prepared website artifact, checks its GitHub SHA-256,
 source identity and complete p2 repository, and deploys it through **Publish
 website and update site**. The documentation and binaries are not rebuilt on
 that path. Release edits, release-workflow completion and explicit manual
