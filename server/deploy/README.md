@@ -1,5 +1,8 @@
 # Timekeeper on Synology Container Manager
 
+For Docker Desktop or Docker Engine on your own computer, see the
+[local Docker setup guide](LOCAL.md).
+
 This deployment runs two stateless Timekeeper servers, one PostgreSQL 18 instance
 using the official `postgres:18.6-bookworm` image, and HAProxy for HTTP load balancing.
 It targets the DS923+ (AMD64), DSM 7.4.1 and Container Manager. The published
