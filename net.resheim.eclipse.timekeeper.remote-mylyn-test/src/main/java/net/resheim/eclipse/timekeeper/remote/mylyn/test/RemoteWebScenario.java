@@ -123,6 +123,8 @@ final class RemoteWebScenario {
             builder.redirectError(RemoteBootstrap.fixtureFolder().resolve("browser-peer.log").toFile());process=builder.start();
             input=new BufferedWriter(new OutputStreamWriter(process.getOutputStream(),StandardCharsets.UTF_8));output=new BufferedReader(new InputStreamReader(process.getInputStream(),StandardCharsets.UTF_8));
             RemoteBootstrap.receipt().setProperty("web.browser-driver.pid",Long.toString(process.pid()));
+            String pids=RemoteBootstrap.receipt().getProperty("web.browser-driver.pids","");
+            RemoteBootstrap.receipt().setProperty("web.browser-driver.pids",pids.isEmpty() ? Long.toString(process.pid()) : pids+","+process.pid());
         }
         void command(Map<String,String> values) throws Exception {
             var fields=values.entrySet().stream().map(e->json(e.getKey())+":"+json(e.getValue())).toList();input.write("{"+String.join(",",fields)+"}\n");input.flush();

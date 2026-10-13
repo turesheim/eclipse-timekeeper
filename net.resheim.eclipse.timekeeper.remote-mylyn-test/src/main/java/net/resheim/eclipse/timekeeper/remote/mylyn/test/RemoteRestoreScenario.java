@@ -42,6 +42,9 @@ final class RemoteRestoreScenario {
                 browser.command(Map.of("action","offline-draft","draft",webDraft,"url",webUrl));
                 assertEquals(nativeDraft,nativeEditor.bot().textWithLabel("Summary").getText());assertEquals(nativeUrl,nativeEditor.bot().textWithLabel("URL (optional)").getText());RemoteTestSupport.closedLocalStorage();
                 RemoteBootstrap.restoreStoppedFixtureServer();
+                // The administrative observer performed the restore; the two live UIs
+                // must detect the history reset themselves without manual refresh.
+                peer.invalidateVersions();
                 assertEquals(RemoteBootstrap.receipt().getProperty("server.backup.sha256"),RemoteBootstrap.receipt().getProperty("server.restored.sha256"));
                 var restored=peer.task(baseline.id()).orElseThrow();assertEquals(baseline,restored);
                 var current=peer.updateTask(new UpdateTask(restored.id(),restored.version(),restored.projectId(),restored.parentTaskId(),prefix+" after restore",Optional.of("https://example.invalid/after-restore")));
