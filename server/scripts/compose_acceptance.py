@@ -81,7 +81,7 @@ def main():
             time.sleep(.5)
         raise AssertionError('Compose gateway did not recover readiness')
 
-    receipt = {'httpContractCases': 0, 'twoReplicas': False, 'singleDatabase': False,
+    receipt = {'httpContractCases': 0, 'bundledWeb': False, 'twoReplicas': False, 'singleDatabase': False,
                'databaseRestart': False, 'databaseCrashRecovery': False,
                'serverFailover': False, 'durableRestart': False, 'backupRestore': False,
                'rollingUpdate': False, 'failedUpdateRollback': False, 'secondReplicaRollback': False,
@@ -93,12 +93,19 @@ def main():
     try:
         compose('up', '-d', '--wait', '--wait-timeout', '180')
         wait_ready()
+        with urlopen(base + '/web/', timeout=3) as response:
+            client.assertIn(b'id="login-form"', response.read())
+            client.assertIn("frame-ancestors 'none'", response.headers.get('Content-Security-Policy', ''))
         for member in ('api-1', 'api-2'):
+            for asset in ('', 'app.js', 'api.js', 'model.js', 'style.css', 'favicon.svg'):
+                compose('exec', '-T', member, 'curl', '-fsS', '-o', '/dev/null',
+                        'http://localhost:8080/web/' + asset)
             identity = json.loads(compose('exec', '-T', member, 'curl', '-fsS', '-H', '@-',
                                          'http://localhost:8080/api/v1/me',
                                          input='Authorization: Bearer ' + tokens['a'] + '\n'))
             client.assertEqual('owner-a', identity['ownerId'])
         receipt['twoReplicas'] = True
+        receipt['bundledWeb'] = True
         client.assertEqual({'postgres', 'api-1', 'api-2', 'gateway'}, set(compose('ps', '--services').split()))
         roles = compose('exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-Atc',
                         "SELECT rolsuper FROM pg_roles WHERE rolname='timekeeper'").strip()

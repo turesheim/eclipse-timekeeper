@@ -101,7 +101,10 @@ final class RemoteTaskFailureScenario {
             RemoteTestSupport.onUi(()->{org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getTaskList().deleteTask(projection);return null;});
             assertTrue(MylynIntegration.getDefault().linked(pending).isEmpty());
         } finally {assertNotEquals(stopped,RemoteBootstrap.restartFixtureServer());}
-        assertEquals(before,api.metadata());assertEquals(task,api.task(task.id()).orElseThrow());assertEquals(pending,api.task(pending.id()).orElseThrow());
+        // Automatic reconnect can already have completed the explicitly queued deletion.
+        var recoveredMetadata=api.metadata();assertEquals(before.projects(),recoveredMetadata.projects());assertEquals(before.labels(),recoveredMetadata.labels());assertEquals(before.active(),recoveredMetadata.active());
+        assertEquals(task,api.task(task.id()).orElseThrow());
+        api.task(pending.id()).ifPresent(value->assertEquals(pending,value));
         editor.button("OK").click();
         RemoteTestSupport.waitFor(()->!shell.isOpen() && api.task(task.id()).filter(t->t.summary().equals(draft)).isPresent(),"Recovered server did not save the same offline editor draft");
         var saved=api.task(task.id()).orElseThrow();assertEquals(task.version()+1,saved.version());assertEquals(Optional.of(url),saved.url());

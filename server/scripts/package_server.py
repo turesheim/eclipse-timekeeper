@@ -43,7 +43,8 @@ def package(output, tag, commit):
                 raise ValueError('Unexpected distribution input')
             if name == 'timekeeper-server/README.md':
                 target.writestr(name, source.read_text().replace('(../api/README.md)', '(API-POLICY.md)')
-                               .replace('(deploy/README.md)', f'(https://github.com/turesheim/eclipse-timekeeper/blob/{commit}/server/deploy/README.md)'))
+                               .replace('(deploy/README.md)', f'(https://github.com/turesheim/eclipse-timekeeper/blob/{commit}/server/deploy/README.md)')
+                               .replace('(../web/README.md)', f'(https://github.com/turesheim/eclipse-timekeeper/blob/{commit}/web/README.md)'))
             else:
                 target.write(source, name)
         target.writestr('timekeeper-server/timekeeper-release.json', json.dumps(manifest, indent=2) + '\n')

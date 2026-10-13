@@ -7,14 +7,28 @@ dispatches it through background Jobs; synchronous calls belong on workers.
 In Eclipse, **Preferences → Timekeeper → Backend** selects a local database or
 server. Enter the server URL and token, then restart Eclipse. Tokens use Equinox
 encrypted storage. Server mode keeps the embedded database closed. A failed
-connection retains the last display snapshots and reports an error; use
-**Workweek → Reconnect / refresh backend** after resolving the problem.
+connection retains the last display snapshots and reports an error. Eclipse
+automatically retries the connection after the problem is resolved; **Workweek →
+Reconnect / refresh backend** also requests an immediate refresh.
+
+Changes committed by another authorized session automatically refresh Workweek
+and cached reports. Open editor drafts retain their original expected version;
+if another session edits the same record, Save reports a conflict and asks you
+to close and reopen the editor to review the current values. Reconnection reads
+the current server state without repeating earlier commands.
 
 The optional Mylyn adapter stores separate mappings for each backend/account.
 Native Task List projections stay associated with their original scope; selecting
 another server or account does not import those projections. Return to their
 original backend to activate them. Provider tasks may be explicitly linked in
 another scope without reusing that scope's UUIDs.
+
+The selected HTTP session stays bound to its authenticated owner. If the server
+reassigns the token to another owner, existing reads and writes fail with
+`OWNER_CHANGED` instead of switching accounts implicitly. Cached records and
+open drafts remain associated with the original account. Restore that account's
+authorization to recover the session, or select the intended account and restart
+Eclipse to start a new one.
 
 ## Server CSV transfer
 

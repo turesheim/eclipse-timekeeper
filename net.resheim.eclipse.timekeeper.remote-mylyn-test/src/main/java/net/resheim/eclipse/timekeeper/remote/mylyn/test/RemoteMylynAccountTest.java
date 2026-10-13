@@ -57,13 +57,22 @@ public class RemoteMylynAccountTest {
             verifyRejectedDeletions(api,project,task,active.id());
             verifyReadOnlyDeletions(api,project);
             RemoteTaskFailureScenario.run(api,project);
+            RemoteSynchronizationScenario.run(api,project);
+            RemoteOwnerBindingScenario.run(api,project);
+            RemoteWebScenario.run(api);
+            RemotePreferenceScenario.run(api);
+            RemoteRestoreScenario.run(api,project);
+            UncertainCreateScenario.run(api,project);
+            RemoteLabelRestoreScenario.run(api);
             assertEquals(1,api.projects().size());assertEquals(1,api.tasks().size());
             assertEquals(previous,original.metadata());assertEquals(history,original.activity(history.id()).orElseThrow());assertEquals(successor,original.activity(successor.id()).orElseThrow());
             assertEquals(3,RemoteBootstrap.receipt().getProperty("server.pids").split(",").length);
             RemoteBootstrap.receipt().setProperty("mylyn.account-b.task",task.id().value().toString());
+            RemoteBootstrap.receipt().setProperty("mylyn.account-b.interval",active.id().value().toString());
             RemoteBootstrap.receipt().setProperty("phase.mylyn.account","passed");RemoteBootstrap.writeProof();
         }
         RemoteTestSupport.readyWithMylyn();
+        BackendSwitchScenario.prepareEndpointSwitch();
     }
     private static void verifyRejectedDeletions(HttpTimekeeperService api,Project project,Task task,ActivityId intervalId) throws Exception {
         var list=org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getTaskList();
@@ -151,8 +160,11 @@ public class RemoteMylynAccountTest {
         tree.getTreeItem(project.name()).getNode(task.summary()).contextMenu("Edit task...").click();
         var shell=bot.shell("Edit task");var editor=shell.bot();
         String draft="Unsaved read-only task draft";editor.textWithLabel("Summary").setText(draft);editor.button("OK").click();
-        RemoteTestSupport.waitFor(()->editor.button("OK").isEnabled()
-            && TimekeeperUiPlugin.getDefault().backendStatus().contains("does not permit"),"Permission-rejected editor did not release the form");
+        RemoteTestSupport.waitFor(()->{
+            try {return editor.button("OK").isEnabled()
+                && RemoteTestSupport.onUi(()->hasVisibleText(shell.widget,"This token does not permit the requested change."));}
+            catch(Exception loading) {return false;}
+        },"Permission-rejected editor did not release the form");
         assertTrue(shell.isOpen());assertTrue(editor.textWithLabel("Summary").isEnabled());
         assertEquals(draft,editor.textWithLabel("Summary").getText());
         assertTrue("Editor did not display the permission error",RemoteTestSupport.onUi(()->hasVisibleText(shell.widget,"This token does not permit the requested change.")));

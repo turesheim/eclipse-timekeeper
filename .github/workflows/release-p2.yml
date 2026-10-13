@@ -1,4 +1,4 @@
-name: Release p2 repository
+name: Release p2 and server distributions
 
 on:
   release:
@@ -20,7 +20,7 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: write
     env:
@@ -35,7 +35,7 @@ jobs:
 
       - name: Validate published release and existing assets
         id: release
-        run: python3 scripts/p2_release.py prepare --repo "$GITHUB_REPOSITORY" --tag "$RELEASE_TAG"
+        run: python3 scripts/p2_release.py prepare --repo "$GITHUB_REPOSITORY" --tag "$RELEASE_TAG" --require-server
 
       - name: Check out release tag
         if: steps.release.outputs.reuse != 'true'
@@ -72,9 +72,44 @@ jobs:
             release-source/net.resheim.eclipse.timekeeper.jira-test/jira.target
             release-source/.mvn/wrapper/maven-wrapper.properties
 
+      - name: Set up Node for browser acceptance
+        if: steps.release.outputs.reuse != 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: release-source/web/package-lock.json
+
+      - name: Install locked browser dependencies and Chromium
+        if: steps.release.outputs.reuse != 'true'
+        working-directory: release-source/web
+        run: |
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium
+
+      - name: Build and test the tagged server
+        if: steps.release.outputs.reuse != 'true'
+        working-directory: release-source
+        run: ./mvnw -B -ntp -f server/pom.xml clean verify
+
+      - name: Package the tagged server and bundled web client
+        if: steps.release.outputs.reuse != 'true'
+        working-directory: release-source
+        run: |
+          python server/scripts/package_server.py --output server/target/distribution \
+            --tag "$RELEASE_TAG" --commit "$(git rev-parse HEAD)"
+
+      - name: Verify packaged HTTP server and browser client
+        if: steps.release.outputs.reuse != 'true'
+        working-directory: release-source
+        run: |
+          python server/scripts/acceptance.py --distribution server/target/distribution/timekeeper-server.zip
+          npm test --prefix web
+          python web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip
+
       - name: Install Xvfb
         if: steps.release.outputs.reuse != 'true'
-        run: sudo apt-get update && sudo apt-get install -y xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb xdotool
 
       - name: Build and test the tagged source
         if: steps.release.outputs.reuse != 'true'
@@ -89,12 +124,30 @@ jobs:
             --tag "$RELEASE_TAG" --commit "$(git -C release-source rev-parse HEAD)" \
             --output "$RUNNER_TEMP/release-assets"
 
-      - name: Attach repository and checksum to release
+      - name: Verify installed Eclipse with browser peer and real GTK dialogs
+        if: steps.release.outputs.reuse != 'true'
+        working-directory: release-source
+        run: xvfb-run --auto-servernum --server-args="-screen 0, 1280x900x24" ./mvnw -B -ntp clean verify -Premote-client-tests -pl .,timekeeper-domain,timekeeper-service-api,timekeeper-http-client,net.resheim.eclipse.timekeeper.db,net.resheim.eclipse.timekeeper.ui,net.resheim.eclipse.timekeeper-feature,net.resheim.eclipse.timekeeper.mylyn,net.resheim.eclipse.timekeeper.mylyn-feature,net.resheim.eclipse.timekeeper.remote-test,net.resheim.eclipse.timekeeper.remote-mylyn-test -Dtycho.localArtifacts=ignore -Dtimekeeper.native.dialog-tests=true
+
+      - name: Assemble and verify both release distributions
+        if: steps.release.outputs.reuse != 'true'
+        run: |
+          cp release-source/server/target/distribution/timekeeper-server.zip* "$RUNNER_TEMP/release-assets/"
+          python3 - "$RUNNER_TEMP/release-assets" "$RELEASE_TAG" <<'PY'
+          import sys
+          from pathlib import Path
+          from scripts.p2_release import verify_complete_assets
+          verify_complete_assets(Path(sys.argv[1]), sys.argv[2])
+          PY
+
+      - name: Attach distributions and checksums to release
         if: steps.release.outputs.reuse != 'true'
         run: |
           gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             "$RUNNER_TEMP/release-assets/timekeeper-p2.zip" \
-            "$RUNNER_TEMP/release-assets/timekeeper-p2.zip.sha256"
+            "$RUNNER_TEMP/release-assets/timekeeper-p2.zip.sha256" \
+            "$RUNNER_TEMP/release-assets/timekeeper-server.zip" \
+            "$RUNNER_TEMP/release-assets/timekeeper-server.zip.sha256"
 
       - name: Upload test reports and Error Logs
         if: always() && steps.release.outputs.reuse != 'true'
@@ -106,6 +159,17 @@ jobs:
           path: |
             release-source/**/target/surefire-reports/
             release-source/**/target/surefire-reports-restart/
+            release-source/net.resheim.eclipse.timekeeper.remote-mylyn-test/target/surefire-reports-*/
+            release-source/net.resheim.eclipse.timekeeper.remote-test/target/acceptance-data/proof.properties
+            release-source/net.resheim.eclipse.timekeeper.remote-mylyn-test/target/acceptance-data/proof.properties
+            release-source/net.resheim.eclipse.timekeeper.remote-*/target/acceptance-data/server-*.log
+            release-source/net.resheim.eclipse.timekeeper.remote-mylyn-test/target/acceptance-data/browser-peer.log
+            release-source/net.resheim.eclipse.timekeeper.remote-mylyn-test/target/acceptance-data/browser-peer-failure.*
+            release-source/net.resheim.eclipse.timekeeper.remote-*/target/work/**/.metadata/.log
+            release-source/net.resheim.eclipse.timekeeper.remote-*/target/work/**/configuration/*.log
+            release-source/server/target/acceptance/
+            release-source/web/test-results/
+            release-source/web/target/server.log
             release-source/**/target/test-reports/
             release-source/**/target/work/data/.metadata/.log
             release-source/net.resheim.eclipse.timekeeper.jira-test/target/work/**/.metadata/.log

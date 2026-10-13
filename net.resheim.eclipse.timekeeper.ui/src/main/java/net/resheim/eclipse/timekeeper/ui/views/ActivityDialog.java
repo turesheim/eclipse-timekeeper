@@ -65,7 +65,7 @@ final class ActivityDialog extends AsyncRecordDialog {
 		this(shell, service, activity.taskId(), activity, date);
 	}
 	private ActivityDialog(Shell shell, TimekeeperService service, TaskId taskId, Activity original, LocalDate date) {
-		super(shell);
+		super(shell,service,original);
 		this.service = service;
 		this.taskId = taskId;
 		this.original = original;

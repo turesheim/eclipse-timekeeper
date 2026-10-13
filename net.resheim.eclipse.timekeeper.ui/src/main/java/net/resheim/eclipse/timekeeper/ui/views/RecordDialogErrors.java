@@ -16,11 +16,12 @@ import net.resheim.eclipse.timekeeper.service.ServiceException;
 
 final class RecordDialogErrors {
 	private RecordDialogErrors() { }
+    static void verifyRemoteSnapshot(net.resheim.eclipse.timekeeper.service.TimekeeperService service,Object original) {
+        net.resheim.eclipse.timekeeper.ui.client.RemoteRecordSnapshots.verify(service,original);
+    }
     static String editorMessage(RuntimeException failure) {
-        if (failure instanceof RemoteFailure problem && problem.kind() == RemoteFailure.Kind.CONFLICT
-                && problem.code().equals("STALE_VERSION"))
-            return "This record has changed. Close and reopen the editor before saving.";
-        return message(failure);
+        return failure instanceof RemoteFailure
+            ? net.resheim.eclipse.timekeeper.ui.client.RemoteRecordSnapshots.message(failure) : message(failure);
     }
 	static String message(RuntimeException failure) {
 		if (failure instanceof ServiceException problem && problem.code() == FailureCode.CONFLICT

@@ -21,6 +21,10 @@
     <resources>
       <resource><directory>src/main/resources</directory></resource>
       <resource>
+        <directory>${project.basedir}/../../web/src</directory>
+        <targetPath>META-INF/resources/web</targetPath>
+      </resource>
+      <resource>
         <directory>${project.basedir}/../../api</directory>
         <includes><include>openapi.json</include></includes>
         <targetPath>META-INF/resources/api/v1</targetPath>

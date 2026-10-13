@@ -11,18 +11,31 @@ import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 /** Preserve the form until the selected backend acknowledges a save. */
 abstract class AsyncRecordDialog extends TitleAreaDialog {
     private Job pending;
-    protected AsyncRecordDialog(Shell shell) {super(shell);}
+    private boolean uncertainCreate;
+    private final net.resheim.eclipse.timekeeper.service.TimekeeperService service;
+    private final Object original;
+    protected AsyncRecordDialog(Shell shell,net.resheim.eclipse.timekeeper.service.TimekeeperService service,Object original) {
+        super(shell);this.service=service;this.original=original;
+    }
     protected <T> void save(String title,Supplier<T> operation,Consumer<T> saved) {
-        if(pending!=null) return;
+        if(pending!=null || uncertainCreate) return;
         getDialogArea().setEnabled(false);
         getButton(IDialogConstants.OK_ID).setEnabled(false);setErrorMessage(null);
-        pending=TimekeeperUiPlugin.getDefault().runOperation(title,operation,value->{
+        pending=TimekeeperUiPlugin.getDefault().runOperation(title,()->{
+            RecordDialogErrors.verifyRemoteSnapshot(service,original);return operation.get();
+        },value->{
             pending=null;if(getShell()==null || getShell().isDisposed()) return;
             saved.accept(value);AsyncRecordDialog.super.okPressed();
         },failure->{
             pending=null;if(getShell()==null || getShell().isDisposed()) return;
+            uncertainCreate=original==null && TimekeeperUiPlugin.getDefault().isRemote()
+                    && net.resheim.eclipse.timekeeper.ui.client.RemoteOutcomes.unknown(failure);
             getDialogArea().setEnabled(true);
-            getButton(IDialogConstants.OK_ID).setEnabled(true);setErrorMessage(RecordDialogErrors.editorMessage(failure));
+            getButton(IDialogConstants.OK_ID).setEnabled(!uncertainCreate);
+            if(uncertainCreate) {
+                String message=net.resheim.eclipse.timekeeper.ui.client.RemoteOutcomes.REVIEW_CREATE;
+                setErrorMessage(message);setMessage(message,org.eclipse.jface.dialogs.IMessageProvider.WARNING);
+            } else setErrorMessage(RecordDialogErrors.editorMessage(failure));
         });
     }
     @Override protected void cancelPressed() {if(pending!=null) pending.cancel();super.cancelPressed();}

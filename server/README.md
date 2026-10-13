@@ -6,6 +6,8 @@ version **1**. The same ordinary Java domain/application-service sources are
 compiled by the standalone Maven reactor and the Eclipse build. The server has
 no Eclipse Platform, workspace, SWT, Mylyn, OSGi or JPA dependency.
 
+The bundled web client is available at `/web/`; see [web client documentation](../web/README.md) for usage and browser tests.
+
 Remote Eclipse (#220), web frontend (#221) and client synchronization (#219)
 acceptance remain required before Timekeeper 2.0 publication. Server HTTP tests
 do not certify those clients or a published p2 installation.
