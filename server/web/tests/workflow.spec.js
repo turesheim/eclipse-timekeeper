@@ -102,11 +102,27 @@ test('same-token owner reassignment cannot switch a live browser session', async
     expect((await (await api(request,'GET','/projects')).json()).items).toHaveLength(0);
   } finally { const temporary = file + '.new'; await writeFile(temporary, original, {mode:0o600}); await rename(temporary, file); }
 });
-test('sign-out and reload retain no token or account records in browser storage', async ({page}) => {
+test('reload signs in with the remembered token and sign-out forgets it', async ({page}) => {
   await signIn(page); expect(await page.locator('#token').inputValue()).toBe('');
-  expect(await page.evaluate(() => ({local:localStorage.length, session:sessionStorage.length}))).toEqual({local:0, session:0});
+  expect(await page.evaluate(value => localStorage.getItem('timekeeper.access-token') === value, token)).toBeTruthy();
+  expect(await page.evaluate(() => ({keys:Object.keys(localStorage), session:sessionStorage.length}))).toEqual({keys:['timekeeper.access-token'], session:0});
+  await page.reload(); await expect(page.locator('#workspace')).toBeVisible(); await expect(page.locator('#status')).toHaveText('Up to date');
+  await expect(page.locator('#login')).not.toBeVisible(); expect(await page.locator('#token').inputValue()).toBe('');
+  await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#tasks')).toBeEmpty();
+  expect(await page.evaluate(() => localStorage.getItem('timekeeper.access-token'))).toBeNull();
   await page.reload(); await expect(page.locator('#login')).toBeVisible(); await expect(page.locator('#workspace')).not.toBeVisible();
-  await signIn(page); await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#tasks')).toBeEmpty();
+});
+test('an invalid remembered token is forgotten and a valid replacement can sign in', async ({page}) => {
+  await page.addInitScript(() => localStorage.setItem('timekeeper.access-token', 'invalid-saved-fixture'));
+  await page.goto('/web/'); await expect(page.locator('#login-error')).toContainText('no longer authorized');
+  expect(await page.evaluate(() => localStorage.getItem('timekeeper.access-token'))).toBeNull();
+  await page.getByLabel('Access token').fill(token); await page.getByRole('button', {name:'Sign in', exact:true}).click();
+  await expect(page.locator('#status')).toHaveText('Up to date');
+});
+test('blocked browser storage keeps sign-in usable and explains why reload needs a token', async ({page}) => {
+  await page.addInitScript(() => Object.defineProperty(window, 'localStorage', {get() {throw new DOMException('Blocked', 'SecurityError');}}));
+  await signIn(page); await expect(page.locator('#remember-notice')).toContainText('could not remember');
+  await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#login-error')).toContainText('could not forget');
 });
 test('future starts are rejected without losing browser drafts or changing recorded time', async ({page, request}) => {
   const task = await createTask(request, 'Future boundary ' + randomUUID());
@@ -162,6 +178,15 @@ test('workweek groups linked tasks under projects with seven day columns and con
   const activity = await (await api(request,'POST','/activities',{taskId:child.id,summary:'DST review '+suffix,start:'2025-10-25T22:00:00.123456789Z',end:'2025-10-26T23:00:00Z',labelIds:[]})).json();
   await signIn(page); await page.getByLabel('Week containing').fill('2025-10-26');
   await expect(page.locator('#zone-caption')).toContainText('2025-10-20');
+  expect(await page.evaluate(async () => {
+    await document.fonts.load('900 18px "Font Awesome 7 Free"');
+    return [...document.fonts].some(font => font.family.includes('Font Awesome 7 Free') && font.status === 'loaded');
+  })).toBeTruthy();
+  const iconAction = page.locator('#activities tr[data-kind=task]').first().getByRole('button', {name:'Edit task', exact:true});
+  await expect(iconAction).toHaveAttribute('title', 'Edit task');
+  await expect(iconAction.locator('.icon')).toHaveAttribute('aria-hidden', 'true');
+  expect(await iconAction.evaluate(node => !node.textContent.includes('Edit task') && node.getBoundingClientRect().width >= 32)).toBeTruthy();
+  expect(await page.locator('.tree-toggle').first().evaluate(node => node.getBoundingClientRect().height >= 32)).toBeTruthy();
   const table = page.locator('#activities table');
   await expect(table.locator('th')).toHaveCount(11);
   await expect(table.locator('tr[data-kind=project]').filter({hasText:project.name})).toContainText('24h 59m 59s');

@@ -10,6 +10,15 @@ const page = await browser.newPage({baseURL: process.env.TIMEKEEPER_WEB_URL});
 page.setDefaultTimeout(15000);
 const record = {};
 async function tab(name) { await page.getByRole('button', {name, exact:true}).click(); }
+async function signIn() {
+  await page.goto('/web/');
+  await expect.poll(async () => await page.locator('#workspace').isVisible() || await page.locator('#login-form button').isEnabled()).toBe(true);
+  if (!await page.locator('#workspace').isVisible()) {
+    await page.getByLabel('Access token').fill(process.env.TIMEKEEPER_WEB_TOKEN);
+    await page.getByRole('button', {name:'Sign in', exact:true}).click();
+  }
+  await expect(page.locator('#status')).toHaveText('Up to date');
+}
 async function save(name = 'Save') {
   await page.locator('#editor').getByRole('button', {name, exact:true}).click();
   await expect(page.locator('#editor')).not.toBeVisible();
@@ -27,8 +36,7 @@ async function command(input) {
   switch (input.action) {
     case 'attach':
       record.project = input.project; record.task = input.summary;
-      await page.goto('/web/'); await page.getByLabel('Access token').fill(process.env.TIMEKEEPER_WEB_TOKEN);
-      await page.getByRole('button', {name:'Sign in', exact:true}).click(); await expect(page.locator('#status')).toHaveText('Up to date');
+      await signIn();
       break;
     case 'offline-draft':
       await expect(page.locator('#status')).toContainText('Reconnecting', {timeout:15000});
@@ -37,8 +45,7 @@ async function command(input) {
       break;
     case 'create':
       record.project = input.prefix + ' project'; record.task = input.prefix + ' task'; record.label = input.prefix + ' label';
-      await page.goto('/web/'); await page.getByLabel('Access token').fill(process.env.TIMEKEEPER_WEB_TOKEN);
-      await page.getByRole('button', {name:'Sign in', exact:true}).click(); await expect(page.locator('#status')).toHaveText('Up to date');
+      await signIn();
       await zone(input.zone); await named('Projects', 'project', record.project); await named('Labels', 'label', record.label);
       await tab('Tasks'); await page.getByRole('button', {name:'New task', exact:true}).click();
       await page.getByLabel('Summary', {exact:true}).fill(record.task); await page.getByLabel('Project', {exact:true}).selectOption({label:record.project}); await save();

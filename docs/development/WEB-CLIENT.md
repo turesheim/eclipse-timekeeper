@@ -4,7 +4,14 @@ The standalone server serves its bundled client at `/web/`. Production uses
 native browser modules; no Node process, CDN or separate database is needed.
 Maven includes `server/web/src` in the server JAR. An administrator issues access tokens
 as described in [server/README.md](../operations/SERVER.md). Use HTTPS outside loopback.
-The token stays in tab memory; reload or sign-out ends the browser session.
+The browser remembers the token in same-origin local storage and signs in
+automatically after reload. **Sign out** removes the remembered token. Records
+and editor drafts stay in memory. If browser storage is blocked, sign-in still
+works and the client explains that it cannot remember the token.
+
+Font Awesome Free 7.3.1 supplies locally bundled icon fonts for larger tree
+controls and action buttons. Buttons retain accessible names and hover titles;
+fonts and their upstream license are included in the server distribution.
 
 Projects, tasks, labels and activities use API v1. Start/stop uses durable
 idempotency keys. Editors/deletion retain the original opaque ETag, including
@@ -59,7 +66,7 @@ Remote-Eclipse.
 
 Browser tests cover core tracking, authorization/validation, peer synchronization,
 stale drafts, lost committed replies, exact nanoseconds, autumn DST, mobile
-layout, expandable project/task hierarchy, external issue links and memory-only
+layout, expandable project/task hierarchy, external issue links and remembered
 credentials. The `remote-client-tests` Eclipse profile
 also launches a real browser peer against its installed runtime's server;
 [WEB-ECLIPSE.md](../verification/WEB-ECLIPSE.md) records that bidirectional verification.
