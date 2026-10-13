@@ -14,6 +14,22 @@ import io.quarkus.test.junit.QuarkusTest;
 @QuarkusTest
 class HttpProtocolTest {
     @TestHTTPResource URI baseUri;
+    @Test void serverInformationRequiresReadPermissionAndRetainsBuildAndDeploymentIdentity() throws Exception {
+        given().get("/api/v1/server").then().statusCode(401);
+        var response=given().header("Authorization","Bearer test-read").get("/api/v1/server").then()
+            .statusCode(200).header("Cache-Control",equalTo("no-store"))
+            .header("X-Timekeeper-Owner",equalTo("YQ"))
+            .body("deployedAt",equalTo("2026-10-13T08:30:00Z")).extract().response();
+        var information=JsonValues.parse(response.asString());
+        var build=new java.util.Properties();
+        try(var input=getClass().getResourceAsStream("/timekeeper-build.properties")) {build.load(input);}
+        assertEquals(build.getProperty("version"),information.get("version").asText());
+        if(!build.getProperty("commit").equals("unknown")) assertEquals(build.getProperty("commit"),information.get("commit").asText());
+        assertTrue(java.time.Instant.parse(information.get("builtAt").asText()).isBefore(java.time.Instant.now()));
+        assertNotEquals(information.get("deployedAt"),information.get("startedAt"));
+        assertEquals(information,JsonValues.parse(given().header("Authorization","Bearer test-a").get("/api/v1/server").asString()));
+        given().header("Authorization","Bearer test-a").header("X-Timekeeper-Owner","Yg").get("/api/v1/server").then().statusCode(401);
+    }
     @Test void ownerBindingIsOptionalAndCannotGrantForeignPermissions() {
         given().header("Authorization","Bearer test-a").get("/api/v1/me").then().statusCode(200).header("X-Timekeeper-Owner",equalTo("YQ"));
         given().header("Authorization","Bearer test-a").header("X-Timekeeper-Owner","YQ").get("/api/v1/projects").then().statusCode(200);

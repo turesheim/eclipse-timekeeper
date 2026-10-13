@@ -1,5 +1,14 @@
 # Timekeeper web client
 
+The signed-in footer reads `/api/v1/server` to identify the running server
+version and commit. Its details distinguish immutable build time, explicitly
+recorded deployment time and process-start time. Information refreshes after
+long polls and manual refreshes, including during rolling updates. Missing
+deployment metadata is shown as **Not recorded**. The Docker/Synology deployment
+guide records `TIMEKEEPER_DEPLOYED_AT`; direct JVM deployments may supply the
+same UTC timestamp as an environment variable. Maven embeds Git identity and
+build time in the server, and Docker builds receive Git identity as build args.
+
 The standalone server serves its bundled client at `/web/`. Production uses
 native browser modules; no Node process, CDN or separate database is needed.
 Maven includes `server/web/src` in the server JAR. An administrator issues access tokens

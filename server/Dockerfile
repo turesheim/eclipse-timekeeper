@@ -2,7 +2,10 @@ FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /source
 COPY server server
 COPY common common
-RUN mvn -B -ntp -f server/pom.xml package -DskipTests -Dquarkus.profile=postgresql
+ARG TIMEKEEPER_BUILD_COMMIT=unknown
+ARG TIMEKEEPER_BUILD_DIRTY=unknown
+RUN mvn -B -ntp -f server/pom.xml package -DskipTests -Dquarkus.profile=postgresql \
+    -Dgit.commit.id.full="$TIMEKEEPER_BUILD_COMMIT" -Dgit.dirty="$TIMEKEEPER_BUILD_DIRTY"
 
 FROM eclipse-temurin:21-jre-jammy
 RUN apt-get update && apt-get install -y --no-install-recommends curl \

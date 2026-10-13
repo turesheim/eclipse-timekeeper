@@ -61,7 +61,7 @@ jobs:
           docker rm -f timekeeper-pg-test
       - name: Build actual deployment images
         run: |
-          docker build -t timekeeper-server:test -f server/Dockerfile .
+          docker build --build-arg TIMEKEEPER_BUILD_COMMIT="$GITHUB_SHA" --build-arg TIMEKEEPER_BUILD_DIRTY=false -t timekeeper-server:test -f server/Dockerfile .
           docker pull postgres:18.6-bookworm
       - name: Verify HTTP contracts, rolling updates, backups and durable restart
         run: |
@@ -122,6 +122,9 @@ jobs:
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            TIMEKEEPER_BUILD_COMMIT=${{ github.sha }}
+            TIMEKEEPER_BUILD_DIRTY=false
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.image }}

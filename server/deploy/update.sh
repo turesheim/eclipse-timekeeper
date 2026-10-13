@@ -62,7 +62,7 @@ drain() {
 
 replace() {
   drain "$1" || return 1
-  TIMEKEEPER_SERVER_IMAGE="$2" docker compose up -d --no-deps "$1" || return 1
+  TIMEKEEPER_SERVER_IMAGE="$2" TIMEKEEPER_DEPLOYED_AT="${3-$deployment_time}" docker compose up -d --no-deps "$1" || return 1
   wait_ready "$1" || return 1
   gateway_command "set server api/$1 state ready" || return 1
   wait_routed "$1" || return 1
@@ -75,17 +75,24 @@ wait_routed api-1
 wait_routed api-2
 old_1=$(docker inspect --format '{{.Image}}' "$(docker compose ps -q api-1)")
 old_2=$(docker inspect --format '{{.Image}}' "$(docker compose ps -q api-2)")
+deployment_date() {
+  docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$(docker compose ps -q "$1")" |
+    awk '/^TIMEKEEPER_DEPLOYED_AT=/ {sub(/^TIMEKEEPER_DEPLOYED_AT=/, ""); print; exit}'
+}
+old_date_1=$(deployment_date api-1)
+old_date_2=$(deployment_date api-2)
 docker compose pull api-1 api-2
 image_ref=${TIMEKEEPER_SERVER_IMAGE:-ghcr.io/turesheim/eclipse-timekeeper-server:edge}
 new_image=$(docker image inspect --format '{{.Id}}' "$image_ref")
 if [ "$old_1" = "$new_image" ] && [ "$old_2" = "$new_image" ]; then echo 'Server image is current.'; exit 0; fi
 sh ./backup.sh
+deployment_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 rollback() {
   # Recover the failed replica first, keeping the surviving replica in service.
   if [ "$1" = api-2 ]; then
-    replace api-2 "$old_2" && replace api-1 "$old_1"
+    replace api-2 "$old_2" "$old_date_2" && replace api-1 "$old_1" "$old_date_1"
   else
-    replace api-1 "$old_1" && replace api-2 "$old_2"
+    replace api-1 "$old_1" "$old_date_1" && replace api-2 "$old_2" "$old_date_2"
   fi
 }
 if ! replace api-1 "$new_image"; then
@@ -98,4 +105,5 @@ if ! replace api-2 "$new_image"; then
   echo 'Second replica failed replacement; previous images restored.' >&2
   exit 1
 fi
+sh ./set-deployment-time.sh "$deployment_time"
 echo 'Both server replicas updated and healthy.'

@@ -64,7 +64,10 @@ on a second run does not replace the existing token registry.
 Build the server from your checkout, then start the regular Compose deployment:
 
 ```sh
+export TIMEKEEPER_BUILD_COMMIT="$(git rev-parse HEAD)"
+export TIMEKEEPER_BUILD_DIRTY=$(if [ -z "$(git status --porcelain)" ]; then printf false; else printf true; fi)
 docker compose -f compose.yaml -f compose.build.yaml build api-1
+sh set-deployment-time.sh
 docker compose up -d --wait --wait-timeout 180
 docker compose ps
 ```
@@ -72,6 +75,12 @@ docker compose ps
 Both server instances use the same built image. Docker downloads the official
 PostgreSQL and HAProxy images as needed. The first build needs internet access
 and can take a few minutes. All four services should become healthy.
+
+The web client's footer identifies the running version and source commit. Open
+its details to see when it was built, deployed and last started. The build
+commands record whether the checkout had modified source. `set-deployment-time.sh`
+records the deployment time in `.env` for both replicas; use it when deploying a
+new build, and keep the existing timestamp when simply restarting services.
 
 If startup fails, inspect the logs:
 
@@ -168,8 +177,11 @@ database upgrades require a planned migration.
 For an image built locally, rebuild after updating your checkout:
 
 ```sh
+export TIMEKEEPER_BUILD_COMMIT="$(git rev-parse HEAD)"
+export TIMEKEEPER_BUILD_DIRTY=$(if [ -z "$(git status --porcelain)" ]; then printf false; else printf true; fi)
 docker compose -f compose.yaml -f compose.build.yaml build api-1
 sh backup.sh
+sh set-deployment-time.sh
 docker compose up -d --no-deps --wait --wait-timeout 180 api-1 api-2
 ```
 

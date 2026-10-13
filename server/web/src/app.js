@@ -8,6 +8,7 @@ let api = null, snapshot = null, connected = false, refreshing = null, reloadAga
 let editor = null, selectedActivity = null, selectedDay = null;
 let watchSession = null;
 let activeCredential = '';
+let serverInfoRequest = 0;
 const collapsed = new Set();
 let decimalHours = false, activitiesCollapsed = false;
 const displayNanos = value => decimalHours ? decimalHoursText(value) : nanosText(value);
@@ -26,6 +27,27 @@ function button(text, action) {
 }
 function errorText(error) { return error instanceof ApiError ? error.message : 'Check the entered values, then try again.'; }
 function setStatus(text) { $('status').textContent = text; }
+function clearServerInfo() {
+  $('server-build').textContent = 'Server build information unavailable';
+  for (const field of ['version', 'commit', 'built', 'deployed', 'started']) $(`server-${field}`).textContent = '—';
+}
+async function refreshServerInfo(session) {
+  const request = ++serverInfoRequest;
+  try {
+    const {data} = await session.request('/server');
+    if (session !== api || request !== serverInfoRequest) return;
+    const date = value => value ? new Date(value).toLocaleString(undefined, {timeZoneName:'short'}) : 'Not recorded';
+    const build = `${data.version}${data.commit ? ` · ${data.commit.slice(0, 8)}` : ' · commit not recorded'}${data.dirty ? ' · modified source' : ''}`;
+    $('server-build').textContent = `Server ${build} · Deployed ${date(data.deployedAt)}`;
+    $('server-version').textContent = data.version;
+    $('server-commit').textContent = data.commit ? `${data.commit}${data.dirty ? ' (modified source)' : ''}` : 'Not recorded';
+    $('server-built').textContent = date(data.builtAt);
+    $('server-deployed').textContent = date(data.deployedAt);
+    $('server-started').textContent = date(data.startedAt);
+  } catch {
+    if (session === api && request === serverInfoRequest) clearServerInfo();
+  }
+}
 function readOnlyWhileDisconnected() {
   for (const id of ['add-task', 'add-project', 'add-label', 'add-activity', 'settings', 'stop']) $(id).disabled = !connected;
   for (const action of document.querySelectorAll('td.actions button')) action.disabled = !connected;
@@ -62,6 +84,7 @@ async function signIn(token) {
   } finally { form.querySelector('button').disabled = false; }
 }
 $('sign-out').addEventListener('click', () => {
+  ++serverInfoRequest; clearServerInfo();
   const forgotten = forgetToken(activeCredential);
   activeCredential = '';
   api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null;
@@ -95,6 +118,7 @@ async function refresh() {
       if (reloadAgain) continue;
       snapshot = current; connected = true;
       render(); setStatus('Up to date');
+      void refreshServerInfo(session);
     } while (reloadAgain && session === api);
   })();
   try { await refreshing; }
@@ -112,6 +136,7 @@ async function watch(session) {
       if (session !== api) return;
       // Full consistent reads include changes made during pagination/report loading.
       if (changes.items.length || changes.hasMore || snapshot.active.data) await refresh();
+      else void refreshServerInfo(session);
       delay = 1000;
     } catch (error) {
       if (session !== api) return;

@@ -33,4 +33,8 @@ td.actions .icon-button{margin-left:.25rem}
 .icon-button:hover,.tree-toggle:hover{background:#e0eee6;color:var(--accent)}
 #stop{display:inline-flex;align-items:center;gap:.6rem}
 #remember-notice:empty{display:none}
+.server-info{margin:1.5rem 0 .5rem;color:var(--muted);font-size:.8rem;overflow-wrap:anywhere}
+.server-info summary{cursor:pointer;min-height:2rem;padding:.4rem 0}
+.server-info dl{display:grid;grid-template-columns:auto 1fr;gap:.3rem 1rem;margin:.5rem 0}
+.server-info dd{margin:0;font-variant-numeric:tabular-nums}
 @media(max-width:640px){.tree-toggle,.icon-button{width:2.75rem;height:2.75rem}.activity-icon{width:2.75rem}.icon{font-size:1.2rem}}

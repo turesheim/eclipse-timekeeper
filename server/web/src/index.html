@@ -31,6 +31,11 @@
       <section id="tasks-panel" hidden><div class="toolbar"><h2>Tasks</h2><button id="add-task" class="primary">New task</button></div><div id="tasks" class="card table-wrap"></div></section>
       <section id="projects-panel" hidden><div class="toolbar"><h2>Projects</h2><button id="add-project" class="primary">New project</button></div><div id="projects" class="card table-wrap"></div></section>
       <section id="labels-panel" hidden><div class="toolbar"><h2>Labels</h2><button id="add-label" class="primary">New label</button></div><div id="labels" class="card table-wrap"></div></section>
+      <footer id="server-info" class="server-info" aria-label="Server information">
+        <details><summary id="server-build">Server build information unavailable</summary>
+          <dl><dt>Version</dt><dd id="server-version">—</dd><dt>Commit</dt><dd id="server-commit">—</dd><dt>Built</dt><dd id="server-built">—</dd><dt>Deployed</dt><dd id="server-deployed">—</dd><dt>Started</dt><dd id="server-started">—</dd></dl>
+        </details>
+      </footer>
     </div>
   </main>
   <dialog id="editor" aria-labelledby="editor-title"><form id="editor-form"><h2 id="editor-title"></h2><div id="fields"></div><p id="editor-error" role="alert"></p><p id="editor-notice" role="status"></p><div class="dialog-actions"><button id="cancel" type="button">Cancel</button><button id="save" class="primary" type="submit">Save</button></div></form></dialog>

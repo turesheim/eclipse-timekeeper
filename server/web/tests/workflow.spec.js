@@ -21,6 +21,29 @@ async function newNamed(page, tab, singular, name) {
   await page.getByRole('button', {name:tab, exact:true}).click(); await page.getByRole('button', {name:`New ${singular}`, exact:true}).click();
   await page.getByLabel('Name', {exact:true}).fill(name); await save(page);
 }
+test('server build and deployment details describe the actual packaged server after reload', async ({page, request}) => {
+  const information = await (await api(request, 'GET', '/server')).json();
+  expect(information.commit).toBe(process.env.TIMEKEEPER_WEB_BUILD_COMMIT);
+  expect(information.dirty).toBe(false);
+  expect(information.deployedAt).toBe('2026-10-13T08:30:00Z');
+  expect(information.startedAt).not.toBe(information.deployedAt);
+  expect(Date.parse(information.builtAt)).toBeLessThanOrEqual(Date.now());
+  await signIn(page);
+  await expect(page.locator('#server-build')).toContainText(information.commit.slice(0,8));
+  await page.locator('#server-build').click();
+  await expect(page.locator('#server-version')).toHaveText(information.version);
+  await expect(page.locator('#server-commit')).toHaveText(information.commit);
+  await expect(page.locator('#server-deployed')).not.toHaveText('Not recorded');
+  await expect(page.locator('#server-started')).not.toHaveText(await page.locator('#server-deployed').textContent());
+  await page.screenshot({path:'test-results/server-information-desktop.png', fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:'test-results/server-information-mobile.png', fullPage:true});
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  await page.reload();
+  await expect(page.locator('#server-build')).toContainText(information.commit.slice(0,8));
+  await page.getByRole('button', {name:'Sign out',exact:true}).click();
+  await expect(page.locator('#server-info')).not.toBeVisible();
+});
 test('core browser workflow manages records, tracks time, and preserves exact reports', async ({page, request}) => {
   const suffix = randomUUID().slice(0,8), project = 'Project ' + suffix, task = 'Task ' + suffix, label = 'Label ' + suffix;
   await signIn(page); await newNamed(page, 'Projects', 'project', project); await newNamed(page, 'Labels', 'label', label);
