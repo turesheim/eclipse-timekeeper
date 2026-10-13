@@ -53,6 +53,13 @@ export TIMEKEEPER_SERVER_TOKENS_FILE='/secure/timekeeper/tokens.json'
 java -jar quarkus-run.jar
 ```
 
+The authenticated `GET /api/v1/server` reports this server's build identity and
+timestamps, which the web client displays in its footer. For a direct JVM
+deployment, set `TIMEKEEPER_DEPLOYED_AT` to the actual UTC deployment timestamp
+(for example, `2026-10-13T08:30:00Z`) and retain that value in the service's
+environment across restarts. Without a recorded deployment timestamp, the web
+client shows **Not recorded**; process-start time remains available separately.
+
 The token command prints one newly generated 256-bit bearer token. Save it in the
 client's credential store; the registry contains only SHA-256 hashes. Run from
 the extracted `timekeeper-server` distribution directory. From a source checkout,

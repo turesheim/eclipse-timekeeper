@@ -2451,6 +2451,36 @@
           }
         }
       }
+    },
+    "/server": {
+      "get": {
+        "operationId": "getServerInformation",
+        "summary": "Read the serving server build and deployment information",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Immutable build information and runtime deployment/start timestamps. Deployment time is null when it has not been recorded. During rolling updates this describes the replica serving the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerInformation"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3606,6 +3636,51 @@
           "url"
         ],
         "additionalProperties": false
+      },
+      "ServerInformation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "commit",
+          "dirty",
+          "builtAt",
+          "deployedAt",
+          "startedAt"
+        ],
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "commit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "dirty": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether the build included modified source; null if not known."
+          },
+          "builtAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "deployedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Explicitly recorded deployment time; never inferred from process startup."
+          },
+          "startedAt": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        }
       }
     },
     "parameters": {

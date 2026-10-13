@@ -56,6 +56,7 @@ PostgreSQL service. VMM on the same NAS does not remove these shared failure poi
 
    ```sh
    docker compose pull
+   sh set-deployment-time.sh
    docker compose up -d
    docker compose ps
    ```
@@ -63,6 +64,15 @@ PostgreSQL service. VMM on the same NAS does not remove these shared failure poi
    On older Compose clients, `docker compose pull` may include the optional
    maintenance client. This is harmless. Allow a few minutes for the first
    database to initialize and for all health checks to become healthy.
+
+   Before the initial Container Manager deployment, run `sh set-deployment-time.sh`
+   over SSH in the deployment directory. It records `TIMEKEEPER_DEPLOYED_AT` in
+   `.env`, which both servers use. The web footer shows the running version,
+   commit and deployment time; expand it for build and process-start times too.
+   Keep this timestamp on ordinary restarts. `update.sh` records a new timestamp
+   only after both replacement replicas are healthy, and preserves the earlier
+   timestamps when rolling back. During a rolling update the footer describes
+   the replica that served its latest information request.
 5. For private access from your tailnet, follow the [shared Tailscale guide](TAILSCALE.md)
    on the NAS. It uses the same loopback gateway and provides HTTPS for Eclipse
    and the browser client.
@@ -228,7 +238,10 @@ To run a source build locally, set the images and state path in a deployment
 
 ```sh
 cd server/deploy
+export TIMEKEEPER_BUILD_COMMIT="$(git rev-parse HEAD)"
+export TIMEKEEPER_BUILD_DIRTY=$(if [ -z "$(git status --porcelain)" ]; then printf false; else printf true; fi)
 docker compose -f compose.yaml -f compose.build.yaml build
+sh set-deployment-time.sh
 docker compose -f compose.yaml -f compose.build.yaml up -d
 ```
 

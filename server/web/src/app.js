@@ -1,10 +1,14 @@
 import {Api, ApiError} from './api.js';
 import {addDays, dateInZone, dayStart, durationText, durationNanos, instantText, instantNanos, weekRange, taskPresentation, activityDayNanos, nanosText, decimalHoursText, workweekGroups} from './model.js';
+import {savedToken, rememberToken, forgetToken} from './credentials.js';
+import {icon, iconButton} from './icons.js';
 
 const $ = id => document.getElementById(id);
 let api = null, snapshot = null, connected = false, refreshing = null, reloadAgain = false;
 let editor = null, selectedActivity = null, selectedDay = null;
 let watchSession = null;
+let activeCredential = '';
+let serverInfoRequest = 0;
 const collapsed = new Set();
 let decimalHours = false, activitiesCollapsed = false;
 const displayNanos = value => decimalHours ? decimalHoursText(value) : nanosText(value);
@@ -23,6 +27,27 @@ function button(text, action) {
 }
 function errorText(error) { return error instanceof ApiError ? error.message : 'Check the entered values, then try again.'; }
 function setStatus(text) { $('status').textContent = text; }
+function clearServerInfo() {
+  $('server-build').textContent = 'Server build information unavailable';
+  for (const field of ['version', 'commit', 'built', 'deployed', 'started']) $(`server-${field}`).textContent = '—';
+}
+async function refreshServerInfo(session) {
+  const request = ++serverInfoRequest;
+  try {
+    const {data} = await session.request('/server');
+    if (session !== api || request !== serverInfoRequest) return;
+    const date = value => value ? new Date(value).toLocaleString(undefined, {timeZoneName:'short'}) : 'Not recorded';
+    const build = `${data.version}${data.commit ? ` · ${data.commit.slice(0, 8)}` : ' · commit not recorded'}${data.dirty ? ' · modified source' : ''}`;
+    $('server-build').textContent = `Server ${build} · Deployed ${date(data.deployedAt)}`;
+    $('server-version').textContent = data.version;
+    $('server-commit').textContent = data.commit ? `${data.commit}${data.dirty ? ' (modified source)' : ''}` : 'Not recorded';
+    $('server-built').textContent = date(data.builtAt);
+    $('server-deployed').textContent = date(data.deployedAt);
+    $('server-started').textContent = date(data.startedAt);
+  } catch {
+    if (session === api && request === serverInfoRequest) clearServerInfo();
+  }
+}
 function readOnlyWhileDisconnected() {
   for (const id of ['add-task', 'add-project', 'add-label', 'add-activity', 'settings', 'stop']) $(id).disabled = !connected;
   for (const action of document.querySelectorAll('td.actions button')) action.disabled = !connected;
@@ -35,29 +60,41 @@ function tab(name) {
 }
 for (const node of document.querySelectorAll('[data-tab]')) node.addEventListener('click', () => tab(node.dataset.tab));
 
-$('login-form').addEventListener('submit', async event => {
-  event.preventDefault(); const form = event.currentTarget, token = $('token').value;
+$('login-form').addEventListener('submit', event => { event.preventDefault(); void signIn($('token').value); });
+async function signIn(token) {
+  const form = $('login-form');
   const session = new Api(token); $('token').value = ''; $('login-error').textContent = '';
   form.querySelector('button').disabled = true;
   try {
     // Reject remote clear-text deployments before sending credentials.
     if (location.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) throw new Error('Use HTTPS to sign in to this server.');
     const {data: profile} = await session.request('/me');
+    activeCredential = token;
+    $('remember-notice').textContent = rememberToken(token) ? '' : 'Signed in, but this browser could not remember your token. You will need it after reloading.';
     $('week-date').value = dateInZone(Date.now(), profile.zoneId);
     api = session; $('login').hidden = true; $('workspace').hidden = false; $('session').hidden = false;
     await refresh(); startWatch(session);
   } catch (error) {
     if (api === session) { api = null; $('login').hidden = false; $('workspace').hidden = true; $('session').hidden = true; }
-    session.close(); $('login-error').textContent = error instanceof ApiError ? error.message : 'Use HTTPS and a valid server time zone to sign in.';
+    session.close();
+    if (error.status === 401) forgetToken(token);
+    else $('token').value = token;
+    activeCredential = '';
+    $('login-error').textContent = error instanceof ApiError ? error.message : 'Use HTTPS and a valid server time zone to sign in.';
   } finally { form.querySelector('button').disabled = false; }
-});
+}
 $('sign-out').addEventListener('click', () => {
+  ++serverInfoRequest; clearServerInfo();
+  const forgotten = forgetToken(activeCredential);
+  activeCredential = '';
   api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null;
   collapsed.clear();
   $('editor').close(); $('fields').replaceChildren(); $('token').value = '';
   $('login').hidden = false; $('workspace').hidden = true; $('session').hidden = true;
   for (const id of ['projects', 'tasks', 'labels', 'activities', 'days']) $(id).replaceChildren();
   $('owner').textContent = ''; $('token').focus();
+  $('remember-notice').textContent = '';
+  $('login-error').textContent = forgotten ? '' : 'This browser could not forget your token. Clear site data in the browser settings.';
 });
 $('refresh').addEventListener('click', () => { const session = api; void refresh().then(() => { if (session === api) startWatch(session); }).catch(() => {}); });
 $('week-date').addEventListener('change', () => { selectedDay = null; void refresh().catch(() => {}); });
@@ -81,6 +118,7 @@ async function refresh() {
       if (reloadAgain) continue;
       snapshot = current; connected = true;
       render(); setStatus('Up to date');
+      void refreshServerInfo(session);
     } while (reloadAgain && session === api);
   })();
   try { await refreshing; }
@@ -98,6 +136,7 @@ async function watch(session) {
       if (session !== api) return;
       // Full consistent reads include changes made during pagination/report loading.
       if (changes.items.length || changes.hasMore || snapshot.active.data) await refresh();
+      else void refreshServerInfo(session);
       delay = 1000;
     } catch (error) {
       if (session !== api) return;
@@ -121,7 +160,9 @@ function row(values, actions = []) {
   const cell = element('td', undefined, 'actions'); for (const action of actions) cell.append(action); node.append(cell); return node;
 }
 function action(text, operation) {
-  const node = button(text, () => { void operation().catch(error => setStatus(errorText(error))); }); node.disabled = !connected; return node;
+  const node = button('', () => { void operation().catch(error => setStatus(errorText(error))); });
+  iconButton(node, text === 'Start' ? 'start' : text === 'Delete' ? 'delete' : 'edit', text);
+  node.disabled = !connected; return node;
 }
 function name(list, id, field = 'name') { const value = list.find(v => v.id === id); return value && field === 'summary' ? taskPresentation(value).title : value?.[field] ?? 'Unassigned'; }
 function taskLabel(task) {
@@ -166,9 +207,10 @@ function renderWorkweek(s, zone) {
   const titleCell = (content, level, key, title) => {
     const node = element('div', undefined, 'tree-title'); node.style.setProperty('--level', level);
     if (key) {
-      const toggle = button(collapsed.has(key) ? '▸' : '▾', () => { if (collapsed.has(key)) collapsed.delete(key); else collapsed.add(key); render(); });
+      const toggle = button('', () => { if (collapsed.has(key)) collapsed.delete(key); else collapsed.add(key); render(); });
+      toggle.append(icon(collapsed.has(key) ? 'right' : 'down'));
       toggle.className = 'tree-toggle'; toggle.setAttribute('aria-label', `${collapsed.has(key) ? 'Expand' : 'Collapse'} ${title}`); toggle.setAttribute('aria-expanded', String(!collapsed.has(key))); node.append(toggle);
-    } else node.append(element('span', '◷', 'activity-icon'));
+    } else { const marker = element('span', undefined, 'activity-icon'); marker.append(icon('clock')); node.append(marker); }
     node.append(content); return node;
   };
   const rows = [];
@@ -328,3 +370,9 @@ $('editor-form').addEventListener('submit', async event => {
 $('cancel').addEventListener('click', () => { if (editor?.busy) return; editor = null; $('editor').close(); $('fields').replaceChildren(); });
 $('editor').addEventListener('cancel', event => { if (editor?.busy) event.preventDefault(); else { editor = null; $('fields').replaceChildren(); } });
 window.addEventListener('pagehide', () => api?.close());
+iconButton($('refresh'), 'refresh', 'Refresh');
+iconButton($('collapse-activities'), 'collapse', 'Hide activities');
+iconButton($('expand-activities'), 'expand', 'Show activities');
+$('stop').prepend(icon('stop'));
+const remembered = savedToken();
+if (remembered) void signIn(remembered);

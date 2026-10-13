@@ -42,7 +42,8 @@ def main():
         port = sock.getsockname()[1]
     project = 'timekeeper-test-' + secrets.token_hex(4)
     (deployment / '.env').write_text(f'TIMEKEEPER_STATE_DIR={state}\nTIMEKEEPER_SERVER_IMAGE={args.server_image}\n'
-                                    f'TIMEKEEPER_POSTGRES_IMAGE={args.postgres_image}\nTIMEKEEPER_HTTP_PORT={port}\n')
+                                    f'TIMEKEEPER_POSTGRES_IMAGE={args.postgres_image}\nTIMEKEEPER_HTTP_PORT={port}\n'
+                                    'TIMEKEEPER_DEPLOYED_AT=2026-10-13T08:30:00Z\n')
     subprocess.run([sys.executable, str(deployment / 'setup.py'), '--owner', 'owner-a'],
                    check=True, stdout=subprocess.DEVNULL)
     tokens = {role: secrets.token_urlsafe(32) for role in ('a', 'b', 'read', 'expired')}
@@ -53,7 +54,7 @@ def main():
                 for role, token in tokens.items()]
     (state / 'config/tokens.json').write_text(json.dumps(registry))
     environment = dict(os.environ)
-    for name in ('TIMEKEEPER_STATE_DIR', 'TIMEKEEPER_SERVER_IMAGE', 'TIMEKEEPER_POSTGRES_IMAGE', 'TIMEKEEPER_HTTP_PORT'):
+    for name in ('TIMEKEEPER_STATE_DIR', 'TIMEKEEPER_SERVER_IMAGE', 'TIMEKEEPER_POSTGRES_IMAGE', 'TIMEKEEPER_HTTP_PORT', 'TIMEKEEPER_DEPLOYED_AT'):
         environment.pop(name, None)
     command = ['docker', 'compose', '-p', project]
 
@@ -93,6 +94,15 @@ def main():
     try:
         compose('up', '-d', '--wait', '--wait-timeout', '180')
         wait_ready()
+        def server_information(member):
+            return json.loads(compose('exec', '-T', member, 'curl', '-fsS', '-H', '@-',
+                                     'http://localhost:8080/api/v1/server',
+                                     input='Authorization: Bearer ' + tokens['a'] + '\n'))
+        initial_information = {member: server_information(member) for member in ('api-1', 'api-2')}
+        for information in initial_information.values():
+            client.assertEqual('2026-10-13T08:30:00Z', information['deployedAt'])
+            client.assertRegex(information['commit'], '^[0-9a-f]{40}$')
+        client.assertEqual(initial_information['api-1']['commit'], initial_information['api-2']['commit'])
         with urlopen(base + '/web/', timeout=3) as response:
             client.assertIn(b'id="login-form"', response.read())
             client.assertIn("frame-ancestors 'none'", response.headers.get('Content-Security-Policy', ''))
@@ -276,6 +286,11 @@ def main():
         client.assertEqual(replacement_id, deployed_image('api-1'))
         client.assertEqual(replacement_id, deployed_image('api-2'))
         receipt['rollingUpdate'] = True
+        deployed_information = {member: server_information(member) for member in ('api-1', 'api-2')}
+        deployment_time = deployed_information['api-1']['deployedAt']
+        client.assertNotEqual(initial_information['api-1']['deployedAt'], deployment_time)
+        client.assertEqual(deployment_time, deployed_information['api-2']['deployedAt'])
+        client.assertIn('TIMEKEEPER_DEPLOYED_AT=' + deployment_time, env_file.read_text())
         publish_replacement(broken=True)
         failed, receipt['requestsDuringRollback'], receipt['longPollsDuringRollback'] = update_with_requests()
         client.assertNotEqual(0, failed.returncode)
@@ -283,6 +298,8 @@ def main():
         client.assertEqual(replacement_id, deployed_image('api-2'))
         wait_ready()
         receipt['failedUpdateRollback'] = True
+        for member in ('api-1', 'api-2'):
+            client.assertEqual(deployment_time, server_information(member)['deployedAt'])
         publish_replacement(broken_second=True)
         failed_second, receipt['requestsDuringSecondRollback'], receipt['longPollsDuringSecondRollback'] = update_with_requests()
         client.assertNotEqual(0, failed_second.returncode)
@@ -291,6 +308,9 @@ def main():
         client.assertEqual(replacement_id, deployed_image('api-2'))
         wait_ready()
         receipt['secondReplicaRollback'] = True
+        for member in ('api-1', 'api-2'):
+            client.assertEqual(deployment_time, server_information(member)['deployedAt'])
+        receipt['buildAndDeploymentInformation'] = True
         env_file.write_text(original_environment)
         print('Rolling image update and broken-image rollback: PASS', flush=True)
         compose('down')

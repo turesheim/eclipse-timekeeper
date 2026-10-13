@@ -1,6 +1,11 @@
 # Source-checkout build override. Synology uses the published API image.
 services:
   api-1:
-    build: {context: ../.., dockerfile: server/Dockerfile}
+    build: &build
+      context: ../..
+      dockerfile: server/Dockerfile
+      args:
+        TIMEKEEPER_BUILD_COMMIT: ${TIMEKEEPER_BUILD_COMMIT:-unknown}
+        TIMEKEEPER_BUILD_DIRTY: ${TIMEKEEPER_BUILD_DIRTY:-unknown}
   api-2:
-    build: {context: ../.., dockerfile: server/Dockerfile}
+    build: *build

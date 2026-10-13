@@ -1,7 +1,10 @@
 # Bundled web client acceptance
 
 Issue #221, stacked on the remote-client/synchronization/owner-binding drafts.
-This checkpoint does not close #221 or certify release acceptance.
+This records an earlier checkpoint and does not certify release acceptance.
+Its tab-only credential policy was subsequently replaced at the user's request
+with remembered browser sign-in and explicit removal on sign-out. See the
+[current web client guide](../development/WEB-CLIENT.md).
 
 The server packages native browser modules at `/web/`. The UI uses only the
 public owner-scoped API: token sign-in, project/task/label/activity CRUD,

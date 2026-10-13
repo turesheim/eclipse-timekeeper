@@ -165,6 +165,9 @@ public class MylynBackendScopeTest {
             var staleCategory=new TaskCategory(scopeA.categoryHandle(missingProject),"Deleted backend project");
             var staleTask=new LocalTask(String.valueOf(list.getNextLocalTaskId()),"Deleted backend task");
             scopeA.remember(missingProject,staleCategory);scopeA.remember(staleTask,missingTask,true);
+            // A late category projection must retain its UUID after deletion
+            // removes the preference mapping; it must not import a new project.
+            scopeA.forget(missingProject);
             onUi(()->{
                 list.addCategory(staleCategory);list.addTask(staleTask,staleCategory);
                 projectedA.setSummary("A edit after stale projections");list.notifyElementChanged(projectedA);

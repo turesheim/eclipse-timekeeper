@@ -25,6 +25,7 @@ x-api: &api
     QUARKUS_DATASOURCE_JDBC_MAX_SIZE: '16'
     QUARKUS_SHUTDOWN_TIMEOUT: 20s
     JAVA_OPTS: -Xms64m -Xmx384m
+    TIMEKEEPER_DEPLOYED_AT: ${TIMEKEEPER_DEPLOYED_AT:-}
   secrets: [timekeeper_database_password]
   volumes:
     - ${TIMEKEEPER_STATE_DIR:-./state}/config:/config:ro
