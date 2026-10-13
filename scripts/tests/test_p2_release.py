@@ -142,6 +142,59 @@ class PublicationTest(unittest.TestCase):
         self.assertEqual("0", root.find("children").get("size"))
         self.assertIn("No release repositories", (self.root / "site/updates/index.html").read_text())
 
+    def complete_assets(self, commit="a" * 40, tag="v2.0.0"):
+        assets = self.assets(tag)
+        with zipfile.ZipFile(assets / p2.SERVER_ARCHIVE, "w") as archive:
+            archive.writestr("timekeeper-server/" + p2.PROVENANCE,
+                            json.dumps({"kind": "release", "tag": tag, "commit": commit}))
+        digest = hashlib.sha256((assets / p2.SERVER_ARCHIVE).read_bytes()).hexdigest()
+        (assets / p2.SERVER_CHECKSUM).write_text(f"{digest}  {p2.SERVER_ARCHIVE}\n")
+        return assets
+
+    def test_complete_release_rejects_every_partial_upload(self):
+        from itertools import combinations
+        names = [p2.ARCHIVE, p2.CHECKSUM, p2.SERVER_ARCHIVE, p2.SERVER_CHECKSUM]
+        release = {"tag_name": "v2.0.0", "assets": []}
+        self.assertFalse(p2.complete_asset_state(release))
+        for size in range(1, 4):
+            for subset in combinations(names, size):
+                with self.subTest(subset=subset), self.assertRaisesRegex(ValueError, "Incomplete"):
+                    p2.complete_asset_state({**release, "assets": [{"name": name} for name in subset]})
+        self.assertTrue(p2.complete_asset_state({**release, "assets": [{"name": name} for name in names]}))
+
+    def test_complete_assets_require_shared_provenance_and_intact_server(self):
+        assets = self.complete_assets()
+        p2.verify_complete_assets(assets, "v2.0.0")
+        with (assets / p2.SERVER_ARCHIVE).open("ab") as archive:
+            archive.write(b"corruption")
+        with self.assertRaisesRegex(ValueError, "checksum"):
+            p2.verify_complete_assets(assets, "v2.0.0")
+        assets = self.complete_assets(commit="b" * 40)
+        with self.assertRaisesRegex(ValueError, "provenance"):
+            p2.verify_complete_assets(assets, "v2.0.0")
+
+    def test_full_preflight_verifies_downloads_before_emitting_reuse(self):
+        assets = self.complete_assets()
+        release = {"tagName": "v2.0.0", "isDraft": False,
+                   "assets": [{"name": path.name} for path in assets.iterdir()]}
+        def github(*args):
+            if args[1] == "view":
+                return json.dumps(release)
+            destination = Path(args[args.index("--dir") + 1])
+            for source in assets.iterdir():
+                shutil.copy2(source, destination / source.name)
+            return ""
+        output = self.root / "output"
+        with patch.dict(os.environ, {"GITHUB_OUTPUT": str(output)}), patch.object(p2, "gh", side_effect=github):
+            p2.prepare("owner/repo", "v2.0.0", require_server=True)
+            self.assertEqual("reuse=true\n", output.read_text())
+            output.unlink()
+            with (assets / p2.SERVER_ARCHIVE).open("ab") as archive:
+                archive.write(b"corruption")
+            with self.assertRaisesRegex(ValueError, "checksum"):
+                p2.prepare("owner/repo", "v2.0.0", require_server=True)
+            self.assertFalse(output.exists())
+
     def test_preflight_reuses_assets_and_rejects_drafts(self):
         release = {"tagName": "v2.0.0", "isDraft": False, "assets": self.release("v2.0.0")["assets"]}
         with patch.dict(os.environ, {"GITHUB_OUTPUT": str(self.root / "output")}), patch.object(p2, "gh", return_value=json.dumps(release)):

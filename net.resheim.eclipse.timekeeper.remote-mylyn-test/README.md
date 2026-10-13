@@ -15,6 +15,13 @@ There is no production Node dependency. The token goes only through the child
 environment; the line protocol and retained diagnostics contain no credentials.
 Details and limits: [WEB-ECLIPSE.md](../baseline/WEB-ECLIPSE.md).
 
+Native remote preference/report controls are also exercised in this runtime.
+On Linux, install `xdotool` and run with `-Dtimekeeper.native.dialog-tests=true`
+inside an isolated Xvfb display to operate the real GTK report/CSV pickers. CI
+enables this explicitly. Other platforms record that picker scope as not run;
+they must not be treated as picker acceptance. See
+[NATIVE-REMOTE-TRANSFER.md](../baseline/NATIVE-REMOTE-TRANSFER.md).
+
 This module extends the isolated packaged-server bootstrap from `remote-test`
 and installs the official optional Timekeeper/Mylyn feature using p2. It runs
 in its own workspace and credential fixture, separate from the native-only

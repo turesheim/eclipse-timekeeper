@@ -169,6 +169,22 @@ public final class RemoteBootstrap implements IApplication {
         proof.setProperty("server.recovery-pids",previous.isEmpty() ? String.valueOf(active.server.pid()) : previous+","+active.server.pid());writeProof();
         return active.server.pid();
     }
+    /** Cold snapshot of the isolated packaged-server H2 file, never the app's local database. */
+    public static void backupFixtureServer() throws Exception {
+        stopFixtureServer();
+        try {
+            Path backup=folder.resolve("cold-server-backup.mv.db");
+            Files.copy(folder.resolve("server data/timekeeper.mv.db"),backup,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            proof.setProperty("server.backup.sha256",hash(backup));writeProof();
+        } finally {restartFixtureServer();}
+    }
+    public static void restoreStoppedFixtureServer() throws Exception {
+        if(active.server.isAlive()) throw new IllegalStateException("Cold restore requires the fixture server to be stopped");
+        Path backup=folder.resolve("cold-server-backup.mv.db"),database=folder.resolve("server data/timekeeper.mv.db");
+        if(!hash(backup).equals(proof.getProperty("server.backup.sha256"))) throw new IllegalStateException("Fixture backup checksum changed");
+        Files.copy(backup,database,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        proof.setProperty("server.restored.sha256",hash(database));writeProof();restartFixtureServer();
+    }
     @Override public void stop() {if(delegate!=null) delegate.stop();stopReplyGate();stopServer();stopAlternate();}
     private void stopAlternate() {
         if(alternate==null) return;alternate.destroy();
@@ -194,12 +210,31 @@ public final class RemoteBootstrap implements IApplication {
         proof.setProperty("server.reply-gate-pid",String.valueOf(active.replyGate.pid()));writeProof();
     }
     public static void holdNextTaskReply(java.util.UUID id) throws Exception {control("hold","/api/v1/tasks/"+id);}
+    public static void holdNextCreateReply(String collection) throws Exception {
+        if(!java.util.Set.of("projects","tasks","activities","labels").contains(collection)) throw new IllegalArgumentException("Unsupported create fixture");
+        control("hold","POST /api/v1/"+collection);
+    }
+    public static void holdNextTrackingReply(java.util.UUID activity) throws Exception {
+        control("hold","POST /api/v1/activities/"+(activity==null ? "start" : activity+"/stop"));
+    }
+    public static void holdNextDeleteReply(String collection,java.util.UUID id) throws Exception {
+        if(!java.util.Set.of("projects","tasks","activities","labels").contains(collection)) throw new IllegalArgumentException("Unsupported delete fixture");
+        control("hold","DELETE /api/v1/"+collection+"/"+id);
+    }
+    public static void holdNextImportReply() throws Exception {control("hold","POST /api/v1/data/import");}
+    public static void awaitImportReplyCommitted() throws Exception {awaitReplyCommitted(201);}
+    public static void awaitDeleteReplyCommitted() throws Exception {awaitReplyCommitted(204);}
+    public static void awaitTrackingReplyCommitted(boolean start) throws Exception {awaitReplyCommitted(start ? 201 : 200);}
+    public static void awaitCreateReplyCommitted() throws Exception {awaitReplyCommitted(201);}
     public static void awaitTaskReplyCommitted() throws Exception {
+        awaitReplyCommitted(200);
+    }
+    private static void awaitReplyCommitted(int status) throws Exception {
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
         while(System.nanoTime()<deadline) {
             String value=control("state",null);
             if(value.startsWith("committed=")) {
-                if(!value.equals("committed=200")) throw new IllegalStateException("Fixture update was not acknowledged by the backend: "+value);
+                if(!value.equals("committed="+status)) throw new IllegalStateException("Fixture mutation was not acknowledged by the backend: "+value);
                 return;
             }
             Thread.sleep(25);

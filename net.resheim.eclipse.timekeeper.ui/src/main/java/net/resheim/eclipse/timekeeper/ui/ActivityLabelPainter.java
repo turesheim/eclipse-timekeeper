@@ -61,6 +61,7 @@ public class ActivityLabelPainter {
 	}
 
 	private Image getLabelImage(Object keySource, String labelColor, int size, boolean outline) {
+		if (labelColor == null || labelColor.isBlank()) labelColor = "0,0,0";
 
 		Object key = generateKey(keySource, Integer.valueOf(size), Boolean.valueOf(outline));
 
