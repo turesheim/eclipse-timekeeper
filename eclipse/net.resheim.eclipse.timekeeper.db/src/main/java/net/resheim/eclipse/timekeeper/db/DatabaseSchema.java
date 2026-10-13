@@ -15,7 +15,7 @@ import java.util.TreeSet;
 public final class DatabaseSchema {
 	private DatabaseSchema() { }
 
-	public enum Kind { EMPTY, CURRENT, MIGRATING, INCOMPLETE, UNKNOWN }
+	public enum Kind { EMPTY, CURRENT, UPGRADE_REQUIRED, MIGRATING, INCOMPLETE, UNKNOWN }
 
 	// Order is also the foreign-key-safe insertion order. No constraints are disabled.
 	static final Map<String, List<String>> CURRENT = columns(
@@ -23,19 +23,28 @@ public final class DatabaseSchema {
 			"PROJECT:NAME,REPOSITORY_URL,EXTERNAL_ID,PROJECT_URL,TASKS_URL,TYPE",
 			"TASK:ID,VERSION,TICK,TASK_URL,TASK_SUMMARY,TASK_PROJECT,PARENT_TASK,CURRENTACTIVITY_ID",
 			"EXTERNAL_TASK_REFERENCE:ID,PROVIDER_ID,REPOSITORY_ID,EXTERNAL_ID,EXTERNAL_URL,TASK_ID",
-			"ACTIVITY:ID,START_TIME,END_TIME,ADJUSTED,SUMMARY,OWNER_ID,TASK_ID,ACTIVITY_PROJECT",
+			"ACTIVITY:ID,START_TIME,END_TIME,ADJUSTED,SUMMARY,OWNER_ID,TASK_ID,ACTIVITY_PROJECT,WORK_SESSION_ID",
+            "WORK_SESSION:ID,VERSION,OWNER_ID,START_TIME,END_TIME,SUMMARY,STATE",
+            "TIMEKEEPER_WRITE_LOCK:ID",
 			"TASK_ACTIVITY:TASK_ID,ACTIVITIES_ID",
 			"PROJECT_TASK:PROJECT_NAME,TASKS_ID",
 			"PROJECT_ACTIVITY:PROJECT_NAME,CHILDREN_ID",
 			"ACTIVITYLABEL:ID,NAME,COLOR",
 			"ACTIVITY_ACTIVITYLABEL:ACTIVITY_ID,LABELS_ID");
 
+    static final Map<String,List<String>> VERSION_2;
+    static {
+        VERSION_2=new LinkedHashMap<>(CURRENT);VERSION_2.remove("WORK_SESSION");VERSION_2.remove("TIMEKEEPER_WRITE_LOCK");
+        VERSION_2.put("ACTIVITY",List.of("ID","START_TIME","END_TIME","ADJUSTED","SUMMARY","OWNER_ID","TASK_ID","ACTIVITY_PROJECT"));
+    }
+
 
 	public static Kind inspect(Connection connection) throws SQLException {
 		Map<String, Set<String>> actual = schema(connection);
 		DatabaseVersion.Stamp version = removeVersion(connection, actual);
-		if (version != null) {
-			if (version.state().equals("CREATING")) return Kind.INCOMPLETE;
+        if (version != null) {
+            if(version.version()==2) return version.state().equals("READY") && matches(actual,VERSION_2) ? Kind.UPGRADE_REQUIRED : Kind.INCOMPLETE;
+            if (version.state().equals("CREATING")) return Kind.INCOMPLETE;
 			if (version.state().equals("MIGRATING")) {
 				return matches(actual, CURRENT) ? Kind.MIGRATING : Kind.INCOMPLETE;
 			}

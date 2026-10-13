@@ -73,11 +73,11 @@ your home directory; restart after changing the location. See the
 for the user workflow. Database instances use H2 mixed mode; concurrent edits
 to the same task are unsupported. See [multi-instance acceptance](verification/CONCURRENT-INSTANCES.md).
 
-The Eclipse 2026-09 upgrade uses **H2 2.5.250 with schema version 2** as its
+The Eclipse 2026-09 upgrade uses **H2 2.5.250 with schema version 3** as its
 supported database baseline. Start with new storage; historical H2 files,
 unversioned databases and old Mylyn attribute records are not imported.
 Schema versioning and guarded migration-target infrastructure are retained for
-future migrations, but there are no active migration recipes or recovery buttons.
+future migrations. Known version-2 storage is extended for Work Sessions after a verified SQL backup; historical formats remain unsupported.
 See the [complete data model and ER diagram](architecture/DATA-MODEL.md) and the
 [database policy, backups and future migration contract](operations/DATABASE-RECOVERY.md).
 
