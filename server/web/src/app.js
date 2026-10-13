@@ -1,5 +1,5 @@
 import {Api, ApiError} from './api.js';
-import {addDays, dateInZone, dayStart, durationText, durationNanos, instantText, instantNanos, weekRange, taskPresentation, activityDayNanos, nanosText, decimalHoursText, workweekGroups} from './model.js';
+import {addDays, dateInZone, dayStart, durationText, durationNanos, instantText, instantNanos, weekRange, taskPresentation, activityDayNanos, nanosText, decimalHoursText, workweekGroups, sessionTimeNanos} from './model.js';
 import {savedToken, rememberToken, forgetToken} from './credentials.js';
 import {icon, iconButton} from './icons.js';
 
@@ -9,6 +9,7 @@ let editor = null, selectedActivity = null, selectedDay = null;
 let watchSession = null;
 let activeCredential = '';
 let serverInfoRequest = 0;
+let selectedWorkSession = null, snapshotAt = 0, sessionAsOf = 0n;
 const collapsed = new Set();
 let decimalHours = false, activitiesCollapsed = false;
 const displayNanos = value => decimalHours ? decimalHoursText(value) : nanosText(value);
@@ -49,7 +50,7 @@ async function refreshServerInfo(session) {
   }
 }
 function readOnlyWhileDisconnected() {
-  for (const id of ['add-task', 'add-project', 'add-label', 'add-activity', 'settings', 'stop']) $(id).disabled = !connected;
+  for (const id of ['add-task', 'add-project', 'add-label', 'add-activity', 'settings', 'stop', 'session-start', 'session-stop', 'session-new', 'session-edit', 'session-delete', 'session-add', 'session-associate']) $(id).disabled = !connected;
   for (const action of document.querySelectorAll('td.actions button')) action.disabled = !connected;
 }
 function tab(name) {
@@ -88,7 +89,7 @@ $('sign-out').addEventListener('click', () => {
   const forgotten = forgetToken(activeCredential);
   activeCredential = '';
   api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null;
-  collapsed.clear();
+  collapsed.clear(); selectedWorkSession = null; $('session-activities').replaceChildren();
   $('editor').close(); $('fields').replaceChildren(); $('token').value = '';
   $('login').hidden = false; $('workspace').hidden = true; $('session').hidden = true;
   for (const id of ['projects', 'tasks', 'labels', 'activities', 'days']) $(id).replaceChildren();
@@ -109,14 +110,14 @@ async function refresh() {
   refreshing = (async () => {
     do {
       reloadAgain = false;
-      const date = $('week-date').value;
-      const current = await session.snapshot(zone => weekRange(date, zone));
+      const date = $('week-date').value, selected = selectedWorkSession;
+      const current = await session.snapshot(zone => weekRange(date, zone), selected);
       if (session !== api) return;
-      if (date !== $('week-date').value) { reloadAgain = true; continue; }
+      if (date !== $('week-date').value || selected !== selectedWorkSession) { reloadAgain = true; continue; }
       // A save may have queued another read while this older snapshot was in
       // flight. Publish only the final snapshot before enabling dependent forms.
       if (reloadAgain) continue;
-      snapshot = current; connected = true;
+      snapshot = current; snapshotAt = performance.now(); sessionAsOf = current.workSessionReport ? instantNanos(current.workSessionReport.generatedAt) : 0n; connected = true;
       render(); setStatus('Up to date');
       void refreshServerInfo(session);
     } while (reloadAgain && session === api);
@@ -135,7 +136,7 @@ async function watch(session) {
       const changes = await session.changes(snapshot.revision);
       if (session !== api) return;
       // Full consistent reads include changes made during pagination/report loading.
-      if (changes.items.length || changes.hasMore || snapshot.active.data) await refresh();
+      if (changes.items.length || changes.hasMore || snapshot.active.data || snapshot.activeWorkSession.data) await refresh();
       else void refreshServerInfo(session);
       delay = 1000;
     } catch (error) {
@@ -183,7 +184,7 @@ function render() {
   table('projects', ['Name', 'Actions'], s.projects.map(value => row([value.name], [action('Edit', () => openRecord('projects', value.id)), action('Delete', () => openDelete('projects', value.id))])));
   table('tasks', ['Task', 'Project', 'Parent', 'Actions'], s.tasks.map(value => row([taskLabel(value), name(s.projects, value.projectId), value.parentTaskId ? name(s.tasks, value.parentTaskId, 'summary') : '—'], [action('Start', () => openStart(value.id)), action('Edit', () => openRecord('tasks', value.id)), action('Delete', () => openDelete('tasks', value.id))])));
   table('labels', ['Name', 'Color', 'Actions'], s.labels.map(value => row([value.name, value.color || '—'], [action('Edit', () => openRecord('labels', value.id)), action('Delete', () => openDelete('labels', value.id))])));
-  refreshLabelFields();
+  refreshLabelFields(); refreshSessionChoices(); renderSession();
   $('week-total').textContent = displayDuration(s.report.total); $('days').replaceChildren();
   for (let index = 0; index < 7; index++) {
     const date = addDays(s.dates.first, index), day = s.report.days.find(v => v.date === date);
@@ -234,11 +235,11 @@ function renderWorkweek(s, zone) {
     if (!collapsed.has(key)) { for (const child of node.children) addTask(child, level + 1); for (const value of node.activities.filter(visible)) addActivity(value, level + 1); }
   };
   for (const group of workweekGroups(s.tasks, s.projects, s.activities)) {
-    const activities = group.tasks.flatMap(allActivities); if (!activities.some(visible)) continue;
+    const activities = [...group.tasks.flatMap(allActivities), ...(group.activities || [])]; if (!activities.some(visible)) continue;
     const key = `project:${group.id}`;
     const projectRow = row([titleCell(element('span', group.name), 0, key, group.name), ...totals(activities), '']);
     projectRow.dataset.kind = 'project'; rows.push(projectRow);
-    if (!collapsed.has(key)) for (const node of group.tasks) addTask(node, 1);
+    if (!collapsed.has(key)) { for (const node of group.tasks) addTask(node, 1); for (const value of (group.activities || []).filter(visible)) addActivity(value, 1); }
   }
   const headings = dates.map(date => new Intl.DateTimeFormat(undefined, {weekday: 'short', day: 'numeric', timeZone: 'UTC'}).format(new Date(`${date}T12:00:00Z`)));
   table('activities', ['Activity', ...headings, 'Weekly total', 'Labels', 'Actions'], rows);
@@ -282,11 +283,11 @@ function begin(title, state) {
   $('editor-title').textContent = title; $('save').textContent = 'Save'; $('save').disabled = false; $('cancel').disabled = false; return true;
 }
 function showEditor() { $('editor').showModal(); $('fields').querySelector('input,select')?.focus(); }
-async function openRecord(collection, id = null) {
+async function openRecord(collection, id = null, activitySession = null) {
   const session = api;
   const loaded = id ? await session.request(`/${collection}/${id}`) : {data: {}, etag: null};
   if (session !== api || !connected) return;
-  const titles = {projects: 'project', tasks: 'task', labels: 'label', activities: 'activity'}, value = loaded.data;
+  const titles = {projects: 'project', tasks: 'task', labels: 'label', activities: 'activity', 'work-sessions': 'work session'}, value = loaded.data;
   if (!begin(`${id ? 'Edit' : 'New'} ${titles[collection]}`, {collection, id, etag: loaded.etag})) return;
   if (collection === 'projects' || collection === 'labels') field('Name', 'name', value.name, {required: true, max: 1000});
   if (collection === 'labels') field('Color (optional)', 'color', value.color, {hint: 'Hex color, for example #176653.'});
@@ -297,11 +298,18 @@ async function openRecord(collection, id = null) {
     field('URL (optional)', 'url', value.url, {type: 'url', max: 4096});
   }
   if (collection === 'activities') {
-    const task = field('Task', 'taskId', value.taskId, {required: true, choices: [['', 'Choose task'], ...snapshot.tasks.map(v => [v.id, taskPresentation(v).title])]}); task.disabled = !!id;
+    const task = field('Task', 'taskId', value.taskId, {choices: [['', 'No task'], ...snapshot.tasks.map(v => [v.id, taskPresentation(v).title])]}); task.disabled = !!id;
+    if (!id) { field('Project (without task)', 'projectId', '', {choices:[['','No project'],...snapshot.projects.map(v => [v.id,v.name])]}); field('Work session', 'workSessionId', activitySession, {choices:sessionChoices()}); }
     field('Summary', 'summary', value.summary, {max: 2000});
     field('Start (UTC)', 'start', value.start || new Date().toISOString(), {required: true, hint: `UTC timestamp, e.g. 2026-10-13T08:30:00Z. Start cannot be in the future. Your reports use ${snapshot.profile.data.zoneId}. Up to nine fractional digits are preserved.`});
     field('End (UTC, blank while tracking)', 'end', value.end); labelFields(value.labelIds);
   }
+  if (collection === 'work-sessions') {
+    field('Summary','summary',value.summary || '',{max:2000});
+    field('Start (UTC)','start',value.start || new Date().toISOString(),{required:true,hint:'The start cannot be in the future.'});
+    field('End (UTC, blank while running)','end',value.end || '');
+  }
+  if(collection==='activities' && !id) addSessionWarning();
   showEditor();
 }
 async function openDelete(collection, id) {
@@ -313,7 +321,7 @@ async function openDelete(collection, id) {
 async function openStart(id) {
   if (!begin('Start tracking', {command: 'start', key: crypto.randomUUID(), expected: snapshot.active.data})) return;
   field('Task', 'taskId', id, {required: true, choices: snapshot.tasks.map(v => [v.id, taskPresentation(v).title])});
-  field('Summary', 'summary', '', {max: 2000}); labelFields(); $('save').textContent = 'Start';
+  field('Summary', 'summary', '', {max: 2000}); field('Work session','workSessionId',snapshot.activeWorkSession.data?.id || '',{choices:sessionChoices()}); labelFields(); $('save').textContent = 'Start';
   if (snapshot.active.data) $('editor-notice').textContent = 'Starting this task stops the current activity.'; showEditor();
 }
 $('stop').addEventListener('click', () => {
@@ -329,32 +337,36 @@ for (const [id, collection] of [['add-project','projects'], ['add-task','tasks']
 function values() {
   const get = key => $('fields').querySelector(`[name="${key}"]`)?.value;
   const labels = () => [...$('fields').querySelectorAll('[name="labelIds"]:checked')].map(node => node.value);
-  if (editor.command === 'stop' || editor.remove) return undefined;
-  if (editor.command === 'start') return {taskId: get('taskId'), summary: get('summary'), labelIds: labels(), expectedActiveId: editor.expected?.id ?? null, expectedActiveVersion: editor.expected?.version ?? null};
+  if (editor.command === 'stop' || editor.command === 'session-stop' || editor.remove) return undefined;
+  if (editor.command === 'session-start') return {summary:''};
+  if (editor.association) return {workSessionId:get('workSessionId') || null};
+  if (editor.command === 'start') return {taskId: get('taskId'), workSessionId:get('workSessionId') || null, summary: get('summary'), labelIds: labels(), expectedActiveId: editor.expected?.id ?? null, expectedActiveVersion: editor.expected?.version ?? null};
   switch (editor.collection) {
     case 'projects': return {name: get('name')};
     case 'labels': return {name: get('name'), color: get('color') || null};
     case 'tasks': return {summary: get('summary'), projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null};
-    case 'activities': return {...(editor.id ? {} : {taskId: get('taskId')}), summary: get('summary'), start: get('start'), end: get('end') || null, labelIds: labels()};
+    case 'activities': return {...(editor.id ? {} : {taskId: get('taskId') || null, projectId:get('taskId') ? null : get('projectId') || null, workSessionId:get('workSessionId') || null}), summary: get('summary'), start: get('start'), end: get('end') || null, labelIds: labels()};
+    case 'work-sessions': return {summary:get('summary'),start:get('start'),end:get('end') || null};
     case 'me': return {zoneId: get('zoneId')};
   }
 }
 function freeze(state) { for (const input of $('fields').querySelectorAll('input,select')) input.disabled = state || (editor.collection === 'activities' && !!editor.id && input.name === 'taskId'); }
-$('editor-form').addEventListener('submit', async event => {
-  event.preventDefault(); const current = editor;
+async function saveEditor(event) {
+  event?.preventDefault(); const current = editor;
   if (!current || current.busy || current.session !== api) return;
   current.busy = true; $('save').disabled = true; $('cancel').disabled = true; $('editor-error').textContent = '';
   try {
     const body = current.uncertain ? current.payload : values();
     current.payload = body; freeze(true);
-    const path = current.command === 'start' ? '/activities/start' : current.command === 'stop' ? `/activities/${current.id}/stop` : `/${current.collection}${current.id ? '/' + current.id : ''}`;
+    const path = current.association ? `/activities/${current.id}/work-session` : current.command === 'session-start' ? '/work-sessions/start' : current.command === 'session-stop' ? `/work-sessions/${current.id}/stop` : current.command === 'start' ? '/activities/start' : current.command === 'stop' ? `/activities/${current.id}/stop` : `/${current.collection}${current.id ? '/' + current.id : ''}`;
     const method = current.command ? 'POST' : current.remove ? 'DELETE' : current.id !== null ? 'PUT' : 'POST';
-    await current.session.request(path, {method, body, etag: current.etag, key: current.key});
+    const saved = await current.session.request(path, {method, body, etag: current.etag, key: current.key});
     if (current.session !== api || current !== editor) return;
     editor = null; $('editor').close(); $('fields').replaceChildren();
     connected = false; readOnlyWhileDisconnected(); setStatus('Refreshing saved changes…');
     // Acknowledged saves remain successful even if the following read fails.
     await refresh().catch(() => {});
+    if(saved.data?.outsideSession) setStatus('Saved. This activity extends outside the selected work session.');
   } catch (error) {
     if (current !== editor || current.session !== api) return;
     $('editor-error').textContent = errorText(error);
@@ -366,9 +378,88 @@ $('editor-form').addEventListener('submit', async event => {
   } finally {
     if (current === editor) { current.busy = false; $('save').disabled = current.uncertain && !current.key; $('cancel').disabled = false; refreshLabelFields(); }
   }
-});
+}
+$('editor-form').addEventListener('submit', saveEditor);
 $('cancel').addEventListener('click', () => { if (editor?.busy) return; editor = null; $('editor').close(); $('fields').replaceChildren(); });
 $('editor').addEventListener('cancel', event => { if (editor?.busy) event.preventDefault(); else { editor = null; $('fields').replaceChildren(); } });
+function sessionLabel(value) {
+  return `${new Date(value.start).toLocaleString(undefined,{timeZone:snapshot.profile.data.zoneId,year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})} · ${value.end ? 'Completed' : 'Running'}${value.summary ? ' · '+value.summary : ''}`;
+}
+function sessionChoices() {return [['','Standalone'],...snapshot.workSessions.map(value => [value.id,sessionLabel(value)])];}
+function refreshSessionChoices() {
+  const input=$('field-workSessionId');if(!input || editor?.busy || editor?.uncertain) return;const selected=input.value;
+  input.replaceChildren();for(const [id,label] of sessionChoices()) {const option=element('option',label);option.value=id;input.append(option);}
+  if(selected && !snapshot.workSessions.some(value=>value.id===selected)) {const option=element('option','Removed work session');option.value=selected;input.append(option);}
+  input.value=selected;
+}
+function renderSession() {
+  const active=snapshot.activeWorkSession.data, report=snapshot.workSessionReport, choice=$('work-session-choice');
+  $('work-session-state').textContent=active ? 'Running' : 'Stopped';
+  $('work-session-current').textContent=active ? `Current session started ${instantText(active.start,snapshot.profile.data.zoneId)}` : 'Start a work session to track your day independently of tasks.';
+  $('session-start').disabled=!connected || !!active; $('session-stop').hidden=!active;
+  choice.replaceChildren();for(const value of [...snapshot.workSessions].sort((a,b) => b.start.localeCompare(a.start))) {const option=element('option',sessionLabel(value));option.value=value.id;choice.append(option);}
+  if(!report) {const option=element('option','No sessions yet');option.value='';choice.append(option);}
+  choice.value=report?.session.id || '';choice.disabled=!connected || !report;
+  $('work-session-details').hidden=!report;
+  if(!report) return;
+  $('work-session-started').textContent=`${report.session.summary || 'Work session'} · ${instantText(report.session.start,snapshot.profile.data.zoneId)} → ${instantText(report.session.end,snapshot.profile.data.zoneId)}`;
+  table('session-activities',['Activity','Task / project','Time','Actions'],report.activities.map(value => row([
+    value.summary || 'Activity',value.taskId ? name(snapshot.tasks,value.taskId,'summary') : name(snapshot.projects,value.projectId),
+    `${instantText(value.start,snapshot.profile.data.zoneId)} → ${instantText(value.end,snapshot.profile.data.zoneId)}`,
+  ],[action('Edit',()=>openRecord('activities',value.id)),action('Remove from session',()=>openAssociation(value.id,''))])));
+  $('session-warning').textContent=report.time.outsideSession.length ? 'Some activities extend outside this session. Only their overlap counts toward covered time.' : '';
+  renderSessionTime();
+}
+function renderSessionTime() {
+  if(!snapshot?.workSessionReport) return;const report=snapshot.workSessionReport;
+  const elapsed=connected ? BigInt(Math.max(0,Math.floor(performance.now()-snapshotAt)))*1000000n : 0n;
+  if(connected) sessionAsOf=instantNanos(report.generatedAt)+elapsed;
+  const time=sessionTimeNanos(report.session,report.activities,sessionAsOf);
+  for(const [id,key] of [['ws-duration','duration'],['ws-tracked','tracked'],['ws-covered','allocated'],['ws-unallocated','unallocated']]) $(id).textContent=displayNanos(time[key]);
+}
+function addSessionWarning() {
+  const warning=element('p','', 'hint');warning.id='activity-session-warning';warning.setAttribute('role','status');$('fields').append(warning);
+  const update=()=> {
+    try {
+      const session=snapshot.workSessions.find(value=>value.id===$('field-workSessionId').value);
+      const from=instantNanos($('field-start').value),end=$('field-end').value ? instantNanos($('field-end').value) : instantNanos(snapshot.report.generatedAt);
+      warning.textContent=session && (from<instantNanos(session.start) || (session.end && end>instantNanos(session.end))) ? 'This activity extends outside the session. Only the overlapping time counts toward covered time.' : '';
+    } catch {warning.textContent='';}
+  };
+  for(const input of $('fields').querySelectorAll('input,select')) input.addEventListener('input',update);update();
+}
+async function openAssociation(id=null, defaultSession=snapshot.workSessionReport?.session.id || '') {
+  const session=api, selected=id || snapshot.activities[0]?.id;
+  if(!selected) {setStatus('Choose a week containing activities, or add an activity first.');return;}
+  const loaded=await session.request(`/activities/${selected}`);
+  if(session!==api || !connected || !begin('Associate activity',{collection:'activities',id:selected,etag:loaded.etag,association:true})) return;
+  const state=editor;
+  const selector=field('Activity','activityId',selected,{choices:[...new Map([...snapshot.activities,...(snapshot.workSessionReport?.activities || [])].map(value=>[value.id,value])).values()].map(value=>[value.id,`${value.summary || 'Activity'} · ${instantText(value.start,snapshot.profile.data.zoneId)}`])});
+  field('Work session','workSessionId',defaultSession,{choices:sessionChoices()});
+  const warning=element('p','', 'hint');warning.setAttribute('role','status');$('fields').append(warning);
+  let record=loaded.data, generation=0;
+  const warn=()=> {const target=snapshot.workSessions.find(value=>value.id===$('field-workSessionId').value);warning.textContent=target && (instantNanos(record.start)<instantNanos(target.start) || (target.end && instantNanos(record.end || snapshot.report.generatedAt)>instantNanos(target.end))) ? 'This activity extends outside the session. Only the overlapping time counts toward covered time.' : '';};
+  $('field-workSessionId').addEventListener('change',warn);warn();
+  selector.addEventListener('change',async()=> {
+    const request=++generation;state.busy=true;$('save').disabled=true;
+    try {const next=await session.request(`/activities/${selector.value}`);if(editor!==state || request!==generation) return;
+      state.id=next.data.id;state.etag=next.etag;record=next.data;warn();}
+    catch(error) {if(editor===state) $('editor-error').textContent=errorText(error);}
+    finally {if(editor===state && request===generation) {state.busy=false;$('save').disabled=state.id!==selector.value;}}
+  });showEditor();
+}
+$('work-session-choice').addEventListener('change',()=> {selectedWorkSession=$('work-session-choice').value || null;void refresh().catch(()=>{});});
+$('session-start').addEventListener('click',()=> {
+  if(!connected || snapshot.activeWorkSession.data || !begin('Start work session',{command:'session-start',key:crypto.randomUUID()})) return;
+  $('fields').append(element('p','Starting your work session…'));showEditor();void saveEditor();
+});
+$('session-stop').addEventListener('click',()=> {
+  const active=snapshot.activeWorkSession;if(!connected || !active.data || !begin('Stop work session',{command:'session-stop',id:active.data.id,etag:active.etag,key:crypto.randomUUID()})) return;
+  $('fields').append(element('p','Stopping your work session. Activity timers remain running.'));showEditor();void saveEditor();
+});
+for(const [id,work] of [['session-new',()=>openRecord('work-sessions')],['session-edit',()=>openRecord('work-sessions',snapshot.workSessionReport.session.id)],['session-delete',()=>openDelete('work-sessions',snapshot.workSessionReport.session.id)],['session-add',()=>openRecord('activities',null,snapshot.workSessionReport.session.id)],['session-associate',()=>openAssociation()]]) $(id).addEventListener('click',()=> {void work().catch(error=>setStatus(errorText(error)));});
+for(const [id,glyph,label] of [['session-start','start','Start work session'],['session-stop','stop','Stop work session'],['session-new','add','Record work session'],['session-edit','edit','Edit work session'],['session-delete','delete','Delete work session'],['session-add','add','Add activity to session'],['session-associate','link','Associate activity']]) iconButton($(id),glyph,label);
+setInterval(renderSessionTime,1000);
 window.addEventListener('pagehide', () => api?.close());
 iconButton($('refresh'), 'refresh', 'Refresh');
 iconButton($('collapse-activities'), 'collapse', 'Hide activities');

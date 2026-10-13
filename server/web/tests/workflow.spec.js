@@ -327,3 +327,85 @@ test('live label changes update an open tracking draft without dropping selected
   const extra = await api(request,'GET','/labels/'+added.id);await api(request,'DELETE','/labels/'+added.id,undefined,{'If-Match':extra.headers().etag});
   const final = await api(request,'GET','/tasks/'+task.id);await api(request,'DELETE','/tasks/'+task.id,undefined,{'If-Match':final.headers().etag});
 });
+
+async function removeSessionFixture(request, sessionIds) {
+  for (const id of sessionIds) {
+    const report = (await (await api(request,'GET',`/work-sessions/${id}/report`)).json());
+    for (const value of report.activities) {
+      const read = await api(request,'GET',`/activities/${value.id}`);
+      await api(request,'DELETE',`/activities/${value.id}`,undefined,{'If-Match':read.headers().etag});
+    }
+    const read = await api(request,'GET',`/work-sessions/${id}`);
+    await api(request,'DELETE',`/work-sessions/${id}`,undefined,{'If-Match':read.headers().etag});
+  }
+}
+test('work session controls start once and stop independently of a task activity', async ({page,request}) => {
+  const task = await createTask(request,'Session browser task '+randomUUID());await signIn(page);
+  await page.getByRole('button',{name:'Start work session',exact:true}).click();
+  await expect(page.locator('#work-session-state')).toHaveText('Running');await expect(page.locator('#editor')).not.toBeVisible();
+  const first = await (await api(request,'GET','/work-sessions/active')).json();
+  await page.getByRole('button',{name:'Tasks',exact:true}).click();
+  await page.locator('#tasks tr').filter({hasText:task.summary}).getByRole('button',{name:'Start',exact:true}).click();
+  await expect(page.locator('#editor').getByLabel('Work session',{exact:true})).toHaveValue(first.id);
+  await page.locator('#editor').getByRole('button',{name:'Start',exact:true}).click();await expect(page.locator('#editor')).not.toBeVisible();
+  const active = await (await api(request,'GET','/activities/active')).json();expect(active.workSessionId).toBe(first.id);
+  await page.getByRole('button',{name:'Stop work session',exact:true}).click();await expect(page.locator('#work-session-state')).toHaveText('Stopped');
+  expect((await (await api(request,'GET','/activities/active')).json()).id).toBe(active.id);
+  await page.getByRole('button',{name:'Start work session',exact:true}).click();await expect(page.locator('#work-session-state')).toHaveText('Running');
+  const second = await (await api(request,'GET','/work-sessions/active')).json();expect(second.id).not.toBe(first.id);
+  await page.getByRole('button',{name:'Stop tracking',exact:true}).click();await page.locator('#editor').getByRole('button',{name:'Stop',exact:true}).click();await expect(page.locator('#editor')).not.toBeVisible();
+  expect((await (await api(request,'GET','/work-sessions/active')).json()).id).toBe(second.id);
+  await page.getByRole('button',{name:'Stop work session',exact:true}).click();await expect(page.locator('#work-session-state')).toHaveText('Stopped');
+  await removeSessionFixture(request,[first.id,second.id]);
+  const read = await api(request,'GET',`/tasks/${task.id}`);await api(request,'DELETE',`/tasks/${task.id}`,undefined,{'If-Match':read.headers().etag});
+});
+test('session editors and taskless activities preserve exact overlap accounting and warn outside bounds', async ({page,request}) => {
+  const tasksBefore = (await (await api(request,'GET','/tasks')).json()).items.length;await signIn(page);
+  await page.getByRole('button',{name:'Record work session',exact:true}).click();
+  await page.getByLabel('Summary',{exact:true}).fill('Browser session '+randomUUID());
+  await page.getByLabel('Start (UTC)',{exact:true}).fill('2025-10-25T22:00:00.123456789Z');
+  await page.getByLabel('End (UTC, blank while running)',{exact:true}).fill('2025-10-26T23:00:00.123456789Z');await save(page);
+  const session = (await (await api(request,'GET','/work-sessions')).json()).items[0];
+  const label = (await (await api(request,'GET','/labels')).json()).items[0];
+  for (const [summary,start,end] of [['First overlap','2025-10-26T08:00:00.123456789Z','2025-10-26T12:00:00.123456789Z'],['Second overlap','2025-10-26T10:00:00.123456789Z','2025-10-26T14:00:00.123456789Z']]) {
+    await page.getByRole('button',{name:'Add activity to session',exact:true}).click();
+    await expect(page.getByLabel('Task',{exact:true})).toHaveValue('');await expect(page.locator('#editor').getByLabel('Work session',{exact:true})).toHaveValue(session.id);
+    await page.getByLabel('Summary',{exact:true}).fill(summary);await page.getByLabel('Start (UTC)',{exact:true}).fill(start);
+    await page.getByLabel('End (UTC, blank while tracking)',{exact:true}).fill(end);await page.locator('#editor').getByLabel(label.name,{exact:true}).check();await save(page);
+  }
+  await expect(page.locator('#ws-duration')).toHaveText('25h 0m');await expect(page.locator('#ws-tracked')).toHaveText('8h 0m');
+  await expect(page.locator('#ws-covered')).toHaveText('6h 0m');await expect(page.locator('#ws-unallocated')).toHaveText('19h 0m');
+  expect((await (await api(request,'GET','/tasks')).json()).items.length).toBe(tasksBefore);
+  await page.getByRole('button',{name:'Edit work session',exact:true}).click();
+  await expect(page.getByLabel('Start (UTC)',{exact:true})).toHaveValue(session.start);
+  await page.getByLabel('End (UTC, blank while running)',{exact:true}).fill('2025-10-26T23:00:00.123456790Z');await save(page);
+  expect((await (await api(request,'GET',`/work-sessions/${session.id}`)).json()).end).toBe('2025-10-26T23:00:00.123456790Z');
+  await page.getByRole('button',{name:'Add activity to session',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill('Outside session');
+  await page.getByLabel('Start (UTC)',{exact:true}).fill('2025-10-27T00:00:00Z');await page.getByLabel('End (UTC, blank while tracking)',{exact:true}).fill('2025-10-27T01:00:00Z');
+  await expect(page.locator('#activity-session-warning')).toContainText('outside the session');await save(page);
+  await expect(page.locator('#session-warning')).toContainText('outside this session');
+  await page.screenshot({path:'test-results/work-session-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:'test-results/work-session-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+  await removeSessionFixture(request,[session.id]);
+});
+test('lost session start and stop replies retry the exact durable command', async ({page,request}) => {
+  await signIn(page);const keys=[];
+  await page.route('**/api/v1/work-sessions/start',async route=>{keys.push(route.request().headers()['idempotency-key']);const response=await route.fetch();expect(response.status()).toBe(201);await route.abort('failed');},{times:1});
+  await page.getByRole('button',{name:'Start work session',exact:true}).click();await expect(page.locator('#editor-notice')).toContainText('outcome is unknown');
+  page.on('request',r=>{if(r.url().endsWith('/work-sessions/start')) keys.push(r.headers()['idempotency-key']);});
+  await page.getByRole('button',{name:'Retry same command',exact:true}).click();await expect(page.locator('#editor')).not.toBeVisible();expect(new Set(keys).size).toBe(1);
+  const active=await (await api(request,'GET','/work-sessions/active')).json();
+  await page.route('**/api/v1/work-sessions/*/stop',async route=>{const response=await route.fetch();expect(response.ok()).toBeTruthy();await route.abort('failed');},{times:1});
+  await page.getByRole('button',{name:'Stop work session',exact:true}).click();await expect(page.locator('#editor-notice')).toContainText('outcome is unknown');
+  await page.getByRole('button',{name:'Retry same command',exact:true}).click();await expect(page.locator('#editor')).not.toBeVisible();
+  expect((await (await api(request,'GET',`/work-sessions/${active.id}`)).json()).version).toBe(1);await removeSessionFixture(request,[active.id]);
+});
+test('peer session edits preserve an open draft and reject a stale save', async ({page,request}) => {
+  const session=await (await api(request,'POST','/work-sessions',{start:'2025-10-26T08:00:00Z',end:'2025-10-26T09:00:00Z',summary:'Peer session '+randomUUID()})).json();
+  await signIn(page);await page.getByRole('button',{name:'Edit work session',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill('Unsaved session draft');
+  const read=await api(request,'GET',`/work-sessions/${session.id}`);await api(request,'PUT',`/work-sessions/${session.id}`,{start:session.start,end:session.end,summary:'Peer changed session'},{'If-Match':read.headers().etag});
+  await expect(page.locator('#work-session-started')).toContainText('Peer changed session');await expect(page.getByLabel('Summary',{exact:true})).toHaveValue('Unsaved session draft');
+  await page.locator('#editor').getByRole('button',{name:'Save',exact:true}).click();await expect(page.locator('#editor-error')).toContainText('This record changed');
+  await expect(page.getByLabel('Summary',{exact:true})).toHaveValue('Unsaved session draft');await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  await removeSessionFixture(request,[session.id]);
+});
