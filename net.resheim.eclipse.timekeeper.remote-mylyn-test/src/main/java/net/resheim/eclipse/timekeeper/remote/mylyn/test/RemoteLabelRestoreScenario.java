@@ -56,6 +56,11 @@ final class RemoteLabelRestoreScenario {
                 assertEquals(draft,prefs.bot().textWithLabel("Label:").getText());assertTrue(prefs.bot().textWithLabel("Label:").isEnabled());
                 // A retained deletion intent must compare the same captured DTO too.
                 prefs.bot().button("Remove").click();prefs.bot().button("Apply").click();
+                var deletionFinished=new java.util.concurrent.atomic.AtomicBoolean();
+                RemoteTestSupport.onUi(()->{
+                    TimekeeperUiPlugin.getDefault().runRead("Observe label deletion outcome",()->TimekeeperUiPlugin.getDefault().getTimekeeperService().labels(),value->deletionFinished.set(true),failure->{throw new AssertionError(failure);});return null;
+                });
+                RemoteTestSupport.waitFor(deletionFinished::get,"Label deletion worker barrier did not finish");
                 RemoteTestSupport.waitFor(()->{
                     try {return prefs.bot().button("Apply").isEnabled() && (peer.label(current.id()).isEmpty()
                         || RemoteTestSupport.onUi(()->message(prefs.widget,STALE)));}
