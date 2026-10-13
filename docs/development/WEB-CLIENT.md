@@ -24,6 +24,10 @@ URL in a separate tab. Native task UUIDs are not display IDs.
 UTC activity fields retain up to nine fractional digits. First click
 selects an activity; another click or Enter while selected opens its editor.
 Long polling loads consistent owner-scoped snapshots without replacing drafts.
+Label choices in open activity and tracking dialogs receive additions and
+renames from other clients while retaining their checked IDs and draft fields.
+A selected label deleted by another client stays visible as deleted until the
+user reviews it; saving cannot silently drop that reference.
 Offline reads reconnect with backoff and never replay writes. Sessions bind to
 the authenticated owner and reject live token owner reassignment.
 

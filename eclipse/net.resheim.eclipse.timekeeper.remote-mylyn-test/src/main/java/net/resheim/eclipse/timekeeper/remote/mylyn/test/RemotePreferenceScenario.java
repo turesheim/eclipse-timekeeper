@@ -34,6 +34,7 @@ final class RemotePreferenceScenario {
         var zone=api.profile().zone();var date=LocalDate.now(zone);
         var start=date.atTime(8,0,0,123456789).atZone(zone).toInstant();
         var interval=api.createActivity(new CreateActivity(task.id(),OwnerId.LOCAL,start,Optional.of(start.plusNanos(1)),prefix+" interval",Set.of()));
+        liveLabelChoices(api,project,task,interval,prefix);
         var bot=new SWTWorkbenchBot();
         try(var peer=new HttpTimekeeperService(RemoteBootstrap.endpoint(),RemoteBootstrap::observerBToken,Duration.ofSeconds(5))) {
             var emptyColor=peer.createLabel(new CreateLabel(prefix+" no color",Optional.empty()));
@@ -89,6 +90,34 @@ final class RemotePreferenceScenario {
             RemoteTestSupport.waitFor(()->!remove.isOpen(),"Label removal preferences did not acknowledge");assertTrue(api.label(changed.id()).isEmpty());assertTrue(api.label(emptyColor.id()).isEmpty());
             RemoteTestSupport.closedLocalStorage();RemoteBootstrap.receipt().setProperty("phase.native.label-preferences","passed");RemoteBootstrap.receipt().setProperty("phase.native.report-controls","passed");RemoteBootstrap.writeProof();
         }
+    }
+    private static void liveLabelChoices(HttpTimekeeperService api,Project project,Task task,Activity interval,String prefix) throws Exception {
+        var original=api.createLabel(new CreateLabel(prefix+" live original",Optional.empty()));awaitLabel(original);
+        var preferences=open(LABELS);var controls=preferences.bot();controls.table().select(original.name());
+        String draft=prefix+" unsaved label draft";controls.textWithLabel("Label:").setText(draft);
+        var addition=api.createLabel(new CreateLabel(prefix+" live addition",Optional.of("19,171,205")));awaitLabel(addition);
+        RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->Arrays.stream(controls.table().widget.getItems()).anyMatch(item->item.getText().equals(addition.name())));}catch(Exception pending) {return false;}},"Open label preferences did not receive a peer-created label");
+        assertEquals(draft,controls.textWithLabel("Label:").getText());
+        var renamed=api.updateLabel(new UpdateLabel(original.id(),original.version(),prefix+" peer-renamed label",Optional.of("17,34,51")));awaitLabel(renamed);
+        assertEquals(draft,controls.textWithLabel("Label:").getText());controls.button("Apply").click();
+        RemoteTestSupport.waitFor(()->{try {return controls.textWithLabel("Label:").isEnabled() && RemoteTestSupport.onUi(()->message(preferences.widget,"This record has changed. Close and reopen the editor before saving."));}catch(Exception pending) {return false;}},"Live labels silently upgraded a conflicting label draft");
+        assertEquals(draft,controls.textWithLabel("Label:").getText());assertEquals(renamed,api.label(original.id()).orElseThrow());
+        controls.button("Cancel").click();RemoteTestSupport.waitFor(()->!preferences.isOpen(),"Live label preference draft did not cancel");
+
+        awaitTree(project,task,interval.summary());
+        new SWTWorkbenchBot().viewByTitle("Workweek").bot().treeWithId("workweek-editor-tree")
+            .getTreeItem(project.name()).getNode(task.summary()).getNode(interval.summary()).contextMenu("Edit activity...").click();
+        var editor=new SWTWorkbenchBot().shell("Edit activity");editor.bot().textWithLabel("Summary").setText(prefix+" unsaved activity draft");
+        var late=api.createLabel(new CreateLabel(prefix+" activity choice",Optional.empty()));awaitLabel(late);
+        var table=editor.bot().tableWithId("activity-labels");
+        RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->Arrays.stream(table.widget.getItems()).anyMatch(item->item.getText().equals(late.name())));}catch(Exception pending) {return false;}},"Open activity editor did not receive a peer-created label");
+        table.getTableItem(late.name()).check();api.deleteLabel(new DeleteLabel(late.id(),late.version()));
+        RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->Arrays.stream(table.widget.getItems()).anyMatch(item->item.getText().equals(late.name()+" (deleted)") && item.getChecked()));}catch(Exception pending) {return false;}},"Deleted selected label was silently removed from the activity draft");
+        assertEquals(prefix+" unsaved activity draft",editor.bot().textWithLabel("Summary").getText());
+        editor.bot().button("Cancel").click();RemoteTestSupport.waitFor(()->!editor.isOpen(),"Live activity draft did not cancel");
+        assertEquals(interval,api.activity(interval.id()).orElseThrow());
+        api.deleteLabel(new DeleteLabel(renamed.id(),renamed.version()));api.deleteLabel(new DeleteLabel(addition.id(),addition.version()));
+        RemoteBootstrap.receipt().setProperty("phase.native.live-labels","passed");RemoteBootstrap.writeProof();
     }
     private static void copyReport(HttpTimekeeperService api,String prefix,Task task) throws Exception {
         var bot=new SWTWorkbenchBot();var preferences=open(TEMPLATES);preferences.bot().button("Add").click();

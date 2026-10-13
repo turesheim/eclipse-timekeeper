@@ -173,3 +173,31 @@ test('workweek groups linked tasks under projects with seven day columns and con
   await page.locator('#editor').getByRole('button',{name:'Stop',exact:true}).click();
   await expect(page.locator('#editor')).not.toBeVisible();
 });
+
+test('live label changes update an open tracking draft without dropping selected references', async ({page, request}) => {
+  const suffix = randomUUID().slice(0,8), task = await createTask(request);
+  const original = await (await api(request,'POST','/labels',{name:'Original '+suffix,color:'#123456'})).json();
+  await signIn(page); await page.getByRole('button',{name:'Tasks',exact:true}).click();
+  await page.locator('#tasks tr').filter({hasText:task.summary}).getByRole('button',{name:'Start',exact:true}).click();
+  await page.getByLabel('Summary',{exact:true}).fill('Keep my tracking draft');
+  await page.getByLabel(original.name,{exact:true}).check();
+  const added = await (await api(request,'POST','/labels',{name:'Peer addition '+suffix,color:'#abcdef'})).json();
+  await expect(page.getByLabel(added.name,{exact:true})).toBeVisible();
+  await expect(page.getByLabel(added.name,{exact:true})).not.toBeChecked();
+  await expect(page.getByLabel(original.name,{exact:true})).toBeChecked();
+  const read = await api(request,'GET','/labels/'+original.id);
+  const renamed = await (await api(request,'PUT','/labels/'+original.id,{name:'Peer rename '+suffix,color:'#765432'},{'If-Match':read.headers().etag})).json();
+  await expect(page.getByLabel(renamed.name,{exact:true})).toBeChecked();
+  const current = await api(request,'GET','/labels/'+original.id);
+  await api(request,'DELETE','/labels/'+original.id,undefined,{'If-Match':current.headers().etag});
+  await expect(page.getByLabel(renamed.name+' (deleted)',{exact:true})).toBeChecked();
+  await expect(page.getByLabel('Summary',{exact:true})).toHaveValue('Keep my tracking draft');
+  await page.locator('#editor').getByRole('button',{name:'Start',exact:true}).click();
+  await expect(page.locator('#editor-error')).toContainText('no longer exists');
+  await expect(page.getByLabel(renamed.name+' (deleted)',{exact:true})).toBeChecked();
+  await expect(page.getByLabel('Summary',{exact:true})).toHaveValue('Keep my tracking draft');
+  expect((await (await api(request,'GET','/activities?from=2000-01-01T00:00:00Z&to=2100-01-01T00:00:00Z&taskId='+task.id)).json()).items).toHaveLength(0);
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  const extra = await api(request,'GET','/labels/'+added.id);await api(request,'DELETE','/labels/'+added.id,undefined,{'If-Match':extra.headers().etag});
+  const final = await api(request,'GET','/tasks/'+task.id);await api(request,'DELETE','/tasks/'+task.id,undefined,{'If-Match':final.headers().etag});
+});

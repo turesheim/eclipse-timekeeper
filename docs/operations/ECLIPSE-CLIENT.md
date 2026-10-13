@@ -28,6 +28,13 @@ describes HTTPS access through Tailscale. The server remains the authority for
 records; selecting a backend does not copy or merge databases. Mylyn activation
 uses the selected backend after restart.
 
+Eclipse and the web client share projects, tasks, activities and labels when
+their tokens belong to the same server account. Different accounts have separate
+records, even on the same server. Open label preferences and activity editors
+receive label changes while preserving unsaved fields and selected labels.
+Conflicting label-definition edits retain their original version and are
+rejected for review rather than overwriting another client's changes.
+
 ## If the token cannot be saved
 
 Timekeeper encrypts tokens using Eclipse secure storage. A storage error occurs

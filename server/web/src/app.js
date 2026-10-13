@@ -136,6 +136,7 @@ function render() {
   table('projects', ['Name', 'Actions'], s.projects.map(value => row([value.name], [action('Edit', () => openRecord('projects', value.id)), action('Delete', () => openDelete('projects', value.id))])));
   table('tasks', ['Task', 'Project', 'Parent', 'Actions'], s.tasks.map(value => row([taskLabel(value), name(s.projects, value.projectId), value.parentTaskId ? name(s.tasks, value.parentTaskId, 'summary') : '—'], [action('Start', () => openStart(value.id)), action('Edit', () => openRecord('tasks', value.id)), action('Delete', () => openDelete('tasks', value.id))])));
   table('labels', ['Name', 'Color', 'Actions'], s.labels.map(value => row([value.name, value.color || '—'], [action('Edit', () => openRecord('labels', value.id)), action('Delete', () => openDelete('labels', value.id))])));
+  refreshLabelFields();
   $('week-total').textContent = durationText(s.report.total); $('days').replaceChildren();
   for (let index = 0; index < 7; index++) {
     const date = addDays(s.dates.first, index), day = s.report.days.find(v => v.date === date);
@@ -201,10 +202,27 @@ function field(labelText, key, value = '', options = {}) {
   $('fields').append(label); return input;
 }
 function labelFields(ids = []) {
-  const group = element('fieldset'); group.append(element('legend', 'Labels'));
-  if (!snapshot.labels.length) group.append(element('p', 'Create labels in the Labels tab.', 'hint'));
-  for (const value of snapshot.labels) { const label = element('label'), input = element('input'); input.type = 'checkbox'; input.name = 'labelIds'; input.value = value.id; input.checked = ids.includes(value.id); label.append(input, document.createTextNode(value.name)); group.append(label); }
-  $('fields').append(group);
+  const group = element('fieldset'); group.id = 'editor-labels'; group.append(element('legend', 'Labels'));
+  const hint = element('p', 'Create labels in the Labels tab.', 'hint'); hint.id = 'label-choice-hint'; group.append(hint);
+  $('fields').append(group); refreshLabelFields(ids);
+}
+function refreshLabelFields(ids = []) {
+  const group = $('editor-labels'); if (!group || editor?.busy || editor?.uncertain) return;
+  const available = new Set(snapshot.labels.map(value => value.id));
+  const existing = new Map([...group.querySelectorAll('input')].map(input => [input.value, input]));
+  for (const value of snapshot.labels) {
+    let input = existing.get(value.id);
+    if (!input) {
+      input = element('input'); input.type = 'checkbox'; input.name = 'labelIds'; input.value = value.id; input.checked = ids.includes(value.id);
+      const label = element('label'); label.append(input, element('span', value.name)); group.append(label);
+    } else input.closest('label').querySelector('span').textContent = value.name;
+    input.dataset.labelName = value.name;
+  }
+  for (const [id, input] of existing) if (!available.has(id)) {
+    if (input.checked) input.closest('label').querySelector('span').textContent = `${input.dataset.labelName} (deleted)`;
+    else input.closest('label').remove();
+  }
+  $('label-choice-hint').hidden = !!group.querySelector('input');
 }
 function begin(title, state) {
   if ($('editor').open) return false;
@@ -294,7 +312,7 @@ $('editor-form').addEventListener('submit', async event => {
       else { $('editor-notice').textContent = 'The outcome is unknown. Cancel and refresh to review the records before making another change.'; }
     } else { current.uncertain = false; freeze(false); }
   } finally {
-    if (current === editor) { current.busy = false; $('save').disabled = current.uncertain && !current.key; $('cancel').disabled = false; }
+    if (current === editor) { current.busy = false; $('save').disabled = current.uncertain && !current.key; $('cancel').disabled = false; refreshLabelFields(); }
   }
 });
 $('cancel').addEventListener('click', () => { if (editor?.busy) return; editor = null; $('editor').close(); $('fields').replaceChildren(); });
