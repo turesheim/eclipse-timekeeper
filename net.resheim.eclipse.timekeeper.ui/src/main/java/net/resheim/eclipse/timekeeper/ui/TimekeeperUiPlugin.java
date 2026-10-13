@@ -70,6 +70,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 
 	private static TimekeeperUiPlugin plugin;
 	private ServiceTracker<TimekeeperService, TimekeeperService> serviceTracker;
+    private net.resheim.eclipse.timekeeper.ui.client.EclipseBackend backend;
 	private ServiceTracker<TaskIntegration, TaskIntegration> integrationTracker;
 	private Timer timer;
 	private ActivityId sampledActivity;
@@ -87,11 +88,11 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	private static final ZoneId CALENDAR_ZONE = ZoneId.systemDefault();
 
 	public static ZoneId getCalendarZone() {
-		return CALENDAR_ZONE;
+		return plugin!=null && plugin.backend!=null ? plugin.backend.zone() : CALENDAR_ZONE;
 	}
 
 	private static String formatInstant(Instant instant) {
-		return DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US).withZone(CALENDAR_ZONE).format(instant);
+		return DateTimeFormatter.ofPattern("EEE e, HH:mm:ss", Locale.US).withZone(getCalendarZone()).format(instant);
 	}
 
 	/**
@@ -108,18 +109,38 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 	 * embedded adapter.
 	 */
 	public TimekeeperService getTimekeeperService() {
-		TimekeeperService service = serviceTracker == null ? null : serviceTracker.getService();
-		if (service == null)
-			throw new IllegalStateException("Timekeeper service is not available");
-		return service;
+        if(backend==null) throw new IllegalStateException("Timekeeper client is not available");
+        return backend.service();
 	}
 
+    public boolean isBackendReady() {return backend!=null && backend.ready();}
+    public boolean snapshotsAvailable() {return backend!=null && backend.snapshotsAvailable();}
+    public boolean isRemote() {return backend!=null && backend.remote();}
+    public String backendStatus() {return backend==null ? "Connecting to Timekeeper." : backend.status();}
+    public String backendIdentity() {return backend==null ? "connecting" : backend.identity();}
+    public void addBackendListener(net.resheim.eclipse.timekeeper.db.DatabaseChangeListener listener) {backend.addListener(listener);}
+    public void removeBackendListener(net.resheim.eclipse.timekeeper.db.DatabaseChangeListener listener) {backend.removeListener(listener);}
+    public void refreshBackend() {backend.refresh();}
+    public int exportRemoteCsv(java.nio.file.Path folder) throws java.io.IOException {return backend.exportCsv(folder);}
+    public int importRemoteCsv(java.nio.file.Path folder) throws java.io.IOException {
+        return backend.importCsv(folder,getStateLocation().toFile().toPath().resolve("pending-imports"));
+    }
+    public Activity activateRemoteInWorker(net.resheim.eclipse.timekeeper.domain.TaskId task) {return backend.activateInWorker(task);}
+    public void activateRemoteTask(net.resheim.eclipse.timekeeper.domain.TaskId task,Optional<Activity> observed) {backend.activate(task,observed);}
+    public <T> org.eclipse.core.runtime.jobs.Job runOperation(String name,java.util.function.Supplier<T> action,
+            java.util.function.Consumer<T> success,java.util.function.Consumer<RuntimeException> failure) {
+        return backend.execute(name,action,success,failure);
+    }
+    public <T> org.eclipse.core.runtime.jobs.Job runRead(String name,java.util.function.Supplier<T> action,
+            java.util.function.Consumer<T> success,java.util.function.Consumer<RuntimeException> failure) {
+        return backend.read(name,action,success,failure);
+    }
 	public Optional<TaskIntegration> getTaskIntegration() {
 		return Optional.ofNullable(integrationTracker == null ? null : integrationTracker.getService());
 	}
 
 	private Optional<Activity> activeActivity() {
-		if (!TimekeeperPlugin.getDefault().isReady())
+		if (!isBackendReady())
 			return Optional.empty();
 		return getTimekeeperService().activeActivity(OwnerId.LOCAL);
 	}
@@ -216,12 +237,10 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 										formatInstant(lastActive), time),
 								MessageDialog.QUESTION, new String[] { "No", "Yes" }, 1);
 						if (md.open() == 1) {
-							closeIdleActivity(activity, lastActive);
-							getTimekeeperService().startActivity(
-									new StartActivity(activity.taskId(), activity.ownerId(), "", java.util.Set.of()));
+							idleChange(activity,lastActive,true);
 						}
 					} else {
-						closeIdleActivity(activity, lastActive);
+						idleChange(activity,lastActive,!afkDeactivate);
 						if (afkDeactivate) {
 							getTaskIntegration().ifPresent(integration -> integration.deactivate(activity.taskId()));
 							MessageDialog.openInformation(Display.getCurrent().getActiveShell(),
@@ -230,10 +249,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 											"You have been away for too long ({0}) and tracking of the current activity was automatically ended on {1}.",
 											DurationFormatUtils.formatDuration(lastIdleTimeMillis, "H:mm:ss", true),
 											formatInstant(lastActive)));
-						} else {
-							getTimekeeperService().startActivity(
-									new StartActivity(activity.taskId(), activity.ownerId(), "", java.util.Set.of()));
-						}
+                        }
 					}
 				} catch (net.resheim.eclipse.timekeeper.service.ServiceException failure) {
 					MessageDialog.openError(Display.getCurrent().getActiveShell(), "Could not update idle activity",
@@ -264,6 +280,13 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 		return activeActivity().isPresent() && lastActiveTime != null ? lastActiveTime : null;
 	}
 
+    private void idleChange(Activity activity,Instant lastActive,boolean restart) {
+        runOperation("Update idle activity",()->{
+            closeIdleActivity(activity,lastActive);
+            if(restart) getTimekeeperService().startActivity(new StartActivity(activity.taskId(),activity.ownerId(),"",java.util.Set.of()));
+            return null;
+        },value->{},failure->MessageDialog.openError(Display.getCurrent().getActiveShell(),"Could not update idle activity",failure.getMessage()));
+    }
 	private void closeIdleActivity(Activity activity, Instant lastActive) {
 		getTimekeeperService().updateActivity(new UpdateActivity(activity.id(), activity.version(), activity.start(),
 				Optional.of(lastActive), activity.summary(), activity.labelIds()));
@@ -360,6 +383,21 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 		plugin = this;
 		serviceTracker = new ServiceTracker<>(context, TimekeeperService.class, null);
 		serviceTracker.open();
+        net.resheim.eclipse.timekeeper.client.HttpTimekeeperService remote=null;
+        String configurationFailure=null;
+        if(TimekeeperPlugin.remoteConfigured()) {
+            try {
+                String token=net.resheim.eclipse.timekeeper.ui.client.BackendCredentials.read();
+                remote=new net.resheim.eclipse.timekeeper.client.HttpTimekeeperService(java.net.URI.create(TimekeeperPlugin.backendUrl()),()->token,java.time.Duration.ofSeconds(15));
+            } catch(RuntimeException invalidConfiguration) {
+                configurationFailure="Check the server URL and token in Timekeeper backend preferences, then restart Eclipse.";
+            }
+        }
+        java.util.function.Supplier<TimekeeperService> embedded=()->{
+            var service=serviceTracker.getService();if(service==null) throw new IllegalStateException("Embedded Timekeeper service unavailable");return service;
+        };
+        backend=configurationFailure==null ? new net.resheim.eclipse.timekeeper.ui.client.EclipseBackend(embedded,remote,PlatformUI.getWorkbench().getDisplay())
+                : net.resheim.eclipse.timekeeper.ui.client.EclipseBackend.unavailableRemote(embedded,PlatformUI.getWorkbench().getDisplay(),configurationFailure);
 		integrationTracker = new ServiceTracker<>(context, TaskIntegration.class, null);
 		integrationTracker.open();
 		consideredIdleThreshold = getPreferenceStore().getLong(PreferenceConstants.MINUTES_IDLE) * 60_000l;
@@ -379,6 +417,7 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
 				display.removeFilter(SWT.KeyUp, reactivationListener);
 				display.removeFilter(SWT.MouseUp, reactivationListener);
 			});
+        if(backend!=null) backend.close();
 		if (integrationTracker != null)
 			integrationTracker.close();
 		if (serviceTracker != null)

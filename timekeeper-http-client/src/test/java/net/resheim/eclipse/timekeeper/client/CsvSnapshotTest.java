@@ -1,0 +1,80 @@
+package net.resheim.eclipse.timekeeper.client;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.UUID;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+class CsvSnapshotTest {
+    @TempDir Path temporary;
+
+    @Test void roundTripPreservesUnicodeQuotesNewlinesNullsIdsAndNanoseconds() throws Exception {
+        JsonObject original=snapshot();Path export=temporary.resolve("folder with spaces");
+        assertEquals(5,CsvSnapshot.write(original,export));
+        assertEquals(original,CsvSnapshot.read(export));
+        assertTrue(Files.readString(export.resolve("projects.csv")).contains("\"\"quoted\"\""));
+        assertFalse(Files.readString(export.resolve("activities.csv")).contains("ownerId"));
+        assertFalse(Files.readString(export.resolve("tasks.csv")).contains("version"));
+    }
+
+    @Test void exportRefusesToOverwriteAnEarlierFolder() throws Exception {
+        Path export=temporary.resolve("existing");Files.createDirectory(export);Files.writeString(export.resolve("keep.txt"),"keep");
+        assertThrows(IOException.class,()->CsvSnapshot.write(snapshot(),export));
+        assertEquals("keep",Files.readString(export.resolve("keep.txt")));
+    }
+
+    @Test void missingFileMalformedCsvAndInvalidNestedValuesAreRejected() throws Exception {
+        Path missing=temporary.resolve("missing");CsvSnapshot.write(snapshot(),missing);Files.delete(missing.resolve("labels.csv"));
+        assertThrows(IOException.class,()->CsvSnapshot.read(missing));
+        Path invalid=temporary.resolve("invalid");CsvSnapshot.write(snapshot(),invalid);
+        Files.writeString(invalid.resolve("projects.csv"),"\"id\",\"name\"\r\n\"unterminated");
+        assertThrows(IOException.class,()->CsvSnapshot.read(invalid));
+        Path nested=temporary.resolve("nested");CsvSnapshot.write(snapshot(),nested);
+        Files.writeString(nested.resolve("tasks.csv"),"\"id\",\"projectId\",\"parentTaskId\",\"summary\",\"url\",\"externalReferences\"\r\n\"id\",,,\"summary\",,\"{}\"\r\n");
+        assertThrows(IOException.class,()->CsvSnapshot.read(nested));
+    }
+
+    @Test void corruptDescriptorIsReportedAsAUserFacingIoFailure() throws Exception {
+        Path export=temporary.resolve("descriptor");CsvSnapshot.write(snapshot(),export);
+        Files.writeString(export.resolve("timekeeper.csv.json"),"{}");
+        assertEquals("Invalid or incomplete Timekeeper domain CSV export.",assertThrows(IOException.class,()->CsvSnapshot.read(export)).getMessage());
+    }
+
+    @Test void pendingImportSurvivesClientRestartAndIsScopedByBackendOwnerAndPayload() throws Exception {
+        Path journal=temporary.resolve("journal");String payload=snapshot().toString();
+        String first=new ImportJournal(journal,"https://one.invalid/api/v1","alice",payload).pending();
+        assertEquals(first,new ImportJournal(journal,"https://one.invalid/api/v1","alice",payload).pending());
+        assertNotEquals(first,new ImportJournal(journal,"https://two.invalid/api/v1","alice",payload).pending());
+        assertNotEquals(first,new ImportJournal(journal,"https://one.invalid/api/v1","bob",payload).pending());
+        assertNotEquals(first,new ImportJournal(journal,"https://one.invalid/api/v1","alice",payload+" ").pending());
+        new ImportJournal(journal,"https://one.invalid/api/v1","alice",payload).acknowledged(first);
+        assertNotEquals(first,new ImportJournal(journal,"https://one.invalid/api/v1","alice",payload).pending());
+        try(var files=Files.list(journal)) {
+            for(Path file:files.toList()) {
+                assertFalse(file.getFileName().toString().contains("alice"));
+                String contents=Files.readString(file);
+                if(!contents.isEmpty()) assertDoesNotThrow(()->UUID.fromString(contents));
+            }
+        }
+    }
+
+    static JsonObject snapshot() {
+        JsonObject value=JsonParser.parseString("""
+            {"format":"timekeeper-domain-v1","zoneId":"Europe/Oslo",
+             "projects":[{"id":"11111111-1111-4111-8111-111111111111","name":"Økonomi, \\"quoted\\"\\nnext line"}],
+             "tasks":[
+              {"id":"22222222-2222-4222-8222-222222222222","projectId":"11111111-1111-4111-8111-111111111111","parentTaskId":null,"summary":"Parent","url":null,"externalReferences":[]},
+              {"id":"33333333-3333-4333-8333-333333333333","projectId":"11111111-1111-4111-8111-111111111111","parentTaskId":"22222222-2222-4222-8222-222222222222","summary":"Child","url":"https://example.invalid/æ","externalReferences":[{"providerId":"jira","repositoryId":"https://jira.invalid","externalId":"TK-1","externalUrl":null}]}],
+             "labels":[{"id":"44444444-4444-4444-8444-444444444444","name":"","color":null}],
+             "activities":[{"id":"55555555-5555-4555-8555-555555555555","taskId":"33333333-3333-4333-8333-333333333333","start":"2026-10-12T08:00:00.123456789Z","end":"2026-10-12T09:00:00.987654321Z","summary":"","labelIds":["44444444-4444-4444-8444-444444444444"],"manual":true}]}
+            """).getAsJsonObject();
+        return value;
+    }
+}

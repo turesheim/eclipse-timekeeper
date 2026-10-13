@@ -45,7 +45,7 @@ import net.resheim.eclipse.timekeeper.service.TimekeeperService;
 import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 
 /** Creates or edits a service-owned interval, including its calendar dates and labels. */
-final class ActivityDialog extends TitleAreaDialog {
+final class ActivityDialog extends AsyncRecordDialog {
 	private static final DateTimeFormatter FORMAT = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm")
 			.withResolverStyle(ResolverStyle.STRICT);
 	private final TimekeeperService service;
@@ -130,12 +130,9 @@ final class ActivityDialog extends TitleAreaDialog {
 			}
 			Set<LabelId> selected = Arrays.stream(labels.getCheckedElements())
 					.map(value -> ((net.resheim.eclipse.timekeeper.domain.Label) value).id()).collect(Collectors.toSet());
-			if (original == null) {
-				service.createActivity(new CreateActivity(taskId, OwnerId.LOCAL, from, until, summary.getText(), selected));
-			} else {
-				service.updateActivity(new UpdateActivity(original.id(), original.version(), from, until, summary.getText(), selected));
-			}
-			super.okPressed();
+            String entered=summary.getText();
+            save("Save Timekeeper activity",()-> original==null ? service.createActivity(new CreateActivity(taskId,OwnerId.LOCAL,from,until,entered,selected))
+                    : service.updateActivity(new UpdateActivity(original.id(),original.version(),from,until,entered,selected)),value -> {});
 		} catch (RuntimeException failure) {
 			setErrorMessage(failureMessage(failure));
 		}

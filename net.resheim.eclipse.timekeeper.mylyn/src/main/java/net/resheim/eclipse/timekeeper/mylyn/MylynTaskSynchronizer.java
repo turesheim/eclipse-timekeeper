@@ -18,11 +18,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
-import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.jface.util.IPropertyChangeListener;
 import org.eclipse.jface.util.PropertyChangeEvent;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
@@ -36,9 +34,9 @@ import org.eclipse.mylyn.internal.tasks.core.TaskList;
 import org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.swt.widgets.Display;
-import org.osgi.service.prefs.BackingStoreException;
-import org.osgi.service.prefs.Preferences;
 
+import net.resheim.eclipse.timekeeper.client.RemoteFailure;
+import net.resheim.eclipse.timekeeper.service.ServiceException;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
 import net.resheim.eclipse.timekeeper.domain.Project;
@@ -61,33 +59,40 @@ import net.resheim.eclipse.timekeeper.ui.preferences.PreferenceConstants;
  */
 @SuppressWarnings("restriction")
 public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPropertyChangeListener {
-	private static final String PROJECT_HANDLE_PREFIX = "timekeeper-project-";
-	private static final String PROJECT_MAPPING_PREFIX = "mylyn-project-";
 
 	private final TimekeeperService service;
 	private final TaskList taskList;
 	private final Display display;
-	private final Preferences mappings;
-	private boolean running;
+	private final java.util.function.Supplier<MylynBackendScope> scopeSupplier;
+	private volatile boolean running;
+    private volatile Thread worker;
+    private volatile boolean busy;
 	private boolean restoreAfterDeletionFailure;
-	private boolean applying;
-	private final Set<TaskId> deletedTasks = new HashSet<>();
-	private final Set<ProjectId> deletedProjects = new HashSet<>();
+	private volatile boolean applying;
+	private final Set<TaskId> deletedTasks = java.util.concurrent.ConcurrentHashMap.newKeySet();
+	private final Set<ProjectId> deletedProjects = java.util.concurrent.ConcurrentHashMap.newKeySet();
 	private Set<TaskId> knownBackendTasks = Set.of();
 	private Set<ProjectId> knownBackendProjects = Set.of();
 	private Set<TaskId> knownProjectedTasks = Set.of();
-	private boolean scheduled;
-	private boolean backendAvailable;
+	private volatile boolean scheduled;
+	private volatile boolean backendAvailable;
 	private final Runnable backendPoll = this::pollBackend;
-	private boolean mylynDirty = true;
-	private boolean backendDirty = true;
+	private final java.util.concurrent.atomic.AtomicBoolean mylynDirty = new java.util.concurrent.atomic.AtomicBoolean(true);
+	private final java.util.concurrent.atomic.AtomicBoolean backendDirty = new java.util.concurrent.atomic.AtomicBoolean(true);
 	private String lastFailure;
 
 	public MylynTaskSynchronizer(TimekeeperService service, Display display) {
+        this(service,display,MylynBackendScope::current);
+    }
+
+    public MylynTaskSynchronizer(TimekeeperService service,Display display,java.util.function.Supplier<MylynBackendScope> scopeSupplier) {
+        this(service,display,scopeSupplier,TasksUiPlugin.getTaskList());
+    }
+    public MylynTaskSynchronizer(TimekeeperService service,Display display,java.util.function.Supplier<MylynBackendScope> scopeSupplier,TaskList taskList) {
+        this.scopeSupplier=scopeSupplier;
 		this.service = service;
 		this.display = display;
-		this.taskList = TasksUiPlugin.getTaskList();
-		this.mappings = InstanceScope.INSTANCE.getNode(TimekeeperUiPlugin.PLUGIN_ID).node("mylyn-projects");
+		this.taskList = taskList;
 	}
 
 	public void start() {
@@ -95,8 +100,8 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 			return;
 		running = true;
 		backendAvailable = false;
-		mylynDirty = true;
-		backendDirty = true;
+		mylynDirty.set(true);
+		backendDirty.set(true);
 		TimekeeperUiPlugin.getDefault().getPreferenceStore().addPropertyChangeListener(this);
 		taskList.addChangeListener(this);
 		display.timerExec(1000, backendPoll);
@@ -123,7 +128,7 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 
 	@Override
 	public void containersChanged(Set<TaskContainerDelta> deltas) {
-		if (!running || applying)
+		if (!running || (applying && (worker==null || Thread.currentThread()==worker)))
 			return;
 		for (TaskContainerDelta delta : deltas) {
 			if (delta.getKind() != TaskContainerDelta.Kind.DELETED)
@@ -138,8 +143,9 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 	}
 
 	private void schedule(boolean fromMylyn, boolean fromBackend) {
-		mylynDirty |= fromMylyn;
-		backendDirty |= fromBackend;
+        if(Display.getCurrent()!=display) {if(!display.isDisposed()) display.asyncExec(()->schedule(fromMylyn,fromBackend));return;}
+		if(fromMylyn) mylynDirty.set(true);
+		if(fromBackend) backendDirty.set(true);
 		if (scheduled || display.isDisposed())
 			return;
 		scheduled = true;
@@ -147,13 +153,16 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 	}
 
 	private void reconcile() {
+        if(TimekeeperUiPlugin.getDefault().isRemote() && Display.getCurrent()!=null) {
+            scheduled=false;if(busy || !backendAvailable || !running) return;busy=true;
+            TimekeeperUiPlugin.getDefault().runOperation("Synchronize Mylyn tasks",()->{worker=Thread.currentThread();try {reconcile();return null;}finally {worker=null;}},
+                value->{busy=false;if(mylynDirty.get() || backendDirty.get()) schedule(false,false);},failure->{busy=false;mylynDirty.set(true);backendDirty.set(true);});return;
+        }
 		scheduled = false;
 		if (!running || display.isDisposed() || !backendAvailable)
 			return;
-		boolean importMylyn = mylynDirty;
-		boolean exportBackend = backendDirty;
-		mylynDirty = false;
-		backendDirty = false;
+		boolean importMylyn = mylynDirty.getAndSet(false);
+		boolean exportBackend = backendDirty.getAndSet(false);
 		applying = true;
 		boolean succeeded = false;
 		try {
@@ -166,17 +175,18 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 			succeeded = true;
 			lastFailure = null;
 		} catch (RuntimeException failure) {
-			mylynDirty |= importMylyn;
-			backendDirty |= exportBackend;
+			if(importMylyn) mylynDirty.set(true);
+			if(exportBackend) backendDirty.set(true);
 			String description = failure.getClass().getName() + ": " + failure.getMessage();
 			if (!description.equals(lastFailure)) {
 				TimekeeperUiPlugin.getDefault().getLog().log(new Status(IStatus.WARNING, MylynIntegration.PLUGIN_ID,
 						"Could not synchronize Mylyn through the Timekeeper client; retrying", failure));
 				lastFailure = description;
 			}
+            if(TimekeeperUiPlugin.getDefault().isRemote()) throw failure;
 		} finally {
 			applying = false;
-			if (succeeded && (mylynDirty || backendDirty))
+			if (succeeded && (mylynDirty.get() || backendDirty.get()))
 				schedule(false, false);
 		}
 	}
@@ -188,10 +198,11 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 		if (!running || display.isDisposed())
 			return;
 		try {
+            if(!TimekeeperUiPlugin.getDefault().isBackendReady()) {backendAvailable=false;return;}
 			var tasks = service.tasks();
 			var projects = service.projects();
 			backendAvailable = true;
-			if (mylynDirty || backendDirty || !tasks.equals(lastTasks) || !projects.equals(lastProjects)) {
+			if (mylynDirty.get() || backendDirty.get() || !tasks.equals(lastTasks) || !projects.equals(lastProjects)) {
 				lastTasks = tasks;
 				lastProjects = projects;
 				schedule(false, true);
@@ -211,25 +222,25 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 				try {
 					service.deleteTask(
 							new net.resheim.eclipse.timekeeper.service.Commands.DeleteTask(id, task.version()));
-				} catch (net.resheim.eclipse.timekeeper.service.ServiceException failure) {
+				} catch (RuntimeException failure) {
 					// Recorded history is preserved; the projection is restored below.
-					showDeletionFailure(failure);
+					handleDeletionFailure(failure);
 				}
 			});
+            deletedTasks.remove(id);
 		}
-		deletedTasks.clear();
 		for (ProjectId id : Set.copyOf(deletedProjects)) {
 			service.project(id).ifPresent(project -> {
 				try {
 					service.deleteProject(
 							new net.resheim.eclipse.timekeeper.service.Commands.DeleteProject(id, project.version()));
-					mappings.remove(mappingKey(id));
-				} catch (net.resheim.eclipse.timekeeper.service.ServiceException failure) {
-					showDeletionFailure(failure);
+					scope().forget(id);
+				} catch (RuntimeException failure) {
+					handleDeletionFailure(failure);
 				}
 			});
+            deletedProjects.remove(id);
 		}
-		deletedProjects.clear();
 		if (restoreAfterDeletionFailure) {
 			restoreAfterDeletionFailure = false;
 			// Repair the hierarchy before importing changes caused by Mylyn deletion.
@@ -237,20 +248,36 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 		}
 	}
 
+    private void handleDeletionFailure(RuntimeException failure) {
+        if (failure instanceof ServiceException
+                || failure instanceof RemoteFailure remote && (remote.kind() == RemoteFailure.Kind.CONFLICT
+                    || remote.kind() == RemoteFailure.Kind.FORBIDDEN)) {
+            showDeletionFailure(failure);
+            return;
+        }
+        // An unknown transport outcome must retain the pending deletion for reconciliation.
+        throw failure;
+    }
+
 	private void showDeletionFailure(RuntimeException failure) {
 		restoreAfterDeletionFailure = true;
-		org.eclipse.jface.dialogs.MessageDialog.openError(display.getActiveShell(),
-				"Could not delete Timekeeper record", failure.getMessage());
+        Runnable error=()->org.eclipse.jface.dialogs.MessageDialog.openError(display.getActiveShell(),"Could not delete Timekeeper record",failure.getMessage());
+        if(Display.getCurrent()==display) error.run();else display.asyncExec(error);
 	}
 
 	private void synchronizeMylynToBackend() {
 		Map<String, Project> projects = new HashMap<>();
-		for (AbstractTaskCategory category : taskList.getTaskCategories()) {
-			projects.put(category.getHandleIdentifier(), ensureProject(category));
-		}
+        for (AbstractTaskCategory category : taskList.getTaskCategories()) {
+            if(scope().maySynchronize(category) && mappedProject(category).map(id -> service.project(id).isPresent()).orElse(true))
+                projects.put(category.getHandleIdentifier(),ensureProject(category));
+        }
 
 		Map<ITask, Task> synchronizedTasks = new HashMap<>();
 		List<AbstractTask> localTasks = taskList.getAllTasks().stream().filter(LocalTask.class::isInstance)
+                .filter(task -> scope().maySynchronize(task))
+                // A UUID denotes an existing projection, not a request to create
+                // another backend record when that UUID has disappeared.
+                .filter(task -> mappedTask(task).map(id -> service.task(id).isPresent()).orElse(true))
 				.sorted(Comparator.comparingInt(this::depth)).toList();
 		for (AbstractTask task : localTasks)
 			ensureTask(task, projects, synchronizedTasks);
@@ -258,14 +285,15 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 
 	private Project ensureProject(AbstractTaskCategory category) {
 		Optional<ProjectId> mappedId = mappedProject(category);
-		Project project = mappedId.flatMap(service::project)
-				.orElseGet(() -> service.projects().stream()
-						.filter(candidate -> candidate.name().equals(category.getSummary())).findFirst()
-						.orElseGet(() -> service.createProject(new CreateProject(category.getSummary()))));
+        Project project;
+        if(mappedId.isPresent()) project=service.project(mappedId.orElseThrow()).orElseThrow(()->ServiceException.notFound("project",mappedId.orElseThrow()));
+        else project=service.projects().stream().filter(candidate->candidate.name().equals(category.getSummary())).findFirst()
+            .orElseGet(()->service.createProject(new CreateProject(category.getSummary())));
 		remember(project.id(), category);
-		if (!project.name().equals(category.getSummary())) {
-			project = service.updateProject(new UpdateProject(project.id(), project.version(), category.getSummary()));
+		if (!project.name().equals(category.getSummary()) && !scope().projectProjectionUnchanged(project.id(),category.getSummary())) {
+            project = service.updateProject(new UpdateProject(project.id(), scope().projectProjectionVersion(project), category.getSummary()));
 		}
+        if(project.name().equals(category.getSummary())) scope().rememberProjection(project);
 		return project;
 	}
 
@@ -274,26 +302,30 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 		if (known != null)
 			return known;
 
-		Optional<Task> parent = parentTask(mylynTask).filter(LocalTask.class::isInstance)
+		Optional<Task> parent = parentTask(mylynTask).filter(LocalTask.class::isInstance).filter(task -> scope().maySynchronize(task))
 				.map(value -> ensureTask(value, projects, synchronizedTasks));
 		Optional<ProjectId> requestedProjectId = parent.flatMap(Task::projectId)
-				.or(() -> category(mylynTask).map(
+				.or(() -> category(mylynTask).filter(value -> scope().maySynchronize(value)).map(
 						value -> projects.computeIfAbsent(value.getHandleIdentifier(), ignored -> ensureProject(value)))
 						.map(Project::id));
 		ExternalTaskReference reference = externalReference(mylynTask);
-		Task current = mappedTask(mylynTask).flatMap(service::task).or(() -> service.findTask(reference.key()))
-				.orElseGet(() -> service.createTask(new CreateTask(requestedProjectId, parent.map(Task::id),
-						mylynTask.getSummary(), Optional.ofNullable(mylynTask.getUrl()))));
+        Optional<TaskId> mappedId=mappedTask(mylynTask);
+        Task current=mappedId.flatMap(service::task).or(()->service.findTask(reference.key())).orElseGet(()->{
+            if(mappedId.isPresent()) throw ServiceException.notFound("task",mappedId.orElseThrow());
+            return service.createTask(new CreateTask(requestedProjectId,parent.map(Task::id),mylynTask.getSummary(),Optional.ofNullable(mylynTask.getUrl())));
+        });
 		Optional<ProjectId> projectId = requestedProjectId;
 		if (projectId.isEmpty())
 			projectId = current.projectId();
 
 		Optional<TaskId> parentId = parent.map(Task::id);
 		Optional<String> url = Optional.ofNullable(mylynTask.getUrl()).filter(value -> !value.isBlank());
-		if (!current.projectId().equals(projectId) || !current.parentTaskId().equals(parentId)
-				|| !current.summary().equals(mylynTask.getSummary()) || !current.url().equals(url)) {
+        String sourceState=scope().taskState(projectId,parentId,mylynTask.getSummary(),url);
+		if ((!current.projectId().equals(projectId) || !current.parentTaskId().equals(parentId)
+				|| !current.summary().equals(mylynTask.getSummary()) || !current.url().equals(url))
+                && !scope().taskProjectionUnchanged(mylynTask,sourceState)) {
 			try {
-				current = service.updateTask(new UpdateTask(current.id(), current.version(), projectId, parentId,
+                current = service.updateTask(new UpdateTask(current.id(), scope().taskProjectionVersion(mylynTask,current), projectId, parentId,
 						mylynTask.getSummary(), url));
 			} catch (RuntimeException failure) {
 				throw new IllegalStateException("Could not synchronize Mylyn task '" + mylynTask.getSummary() + "' ("
@@ -301,7 +333,11 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 						+ parentId, failure);
 			}
 		}
-		mylynTask.setAttribute(MylynMetadata.ATTR_TIMEKEEPER_TASK_ID, current.id().value().toString());
+		scope().remember(mylynTask,current.id(),current.externalReferences().isEmpty());
+        // A successful import is a new baseline even if a later record aborts this pass.
+        // Do not mark an unchanged, stale projection as matching newer backend fields.
+        if(sourceState.equals(scope().taskState(current.projectId(),current.parentTaskId(),current.summary(),current.url())))
+            scope().rememberProjection(mylynTask,current);
 		synchronizedTasks.put(mylynTask, current);
 		return current;
 	}
@@ -312,16 +348,16 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 		for (AbstractTask projected : List.copyOf(taskList.getAllTasks())) {
 			if (!(projected instanceof LocalTask))
 				continue;
-			mappedTask(projected).filter(id -> knownBackendTasks.contains(id) && !domainTasks.containsKey(id))
+			mappedTask(projected).filter(id -> (scope().ownsProjection(projected) || knownBackendTasks.contains(id)) && !domainTasks.containsKey(id))
 					.ifPresent(id -> taskList.deleteTask(projected));
 		}
 		Set<ProjectId> projectIds = service.projects().stream().map(Project::id)
 				.collect(java.util.stream.Collectors.toSet());
 		for (AbstractTaskCategory category : Set.copyOf(taskList.getTaskCategories())) {
-			mappedProject(category).filter(id -> knownBackendProjects.contains(id) && !projectIds.contains(id))
+			mappedProject(category).filter(id -> (scope().ownsCategory(category) || knownBackendProjects.contains(id)) && !projectIds.contains(id))
 					.ifPresent(id -> {
 						taskList.deleteCategory(category);
-						mappings.remove(mappingKey(id));
+						scope().forget(id);
 					});
 		}
 
@@ -347,7 +383,7 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 		Set<ProjectId> nativeProjects = new HashSet<>();
 		if (includeNew)
 			service.projects().stream().map(Project::id).forEach(nativeProjects::add);
-		service.projects().stream().filter(project -> mappings.get(mappingKey(project.id()), null) != null)
+		service.projects().stream().filter(project -> scope().category(project.id()) != null)
 				.map(Project::id).forEach(nativeProjects::add);
 		domainTasks.values().stream().filter(task -> projected.contains(task.id())).map(Task::projectId)
 				.flatMap(Optional::stream).forEach(nativeProjects::add);
@@ -369,12 +405,13 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 			if (mylynTask == null) {
 				mylynTask = new LocalTask(String.valueOf(taskList.getNextLocalTaskId()), task.summary());
 			}
-			mylynTask.setAttribute(MylynMetadata.ATTR_TIMEKEEPER_TASK_ID, task.id().value().toString());
+			scope().remember(mylynTask,task.id(),task.externalReferences().isEmpty());
 			mylynTask.setSummary(task.summary());
 			mylynTask.setUrl(task.url().orElse(null));
 			AbstractTaskContainer parent = task.parentTaskId().map(mylynTasks::get)
 					.<AbstractTaskContainer>map(value -> value)
 					.orElseGet(() -> task.projectId().map(categories::get).orElse(null));
+            scope().rememberProjection(mylynTask,task);
 			// A null parent moves a local task to Mylyn's unmatched container as well.
 			if (!taskList.addTask(mylynTask, parent))
 				taskList.notifyElementChanged(mylynTask);
@@ -391,19 +428,22 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 	}
 
 	private AbstractTaskCategory ensureCategory(Project project) {
-		String handle = mappings.get(mappingKey(project.id()), null);
+		String handle = scope().category(project.id());
 		AbstractTaskCategory category = handle == null ? null : taskList.getContainerForHandle(handle);
 		if (category == null) {
 			category = taskList.getTaskCategories().stream()
+                    .filter(candidate -> scope().maySynchronize(candidate))
+                    .filter(candidate -> mappedProject(candidate).map(project.id()::equals).orElse(true))
 					.filter(candidate -> candidate.getSummary().equals(project.name())).findFirst().orElse(null);
 		}
 		if (category == null) {
-			category = new TaskCategory(PROJECT_HANDLE_PREFIX + project.id().value(), project.name());
+			category = new TaskCategory(scope().categoryHandle(project.id()), project.name());
 			taskList.addCategory((TaskCategory) category);
 		} else if (!category.getSummary().equals(project.name())) {
 			taskList.renameContainer(category, project.name());
 		}
 		remember(project.id(), category);
+        scope().rememberProjection(project);
 		return category;
 	}
 
@@ -416,6 +456,7 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 
 	private Optional<AbstractTask> findByReference(Task task) {
 		for (AbstractTask candidate : taskList.getAllTasks()) {
+            if(scope().foreignProjection(candidate)) continue;
 			ExternalTaskReferenceKey key = externalReference(candidate).key();
 			if (task.externalReferences().stream().anyMatch(reference -> reference.key().equals(key))) {
 				return Optional.of(candidate);
@@ -430,44 +471,16 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 				task.getUrl());
 	}
 
-	private Optional<TaskId> mappedTask(ITask task) {
-		String value = task.getAttribute(MylynMetadata.ATTR_TIMEKEEPER_TASK_ID);
-		if (value == null)
-			return Optional.empty();
-		try {
-			return Optional.of(new TaskId(UUID.fromString(value)));
-		} catch (IllegalArgumentException malformed) {
-			return Optional.empty();
-		}
-	}
-
-	private Optional<ProjectId> mappedProject(AbstractTaskCategory category) {
-		try {
-			for (String key : mappings.keys()) {
-				if (category.getHandleIdentifier().equals(mappings.get(key, null))
-						&& key.startsWith(PROJECT_MAPPING_PREFIX)) {
-					return Optional.of(new ProjectId(UUID.fromString(key.substring(PROJECT_MAPPING_PREFIX.length()))));
-				}
-			}
-		} catch (BackingStoreException ignored) {
-			// A missing workspace mapping is recoverable through the project name.
-		}
-		return Optional.empty();
-	}
-
-	private void remember(ProjectId projectId, AbstractTaskCategory category) {
-		mappings.put(mappingKey(projectId), category.getHandleIdentifier());
-		try {
-			mappings.flush();
-		} catch (BackingStoreException failure) {
-			TimekeeperUiPlugin.getDefault().getLog().log(new Status(IStatus.WARNING, TimekeeperUiPlugin.PLUGIN_ID,
-					"Could not store the Mylyn category mapping", failure));
-		}
-	}
-
-	private String mappingKey(ProjectId projectId) {
-		return PROJECT_MAPPING_PREFIX + projectId.value();
-	}
+    private MylynBackendScope scope() {
+        var scope=scopeSupplier.get();if(scope==null) throw new IllegalStateException("The Timekeeper backend is still connecting.");return scope;
+    }
+    private Optional<TaskId> mappedTask(ITask task) {
+        var scope=scopeSupplier.get();return scope==null ? Optional.empty() : scope.task(task);
+    }
+    private Optional<ProjectId> mappedProject(AbstractTaskCategory category) {
+        var scope=scopeSupplier.get();return scope==null ? Optional.empty() : scope.project(category);
+    }
+    private void remember(ProjectId projectId,AbstractTaskCategory category) {scope().remember(projectId,category);}
 
 	private Optional<AbstractTask> parentTask(ITask task) {
 		if (!(task instanceof AbstractTask concrete))

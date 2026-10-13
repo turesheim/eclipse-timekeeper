@@ -32,5 +32,5 @@
       </plugin>
     </plugins>
   </build>
-  <modules><module>core-domain</module><module>core-service</module><module>app</module></modules>
+  <modules><module>core-domain</module><module>core-service</module><module>core-http</module><module>app</module></modules>
 </project>

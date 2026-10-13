@@ -1,0 +1,5 @@
+Timekeeper HTTP client
+
+This bundle includes Gson 2.13.2, Copyright Google Inc., licensed under
+the Apache License, Version 2.0. See LICENSE-GSON.
+Upstream: https://github.com/google/gson/tree/gson-parent-2.13.2

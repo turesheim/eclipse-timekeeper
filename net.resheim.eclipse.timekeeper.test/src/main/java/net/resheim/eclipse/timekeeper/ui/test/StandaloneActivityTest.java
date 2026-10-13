@@ -95,7 +95,7 @@ public class StandaloneActivityTest {
 			java.nio.file.Files.createDirectories(screenshots);
 			onUi(() -> TestUtility.takeScreenshot(screenshots.toFile(),
 					bot.shell("New activity").widget, "standalone-activity-dialog.png"));
-			bot.button("Save").click();
+			bot.shell("New activity").bot().button("Save").click();
 			bot.waitUntil(new DefaultCondition() {
 				@Override public boolean test() { return recorded(service, task.id(), monday).isPresent(); }
 				@Override public String getFailureMessage() { return "Recorded activity was not saved"; }

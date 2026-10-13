@@ -57,9 +57,9 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	private Viewer viewer;
 	private volatile Display viewerDisplay;
 
-	protected WeekViewContentProvider() { this(TimekeeperUiPlugin.getCalendarZone()); }
+	protected WeekViewContentProvider() { this(null); }
 	protected WeekViewContentProvider(ZoneId zoneId) { this.zoneId = zoneId; }
-	ZoneId getZoneId() { return zoneId; }
+	ZoneId getZoneId() { return zoneId==null ? TimekeeperUiPlugin.getCalendarZone() : zoneId; }
 	public Set<Task> getFiltered() { return filtered; }
 	public void setShowAllTasks(boolean showAllTasks) { this.showAllTasks = showAllTasks; }
 	public Optional<Task> task(TaskId id) { return Optional.ofNullable(tasks.get(id)); }
@@ -71,7 +71,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	@Override public void dispose() {
 		viewerDisplay = null;
 		viewer = null;
-		TimekeeperPlugin.getDefault().removeListener(this);
+		TimekeeperUiPlugin.getDefault().removeBackendListener(this);
 	}
 	@Override public void inputChanged(Viewer v, Object oldInput, Object newInput) {
 		viewer = v;
@@ -107,14 +107,15 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	}
 
 	protected void filter() {
-		if (firstDayOfWeek == null || !TimekeeperPlugin.getDefault().isReady()) {
+		if (firstDayOfWeek == null || !TimekeeperUiPlugin.getDefault().snapshotsAvailable()) {
 			filtered = Set.of();
 			projects = Map.of();
 			tasks = Map.of();
 			activities = List.of();
 			return;
 		}
-		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
+		ZoneId zoneId=getZoneId();
+        var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
 		projects = service.projects().stream().collect(Collectors.toMap(Project::id, Function.identity(),
 				(a, b) -> a, LinkedHashMap::new));
 		tasks = service.tasks().stream().collect(Collectors.toMap(Task::id, Function.identity()));
@@ -145,7 +146,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 			if (element instanceof Project project) return task(activity.taskId())
 					.map(task -> task.projectId().equals(Optional.of(project.id()))).orElse(false);
 			return element instanceof WeeklySummary;
-		}).mapToLong(activity -> activity.duration(date, zoneId, now).getSeconds()).sum();
+		}).mapToLong(activity -> activity.duration(date, getZoneId(), now).getSeconds()).sum();
 	}
 	public boolean active(Object element) {
 		return activities.stream().filter(activity -> activity.end().isEmpty()).anyMatch(activity -> {

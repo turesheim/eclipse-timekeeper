@@ -4,7 +4,8 @@ Bundle-Name: Timekeeper
 Bundle-SymbolicName: net.resheim.eclipse.timekeeper.ui;singleton:=true
 Bundle-Version: 2.0.0.qualifier
 Bundle-Activator: net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin
-Require-Bundle: org.eclipse.ui;bundle-version="3.109.100",
+Require-Bundle: net.resheim.eclipse.timekeeper.http;bundle-version="[2.0.0,3.0.0)",
+ org.eclipse.equinox.security, org.eclipse.ui;bundle-version="3.109.100",
  org.eclipse.ui.forms;bundle-version="3.7.200",
  org.eclipse.ui.editors;bundle-version="3.10.1",
  org.eclipse.core.runtime;bundle-version="3.14.0",
@@ -24,6 +25,7 @@ Bundle-Vendor: Torkild U. Resheim
 Export-Package: net.resheim.eclipse.timekeeper.internal;x-friends:="net.resheim.eclipse.timekeeper.test",
  net.resheim.eclipse.timekeeper.internal.idle;x-friends:="net.resheim.eclipse.timekeeper.test",
  net.resheim.eclipse.timekeeper.ui,
+ net.resheim.eclipse.timekeeper.ui.client;x-friends:="net.resheim.eclipse.timekeeper.native-test",
  net.resheim.eclipse.timekeeper.ui.commands,
  net.resheim.eclipse.timekeeper.ui.export,
  net.resheim.eclipse.timekeeper.ui.preferences,

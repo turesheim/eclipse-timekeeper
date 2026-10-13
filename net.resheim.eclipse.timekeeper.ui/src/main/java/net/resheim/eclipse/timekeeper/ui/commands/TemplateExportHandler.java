@@ -11,9 +11,10 @@
 
 package net.resheim.eclipse.timekeeper.ui.commands;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -23,6 +24,7 @@ import org.eclipse.core.commands.AbstractHandler;
 import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
 import org.eclipse.core.commands.IHandler;
+import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.dnd.ByteArrayTransfer;
 import org.eclipse.swt.dnd.Clipboard;
@@ -30,7 +32,6 @@ import org.eclipse.swt.dnd.HTMLTransfer;
 import org.eclipse.swt.dnd.RTFTransfer;
 import org.eclipse.swt.dnd.TextTransfer;
 import org.eclipse.swt.dnd.Transfer;
-import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.FileDialog;
 import org.eclipse.ui.IWorkbenchPart;
 import org.eclipse.ui.handlers.HandlerUtil;
@@ -53,43 +54,54 @@ public class TemplateExportHandler extends AbstractHandler implements IHandler {
 	public Object execute(ExecutionEvent event) throws ExecutionException {
 		@SuppressWarnings("unchecked")
 		Map<String, String> parameters = event.getParameters();
-		IWorkbenchPart activePart = HandlerUtil.getActivePart(event);
-		if (activePart instanceof WorkWeekView) {
-			Map<String, ReportTemplate> templates = TimekeeperPlugin.getTemplates();
-			LocalDate firstDayOfWeek = ((WorkWeekView) activePart).getFirstDayOfWeek();
-			ReportTemplate template = templates.get(parameters.get(COMMAND_PARAMETER_TEMPLATE_NAME));
-			TemplateExporter export = new TemplateExporter(template, TimekeeperUiPlugin.getCalendarZone());
-			String result = export.getData(firstDayOfWeek, TimekeeperUiPlugin.getDefault().getTimekeeperService());
-			if (result != null) {
-				// save to file or copy to clipboard
-				boolean save = Boolean.parseBoolean(parameters.getOrDefault(COMMAND_PARAMETER_FILE, "false"));
-				if (save) {
-					try {
-						FileDialog fd = new FileDialog(activePart.getSite().getShell(), SWT.SAVE);
-						fd.setFilterExtensions(new String[] { getFileExtension(template) });
-						fd.setFileName(fileNameFormat.format(firstDayOfWeek));
-						String filename = fd.open();
-						if (filename != null) {
-							try (BufferedWriter bw = new BufferedWriter(new FileWriter(new File(filename)))) {
-								bw.write(result);
-								bw.close();
-							}
-						}
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-
-				} else {
-					Clipboard clipboard = new Clipboard(Display.getCurrent());
-					ByteArrayTransfer targetTransfer = getTransfer(template);
-					Transfer[] transfers = new Transfer[] { targetTransfer };
-					Object[] data = new Object[] { result };
-					clipboard.setContents(data, transfers);
-					clipboard.dispose();
-				}
-			}
+		IWorkbenchPart part = HandlerUtil.getActivePart(event);
+		if (part instanceof WorkWeekView view) {
+			ReportTemplate template = TimekeeperPlugin.getTemplates().get(parameters.get(COMMAND_PARAMETER_TEMPLATE_NAME));
+			export(part, template, view.getFirstDayOfWeek(),
+					Boolean.parseBoolean(parameters.getOrDefault(COMMAND_PARAMETER_FILE, "false")));
 		}
 		return null;
+	}
+
+	static void export(IWorkbenchPart part, ReportTemplate template, LocalDate firstDay, boolean save) {
+		var plugin = TimekeeperUiPlugin.getDefault();
+		var shell = part.getSite().getShell();
+		if (!plugin.isBackendReady()) {
+			MessageDialog.openError(shell, "Could not export week", plugin.backendStatus());
+			return;
+		}
+		if (template == null) {
+			MessageDialog.openError(shell, "Could not export week", "Select a report template in Timekeeper preferences.");
+			return;
+		}
+		String filename = null;
+		if (save) {
+			FileDialog dialog = new FileDialog(shell, SWT.SAVE);
+			dialog.setFilterExtensions(new String[] { "*." + getFileExtension(template) });
+			dialog.setFileName(fileNameFormat.format(firstDay));
+			filename = dialog.open();
+			if (filename == null) return;
+		}
+		Path destination = filename == null ? null : Path.of(filename);
+		var zone = TimekeeperUiPlugin.getCalendarZone();
+		plugin.runRead("Export Timekeeper week", () -> {
+			// The remote service runs on the worker, so this fetches an actual report
+			// instead of exporting the UI's temporary loading snapshot.
+			String result = new TemplateExporter(template, zone).getData(firstDay, plugin.getTimekeeperService());
+			if (result == null) throw new IllegalStateException("The report template could not be rendered.");
+			if (destination != null) {
+				try { Files.writeString(destination, result, StandardCharsets.UTF_8); }
+				catch (IOException failure) { throw new UncheckedIOException(failure); }
+			}
+			return result;
+		}, result -> {
+			if (shell.isDisposed() || destination != null) return;
+			Clipboard clipboard = new Clipboard(shell.getDisplay());
+			try { clipboard.setContents(new Object[] { result }, new Transfer[] { getTransfer(template) }); }
+			finally { clipboard.dispose(); }
+		}, failure -> {
+			if (!shell.isDisposed()) MessageDialog.openError(shell, "Could not export week", failure.getMessage());
+		});
 	}
 
 	/**
@@ -100,7 +112,7 @@ public class TemplateExportHandler extends AbstractHandler implements IHandler {
 	 *            the report template
 	 * @return the transfer type
 	 */
-	private ByteArrayTransfer getTransfer(ReportTemplate template) {
+	private static ByteArrayTransfer getTransfer(ReportTemplate template) {
 		switch (template.getType()) {
 		case HTML:
 			return HTMLTransfer.getInstance();
@@ -111,7 +123,7 @@ public class TemplateExportHandler extends AbstractHandler implements IHandler {
 		}
 	}
 
-	private String getFileExtension(ReportTemplate template) {
+	private static String getFileExtension(ReportTemplate template) {
 		switch (template.getType()) {
 		case HTML:
 			return "html";

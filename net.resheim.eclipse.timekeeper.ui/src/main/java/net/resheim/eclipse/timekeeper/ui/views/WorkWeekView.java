@@ -131,14 +131,18 @@ public class WorkWeekView extends ViewPart {
 	 * @return the active milliseconds or "0"
 	 */
 	public long getActiveTime() {
+		if (!TimekeeperUiPlugin.getDefault().snapshotsAvailable()) return 0L;
 		return TimekeeperUiPlugin.getDefault().getTimekeeperService()
 				.activeActivity(OwnerId.LOCAL)
 				.map(activity -> Math.max(0, Duration.between(activity.start(), Instant.now()).toMillis())).orElse(0L);
 	}
 
 	private void updateStatus() {
-		if (!TimekeeperPlugin.getDefault().isReady()) {
-			statusLabel.setText(TimekeeperPlugin.getDefault().getDatabaseStatus().getMessage());
+		boolean ready = TimekeeperUiPlugin.getDefault().isBackendReady();
+		newProjectAction.setEnabled(ready);
+		newTaskAction.setEnabled(ready);
+		if (!ready || !TimekeeperUiPlugin.getDefault().backendStatus().isBlank()) {
+			statusLabel.setText(TimekeeperUiPlugin.getDefault().backendStatus());
 			return;
 		}
 		var active = TimekeeperUiPlugin.getDefault().getTimekeeperService()
@@ -151,10 +155,10 @@ public class WorkWeekView extends ViewPart {
 		Activity activity = active.orElseThrow();
 		Instant idleSince = TimekeeperUiPlugin.getDefault().getIdleSince();
 		if (TimekeeperUiPlugin.getDefault().isIdle() && idleSince != null) {
-			statusLabel.setText("Idle since " + timeFormat.format(idleSince));
+			statusLabel.setText("Idle since " + timeFormat.withZone(TimekeeperUiPlugin.getCalendarZone()).format(idleSince));
 		} else {
 			long elapsed = Math.max(0, Duration.between(activity.start(), Instant.now()).toMillis());
-			statusLabel.setText(MessageFormat.format("Active since {0}, {1} elapsed", timeFormat.format(activity.start()),
+			statusLabel.setText(MessageFormat.format("Active since {0}, {1} elapsed", timeFormat.withZone(TimekeeperUiPlugin.getCalendarZone()).format(activity.start()),
 					DurationFormatUtils.formatDurationWords(elapsed, true, true)));
 		}
 		refreshActiveTask();
@@ -312,7 +316,7 @@ public class WorkWeekView extends ViewPart {
 		contentProvider = new ContentProvider();
 		contentProvider.setShowAllTasks(TimekeeperUiPlugin.getDefault().getPreferenceStore()
 				.getBoolean(PreferenceConstants.SHOW_ALL_TASKS));
-		TimekeeperPlugin.getDefault().addListener(contentProvider);
+		TimekeeperUiPlugin.getDefault().addBackendListener(contentProvider);
 		viewer.setContentProvider(contentProvider);
 		GridData layoutData = GridDataFactory.fillDefaults().grab(true, true).span(3, 1).create();
 		viewer.getControl().setLayoutData(layoutData);
@@ -391,7 +395,7 @@ public class WorkWeekView extends ViewPart {
 		});
 
 		// Determine the first date of the week
-		LocalDate date = LocalDate.now();
+		LocalDate date = LocalDate.now(TimekeeperUiPlugin.getCalendarZone());
 		WeekFields weekFields = WeekFields.of(Locale.getDefault());
 		long day = date.get(weekFields.dayOfWeek());
 		contentProvider.setFirstDayOfWeek(date.minusDays(day - 1));
@@ -459,6 +463,7 @@ public class WorkWeekView extends ViewPart {
 		manager.add(previousWeekAction);
 		manager.add(currentWeekAction);
 		manager.add(nextWeekAction);
+		if (!TimekeeperUiPlugin.getDefault().isBackendReady()) return;
 		manager.add(new Separator("create"));
 		manager.add(newProjectAction);
 		manager.add(newTaskAction);
@@ -521,15 +526,19 @@ public class WorkWeekView extends ViewPart {
 		}
 	}
 
-	private void perform(Runnable action) {
-		try {
-			action.run();
-			refreshAll();
-		} catch (RuntimeException failure) {
-			org.eclipse.jface.dialogs.MessageDialog.openError(getSite().getShell(), "Timekeeper", ActivityDialog.failureMessage(failure));
-			refreshAll();
-		}
-	}
+    private void perform(Runnable action) {
+        TimekeeperUiPlugin.getDefault().runOperation("Update Timekeeper",()->{action.run();return null;},value->refreshAll(),failure->{
+            if(!viewer.getControl().isDisposed()) org.eclipse.jface.dialogs.MessageDialog.openError(getSite().getShell(),"Timekeeper",ActivityDialog.failureMessage(failure));
+            refreshAll();
+        });
+    }
+
+    private void performOnUi(Runnable action) {
+        try {action.run();refreshAll();}
+        catch(RuntimeException failure) {
+            org.eclipse.jface.dialogs.MessageDialog.openError(getSite().getShell(),"Timekeeper",ActivityDialog.failureMessage(failure));
+        }
+    }
 
 	private boolean isTaskActive(Task task) {
 		var plugin = TimekeeperUiPlugin.getDefault();
@@ -551,21 +560,24 @@ public class WorkWeekView extends ViewPart {
 		plugin.getTaskIntegration().ifPresent(integration -> integration.deactivateActiveTask());
 		var active = service.activeActivity(OwnerId.LOCAL);
 		if (active.filter(activity -> activity.taskId().equals(current.id())).isPresent()) return;
-		active.ifPresent(activity -> service.stopActivity(new StopActivity(activity.id(), activity.version())));
-		service.startActivity(new StartActivity(current.id(), OwnerId.LOCAL, "", Set.of()));
+		        if(plugin.isRemote()) {
+            plugin.activateRemoteTask(current.id(),active);
+        } else {
+            active.ifPresent(activity -> service.stopActivity(new StopActivity(activity.id(), activity.version())));
+            service.startActivity(new StartActivity(current.id(),OwnerId.LOCAL,"",Set.of()));
+        }
 	}
 
 	private void deactivateTask(Task task) {
 		var plugin = TimekeeperUiPlugin.getDefault();
 		plugin.getTaskIntegration().filter(integration -> integration.isLinked(task))
 				.ifPresent(integration -> integration.deactivate(task.id()));
-		plugin.getTimekeeperService().activeActivity(OwnerId.LOCAL)
-				.filter(activity -> activity.taskId().equals(task.id()))
-				.ifPresent(activity -> plugin.getTimekeeperService()
-						.stopActivity(new StopActivity(activity.id(), activity.version())));
+        plugin.getTimekeeperService().activeActivity(OwnerId.LOCAL).filter(activity -> activity.taskId().equals(task.id()))
+                .ifPresent(activity -> perform(()->plugin.getTimekeeperService().stopActivity(new StopActivity(activity.id(),activity.version()))));
 	}
 
 	private void fillLocalPullDown(IMenuManager manager) {
+        manager.add(new Action("Reconnect / refresh backend") {@Override public void run() {TimekeeperUiPlugin.getDefault().refreshBackend();}});
 		manager.add(newProjectAction);
 		manager.add(newTaskAction);
 		manager.add(new Separator("filter"));
@@ -684,7 +696,7 @@ public class WorkWeekView extends ViewPart {
 		currentWeekAction = new Action() {
 			@Override
 			public void run() {
-				contentProvider.setFirstDayOfWeek(calculateFirstDayOfWeek(LocalDate.now()));
+				contentProvider.setFirstDayOfWeek(calculateFirstDayOfWeek(LocalDate.now(TimekeeperUiPlugin.getCalendarZone())));
 				viewer.setInput(getViewSite());
 			}
 		};
@@ -712,6 +724,7 @@ public class WorkWeekView extends ViewPart {
 		doubleClickAction = new Action() {
 			@Override
 			public void run() {
+				if (!TimekeeperUiPlugin.getDefault().isBackendReady()) return;
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
 				if (obj instanceof Task) {
@@ -732,7 +745,7 @@ public class WorkWeekView extends ViewPart {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
 				if (obj instanceof Task) {
-					perform(() -> deactivateTask((Task) obj));
+					performOnUi(() -> deactivateTask((Task)obj));
 				}
 			}
 		};
@@ -744,7 +757,7 @@ public class WorkWeekView extends ViewPart {
 				ISelection selection = viewer.getSelection();
 				Object obj = ((IStructuredSelection) selection).getFirstElement();
 				if (obj instanceof Task) {
-					perform(() -> activateTask((Task) obj));
+					performOnUi(() -> activateTask((Task)obj));
 				}
 			}
 		};
@@ -779,7 +792,8 @@ public class WorkWeekView extends ViewPart {
 
 	private void editProject(Project original) {
 		ProjectDialog dialog = new ProjectDialog(getSite().getShell(), TimekeeperUiPlugin.getDefault().getTimekeeperService(), original);
-		if (dialog.open() == org.eclipse.jface.window.Window.OK) {
+		if (dialog.open() == org.eclipse.jface.window.Window.OK && dialog.savedProject() != null
+                && !viewer.getControl().isDisposed()) {
 			refreshAll();
 			viewer.setSelection(new StructuredSelection(dialog.savedProject()), true);
 		}
@@ -788,7 +802,8 @@ public class WorkWeekView extends ViewPart {
 	private void editTask(Task original, Optional<net.resheim.eclipse.timekeeper.domain.ProjectId> projectId,
 			Optional<net.resheim.eclipse.timekeeper.domain.TaskId> parentId) {
 		TaskDialog dialog = new TaskDialog(getSite().getShell(), TimekeeperUiPlugin.getDefault().getTimekeeperService(), original, projectId, parentId);
-		if (dialog.open() == org.eclipse.jface.window.Window.OK) {
+		if (dialog.open() == org.eclipse.jface.window.Window.OK && dialog.savedTask() != null
+                && !viewer.getControl().isDisposed()) {
 			refreshAll();
 			viewer.setSelection(new StructuredSelection(dialog.savedTask()), true);
 		}
@@ -809,10 +824,13 @@ public class WorkWeekView extends ViewPart {
 	 * Typically after importing a number of records.
 	 */
 	public void refreshAll() {
+        // A modal editor can return after its view was closed during workbench shutdown.
+        if (viewer == null || viewer.getControl().isDisposed() || viewer.getContentProvider() == null)
+            return;
 		viewer.getContentProvider().inputChanged(viewer, viewer.getInput(), null);
 	}
 
 	public void refresh(Object element) {
-		viewer.getContentProvider().inputChanged(viewer, viewer.getInput(), null);
+        refreshAll();
 	}
 }

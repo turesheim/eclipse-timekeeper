@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin>
+  <extension point="org.eclipse.core.runtime.applications" id="bootstrap">
+    <application><run class="net.resheim.eclipse.timekeeper.remote.test.RemoteBootstrap"/></application>
+  </extension>
+</plugin>

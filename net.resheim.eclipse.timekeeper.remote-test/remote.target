@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?pde?>
+<target name="Installed remote Timekeeper acceptance" sequenceNumber="20261012">
+  <locations><location type="InstallableUnit" includeMode="planner" includeAllPlatforms="false" includeSource="false" includeConfigurePhase="false">
+    <unit id="org.eclipse.platform.ide" version="0.0.0"/>
+    <repository location="https://download.eclipse.org/releases/2026-09/202609091000/"/>
+  </location></locations>
+</target>

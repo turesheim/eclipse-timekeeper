@@ -34,12 +34,9 @@ class ActivitySummaryEditingSupport extends EditingSupport {
 	@Override protected Object getValue(Object element) { return ((Activity) element).summary(); }
 	@Override protected void setValue(Object element, Object value) {
 		Activity activity = (Activity) element;
-		try {
-			TimekeeperUiPlugin.getDefault().getTimekeeperService().updateActivity(new UpdateActivity(
-					activity.id(), activity.version(), activity.start(), activity.end(), value.toString(), activity.labelIds()));
-		} catch (RuntimeException failure) {
-			MessageDialog.openError(getViewer().getControl().getShell(), "Could not edit activity", ActivityDialog.failureMessage(failure));
-		}
-		content.databaseStateChanged();
+        var command=new UpdateActivity(activity.id(),activity.version(),activity.start(),activity.end(),value.toString(),activity.labelIds());
+        TimekeeperUiPlugin.getDefault().runOperation("Edit activity summary",()->TimekeeperUiPlugin.getDefault().getTimekeeperService().updateActivity(command),saved->content.databaseStateChanged(),failure->{
+            MessageDialog.openError(getViewer().getControl().getShell(),"Could not edit activity",ActivityDialog.failureMessage(failure));
+        });
 	}
 }

@@ -26,7 +26,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateProject;
 import net.resheim.eclipse.timekeeper.service.TimekeeperService;
 
 /** Edits a versioned project snapshot through the client API. */
-final class ProjectDialog extends TitleAreaDialog {
+final class ProjectDialog extends AsyncRecordDialog {
 	private final TimekeeperService service;
 	private final Project original;
 	private Text name;
@@ -58,14 +58,10 @@ final class ProjectDialog extends TitleAreaDialog {
 		name.addModifyListener(event -> setErrorMessage(null));
 		return area;
 	}
-	@Override protected void okPressed() {
-		try {
-			saved = original == null ? service.createProject(new CreateProject(name.getText()))
-					: service.updateProject(new UpdateProject(original.id(), original.version(), name.getText()));
-			super.okPressed();
-		} catch (RuntimeException failure) {
-			setErrorMessage(RecordDialogErrors.message(failure));
-		}
-	}
+    @Override protected void okPressed() {
+        String entered=name.getText();
+        save("Save Timekeeper project",()-> original==null ? service.createProject(new CreateProject(entered))
+                : service.updateProject(new UpdateProject(original.id(),original.version(),entered)),value -> saved=value);
+    }
 	Project savedProject() { return saved; }
 }

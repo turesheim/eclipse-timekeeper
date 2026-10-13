@@ -10,11 +10,18 @@
  *******************************************************************************/
 package net.resheim.eclipse.timekeeper.ui.views;
 
+import net.resheim.eclipse.timekeeper.client.RemoteFailure;
 import net.resheim.eclipse.timekeeper.domain.FailureCode;
 import net.resheim.eclipse.timekeeper.service.ServiceException;
 
 final class RecordDialogErrors {
 	private RecordDialogErrors() { }
+    static String editorMessage(RuntimeException failure) {
+        if (failure instanceof RemoteFailure problem && problem.kind() == RemoteFailure.Kind.CONFLICT
+                && problem.code().equals("STALE_VERSION"))
+            return "This record has changed. Close and reopen the editor before saving.";
+        return message(failure);
+    }
 	static String message(RuntimeException failure) {
 		if (failure instanceof ServiceException problem && problem.code() == FailureCode.CONFLICT
 				&& (problem.field().equals("task") || problem.field().equals("project"))) {
