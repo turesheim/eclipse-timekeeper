@@ -19,7 +19,7 @@ public class RemoteRestartTest {
             var precise=api.activity(new ActivityId(UUID.fromString(RemoteBootstrap.proof.getProperty("manual.id")))).orElseThrow();
             assertEquals(Instant.parse(RemoteBootstrap.proof.getProperty("manual.start")),precise.start());assertEquals(Optional.of(Instant.parse(RemoteBootstrap.proof.getProperty("manual.end"))),precise.end());
             assertEquals("remote-owner-a",precise.ownerId().value());assertEquals("Edited precise interval",precise.summary());
-            String[] processes=RemoteBootstrap.proof.getProperty("server.pids").split(",");assertEquals(2,processes.length);assertNotEquals(processes[0],processes[1]);
+            String[] processes=RemoteBootstrap.proof.getProperty("server.pids").split(",");assertEquals("Initial server, reply-gate relocation and retained-workspace restart",3,processes.length);assertEquals(3,java.util.Set.of(processes).size());
             RemoteBootstrap.proof.setProperty("phase.restart","passed");RemoteBootstrap.writeProof();
         }
         RemoteTestSupport.ready();

@@ -214,6 +214,10 @@ public final class RemoteBootstrap implements IApplication {
         if(!java.util.Set.of("projects","tasks","activities","labels").contains(collection)) throw new IllegalArgumentException("Unsupported create fixture");
         control("hold","POST /api/v1/"+collection);
     }
+    public static void holdNextTrackingReply(java.util.UUID activity) throws Exception {
+        control("hold","POST /api/v1/activities/"+(activity==null ? "start" : activity+"/stop"));
+    }
+    public static void awaitTrackingReplyCommitted(boolean start) throws Exception {awaitReplyCommitted(start ? 201 : 200);}
     public static void awaitCreateReplyCommitted() throws Exception {awaitReplyCommitted(201);}
     public static void awaitTaskReplyCommitted() throws Exception {
         awaitReplyCommitted(200);

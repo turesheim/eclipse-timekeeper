@@ -67,6 +67,7 @@ public class RemoteNativeTest {
             RemoteBootstrap.proof.setProperty("manual.start",from.toString());RemoteBootstrap.proof.setProperty("manual.end",until.toString());
             RemoteBootstrap.proof.setProperty("project.id",project.id().value().toString());RemoteBootstrap.proof.setProperty("task.id",task.id().value().toString());
             RemoteBootstrap.proof.setProperty("stopped.id",stopped.id().value().toString());RemoteBootstrap.proof.setProperty("manual.id",manual.id().value().toString());
+            UncertainTrackingScenario.run(api);
             RemoteBootstrap.proof.setProperty("phase.native","passed");RemoteBootstrap.writeProof();
         }
         RemoteTestSupport.ready();

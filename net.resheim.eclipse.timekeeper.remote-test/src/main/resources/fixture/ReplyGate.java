@@ -29,7 +29,7 @@ public class ReplyGate {
                             String method=target.startsWith("POST ") ? "POST" : "PUT";
                             if(method.equals("POST")) target=target.substring(5);
                             if(!(method.equals("PUT") ? target.matches("/api/v1/tasks/[0-9a-f-]{36}")
-                                    : target.matches("/api/v1/(projects|tasks|activities|labels)"))) throw new IllegalArgumentException("Invalid fixture route");
+                                    : (target.matches("/api/v1/(projects|tasks|activities|labels)") || target.equals("/api/v1/activities/start") || target.matches("/api/v1/activities/[0-9a-f-]{36}/stop")))) throw new IllegalArgumentException("Invalid fixture route");
                             var next=new Gate(method,target,new CountDownLatch(1),new CountDownLatch(1),new AtomicReference<>(0));
                             var previous=gate.get();if(previous!=null && previous.release().getCount()!=0) throw new IllegalStateException("Previous gate not released");
                             gate.set(next);armed.set(next);reply(exchange,200,"armed");
