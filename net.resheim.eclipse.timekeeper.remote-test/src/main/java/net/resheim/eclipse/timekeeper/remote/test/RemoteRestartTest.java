@@ -20,6 +20,9 @@ public class RemoteRestartTest {
             assertEquals(Instant.parse(RemoteBootstrap.proof.getProperty("manual.start")),precise.start());assertEquals(Optional.of(Instant.parse(RemoteBootstrap.proof.getProperty("manual.end"))),precise.end());
             assertEquals("remote-owner-a",precise.ownerId().value());assertEquals("Edited precise interval",precise.summary());
             String[] processes=RemoteBootstrap.proof.getProperty("server.pids").split(",");assertEquals(2,processes.length);assertNotEquals(processes[0],processes[1]);
+            assertEquals(1,RemoteBootstrap.proof.getProperty("server.recovery-pids").split(",").length);
+            for(String phase:java.util.List.of("timeout.start","timeout.stop","cancel.start","cancel.stop"))
+                assertEquals("passed",RemoteBootstrap.proof.getProperty("phase.tracking."+phase));
             RemoteBootstrap.proof.setProperty("phase.restart","passed");RemoteBootstrap.writeProof();
         }
         RemoteTestSupport.ready();
