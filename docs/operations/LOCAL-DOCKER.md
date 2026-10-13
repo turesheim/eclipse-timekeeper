@@ -119,11 +119,78 @@ Apply the settings and restart Eclipse. Tokens are kept in Eclipse secure
 storage. Existing local Eclipse records remain in their original database;
 selecting the server does not import them.
 
-This listener is accessible only from the Docker host. To connect from another
-computer, configure an HTTPS reverse proxy and the appropriate host binding;
-see the [deployment guide](DEPLOYMENT.md).
+The Docker listener is local to its host. For other devices in your tailnet,
+use the Tailscale setup below. Other remote deployments use an HTTPS reverse
+proxy as described in the [deployment guide](DEPLOYMENT.md).
 
-## 5. Stop, restart and back up
+## 5. Reach the test server through Tailscale
+
+Run [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve) on the
+Docker host. It provides HTTPS access within your tailnet and forwards requests
+to the local gateway. Keep `TIMEKEEPER_BIND_ADDRESS=127.0.0.1` in `.env`;
+the existing Compose configuration needs no network changes for this setup.
+
+Connect the host and the other device to Tailscale. Enable MagicDNS and HTTPS
+certificates in the tailnet; Serve prompts for any missing setup. Tailnet access
+rules must allow the other device to reach this host on TCP port **8443**.
+See [HTTPS setup](https://tailscale.com/docs/how-to/set-up-https-certificates).
+
+If `tailscale` is missing from your shell on macOS, install CLI integration
+from the Tailscale app settings, or use its bundled CLI in this shell:
+
+```sh
+alias tailscale='/Applications/Tailscale.app/Contents/MacOS/Tailscale'
+```
+
+See the [macOS CLI instructions](https://tailscale.com/docs/reference/tailscale-cli?tab=macos).
+Run the commands on the Docker host's operating system, where
+`http://127.0.0.1:8080` is reachable. On Windows with Docker Desktop, this
+means running Serve on Windows.
+
+Check connectivity and existing Serve endpoints, then enable the test endpoint:
+
+```sh
+tailscale status
+tailscale serve status
+tailscale serve --bg --https=8443 http://127.0.0.1:8080
+tailscale serve status
+```
+
+Choose another HTTPS port if 8443 already serves another application. If you
+changed `TIMEKEEPER_HTTP_PORT`, replace `8080` in the proxy target. `--bg`
+keeps the endpoint available after the command exits and resumes it after
+Tailscale restarts. The host must remain running and connected.
+
+Use the full HTTPS DNS name printed by Serve. For example:
+
+| Client | Address |
+| --- | --- |
+| Browser | `https://test-server.tail1234.ts.net:8443/web/` |
+| Eclipse Server URL | `https://test-server.tail1234.ts.net:8443/api/v1` |
+| Readiness | `https://test-server.tail1234.ts.net:8443/q/health/ready` |
+
+Replace the example hostname with your host's printed name. Use that DNS name
+for certificate validation; Eclipse requires HTTPS outside loopback. Browser
+and Eclipse sessions still require the bearer token from setup, and use the
+same account and persistent database as local sessions.
+
+From the other device, verify readiness:
+
+```sh
+curl --fail --silent --show-error https://test-server.tail1234.ts.net:8443/q/health/ready
+```
+
+If this fails, check local Docker readiness first, then the Serve status,
+Tailscale connection, DNS and access rules for port 8443.
+To remove this test endpoint, run on its host:
+
+```sh
+tailscale serve --bg --https=8443 off
+```
+
+Command reference: [Serve CLI](https://tailscale.com/docs/reference/tailscale-cli/serve).
+
+## 6. Stop, restart and back up
 
 ```sh
 docker compose stop
