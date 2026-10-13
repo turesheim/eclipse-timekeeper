@@ -41,6 +41,10 @@ base and optional features in isolated Eclipse runtimes and verifies real
 server/browser interaction, preferences, Mylyn tracking and retained-workspace
 restart. Pages publishes its main p2 build only after the entire Build workflow,
 including this job and the platform matrix, passes.
+**Publication tooling tests** can run in parallel. **Update site checks** waits
+for the matrix and all acceptance jobs, downloads their same-run p2 artifact,
+and builds a complete test site. The separate Pages workflow deploys after the
+whole main Build workflow succeeds.
 
 ## Eclipse import
 

@@ -151,7 +151,7 @@ class PublicationTest(unittest.TestCase):
              "head_branch":"main","path":".github/workflows/build.yml","head_sha":"a"*40,
              "head_repository":{"full_name":"owner/repo"}}
         jobs=[{"name":name,"status":"completed","conclusion":"success"} for name in (
-            "Publication","API-contract","Server","Web","Build (ubuntu-latest)",
+            "Update site checks","Publication tooling tests","API-contract","Server","Web","Build (ubuntu-latest)",
             "Build (macos-latest)","Build (windows-latest)","Installed client tests")]
         artifact={"id":456,"name":"p2-repository","expired":False,
                   "digest":"sha256:"+hashlib.sha256(archive.read_bytes()).hexdigest(),
@@ -181,7 +181,37 @@ class PublicationTest(unittest.TestCase):
         self.assertEqual(self.version,p2.validate_repository(repository,"v2.0.0"))
         self.assertEqual(result,json.loads((repository/"timekeeper-build.json").read_text()))
         self.assertEqual("0",ET.parse(output/"updates/compositeContent.xml").find("children").get("size"))
-        self.assertIn("unreleased main build",(output/"updates/testing/index.html").read_text())
+        self.assertIn("unreleased build",(output/"updates/testing/index.html").read_text())
+
+    def test_site_checks_use_the_supplied_matrix_artifact_without_an_older_run(self):
+        output=self.root/"checked-site"
+        with patch.object(p2,"gh",side_effect=AssertionError("Site checks must use this run's downloaded artifact")):
+            identity=p2.check_site("owner/repo",self.repository,output,"b"*40,789)
+        child=ET.parse(output/"updates/testing/compositeContent.xml").find("./children/child")
+        installed=output/"updates/testing"/child.get("location")
+        self.assertEqual(self.version,p2.validate_repository(installed,"v2.0.0"))
+        self.assertEqual("b"*40,identity["commit"])
+        self.assertEqual(789,identity["run"])
+        self.assertEqual("verification",identity["kind"])
+        self.assertEqual(identity,json.loads((installed/"timekeeper-build.json").read_text()))
+
+    def test_site_checks_refuse_an_incomplete_current_matrix_artifact(self):
+        next((self.repository/"plugins").glob("*.jar")).unlink()
+        with self.assertRaisesRegex(ValueError,"Missing repository artifact"):
+            p2.check_site("owner/repo",self.repository,self.root/"checked-site","b"*40,789)
+
+    def test_new_site_gate_must_pass_and_old_verified_runs_remain_usable(self):
+        for change in ("site-skipped","tooling-skipped","legacy"):
+            with self.subTest(change=change):
+                run,jobs,artifact,archive,github,download=self._testing_fixture()
+                if change=="site-skipped":jobs[0]["conclusion"]="skipped"
+                elif change=="tooling-skipped":jobs[1]["conclusion"]="skipped"
+                else:
+                    jobs[0]["name"]="Publication";jobs.pop(1)
+                with patch.object(p2,"gh",side_effect=github),patch.object(p2,"download_testing_artifact",side_effect=download) as fetch:
+                    result=p2.add_testing_channel("owner/repo",self.root/change)
+                    if change=="legacy":self.assertEqual("a"*40,result["commit"])
+                    else:self.assertIsNone(result);fetch.assert_not_called()
 
     def test_fork_pr_and_incomplete_matrix_cannot_supply_testing_site(self):
         for change in ("fork","pr","failed","skipped-client"):

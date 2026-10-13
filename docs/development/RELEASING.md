@@ -33,7 +33,7 @@ with GitHub's Jekyll action; generated p2 repositories are added after Jekyll,
 so binary metadata and JARs are served without transformation.
 
 The **Website and p2 update site** workflow runs after a successful main Build
-workflow or release build, on main pushes, on release edits/deletions, and on manual dispatch. It
+workflow or release build, on release edits/deletions, and on manual dispatch. It
 always checks out the default branch and reconstructs the complete site from
 published release assets. Drafts and historical releases without the new asset
 pair are excluded. Checksums, embedded release identity, feature version and
@@ -51,15 +51,23 @@ Install locations:
 
 The testing channel comes from the successful main workflow's `p2-repository`
 artifact. Pages rejects PR/fork runs and requires all three platform jobs,
-API, Server, Web, Publication and **Installed client tests** to pass. It verifies
+API, Server, Web, **Publication tooling tests**, **Update site checks** and
+**Installed client tests** to pass. Older verified workflows used the name
+**Publication** for the tooling/site checks. The publisher verifies
 the artifact's run/source identity and GitHub SHA-256 digest, then validates p2
 metadata and every declared plugin/feature file. `timekeeper-build.json` records
 the commit, version, run and artifact checksum. The testing repository has a
 build/artifact-specific path; stable and preview channels remain release-only.
 
-A main push can initially rebuild the website using the preceding successful
-main artifact. When the full new Build workflow succeeds, `workflow_run`
-publishes its artifact. Failed, skipped or PR builds cannot advance testing.
+**Publication tooling tests** runs script tests in parallel. **Update site
+checks** depends on the complete build matrix, API, server, web, installed-client
+and tooling jobs. It downloads `p2-repository` from that same workflow run and
+uses `check-site` to assemble and validate its testing repository. It does not
+substitute a previous main artifact or wait on its own workflow's conclusion.
+
+A main push starts Build. Pages waits for the complete successful workflow;
+there is no separate immediate push deployment. Its `workflow_run` trigger
+then publishes the verified artifact. Failed, skipped or PR builds cannot advance testing.
 If no qualifying unexpired artifact exists, its page explains that no testing
 build is available. It does not substitute an unchecked candidate. Action
 artifacts have finite retention; rerun main Build to repopulate an expired test

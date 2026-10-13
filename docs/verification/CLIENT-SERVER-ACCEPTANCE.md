@@ -120,10 +120,14 @@ GitHub's artifact SHA-256, p2 metadata and every referenced JAR. PR/fork runs,
 incomplete/skipped client tests, wrong source/checksum and expired artifacts
 cannot populate testing.
 
-The publication follow-up passes 20 script/documentation tests and actionlint.
+The publication follow-up passes 23 script/documentation tests and actionlint.
 A complete site was also assembled from the actual main artifact for run
 `38368609913`, with feature `2.0.0.202610130820`, source `102a341`, and artifact
 SHA-256 `98cf4ee7dfd8c3080cc1ea8d825a7f068259a65ed9e8e2b9c093a8202ae3a0b1`.
 Its testing composite contains a real child repository with all declared files.
 Publication of this channel occurs after the workflow changes merge and Pages
 deploys; local assembly alone is not a live installation check.
+The later workflow correction puts **Update site checks** after the complete
+matrix and acceptance jobs. Its site uses the current run's downloaded p2
+artifact, while **Publication tooling tests** runs separately in parallel.
+Pages has no immediate main-push deployment; it follows successful Build.

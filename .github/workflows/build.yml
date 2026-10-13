@@ -158,26 +158,40 @@ jobs:
           eclipse/net.resheim.eclipse.timekeeper.remote-mylyn-test/target/work/**/.metadata/.log
           eclipse/net.resheim.eclipse.timekeeper.remote-mylyn-test/target/work/**/configuration/*.log
 
-  Publication:
+  Publication-tooling:
+    name: Publication tooling tests
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7.0.1
     - name: Verify p2 packaging and release channels
       run: python3 -m unittest discover -s scripts/tests -v
+
+  Publication:
+    name: Update site checks
+    needs: [Build, API-contract, Server, Web, Remote-Eclipse, Publication-tooling]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7.0.1
     - name: Verify project website build
       uses: actions/jekyll-build-pages@v1
       with:
         source: ./
         destination: ./_site
-    - name: Verify update site assembly from published releases
-      env:
-        GH_TOKEN: ${{ github.token }}
+    - name: Download p2 repository from this build matrix
+      uses: actions/download-artifact@v8.0.2
+      with:
+        name: p2-repository
+        path: target/ci-p2-repository
+    - name: Verify update site assembly from this build matrix
       run: |
         # Jekyll's Docker action writes root-owned output.
         sudo chown -R "$(id -u):$(id -g)" _site
-        python3 scripts/p2_release.py site --repo "$GITHUB_REPOSITORY" --output _site --include-testing
+        python3 scripts/p2_release.py check-site \
+          --repo "$GITHUB_REPOSITORY" --repository target/ci-p2-repository \
+          --output _site --commit "$GITHUB_SHA" --run "$GITHUB_RUN_ID"
         test -f _site/index.html
         test -f _site/updates/compositeContent.xml
+        test -f _site/updates/testing/compositeContent.xml
 
   Build:
     strategy:

@@ -123,12 +123,57 @@ def download_testing_artifact(repo, artifact_id, destination):
                        stdout=output, check=True)
 
 
+def testing_repository_version(repository):
+    units=read_repository_xml(repository,"content").findall("./units/unit")
+    base=[unit for unit in units if unit.get("id")==FEATURE]
+    if len(base)!=1:
+        raise ValueError("Testing repository has no unique Timekeeper feature")
+    return validate_repository(repository,"v"+".".join(base[0].get("version","").split(".")[:3]))
+
+
+def assemble_testing_repository(repo,repository,output,provenance,build_path):
+    version=testing_repository_version(repository)
+    commit=provenance["commit"]
+    if not re.fullmatch(r"[0-9a-f]{40}",commit) or provenance["version"]!=version:
+        raise ValueError("Testing repository source/version identity is invalid")
+    if any(path.is_symlink() for path in repository.rglob("*")):
+        raise ValueError("Testing repository contains a symlink")
+    testing=output/"updates/testing"
+    destination=testing/build_path
+    shutil.copytree(repository,destination,dirs_exist_ok=True)
+    (destination/"timekeeper-build.json").write_text(json.dumps(provenance,indent=2)+"\n")
+    composite(testing,"Timekeeper tested main builds",[build_path])
+    (testing/"index.html").write_text(f'''<!doctype html><html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timekeeper testing update site</title><h1>Timekeeper testing update site</h1>
+<p>In Eclipse, use this page's URL in <strong>Help &gt; Install New Software… &gt; Add…</strong>.</p>
+<p>Select <strong>Timekeeper for Eclipse</strong> and optionally <strong>Timekeeper Mylyn integration</strong>.
+Version 2.0 requires Eclipse 2026-09 and Java 21. Keep the Eclipse 2026-09 software site enabled.</p>
+<p>This is an unreleased build that passed the platform matrix, server, web and installed-client tests.
+It is separate from <a href="../">stable releases</a> and <a href="../preview/">release candidates</a>.</p>
+<p>Version: <code>{html.escape(version)}</code>. Source: <code>{commit}</code>.
+<a href="https://github.com/{repo}/actions/runs/{provenance['run']}">Verified build</a>.
+<a href="{build_path}/timekeeper-build.json">Build identity</a>.</p>
+<p>Restart Eclipse after installation, then open <strong>Window &gt; Show View &gt; Other… &gt; Timekeeper &gt; Workweek</strong>.</p>
+</html>\n''',encoding="utf-8")
+
+
+def check_site(repo,repository,output,commit,run):
+    # This verifies an artifact downloaded from the same CI run after its jobs pass.
+    # Pages separately selects a completed trusted main run before deploying.
+    version=testing_repository_version(repository)
+    provenance={"kind":"verification","commit":commit,"version":version,"run":run}
+    assemble_site([],output,lambda *_:None)
+    assemble_testing_repository(repo,repository,output,provenance,f"builds/{commit}")
+    return provenance
+
+
 def add_testing_channel(repo, output):
     branch=gh("api",f"repos/{repo}","--jq",".default_branch").strip()
     runs=json.loads(gh("api",f"repos/{repo}/actions/workflows/build.yml/runs",
                       "--method","GET","-f",f"branch={branch}","-f","event=push",
                       "-f","status=success","-f","per_page=10"))["workflow_runs"]
-    required={"Publication","API-contract","Server","Web","Build (ubuntu-latest)",
+    required={"API-contract","Server","Web","Build (ubuntu-latest)",
               "Build (macos-latest)","Build (windows-latest)"}
     for run in runs:
         if (run.get("status")!="completed" or run.get("conclusion")!="success"
@@ -141,7 +186,10 @@ def add_testing_channel(repo, output):
             raise ValueError("Invalid testing source commit")
         jobs=json.loads(gh("api",f"repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100"))["jobs"]
         passed={job["name"] for job in jobs if job.get("status")=="completed" and job.get("conclusion")=="success"}
-        if not required.issubset(passed) or not passed.intersection({"Remote-Eclipse","Installed client tests"}):
+        if (not required.issubset(passed)
+                or not passed.intersection({"Remote-Eclipse","Installed client tests"})
+                or not passed.intersection({"Publication","Update site checks"})
+                or ("Update site checks" in passed and "Publication tooling tests" not in passed)):
             continue
         artifacts=json.loads(gh("api",f"repos/{repo}/actions/runs/{run['id']}/artifacts?per_page=100"))["artifacts"]
         available=[artifact for artifact in artifacts if artifact["name"]=="p2-repository" and not artifact["expired"]]
@@ -164,32 +212,11 @@ def add_testing_channel(repo, output):
             repository=Path(temporary)/"repository"
             with zipfile.ZipFile(archive) as zipped:
                 extract_repository_zip(zipped,repository)
-            units=read_repository_xml(repository,"content").findall("./units/unit")
-            base=[unit for unit in units if unit.get("id")==FEATURE]
-            if len(base)!=1:
-                raise ValueError("Testing repository has no unique Timekeeper feature")
-            version=validate_repository(repository,"v"+".".join(base[0].get("version","").split(".")[:3]))
+            version=testing_repository_version(repository)
             provenance={"kind":"testing","commit":commit,"version":version,
                         "run":run["id"],"artifactSha256":digest.removeprefix("sha256:")}
-            (repository/"timekeeper-build.json").write_text(json.dumps(provenance,indent=2)+"\n")
-            testing=output/"updates/testing"
-            build_path=f"builds/{run['id']}-{artifact['id']}"
-            destination=testing/build_path
-            shutil.copytree(repository,destination,dirs_exist_ok=True)
-        composite(testing,"Timekeeper tested main builds",[build_path])
-        (testing/"index.html").write_text(f'''<!doctype html><html lang="en">
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Timekeeper testing update site</title><h1>Timekeeper testing update site</h1>
-<p>In Eclipse, use this page's URL in <strong>Help &gt; Install New Software… &gt; Add…</strong>.</p>
-<p>Select <strong>Timekeeper for Eclipse</strong> and optionally <strong>Timekeeper Mylyn integration</strong>.
-Version 2.0 requires Eclipse 2026-09 and Java 21. Keep the Eclipse 2026-09 software site enabled.</p>
-<p>This is an unreleased main build that passed the platform matrix, server, web and installed-client tests.
-It is separate from <a href="../">stable releases</a> and <a href="../preview/">release candidates</a>.</p>
-<p>Version: <code>{html.escape(version)}</code>. Source: <code>{commit}</code>.
-<a href="https://github.com/{repo}/actions/runs/{run['id']}">Verified build</a>.
-<a href="{build_path}/timekeeper-build.json">Build identity</a>.</p>
-<p>Restart Eclipse after installation, then open <strong>Window &gt; Show View &gt; Other… &gt; Timekeeper &gt; Workweek</strong>.</p>
-</html>\n''',encoding="utf-8")
+            assemble_testing_repository(repo,repository,output,provenance,
+                                        f"builds/{run['id']}-{artifact['id']}")
         print(json.dumps(provenance))
         return provenance
     print("No complete verified main p2 artifact is available for the testing channel.")
@@ -333,11 +360,19 @@ def main():
     publish.add_argument("--repo", required=True)
     publish.add_argument("--output", required=True, type=Path)
     publish.add_argument("--include-testing", action="store_true", help="Add a separate channel from a fully verified main Build artifact")
+    check = commands.add_parser("check-site", help="Verify site assembly using this CI run's matrix artifact")
+    check.add_argument("--repo", required=True)
+    check.add_argument("--repository", required=True, type=Path)
+    check.add_argument("--output", required=True, type=Path)
+    check.add_argument("--commit", required=True)
+    check.add_argument("--run", required=True, type=int)
     args = parser.parse_args()
     if args.command == "prepare":
         prepare(args.repo, args.tag, args.require_server)
     elif args.command == "package":
         package(args.repository, args.tag, args.commit, args.output)
+    elif args.command == "check-site":
+        check_site(args.repo, args.repository, args.output, args.commit, args.run)
     else:
         site(args.repo, args.output, args.include_testing)
 
