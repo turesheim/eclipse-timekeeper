@@ -25,7 +25,7 @@ PostgreSQL service. VMM on the same NAS does not remove these shared failure poi
 2. Copy `.env.example` to `.env`. Keep
    `TIMEKEEPER_STATE_DIR=/volume1/docker/timekeeper/state`; adjust it if using a
    different NAS volume. The HTTP listener defaults to `127.0.0.1:8080` for DSM's
-   HTTPS reverse proxy. Change the port if it is occupied.
+   HTTPS reverse proxy or Tailscale Serve. Change the port if it is occupied.
 3. Run the one-time setup from SSH or a DSM user-defined task with permission to
    create the state directories. With Python 3 available:
 
@@ -63,7 +63,11 @@ PostgreSQL service. VMM on the same NAS does not remove these shared failure poi
    On older Compose clients, `docker compose pull` may include the optional
    maintenance client. This is harmless. Allow a few minutes for the first
    database to initialize and for all health checks to become healthy.
-5. In **Control Panel → Login Portal → Advanced → Reverse Proxy**, create an
+5. For private access from your tailnet, follow the [shared Tailscale guide](TAILSCALE.md)
+   on the NAS. It uses the same loopback gateway and provides HTTPS for Eclipse
+   and the browser client.
+
+   Alternatively, in **Control Panel → Login Portal → Advanced → Reverse Proxy**, create an
    HTTPS entry for your chosen Timekeeper hostname, targeting
    `http://127.0.0.1:8080`. Assign the hostname's certificate. Set proxy timeouts
    above 30 seconds because the API supports 25-second change polls. Test

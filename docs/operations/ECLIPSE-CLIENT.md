@@ -23,8 +23,8 @@ for publication status and candidate installation.
    Timekeeper > Workweek**.
 
 Use `http://127.0.0.1:8080/api/v1` for a server on the same computer. Other hosts
-require HTTPS. The [local Docker guide](LOCAL-DOCKER.md#5-reach-the-test-server-through-tailscale)
-describes HTTPS access through Tailscale. The server remains the authority for
+require HTTPS. The [shared Tailscale guide](TAILSCALE.md)
+describes private HTTPS access for local Docker and Synology deployments. The server remains the authority for
 records; selecting a backend does not copy or merge databases. Mylyn activation
 uses the selected backend after restart.
 

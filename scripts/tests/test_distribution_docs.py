@@ -5,12 +5,15 @@ import sys
 import tarfile
 import tempfile
 import unittest
+import zipfile
+from unittest.mock import patch
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'server/scripts'))
 from documentation import render_document
 from package_deployment import package
+import package_server
 
 COMMIT = 'a' * 40
 
@@ -54,13 +57,40 @@ class DistributionDocumentationTest(unittest.TestCase):
                 self.assertIn('python3 setup.py --owner alice', local)
                 self.assertIn('http://127.0.0.1:8080/web/', local)
                 self.assertIn('[deployment guide](README.md)', local)
-                for name in ('README.md', 'LOCAL.md', 'SERVER.md', 'API-POLICY.md'):
+                self.assertIn('[shared Tailscale access guide](TAILSCALE.md)', local)
+                self.assertIn('[shared Tailscale guide](TAILSCALE.md)', archive.extractfile('README.md').read().decode())
+                for name in ('README.md', 'LOCAL.md', 'SERVER.md', 'API-POLICY.md', 'TAILSCALE.md'):
                     text = archive.extractfile(name).read().decode()
                     for url in re.findall(r'\]\(([^\s)]+)\)', text):
                         parts = urlsplit(url)
                         if parts.scheme or not parts.path:
                             continue
                         self.assertIn(parts.path, names, (name, url))
+
+    def test_server_zip_includes_shared_tailscale_guide_with_local_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            for name in ('server/app/target/quarkus-app/quarkus-run.jar',
+                         'server/app/target/quarkus-app/app/fixture.jar',
+                         'server/app/target/quarkus-app/lib/fixture.jar',
+                         'server/app/target/quarkus-app/quarkus/fixture.jar',
+                         'common/api/openapi.json','server/scripts/create_token.py','LICENSE'):
+                path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('Packaging fixture')
+            # Exercise ZIP assembly with synthetic JVM files and the real operational guides.
+            with patch.object(package_server,'ROOT',root),patch.object(package_server.subprocess,'check_output',side_effect=[COMMIT,'']), \
+                    patch.object(package_server,'render_document',side_effect=lambda _,source,destinations,commit:render_document(ROOT,source,destinations,commit)):
+                package_server.package(root/'output',None,COMMIT)
+            with zipfile.ZipFile(root/'output/timekeeper-server.zip') as archive:
+                names=set(archive.namelist())
+                guide=archive.read('timekeeper-server/TAILSCALE.md').decode()
+                self.assertIn('[Synology deployment guide](DEPLOYMENT.md)',guide)
+                self.assertIn('[local Docker guide](LOCAL-DOCKER.md)',guide)
+                for name in ('DEPLOYMENT.md','LOCAL-DOCKER.md','TAILSCALE.md'):
+                    text=archive.read('timekeeper-server/'+name).decode()
+                    for url in re.findall(r'\]\(([^\s)]+)\)',text):
+                        parts=urlsplit(url)
+                        if not parts.scheme and parts.path:
+                            self.assertIn('timekeeper-server/'+parts.path,names,(name,url))
 
 
 if __name__ == '__main__':

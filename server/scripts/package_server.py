@@ -38,6 +38,7 @@ def package(output, tag, commit):
               'docs/architecture/API-V1.md': 'API-POLICY.md',
               'docs/operations/DEPLOYMENT.md': 'DEPLOYMENT.md',
               'docs/operations/LOCAL-DOCKER.md': 'LOCAL-DOCKER.md',
+              'docs/operations/TAILSCALE.md': 'TAILSCALE.md',
               'docs/development/WEB-CLIENT.md': 'WEB-CLIENT.md'}
     destinations = {**guides, 'common/api/openapi.json': 'openapi.json'}
     files += [(ROOT / source, 'timekeeper-server/' + destination)
