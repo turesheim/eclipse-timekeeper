@@ -21,7 +21,10 @@ Daily and weekly summaries show whole seconds; stored times and calculations
 retain nanoseconds. Linked task titles include their external ID (the Jira browse
 key or GitHub issue number when available) and open the recorded HTTP/HTTPS issue
 URL in a separate tab. Native task UUIDs are not display IDs.
-UTC activity fields retain up to nine fractional digits. First click
+UTC activity fields retain up to nine fractional digits.
+Start cannot be in the future, for either an ongoing or completed interval.
+The server rejects invalid creates, edits and imports without changing records.
+First click
 selects an activity; another click or Enter while selected opens its editor.
 Long polling loads consistent owner-scoped snapshots without replacing drafts.
 Label choices in open activity and tracking dialogs receive additions and

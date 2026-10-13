@@ -36,7 +36,8 @@ connector.
 - **New activity** records an interval on a selected task, including tasks
   without a Mylyn projection. The dialog accepts explicit start/end dates,
   summary and labels in the Eclipse host time zone. An empty end records an
-  ongoing activity; its start cannot be in the future.
+  ongoing activity. The start cannot be in the future for ongoing or completed
+  intervals; invalid creates, edits and imports leave stored records unchanged.
 - **Edit activity...** changes dates, times, summary and labels. Inline summary
   and time editing also use the service. Invalid intervals and stale versions
   leave persisted values unchanged and explain how to continue.

@@ -154,7 +154,7 @@ public abstract class NativeProjectTaskScenario {
 		var unassigned = service.createTask(new CreateTask(Optional.empty(), "Unassigned without time", Optional.empty()));
 		LocalDate firstDay = LocalDate.now(TimekeeperUiPlugin.getCalendarZone())
 				.with(WeekFields.of(Locale.getDefault()).dayOfWeek(), 1);
-		var start = firstDay.atTime(9, 0).atZone(TimekeeperUiPlugin.getCalendarZone()).toInstant();
+		var start = firstDay.atStartOfDay(TimekeeperUiPlugin.getCalendarZone()).toInstant();
 		var current = service.createActivity(new CreateActivity(child.id(), net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL,
 				start, Optional.of(start.plusSeconds(3600)), "This week's time", java.util.Set.of()));
 		var oldStart = firstDay.minusWeeks(1).atTime(9, 0).atZone(TimekeeperUiPlugin.getCalendarZone()).toInstant();
@@ -254,8 +254,8 @@ public abstract class NativeProjectTaskScenario {
 		var task = service.createTask(new CreateTask(Optional.of(project.id()), "Label display task", Optional.empty()));
 		var red = service.createLabel(new CreateLabel("Acceptance red", Optional.of("210,55,55")));
 		var blue = service.createLabel(new CreateLabel("Acceptance blue", Optional.of("45,90,210")));
-		var start = LocalDate.now(TimekeeperUiPlugin.getCalendarZone()).atTime(9, 0)
-				.atZone(TimekeeperUiPlugin.getCalendarZone()).toInstant();
+		var start = LocalDate.now(TimekeeperUiPlugin.getCalendarZone())
+				.atStartOfDay(TimekeeperUiPlugin.getCalendarZone()).toInstant();
 		var activity = service.createActivity(new CreateActivity(task.id(), net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL,
 				start, Optional.of(start.plusSeconds(3600)), "Visible activity labels", java.util.Set.of(red.id(), blue.id())));
 		try {
@@ -441,6 +441,17 @@ public abstract class NativeProjectTaskScenario {
 			bot.button("Save").click();
 			assertTrue(edit.isOpen());assertEquals(activity,service.activity(activity.id()).orElseThrow());
 			bot.button("Cancel").click();
+			var folder = Files.createTempDirectory("timekeeper-future-import-");
+			TimekeeperPlugin.getDefault().exportTo(folder);
+			var csv = folder.resolve("activity.csv");var exported = Files.readString(csv);
+			assertTrue(exported.contains(activity.start().toString()));
+			Files.writeString(csv,exported.replace(activity.start().toString(),future.atTime(9,0)
+					.atZone(TimekeeperUiPlugin.getCalendarZone()).toInstant().toString()));
+			var projectsBefore = service.projects();var tasksBefore = service.tasks();
+			assertTrue(assertThrows(java.io.IOException.class,()->TimekeeperPlugin.getDefault().importFrom(folder))
+					.getMessage().contains("future"));
+			assertEquals(activity,service.activity(activity.id()).orElseThrow());
+			assertEquals(projectsBefore,service.projects());assertEquals(tasksBefore,service.tasks());
 		} finally {cleanup(service,project,java.util.List.of(task.id()));}
 	}
 
@@ -456,11 +467,12 @@ public abstract class NativeProjectTaskScenario {
 		showWorkweek();
 		bot.viewByTitle("Workweek").setFocus();
 		bot.viewByTitle("Workweek").toolbarButton("Show current week").click();
+		bot.viewByTitle("Workweek").toolbarButton("Show previous week").click();
 		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
 		var project = service.createProject(new CreateProject("Activity selection " + column));
 		var task = service.createTask(new CreateTask(Optional.of(project.id()), "Select before editing", Optional.empty()));
 		LocalDate firstDay = LocalDate.now(TimekeeperUiPlugin.getCalendarZone())
-				.with(WeekFields.of(Locale.getDefault()).dayOfWeek(), 1);
+				.with(WeekFields.of(Locale.getDefault()).dayOfWeek(), 1).minusWeeks(1);
 		var start = firstDay.atTime(9, 0).atZone(TimekeeperUiPlugin.getCalendarZone()).toInstant();
 		var activity = service.createActivity(new CreateActivity(task.id(), net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL,
 				start, Optional.of(start.plusSeconds(3600)), "First activity", java.util.Set.of()));
@@ -545,6 +557,7 @@ public abstract class NativeProjectTaskScenario {
 		} finally {
 			onUi(() -> { Text editor = cellEditor(tree); if (editor != null) key(editor, SWT.ESC); });
 			cleanup(service, project, java.util.List.of(task.id()));
+			bot.viewByTitle("Workweek").toolbarButton("Show current week").click();
 		}
 	}
 
@@ -684,8 +697,8 @@ public abstract class NativeProjectTaskScenario {
 			bot.textWithLabel("Summary").setText("Native UI recorded interval");
 			LocalDate monday = LocalDate.now(TimekeeperUiPlugin.getCalendarZone())
 					.with(WeekFields.of(Locale.getDefault()).dayOfWeek(), 1);
-			bot.textWithLabel("Start (yyyy-MM-dd HH:mm)").setText(monday + " 09:00");
-			bot.textWithLabel("End (yyyy-MM-dd HH:mm)").setText(monday + " 10:00");
+			bot.textWithLabel("Start (yyyy-MM-dd HH:mm)").setText(monday + " 00:00");
+			bot.textWithLabel("End (yyyy-MM-dd HH:mm)").setText(monday + " 01:00");
 			bot.button("Save").click();
 			assertEquals(3600, service.activities(query(parent)).total().getSeconds());
 			assertUnprojected(project, parent, child);
@@ -732,7 +745,7 @@ public abstract class NativeProjectTaskScenario {
 		task = service.linkExternalReference(new LinkExternalReference(task.id(), task.version(), reference));
 		LocalDate monday = LocalDate.now(TimekeeperUiPlugin.getCalendarZone())
 				.with(WeekFields.of(Locale.getDefault()).dayOfWeek(), 1);
-		var start = monday.atTime(9, 0).atZone(TimekeeperUiPlugin.getCalendarZone()).toInstant();
+		var start = monday.atStartOfDay(TimekeeperUiPlugin.getCalendarZone()).toInstant();
 		var activity = service.createActivity(
 				new CreateActivity(task.id(), net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL, start,
 						Optional.of(start.plusSeconds(3600)), "History with a missing provider", java.util.Set.of()));
