@@ -22,6 +22,7 @@ import net.resheim.eclipse.timekeeper.service.Queries.*;
 /** Synchronous HTTP port for worker threads. UI adapters must dispatch before calling. */
 public final class HttpTimekeeperService implements TimekeeperService,AutoCloseable {
     public record Profile(OwnerId owner,ZoneId zone,long version) { }
+    public record ChangeBatch(long nextSequence,boolean changed,boolean resynchronize) { }
     public record Metadata(Profile profile,List<Project> projects,List<Task> tasks,List<Label> labels,Optional<Activity> active,long revision) { }
     private record Result(int status,JsonElement body,String etag) { }
     private record VersionTag(long version,String tag) { }
@@ -179,5 +180,21 @@ public final class HttpTimekeeperService implements TimekeeperService,AutoClosea
         }
     }
     public JsonObject changes(long after,int waitSeconds) {return request("GET","/changes?after="+after+"&waitSeconds="+waitSeconds,null).body().getAsJsonObject();}
+    public ChangeBatch changeBatch(long after,int waitSeconds) {
+        try {
+            var page=changes(after,waitSeconds);var items=page.getAsJsonArray("items");
+            long next=page.get("nextSequence").getAsLong(),previous=after;
+            boolean more=page.get("hasMore").getAsBoolean();
+            for(var item:items) {
+                long sequence=item.getAsJsonObject().get("sequence").getAsLong();
+                if(sequence<=previous) throw new IllegalStateException("Invalid change order");previous=sequence;
+            }
+            if(next!=previous || next<after) throw new IllegalStateException("Invalid change cursor");
+            return new ChangeBatch(next,!items.isEmpty(),items.isEmpty() && more);
+        } catch(RemoteFailure failure) {throw failure;}
+        catch(RuntimeException invalid) {throw new RemoteFailure(RemoteFailure.Kind.UNAVAILABLE,"INVALID_CHANGE_PAGE");}
+    }
+    /** Used only inside serialized full resynchronization after a server cursor reset. */
+    public void invalidateVersions() {tags.clear();}
     @Override public void close() {http.shutdownNow();}
 }
