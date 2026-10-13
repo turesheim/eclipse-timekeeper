@@ -19,6 +19,7 @@ import java.util.function.Supplier;
 
 import net.resheim.eclipse.timekeeper.domain.Activity;
 import net.resheim.eclipse.timekeeper.domain.ActivityId;
+import net.resheim.eclipse.timekeeper.domain.ActivityDailySegments;
 import net.resheim.eclipse.timekeeper.domain.DomainValidationException;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
@@ -298,15 +299,30 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			required(command, "command");
 			Activity current = requiredActivity(command.id());
 			version(current.version(), command.expectedVersion(), "activity");
-			Activity updated = ports.activities().save(current.stop(ports.timeSource().now()));
-			publish(ACTIVITY, UPDATED, updated.id().value().toString());
-			return updated;
+			Instant now = ports.timeSource().now();
+			return saveDailyActivities(current.stop(now), true, now);
 		});
 	}
 
 	@Override
 	public Optional<Activity> activeActivity(OwnerId ownerId) {
 		return tx(() -> ports.activities().findOpenByOwner(required(ownerId, "ownerId")));
+	}
+
+	@Override
+	public void rolloverActivities(OwnerId ownerId) {
+		tx(() -> {
+			required(ownerId, "ownerId");
+			Instant now = ports.timeSource().now();
+			for (var current : ports.activities().findAllActivities()) {
+				if (!current.ownerId().equals(ownerId)) continue;
+				if (ActivityDailySegments.split(current, ports.timeSource().zone(ownerId), now).size() < 2) continue;
+				var changed = new Activity(current.id(), current.taskId(), current.ownerId(), current.start(), current.end(),
+						current.summary(), current.labelIds(), current.manual(), current.version() + 1);
+				saveDailyActivities(changed, true, now);
+			}
+			return null;
+		});
 	}
 
 	@Override
@@ -318,10 +334,9 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			OwnerId owner = required(command.ownerId(), "ownerId");
 			validateLabels(command.labelIds());
 			if (command.end().isEmpty()) ensureNoOpenActivity(owner, null);
-			Activity created = ports.activities().save(new Activity(ports.identifiers().newActivityId(), task.id(),
-					owner, command.start(), command.end(), command.summary(), command.labelIds(), true, 0));
-			publish(ACTIVITY, CREATED, created.id().value().toString());
-			return created;
+			return saveDailyActivities(new Activity(ports.identifiers().newActivityId(), task.id(),
+					owner, command.start(), command.end(), command.summary(), command.labelIds(), true, 0), false,
+					ports.timeSource().now());
 		});
 	}
 
@@ -334,11 +349,29 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			validateLabels(command.labelIds());
 			Activity.validateStart(command.start(), ports.timeSource().now());
 			if (command.end().isEmpty()) ensureNoOpenActivity(current.ownerId(), current.id());
-			Activity updated = ports.activities().save(current.edit(command.start(), command.end().orElse(null),
-					command.summary(), command.labelIds()));
-			publish(ACTIVITY, UPDATED, updated.id().value().toString());
-			return updated;
+			return saveDailyActivities(current.edit(command.start(), command.end().orElse(null),
+					command.summary(), command.labelIds()), true,
+					ports.timeSource().now());
 		});
+	}
+
+	private Activity saveDailyActivities(Activity requested, boolean existing, Instant now) {
+		var intervals = ActivityDailySegments.split(requested, ports.timeSource().zone(requested.ownerId()), now);
+		int retainedIndex = intervals.size() - 1;
+		Activity retained = null;
+		for (int index = 0; index < intervals.size(); index++) {
+			var interval = intervals.get(index);
+			boolean original = index == retainedIndex;
+			var part = new Activity(original ? requested.id() : ActivityDailySegments.identifier(requested.id(), interval.start()), requested.taskId(),
+					requested.ownerId(), interval.start(), interval.end(), requested.summary(), requested.labelIds(),
+					requested.manual(), original ? requested.version() : 0);
+			if (!original && ports.activities().find(part.id()).isPresent())
+				throw conflict("activity", "A daily activity already uses this interval. Edit that day's activity separately.");
+			part = ports.activities().save(part);
+			publish(ACTIVITY, original && existing ? UPDATED : CREATED, part.id().value().toString());
+			if (original) retained = part;
+		}
+		return retained;
 	}
 
 	@Override

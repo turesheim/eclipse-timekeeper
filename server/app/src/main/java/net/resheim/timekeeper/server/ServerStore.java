@@ -30,6 +30,9 @@ import net.resheim.eclipse.timekeeper.service.Ports.*;
 public class ServerStore {
     @Inject AgroalDataSource datasource;
     @Inject TokenRegistry tokens;
+    @Inject BackendClock clock;
+    private final java.util.concurrent.ConcurrentMap<String,String> partitionDates=new java.util.concurrent.ConcurrentHashMap<>();
+    private java.util.concurrent.ScheduledExecutorService maintenance;
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="quarkus.datasource.jdbc.url") String jdbcUrl;
     private final ThreadLocal<Context> context = new ThreadLocal<>();
     record Context(String owner, Connection connection, Instant now) { }
@@ -43,6 +46,28 @@ public class ServerStore {
             }
         }
         initializeConfiguredOwners();
+        maintenance=java.util.concurrent.Executors.newSingleThreadScheduledExecutor(work -> {
+            var thread=new Thread(work,"Timekeeper day boundaries");thread.setDaemon(true);return thread;
+        });
+        maintenance.scheduleWithFixedDelay(this::maintainDays,1,1,java.util.concurrent.TimeUnit.SECONDS);
+    }
+    @jakarta.annotation.PreDestroy void stopMaintenance() {if(maintenance!=null) maintenance.shutdownNow();}
+    private static String partitionDate(String zone,Instant now) {
+        return zone+":"+now.atZone(java.time.ZoneId.of(zone)).toLocalDate();
+    }
+    private void maintainDays() {
+        try {
+            var owners=new java.util.HashMap<String,String>();
+            try(var connection=datasource.getConnection();var statement=connection.createStatement();
+                var rows=statement.executeQuery("SELECT id,zone_id FROM tk_owner")) {
+                while(rows.next()) owners.put(rows.getString(1),rows.getString(2));
+            }
+            Instant now=clock.now();
+            for(var entry:owners.entrySet()) if(!partitionDate(entry.getValue(),now).equals(partitionDates.get(entry.getKey())))
+                transaction(entry.getKey(),()->null);
+        } catch(RuntimeException | SQLException failure) {
+            System.getLogger(ServerStore.class.getName()).log(System.Logger.Level.WARNING,"Could not maintain daily activity boundaries",failure);
+        }
     }
     void initializeConfiguredOwners() {
         for (String owner : tokens.load().stream().map(TokenRegistry.Token::owner).distinct().toList()) {
@@ -77,9 +102,11 @@ public class ServerStore {
                 try (var lock = connection.prepareStatement("SELECT revision FROM tk_owner WHERE id=? FOR UPDATE")) {
                     lock.setString(1,owner); try (var rows = lock.executeQuery()) { if (!rows.next()) throw new SQLException("Missing owner"); }
                 }
-                context.set(new Context(owner,connection,Instant.now()));
+                context.set(new Context(owner,connection,clock.now()));
                 if (created) initializeDefaultLabels();
-                T result = work.get(); connection.commit(); return result;
+                String date=partitionDate(profile().get("zoneId").asText(),now());
+                if(!date.equals(partitionDates.get(owner))) service().rolloverActivities(new OwnerId(owner));
+                T result = work.get(); connection.commit(); partitionDates.put(owner,date);return result;
             } catch (Throwable e) {
                 try { connection.rollback(); } catch (SQLException rollback) { e.addSuppressed(rollback); }
                 throw e;
@@ -225,7 +252,11 @@ public class ServerStore {
             public ActivityId newActivityId() { return new ActivityId(UUID.randomUUID()); }
             public LabelId newLabelId() { return new LabelId(UUID.randomUUID()); }
         };
-        return new DefaultTimekeeperService(new ServicePorts(ports.projects(),ports.tasks(),ports.activities(),ports.labels(),ids,ServerStore.this::now,
+        var time=new TimeSource() {
+            public Instant now() {return ServerStore.this.now();}
+            public java.time.ZoneId zone(OwnerId ignored) {return java.time.ZoneId.of(profile().get("zoneId").asText());}
+        };
+        return new DefaultTimekeeperService(new ServicePorts(ports.projects(),ports.tasks(),ports.activities(),ports.labels(),ids,time,
                 new TransactionRunner() { public <T> T required(Supplier<T> work) { return transaction(owner,work); } },
                 event -> change(event.entityType().name(),event.changeType().name(),event.entityId())));
     }
@@ -257,6 +288,7 @@ public class ServerStore {
             public void delete(LabelId id) { check(); ServerStore.this.delete("LABEL",id.value()); }
         }; }
         ActivityRepository activities() { return new ActivityRepository() {
+            public List<Activity> findAllActivities() {return all("ACTIVITY",Activity.class);}
             public Optional<Activity> find(ActivityId id) { return get("ACTIVITY",id.value(),Activity.class); }
             public Optional<Activity> findOpenByOwner(OwnerId id) { check(); if (!owner().equals(id.value())) throw ApiFailure.notFound(); return active().map(node -> (Activity)decode("ACTIVITY",node)); }
             public List<Activity> findOverlapping(Instant from,Instant to,Optional<OwnerId> owner,Optional<TaskId> task) {

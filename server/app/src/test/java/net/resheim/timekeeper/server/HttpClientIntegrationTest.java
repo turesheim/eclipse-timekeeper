@@ -165,14 +165,15 @@ class HttpClientIntegrationTest {
             var stopped=client.stopActivity(new StopActivity(second.id(),second.version()));
             assertTrue(stopped.end().isPresent());
             var manual=client.createActivity(new CreateActivity(child.id(),OwnerId.LOCAL,Instant.parse("2026-03-28T23:00:00Z"),Optional.of(Instant.parse("2026-03-29T22:00:00Z")),"DST",Set.of(label.id())));
-            var report=client.activities(new ActivityQuery(manual.start(),manual.end().orElseThrow(),Optional.of(OwnerId.LOCAL),Optional.of(child.id()),Optional.empty(),ZoneId.of("Europe/Oslo")));
+            var report=client.activities(new ActivityQuery(Instant.parse("2026-03-28T23:00:00Z"),Instant.parse("2026-03-29T22:00:00Z"),Optional.of(OwnerId.LOCAL),Optional.of(child.id()),Optional.empty(),ZoneId.of("Europe/Oslo")));
             assertEquals(Duration.ofHours(23),report.total());
+            assertEquals(2,report.activities().size());
             assertTrue(client.metadata().tasks().stream().anyMatch(task -> task.id().equals(parent.id())));
             var renamed=client.updateProject(new UpdateProject(project.id(),project.version(),"Renamed"));
             var failure=assertThrows(RemoteFailure.class,()->client.updateProject(new UpdateProject(project.id(),project.version(),"Stale")));
             assertEquals(RemoteFailure.Kind.CONFLICT,failure.kind());
             assertEquals("Renamed",client.project(project.id()).orElseThrow().name());
-            client.deleteActivity(new DeleteActivity(manual.id(),manual.version()));
+            for(var part:report.activities()) client.deleteActivity(new DeleteActivity(part.id(),part.version()));
             var closedFirst=client.activity(first.id()).orElseThrow();client.deleteActivity(new DeleteActivity(closedFirst.id(),closedFirst.version()));
             client.deleteActivity(new DeleteActivity(stopped.id(),stopped.version()));
             client.deleteTask(new DeleteTask(child.id(),child.version()));client.deleteTask(new DeleteTask(parent.id(),parent.version()));

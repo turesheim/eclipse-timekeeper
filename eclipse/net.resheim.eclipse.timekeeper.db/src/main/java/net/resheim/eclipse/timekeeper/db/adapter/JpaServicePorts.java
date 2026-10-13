@@ -51,7 +51,11 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 	}
 
 	public ServicePorts ports(EventSink events) {
-		return new ServicePorts(this, this, this, this, this, Clock.systemUTC()::instant, this, events);
+		var time = new net.resheim.eclipse.timekeeper.service.Ports.TimeSource() {
+			public Instant now() {return Clock.systemUTC().instant();}
+			public java.time.ZoneId zone(OwnerId owner) {return java.time.ZoneId.systemDefault();}
+		};
+		return new ServicePorts(this, this, this, this, this, time, this, events);
 	}
 
 	@Override
@@ -209,6 +213,12 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 	public Optional<Activity> find(ActivityId id) {
 		return Optional.ofNullable(manager().find(net.resheim.eclipse.timekeeper.db.model.Activity.class,
 				id.value().toString())).map(this::activity);
+	}
+
+	@Override
+	public List<Activity> findAllActivities() {
+		return manager().createQuery("SELECT a FROM Activity a", net.resheim.eclipse.timekeeper.db.model.Activity.class)
+				.getResultStream().map(this::activity).toList();
 	}
 
 	@Override

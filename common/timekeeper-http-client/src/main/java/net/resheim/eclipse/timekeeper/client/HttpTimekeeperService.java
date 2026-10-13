@@ -21,6 +21,7 @@ import net.resheim.eclipse.timekeeper.service.Queries.*;
 
 /** Synchronous HTTP port for worker threads. UI adapters must dispatch before calling. */
 public final class HttpTimekeeperService implements TimekeeperService,AutoCloseable {
+    @Override public void rolloverActivities(OwnerId owner) {activeActivity(owner);}
     public record Profile(OwnerId owner,ZoneId zone,long version) { }
     public record ChangeBatch(long nextSequence,boolean changed,boolean resynchronize) { }
     public record Metadata(Profile profile,List<Project> projects,List<Task> tasks,List<Label> labels,Optional<Activity> active,long revision) { }
