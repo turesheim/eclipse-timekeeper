@@ -116,6 +116,25 @@ current instant is allowed. Invalid writes leave records and revisions unchanged
 start/stop always uses the server clock. Clients do not submit their clocks for
 live tracking.
 
+Activities are stored as separate records for each local calendar day in the
+owner's configured time zone (the machine's calendar zone for local Eclipse
+storage). Ongoing tracking closes the previous day's record and continues at
+midnight, retaining the active UUID on the newest record. Startup catches up
+missed days. Both manual writes and imports use the same day boundaries.
+Each part retains task, owner, summary, labels and the original manual flag;
+manual edits still mark their resulting parts as manual. Exact instants and
+nanoseconds are preserved, including 23/25-hour DST days. Splits occur only at
+boundaries that have elapsed; a permitted future end is split further as those
+days arrive. An end exactly at midnight creates no empty completed record.
+
+Create/update responses and Location/ETag identify the last resulting day;
+earlier parts appear as additional activities and change events. Each daily
+record can be edited or deleted independently. A pre-midnight editor has a stale
+version after rollover and must reload. Changing the reporting zone can split
+existing records at additional boundaries; it never joins independently edited
+records. Day maintenance and all parts of a write commit atomically under the
+same per-owner lock, including across server replicas.
+
 Portable interchange uses `timekeeper-domain-v1` JSON, not SQL/JPA table names.
 Export reads a consistent owned snapshot. Import validates the entire graph,
 then generates fresh UUIDs and rewrites references in one transaction; it never

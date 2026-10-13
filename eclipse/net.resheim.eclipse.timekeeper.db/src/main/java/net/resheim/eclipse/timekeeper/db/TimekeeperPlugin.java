@@ -383,7 +383,7 @@ public class TimekeeperPlugin extends Plugin {
 		EntityTransaction transaction = entityManager.getTransaction();
 		try {
 			transaction.begin();
-			entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE;").executeUpdate();
+
 			int projectTypesImported = entityManager
 					.createNativeQuery("MERGE INTO PROJECT_TYPE (SELECT * FROM CSVREAD('" + projectTypes + "'));")
 					.executeUpdate();
@@ -412,7 +412,7 @@ public class TimekeeperPlugin extends Plugin {
 			else for (var archive : prepared.originals.entrySet()) entityManager.createNativeQuery(
 					"MERGE INTO ACTIVITY_ACTIVITYLABEL SELECT ?1, LABELS_ID FROM ACTIVITY_ACTIVITYLABEL WHERE ACTIVITY_ID=?2")
 					.setParameter(1,archive.getKey()).setParameter(2,archive.getValue()).executeUpdate();
-			entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE;").executeUpdate();
+
 			transaction.commit();
 			// Refresh cached task state after importing persisted records.
 			importGeneration++;

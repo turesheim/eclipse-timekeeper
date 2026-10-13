@@ -42,7 +42,12 @@ Daily and weekly summaries show whole seconds; stored times and calculations
 retain nanoseconds. Linked task titles include their external ID (the Jira browse
 key or GitHub issue number when available) and open the recorded HTTP/HTTPS issue
 URL in a separate tab. Native task UUIDs are not display IDs.
-UTC activity fields retain up to nine fractional digits.
+UTC activity fields retain up to nine fractional digits. Intervals across
+midnight are stored as separate activities in the account's time zone, including
+manual entries. Live tracking continues into the next day with the same active
+identity and labels. Each day's activity is edited or deleted separately; a
+rollover invalidates the earlier editor version. Day boundaries preserve exact
+time through daylight-saving changes.
 Start cannot be in the future, for either an ongoing or completed interval.
 The server rejects invalid creates, edits and imports without changing records.
 First click

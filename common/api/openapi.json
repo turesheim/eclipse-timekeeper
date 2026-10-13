@@ -1536,7 +1536,8 @@
           {
             "$ref": "#/components/parameters/OwnerBinding"
           }
-        ]
+        ],
+        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
       }
     },
     "/activities/{id}": {
@@ -1680,7 +1681,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
       },
       "delete": {
         "operationId": "deleteActivity",
@@ -1986,7 +1988,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Stop an open interval. A newly keyed command for an already stopped interval with its current ETag returns it unchanged. A successful same-key replay returns its original response, even with its original stale ETag.",
+        "description": "Stop an open interval. A newly keyed command for an already stopped interval with its current ETag returns it unchanged. A successful same-key replay returns its original response, even with its original stale ETag. Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
@@ -2412,7 +2414,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Validate the complete graph, unique source IDs, parent cycles, reference uniqueness, temporal rules and open-activity limit before commit. Allocate fresh Timekeeper UUIDs for every record and rewrite internal relations; return source-to-new ID mappings. Never overwrite existing data or accept owner identities. Existing external identities conflict with 409; invalid graph returns 422. No record survives a failed import. Maximum 10,000 per type and 20 MiB. Do not change the owner’s configured zone implicitly.",
+        "description": "Validate the complete graph, unique source IDs, parent cycles, reference uniqueness, temporal rules and open-activity limit before commit. Allocate fresh Timekeeper UUIDs for every record and rewrite internal relations; return source-to-new ID mappings. Never overwrite existing data or accept owner identities. Existing external identities conflict with 409; invalid graph returns 422. No record survives a failed import. Maximum 10,000 per type and 20 MiB. Do not change the owner’s configured zone implicitly. Imported multi-day activities are split at elapsed local day boundaries, with source activity IDs mapped to the last part.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"

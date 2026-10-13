@@ -81,6 +81,48 @@ test('core browser workflow manages records, tracks time, and preserves exact re
   await page.getByRole('button', {name:'Tasks', exact:true}).click(); await taskRow.getByRole('button', {name:'Delete', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Delete', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible();
   for (const [tabName, container, value] of [['Projects','projects',project], ['Labels','labels',label]]) { await page.getByRole('button', {name:tabName, exact:true}).click(); await page.locator(`#${container} tr`).filter({hasText:value}).getByRole('button', {name:'Delete', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Delete', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible(); }
 });
+test('manual intervals spanning midnight create editable daily records with exact DST time and labels', async ({page, request}) => {
+  const task = await createTask(request, 'Daily browser task ' + randomUUID());
+  const label = (await (await api(request, 'GET', '/labels')).json()).items[0];
+  const summary = 'Daily interval ' + randomUUID();
+  await signIn(page);
+  await page.getByRole('button', {name:'Time zone', exact:true}).click();
+  await page.getByRole('textbox', {name:'Time zone', exact:true}).fill('Europe/Oslo'); await save(page);
+  await page.getByLabel('Week containing').fill('2025-10-26');
+  await page.getByRole('button', {name:'Add time', exact:true}).click();
+  await page.getByLabel('Task', {exact:true}).selectOption({label:task.summary});
+  await page.getByLabel('Summary', {exact:true}).fill(summary);
+  await page.getByLabel('Start (UTC)', {exact:true}).fill('2025-10-25T21:59:59.123456789Z');
+  await page.getByLabel('End (UTC, blank while tracking)', {exact:true}).fill('2025-10-27T22:00:00.987654321Z');
+  await page.locator('#editor').getByLabel(label.name, {exact:true}).check(); await save(page);
+  const range = `/activities?from=2025-10-25T00:00:00Z&to=2025-10-28T00:00:00Z&taskId=${task.id}`;
+  const before = (await (await api(request, 'GET', range)).json()).items.sort((a,b) => a.start.localeCompare(b.start));
+  expect(before).toHaveLength(3);
+  expect(before.map(v => [v.start,v.end])).toEqual([
+    ['2025-10-25T21:59:59.123456789Z','2025-10-25T22:00:00Z'],
+    ['2025-10-25T22:00:00Z','2025-10-26T23:00:00Z'],
+    ['2025-10-26T23:00:00Z','2025-10-27T22:00:00.987654321Z'],
+  ]);
+  for (const value of before) { expect(value.summary).toBe(summary); expect(value.manual).toBe(true); expect(value.labelIds).toEqual([label.id]); }
+  await expect(page.locator('#activities tr').filter({hasText:summary})).toHaveCount(2);
+  await expect(page.locator('#days .day').filter({hasText:'2025-10-26'})).toContainText('25h 0m');
+  await page.getByLabel('Week containing').fill('2025-10-27');
+  const row = page.locator('#activities tr').filter({hasText:summary}); await expect(row).toHaveCount(1);
+  await row.getByRole('button', {name:'Edit', exact:true}).click();
+  await expect(page.getByLabel('Start (UTC)', {exact:true})).toHaveValue(before[2].start);
+  await page.getByLabel('End (UTC, blank while tracking)', {exact:true}).fill('2025-10-27T22:00:00.987654322Z'); await save(page);
+  const after = (await (await api(request, 'GET', range)).json()).items.sort((a,b) => a.start.localeCompare(b.start));
+  expect(after.slice(0,2)).toEqual(before.slice(0,2)); expect(after[2].id).toBe(before[2].id);
+  expect(after[2].end).toBe('2025-10-27T22:00:00.987654322Z');
+  const report = (await (await api(request, 'GET', `/reports/activities?from=2025-10-25T00:00:00Z&to=2025-10-28T00:00:00Z&taskId=${task.id}&zoneId=Europe%2FOslo`)).json());
+  expect(report.total).toBe('PT48H1.864197533S');
+  for (const value of after) {
+    const response = await api(request, 'GET', `/activities/${value.id}`);
+    await api(request, 'DELETE', `/activities/${value.id}`, undefined, {'If-Match':response.headers().etag});
+  }
+  const response = await api(request, 'GET', `/tasks/${task.id}`);
+  await api(request, 'DELETE', `/tasks/${task.id}`, undefined, {'If-Match':response.headers().etag});
+});
 test('live peer changes preserve a draft and a stale save cannot overwrite them', async ({page, request, browser}) => {
   const task = await createTask(request); await signIn(page); await page.getByRole('button', {name:'Tasks', exact:true}).click();
   await page.locator('#tasks tr').filter({hasText:task.summary}).getByRole('button', {name:'Edit', exact:true}).click(); await page.getByLabel('Summary', {exact:true}).fill('My unsaved draft');
