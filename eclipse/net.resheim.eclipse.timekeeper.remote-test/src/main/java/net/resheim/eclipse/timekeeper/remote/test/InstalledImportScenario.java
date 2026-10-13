@@ -67,7 +67,7 @@ final class InstalledImportScenario {
         assertEquals(get("import.committed.csv.sha256"),csvHash(before));
         mark("phase.import.retained-key","passed");
         var prefs=open();selectImport(prefs,exported);
-        shell("Data imported").bot().button("OK").click();
+        RemoteTestSupport.confirmTransferResult("Data imported","Could not import data");
         assertTrue("Acknowledged retry did not clear the pending receipt key",keys().isEmpty());
         assertEquals("Retry created another import or changed record versions",get("import.committed.state.sha256"),stateHash(api));
         Path after=RemoteBootstrap.fixtureFolder().resolve("lost-import-after-replay");api.exportCsv(after);

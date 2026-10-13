@@ -54,6 +54,26 @@ public final class RemoteTestSupport {
             window.getActivePage().showView(WorkWeekView.VIEW_ID);return null;
         });
     }
+    public static void confirmTransferResult(String success,String failure) throws Exception {
+        waitFor(()->{
+            try {return onUi(()->java.util.Arrays.stream(PlatformUI.getWorkbench().getDisplay().getShells())
+                .anyMatch(shell->shell.isVisible() && (shell.getText().equals(success) || shell.getText().equals(failure))));}
+            catch(Exception pending) {return false;}
+        },"Native transfer did not report its result");
+        var error=onUi(()->java.util.Arrays.stream(PlatformUI.getWorkbench().getDisplay().getShells())
+            .filter(shell->shell.isVisible() && shell.getText().equals(failure)).map(RemoteTestSupport::dialogText).findFirst());
+        assertFalse("Native transfer failed: "+error.orElse(""),error.isPresent());
+        new SWTWorkbenchBot().shell(success).bot().button("OK").click();
+    }
+    private static String dialogText(org.eclipse.swt.widgets.Composite parent) {
+        var text=new StringBuilder();
+        for(var child:parent.getChildren()) {
+            if(child instanceof org.eclipse.swt.widgets.Label label) text.append(label.getText()).append(' ');
+            else if(child instanceof org.eclipse.swt.widgets.Text field && (field.getStyle() & org.eclipse.swt.SWT.PASSWORD)==0) text.append(field.getText()).append(' ');
+            else if(child instanceof org.eclipse.swt.widgets.Composite nested) text.append(dialogText(nested));
+        }
+        return text.toString();
+    }
     public static void waitFor(BooleanSupplier condition,String message) {
         new SWTWorkbenchBot().waitUntil(new DefaultCondition() {
             public boolean test() {try {return condition.getAsBoolean();}catch(RuntimeException transientState) {return false;}}

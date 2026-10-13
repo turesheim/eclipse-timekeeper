@@ -147,7 +147,7 @@ final class RemotePreferenceScenario {
         NativeGtkDialog.choose("Please choose a folder to store the exported files",parent,()->prefs.bot().button("Export...").click());bot.shell("Data exported").bot().button("OK").click();
         Path export;try(var children=Files.list(parent)) {export=children.filter(Files::isDirectory).findFirst().orElseThrow();}assertTrue(Files.isRegularFile(export.resolve("timekeeper.csv.json")));assertEquals(before,api.metadata());
         NativeGtkDialog.choose("Please choose a folder to import from",export,()->prefs.bot().button("Import...").click());bot.shell("Import server data").bot().button("Cancel").click();assertEquals(before,api.metadata());
-        NativeGtkDialog.choose("Please choose a folder to import from",export,()->prefs.bot().button("Import...").click());bot.shell("Import server data").bot().button("OK").click();bot.shell("Data imported").bot().button("OK").click();
+        NativeGtkDialog.choose("Please choose a folder to import from",export,()->prefs.bot().button("Import...").click());bot.shell("Import server data").bot().button("OK").click();RemoteTestSupport.confirmTransferResult("Data imported","Could not import data");
         var after=api.metadata();assertEquals(before.projects().size()*2,after.projects().size());assertEquals(before.tasks().size()*2,after.tasks().size());assertEquals(before.labels().size()*2,after.labels().size());
         var imported=api.activities(query).activities().stream().filter(a->activities.stream().noneMatch(old->old.id().equals(a.id()))).toList();assertEquals(activities.size(),imported.size());
         for(var old:activities) {
