@@ -20,7 +20,7 @@ import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 /** Always visible above Workweek; every database/network read runs in a Job. */
 final class WorkSessionPanel {
     private record Snapshot(List<WorkSession> sessions,Optional<WorkSession> active,WorkSessionService.Report report) { }
-    private final Group group;
+    private final Composite group;
     private final Label status,totals,details,warning;
     private final Combo history;
     private final Table activities;
@@ -31,8 +31,8 @@ final class WorkSessionPanel {
     private Supplier<?> pending;
     private final DateTimeFormatter date=DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     WorkSessionPanel(Composite parent) {
-        group=new Group(parent,SWT.NONE);
-        group.setText("Work Session");
+        group=new Composite(parent,SWT.BORDER);
+        group.setData("org.eclipse.swtbot.widget.key","work-session-panel");
         var compactLayout=new GridLayout(4,false);
         compactLayout.marginHeight=0;compactLayout.verticalSpacing=0;
         group.setLayout(compactLayout);
@@ -41,6 +41,7 @@ final class WorkSessionPanel {
         status.setData("org.eclipse.swtbot.widget.key","work-session-status");
         var statusData=new GridData(SWT.FILL,SWT.CENTER,true,false);statusData.widthHint=180;status.setLayoutData(statusData);
         start=button(group,"Start work session",this::start);
+        start.setData("org.eclipse.swtbot.widget.key","work-session-start");
         stop=button(group,"Stop work session",this::stop);
         var toggle=new Button(group,SWT.TOGGLE);
         toggle.setText("Session details");
@@ -119,7 +120,7 @@ final class WorkSessionPanel {
     }
     private void render() {
         var current=snapshot.active().or(()->Optional.ofNullable(snapshot.report()).map(WorkSessionService.Report::session));
-        status.setText((snapshot.active().isPresent() ? "Running" : "Stopped")+current.map(value->" · Started "+time(value.start())).orElse(""));
+        status.setText("Work session: "+(snapshot.active().isPresent() ? "Running" : "Stopped")+current.map(value->" · Started "+time(value.start())).orElse(""));
         status.setToolTipText(current.map(value->"Started "+value.start()+value.end().map(end->" · Ended "+end).orElse(" · Running")).orElse("No work session recorded"));
         history.removeAll();
         for(var value:snapshot.sessions()) history.add(time(value.start())+" · "+(value.end().isEmpty() ? "Running" : "Completed")+" · "+value.summary());
@@ -137,6 +138,7 @@ final class WorkSessionPanel {
             for(var activity:report.activities()) {var row=new TableItem(activities,SWT.NONE);row.setText(new String[]{activityTitle(activity,titles),time(activity.start()),activity.end().map(this::time).orElse("Running")});row.setData(activity);if(previouslySelected!=null && previouslySelected.id().equals(activity.id())) activities.setSelection(row);}
             warning.setText(metric.outsideSession().isEmpty() ? "" : "Some activities extend outside this session; only their overlap counts toward covered time.");
         }
+        var totalData=(GridData)totals.getLayoutData();totalData.exclude=report==null;totals.setVisible(report!=null);
         if(pending!=null) warning.setText("The outcome is unknown. Retry reuses the same session command.");
         var warningData=(GridData)warning.getLayoutData();warningData.exclude=warning.getText().isEmpty();warning.setVisible(!warningData.exclude);
         enabled();group.getParent().layout(true,true);
@@ -176,6 +178,9 @@ final class WorkSessionPanel {
         command("Stop work session",()->{
             var operation=prepared.get();
             if(operation==null) {
+                // Validate restored histories before the first write. A retry retains
+                // the original prepared operation after a potentially committed stop.
+                RemoteRecordSnapshots.verify(ui().getTimekeeperService(),value);
                 var service=ui().getWorkSessionService();
                 operation=service instanceof HttpTimekeeperService remote ? remote.prepareWorkSessionStop(input,key) : ()->service.stopWorkSession(input);
                 prepared.set(operation);

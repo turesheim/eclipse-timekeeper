@@ -324,7 +324,7 @@ public abstract class NativeProjectTaskScenario {
 			tree.deselectAll();
 			// The session header reduces the initial docked view height. Scroll the
 			// inspected row into view before checking pixels, as a user would.
-			assertTrue("Workweek must retain a visible activity row", tree.getSize().y > tree.getHeaderHeight() + tree.getItemHeight());
+			assertTrue("Workweek must retain a visible activity row: tree="+tree.getSize()+", client="+tree.getClientArea()+", header="+tree.getHeaderHeight()+", item="+tree.getItemHeight()+", parent="+tree.getParent().getSize(), tree.getSize().y > tree.getHeaderHeight() + tree.getItemHeight());
 			tree.setTopItem(row.widget);
 			tree.showItem(row.widget);
 			tree.redraw();

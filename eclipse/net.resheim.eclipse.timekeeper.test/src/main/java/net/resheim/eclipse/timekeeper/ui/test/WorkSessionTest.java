@@ -33,7 +33,7 @@ public class WorkSessionTest {
         var first=sessions.activeWorkSession(OwnerId.LOCAL).orElseThrow();
         var activity=activities.startActivity(new StartActivity(null,OwnerId.LOCAL,"Independent timer",Set.of(),Optional.of(first.id()),Optional.empty()));
         try {
-            waitFor(()->bot.labelWithId("work-session-status").getText().startsWith("Running") && bot.button("Stop work session").isEnabled(),"Running status missing");
+            waitFor(()->bot.labelWithId("work-session-status").getText().contains("Running") && bot.button("Stop work session").isEnabled(),"Running status missing");
             bot.button("Stop work session").click();
             waitFor(()->sessions.workSession(first.id()).orElseThrow().end().isPresent(),"Session did not stop");
             assertEquals(activity.id(),activities.activeActivity(OwnerId.LOCAL).orElseThrow().id());

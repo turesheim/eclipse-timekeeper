@@ -78,7 +78,7 @@ final class WorkSessionScenario {
         RemoteBootstrap.holdNextSessionReply(null);
         WorkSession started;
         try {
-            RemoteTestSupport.waitFor(()->bot.button("Start work session").isEnabled(),"Unknown start unavailable");
+            awaitStart(bot);
             bot.button("Start work session").click();RemoteBootstrap.awaitTrackingReplyCommitted(true);
             started=api.activeWorkSession(OwnerId.LOCAL).orElseThrow();
             RemoteTestSupport.waitFor(()->bot.button("Retry session command").isEnabled(),"Lost start did not retain its retry command");
@@ -100,6 +100,20 @@ final class WorkSessionScenario {
         RemoteBootstrap.proof.setProperty("phase.work-session.uncertain-start","passed");
         RemoteBootstrap.proof.setProperty("phase.work-session.uncertain-stop","passed");RemoteBootstrap.writeProof();
         RemoteTestSupport.closedLocalStorage();
+    }
+
+    private static void awaitStart(SWTWorkbenchBot bot) throws Exception {
+        try {RemoteTestSupport.waitFor(()->bot.buttonWithId("work-session-start").isEnabled(),"Unknown start unavailable");}
+        catch(RuntimeException failure) {
+            String state=RemoteTestSupport.onUi(()->{
+                var ui=net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin.getDefault();
+                var button=bot.buttonWithId("work-session-start").widget;
+                return "ready="+ui.isBackendReady()+", backend="+ui.backendStatus()+", enabled="+button.getEnabled()
+                        +", inherited="+button.isEnabled()+", visible="+button.isVisible()+", caption="+button.getText()
+                        +", status="+bot.labelWithId("work-session-status").getText()+", history="+bot.comboBoxWithId("work-session-history").selection();
+            });
+            throw new AssertionError("Unknown start unavailable: "+state,failure);
+        }
     }
 
     static void restart(HttpTimekeeperService api) throws Exception {
