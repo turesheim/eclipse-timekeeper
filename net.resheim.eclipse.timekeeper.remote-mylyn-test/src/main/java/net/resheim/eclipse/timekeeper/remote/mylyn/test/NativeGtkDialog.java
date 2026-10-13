@@ -27,7 +27,10 @@ final class NativeGtkDialog {
                 assertNotNull("Actual native chooser did not appear: "+title,id);
                 try {
                 run(true,"xdotool","windowfocus","--sync",id);
-                if(path==null) run(true,"xdotool","key","--window",id,"Escape");
+                // The matched chooser is focused above. Send Escape through the
+                // keyboard so its release does not address a window already
+                // destroyed by the press (X_SendEvent BadWindow in CI).
+                if(path==null) run(true,"xdotool","key","Escape");
                 else {
                     // GTK's Recent view does not accept a directory location.
                     // Home switches to normal browsing before entering the path.
