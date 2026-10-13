@@ -376,6 +376,13 @@ public abstract class NativeProjectTaskScenario {
 		var service = TimekeeperUiPlugin.getDefault().getTimekeeperService();
 		var project = service.createProject(new CreateProject("Tree toolbar project"));
 		var task = service.createTask(new CreateTask(Optional.of(project.id()), "Tree toolbar task", Optional.empty()));
+		view.toolbarButton("Show current week").click();
+		view.toolbarButton("Show previous week").click();
+		var start = LocalDate.now(TimekeeperUiPlugin.getCalendarZone()).minusWeeks(1)
+				.with(WeekFields.of(Locale.getDefault()).dayOfWeek(), 1)
+				.atTime(9, 0).atZone(TimekeeperUiPlugin.getCalendarZone()).toInstant();
+		var activity = service.createActivity(new CreateActivity(task.id(), net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL,
+				start, Optional.of(start.plusSeconds(1800)), "Tree toolbar activity", java.util.Set.of()));
 		Project[] refreshProof = new Project[1];
 		try {
 			// JFace may reuse TreeItems for other roots when refresh changes sorting.
@@ -385,24 +392,33 @@ public abstract class NativeProjectTaskScenario {
 			view.toolbarButton("Expand all projects and tasks").click();
 			await(bot, () -> row.get().isExpanded(), "Expand all did not open the project");
 			assertEquals(task.summary(), row.get().getNode(task.summary()).getText());
-			view.toolbarButton("Collapse all projects and tasks").click();
-			await(bot, () -> !row.get().isExpanded(), "Collapse all did not close the project");
+			assertEquals(activity.summary(), row.get().getNode(task.summary()).getNode(activity.summary()).getText());
+			view.toolbarButton("Hide activities and keep projects and tasks visible").click();
+			assertTrue("Hiding activities must keep tasks visible", row.get().isExpanded());
+			var hiddenTask = row.get().getNode(task.summary());
+			onUi(() -> assertEquals("Activities must be hidden", 0, hiddenTask.widget.getItemCount()));
 			// A new root makes the asynchronous database refresh observable.
 			refreshProof[0] = service.createProject(new CreateProject("Tree refresh proof"));
 			view.bot().treeWithId("workweek-editor-tree").getTreeItem(refreshProof[0].name());
-			assertFalse("Database updates must retain collapsed rows", row.get().isExpanded());
+			assertTrue("Database updates must keep tasks visible", row.get().isExpanded());
+			var refreshedTask = row.get().getNode(task.summary());
+			onUi(() -> assertEquals("Database updates must keep activities hidden", 0, refreshedTask.widget.getItemCount()));
 			onUi(() -> {
 				var workweek = (WorkWeekView) PlatformUI.getWorkbench().getActiveWorkbenchWindow()
 						.getActivePage().findView(WorkWeekView.VIEW_ID);
 				workweek.refreshAll();
 			});
-			assertFalse("Explicit refresh must retain collapsed rows", row.get().isExpanded());
+			assertTrue("Explicit refresh must keep tasks visible", row.get().isExpanded());
+			var explicitTask = row.get().getNode(task.summary());
+			onUi(() -> assertEquals("Explicit refresh must keep activities hidden", 0, explicitTask.widget.getItemCount()));
 			view.toolbarButton("Expand all projects and tasks").click();
 			await(bot, () -> row.get().isExpanded(), "Expand all did not reopen the refreshed project");
 			assertEquals(task.summary(), row.get().getNode(task.summary()).getText());
+			assertEquals(activity.summary(), row.get().getNode(task.summary()).getNode(activity.summary()).getText());
 		} finally {
 			cleanup(service, project, java.util.List.of(task.id()));
 			if (refreshProof[0] != null) service.deleteProject(new DeleteProject(refreshProof[0].id(), refreshProof[0].version()));
+			view.toolbarButton("Show current week").click();
 		}
 	}
 
