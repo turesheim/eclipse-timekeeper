@@ -2,8 +2,8 @@
 
 [![Build](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml/badge.svg)](https://github.com/turesheim/eclipse-timekeeper/actions/workflows/build.yml)
 
-Timekeeper tracks projects, tasks and activities in Eclipse or through a
-standalone server with a bundled browser interface at `/web/`. Optional Mylyn
+Timekeeper tracks work sessions projects, tasks and activities in Eclipse or through a
+standalone server with a bundled browser interface. Optional Mylyn
 integration connects Eclipse task activation and repository-backed tasks.
 
 Timekeeper 2.0 is under development. See the [project documentation](docs/README.md)
@@ -12,9 +12,8 @@ for capabilities and release status.
 
 ## Choose how to use Timekeeper
 
-The Eclipse plugin works on its own, with optional Mylyn integration for task
-repositories such as Jira. Choose the backend under **Preferences > Timekeeper >
-Backend**; backend changes take effect after restarting Eclipse.
+The Eclipse plugin works on its own, or with optional Mylyn integration for task
+repositories such as Jira.
 
 | Mode | Where records are stored | When to use it |
 | --- | --- | --- |
