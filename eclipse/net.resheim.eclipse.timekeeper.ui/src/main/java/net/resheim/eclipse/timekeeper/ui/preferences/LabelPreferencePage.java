@@ -69,6 +69,8 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
     private boolean uncertainCreate;
 	private Button addButton;
 	private Button removeButton;
+    private final net.resheim.eclipse.timekeeper.db.DatabaseChangeListener backendListener=this::backendChanged;
+    private boolean listening;
 
 	public LabelPreferencePage() {
 	}
@@ -177,6 +179,7 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 	protected Control createContents(Composite parent) {
 		Control control = createAppearancePage(parent);
 		initialize();
+		net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin.getDefault().addBackendListener(backendListener);listening=true;
 		Dialog.applyDialogFont(control);
 		return control;
 	}
@@ -195,7 +198,7 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 			RGB rgb = StringConverter.asRGB(selectedLabel.getColor() == null ? "0,0,0" : selectedLabel.getColor());
 			fAppearanceColorEditor.setColorValue(rgb);
 			fAppearanceColorTableViewer.update(selectedLabel, null);
-			labelText.setText(selectedLabel.getName());
+			if(!labelText.getText().equals(selectedLabel.getName())) labelText.setText(selectedLabel.getName());
 		} else labelText.setText("");
 	}
 
@@ -203,6 +206,50 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 	public void init(IWorkbench workbench) {
 		// ignore
 	}
+
+    private void backendChanged() {
+        if(fAppearanceColorTableViewer==null || fAppearanceColorTableViewer.getControl().isDisposed()) return;
+        var display=fAppearanceColorTableViewer.getControl().getDisplay();
+        if(org.eclipse.swt.widgets.Display.getCurrent()!=display) {display.asyncExec(this::backendChanged);return;}
+        var plugin=net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin.getDefault();
+        if(saving || uncertainCreate || !databaseLoaded || !plugin.isBackendReady()) return;
+        var available=plugin.getTimekeeperService().labels();
+        var current=available.stream().collect(Collectors.toMap(value->value.id().value().toString(),value->value));
+        var rows=editableLabels.stream().collect(Collectors.toMap(ActivityLabel::getId,value->value));
+        var nextBaseline=new java.util.HashMap<>(baseline);
+        boolean changed=false;
+        for(var entry:baseline.entrySet()) {
+            String id=entry.getKey();var original=entry.getValue();var draft=rows.get(id);var latest=current.get(id);
+            if(draft==null) {
+                // A pending local deletion retains its captured version. If the
+                // peer already deleted it, there is no remaining delete to send.
+                if(latest==null) {nextBaseline.remove(id);changed=true;}
+                continue;
+            }
+            boolean edited=!original.name().equals(draft.getName()) || !original.color().equals(java.util.Optional.ofNullable(draft.getColor()));
+            if(edited || original.equals(latest)) continue;
+            int index=editableLabels.indexOf(draft);
+            if(latest==null) {editableLabels.remove(index);nextBaseline.remove(id);}
+            else {editableLabels.set(index,new ActivityLabel(id,latest.name(),latest.color().orElse(null)));nextBaseline.put(id,latest);}
+            changed=true;
+        }
+        for(var value:available) {
+            String id=value.id().value().toString();
+            if(baseline.containsKey(id) || rows.containsKey(id)) continue;
+            editableLabels.add(new ActivityLabel(id,value.name(),value.color().orElse(null)));nextBaseline.put(id,value);changed=true;
+        }
+        if(!changed) return;
+        String selectedId=getSelectedAppearanceColorOption()==null ? null : getSelectedAppearanceColorOption().getId();
+        baseline=Map.copyOf(nextBaseline);fAppearanceColorTableViewer.refresh();
+        var selected=editableLabels.stream().filter(row->row.getId().equals(selectedId)).findFirst();
+        fAppearanceColorTableViewer.setSelection(selected.map(StructuredSelection::new).orElse(StructuredSelection.EMPTY),true);
+        handleAppearanceColorListSelection();
+    }
+    @Override public void dispose() {
+        var plugin=net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin.getDefault();
+        if(listening && plugin!=null) plugin.removeBackendListener(backendListener);
+        super.dispose();
+    }
 
 	private void initialize() {
 		databaseLoaded = net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin.getDefault().isBackendReady();
@@ -318,6 +365,7 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
         }
         if(failure!=null) {setErrorMessage(uncertainCreate ? net.resheim.eclipse.timekeeper.ui.client.RemoteOutcomes.REVIEW_CREATE : net.resheim.eclipse.timekeeper.ui.client.RemoteRecordSnapshots.message(failure));return;}
         setErrorMessage(null);
+        backendChanged();
         if(closeAfterSave && getShell()!=null && !getShell().isDisposed()) {
             var button=getShell().getDefaultButton();if(button!=null) button.notifyListeners(SWT.Selection,new org.eclipse.swt.widgets.Event());
         }

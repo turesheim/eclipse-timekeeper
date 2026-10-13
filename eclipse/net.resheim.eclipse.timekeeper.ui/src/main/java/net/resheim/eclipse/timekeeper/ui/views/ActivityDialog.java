@@ -57,6 +57,10 @@ final class ActivityDialog extends AsyncRecordDialog {
 	private Text end;
 	private Text summary;
 	private CheckboxTableViewer labels;
+    private java.util.List<net.resheim.eclipse.timekeeper.domain.Label> labelSnapshot=java.util.List.of();
+    private Set<LabelId> deletedLabels=Set.of();
+    private final net.resheim.eclipse.timekeeper.db.DatabaseChangeListener backendListener=this::refreshLabels;
+    private boolean listening;
 
 	ActivityDialog(Shell shell, TimekeeperService service, Task task, LocalDate date) {
 		this(shell, service, task.id(), null, date);
@@ -98,14 +102,38 @@ final class ActivityDialog extends AsyncRecordDialog {
 		labels.getTable().setData("org.eclipse.swtbot.widget.key", "activity-labels");
 		labels.setContentProvider(ArrayContentProvider.getInstance());
 		labels.setLabelProvider(new LabelProvider() {
-			@Override public String getText(Object element) { return ((net.resheim.eclipse.timekeeper.domain.Label) element).name(); }
+			@Override public String getText(Object element) { var label=(net.resheim.eclipse.timekeeper.domain.Label) element;return label.name()+(deletedLabels.contains(label.id()) ? " (deleted)" : ""); }
 		});
 		var available = service.labels();
+        labelSnapshot=java.util.List.copyOf(available);
 		labels.setInput(available);
 		if (original != null) labels.setCheckedElements(available.stream()
 				.filter(label -> original.labelIds().contains(label.id())).toArray());
+        TimekeeperUiPlugin.getDefault().addBackendListener(backendListener);listening=true;
 		return area;
 	}
+    private void refreshLabels() {
+        if(labels==null || labels.getControl().isDisposed()) return;
+        var display=labels.getControl().getDisplay();
+        if(org.eclipse.swt.widgets.Display.getCurrent()!=display) {display.asyncExec(this::refreshLabels);return;}
+        if(!TimekeeperUiPlugin.getDefault().isBackendReady()) return;
+        var checked=Arrays.stream(labels.getCheckedElements()).map(value->(net.resheim.eclipse.timekeeper.domain.Label)value).toList();
+        var selected=checked.stream().map(net.resheim.eclipse.timekeeper.domain.Label::id).collect(Collectors.toSet());
+        var latest=service.labels();if(latest.equals(labelSnapshot)) return;labelSnapshot=java.util.List.copyOf(latest);
+        var available=new java.util.ArrayList<>(latest);
+        var missing=new java.util.HashSet<LabelId>();
+        // Keep a selected, deleted reference visible until the user reviews it.
+        // Silently dropping it would change the draft's intended label set.
+        for(var value:checked) if(available.stream().noneMatch(label->label.id().equals(value.id()))) {available.add(value);missing.add(value.id());}
+        deletedLabels=Set.copyOf(missing);
+        labels.setInput(available);labels.setCheckedElements(available.stream().filter(value->selected.contains(value.id())).toArray());
+    }
+    @Override public boolean close() {
+        boolean closed=super.close();
+        var plugin=TimekeeperUiPlugin.getDefault();
+        if(closed && listening && plugin!=null) {plugin.removeBackendListener(backendListener);listening=false;}
+        return closed;
+    }
 	private Text field(Composite parent, String caption, String value) {
 		new Label(parent, SWT.NONE).setText(caption);
 		Text text = new Text(parent, SWT.BORDER);

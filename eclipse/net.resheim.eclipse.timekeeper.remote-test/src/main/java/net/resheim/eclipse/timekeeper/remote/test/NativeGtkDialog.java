@@ -8,16 +8,16 @@ import org.eclipse.swt.SWT;
 
 /** Operates the real GTK chooser in CI's private Xvfb display, without replacing SWT dialogs. */
 public final class NativeGtkDialog {
-    public static void choose(String title,Path path,Runnable open) throws Exception {interact(title,path.toAbsolutePath().toString(),open);}
+    public static void choose(String title,Path path,Runnable open) throws Exception {interact(title,path.toAbsolutePath().toString(),open,true);}
     public static void saveFile(String title,Path path,String suffix,Runnable open) throws Exception {
         String location=path.toAbsolutePath().toString();
         // GTK adds the selected filter's suffix. Typing it in the location
         // entry as well produces .txt.txt in the tested SWT 3.135 runtime.
         assertTrue(location.endsWith(suffix));
-        interact(title,location.substring(0,location.length()-suffix.length()),open);
+        interact(title,location.substring(0,location.length()-suffix.length()),open,false);
     }
-    public static void cancel(String title,Runnable open) throws Exception {interact(title,null,open);}
-    private static void interact(String title,String path,Runnable open) throws Exception {
+    public static void cancel(String title,Runnable open) throws Exception {interact(title,null,open,true);}
+    private static void interact(String title,String path,Runnable open,boolean directory) throws Exception {
         assertEquals("Native chooser acceptance requires GTK","gtk",SWT.getPlatform());
         var worker=Executors.newSingleThreadExecutor();
         try {
@@ -27,6 +27,8 @@ public final class NativeGtkDialog {
                 assertNotNull("Actual native chooser did not appear: "+title,id);
                 try {
                 run(true,"xdotool","windowfocus","--sync",id);
+                // Mapping/focus can precede GTK's final focus assignment.
+                Thread.sleep(250);
                 // The matched chooser is focused above. Send Escape through the
                 // keyboard so its release does not address a window already
                 // destroyed by the press (X_SendEvent BadWindow in CI).
@@ -35,8 +37,15 @@ public final class NativeGtkDialog {
                     // GTK's Recent view does not accept a directory location.
                     // Home switches to normal browsing before entering the path.
                     run(true,"xdotool","key","--window",id,"alt+Home");
-                    run(true,"xdotool","key","--window",id,"ctrl+l");run(true,"xdotool","type","--window",id,"--clearmodifiers","--delay","1",path);
+                    Thread.sleep(250);
+                    run(true,"xdotool","key","--window",id,"ctrl+l");Thread.sleep(250);
+                    if(directory) run(true,"xdotool","key","--window",id,"ctrl+a");
+                    run(true,"xdotool","type","--window",id,"--clearmodifiers","--delay","1",path);Thread.sleep(250);
                     // GTK location entry first navigates; a further Enter accepts the folder.
+                    if(directory) {
+                        run(false,"xdotool","key","--window",id,"Return");Thread.sleep(750);
+                        if(run(false,"xdotool","search","--onlyvisible","--name","^"+title+"$").trim().isEmpty()) return null;
+                    }
                     for(int attempt=0;attempt<8;attempt++) {run(false,"xdotool","key","--window",id,"Return");Thread.sleep(250);if(run(false,"xdotool","search","--onlyvisible","--name","^"+title+"$").trim().isEmpty()) return null;}
                 }
                 assertTrue("Actual native chooser did not close: "+title,run(false,"xdotool","search","--onlyvisible","--name","^"+title+"$").trim().isEmpty());return null;

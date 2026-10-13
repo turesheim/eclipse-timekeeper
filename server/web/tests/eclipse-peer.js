@@ -55,6 +55,19 @@ async function command(input) {
       await tab('Tasks'); await page.locator('#tasks tr').filter({hasText:record.task}).getByRole('button', {name:'Edit', exact:true}).click();
       await page.getByLabel('Summary', {exact:true}).fill(input.summary); await page.getByLabel('URL (optional)', {exact:true}).fill(input.url);
       break;
+    case 'label-draft':
+      await tab('Tasks');await page.locator('#tasks tr').filter({hasText:record.task}).getByRole('button',{name:'Start',exact:true}).click();
+      await page.getByLabel('Summary',{exact:true}).fill(input.draft);await page.getByLabel(record.label,{exact:true}).check();break;
+    case 'observe-label-choice':
+      await expect(page.getByLabel(input.label,{exact:true})).toBeVisible();
+      await expect(page.getByLabel(record.label,{exact:true})).toBeChecked();
+      await expect(page.getByLabel('Summary',{exact:true})).toHaveValue(input.draft);
+      await page.getByLabel(input.label,{exact:true}).check();break;
+    case 'observe-deleted-label-choice':
+      await expect(page.getByLabel(input.label+' (deleted)',{exact:true})).toBeChecked();
+      await expect(page.getByLabel(record.label,{exact:true})).toBeChecked();
+      await expect(page.getByLabel('Summary',{exact:true})).toHaveValue(input.draft);
+      await page.getByRole('button',{name:'Cancel',exact:true}).click();break;
     case 'conflict':
       await expect(page.locator('#tasks')).toContainText(input.summary);
       await expect(page.getByLabel('Summary', {exact:true})).toHaveValue(input.draft);

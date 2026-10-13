@@ -34,6 +34,7 @@ final class RemotePreferenceScenario {
         var zone=api.profile().zone();var date=LocalDate.now(zone);
         var start=date.atTime(8,0,0,123456789).atZone(zone).toInstant();
         var interval=api.createActivity(new CreateActivity(task.id(),OwnerId.LOCAL,start,Optional.of(start.plusNanos(1)),prefix+" interval",Set.of()));
+        liveLabelChoices(api,project,task,interval,prefix);
         var bot=new SWTWorkbenchBot();
         try(var peer=new HttpTimekeeperService(RemoteBootstrap.endpoint(),RemoteBootstrap::observerBToken,Duration.ofSeconds(5))) {
             var emptyColor=peer.createLabel(new CreateLabel(prefix+" no color",Optional.empty()));
@@ -90,6 +91,34 @@ final class RemotePreferenceScenario {
             RemoteTestSupport.closedLocalStorage();RemoteBootstrap.receipt().setProperty("phase.native.label-preferences","passed");RemoteBootstrap.receipt().setProperty("phase.native.report-controls","passed");RemoteBootstrap.writeProof();
         }
     }
+    private static void liveLabelChoices(HttpTimekeeperService api,Project project,Task task,Activity interval,String prefix) throws Exception {
+        var original=api.createLabel(new CreateLabel(prefix+" live original",Optional.empty()));awaitLabel(original);
+        var preferences=open(LABELS);var controls=preferences.bot();controls.table().select(original.name());
+        String draft=prefix+" unsaved label draft";controls.textWithLabel("Label:").setText(draft);
+        var addition=api.createLabel(new CreateLabel(prefix+" live addition",Optional.of("19,171,205")));awaitLabel(addition);
+        RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->Arrays.stream(controls.table().widget.getItems()).anyMatch(item->item.getText().equals(addition.name())));}catch(Exception pending) {return false;}},"Open label preferences did not receive a peer-created label");
+        assertEquals(draft,controls.textWithLabel("Label:").getText());
+        var renamed=api.updateLabel(new UpdateLabel(original.id(),original.version(),prefix+" peer-renamed label",Optional.of("17,34,51")));awaitLabel(renamed);
+        assertEquals(draft,controls.textWithLabel("Label:").getText());controls.button("Apply").click();
+        RemoteTestSupport.waitFor(()->{try {return controls.textWithLabel("Label:").isEnabled() && RemoteTestSupport.onUi(()->message(preferences.widget,"This record has changed. Close and reopen the editor before saving."));}catch(Exception pending) {return false;}},"Live labels silently upgraded a conflicting label draft");
+        assertEquals(draft,controls.textWithLabel("Label:").getText());assertEquals(renamed,api.label(original.id()).orElseThrow());
+        controls.button("Cancel").click();RemoteTestSupport.waitFor(()->!preferences.isOpen(),"Live label preference draft did not cancel");
+
+        awaitTree(project,task,interval.summary());
+        new SWTWorkbenchBot().viewByTitle("Workweek").bot().treeWithId("workweek-editor-tree")
+            .getTreeItem(project.name()).getNode(task.summary()).getNode(interval.summary()).contextMenu("Edit activity...").click();
+        var editor=new SWTWorkbenchBot().shell("Edit activity");editor.bot().textWithLabel("Summary").setText(prefix+" unsaved activity draft");
+        var late=api.createLabel(new CreateLabel(prefix+" activity choice",Optional.empty()));awaitLabel(late);
+        var table=editor.bot().tableWithId("activity-labels");
+        RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->Arrays.stream(table.widget.getItems()).anyMatch(item->item.getText().equals(late.name())));}catch(Exception pending) {return false;}},"Open activity editor did not receive a peer-created label");
+        table.getTableItem(late.name()).check();api.deleteLabel(new DeleteLabel(late.id(),late.version()));
+        RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->Arrays.stream(table.widget.getItems()).anyMatch(item->item.getText().equals(late.name()+" (deleted)") && item.getChecked()));}catch(Exception pending) {return false;}},"Deleted selected label was silently removed from the activity draft");
+        assertEquals(prefix+" unsaved activity draft",editor.bot().textWithLabel("Summary").getText());
+        editor.bot().button("Cancel").click();RemoteTestSupport.waitFor(()->!editor.isOpen(),"Live activity draft did not cancel");
+        assertEquals(interval,api.activity(interval.id()).orElseThrow());
+        api.deleteLabel(new DeleteLabel(renamed.id(),renamed.version()));api.deleteLabel(new DeleteLabel(addition.id(),addition.version()));
+        RemoteBootstrap.receipt().setProperty("phase.native.live-labels","passed");RemoteBootstrap.writeProof();
+    }
     private static void copyReport(HttpTimekeeperService api,String prefix,Task task) throws Exception {
         var bot=new SWTWorkbenchBot();var preferences=open(TEMPLATES);preferences.bot().button("Add").click();
         var input=bot.shell("New template");input.bot().text().setText(prefix+" report");input.bot().button("OK").click();
@@ -105,7 +134,13 @@ final class RemotePreferenceScenario {
             if(Boolean.getBoolean("timekeeper.native.dialog-tests")) {
                 Path output=RemoteBootstrap.fixtureFolder().resolve("native-week.txt");
                 NativeGtkDialog.saveFile("Save Timekeeper report",output,".txt",()->bot.viewByTitle("Workweek").toolbarDropDownButton("Export selected week to clipboard").menuItem("Save as").click().menu(prefix+" report").click());
-                RemoteTestSupport.waitFor(()->{try {return Files.readString(output).startsWith(expected) && Files.readString(output).contains(task.summary());}catch(Exception loading) {return false;}},"Native report file chooser did not produce the exact remote report");
+                try {
+                    RemoteTestSupport.waitFor(()->{try {return Files.readString(output).startsWith(expected) && Files.readString(output).contains(task.summary());}catch(Exception loading) {return false;}},"Native report file chooser did not produce the exact remote report");
+                } catch(RuntimeException failure) {
+                    try(var files=Files.list(output.getParent())) {
+                        throw new AssertionError("Native report target exists="+Files.exists(output)+"; fixture filenames="+files.map(file->file.getFileName().toString()).sorted().toList(),failure);
+                    }
+                }
             }
         } finally {RemoteTestSupport.onUi(()->{var clipboard=new Clipboard(PlatformUI.getWorkbench().getDisplay());try {if(old==null) clipboard.clearContents();else clipboard.setContents(new Object[]{old},new Transfer[]{TextTransfer.getInstance()});}finally {clipboard.dispose();}return null;});}
         var cleanup=open(TEMPLATES);cleanup.bot().list().select(prefix+" report");cleanup.bot().button("Remove").click();cleanup.bot().button("Apply and Close").click();RemoteTestSupport.waitFor(()->!cleanup.isOpen(),"Temporary report template did not clear");
@@ -118,7 +153,7 @@ final class RemotePreferenceScenario {
         NativeGtkDialog.choose("Please choose a folder to store the exported files",parent,()->prefs.bot().button("Export...").click());bot.shell("Data exported").bot().button("OK").click();
         Path export;try(var children=Files.list(parent)) {export=children.filter(Files::isDirectory).findFirst().orElseThrow();}assertTrue(Files.isRegularFile(export.resolve("timekeeper.csv.json")));assertEquals(before,api.metadata());
         NativeGtkDialog.choose("Please choose a folder to import from",export,()->prefs.bot().button("Import...").click());bot.shell("Import server data").bot().button("Cancel").click();assertEquals(before,api.metadata());
-        NativeGtkDialog.choose("Please choose a folder to import from",export,()->prefs.bot().button("Import...").click());bot.shell("Import server data").bot().button("OK").click();bot.shell("Data imported").bot().button("OK").click();
+        NativeGtkDialog.choose("Please choose a folder to import from",export,()->prefs.bot().button("Import...").click());bot.shell("Import server data").bot().button("OK").click();RemoteTestSupport.confirmTransferResult("Data imported","Could not import data");
         var after=api.metadata();assertEquals(before.projects().size()*2,after.projects().size());assertEquals(before.tasks().size()*2,after.tasks().size());assertEquals(before.labels().size()*2,after.labels().size());
         var imported=api.activities(query).activities().stream().filter(a->activities.stream().noneMatch(old->old.id().equals(a.id()))).toList();assertEquals(activities.size(),imported.size());
         for(var old:activities) {
