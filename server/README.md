@@ -31,6 +31,9 @@ when finished. Logs and a credential-free receipt are under
 
 ## Configure and run
 
+For Docker on your own computer, follow the [local Docker setup guide](deploy/LOCAL.md).
+It covers a source build, persistent storage, credentials and Eclipse connection settings.
+
 For Synology Container Manager, use the complete [Docker Compose deployment](deploy/README.md).
 It supplies two PostgreSQL-backed server replicas, one PostgreSQL instance using
 its official image, and HAProxy. Data lives in a separate host directory. The
