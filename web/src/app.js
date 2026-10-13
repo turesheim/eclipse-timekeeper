@@ -68,6 +68,9 @@ async function refresh() {
       const current = await session.snapshot(zone => weekRange(date, zone));
       if (session !== api) return;
       if (date !== $('week-date').value) { reloadAgain = true; continue; }
+      // A save may have queued another read while this older snapshot was in
+      // flight. Publish only the final snapshot before enabling dependent forms.
+      if (reloadAgain) continue;
       snapshot = current; connected = true;
       render(); setStatus('Up to date');
     } while (reloadAgain && session === api);
