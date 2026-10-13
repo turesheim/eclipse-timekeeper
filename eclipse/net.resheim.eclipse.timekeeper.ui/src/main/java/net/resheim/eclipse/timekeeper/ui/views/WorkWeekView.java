@@ -284,6 +284,7 @@ public class WorkWeekView extends ViewPart {
 		main.setBackgroundMode(SWT.INHERIT_FORCE);
 		GridLayout layout2 = GridLayoutFactory.fillDefaults().numColumns(3).equalWidth(false).create();
 		main.setLayout(layout2);
+        new WorkSessionPanel(main);
 
 		// text before the date chooser
 		dateTimeLabel = new Label(main, SWT.NONE);

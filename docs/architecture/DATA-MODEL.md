@@ -10,9 +10,10 @@ startup allow-list for tables and columns.
 
 A `PROJECT` groups zero or more `TASK` records. A task may point to another task
 in the same project through `PARENT_TASK`, forming the project > task > subtask
-tree. `ACTIVITY` records are time intervals recorded against a task. Activities
-may have reusable labels, and tasks may have identities in one or more external
-task providers.
+tree. `ACTIVITY` records are time intervals with an optional task, direct project
+and independent `WORK_SESSION`. Activities may have reusable labels, and tasks
+may have identities in one or more external task providers. An activity may
+also have none of these associations; no placeholder task is created.
 
 The schema also contains three association tables created by the older
 unidirectional JPA collections. They duplicate the child-side foreign keys used
@@ -38,6 +39,20 @@ erDiagram
         integer VERSION
         varchar STATE
         varchar ORIGIN
+    }
+
+    TIMEKEEPER_WRITE_LOCK {
+        integer ID PK
+    }
+
+    WORK_SESSION {
+        varchar ID PK
+        bigint VERSION
+        varchar OWNER_ID
+        varchar START_TIME
+        varchar END_TIME
+        varchar SUMMARY
+        varchar STATE
     }
 
     PROJECT_TYPE {
@@ -82,6 +97,7 @@ erDiagram
         varchar OWNER_ID
         varchar TASK_ID FK
         varchar ACTIVITY_PROJECT FK
+        varchar WORK_SESSION_ID FK
     }
 
     ACTIVITYLABEL {
@@ -116,6 +132,7 @@ erDiagram
     TASK ||--o{ EXTERNAL_TASK_REFERENCE : "TASK_ID"
     TASK o|--o{ ACTIVITY : "TASK_ID"
     PROJECT o|--o{ ACTIVITY : "ACTIVITY_PROJECT"
+    WORK_SESSION o|--o{ ACTIVITY : "WORK_SESSION_ID"
     TASK o|--o| ACTIVITY : "CURRENTACTIVITY_ID"
 
     PROJECT ||--o{ PROJECT_TASK : contains
@@ -238,8 +255,9 @@ and removed as orphans when unlinked.
 
 ### `ACTIVITY`
 
-A recorded work interval. An activity belongs to exactly one task in the current
-service model, even though the historical JPA column remains nullable.
+A recorded work interval. Task, direct project and work-session associations are
+optional. If both a task and a direct project are supplied, their projects must
+agree. Session and activity owners must match.
 
 | Column | SQL type | Required | Meaning |
 | --- | --- | --- | --- |
@@ -249,12 +267,13 @@ service model, even though the historical JPA column remains nullable.
 | `ADJUSTED` | `BOOLEAN` | no | True when the interval was manually created or edited. |
 | `SUMMARY` | `VARCHAR` | no | Free-form activity note; normalized to an empty string by the service. |
 | `OWNER_ID` | `VARCHAR` | yes | Stable user or service identity. The embedded client uses `local`; this is a value, not a foreign key. |
-| `TASK_ID` | `VARCHAR` | no in SQL; yes in service | Foreign key to `TASK.ID`. |
-| `ACTIVITY_PROJECT` | `VARCHAR` | no | Foreign key to `PROJECT.NAME` for legacy activities recorded directly against a project. |
+| `TASK_ID` | `VARCHAR` | no | Optional foreign key to `TASK.ID`. |
+| `ACTIVITY_PROJECT` | `VARCHAR` | no | Optional foreign key to `PROJECT.NAME` for an activity recorded directly against a project. |
+| `WORK_SESSION_ID` | `VARCHAR(36)` | no | Optional foreign key to `WORK_SESSION.ID`. |
 
 Activities do not have a physical version column. The adapter calculates their
 service version from the persisted interval, summary, owner, adjusted flag, and
-sorted label identifiers.
+sorted label identifiers, project and work-session associations.
 
 ### `ACTIVITYLABEL`
 
@@ -296,11 +315,19 @@ database constraint is explicitly mentioned:
   its own parent, and following `PARENT_TASK` must never form a cycle.
 - A task with subtasks cannot move to another project. It cannot be deleted
   while it has subtasks or activities, and a project cannot be deleted while it
-  has tasks.
+  has tasks or directly associated activities.
 - An activity end cannot precede its start. At most one activity may be open for
   an owner, and `CURRENTACTIVITY_ID` identifies the open interval for a task.
 - An activity may use only existing labels. A label cannot be deleted while an
   activity uses it.
+- Each owner may have one running work session, independently of their open
+  activity. Sessions can span midnight without stopping; daily activity parts
+  retain their session association. Stopping a session leaves activity timers
+  unchanged. A session cannot be deleted while activities reference it.
+- Session tracked time sums clipped activity intervals. Allocated time is their
+  union, and unallocated time is session duration minus that union. Overlapping
+  activities therefore do not count twice toward covered time. Intervals outside
+  the session are allowed with a warning.
 - The composite external-reference key is unique in both the service and the
   database, so the same external issue cannot be linked to two Timekeeper tasks.
 - Task updates use the physical optimistic-lock `VERSION`. Projects, activities,
@@ -325,11 +352,12 @@ deletion preconditions before the JPA adapter mutates the schema. In particular:
   preserving the embedded service UUID.
 
 Direct SQL writers and import tools must preserve both the child-side foreign
-keys and their corresponding association tables. CSV export/import includes the
-project types, projects, tasks, activities, external references, and the three
-collection relation tables. Labels and their activity assignments remain part
-of the database model but are not currently included in that CSV interchange
-operation.
+keys and their corresponding association tables. Native CSV export/import includes project types, projects, tasks, activities,
+external references, collection relation tables, labels, activity-label
+assignments and work sessions. Older exports remain supported, but a new export
+with session associations requires its work-session file. The server's portable
+domain-v2 JSON and CSV formats include all five domain entity types and remap
+identifiers when importing into another account.
 
 ## Schema compatibility
 

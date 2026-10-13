@@ -189,6 +189,10 @@ public final class HttpTimekeeperService implements TimekeeperService,WorkSessio
             if(page.revision()==report.get("revision").getAsLong()) return new ActivityReport(input,Instant.parse(report.get("generatedAt").getAsString()),page.items().stream().map(WireValues::activity).toList(),Duration.parse(report.get("total").getAsString()));
         }throw new RemoteFailure(RemoteFailure.Kind.CONFLICT,"CURSOR_EXPIRED");
     }
+    /** Full owned activity choices without constructing a multi-century daily report. */
+    public List<Activity> allActivities() {
+        return page("activities",Map.of("from","0000-01-01T00:00:00Z","to","9999-12-31T23:59:59.999999999Z")).items().stream().map(WireValues::activity).toList();
+    }
     private static JsonObject workSessionInterval(Instant start,Optional<Instant> end,String summary) {
         var body=object();body.addProperty("start",start.toString());optional(body,"end",end);body.addProperty("summary",summary);return body;
     }
@@ -214,9 +218,13 @@ public final class HttpTimekeeperService implements TimekeeperService,WorkSessio
     }
     @Override public WorkSession stopWorkSession(StopWorkSession command) {return stopWorkSession(command,UUID.randomUUID());}
     public WorkSession stopWorkSession(StopWorkSession command,UUID commandId) {
+        return prepareWorkSessionStop(command,commandId).get();
+    }
+    /** Capture before the first write; retain this operation to retry an unknown outcome. */
+    public Supplier<WorkSession> prepareWorkSessionStop(StopWorkSession command,UUID commandId) {
         String path="/work-sessions/"+command.id().value();
-        return WireValues.workSession(remember(path,request("POST",path+"/stop",null,
-                Map.of("If-Match",match(path,command.expectedVersion()),"Idempotency-Key",commandId.toString()))));
+        var headers=Map.of("If-Match",match(path,command.expectedVersion()),"Idempotency-Key",commandId.toString());
+        return ()->WireValues.workSession(remember(path,request("POST",path+"/stop",null,headers)));
     }
     @Override public Association associateWorkSession(AssociateWorkSession command) {
         String path="/activities/"+command.activityId().value();var body=object();optional(body,"workSessionId",command.workSessionId().map(WorkSessionId::value));

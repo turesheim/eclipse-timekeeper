@@ -101,7 +101,7 @@ final class InstalledImportScenario {
     }
     private static String csvHash(Path folder) throws Exception {
         var digest=MessageDigest.getInstance("SHA-256");
-        for(String name:List.of("projects.csv","tasks.csv","labels.csv","activities.csv","timekeeper.csv.json")) {
+        for(String name:List.of("projects.csv","tasks.csv","labels.csv","activities.csv","workSessions.csv","timekeeper.csv.json")) {
             byte[] data=Files.readAllBytes(folder.resolve(name));digest.update(name.getBytes(StandardCharsets.UTF_8));
             digest.update(java.nio.ByteBuffer.allocate(8).putLong(data.length).array());digest.update(data);
         }
@@ -114,6 +114,7 @@ final class InstalledImportScenario {
         metadata.projects().forEach(value->state.put("project:"+value.id().value(),Long.toString(value.version())));
         metadata.tasks().forEach(value->state.put("task:"+value.id().value(),Long.toString(value.version())));
         metadata.labels().forEach(value->state.put("label:"+value.id().value(),Long.toString(value.version())));
+        api.workSessions(OwnerId.LOCAL).forEach(value->state.put("work-session:"+value.id().value(),Long.toString(value.version())));
         api.activities(query(api)).activities().forEach(value->state.put("activity:"+value.id().value(),Long.toString(value.version())));
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(state.toString().getBytes(StandardCharsets.UTF_8)));
     }

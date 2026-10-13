@@ -62,6 +62,17 @@ final class ActivityDialog extends AsyncRecordDialog {
     private final net.resheim.eclipse.timekeeper.db.DatabaseChangeListener backendListener=this::refreshLabels;
     private boolean listening;
 
+    private net.resheim.eclipse.timekeeper.domain.WorkSession initialSession;
+    private org.eclipse.swt.widgets.Combo taskChoice,projectChoice;
+    private java.util.List<net.resheim.eclipse.timekeeper.domain.Task> taskChoices=java.util.List.of();
+    private java.util.List<net.resheim.eclipse.timekeeper.domain.Project> projectChoices=java.util.List.of();
+    private java.time.Instant initialStart,initialEnd;
+    private Label sessionWarning;
+    ActivityDialog(Shell shell,TimekeeperService service,net.resheim.eclipse.timekeeper.domain.WorkSession session,LocalDate date) {
+        this(shell,service,(TaskId)null,null,date);initialSession=session;initialStart=session.start();
+        initialEnd=session.end().orElseGet(java.time.Instant::now);if(initialEnd.isBefore(initialStart)) initialEnd=initialStart;
+    }
+
 	ActivityDialog(Shell shell, TimekeeperService service, Task task, LocalDate date) {
 		this(shell, service, task.id(), null, date);
 	}
@@ -88,12 +99,25 @@ final class ActivityDialog extends AsyncRecordDialog {
 		body.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 		body.setLayout(new GridLayout(2, false));
 		new Label(body, SWT.NONE).setText("Task");
-		new Label(body, SWT.NONE).setText(taskId==null ? "Unassigned activity" : service.task(taskId).orElseThrow().summary());
+        if(initialSession==null) new Label(body,SWT.NONE).setText(taskId==null ? "Unassigned activity" : service.task(taskId).orElseThrow().summary());
+        else {
+            taskChoices=service.tasks();taskChoice=new org.eclipse.swt.widgets.Combo(body,SWT.READ_ONLY);taskChoice.setLayoutData(new GridData(SWT.FILL,SWT.CENTER,true,false));
+            taskChoice.add("No task");for(var task:taskChoices) taskChoice.add(task.summary());taskChoice.select(0);
+            new Label(body,SWT.NONE).setText("Project (without task)");projectChoices=service.projects();projectChoice=new org.eclipse.swt.widgets.Combo(body,SWT.READ_ONLY);
+            projectChoice.setLayoutData(new GridData(SWT.FILL,SWT.CENTER,true,false));projectChoice.add("No project");for(var project:projectChoices) projectChoice.add(project.name());projectChoice.select(0);
+            taskChoice.addListener(SWT.Selection,event->projectChoice.setEnabled(taskChoice.getSelectionIndex()==0));
+            new Label(body,SWT.NONE).setText("Work session");new Label(body,SWT.NONE).setText(FORMAT.format(initialSession.start().atZone(zone))+" · "+initialSession.summary());
+        }
 		summary = field(body, "Summary", original == null ? "" : original.summary());
-		start = field(body, "Start (yyyy-MM-dd HH:mm)", original == null ? FORMAT.format(date.atTime(9, 0))
+		start = field(body, "Start (yyyy-MM-dd HH:mm)", original == null ? initialSession==null ? FORMAT.format(date.atTime(9, 0)) : FORMAT.format(initialStart.atZone(zone))
 				: FORMAT.format(original.start().atZone(zone)));
-		end = field(body, "End (yyyy-MM-dd HH:mm)", original == null ? FORMAT.format(date.atTime(10, 0))
+		end = field(body, "End (yyyy-MM-dd HH:mm)", original == null ? initialSession==null ? FORMAT.format(date.atTime(10, 0)) : FORMAT.format(initialEnd.atZone(zone))
 				: original.end().map(value -> FORMAT.format(value.atZone(zone))).orElse(""));
+        if(initialSession!=null) {
+            sessionWarning=new Label(body,SWT.WRAP);sessionWarning.setData("org.eclipse.swtbot.widget.key","session-activity-warning");sessionWarning.setLayoutData(new GridData(SWT.FILL,SWT.CENTER,true,false,2,1));
+            start.addModifyListener(event->warnSession());end.addModifyListener(event->warnSession());warnSession();
+        }
+
 		new Label(body, SWT.NONE).setText("Labels");
 		labels = CheckboxTableViewer.newCheckList(body, SWT.BORDER | SWT.V_SCROLL);
 		GridData data = new GridData(SWT.FILL, SWT.FILL, true, true);
@@ -150,19 +174,29 @@ final class ActivityDialog extends AsyncRecordDialog {
 	}
 	@Override protected void okPressed() {
 		try {
-			var from = endpoint(start.getText(), original == null ? Optional.empty() : Optional.of(original.start()));
+			var from = endpoint(start.getText(), original == null ? Optional.ofNullable(initialStart) : Optional.of(original.start()));
 			Optional<java.time.Instant> until = end.getText().isBlank() ? Optional.empty()
-					: Optional.of(endpoint(end.getText(), original == null ? Optional.empty() : original.end()));
+					: Optional.of(endpoint(end.getText(), original == null ? Optional.ofNullable(initialEnd) : original.end()));
 			Activity.validateStart(from, java.time.Instant.now());
 			Set<LabelId> selected = Arrays.stream(labels.getCheckedElements())
 					.map(value -> ((net.resheim.eclipse.timekeeper.domain.Label) value).id()).collect(Collectors.toSet());
             String entered=summary.getText();
-            save("Save Timekeeper activity",()-> original==null ? service.createActivity(new CreateActivity(taskId,OwnerId.LOCAL,from,until,entered,selected))
+            TaskId assigned=taskChoice==null || taskChoice.getSelectionIndex()==0 ? taskId : taskChoices.get(taskChoice.getSelectionIndex()-1).id();
+            var project=projectChoice!=null && assigned==null && projectChoice.getSelectionIndex()>0 ? Optional.of(projectChoices.get(projectChoice.getSelectionIndex()-1).id()) : Optional.<net.resheim.eclipse.timekeeper.domain.ProjectId>empty();
+            save("Save Timekeeper activity",()-> original==null ? service.createActivity(new CreateActivity(assigned,OwnerId.LOCAL,from,until,entered,selected,Optional.ofNullable(initialSession).map(net.resheim.eclipse.timekeeper.domain.WorkSession::id),project))
                     : service.updateActivity(new UpdateActivity(original.id(),original.version(),from,until,entered,selected)),value -> {});
 		} catch (RuntimeException failure) {
 			setErrorMessage(failureMessage(failure));
 		}
 	}
+    private void warnSession() {
+        try {
+            var from=endpoint(start.getText(),Optional.of(initialStart));var until=end.getText().isBlank() ? java.time.Instant.now() : endpoint(end.getText(),Optional.of(initialEnd));
+            sessionWarning.setText(from.isBefore(initialSession.start()) || initialSession.end().filter(value->until.isAfter(value)).isPresent()
+                    ? "This activity extends outside the session. Only the overlap counts toward covered time." : "");
+        } catch(RuntimeException invalid) {sessionWarning.setText("");}
+    }
+
 	private java.time.Instant endpoint(String text, Optional<java.time.Instant> stored) {
 		String value = text.trim();
 		// The editor displays minutes; unchanged fields retain their original precision and offset.

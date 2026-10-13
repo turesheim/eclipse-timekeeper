@@ -217,6 +217,9 @@ public final class RemoteBootstrap implements IApplication {
     public static void holdNextTrackingReply(java.util.UUID activity) throws Exception {
         control("hold","POST /api/v1/activities/"+(activity==null ? "start" : activity+"/stop"));
     }
+    public static void holdNextSessionReply(java.util.UUID session) throws Exception {
+        control("hold","POST /api/v1/work-sessions/"+(session==null ? "start" : session+"/stop"));
+    }
     public static void holdNextDeleteReply(String collection,java.util.UUID id) throws Exception {
         if(!java.util.Set.of("projects","tasks","activities","labels").contains(collection)) throw new IllegalArgumentException("Unsupported delete fixture");
         control("hold","DELETE /api/v1/"+collection+"/"+id);

@@ -28,7 +28,7 @@ describes private HTTPS access for local Docker and Synology deployments. The se
 records; selecting a backend does not copy or merge databases. Mylyn activation
 uses the selected backend after restart.
 
-Eclipse and the web client share projects, tasks, activities and labels when
+Eclipse and the web client share projects, tasks, activities, labels and work sessions when
 their tokens belong to the same server account. Different accounts have separate
 records, even on the same server. Open label preferences and activity editors
 receive label changes while preserving unsaved fields and selected labels.
@@ -52,6 +52,39 @@ must reload the changed record before saving.
 CSV exports include label definitions and activity-label assignments. Older
 exports without these two files remain supported; when merging such an export,
 existing labels on a split activity are copied to its new daily records.
+New exports also include work sessions and their activity associations. Keep all
+exported files together; an activity's session reference requires the session file.
+
+## Work sessions
+
+The compact **Work Session** panel above Workweek shows the current running status,
+session start/end, duration, tracked time, covered time and unallocated time.
+**Start work session** and **Stop work session** operate independently of task
+timers. Stopping the session leaves a running activity unchanged. Only one
+session may run per account; several completed sessions can be recorded in a day.
+Sessions can span midnight without stopping, while their activities split into
+daily records and retain the association.
+
+Expand **Session details** to show history, associated activities and editing
+actions. Use **Record session** for an earlier interval, or choose a session in the history
+list and use **Edit session**. These editors accept exact UTC timestamps,
+including fractional seconds. Leave the end blank for a running session.
+**Add activity** assigns the new interval to the selected session; choosing a
+task is optional, and a taskless activity can optionally belong directly to a
+project. **Associate activity** links an existing interval without changing its
+times or task. Select a row and use **Remove association** to detach it. Double
+click an associated row to edit the activity. A session must be detached from
+all activities before deletion.
+
+Tracked time sums each activity's overlap with the session. Covered time counts
+the union of those intervals, so overlaps do not cover time twice. Unallocated
+time is session duration minus covered time. An activity outside the session is
+allowed with a warning; only its overlap contributes to these totals. Session
+associations do not change Jira/GitHub task references.
+
+Remote reads and writes run in background jobs. Failed edits preserve drafts.
+If a start/stop reply is lost, **Retry session command** repeats the original
+command key and payload instead of creating a second session or stopping twice.
 
 ## If the token cannot be saved
 

@@ -23,6 +23,31 @@ import com.sun.net.httpserver.HttpServer;
 class HttpTransportTest {
     private static final String TOKEN = "private-test-token";
 
+    @Test void preparedSessionStopRetainsItsPreconditionAfterLostReplyAndResynchronization() throws Exception {
+        var id=new net.resheim.eclipse.timekeeper.domain.WorkSessionId(java.util.UUID.randomUUID());
+        var key=java.util.UUID.randomUUID();var version=new AtomicInteger();var attempts=new AtomicInteger();
+        try(Fixture server=new Fixture(exchange->{
+            if(exchange.getRequestMethod().equals("POST")) {
+                assertEquals(key.toString(),exchange.getRequestHeaders().getFirst("Idempotency-Key"));
+                assertEquals("\"session-0\"",exchange.getRequestHeaders().getFirst("If-Match"));
+                if(attempts.incrementAndGet()==1) {
+                    version.incrementAndGet();reply(exchange,503,"{\"code\":\"UNAVAILABLE\"}");return;
+                }
+            }
+            var stopped=version.get()>0;
+            exchange.getResponseHeaders().set("ETag","\"session-"+version.get()+"\"");
+            reply(exchange,200,"{\"id\":\""+id.value()+"\",\"ownerId\":\"owner-test\",\"version\":"+version.get()
+                    +",\"start\":\"2026-10-01T08:00:00Z\",\"end\":"+(stopped ? "\"2026-10-01T09:00:00Z\"" : "null")
+                    +",\"summary\":\"Session\",\"state\":\""+(stopped ? "COMPLETED" : "RUNNING")+"\"}");
+        });var client=server.client(Duration.ofSeconds(2))) {
+            var original=client.workSession(id).orElseThrow();
+            var operation=client.prepareWorkSessionStop(new net.resheim.eclipse.timekeeper.service.Commands.StopWorkSession(id,original.version()),key);
+            assertEquals(RemoteFailure.Kind.UNAVAILABLE,assertThrows(RemoteFailure.class,operation::get).kind());
+            client.invalidateVersions();assertEquals(1,client.workSession(id).orElseThrow().version());
+            assertEquals(1,operation.get().version());assertEquals(2,attempts.get());assertEquals(1,version.get());
+        }
+    }
+
     @Test void timeoutTerminatesAnOutstandingRequest() throws Exception {
         CountDownLatch received = new CountDownLatch(1), release = new CountDownLatch(1);
         try (Fixture server = new Fixture(exchange -> {

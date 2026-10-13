@@ -70,8 +70,8 @@ Choose shared, workspace-relative or explicit H2 storage in **Preferences >
 Timekeeper > Database**. The default is shared storage under `.timekeeper` in
 your home directory; restart after changing the location. See the
 [installation and storage guide](https://github.com/turesheim/eclipse-timekeeper/wiki/Installing-Timekeeper-2.0)
-for the user workflow. Database instances use H2 mixed mode; concurrent edits
-to the same task are unsupported. See [multi-instance acceptance](verification/CONCURRENT-INSTANCES.md).
+for the user workflow. Database instances use H2 mixed mode; service writes
+are serialized and stale record versions are rejected. See [multi-instance acceptance](verification/CONCURRENT-INSTANCES.md).
 
 The Eclipse 2026-09 upgrade uses **H2 2.5.250 with schema version 3** as its
 supported database baseline. Start with new storage; historical H2 files,
@@ -83,7 +83,7 @@ See the [complete data model and ER diagram](architecture/DATA-MODEL.md) and the
 
 Keep unsupported databases intact and select a separate empty location. CSV
 Export/Import now targets the current project, task, activity, external-reference
-and relation tables, including native task hierarchy, but it remains a
+and relation tables, including native task hierarchy, labels and work sessions, but it remains a
 convenience interchange format rather than a database backup, migration or
 rollback mechanism.
 
