@@ -168,6 +168,73 @@ def check_site(repo,repository,output,commit,run):
     return provenance
 
 
+def extract_run_artifact(repo,run,name,destination):
+    artifacts=json.loads(gh("api",f"repos/{repo}/actions/runs/{run['id']}/artifacts?per_page=100"))["artifacts"]
+    available=[item for item in artifacts if item["name"]==name and not item["expired"]]
+    if len(available)!=1:
+        raise ValueError(f"Expected one available {name} artifact")
+    artifact=available[0];source=artifact.get("workflow_run",{})
+    if (source.get("id")!=run["id"] or source.get("head_sha")!=run["head_sha"]
+            or source.get("head_branch")!=run["head_branch"]):
+        raise ValueError("Artifact source does not match its workflow run")
+    digest=artifact.get("digest","")
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}",digest):
+        raise ValueError("Artifact has no SHA-256 digest")
+    with tempfile.TemporaryDirectory() as temporary:
+        archive=Path(temporary)/"artifact.zip"
+        download_testing_artifact(repo,artifact["id"],archive)
+        if "sha256:"+hashlib.sha256(archive.read_bytes()).hexdigest()!=digest:
+            raise ValueError("Artifact checksum does not match")
+        with zipfile.ZipFile(archive) as zipped:
+            extract_repository_zip(zipped,destination)
+    return artifact
+
+
+def build_site(repo,output,commit,run_id):
+    run=json.loads(gh("api",f"repos/{repo}/actions/runs/{run_id}"))
+    if run["id"]!=run_id or (run["event"]=="push" and run["head_sha"]!=commit):
+        raise ValueError("Current build source does not match its workflow run")
+    with tempfile.TemporaryDirectory() as temporary:
+        repository=Path(temporary)/"repository"
+        artifact=extract_run_artifact(repo,run,"p2-repository",repository)
+        version=testing_repository_version(repository)
+        provenance={"kind":"testing","commit":commit,"version":version,"run":run_id,
+                    "artifactSha256":artifact["digest"].removeprefix("sha256:")}
+        site(repo,output)  # Released channels; no lookup of an older testing build.
+        assemble_testing_repository(repo,repository,output,provenance,f"builds/{run_id}-{artifact['id']}")
+        if not (output/"index.html").is_file():
+            raise ValueError("Build the project website before adding update repositories")
+        (output/"timekeeper-site.json").write_text(json.dumps(provenance,indent=2)+"\n")
+    return provenance
+
+
+def fetch_site(repo,output,run_id):
+    branch=gh("api",f"repos/{repo}","--jq",".default_branch").strip()
+    run=json.loads(gh("api",f"repos/{repo}/actions/runs/{run_id}"))
+    if (run.get("id")!=run_id or run.get("status")!="completed" or run.get("conclusion")!="success"
+            or run.get("event")!="push" or run.get("head_branch")!=branch
+            or run.get("path")!=".github/workflows/build.yml"
+            or run.get("head_repository",{}).get("full_name")!=repo):
+        raise ValueError("Site deployment requires a successful trusted main Build run")
+    with tempfile.TemporaryDirectory() as temporary:
+        prepared=Path(temporary)/"site"
+        extract_run_artifact(repo,run,"website-update-site",prepared)
+        identity=json.loads((prepared/"timekeeper-site.json").read_text())
+        if identity.get("commit")!=run["head_sha"] or identity.get("run")!=run_id:
+            raise ValueError("Prepared site source does not match the successful build")
+        children=ET.parse(prepared/"updates/testing/compositeContent.xml").findall("./children/child")
+        if len(children)!=1:
+            raise ValueError("Prepared site has no unique testing repository")
+        repository=(prepared/"updates/testing"/children[0].get("location","")).resolve()
+        repository.relative_to(prepared.resolve())
+        if testing_repository_version(repository)!=identity.get("version") or not (prepared/"index.html").is_file():
+            raise ValueError("Prepared website or testing version is invalid")
+        if json.loads((repository/"timekeeper-build.json").read_text())!=identity:
+            raise ValueError("Prepared site and p2 source identities differ")
+        shutil.copytree(prepared,output,dirs_exist_ok=True)
+    return identity
+
+
 def add_testing_channel(repo, output):
     branch=gh("api",f"repos/{repo}","--jq",".default_branch").strip()
     runs=json.loads(gh("api",f"repos/{repo}/actions/workflows/build.yml/runs",
@@ -188,8 +255,9 @@ def add_testing_channel(repo, output):
         passed={job["name"] for job in jobs if job.get("status")=="completed" and job.get("conclusion")=="success"}
         if (not required.issubset(passed)
                 or not passed.intersection({"Remote-Eclipse","Installed client tests"})
-                or not passed.intersection({"Publication","Update site checks"})
-                or ("Update site checks" in passed and "Publication tooling tests" not in passed)):
+                or not passed.intersection({"Publication","Update site checks","Build website and update site"})
+                or (passed.intersection({"Update site checks","Build website and update site"})
+                    and not passed.intersection({"Publication tooling tests","Packaging and channel tests"}))):
             continue
         artifacts=json.loads(gh("api",f"repos/{repo}/actions/runs/{run['id']}/artifacts?per_page=100"))["artifacts"]
         available=[artifact for artifact in artifacts if artifact["name"]=="p2-repository" and not artifact["expired"]]
@@ -366,6 +434,15 @@ def main():
     check.add_argument("--output", required=True, type=Path)
     check.add_argument("--commit", required=True)
     check.add_argument("--run", required=True, type=int)
+    build = commands.add_parser("build-site", help="Build the deployable site from this run's matrix artifact")
+    build.add_argument("--repo", required=True)
+    build.add_argument("--output", required=True, type=Path)
+    build.add_argument("--commit", required=True)
+    build.add_argument("--run", required=True, type=int)
+    fetch = commands.add_parser("fetch-site", help="Fetch the site prepared by a successful main Build")
+    fetch.add_argument("--repo", required=True)
+    fetch.add_argument("--output", required=True, type=Path)
+    fetch.add_argument("--run", required=True, type=int)
     args = parser.parse_args()
     if args.command == "prepare":
         prepare(args.repo, args.tag, args.require_server)
@@ -373,6 +450,10 @@ def main():
         package(args.repository, args.tag, args.commit, args.output)
     elif args.command == "check-site":
         check_site(args.repo, args.repository, args.output, args.commit, args.run)
+    elif args.command == "build-site":
+        build_site(args.repo,args.output,args.commit,args.run)
+    elif args.command == "fetch-site":
+        fetch_site(args.repo,args.output,args.run)
     else:
         site(args.repo, args.output, args.include_testing)
 

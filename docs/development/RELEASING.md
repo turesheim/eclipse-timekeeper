@@ -51,23 +51,35 @@ Install locations:
 
 The testing channel comes from the successful main workflow's `p2-repository`
 artifact. Pages rejects PR/fork runs and requires all three platform jobs,
-API, Server, Web, **Publication tooling tests**, **Update site checks** and
+API, Server, Web, **Packaging and channel tests**, **Build website and update site** and
 **Installed client tests** to pass. Older verified workflows used the name
-**Publication** for the tooling/site checks. The publisher verifies
+**Publication**, **Publication tooling tests** and **Update site checks**. The publisher verifies
 the artifact's run/source identity and GitHub SHA-256 digest, then validates p2
 metadata and every declared plugin/feature file. `timekeeper-build.json` records
 the commit, version, run and artifact checksum. The testing repository has a
 build/artifact-specific path; stable and preview channels remain release-only.
 
-**Publication tooling tests** runs script tests in parallel. **Update site
-checks** depends on the complete build matrix, API, server, web, installed-client
-and tooling jobs. It downloads `p2-repository` from that same workflow run and
-uses `check-site` to assemble and validate its testing repository. It does not
-substitute a previous main artifact or wait on its own workflow's conclusion.
+**Packaging and channel tests** runs unit tests of our Python packaging,
+checksum, p2 metadata, channel selection and documentation-link code in
+parallel. These are tests of this repository's tooling.
+
+**Build website and update site** depends on the complete build matrix, API,
+server, web, installed-client and tooling jobs. It builds the documentation
+with Jekyll, verifies and downloads `p2-repository` from that same run, adds
+the testing repository and published release channels, and uploads the complete
+`website-update-site` artifact on main pushes. `timekeeper-site.json` records
+its source/run and p2 identity. It does not substitute a previous main build.
 
 A main push starts Build. Pages waits for the complete successful workflow;
 there is no separate immediate push deployment. Its `workflow_run` trigger
-then publishes the verified artifact. Failed, skipped or PR builds cannot advance testing.
+deploys only a completed main build that still matches the default-branch head
+when the event arrives, so an older build finishing later is skipped. It
+downloads that exact prepared website artifact, checks its GitHub SHA-256,
+source identity and complete p2 repository, and deploys it through **Publish
+website and update site**. The documentation and binaries are not rebuilt on
+that path. Release edits, release-workflow completion and explicit manual
+dispatch still reconstruct the release channels from verified assets and the
+latest qualifying main p2 build. Failed, skipped or PR builds cannot advance testing.
 If no qualifying unexpired artifact exists, its page explains that no testing
 build is available. It does not substitute an unchecked candidate. Action
 artifacts have finite retention; rerun main Build to repopulate an expired test

@@ -11,7 +11,7 @@ on:
 permissions:
   contents: read
 
-# Serialize the whole rebuild/deployment so an older snapshot cannot replace it.
+# Serialize website assembly and deployment.
 concurrency:
   group: github-pages
   cancel-in-progress: false
@@ -24,6 +24,7 @@ jobs:
        (github.event.workflow_run.name != 'Build' ||
         (github.event.workflow_run.event == 'push' &&
          github.event.workflow_run.head_branch == github.event.repository.default_branch &&
+         github.event.workflow_run.head_sha == github.sha &&
          github.event.workflow_run.head_repository.full_name == github.repository)))
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -42,12 +43,14 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Build existing project website
+        if: github.event_name != 'workflow_run' || github.event.workflow_run.name != 'Build'
         uses: actions/jekyll-build-pages@v1
         with:
           source: ./
           destination: ./_site
 
       - name: Add verified release repositories and update channels
+        if: github.event_name != 'workflow_run' || github.event.workflow_run.name != 'Build'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -55,12 +58,20 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" _site
           python3 scripts/p2_release.py site --repo "$GITHUB_REPOSITORY" --output _site --include-testing
 
+      - name: Fetch the complete site from the successful main build
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Build'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ github.event.workflow_run.id }}
+        run: python3 scripts/p2_release.py fetch-site --repo "$GITHUB_REPOSITORY" --run "$SOURCE_RUN" --output _site
+
       - name: Upload website and p2 repositories
         uses: actions/upload-pages-artifact@v4
         with:
           path: _site
 
   deploy:
+    name: Publish website and update site
     needs: build
     runs-on: ubuntu-latest
     permissions:

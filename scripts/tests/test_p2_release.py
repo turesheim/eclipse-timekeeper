@@ -151,7 +151,7 @@ class PublicationTest(unittest.TestCase):
              "head_branch":"main","path":".github/workflows/build.yml","head_sha":"a"*40,
              "head_repository":{"full_name":"owner/repo"}}
         jobs=[{"name":name,"status":"completed","conclusion":"success"} for name in (
-            "Update site checks","Publication tooling tests","API-contract","Server","Web","Build (ubuntu-latest)",
+            "Build website and update site","Packaging and channel tests","API-contract","Server","Web","Build (ubuntu-latest)",
             "Build (macos-latest)","Build (windows-latest)","Installed client tests")]
         artifact={"id":456,"name":"p2-repository","expired":False,
                   "digest":"sha256:"+hashlib.sha256(archive.read_bytes()).hexdigest(),
@@ -240,6 +240,63 @@ class PublicationTest(unittest.TestCase):
         run,jobs,artifact,archive,github,download=self._testing_fixture();artifact["expired"]=True
         with patch.object(p2,"gh",side_effect=github),patch.object(p2,"download_testing_artifact") as fetch:
             self.assertIsNone(p2.add_testing_channel("owner/repo",self.root/"site"));fetch.assert_not_called()
+
+    def _prepared_site_fixture(self):
+        run,jobs,artifact,archive,github,download=self._testing_fixture()
+        prepared=self.root/"prepared-site";prepared.mkdir();(prepared/"index.html").write_text("Project documentation")
+        def api(*args):
+            if args[1]=="repos/owner/repo/actions/runs/123":return json.dumps(run)
+            if args[1]=="repos/owner/repo/releases":return json.dumps([[]])
+            if "workflows/build.yml/runs" in args[1]:self.fail("Current site must not use an older run")
+            return github(*args)
+        with patch.object(p2,"gh",side_effect=api),patch.object(p2,"download_testing_artifact",side_effect=download):
+            identity=p2.build_site("owner/repo",prepared,"a"*40,123)
+        site_zip=self.root/"prepared-site.zip"
+        def repack():
+            with zipfile.ZipFile(site_zip,"w") as zipped:
+                for path in prepared.rglob("*"):
+                    if path.is_file():zipped.write(path,path.relative_to(prepared).as_posix())
+            artifact["digest"]="sha256:"+hashlib.sha256(site_zip.read_bytes()).hexdigest()
+        repack();artifact["name"]="website-update-site"
+        def fetch(repo,artifact_id,destination):shutil.copyfile(site_zip,destination)
+        return run,artifact,prepared,identity,site_zip,api,fetch,repack
+
+    def test_pages_publishes_the_exact_prepared_documentation_and_matrix_site(self):
+        run,artifact,prepared,identity,archive,api,fetch,repack=self._prepared_site_fixture()
+        output=self.root/"deployed"
+        with patch.object(p2,"gh",side_effect=api),patch.object(p2,"download_testing_artifact",side_effect=fetch):
+            self.assertEqual(identity,p2.fetch_site("owner/repo",output,123))
+        expected={p.relative_to(prepared).as_posix():p.read_bytes() for p in prepared.rglob("*") if p.is_file()}
+        actual={p.relative_to(output).as_posix():p.read_bytes() for p in output.rglob("*") if p.is_file()}
+        self.assertEqual(expected,actual)
+        self.assertEqual("Project documentation",(output/"index.html").read_text())
+
+    def test_pages_refuses_untrusted_runs_wrong_site_source_and_corrupt_artifacts(self):
+        for change in ("pr","fork","incomplete","source","checksum"):
+            with self.subTest(change=change):
+                # Each case gets fresh artifact fixtures and output paths.
+                for directory in (self.root/"prepared-site",self.root/"deployed"):
+                    if directory.exists():shutil.rmtree(directory)
+                run,artifact,prepared,identity,archive,api,fetch,repack=self._prepared_site_fixture()
+                if change=="pr":run["event"]="pull_request"
+                elif change=="fork":run["head_repository"]["full_name"]="fork/repo"
+                elif change=="incomplete":run["status"]="in_progress"
+                elif change=="source":
+                    identity["commit"]="b"*40
+                    (prepared/"timekeeper-site.json").write_text(json.dumps(identity));repack()
+                else:
+                    with archive.open("ab") as stream:stream.write(b"corrupt")
+                with patch.object(p2,"gh",side_effect=api),patch.object(p2,"download_testing_artifact",side_effect=fetch):
+                    with self.assertRaises(ValueError):p2.fetch_site("owner/repo",self.root/"deployed",123)
+                self.assertFalse((self.root/"deployed").exists())
+
+    def test_prepared_pages_artifact_must_contain_a_complete_update_repository(self):
+        run,artifact,prepared,identity,archive,api,fetch,repack=self._prepared_site_fixture()
+        next((prepared/"updates/testing").rglob("plugins/*.jar")).unlink();repack()
+        with patch.object(p2,"gh",side_effect=api),patch.object(p2,"download_testing_artifact",side_effect=fetch):
+            with self.assertRaisesRegex(ValueError,"Missing repository artifact"):
+                p2.fetch_site("owner/repo",self.root/"deployed",123)
+        self.assertFalse((self.root/"deployed").exists())
 
     def complete_assets(self, commit="a" * 40, tag="v2.0.0"):
         assets = self.assets(tag)
