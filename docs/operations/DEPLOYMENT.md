@@ -188,6 +188,18 @@ An incompatible image fails readiness and is rolled back. A future schema
 migration must be coordinated separately, with a tested database restore plan;
 rolling back an image alone cannot undo a migration.
 
+For the first upgrade to a build supporting Work Sessions, disable scheduled
+updates, take a verified backup and pause client writes while replacing both
+replicas. Confirm that both replicas run the accepted Work Session build before
+resuming writes. This first transition must not serve writes through a mixture
+of old and new domain models. The generic SQL layout remains server schema 1;
+its version marker alone does not prove that an older binary understands new
+resource types or activity associations. Once sessions or taskless activities
+have been recorded, use only server builds supporting them. Returning to a
+pre-Work-Session build requires stopping client access and restoring a verified
+backup from before those records existed; an image rollback alone is unsupported.
+Later updates between compatible Work Session builds can use the rolling updater.
+
 ## Moving from the earlier three-node deployment
 
 Use a logical backup and restore; the previous Patroni files cannot simply be

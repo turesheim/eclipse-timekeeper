@@ -33,18 +33,18 @@ final class WorkSessionPanel {
     WorkSessionPanel(Composite parent) {
         group=new Group(parent,SWT.NONE);
         group.setText("Work Session");
-        group.setLayout(new GridLayout(4,false));
+        var compactLayout=new GridLayout(4,false);
+        compactLayout.marginHeight=0;compactLayout.verticalSpacing=0;
+        group.setLayout(compactLayout);
         group.setLayoutData(new GridData(SWT.FILL,SWT.TOP,true,false,3,1));
         status=new Label(group,SWT.NONE);
         status.setData("org.eclipse.swtbot.widget.key","work-session-status");
-        status.setLayoutData(new GridData(SWT.FILL,SWT.CENTER,true,false));
+        var statusData=new GridData(SWT.FILL,SWT.CENTER,true,false);statusData.widthHint=180;status.setLayoutData(statusData);
         start=button(group,"Start work session",this::start);
         stop=button(group,"Stop work session",this::stop);
         var toggle=new Button(group,SWT.TOGGLE);
         toggle.setText("Session details");
         toggle.setData("org.eclipse.swtbot.widget.key","work-session-details");
-        details=new Label(group,SWT.NONE);
-        details.setLayoutData(new GridData(SWT.FILL,SWT.CENTER,true,false,4,1));
         totals=new Label(group,SWT.NONE);
         totals.setData("org.eclipse.swtbot.widget.key","work-session-totals");
         totals.setLayoutData(new GridData(SWT.FILL,SWT.CENTER,true,false,4,1));
@@ -80,6 +80,8 @@ final class WorkSessionPanel {
                     snapshot.report().session(),LocalDate.now(TimekeeperUiPlugin.getCalendarZone())).open();
         });
         detach=button(body,"Remove association",this::detach);
+        details=new Label(body,SWT.NONE);
+        details.setLayoutData(new GridData(SWT.FILL,SWT.CENTER,true,false,6,1));
         activities=new Table(body,SWT.BORDER|SWT.FULL_SELECTION|SWT.V_SCROLL|SWT.H_SCROLL);
         activities.setHeaderVisible(true);activities.setLinesVisible(true);
         activities.setData("org.eclipse.swtbot.widget.key","work-session-activities");
@@ -116,7 +118,10 @@ final class WorkSessionPanel {
         },value->{loading=false;if(group.isDisposed()) return;if(!Objects.equals(requested,selected)) {refresh();return;}snapshot=value;render();},failure->{loading=false;if(!group.isDisposed()) {warning.setText(failure.getMessage());enabled();}});
     }
     private void render() {
-        status.setText(snapshot.active().isPresent() ? "Running" : "Stopped");history.removeAll();
+        var current=snapshot.active().or(()->Optional.ofNullable(snapshot.report()).map(WorkSessionService.Report::session));
+        status.setText((snapshot.active().isPresent() ? "Running" : "Stopped")+current.map(value->" · Started "+time(value.start())).orElse(""));
+        status.setToolTipText(current.map(value->"Started "+value.start()+value.end().map(end->" · Ended "+end).orElse(" · Running")).orElse("No work session recorded"));
+        history.removeAll();
         for(var value:snapshot.sessions()) history.add(time(value.start())+" · "+(value.end().isEmpty() ? "Running" : "Completed")+" · "+value.summary());
         var previouslySelected=selectedActivity();activities.removeAll();var report=snapshot.report();
         if(report==null) {details.setText("Start a session to track work independently of tasks.");totals.setText("");warning.setText("");}

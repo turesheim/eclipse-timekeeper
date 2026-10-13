@@ -324,20 +324,21 @@ public abstract class NativeProjectTaskScenario {
 			tree.deselectAll();
 			// The session header reduces the initial docked view height. Scroll the
 			// inspected row into view before checking pixels, as a user would.
-			assertTrue("Workweek must retain a visible activity row", tree.getClientArea().height > tree.getHeaderHeight() + tree.getItemHeight());
+			assertTrue("Workweek must retain a visible activity row", tree.getSize().y > tree.getHeaderHeight() + tree.getItemHeight());
 			tree.setTopItem(row.widget);
 			tree.showItem(row.widget);
 			tree.redraw();
 			tree.update();
 			var image = new org.eclipse.swt.graphics.Image(tree.getDisplay(), tree.getSize().x, tree.getSize().y);
-			var gc = new org.eclipse.swt.graphics.GC(tree.getDisplay());
+			var cocoa="cocoa".equals(SWT.getPlatform());
+			var gc = cocoa ? new org.eclipse.swt.graphics.GC(tree.getDisplay()) : new org.eclipse.swt.graphics.GC(tree);
 			try {
-				var origin = tree.toDisplay(0, 0);
+				var origin = cocoa ? tree.toDisplay(0, 0) : new org.eclipse.swt.graphics.Point(0, 0);
 				gc.copyArea(image, origin.x, origin.y);
 				var data = image.getImageData();
 				var bounds = row.widget.getBounds(0);
-				// Display capture uses the same control coordinates as TreeItem bounds,
-				// avoiding Cocoa scroll-view offsets from a GC constructed on Tree.
+				// Cocoa uses Display capture to avoid its scroll-view GC offsets.
+				// GTK/Windows use the widget GC with control-relative coordinates.
 				bounds = bounds.intersection(new org.eclipse.swt.graphics.Rectangle(0, 0, data.width, data.height));
 				// Inspect only the marker area, avoiding the activity icon and text.
 				bounds.x += Math.max(0, bounds.width - 32);

@@ -21,8 +21,8 @@ python server/scripts/acceptance.py
 ```
 
 JUnit checks the shared core, real Quarkus/HTTP/H2 bootstrap, protocol limits,
-and refusal of damaged/unknown schemas. The process suite runs all twelve
-black-box API contract cases against a fresh file database, then restarts in new
+and refusal of damaged/unknown schemas. The process suite runs the black-box
+API contract cases against a fresh file database, then restarts in new
 JVMs and verifies IDs, provider links, assigned labels, an open interval, durable
 command replay, immediate forced termination after stop, token revocation,
 long-poll delivery, import rollback, hierarchy conflicts, nanoseconds and both
@@ -42,7 +42,7 @@ its official image, and HAProxy. Data lives in a separate host directory. The
 updater drains and replaces one server at a time, verifies readiness and restores
 the previous images on failure. Database upgrades are separate maintenance work.
 
-Use a separate empty server database; the embedded Eclipse schema 2 and
+Use a separate empty server database; the embedded Eclipse schema 3 and
 historical databases are unsupported. The server never copies or merges embedded
 data automatically. Set an explicit JDBC URL and a token registry file:
 
@@ -149,6 +149,15 @@ backup, and reopen the same configuration. A JSON export is current-model
 interchange, not a physical backup or legacy migration. Protect the registry
 separately; tokens are never included in data export. Keep the server version,
 source commit and distribution checksum with operational records.
+
+Work Sessions use the server's existing generic SQL schema 1, while portable
+JSON/CSV export uses domain-v2 to retain sessions and optional activity links.
+Older exports remain readable. Older server binaries do not preserve this new
+domain model during writes or export, even though the SQL tables are unchanged.
+The [first-upgrade procedure](DEPLOYMENT.md#automatic-server-image-updates)
+therefore requires pausing writes until every replica supports Work Sessions.
+Keep compatible server builds for subsequent image rollback; a downgrade to the
+previous domain model requires a matching pre-upgrade backup.
 
 ## Distribution
 
