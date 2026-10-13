@@ -73,20 +73,26 @@ public final class Commands {
 
 	public record DeleteLabel(LabelId id, long expectedVersion) { }
 
-	public record StartActivity(TaskId taskId, OwnerId ownerId, String summary, Set<LabelId> labelIds) {
-		public StartActivity {
-			labelIds = copy(labelIds);
-		}
+	public record StartActivity(TaskId taskId, OwnerId ownerId, String summary, Set<LabelId> labelIds,
+            Optional<WorkSessionId> workSessionId, Optional<ProjectId> projectId) {
+        public StartActivity {
+            labelIds = copy(labelIds); workSessionId = optional(workSessionId); projectId = optional(projectId);
+        }
+        public StartActivity(TaskId taskId, OwnerId ownerId, String summary, Set<LabelId> labelIds) {
+            this(taskId,ownerId,summary,labelIds,Optional.empty(),Optional.empty());
+        }
 	}
 
 	public record StopActivity(ActivityId id, long expectedVersion) { }
 
 	public record CreateActivity(TaskId taskId, OwnerId ownerId, Instant start, Optional<Instant> end,
-			String summary, Set<LabelId> labelIds) {
-		public CreateActivity {
-			end = optional(end);
-			labelIds = copy(labelIds);
-		}
+			String summary, Set<LabelId> labelIds, Optional<WorkSessionId> workSessionId, Optional<ProjectId> projectId) {
+        public CreateActivity {
+            end = optional(end); labelIds = copy(labelIds); workSessionId = optional(workSessionId); projectId = optional(projectId);
+        }
+        public CreateActivity(TaskId taskId, OwnerId ownerId, Instant start, Optional<Instant> end, String summary, Set<LabelId> labelIds) {
+            this(taskId,ownerId,start,end,summary,labelIds,Optional.empty(),Optional.empty());
+        }
 	}
 
 	public record UpdateActivity(ActivityId id, long expectedVersion, Instant start, Optional<Instant> end,

@@ -3411,7 +3411,14 @@
         "description": "A recorded interval. Start must not be after the backend clock, whether the interval is open or closed; a future start returns 422 VALIDATION.",
         "properties": {
           "taskId": {
-            "$ref": "#/components/schemas/Id"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "start": {
             "$ref": "#/components/schemas/Instant"
@@ -3436,6 +3443,26 @@
             },
             "uniqueItems": true,
             "maxItems": 500
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workSessionId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -3488,7 +3515,14 @@
         "type": "object",
         "properties": {
           "taskId": {
-            "$ref": "#/components/schemas/Id"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "summary": {
             "$ref": "#/components/schemas/Summary"
@@ -3515,6 +3549,26 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Version"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workSessionId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
               },
               {
                 "type": "null"
@@ -3730,7 +3784,14 @@
             "$ref": "#/components/schemas/Version"
           },
           "taskId": {
-            "$ref": "#/components/schemas/Id"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "start": {
             "$ref": "#/components/schemas/Instant"
@@ -3760,6 +3821,16 @@
             "type": "boolean"
           },
           "workSessionId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "projectId": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Id"
@@ -3962,7 +4033,14 @@
                     "type": "object",
                     "properties": {
                       "taskId": {
-                        "$ref": "#/components/schemas/Id"
+                        "anyOf": [
+                          {
+                            "$ref": "#/components/schemas/Id"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       },
                       "total": {
                         "$ref": "#/components/schemas/Duration"

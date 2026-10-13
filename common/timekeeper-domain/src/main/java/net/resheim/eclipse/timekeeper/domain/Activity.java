@@ -10,10 +10,10 @@ import java.util.Set;
 /** Immutable recorded interval owned by a user or service. */
 public record Activity(ActivityId id, TaskId taskId, OwnerId ownerId, Instant start,
 		Optional<Instant> end, String summary, Set<LabelId> labelIds, boolean manual, long version,
-        Optional<WorkSessionId> workSessionId) {
+        Optional<WorkSessionId> workSessionId, Optional<ProjectId> projectId) {
 	public Activity {
 		id = Values.required(id, "activityId");
-		taskId = Values.required(taskId, "taskId");
+
 		ownerId = Values.required(ownerId, "ownerId");
 		start = Values.required(start, "start");
 		end = end == null ? Optional.empty() : end;
@@ -24,24 +24,34 @@ public record Activity(ActivityId id, TaskId taskId, OwnerId ownerId, Instant st
 		labelIds = Values.set(labelIds, "labelIds");
 		version = Values.version(version);
         workSessionId = workSessionId == null ? Optional.empty() : workSessionId;
+        projectId = projectId == null ? Optional.empty() : projectId;
 	}
 
     /** Existing standalone activities have no session association. */
     public Activity(ActivityId id, TaskId taskId, OwnerId ownerId, Instant start,
             Optional<Instant> end, String summary, Set<LabelId> labelIds, boolean manual, long version) {
-        this(id, taskId, ownerId, start, end, summary, labelIds, manual, version, Optional.empty());
+        this(id, taskId, ownerId, start, end, summary, labelIds, manual, version, Optional.empty(), Optional.empty());
     }
+
+    public Activity(ActivityId id, TaskId taskId, OwnerId ownerId, Instant start,
+            Optional<Instant> end, String summary, Set<LabelId> labelIds, boolean manual, long version,
+            Optional<WorkSessionId> workSessionId) {
+        this(id,taskId,ownerId,start,end,summary,labelIds,manual,version,workSessionId,Optional.empty());
+    }
+
+    /** Empty for an activity recorded without an assigned task. */
+    public Optional<TaskId> task() { return Optional.ofNullable(taskId); }
 
     public Activity associate(WorkSessionId sessionId) {
         return new Activity(id, taskId, ownerId, start, end, summary, labelIds, manual,
-                version + 1, Optional.ofNullable(sessionId));
+                version + 1, Optional.ofNullable(sessionId), projectId);
     }
 
 	public Activity stop(Instant stoppedAt) {
 		if (end.isPresent()) throw new DomainValidationException("activity", "activity is already stopped");
 		return new Activity(id, taskId, ownerId, start,
 				Optional.of(Values.required(stoppedAt, "stoppedAt")), summary, labelIds, manual,
-				version + 1, workSessionId);
+				version + 1, workSessionId, projectId);
 	}
 
 	/** Validate a recorded start against the owning backend's clock. */
@@ -55,7 +65,7 @@ public record Activity(ActivityId id, TaskId taskId, OwnerId ownerId, Instant st
 
 	public Activity edit(Instant newStart, Instant newEnd, String newSummary, Set<LabelId> newLabelIds) {
 		return new Activity(id, taskId, ownerId, newStart, Optional.ofNullable(newEnd), newSummary,
-				newLabelIds, true, version + 1, workSessionId);
+				newLabelIds, true, version + 1, workSessionId, projectId);
 	}
 
 	public Duration duration(LocalDate date, ZoneId zoneId, Instant asOf) {

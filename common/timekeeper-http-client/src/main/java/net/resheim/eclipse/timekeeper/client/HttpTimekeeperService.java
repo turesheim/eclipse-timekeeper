@@ -164,16 +164,20 @@ public final class HttpTimekeeperService implements TimekeeperService,WorkSessio
     @Override public Optional<Label> label(LabelId id) {return get("/labels/"+id.value()).map(WireValues::label);}
     @Override public List<Label> labels() {return page("labels",Map.of()).items().stream().map(WireValues::label).toList();}
     @Override public Optional<Activity> activeActivity(OwnerId requested) {owner(requested);return get("/activities/active").map(value -> {tags.put("/activities/"+value.get("id").getAsString(),tags.get("/activities/active"));return WireValues.activity(value);});}
-    @Override public Activity startActivity(StartActivity command) {owner(command.ownerId());return activate(command.taskId(),command.summary(),command.labelIds(),activeActivity(OwnerId.LOCAL));}
+    @Override public Activity startActivity(StartActivity command) {owner(command.ownerId());return activate(command.taskId(),command.summary(),command.labelIds(),activeActivity(OwnerId.LOCAL),command.workSessionId(),command.projectId());}
     /** Compare the activity actually observed by the caller; never silently overwrite a successor. */
     public Activity activate(TaskId task,String summary,Set<LabelId> labels,Optional<Activity> observed) {
-        var body=object();body.addProperty("taskId",task.value().toString());body.addProperty("summary",summary);body.add("labelIds",WireValues.labels(labels));optional(body,"expectedActiveId",observed.map(value -> value.id().value()));
+        return activate(task,summary,labels,observed,Optional.empty(),Optional.empty());
+    }
+    public Activity activate(TaskId task,String summary,Set<LabelId> labels,Optional<Activity> observed,Optional<WorkSessionId> session,Optional<ProjectId> project) {
+        var body=object();optional(body,"taskId",Optional.ofNullable(task).map(TaskId::value));
+        session.ifPresent(id -> body.addProperty("workSessionId",id.value().toString()));project.ifPresent(id -> body.addProperty("projectId",id.value().toString()));body.addProperty("summary",summary);body.add("labelIds",WireValues.labels(labels));optional(body,"expectedActiveId",observed.map(value -> value.id().value()));
         if(observed.isEmpty()) body.add("expectedActiveVersion",JsonNull.INSTANCE);else body.addProperty("expectedActiveVersion",observed.get().version());
         Result result=request("POST","/activities/start",body,Map.of("Idempotency-Key",UUID.randomUUID().toString()));var value=result.body().getAsJsonObject();return WireValues.activity(remember("/activities/"+value.get("id").getAsString(),result));
     }
     @Override public Activity stopActivity(StopActivity command) {String path="/activities/"+command.id().value();return WireValues.activity(remember(path,request("POST",path+"/stop",null,Map.of("If-Match",match(path,command.expectedVersion()),"Idempotency-Key",UUID.randomUUID().toString()))));}
     private static JsonObject interval(Instant start,Optional<Instant> end,String summary,Set<LabelId> labels) {var body=object();body.addProperty("start",start.toString());optional(body,"end",end);body.addProperty("summary",summary);body.add("labelIds",WireValues.labels(labels));return body;}
-    @Override public Activity createActivity(CreateActivity command) {owner(command.ownerId());var body=interval(command.start(),command.end(),command.summary(),command.labelIds());body.addProperty("taskId",command.taskId().value().toString());return WireValues.activity(create("activities",body));}
+    @Override public Activity createActivity(CreateActivity command) {owner(command.ownerId());var body=interval(command.start(),command.end(),command.summary(),command.labelIds());optional(body,"taskId",Optional.ofNullable(command.taskId()).map(TaskId::value));command.workSessionId().ifPresent(id -> body.addProperty("workSessionId",id.value().toString()));command.projectId().ifPresent(id -> body.addProperty("projectId",id.value().toString()));return WireValues.activity(create("activities",body));}
     @Override public Activity updateActivity(UpdateActivity command) {return WireValues.activity(put("/activities/"+command.id().value(),command.expectedVersion(),interval(command.start(),command.end(),command.summary(),command.labelIds())));}
     @Override public void deleteActivity(DeleteActivity command) {delete("/activities/"+command.id().value(),command.expectedVersion());}
     @Override public Optional<Activity> activity(ActivityId id) {return get("/activities/"+id.value()).map(WireValues::activity);}

@@ -25,7 +25,7 @@ public final class WireValues {
     public static Label label(JsonObject value) {return new Label(new LabelId(id(value.get("id"))),value.get("name").getAsString(),text(value.get("color")).map(WireValues::rgb),value.get("version").getAsLong());}
     public static Activity activity(JsonObject value) {
         Set<LabelId> ids=StreamSupport.stream(value.getAsJsonArray("labelIds").spliterator(),false).map(WireValues::id).map(LabelId::new).collect(Collectors.toUnmodifiableSet());
-        return new Activity(new ActivityId(id(value.get("id"))),new TaskId(id(value.get("taskId"))),new OwnerId(value.get("ownerId").getAsString()),Instant.parse(value.get("start").getAsString()),text(value.get("end")).map(Instant::parse),value.get("summary").getAsString(),ids,value.get("manual").getAsBoolean(),value.get("version").getAsLong(),text(value.get("workSessionId")).map(UUID::fromString).map(WorkSessionId::new));
+        return new Activity(new ActivityId(id(value.get("id"))),text(value.get("taskId")).map(UUID::fromString).map(TaskId::new).orElse(null),new OwnerId(value.get("ownerId").getAsString()),Instant.parse(value.get("start").getAsString()),text(value.get("end")).map(Instant::parse),value.get("summary").getAsString(),ids,value.get("manual").getAsBoolean(),value.get("version").getAsLong(),text(value.get("workSessionId")).map(UUID::fromString).map(WorkSessionId::new),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new));
     }
     public static WorkSession workSession(JsonObject value) {
         var session=new WorkSession(new WorkSessionId(id(value.get("id"))),new OwnerId(value.get("ownerId").getAsString()),

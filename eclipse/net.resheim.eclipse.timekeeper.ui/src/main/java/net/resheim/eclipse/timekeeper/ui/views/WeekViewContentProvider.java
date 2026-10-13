@@ -65,7 +65,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	public Set<Task> getFiltered() { return filtered; }
 	public void setShowAllTasks(boolean showAllTasks) { this.showAllTasks = showAllTasks; }
 	public void setShowActivities(boolean showActivities) { this.showActivities = showActivities; }
-	public Optional<Task> task(TaskId id) { return Optional.ofNullable(tasks.get(id)); }
+	public Optional<Task> task(TaskId id) { return id==null ? Optional.empty() : Optional.ofNullable(tasks.get(id)); }
 	public List<Label> labels(Activity activity) {
 		return activity.labelIds().stream().map(labels::get).filter(java.util.Objects::nonNull)
 				.sorted(java.util.Comparator.comparing(Label::name).thenComparing(label -> label.id().value())).toList();
@@ -83,26 +83,28 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 
 	@Override public Object[] getChildren(Object parent) {
 		if (parent instanceof Project project) {
-			return filtered.stream().filter(task -> task.projectId().equals(Optional.of(project.id())))
-					.filter(task -> task.parentTaskId().isEmpty()).toArray();
+            return java.util.stream.Stream.concat(filtered.stream().filter(task -> task.projectId().equals(Optional.of(project.id())))
+                    .filter(task -> task.parentTaskId().isEmpty()),activities.stream().filter(activity -> showActivities && activity.task().isEmpty()
+                            && activity.projectId().equals(Optional.of(project.id())))).toArray();
 		}
 		if (parent instanceof Task task) {
 			return java.util.stream.Stream.concat(filtered.stream()
 					.filter(child -> child.parentTaskId().equals(Optional.of(task.id()))),
-					activities.stream().filter(activity -> showActivities && activity.taskId().equals(task.id()))).toArray();
+					activities.stream().filter(activity -> showActivities && task.id().equals(activity.taskId()))).toArray();
 		}
 		return new Object[0];
 	}
 	@Override public Object[] getElements(Object parent) {
-		if (projects.isEmpty() && filtered.isEmpty()) return new Object[0];
+		if (projects.isEmpty() && filtered.isEmpty() && activities.isEmpty()) return new Object[0];
 		return java.util.stream.Stream.concat(java.util.stream.Stream.concat(projects.values().stream(),
 				filtered.stream().filter(task -> task.projectId().isEmpty() && task.parentTaskId().isEmpty())),
-				java.util.stream.Stream.of(WEEKLY_SUMMARY)).toArray();
+                java.util.stream.Stream.concat(activities.stream().filter(activity -> showActivities && activity.task().isEmpty() && activity.projectId().isEmpty()),
+                        java.util.stream.Stream.of(WEEKLY_SUMMARY))).toArray();
 	}
 	@Override public Object getParent(Object element) {
 		if (element instanceof Task task) return task.parentTaskId().map(tasks::get)
 				.<Object>map(value -> value).orElseGet(() -> task.projectId().map(projects::get).orElse(null));
-		if (element instanceof Activity activity) return tasks.get(activity.taskId());
+		if (element instanceof Activity activity) return activity.task().<Object>map(tasks::get).orElseGet(() -> activity.projectId().map(projects::get).orElse(null));
 		return null;
 	}
 	@Override public boolean hasChildren(Object element) {
@@ -127,7 +129,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 				firstDayOfWeek.plusDays(7).atStartOfDay(zoneId).toInstant(), Optional.empty(), Optional.empty(),
 				Optional.empty(), zoneId)).activities();
 		Set<TaskId> visible = showAllTasks ? new java.util.HashSet<>(tasks.keySet())
-				: activities.stream().map(Activity::taskId).collect(Collectors.toSet());
+				: activities.stream().map(Activity::taskId).filter(java.util.Objects::nonNull).collect(Collectors.toSet());
 		for (TaskId id : List.copyOf(visible)) {
 			Task task = tasks.get(id);
 			Set<TaskId> visited = new java.util.HashSet<>();
@@ -161,15 +163,15 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
             }
             return false;
         }
-        if(element instanceof Project project) return task(activity.taskId()).map(task->task.projectId().equals(Optional.of(project.id()))).orElse(false);
+        if(element instanceof Project project) return activity.task().isEmpty() ? activity.projectId().equals(Optional.of(project.id())) : task(activity.taskId()).map(task->task.projectId().equals(Optional.of(project.id()))).orElse(false);
         return element instanceof WeeklySummary;
     }
 	public boolean active(Object element) {
 		return activities.stream().filter(activity -> activity.end().isEmpty()).anyMatch(activity -> {
 			if (element instanceof Activity selected) return activity.id().equals(selected.id());
-			if (element instanceof Task task) return activity.taskId().equals(task.id());
-			if (element instanceof Project project) return task(activity.taskId())
-					.map(task -> task.projectId().equals(Optional.of(project.id()))).orElse(false);
+			if (element instanceof Task task) return task.id().equals(activity.taskId());
+			if (element instanceof Project project) return activity.task().isEmpty() ? activity.projectId().equals(Optional.of(project.id())) : task(activity.taskId())
+                    .map(task -> task.projectId().equals(Optional.of(project.id()))).orElse(false);
 			return false;
 		});
 	}

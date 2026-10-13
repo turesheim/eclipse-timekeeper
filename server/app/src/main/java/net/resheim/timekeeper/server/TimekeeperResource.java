@@ -46,7 +46,7 @@ public class TimekeeperResource {
                 case "PROJECT" -> service.createProject(new CreateProject(input.get("name").asText()));
                 case "TASK" -> service.createTask(new CreateTask(project(input),parent(input),input.get("summary").asText(),optionalText(input.get("url")),references(input.get("externalReferences"))));
                 case "LABEL" -> service.createLabel(new CreateLabel(input.get("name").asText(),optionalText(input.get("color"))));
-                case "ACTIVITY" -> service.createActivity(new CreateActivity(new TaskId(uuid(input.get("taskId"))),new OwnerId(store.owner()),Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText(),labels(input.get("labelIds"))));
+                case "ACTIVITY" -> service.createActivity(new CreateActivity(optionalText(input.get("taskId")).map(UUID::fromString).map(TaskId::new).orElse(null),new OwnerId(store.owner()),Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText(),labels(input.get("labelIds")),optionalText(input.get("workSessionId")).map(UUID::fromString).map(WorkSessionId::new),project(input)));
                 case "WORK_SESSION" -> store.workSessionService().createWorkSession(new CreateWorkSession(new OwnerId(store.owner()),Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText()));
                 default -> throw ApiFailure.notFound();
             };
@@ -106,10 +106,10 @@ public class TimekeeperResource {
             if(expectedId.isNull()!=expectedVersion.isNull()) throw ApiFailure.validation();
             if((active.isEmpty() && !expectedId.isNull()) || (active.isPresent() && (expectedId.isNull() || !active.get().get("id").asText().equals(uuid(expectedId).toString()) || active.get().get("version").asLong()!=expectedVersion.asLong())))
                 throw new ApiFailure(409,"ACTIVE_STATE_CHANGED");
-            UUID task=uuid(input.get("taskId"));required("TASK",task);for(LabelId label:labels(input.get("labelIds"))) required("LABEL",label.value());
-            if(active.isPresent() && active.get().get("taskId").asText().equals(task.toString())) return ApiReplies.resource(200,active.get(),null);
+            UUID task=optionalText(input.get("taskId")).map(UUID::fromString).orElse(null);if(task!=null) required("TASK",task);for(LabelId label:labels(input.get("labelIds"))) required("LABEL",label.value());
+            if(task!=null && active.isPresent() && active.get().get("taskId").asText().equals(task.toString())) return ApiReplies.resource(200,active.get(),null);
             var service=store.service();if(active.isPresent()) service.stopActivity(new StopActivity(new ActivityId(uuid(active.get().get("id"))),active.get().get("version").asLong()));
-            var created=service.startActivity(new StartActivity(new TaskId(task),new OwnerId(store.owner()),input.get("summary").asText(),labels(input.get("labelIds"))));
+            var created=service.startActivity(new StartActivity(task==null ? null : new TaskId(task),new OwnerId(store.owner()),input.get("summary").asText(),labels(input.get("labelIds")),optionalText(input.get("workSessionId")).map(UUID::fromString).map(WorkSessionId::new),project(input)));
             return ApiReplies.resource(201,snapshot(store.owner(),created),"/api/v1/activities/"+created.id().value());
         }));
     }
@@ -221,10 +221,10 @@ public class TimekeeperResource {
                 for(;!date.isAfter(last);date=date.plusDays(1)) {
                     Instant dayStart=date.atStartOfDay(zone).toInstant(),dayEnd=date.plusDays(1).atStartOfDay(zone).toInstant();
                     Instant clippedStart=start.isAfter(dayStart) ? start : dayStart,clippedEnd=end.isBefore(dayEnd) ? end : dayEnd;
-                    Duration duration=Duration.between(clippedStart,clippedEnd);sums.computeIfAbsent(date,ignored -> new TreeMap<>()).merge(activity.taskId().value().toString(),duration,Duration::plus);
+                    Duration duration=Duration.between(clippedStart,clippedEnd);sums.computeIfAbsent(date,ignored -> new TreeMap<>()).merge(activity.taskId()==null ? "" : activity.taskId().value().toString(),duration,Duration::plus);
                 }
             }
-            sums.forEach((date,tasks) -> {var day=object();day.put("date",date.toString());day.put("total",tasks.values().stream().reduce(Duration.ZERO,Duration::plus).toString());var taskTotals=day.putArray("tasks");tasks.forEach((id,duration) -> {var row=object();row.put("taskId",id);row.put("total",duration.toString());taskTotals.add(row);});days.add(day);});
+            sums.forEach((date,tasks) -> {var day=object();day.put("date",date.toString());day.put("total",tasks.values().stream().reduce(Duration.ZERO,Duration::plus).toString());var taskTotals=day.putArray("tasks");tasks.forEach((id,duration) -> {var row=object();if(id.isEmpty()) row.putNull("taskId");else row.put("taskId",id);row.put("total",duration.toString());taskTotals.add(row);});days.add(day);});
             return json(result);
         });
     }

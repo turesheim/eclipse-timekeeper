@@ -88,7 +88,7 @@ final class ActivityDialog extends AsyncRecordDialog {
 		body.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 		body.setLayout(new GridLayout(2, false));
 		new Label(body, SWT.NONE).setText("Task");
-		new Label(body, SWT.NONE).setText(service.task(taskId).orElseThrow().summary());
+		new Label(body, SWT.NONE).setText(taskId==null ? "Unassigned activity" : service.task(taskId).orElseThrow().summary());
 		summary = field(body, "Summary", original == null ? "" : original.summary());
 		start = field(body, "Start (yyyy-MM-dd HH:mm)", original == null ? FORMAT.format(date.atTime(9, 0))
 				: FORMAT.format(original.start().atZone(zone)));

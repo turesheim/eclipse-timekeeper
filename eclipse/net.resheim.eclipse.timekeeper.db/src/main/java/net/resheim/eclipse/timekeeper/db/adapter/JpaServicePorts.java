@@ -257,12 +257,12 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 		String id = snapshot.id().value().toString();
 		net.resheim.eclipse.timekeeper.db.model.Activity entity = manager.find(
 				net.resheim.eclipse.timekeeper.db.model.Activity.class, id);
-		net.resheim.eclipse.timekeeper.db.model.Task tracked = manager.find(
+		net.resheim.eclipse.timekeeper.db.model.Task tracked = snapshot.taskId()==null ? null : manager.find(
 				net.resheim.eclipse.timekeeper.db.model.Task.class, snapshot.taskId().value().toString());
 		if (entity == null) {
 			entity = new net.resheim.eclipse.timekeeper.db.model.Activity(id, tracked,
 					new OwnerIdentity(snapshot.ownerId().value()), snapshot.start());
-			tracked.addActivity(entity);
+            if(tracked!=null) tracked.addActivity(entity);
 			manager.persist(entity);
 		} else {
 			expectNext(snapshot.version(), activityVersion(entity), "activity");
@@ -274,8 +274,17 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 		entity.setManual(snapshot.manual());
 		entity.setLabels(snapshot.labelIds().stream().map(labelId -> manager.find(ActivityLabel.class,
 				labelId.value().toString())).toList());
-		if (snapshot.end().isEmpty()) tracked.setCurrentActivity(entity);
-		else if (tracked.getCurrentActivity().orElse(null) == entity) tracked.setCurrentActivity(null);
+        var directProject=snapshot.projectId().map(idValue -> findProject(idValue).orElseThrow(
+                () -> ServiceException.notFound("project",idValue))).orElse(null);
+        if(entity.getProject()!=directProject) {
+            if(entity.getProject()!=null) entity.getProject().removeActivity(entity);
+            if(directProject!=null) directProject.addActivity(entity);
+            entity.setProject(directProject);
+        }
+        if(tracked!=null) {
+            if (snapshot.end().isEmpty()) tracked.setCurrentActivity(entity);
+            else if (tracked.getCurrentActivity().orElse(null) == entity) tracked.setCurrentActivity(null);
+        }
 		manager.flush();
 		return activity(entity);
 	}
@@ -287,6 +296,7 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 				net.resheim.eclipse.timekeeper.db.model.Activity.class, id.value().toString());
 		if (entity != null) {
 			if (entity.getTrackedTask() != null) entity.getTrackedTask().removeActivity(entity);
+            if(entity.getProject()!=null) entity.getProject().removeActivity(entity);
 			manager.remove(entity);
 		}
 	}
@@ -448,9 +458,9 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 				.map(value -> new LabelId(UUID.fromString(value.getId())))
 				.collect(java.util.stream.Collectors.toSet());
 		return new Activity(new ActivityId(UUID.fromString(entity.getId())),
-				new TaskId(UUID.fromString(entity.getTrackedTask().getId())), new OwnerId(entity.getOwner().value()),
+				entity.getTrackedTask()==null ? null : new TaskId(UUID.fromString(entity.getTrackedTask().getId())), new OwnerId(entity.getOwner().value()),
 				entity.getStart(), Optional.ofNullable(entity.getEnd()), entity.getSummary(), labels,
-				entity.isEdited(), activityVersion(entity));
+				entity.isEdited(), activityVersion(entity), Optional.empty(), Optional.ofNullable(entity.getProject()).map(this::project).map(Project::id));
 	}
 
 	private Label label(ActivityLabel entity) {

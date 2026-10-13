@@ -72,6 +72,36 @@ class WorkSessionHttpTest {
             assertEquals(3,api.workSessions(OwnerId.LOCAL).size());
         }
     }
+    @Test void activitiesWithoutTasksCanBeCreatedAtomicallyInSessionsAndReportedAcrossMidnight() {
+        try(var api=client("test-a")) {
+            var from=Instant.parse("2025-10-25T21:59:59.123456789Z");var end=Instant.parse("2025-10-27T22:00:00.987654321Z");
+            var session=api.createWorkSession(new CreateWorkSession(OwnerId.LOCAL,from,Optional.of(end),"Unassigned work"));
+            var label=api.createLabel(new CreateLabel("Meeting",Optional.of("12,34,56")));
+            var retained=api.createActivity(new CreateActivity(null,OwnerId.LOCAL,from,Optional.of(end),"No task",Set.of(label.id()),Optional.of(session.id()),Optional.empty()));
+            assertTrue(retained.task().isEmpty());assertTrue(retained.projectId().isEmpty());
+            assertEquals(Optional.of(session.id()),retained.workSessionId());assertTrue(api.tasks().isEmpty());
+            var query=new net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery(from,end.plusSeconds(1),Optional.of(OwnerId.LOCAL),Optional.empty(),Optional.empty(),ZoneId.of("UTC"));
+            var report=api.activities(query);assertEquals(3,report.activities().size());assertEquals(Duration.between(from,end),report.total());
+            for(var activity:report.activities()) {assertTrue(activity.task().isEmpty());assertEquals(Optional.of(session.id()),activity.workSessionId());assertEquals(Set.of(label.id()),activity.labelIds());}
+            assertEquals(Duration.ZERO,api.workSessionReport(session.id()).time().unallocatedTime());
+            var project=api.createProject(new CreateProject("Direct project"));
+            var direct=api.createActivity(new CreateActivity(null,OwnerId.LOCAL,from.plusSeconds(1),Optional.of(from.plusSeconds(61)),"Project without task",Set.of(),Optional.empty(),Optional.of(project.id())));
+            assertTrue(direct.task().isEmpty());assertEquals(Optional.of(project.id()),api.activity(direct.id()).orElseThrow().projectId());
+            assertThrows(RemoteFailure.class,()->api.deleteProject(new DeleteProject(project.id(),project.version())));
+            var projectQuery=new net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery(from,end.plusSeconds(1),Optional.of(OwnerId.LOCAL),Optional.empty(),Optional.of(project.id()),ZoneId.of("UTC"));
+            assertEquals(Duration.ofMinutes(1),api.activities(projectQuery).total());
+            var before=api.activities(query).activities();long revision=api.changes(0,0).get("nextSequence").getAsLong();
+            assertThrows(RemoteFailure.class,()->api.createActivity(new CreateActivity(null,OwnerId.LOCAL,from,Optional.of(end),"Unknown session",Set.of(),Optional.of(WorkSessionId.random()),Optional.empty())));
+            assertEquals(before,api.activities(query).activities());assertEquals(revision,api.changes(0,0).get("nextSequence").getAsLong());
+            var running=api.startWorkSession(new StartWorkSession(OwnerId.LOCAL,"Live work"));
+            var live=api.startActivity(new StartActivity(null,OwnerId.LOCAL,"No task timer",Set.of(label.id()),Optional.of(running.id()),Optional.empty()));
+            assertTrue(live.task().isEmpty());assertEquals(Optional.of(running.id()),live.workSessionId());
+            assertEquals(live,api.activeActivity(OwnerId.LOCAL).orElseThrow());
+            api.stopWorkSession(new StopWorkSession(running.id(),running.version()));
+            assertEquals(live,api.activeActivity(OwnerId.LOCAL).orElseThrow());
+            var stopped=api.stopActivity(new StopActivity(live.id(),live.version()));assertEquals(live.workSessionId(),stopped.workSessionId());
+        }
+    }
     @Test void rawHttpCommandsReplayOriginalStartAndStopRepliesAndValidateVersions() {
         String key=UUID.randomUUID().toString(), body="{\"summary\":\"Durable session\"}";
         var started=given().header("Authorization","Bearer test-a").header("Idempotency-Key",key).contentType("application/json").body(body)

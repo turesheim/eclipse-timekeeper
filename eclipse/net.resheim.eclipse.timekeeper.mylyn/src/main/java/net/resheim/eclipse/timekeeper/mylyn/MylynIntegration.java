@@ -146,7 +146,7 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 		Task task = resolve(external);
 		var service = service();
 		var active = service.activeActivity(OwnerId.LOCAL);
-		if (active.filter(activity -> activity.taskId().equals(task.id())).isPresent())
+		if (active.filter(activity -> task.id().equals(activity.taskId())).isPresent())
 			return;
         if(ui.isRemote()) ui.activateRemoteInWorker(task.id());
         else {active.ifPresent(activity -> service.stopActivity(new StopActivity(activity.id(),activity.version())));service.startActivity(new StartActivity(task.id(),OwnerId.LOCAL,"",Set.of()));}

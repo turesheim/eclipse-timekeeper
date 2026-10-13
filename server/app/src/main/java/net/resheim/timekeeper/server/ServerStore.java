@@ -187,7 +187,8 @@ public class ServerStore {
             });
         }
         if (value instanceof Activity activity) {
-            relation(type,id,"task","TASK",activity.taskId().value());
+            activity.task().ifPresent(task -> relation(type,id,"task","TASK",task.value()));
+            activity.projectId().ifPresent(project -> relation(type,id,"project","PROJECT",project.value()));
             activity.labelIds().forEach(label -> relation(type,id,"label","LABEL",label.value()));
             activity.workSessionId().ifPresent(session -> relation(type,id,"workSession","WORK_SESSION",session.value()));
             if (activity.end().isPresent()) update("DELETE FROM tk_active WHERE owner_id=? AND activity_id=?",owner(),id);
@@ -265,7 +266,7 @@ public class ServerStore {
         };
         return new DefaultTimekeeperService(new ServicePorts(ports.projects(),ports.tasks(),ports.activities(),ports.labels(),ids,time,
                 new TransactionRunner() { public <T> T required(Supplier<T> work) { return transaction(owner,work); } },
-                event -> change(event.entityType().name(),event.changeType().name(),event.entityId())));
+                event -> change(event.entityType().name(),event.changeType().name(),event.entityId())),workSessionService());
     }
     private class ScopedPorts {
         private final String boundOwner;
@@ -315,7 +316,7 @@ public class ServerStore {
             public Optional<Activity> findOpenByOwner(OwnerId id) { check(); if (!owner().equals(id.value())) throw ApiFailure.notFound(); return active().map(node -> (Activity)decode("ACTIVITY",node)); }
             public List<Activity> findOverlapping(Instant from,Instant to,Optional<OwnerId> owner,Optional<TaskId> task) {
                 check(); if (owner.isPresent() && !boundOwner.equals(owner.get().value())) throw ApiFailure.notFound();
-                return all("ACTIVITY",Activity.class).stream().filter(value -> task.isEmpty() || value.taskId().equals(task.get()))
+                return all("ACTIVITY",Activity.class).stream().filter(value -> task.isEmpty() || task.get().equals(value.taskId()))
                         .filter(value -> value.start().isBefore(to) && value.end().orElse(now()).isAfter(from)).toList();
             }
             public boolean existsByTask(TaskId id) { check(); return related("task","TASK",id.value()); }
