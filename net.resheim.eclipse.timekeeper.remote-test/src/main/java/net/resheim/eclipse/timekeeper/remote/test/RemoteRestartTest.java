@@ -23,6 +23,9 @@ public class RemoteRestartTest {
             assertEquals(1,RemoteBootstrap.proof.getProperty("server.recovery-pids").split(",").length);
             for(String phase:java.util.List.of("timeout.start","timeout.stop","cancel.start","cancel.stop"))
                 assertEquals("passed",RemoteBootstrap.proof.getProperty("phase.tracking."+phase));
+            for(String outcome:java.util.List.of("timeout","cancel"))
+                for(String kind:java.util.List.of("tasks","projects","activities"))
+                    assertEquals("passed",RemoteBootstrap.proof.getProperty("phase.deletion."+outcome+"."+kind));
             RemoteBootstrap.proof.setProperty("phase.restart","passed");RemoteBootstrap.writeProof();
         }
         RemoteTestSupport.ready();
