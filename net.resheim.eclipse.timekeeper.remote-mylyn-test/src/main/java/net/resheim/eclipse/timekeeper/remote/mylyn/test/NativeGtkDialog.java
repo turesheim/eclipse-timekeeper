@@ -25,14 +25,24 @@ final class NativeGtkDialog {
                 String id=null;long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(20);
                 while(System.nanoTime()<deadline && id==null) {String found=run(false,"xdotool","search","--onlyvisible","--name","^"+title+"$").trim();if(!found.isEmpty()) id=found.lines().findFirst().orElseThrow();else Thread.sleep(100);}
                 assertNotNull("Actual native chooser did not appear: "+title,id);
+                try {
                 run(true,"xdotool","windowfocus","--sync",id);
                 if(path==null) run(true,"xdotool","key","--window",id,"Escape");
                 else {
+                    // GTK's Recent view does not accept a directory location.
+                    // Home switches to normal browsing before entering the path.
+                    run(true,"xdotool","key","--window",id,"alt+Home");
                     run(true,"xdotool","key","--window",id,"ctrl+l");run(true,"xdotool","type","--window",id,"--clearmodifiers","--delay","1",path);
                     // GTK location entry first navigates; a further Enter accepts the folder.
                     for(int attempt=0;attempt<8;attempt++) {run(false,"xdotool","key","--window",id,"Return");Thread.sleep(250);if(run(false,"xdotool","search","--onlyvisible","--name","^"+title+"$").trim().isEmpty()) return null;}
                 }
                 assertTrue("Actual native chooser did not close: "+title,run(false,"xdotool","search","--onlyvisible","--name","^"+title+"$").trim().isEmpty());return null;
+                } finally {
+                    // Release a still-open matched chooser so a driver failure is
+                    // reported instead of leaving SWTBot blocked until VM timeout.
+                    if(!run(false,"xdotool","search","--onlyvisible","--name","^"+title+"$").trim().isEmpty())
+                        run(false,"xdotool","key","--window",id,"Escape");
+                }
             });
             open.run();result.get(30,TimeUnit.SECONDS);
         } finally {worker.shutdownNow();}
