@@ -49,6 +49,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	public static final WeeklySummary WEEKLY_SUMMARY = new WeeklySummary();
 	private LocalDate firstDayOfWeek;
 	private boolean showAllTasks = true;
+	private boolean showActivities = true;
 	private final ZoneId zoneId;
 	protected Set<Task> filtered = Collections.emptySet();
 	private Map<ProjectId, Project> projects = Map.of();
@@ -63,6 +64,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	ZoneId getZoneId() { return zoneId==null ? TimekeeperUiPlugin.getCalendarZone() : zoneId; }
 	public Set<Task> getFiltered() { return filtered; }
 	public void setShowAllTasks(boolean showAllTasks) { this.showAllTasks = showAllTasks; }
+	public void setShowActivities(boolean showActivities) { this.showActivities = showActivities; }
 	public Optional<Task> task(TaskId id) { return Optional.ofNullable(tasks.get(id)); }
 	public List<Label> labels(Activity activity) {
 		return activity.labelIds().stream().map(labels::get).filter(java.util.Objects::nonNull)
@@ -87,7 +89,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 		if (parent instanceof Task task) {
 			return java.util.stream.Stream.concat(filtered.stream()
 					.filter(child -> child.parentTaskId().equals(Optional.of(task.id()))),
-					activities.stream().filter(activity -> activity.taskId().equals(task.id()))).toArray();
+					activities.stream().filter(activity -> showActivities && activity.taskId().equals(task.id()))).toArray();
 		}
 		return new Object[0];
 	}
@@ -104,7 +106,7 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 		return null;
 	}
 	@Override public boolean hasChildren(Object element) {
-		return element instanceof Project || element instanceof Task;
+		return getChildren(element).length > 0;
 	}
 
 	protected void filter() {

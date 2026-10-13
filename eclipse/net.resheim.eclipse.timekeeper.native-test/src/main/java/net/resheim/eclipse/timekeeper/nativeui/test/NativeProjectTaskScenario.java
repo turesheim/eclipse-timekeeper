@@ -416,6 +416,7 @@ public abstract class NativeProjectTaskScenario {
 			assertEquals(task.summary(), row.get().getNode(task.summary()).getText());
 			assertEquals(activity.summary(), row.get().getNode(task.summary()).getNode(activity.summary()).getText());
 		} finally {
+			view.toolbarButton("Expand all projects and tasks").click();
 			cleanup(service, project, java.util.List.of(task.id()));
 			if (refreshProof[0] != null) service.deleteProject(new DeleteProject(refreshProof[0].id(), refreshProof[0].version()));
 			view.toolbarButton("Show current week").click();

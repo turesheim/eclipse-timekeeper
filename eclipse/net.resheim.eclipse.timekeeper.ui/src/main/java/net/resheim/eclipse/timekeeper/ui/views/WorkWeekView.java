@@ -225,7 +225,6 @@ public class WorkWeekView extends ViewPart {
 	private Action collapseAllAction;
 	private Action expandAllAction;
     private Action decimalHoursAction;
-    private boolean activitiesCollapsed;
     private final org.eclipse.jface.util.IPropertyChangeListener durationPreferenceListener=event->{
         if(PreferenceConstants.DECIMAL_HOURS.equals(event.getProperty())) durationPreferenceChanged();
     };
@@ -332,9 +331,6 @@ public class WorkWeekView extends ViewPart {
 				.getBoolean(PreferenceConstants.SHOW_ALL_TASKS));
 		TimekeeperUiPlugin.getDefault().addBackendListener(contentProvider);
 		viewer.setContentProvider(contentProvider);
-        viewer.addFilter(new org.eclipse.jface.viewers.ViewerFilter() {
-            @Override public boolean select(Viewer source,Object parent,Object element) {return !activitiesCollapsed || !(element instanceof Activity);}
-        });
 		GridData layoutData = GridDataFactory.fillDefaults().grab(true, true).span(3, 1).create();
 		viewer.getControl().setLayoutData(layoutData);
 
@@ -685,13 +681,13 @@ public class WorkWeekView extends ViewPart {
 				.getBoolean(PreferenceConstants.SHOW_ALL_TASKS));
 		showAllTasksAction.setToolTipText("Show all tasks, including those without time in the displayed week");
 		collapseAllAction = new Action("Collapse all") {
-			@Override public void run() {activitiesCollapsed=true;viewer.refresh();viewer.expandAll();}
+			@Override public void run() {contentProvider.setShowActivities(false);viewer.refresh();viewer.expandAll();}
 		};
 		collapseAllAction.setToolTipText("Hide activities and keep projects and tasks visible");
 		collapseAllAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
 				.getImageDescriptor(ISharedImages.IMG_ELCL_COLLAPSEALL));
 		expandAllAction = new Action("Expand all") {
-			@Override public void run() {activitiesCollapsed=false;viewer.refresh();viewer.expandAll();}
+			@Override public void run() {contentProvider.setShowActivities(true);viewer.refresh();viewer.expandAll();}
 		};
 		expandAllAction.setToolTipText("Expand all projects and tasks");
 		expandAllAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
