@@ -95,7 +95,7 @@ final class RemotePreferenceScenario {
             RemoteTestSupport.waitFor(()->{try {String data=clipboard();return data!=null && data.startsWith(expected) && data.contains(task.summary());}catch(Exception loading) {return false;}},"Native clipboard report differs from selected remote week and exact total");
             if(Boolean.getBoolean("timekeeper.native.dialog-tests")) {
                 Path output=RemoteBootstrap.fixtureFolder().resolve("native-week.txt");
-                NativeGtkDialog.choose("Save Timekeeper report",output,()->bot.viewByTitle("Workweek").toolbarDropDownButton("Export selected week to clipboard").menuItem("Save as").click().menu(prefix+" report").click());
+                NativeGtkDialog.saveFile("Save Timekeeper report",output,".txt",()->bot.viewByTitle("Workweek").toolbarDropDownButton("Export selected week to clipboard").menuItem("Save as").click().menu(prefix+" report").click());
                 RemoteTestSupport.waitFor(()->{try {return Files.readString(output).startsWith(expected) && Files.readString(output).contains(task.summary());}catch(Exception loading) {return false;}},"Native report file chooser did not produce the exact remote report");
             }
         } finally {RemoteTestSupport.onUi(()->{var clipboard=new Clipboard(PlatformUI.getWorkbench().getDisplay());try {if(old==null) clipboard.clearContents();else clipboard.setContents(new Object[]{old},new Transfer[]{TextTransfer.getInstance()});}finally {clipboard.dispose();}return null;});}
