@@ -48,7 +48,7 @@ final class RemotePreferenceScenario {
             var before=api.metadata();RemoteBootstrap.setAccountBWritable(false);
             try {
                 rejected.bot().button("Apply and Close").click();
-                RemoteTestSupport.waitFor(()->{try {return rejected.bot().textWithLabel("Label:").isEnabled() && RemoteTestSupport.onUi(()->message(rejected.widget,"This account does not have permission to perform that operation."));}catch(Exception loading) {return false;}},"Read-only label failure did not keep the editable preference draft");
+                RemoteTestSupport.waitFor(()->{try {return rejected.bot().textWithLabel("Label:").isEnabled() && RemoteTestSupport.onUi(()->message(rejected.widget,"This token does not permit the requested change."));}catch(Exception loading) {return false;}},"Read-only label failure did not keep the editable preference draft");
                 assertEquals(prefix+" retained draft",rejected.bot().textWithLabel("Label:").getText());assertEquals(before,peer.metadata());
             } finally {RemoteBootstrap.setAccountBWritable(true);}
             rejected.bot().button("Apply and Close").click();RemoteTestSupport.waitFor(()->!rejected.isOpen(),"Restored label permission did not save the same draft");
@@ -56,7 +56,7 @@ final class RemotePreferenceScenario {
             var stale=open(LABELS);stale.bot().table().select(saved.name());stale.bot().textWithLabel("Label:").setText(prefix+" stale draft");
             var changed=peer.updateLabel(new UpdateLabel(saved.id(),saved.version(),prefix+" peer label",Optional.of("19,171,205")));awaitLabel(changed);
             stale.bot().button("Apply and Close").click();
-            RemoteTestSupport.waitFor(()->{try {return stale.bot().textWithLabel("Label:").isEnabled() && RemoteTestSupport.onUi(()->message(stale.widget,"The record changed. Refresh and review it before retrying."));}catch(Exception loading) {return false;}},"Concurrent label edit did not preserve its stale draft");
+            RemoteTestSupport.waitFor(()->{try {return stale.bot().textWithLabel("Label:").isEnabled() && RemoteTestSupport.onUi(()->message(stale.widget,"The record or active task changed on the server. Refresh and review your changes."));}catch(Exception loading) {return false;}},"Concurrent label edit did not preserve its stale draft");
             assertEquals(prefix+" stale draft",stale.bot().textWithLabel("Label:").getText());assertEquals(changed,api.label(changed.id()).orElseThrow());stale.bot().button("Cancel").click();
             RemoteTestSupport.waitFor(()->!stale.isOpen(),"Stale label preferences did not cancel");
             awaitTree(project,task,interval.summary());
@@ -114,7 +114,7 @@ final class RemotePreferenceScenario {
     }
     private static String clipboard() throws Exception {return RemoteTestSupport.onUi(()->{var clipboard=new Clipboard(PlatformUI.getWorkbench().getDisplay());try {return (String)clipboard.getContents(TextTransfer.getInstance());}finally {clipboard.dispose();}});}
     private static SWTBotShell open(String page) {
-        PlatformUI.getWorkbench().getDisplay().asyncExec(()->PreferencesUtil.createPreferenceDialogOn(PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell(),page,new String[]{page},null).open());return new SWTWorkbenchBot().shell("Preferences");
+        PlatformUI.getWorkbench().getDisplay().asyncExec(()->PreferencesUtil.createPreferenceDialogOn(PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell(),page,null,null).open());return new SWTWorkbenchBot().shell("Preferences");
     }
     private static void awaitLabel(net.resheim.eclipse.timekeeper.domain.Label label) {RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->TimekeeperUiPlugin.getDefault().getTimekeeperService().label(label.id()).filter(label::equals).isPresent());}catch(Exception loading) {return false;}},"Remote label did not reach native preference snapshot");}
     private static void awaitTree(Project project,Task task,String summary) {RemoteTestSupport.waitFor(()->{try {return new SWTWorkbenchBot().viewByTitle("Workweek").bot().treeWithId("workweek-editor-tree").getTreeItem(project.name()).expand().getNode(task.summary()).expand().getNode(summary)!=null;}catch(RuntimeException loading) {return false;}},"Remote label fixture did not reach Workweek");}

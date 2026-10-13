@@ -110,7 +110,7 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 			@Override
 			public void modifyText(ModifyEvent e) {
 				ActivityLabel selectedLabel = getSelectedAppearanceColorOption();
-				selectedLabel.setName(labelText.getText());
+				if (selectedLabel != null) selectedLabel.setName(labelText.getText());
 			}
 
 		});
@@ -148,8 +148,10 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 		addButton.addSelectionListener(new SelectionAdapter() {
 			@Override
 			public void widgetSelected(SelectionEvent e) {
-				editableLabels.add(new ActivityLabel("new label", "0,0,0"));
+				var added = new ActivityLabel("new label", "0,0,0");
+				editableLabels.add(added);
 				fAppearanceColorTableViewer.refresh();
+				fAppearanceColorTableViewer.setSelection(new StructuredSelection(added), true);
 			}
 		});
 
@@ -162,6 +164,8 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 				ActivityLabel selectedLabel = getSelectedAppearanceColorOption();
 				editableLabels.remove(selectedLabel);
 				fAppearanceColorTableViewer.refresh();
+				fAppearanceColorTableViewer.setSelection(editableLabels.isEmpty() ? StructuredSelection.EMPTY
+						: new StructuredSelection(editableLabels.get(0)), true);
 			}
 		});
 
@@ -183,12 +187,15 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 
 	private void handleAppearanceColorListSelection() {
 		ActivityLabel selectedLabel = getSelectedAppearanceColorOption();
+		labelText.setEnabled(selectedLabel != null);
+		fAppearanceColorEditor.setEnabled(selectedLabel != null);
+		if (removeButton != null) removeButton.setEnabled(selectedLabel != null);
 		if (selectedLabel != null) {
-			RGB rgb = StringConverter.asRGB(selectedLabel.getColor());
+			RGB rgb = StringConverter.asRGB(selectedLabel.getColor() == null ? "0,0,0" : selectedLabel.getColor());
 			fAppearanceColorEditor.setColorValue(rgb);
 			fAppearanceColorTableViewer.update(selectedLabel, null);
 			labelText.setText(selectedLabel.getName());
-		}
+		} else labelText.setText("");
 	}
 
 	@Override
@@ -215,6 +222,7 @@ public class LabelPreferencePage extends PreferencePage implements IWorkbenchPre
 		fAppearanceColorTableViewer.setInput(editableLabels);
 		Object first = fAppearanceColorTableViewer.getElementAt(0);
 		fAppearanceColorTableViewer.setSelection(first == null ? StructuredSelection.EMPTY : new StructuredSelection(first), true);
+		handleAppearanceColorListSelection();
 	}
 
 	private void initializeLabelList(Composite tableComposite) {
