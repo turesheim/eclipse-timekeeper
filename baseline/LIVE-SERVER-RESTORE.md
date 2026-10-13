@@ -50,3 +50,20 @@ pickers were not exercised on macOS and must pass their dedicated Linux CI.
 Remaining native operation acceptance, official Mylyn Error Log #243, human
 review/merge, final tagged artifacts and public GitHub p2 installation remain
 release gates. No release is published by this checkpoint.
+
+
+## Verified Linux CI — 2026-10-13
+
+[Build run 38332322613](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38332322613)
+passed all eight jobs at source `63aadd9b57a6dee826361c49b896195df656c51f`.
+The downloaded installed acceptance artifact contains nine successful reports
+with zero failures/errors/skips. Its server ZIP SHA-256 is
+`9903b6149e1cb6624759dd36fe9de0e34783130f8be5084b53eeade5d395cffe`.
+The receipt records the actual Linux GTK folder-dialog scope as passed, all five
+live-restore phases as passed, and all four ordinary-create timeout phases and
+their four cancel/review phases as passed. This supersedes the pending Linux CI
+qualification above; the local macOS evidence remains limited to that platform.
+
+The final release workflow/tag execution, remaining native operation acceptance,
+official Mylyn Error Log #243, human review/merge and public GitHub p2 installation
+remain open. Successful branch CI does not establish final release acceptance.
