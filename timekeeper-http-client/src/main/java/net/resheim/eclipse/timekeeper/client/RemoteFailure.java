@@ -7,7 +7,7 @@ public final class RemoteFailure extends RuntimeException {
     private final String code;
     public RemoteFailure(Kind kind,String code) {
         super(switch(kind) {
-            case AUTHENTICATION -> "Sign in to the Timekeeper server with a valid token.";
+            case AUTHENTICATION -> "OWNER_CHANGED".equals(code) ? "The account for this session has changed. Start a new session with the intended account." : "Sign in to the Timekeeper server with a valid token.";
             case FORBIDDEN -> "This token does not permit the requested change.";
             case CONFLICT -> "The record or active task changed on the server. Refresh and review your changes.";
             case VALIDATION -> "The server rejected these values. Review the fields and try again.";

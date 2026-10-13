@@ -27,6 +27,23 @@ The server administrator provisions owners/tokens; v1 has no account-management
 or cross-owner sharing endpoint. TLS is required outside loopback development.
 Tokens are never returned in DTOs, URLs, logs, errors or change notifications.
 
+Stateful clients bind their session to the first authenticated owner. Authorized
+responses include `X-Timekeeper-Owner`, the canonical unpadded base64url encoding
+of that owner's UTF-8 ID, including empty pages and 204 responses. Send that
+value on subsequent requests. The header is an expected-owner restriction and
+cannot grant access to a different owner. Malformed, duplicate or noncanonical
+values return 400. A valid token mapped to a different owner returns 401
+`OWNER_CHANGED` before reading resources or executing a mutation.
+
+Omitting the header retains stateless token-owner behavior for existing API
+consumers. Do not reassign issued tokens to other owners. The binding protects
+existing sessions if registry configuration nevertheless changes. An existing
+client retains its original binding through failures; restoring that owner can
+recover the session, while an intentional account switch creates a new session.
+The Java HTTP client learns the binding from the response header or resource/
+profile `ownerId`, including a first empty page, and never silently replaces it.
+Long polling also rechecks ownership while a request is waiting.
+
 Every project, task, label, activity, external reference, profile, cursor,
 command receipt and change event belongs to exactly one authenticated owner.
 Ownership is immutable. All repository methods (including relation and external

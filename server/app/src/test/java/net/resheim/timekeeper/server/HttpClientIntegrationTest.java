@@ -16,6 +16,62 @@ import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
 class HttpClientIntegrationTest {
     @TestHTTPResource URI server;
     @org.junit.jupiter.api.io.TempDir java.nio.file.Path temporary;
+    @jakarta.inject.Inject TokenRegistry registry;
+    @Test void anEmptyPageBindsUnicodeOwnersWithoutAPriorProfileRead() throws Exception {
+        var actual=io.quarkus.arc.ClientProxy.unwrap(registry);String originalFile=actual.tokensFile;
+        var file=temporary.resolve("unicode-owner-registry.json");
+        var rows=(com.fasterxml.jackson.databind.node.ArrayNode)JsonValues.parse(java.nio.file.Files.readString(java.nio.file.Path.of(originalFile)));
+        String owner="æøå / 🧩 "+UUID.randomUUID(),nextOwner="unicode-next-"+UUID.randomUUID();
+        var row=JsonValues.object();row.put("ownerId",owner);
+        row.put("sha256",java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest("test-unicode-owner".getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+        row.putArray("permissions").add("read").add("write");rows.add(row);
+        java.nio.file.Files.writeString(file,rows.toString());actual.tokensFile=file.toString();
+        try(var client=new HttpTimekeeperService(server,()->"test-unicode-owner",Duration.ofSeconds(3))) {
+            assertTrue(client.projects().isEmpty());
+            row.put("ownerId",nextOwner);java.nio.file.Files.writeString(file,rows.toString());
+            try(var selected=new HttpTimekeeperService(server,()->"test-unicode-owner",Duration.ofSeconds(3))) {
+                var before=selected.metadata();
+                assertEquals("OWNER_CHANGED",assertThrows(RemoteFailure.class,()->client.createProject(new CreateProject("Must not silently change Unicode owner"))).code());
+                assertEquals(before,selected.metadata());
+            }
+            row.put("ownerId",owner);java.nio.file.Files.writeString(file,rows.toString());
+            assertEquals(owner,client.profile().owner().value());
+            var project=client.createProject(new CreateProject("Unicode bound project"));
+            client.deleteProject(new DeleteProject(project.id(),project.version()));
+        } finally {actual.tokensFile=originalFile;}
+    }
+    @Test void aLiveClientCannotWriteUnderAReassignedTokenOwner() throws Exception {
+        var actual=io.quarkus.arc.ClientProxy.unwrap(registry);String originalFile=actual.tokensFile;
+        var file=temporary.resolve("live-owner-registry.json");
+        var rows=(com.fasterxml.jackson.databind.node.ArrayNode)JsonValues.parse(java.nio.file.Files.readString(java.nio.file.Path.of(originalFile)));
+        String owner="reassigned-"+UUID.randomUUID();
+        var peerRow=JsonValues.object();peerRow.put("ownerId",owner);
+        peerRow.put("sha256",java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest("test-owner-peer".getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+        peerRow.putArray("permissions").add("read").add("write");rows.add(peerRow);
+        java.nio.file.Files.writeString(file,rows.toString());actual.tokensFile=file.toString();
+        try(var client=new HttpTimekeeperService(server,()->"test-a",Duration.ofSeconds(3));
+                var peer=new HttpTimekeeperService(server,()->"test-owner-peer",Duration.ofSeconds(3));
+                var readOriginal=new HttpTimekeeperService(server,()->"test-read",Duration.ofSeconds(3))) {
+            var project=client.createProject(new CreateProject("Original owner binding "+UUID.randomUUID()));
+            assertEquals("a",client.profile().owner().value());
+            var original=readOriginal.metadata();var before=peer.metadata();
+            ((com.fasterxml.jackson.databind.node.ObjectNode)rows.get(0)).put("ownerId",owner);
+            java.nio.file.Files.writeString(file,rows.toString());
+            var failure=assertThrows(RemoteFailure.class,()->client.createProject(new CreateProject("Must not appear under reassigned owner")));
+            assertEquals(RemoteFailure.Kind.AUTHENTICATION,failure.kind());assertEquals("OWNER_CHANGED",failure.code());
+            assertEquals(before,peer.metadata(),"Rejecting the client after a committed foreign write is too late");
+            assertEquals(original,readOriginal.metadata());
+            assertEquals(RemoteFailure.Kind.AUTHENTICATION,assertThrows(RemoteFailure.class,client::projects).kind());
+            assertEquals(RemoteFailure.Kind.AUTHENTICATION,assertThrows(RemoteFailure.class,client::metadata).kind());
+            try(var selected=new HttpTimekeeperService(server,()->"test-a",Duration.ofSeconds(3))) {
+                assertEquals(owner,selected.profile().owner().value());
+                var intended=selected.createProject(new CreateProject("Explicit new client owner"));
+                selected.deleteProject(new DeleteProject(intended.id(),intended.version()));
+            }
+            ((com.fasterxml.jackson.databind.node.ObjectNode)rows.get(0)).put("ownerId","a");java.nio.file.Files.writeString(file,rows.toString());
+            assertEquals(project,client.project(project.id()).orElseThrow());client.deleteProject(new DeleteProject(project.id(),project.version()));
+        } finally {actual.tokensFile=originalFile;}
+    }
     @Test void csvTransferPreservesRelationshipsAndPrecisionWithFreshOwnedIds() throws Exception {
         String name="CSV "+UUID.randomUUID();
         try(var source=new HttpTimekeeperService(server,()->"test-a",Duration.ofSeconds(3));
