@@ -1,4 +1,4 @@
-package net.resheim.eclipse.timekeeper.remote.mylyn.test;
+package net.resheim.eclipse.timekeeper.remote.test;
 
 import static org.junit.Assert.*;
 import java.nio.charset.StandardCharsets;
@@ -7,16 +7,16 @@ import java.util.concurrent.*;
 import org.eclipse.swt.SWT;
 
 /** Operates the real GTK chooser in CI's private Xvfb display, without replacing SWT dialogs. */
-final class NativeGtkDialog {
-    static void choose(String title,Path path,Runnable open) throws Exception {interact(title,path.toAbsolutePath().toString(),open);}
-    static void saveFile(String title,Path path,String suffix,Runnable open) throws Exception {
+public final class NativeGtkDialog {
+    public static void choose(String title,Path path,Runnable open) throws Exception {interact(title,path.toAbsolutePath().toString(),open);}
+    public static void saveFile(String title,Path path,String suffix,Runnable open) throws Exception {
         String location=path.toAbsolutePath().toString();
         // GTK adds the selected filter's suffix. Typing it in the location
         // entry as well produces .txt.txt in the tested SWT 3.135 runtime.
         assertTrue(location.endsWith(suffix));
         interact(title,location.substring(0,location.length()-suffix.length()),open);
     }
-    static void cancel(String title,Runnable open) throws Exception {interact(title,null,open);}
+    public static void cancel(String title,Runnable open) throws Exception {interact(title,null,open);}
     private static void interact(String title,String path,Runnable open) throws Exception {
         assertEquals("Native chooser acceptance requires GTK","gtk",SWT.getPlatform());
         var worker=Executors.newSingleThreadExecutor();

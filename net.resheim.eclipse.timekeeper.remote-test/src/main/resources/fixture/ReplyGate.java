@@ -33,7 +33,7 @@ public class ReplyGate {
                                 case "PUT" -> target.matches("/api/v1/tasks/[0-9a-f-]{36}");
                                 case "DELETE" -> target.matches("/api/v1/(projects|tasks|activities|labels)/[0-9a-f-]{36}");
                                 case "POST" -> target.matches("/api/v1/(projects|tasks|activities|labels)")
-                                    || target.equals("/api/v1/activities/start") || target.matches("/api/v1/activities/[0-9a-f-]{36}/stop");
+                                    || target.equals("/api/v1/data/import") || target.equals("/api/v1/activities/start") || target.matches("/api/v1/activities/[0-9a-f-]{36}/stop");
                                 default -> false;
                             };
                             if(!valid) throw new IllegalArgumentException("Invalid fixture route");

@@ -15,6 +15,7 @@ import org.eclipse.ui.dialogs.PreferencesUtil;
 import net.resheim.eclipse.timekeeper.client.HttpTimekeeperService;
 import net.resheim.eclipse.timekeeper.domain.*;
 import net.resheim.eclipse.timekeeper.remote.test.RemoteBootstrap;
+import net.resheim.eclipse.timekeeper.remote.test.NativeGtkDialog;
 import net.resheim.eclipse.timekeeper.remote.test.RemoteTestSupport;
 import net.resheim.eclipse.timekeeper.service.Commands.*;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
