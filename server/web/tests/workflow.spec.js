@@ -102,11 +102,27 @@ test('same-token owner reassignment cannot switch a live browser session', async
     expect((await (await api(request,'GET','/projects')).json()).items).toHaveLength(0);
   } finally { const temporary = file + '.new'; await writeFile(temporary, original, {mode:0o600}); await rename(temporary, file); }
 });
-test('sign-out and reload retain no token or account records in browser storage', async ({page}) => {
+test('reload signs in with the remembered token and sign-out forgets it', async ({page}) => {
   await signIn(page); expect(await page.locator('#token').inputValue()).toBe('');
-  expect(await page.evaluate(() => ({local:localStorage.length, session:sessionStorage.length}))).toEqual({local:0, session:0});
+  expect(await page.evaluate(value => localStorage.getItem('timekeeper.access-token') === value, token)).toBeTruthy();
+  expect(await page.evaluate(() => ({keys:Object.keys(localStorage), session:sessionStorage.length}))).toEqual({keys:['timekeeper.access-token'], session:0});
+  await page.reload(); await expect(page.locator('#workspace')).toBeVisible(); await expect(page.locator('#status')).toHaveText('Up to date');
+  await expect(page.locator('#login')).not.toBeVisible(); expect(await page.locator('#token').inputValue()).toBe('');
+  await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#tasks')).toBeEmpty();
+  expect(await page.evaluate(() => localStorage.getItem('timekeeper.access-token'))).toBeNull();
   await page.reload(); await expect(page.locator('#login')).toBeVisible(); await expect(page.locator('#workspace')).not.toBeVisible();
-  await signIn(page); await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#tasks')).toBeEmpty();
+});
+test('an invalid remembered token is forgotten and a valid replacement can sign in', async ({page}) => {
+  await page.addInitScript(() => localStorage.setItem('timekeeper.access-token', 'invalid-saved-fixture'));
+  await page.goto('/web/'); await expect(page.locator('#login-error')).toContainText('no longer authorized');
+  expect(await page.evaluate(() => localStorage.getItem('timekeeper.access-token'))).toBeNull();
+  await page.getByLabel('Access token').fill(token); await page.getByRole('button', {name:'Sign in', exact:true}).click();
+  await expect(page.locator('#status')).toHaveText('Up to date');
+});
+test('blocked browser storage keeps sign-in usable and explains why reload needs a token', async ({page}) => {
+  await page.addInitScript(() => Object.defineProperty(window, 'localStorage', {get() {throw new DOMException('Blocked', 'SecurityError');}}));
+  await signIn(page); await expect(page.locator('#remember-notice')).toContainText('could not remember');
+  await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#login-error')).toContainText('could not forget');
 });
 test('offline reconnect catches missed peer writes without replacing an open draft', async ({page, request}) => {
   const task = await createTask(request); await signIn(page); await page.getByRole('button', {name:'Tasks', exact:true}).click();
