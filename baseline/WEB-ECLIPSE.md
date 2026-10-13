@@ -39,7 +39,7 @@ Chromium 156.0.8078.4. CI uses Node 24.
   markers. All 20 recorded browser/server/proxy PIDs have exited.
 
 The first run passed records, drafts, tracking and reports but failed cleanup:
-the peer attempted another deletion before the refreshed rows were settled.
+a Delete control was repeatedly detached while the activity table refreshed.
 The helper now waits for the acknowledged row-count reduction; it also closes
 the stdin protocol explicitly so normal exit does not require termination.
 The actual installed snapshot check before native Deactivate was strengthened.
