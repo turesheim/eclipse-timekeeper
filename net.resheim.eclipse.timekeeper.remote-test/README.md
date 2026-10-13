@@ -36,15 +36,15 @@ Run from the repository root after preparing a packaged server ZIP and sidecar:
 ```
 
 CI's `Remote-Eclipse` job downloads the verified distribution from the Server
-job and runs these phases plus the optional Mylyn module under Xvfb. It uploads reports, server/runtime logs and
+job and runs these phases plus the optional Mylyn module's seven phases under Xvfb. It uploads reports, server/runtime logs and
 the credential-free `proof.properties`; secure storage, the password file and
 token registry are excluded from uploaded evidence.
 
 The optional Mylyn module covers installed activation, restart, account-token
-switching, task-editor failure preservation and selected uncertain-update
+switching, server/embedded switches, task-editor failure preservation and selected uncertain-update
 outcomes. It also verifies automatic peer-change refresh and reconnect; see
 [its README](../net.resheim.eclipse.timekeeper.remote-mylyn-test/README.md).
-Still required before #220 is complete: endpoint and embedded/remote switches,
-remaining native preference flows, other form failures and uncertain-command/
+Still required before #220 is complete: remaining native preference flows,
+other form failures and uncertain-command/
 deletion outcomes. #219 web synchronization and #221 web UI remain required
 before the 2.0 release.

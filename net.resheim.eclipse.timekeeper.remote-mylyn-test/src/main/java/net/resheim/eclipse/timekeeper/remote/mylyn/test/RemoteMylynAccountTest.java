@@ -62,9 +62,11 @@ public class RemoteMylynAccountTest {
             assertEquals(previous,original.metadata());assertEquals(history,original.activity(history.id()).orElseThrow());assertEquals(successor,original.activity(successor.id()).orElseThrow());
             assertEquals(3,RemoteBootstrap.receipt().getProperty("server.pids").split(",").length);
             RemoteBootstrap.receipt().setProperty("mylyn.account-b.task",task.id().value().toString());
+            RemoteBootstrap.receipt().setProperty("mylyn.account-b.interval",active.id().value().toString());
             RemoteBootstrap.receipt().setProperty("phase.mylyn.account","passed");RemoteBootstrap.writeProof();
         }
         RemoteTestSupport.readyWithMylyn();
+        BackendSwitchScenario.prepareEndpointSwitch();
     }
     private static void verifyRejectedDeletions(HttpTimekeeperService api,Project project,Task task,ActivityId intervalId) throws Exception {
         var list=org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getTaskList();

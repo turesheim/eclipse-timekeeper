@@ -87,13 +87,20 @@ A broader local Mylyn UI run failed while waiting for native dialogs to become
 active and eventually hit its 180-second process timeout. Its completed
 adapter/scope/Jira classes passed, but that run is not acceptance evidence for
 the full suite. Full Linux/Xvfb regression and all installed phases must pass in
-CI on the synchronization commit. The base remote-client commit `5707be6`
+CI on the synchronization commit. All seven Build jobs for `f3fbf3c` subsequently
+passed in [run 38313548997](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38313548997),
+including the complete Linux/Xvfb regression and all installed phases. Server
+containers verification also passed in
+[run 38313549045](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38313549045).
+Downloaded installed reports confirm the five phases and four synchronization
+markers; secrets are excluded from the artifact. The base remote-client commit `5707be6`
 already passed all seven Build jobs in
 [run 38300177616](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38300177616).
 
 ## Remaining release work
 
-The new code does not clear the remaining #220 backend-switching, native
-preference-flow and uncertain-operation acceptance. Web workflows and web
+Backend-switch acceptance continues in [REMOTE-BACKEND-SWITCH.md](REMOTE-BACKEND-SWITCH.md).
+The new code does not clear the remaining #220 native preference-flow and
+uncertain-operation acceptance. Web workflows and web
 synchronization are still missing in #221/#219. Mylyn Error Log issue #243 is a
 separate gate; these functional tests do not certify a clean Error Log.
