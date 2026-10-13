@@ -135,7 +135,12 @@ existing records at additional boundaries; it never joins independently edited
 records. Day maintenance and all parts of a write commit atomically under the
 same per-owner lock, including across server replicas.
 
-Portable interchange uses `timekeeper-domain-v1` JSON, not SQL/JPA table names.
+Portable interchange exports `timekeeper-domain-v2` JSON, including work sessions
+and optional task, direct-project and session associations. Import also accepts
+older `timekeeper-domain-v1` snapshots without these features. Neither format
+contains SQL/JPA table names. CSV v2 includes `workSessions.csv`; every declared
+file must be present. Older CSV clients reject the new format instead of silently
+discarding session associations.
 Export reads a consistent owned snapshot. Import validates the entire graph,
 then generates fresh UUIDs and rewrites references in one transaction; it never
 updates existing records. Source IDs are correlation keys only. A failure leaves
@@ -201,6 +206,32 @@ fresh GET/change feed before further edits, and never replace unsaved fields
 merely because a delayed command response arrives. Standard CRUD POSTs are not
 implicitly replayable; reconcile ambiguous creates by reloading instead of
 blindly creating another record. Import provides durable retries for bulk data.
+
+## Work sessions
+
+`/work-sessions` supports owned listing and manual creation; individual records
+support read, versioned edit and deletion. `/work-sessions/active` returns the
+running session or 204. `/work-sessions/start` and `/{id}/stop` use durable
+idempotency keys, and stop also requires the original ETag. Sessions can span
+midnight and never start or stop activity timers implicitly. The owner lock
+allows only one running session per owner, including across replicas. Several
+completed sessions may belong to the same day.
+
+Activities may omit their task and optionally name a direct project. Creates
+and live starts can include `workSessionId`, assigning every resulting daily
+part in the same transaction. `/activities/{id}/work-session` retrospectively
+assigns or unassigns one activity using its original ETag; its response includes
+an outside-session warning and the activity's ETag. Task and provider references
+retain their existing identities and ownership rules. Deleting a session with
+associated activities is a conflict; detach the activities first.
+
+`/work-sessions/{id}/report` returns the session, its activities and totals from
+one consistent snapshot. Duration is elapsed session time. Tracked activity
+time sums each interval clipped to the session; allocated time is their union.
+Unallocated time subtracts this union from session duration, preserving
+nanoseconds without counting overlaps twice. The report identifies associated
+activities that extend beyond session boundaries. Transfer remaps session IDs
+alongside the other resources and preserves the independent active-session limit.
 
 ## Queries, time zones and refresh
 

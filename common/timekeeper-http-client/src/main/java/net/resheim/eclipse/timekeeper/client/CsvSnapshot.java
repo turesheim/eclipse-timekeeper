@@ -26,15 +26,31 @@ public final class CsvSnapshot {
         COLUMNS.put("labels", List.of("id", "name", "color"));
         COLUMNS.put("activities", List.of("id", "taskId", "start", "end", "summary", "labelIds", "manual"));
     }
+    private static Map<String,List<String>> columns(boolean sessions) {
+        var columns=new LinkedHashMap<>(COLUMNS);
+        if(sessions) {
+            columns.put("activities",List.of("id","taskId","start","end","summary","labelIds","manual","workSessionId","projectId"));
+            columns.put("workSessions",List.of("id","start","end","summary"));
+        }
+        return columns;
+    }
     private CsvSnapshot() { }
 
     /** Writes into a new subfolder chosen by the UI; never replaces an earlier export. */
     public static int write(JsonObject snapshot, Path folder) throws IOException {
-        if (!"timekeeper-domain-v1".equals(snapshot.get("format").getAsString())) throw invalid();
+        boolean sessions="timekeeper-domain-v2".equals(snapshot.get("format").getAsString());
+        if (!sessions && !"timekeeper-domain-v1".equals(snapshot.get("format").getAsString())) throw invalid();
+        if(!sessions) {
+            if(snapshot.has("workSessions") && !snapshot.getAsJsonArray("workSessions").isEmpty()) throw invalid();
+            for(var item:snapshot.getAsJsonArray("activities")) {
+                var activity=item.getAsJsonObject();if(activity.get("taskId")==null || activity.get("taskId").isJsonNull()) throw invalid();
+                for(var column:List.of("projectId","workSessionId")) if(activity.has(column) && !activity.get(column).isJsonNull()) throw invalid();
+            }
+        }
         ZoneId.of(snapshot.get("zoneId").getAsString());
         Files.createDirectory(folder);
         int count = 0;
-        for (var table : COLUMNS.entrySet()) {
+        for (var table : columns(sessions).entrySet()) {
             checkCancelled();
             StringBuilder csv = new StringBuilder();row(csv, table.getValue());
             JsonArray items = snapshot.getAsJsonArray(table.getKey());
@@ -42,14 +58,15 @@ public final class CsvSnapshot {
                 List<String> fields = new ArrayList<>();
                 for (String column : table.getValue()) {
                     JsonElement value = item.getAsJsonObject().get(column);
-                    if (value == null) throw invalid();
+                    if (value == null && !List.of("workSessionId","projectId").contains(column)) throw invalid();
+                    if(value==null) value=JsonNull.INSTANCE;
                     fields.add(value.isJsonNull() ? null : value.isJsonPrimitive() ? value.getAsString() : value.toString());
                 }
                 row(csv, fields);count++;
             }
             Files.writeString(folder.resolve(table.getKey() + ".csv"), csv, StandardCharsets.UTF_8);
         }
-        JsonObject metadata = new JsonObject();metadata.addProperty("format", "timekeeper-domain-csv-v1");
+        JsonObject metadata = new JsonObject();metadata.addProperty("format", sessions ? "timekeeper-domain-csv-v2" : "timekeeper-domain-csv-v1");
         metadata.add("zoneId", snapshot.get("zoneId"));
         // The descriptor is last: incomplete/cancelled exports cannot be imported.
         Files.writeString(folder.resolve("timekeeper.csv.json"), metadata.toString(), StandardCharsets.UTF_8);
@@ -60,11 +77,12 @@ public final class CsvSnapshot {
         long[] remaining = { MAX_BYTES };
         try {
             JsonObject metadata = JsonParser.parseString(readFile(folder.resolve("timekeeper.csv.json"), remaining)).getAsJsonObject();
-            if (!"timekeeper-domain-csv-v1".equals(metadata.get("format").getAsString())) throw invalid();
+            boolean sessions="timekeeper-domain-csv-v2".equals(metadata.get("format").getAsString());
+            if (!sessions && !"timekeeper-domain-csv-v1".equals(metadata.get("format").getAsString())) throw invalid();
             ZoneId.of(metadata.get("zoneId").getAsString());
-            JsonObject snapshot = new JsonObject();snapshot.addProperty("format", "timekeeper-domain-v1");
+            JsonObject snapshot = new JsonObject();snapshot.addProperty("format", sessions ? "timekeeper-domain-v2" : "timekeeper-domain-v1");
             snapshot.add("zoneId", metadata.get("zoneId"));
-            for (var table : COLUMNS.entrySet()) {
+            for (var table : columns(sessions).entrySet()) {
                 checkCancelled();
                 List<List<String>> rows = parse(readFile(folder.resolve(table.getKey() + ".csv"), remaining));
                 if (rows.isEmpty() || !rows.removeFirst().equals(table.getValue()) || rows.size() > 10000) throw invalid();

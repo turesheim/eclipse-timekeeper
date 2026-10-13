@@ -15,6 +15,23 @@ import com.google.gson.JsonParser;
 class CsvSnapshotTest {
     @TempDir Path temporary;
 
+    @Test void v2CsvPreservesTasklessProjectAndSessionRelationsAndRequiresItsSessionFile() throws Exception {
+        var data=JsonParser.parseString("""
+            {"format":"timekeeper-domain-v2","zoneId":"UTC","projects":[],"tasks":[],"labels":[],
+             "workSessions":[{"id":"00000000-0000-4000-8000-000000000001","start":"2025-10-25T22:00:00.123456789Z","end":null,"summary":"Session, æøå"}],
+             "activities":[{"id":"00000000-0000-4000-8000-000000000002","taskId":null,"start":"2025-10-25T22:00:00.123456789Z","end":null,"summary":"Meeting","labelIds":[],"manual":false,
+                            "workSessionId":"00000000-0000-4000-8000-000000000001","projectId":null}]}
+            """).getAsJsonObject();
+        var root=Files.createTempDirectory("timekeeper-session-csv-");
+        try {
+            var export=root.resolve("export");assertEquals(2,CsvSnapshot.write(data,export));assertEquals(data,CsvSnapshot.read(export));
+            assertTrue(Files.isRegularFile(export.resolve("workSessions.csv")));
+            Files.delete(export.resolve("workSessions.csv"));assertThrows(java.io.IOException.class,()->CsvSnapshot.read(export));
+            data.addProperty("format","timekeeper-domain-v1");assertThrows(java.io.IOException.class,()->CsvSnapshot.write(data,root.resolve("invalid")));
+        } finally {
+            try(var paths=Files.walk(root)) {for(var path:paths.sorted(java.util.Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);}
+        }
+    }
     @Test void roundTripPreservesUnicodeQuotesNewlinesNullsIdsAndNanoseconds() throws Exception {
         JsonObject original=snapshot();Path export=temporary.resolve("folder with spaces");
         assertEquals(5,CsvSnapshot.write(original,export));

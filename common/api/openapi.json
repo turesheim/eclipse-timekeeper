@@ -2353,7 +2353,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Read all four resource types and the owner zone in one consistent snapshot. Maximum 10,000 records per resource type and 20 MiB serialized JSON; larger exports return 413 without a partial body. This format is not a database backup or legacy migration.",
+        "description": "Read an owner-neutral timekeeper-domain-v2 snapshot of projects, tasks, labels, activities and work sessions in one consistent transaction. Includes optional session and direct-project associations. Clients must understand v2 before exporting it to CSV; old CSV clients reject the new format. Limits are 10,000 per type and 20 MiB.",
         "parameters": [
           {
             "$ref": "#/components/parameters/OwnerBinding"
@@ -2414,7 +2414,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Validate the complete graph, unique source IDs, parent cycles, reference uniqueness, temporal rules and open-activity limit before commit. Allocate fresh Timekeeper UUIDs for every record and rewrite internal relations; return source-to-new ID mappings. Never overwrite existing data or accept owner identities. Existing external identities conflict with 409; invalid graph returns 422. No record survives a failed import. Maximum 10,000 per type and 20 MiB. Do not change the owner’s configured zone implicitly. Imported multi-day activities are split at elapsed local day boundaries, with source activity IDs mapped to the last part.",
+        "description": "Validate the complete graph, unique source IDs, parent cycles, reference uniqueness, temporal rules and open-activity limit before commit. Allocate fresh Timekeeper UUIDs for every record and rewrite internal relations; return source-to-new ID mappings. Never overwrite existing data or accept owner identities. Existing external identities conflict with 409; invalid graph returns 422. No record survives a failed import. Maximum 10,000 per type and 20 MiB. Do not change the owner’s configured zone implicitly. Imported multi-day activities are split at elapsed local day boundaries, with source activity IDs mapped to the last part. Accept v1 snapshots without sessions and v2 snapshots containing work sessions and optional task/project/session relations. Remap session IDs, enforce the independent one-running-session limit and preserve associations on all daily activity portions.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -4245,7 +4245,14 @@
             "$ref": "#/components/schemas/Id"
           },
           "taskId": {
-            "$ref": "#/components/schemas/Id"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "start": {
             "$ref": "#/components/schemas/Instant"
@@ -4273,6 +4280,26 @@
           },
           "manual": {
             "type": "boolean"
+          },
+          "workSessionId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -4290,7 +4317,11 @@
         "type": "object",
         "properties": {
           "format": {
-            "const": "timekeeper-domain-v1"
+            "type": "string",
+            "enum": [
+              "timekeeper-domain-v1",
+              "timekeeper-domain-v2"
+            ]
           },
           "zoneId": {
             "$ref": "#/components/schemas/ZoneId"
@@ -4322,6 +4353,13 @@
               "$ref": "#/components/schemas/TransferActivity"
             },
             "maxItems": 10000
+          },
+          "workSessions": {
+            "type": "array",
+            "maxItems": 10000,
+            "items": {
+              "$ref": "#/components/schemas/TransferWorkSession"
+            }
           }
         },
         "required": [
@@ -4332,7 +4370,54 @@
           "labels",
           "activities"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "timekeeper-domain-v2"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "workSessions"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "timekeeper-domain-v1"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "workSessions": {
+                  "maxItems": 0
+                },
+                "activities": {
+                  "items": {
+                    "properties": {
+                      "taskId": {
+                        "$ref": "#/components/schemas/Id"
+                      },
+                      "workSessionId": {
+                        "type": "null"
+                      },
+                      "projectId": {
+                        "type": "null"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
       },
       "ImportResult": {
         "type": "object",
@@ -4348,7 +4433,8 @@
                     "PROJECT",
                     "TASK",
                     "ACTIVITY",
-                    "LABEL"
+                    "LABEL",
+                    "WORK_SESSION"
                   ]
                 },
                 "sourceId": {
@@ -4724,6 +4810,37 @@
           "revision"
         ],
         "additionalProperties": true
+      },
+      "TransferWorkSession": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "start": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "id",
+          "start",
+          "end",
+          "summary"
+        ]
       }
     },
     "parameters": {
