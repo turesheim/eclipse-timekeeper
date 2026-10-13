@@ -12,13 +12,13 @@ import net.resheim.eclipse.timekeeper.service.Commands.*;
 final class WorkSessionScenario {
     static void prepare(HttpTimekeeperService api) throws Exception {
         var bot=new SWTWorkbenchBot();
-        RemoteTestSupport.waitFor(()->bot.button("Start work session").isEnabled(),"Session start unavailable");
-        bot.button("Start work session").click();
+        RemoteTestSupport.waitFor(()->bot.viewByTitle("Workweek").bot().button("Start work session").isEnabled(),"Session start unavailable");
+        bot.viewByTitle("Workweek").bot().button("Start work session").click();
         RemoteTestSupport.waitFor(()->api.activeWorkSession(OwnerId.LOCAL).isPresent(),"Session start did not commit");
         var running=api.activeWorkSession(OwnerId.LOCAL).orElseThrow();
         var activity=api.startActivity(new StartActivity(null,OwnerId.LOCAL,"Independent installed timer",Set.of(),Optional.of(running.id()),Optional.empty()));
-        RemoteTestSupport.waitFor(()->bot.button("Stop work session").isEnabled(),"Session stop unavailable");
-        bot.button("Stop work session").click();
+        RemoteTestSupport.waitFor(()->bot.viewByTitle("Workweek").bot().button("Stop work session").isEnabled(),"Session stop unavailable");
+        bot.viewByTitle("Workweek").bot().button("Stop work session").click();
         RemoteTestSupport.waitFor(()->api.workSession(running.id()).orElseThrow().end().isPresent(),"Session stop did not commit");
         assertEquals(activity.id(),api.activeActivity(OwnerId.LOCAL).orElseThrow().id());
         var stopped=api.stopActivity(new StopActivity(activity.id(),activity.version()));
@@ -73,28 +73,29 @@ final class WorkSessionScenario {
 
     /** The existing tracking scenario has already started the isolated reply gate. */
     static void uncertainCommands(HttpTimekeeperService api) throws Exception {
-        var bot=new SWTWorkbenchBot();assertTrue(api.activeWorkSession(OwnerId.LOCAL).isEmpty());
+        RemoteTestSupport.showWorkweek();
+        var bot=new SWTWorkbenchBot();bot.viewByTitle("Workweek").setFocus();assertTrue(api.activeWorkSession(OwnerId.LOCAL).isEmpty());
         var before=api.workSessions(OwnerId.LOCAL).size();
         RemoteBootstrap.holdNextSessionReply(null);
         WorkSession started;
         try {
             awaitStart(bot);
-            bot.button("Start work session").click();RemoteBootstrap.awaitTrackingReplyCommitted(true);
+            bot.viewByTitle("Workweek").bot().button("Start work session").click();RemoteBootstrap.awaitTrackingReplyCommitted(true);
             started=api.activeWorkSession(OwnerId.LOCAL).orElseThrow();
-            RemoteTestSupport.waitFor(()->bot.button("Retry session command").isEnabled(),"Lost start did not retain its retry command");
+            RemoteTestSupport.waitFor(()->bot.viewByTitle("Workweek").bot().button("Retry session command").isEnabled(),"Lost start did not retain its retry command");
         } finally {RemoteBootstrap.releaseTaskReply();}
-        bot.button("Retry session command").click();
-        RemoteTestSupport.waitFor(()->bot.button("Stop work session").isEnabled(),"Repeated start was not reconciled");
+        bot.viewByTitle("Workweek").bot().button("Retry session command").click();
+        RemoteTestSupport.waitFor(()->bot.viewByTitle("Workweek").bot().button("Stop work session").isEnabled(),"Repeated start was not reconciled");
         assertEquals(started,api.activeWorkSession(OwnerId.LOCAL).orElseThrow());assertEquals(before+1,api.workSessions(OwnerId.LOCAL).size());
         RemoteBootstrap.holdNextSessionReply(started.id().value());
         WorkSession stopped;
         try {
-            bot.button("Stop work session").click();RemoteBootstrap.awaitTrackingReplyCommitted(false);
+            bot.viewByTitle("Workweek").bot().button("Stop work session").click();RemoteBootstrap.awaitTrackingReplyCommitted(false);
             stopped=api.workSession(started.id()).orElseThrow();assertEquals(started.version()+1,stopped.version());
-            RemoteTestSupport.waitFor(()->bot.button("Retry session command").isEnabled(),"Lost stop did not retain its retry command");
+            RemoteTestSupport.waitFor(()->bot.viewByTitle("Workweek").bot().button("Retry session command").isEnabled(),"Lost stop did not retain its retry command");
         } finally {RemoteBootstrap.releaseTaskReply();}
-        bot.button("Retry session command").click();
-        RemoteTestSupport.waitFor(()->bot.button("Start work session").isEnabled(),"Repeated stop was not reconciled");
+        bot.viewByTitle("Workweek").bot().button("Retry session command").click();
+        RemoteTestSupport.waitFor(()->bot.viewByTitle("Workweek").bot().button("Start work session").isEnabled(),"Repeated stop was not reconciled");
         assertEquals(stopped,api.workSession(started.id()).orElseThrow());assertTrue(api.activeWorkSession(OwnerId.LOCAL).isEmpty());
         assertEquals(before+1,api.workSessions(OwnerId.LOCAL).size());
         RemoteBootstrap.proof.setProperty("phase.work-session.uncertain-start","passed");
@@ -103,14 +104,17 @@ final class WorkSessionScenario {
     }
 
     private static void awaitStart(SWTWorkbenchBot bot) throws Exception {
-        try {RemoteTestSupport.waitFor(()->bot.buttonWithId("work-session-start").isEnabled(),"Unknown start unavailable");}
+        try {RemoteTestSupport.waitFor(()->bot.viewByTitle("Workweek").bot().buttonWithId("work-session-start").isEnabled(),"Unknown start unavailable");}
         catch(RuntimeException failure) {
+            var controls=bot.viewByTitle("Workweek").bot();
+            var button=controls.buttonWithId("work-session-start").widget;
+            var status=controls.labelWithId("work-session-status").widget;
+            var history=controls.comboBoxWithId("work-session-history").widget;
             String state=RemoteTestSupport.onUi(()->{
                 var ui=net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin.getDefault();
-                var button=bot.buttonWithId("work-session-start").widget;
                 return "ready="+ui.isBackendReady()+", backend="+ui.backendStatus()+", enabled="+button.getEnabled()
                         +", inherited="+button.isEnabled()+", visible="+button.isVisible()+", caption="+button.getText()
-                        +", status="+bot.labelWithId("work-session-status").getText()+", history="+bot.comboBoxWithId("work-session-history").selection();
+                        +", status="+status.getText()+", history="+history.getText();
             });
             throw new AssertionError("Unknown start unavailable: "+state,failure);
         }

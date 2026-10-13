@@ -26,13 +26,17 @@ public class WorkSessionTest {
         open();
         var activities=TimekeeperUiPlugin.getDefault().getTimekeeperService();
         var sessions=TimekeeperUiPlugin.getDefault().getWorkSessionService();
-        var tasks=activities.tasks();
+        var tasks=activities.tasks().stream().map(Task::id).collect(java.util.stream.Collectors.toSet());
         waitFor(()->bot.button("Start work session").isEnabled(),"Start button unavailable");
         bot.button("Start work session").click();
         waitFor(()->sessions.activeWorkSession(OwnerId.LOCAL).isPresent(),"Work session was not started");
         var first=sessions.activeWorkSession(OwnerId.LOCAL).orElseThrow();
-        var activity=activities.startActivity(new StartActivity(null,OwnerId.LOCAL,"Independent timer",Set.of(),Optional.of(first.id()),Optional.empty()));
+        var ownedSessions=new ArrayList<WorkSessionId>();ownedSessions.add(first.id());
         try {
+            // Other integration scenarios may leave their timer running. Preserve it;
+            // session controls must also work independently of an existing activity.
+            var activity=activities.activeActivity(OwnerId.LOCAL).orElseGet(()->activities.startActivity(
+                    new StartActivity(null,OwnerId.LOCAL,"Independent timer",Set.of(),Optional.of(first.id()),Optional.empty())));
             waitFor(()->bot.labelWithId("work-session-status").getText().contains("Running") && bot.button("Stop work session").isEnabled(),"Running status missing");
             bot.button("Stop work session").click();
             waitFor(()->sessions.workSession(first.id()).orElseThrow().end().isPresent(),"Session did not stop");
@@ -41,20 +45,20 @@ public class WorkSessionTest {
             waitFor(()->bot.button("Start work session").isEnabled(),"Second session unavailable");
             bot.button("Start work session").click();
             waitFor(()->sessions.activeWorkSession(OwnerId.LOCAL).isPresent(),"Second session did not start");
-            var second=sessions.activeWorkSession(OwnerId.LOCAL).orElseThrow();
+            var second=sessions.activeWorkSession(OwnerId.LOCAL).orElseThrow();ownedSessions.add(second.id());
             assertNotEquals(first.id(),second.id());
             waitFor(()->bot.button("Stop work session").isEnabled(),"Second stop unavailable");
             bot.button("Stop work session").click();
             waitFor(()->sessions.activeWorkSession(OwnerId.LOCAL).isEmpty(),"Second session did not stop");
-            assertEquals(tasks,activities.tasks());
+            assertEquals(tasks,activities.tasks().stream().map(Task::id).collect(java.util.stream.Collectors.toSet()));
         } finally {
-            for(var session:sessions.workSessions(OwnerId.LOCAL)) {
-                for(var value:sessions.workSessionReport(session.id()).activities()) {
+            for(var id:ownedSessions) {
+                for(var value:sessions.workSessionReport(id).activities()) {
                     var current=activities.activity(value.id()).orElseThrow();
                     if(current.end().isEmpty()) current=activities.stopActivity(new StopActivity(current.id(),current.version()));
                     activities.deleteActivity(new DeleteActivity(current.id(),current.version()));
                 }
-                var current=sessions.workSession(session.id()).orElseThrow();sessions.deleteWorkSession(new DeleteWorkSession(current.id(),current.version()));
+                var current=sessions.workSession(id).orElseThrow();sessions.deleteWorkSession(new DeleteWorkSession(current.id(),current.version()));
             }
         }
     }
@@ -63,7 +67,7 @@ public class WorkSessionTest {
         open();
         var activities=TimekeeperUiPlugin.getDefault().getTimekeeperService();
         var sessions=TimekeeperUiPlugin.getDefault().getWorkSessionService();
-        var tasks=activities.tasks();var zone=TimekeeperUiPlugin.getCalendarZone();
+        var tasks=activities.tasks().stream().map(Task::id).collect(java.util.stream.Collectors.toSet());var zone=TimekeeperUiPlugin.getCalendarZone();
         var from=LocalDate.now(zone).minusDays(2).atTime(8,0).atZone(zone).toInstant().plusNanos(123);
         var until=from.plus(Duration.ofHours(10));
         if(!bot.toggleButton("Session details").isPressed()) bot.toggleButton("Session details").click();
@@ -89,7 +93,7 @@ public class WorkSessionTest {
             waitFor(()->sessions.workSessionReport(session.id()).activities().size()==2,"Second activity missing");
             var metric=sessions.workSessionReport(session.id()).time();
             assertEquals(Duration.ofHours(13),metric.trackedActivityTime());assertEquals(Duration.ofHours(10),metric.allocatedTime());assertEquals(Duration.ZERO,metric.unallocatedTime());
-            assertEquals(tasks,activities.tasks());
+            assertEquals(tasks,activities.tasks().stream().map(Task::id).collect(java.util.stream.Collectors.toSet()));
             waitFor(()->bot.tableWithId("work-session-activities").rowCount()==2,"Associated rows not displayed");
             var screenshots=java.nio.file.Path.of(System.getProperty("java.io.tmpdir"),"timekeeper-work-session-ui");
             java.nio.file.Files.createDirectories(screenshots);
