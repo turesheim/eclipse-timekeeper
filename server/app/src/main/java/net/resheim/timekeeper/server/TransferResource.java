@@ -62,6 +62,7 @@ public class TransferResource {
             }
         }
         for(JsonNode item:input.get("activities")) {
+            Activity.validateStart(Instant.parse(item.get("start").asText()),store.now());
             if(!sourceTasks.containsKey(uuid(item.get("taskId")))) throw ApiFailure.validation();
             for(JsonNode label:item.get("labelIds")) if(!sourceLabels.contains(uuid(label))) throw ApiFailure.validation();
             var end=optionalText(item.get("end")).map(Instant::parse);if(end.isPresent() && end.get().isBefore(Instant.parse(item.get("start").asText()))) throw ApiFailure.validation();

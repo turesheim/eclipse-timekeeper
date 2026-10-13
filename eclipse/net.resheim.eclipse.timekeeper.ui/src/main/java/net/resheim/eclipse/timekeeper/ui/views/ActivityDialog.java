@@ -153,9 +153,7 @@ final class ActivityDialog extends AsyncRecordDialog {
 			var from = endpoint(start.getText(), original == null ? Optional.empty() : Optional.of(original.start()));
 			Optional<java.time.Instant> until = end.getText().isBlank() ? Optional.empty()
 					: Optional.of(endpoint(end.getText(), original == null ? Optional.empty() : original.end()));
-			if (until.isEmpty() && from.isAfter(java.time.Instant.now())) {
-				throw new IllegalArgumentException("An ongoing activity cannot start in the future.");
-			}
+			Activity.validateStart(from, java.time.Instant.now());
 			Set<LabelId> selected = Arrays.stream(labels.getCheckedElements())
 					.map(value -> ((net.resheim.eclipse.timekeeper.domain.Label) value).id()).collect(Collectors.toSet());
             String entered=summary.getText();

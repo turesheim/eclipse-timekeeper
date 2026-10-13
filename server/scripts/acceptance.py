@@ -176,10 +176,10 @@ def main():
         nano, _ = client.call('GET', '/reports/activities?' + urlencode({'taskId': child['id'],
                              'from': '2026-03-29T00:00:00Z', 'to': '2026-03-29T01:00:00Z'}))
         client.assertEqual('PT0.000000001S', nano['total'])
-        client.create('activities', {'taskId': child['id'], 'start': '2026-10-24T22:00:00Z',
-                                     'end': '2026-10-25T23:00:00Z', 'summary': '', 'labelIds': []})
+        client.create('activities', {'taskId': child['id'], 'start': '2025-10-25T22:00:00Z',
+                                     'end': '2025-10-26T23:00:00Z', 'summary': '', 'labelIds': []})
         autumn, _ = client.call('GET', '/reports/activities?' + urlencode({'taskId': child['id'],
-                               'from': '2026-10-24T22:00:00Z', 'to': '2026-10-25T23:00:00Z', 'zoneId': 'Europe/Oslo'}))
+                               'from': '2025-10-25T22:00:00Z', 'to': '2025-10-26T23:00:00Z', 'zoneId': 'Europe/Oslo'}))
         client.assertEqual('PT25H', autumn['total'])
         receipt['hierarchyRollbackAndPrecisionVerified'] = True
         # JSON Schema length is measured in code points; SQL columns must also fit surrogate pairs.

@@ -109,10 +109,12 @@ through the external-reference lookup instead of creating a duplicate.
 
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
-Manual editing sets `manual=true` and cannot change activity task/owner. Manual
-future recorded intervals follow the embedded domain's current policy; automatic
+Manual editing sets `manual=true` and cannot change activity task/owner. Creating,
+editing or importing an interval whose start is after the backend's clock returns
+422 `VALIDATION`, whether the interval is open or closed. A start exactly at the
+current instant is allowed. Invalid writes leave records and revisions unchanged. Automatic
 start/stop always uses the server clock. Clients do not submit their clocks for
-live tracking. #82 is a separate future-start policy issue.
+live tracking.
 
 Portable interchange uses `timekeeper-domain-v1` JSON, not SQL/JPA table names.
 Export reads a consistent owned snapshot. Import validates the entire graph,

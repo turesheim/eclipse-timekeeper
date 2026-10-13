@@ -31,11 +31,13 @@ final class RemotePreferenceScenario {
         String prefix="Native transfer "+UUID.randomUUID().toString().substring(0,8);
         var project=api.createProject(new CreateProject(prefix+" project"));
         var task=api.createTask(new CreateTask(Optional.of(project.id()),prefix+" task",Optional.empty()));
-        var zone=api.profile().zone();var date=LocalDate.now(zone);
+        var zone=api.profile().zone();var date=LocalDate.now(zone).minusWeeks(1);
         var start=date.atTime(8,0,0,123456789).atZone(zone).toInstant();
         var interval=api.createActivity(new CreateActivity(task.id(),OwnerId.LOCAL,start,Optional.of(start.plusNanos(1)),prefix+" interval",Set.of()));
-        liveLabelChoices(api,project,task,interval,prefix);
         var bot=new SWTWorkbenchBot();
+        bot.viewByTitle("Workweek").toolbarButton("Show current week").click();
+        bot.viewByTitle("Workweek").toolbarButton("Show previous week").click();
+        liveLabelChoices(api,project,task,interval,prefix);
         try(var peer=new HttpTimekeeperService(RemoteBootstrap.endpoint(),RemoteBootstrap::observerBToken,Duration.ofSeconds(5))) {
             var emptyColor=peer.createLabel(new CreateLabel(prefix+" no color",Optional.empty()));
             awaitLabel(emptyColor);var preferences=open(LABELS);
@@ -90,6 +92,7 @@ final class RemotePreferenceScenario {
             RemoteTestSupport.waitFor(()->!remove.isOpen(),"Label removal preferences did not acknowledge");assertTrue(api.label(changed.id()).isEmpty());assertTrue(api.label(emptyColor.id()).isEmpty());
             RemoteTestSupport.closedLocalStorage();RemoteBootstrap.receipt().setProperty("phase.native.label-preferences","passed");RemoteBootstrap.receipt().setProperty("phase.native.report-controls","passed");RemoteBootstrap.writeProof();
         }
+        bot.viewByTitle("Workweek").toolbarButton("Show current week").click();
     }
     private static void liveLabelChoices(HttpTimekeeperService api,Project project,Task task,Activity interval,String prefix) throws Exception {
         var original=api.createLabel(new CreateLabel(prefix+" live original",Optional.empty()));awaitLabel(original);

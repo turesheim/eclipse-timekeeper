@@ -2634,6 +2634,7 @@
       },
       "ActivityInput": {
         "type": "object",
+        "description": "A recorded interval. Start must not be after the backend clock, whether the interval is open or closed; a future start returns 422 VALIDATION.",
         "properties": {
           "taskId": {
             "$ref": "#/components/schemas/Id"
@@ -2674,6 +2675,7 @@
       },
       "ActivityUpdate": {
         "type": "object",
+        "description": "Edit a recorded interval. Start must not be after the backend clock; invalid edits do not change records or versions.",
         "properties": {
           "start": {
             "$ref": "#/components/schemas/Instant"

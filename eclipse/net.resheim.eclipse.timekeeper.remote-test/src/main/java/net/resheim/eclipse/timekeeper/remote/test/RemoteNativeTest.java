@@ -48,7 +48,8 @@ public class RemoteNativeTest {
             RemoteTestSupport.waitFor(()->api.activeActivity(OwnerId.LOCAL).isEmpty(),"Remote tracking was not stopped");
             var stopped=api.activity(started.id()).orElseThrow();assertTrue(stopped.end().isPresent());
             // Seed a precise interval through the same HTTP port and prove it is retained on restart.
-            var date=java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+            view.toolbarButton("Show previous week").click();
+            var date=java.time.LocalDate.now(java.time.ZoneOffset.UTC).minusWeeks(1);
             var from=date.atTime(8,0,0,123456789).toInstant(java.time.ZoneOffset.UTC);
             var until=date.atTime(9,0,0,987654321).toInstant(java.time.ZoneOffset.UTC);
             var manual=api.createActivity(new CreateActivity(task.id(),OwnerId.LOCAL,from,Optional.of(until),"Precise remote interval",Set.of()));
@@ -68,6 +69,7 @@ public class RemoteNativeTest {
             RemoteBootstrap.proof.setProperty("manual.start",from.toString());RemoteBootstrap.proof.setProperty("manual.end",until.toString());
             RemoteBootstrap.proof.setProperty("project.id",project.id().value().toString());RemoteBootstrap.proof.setProperty("task.id",task.id().value().toString());
             RemoteBootstrap.proof.setProperty("stopped.id",stopped.id().value().toString());RemoteBootstrap.proof.setProperty("manual.id",manual.id().value().toString());
+            view.toolbarButton("Show current week").click();
             UncertainTrackingScenario.run(api);
             UncertainDeletionScenario.run(api);
             InstalledImportScenario.prepare(api);

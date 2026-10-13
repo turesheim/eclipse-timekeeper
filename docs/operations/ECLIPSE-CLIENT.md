@@ -35,6 +35,11 @@ receive label changes while preserving unsaved fields and selected labels.
 Conflicting label-definition edits retain their original version and are
 rejected for review rather than overwriting another client's changes.
 
+Use **New activity** or **Edit activity...** in Workweek to record or adjust an
+interval. Its start cannot be in the future, whether it is ongoing or completed.
+The selected backend validates its own clock; an invalid edit or import leaves
+stored records unchanged.
+
 ## If the token cannot be saved
 
 Timekeeper encrypts tokens using Eclipse secure storage. A storage error occurs

@@ -364,6 +364,7 @@ public class TimekeeperPlugin extends Plugin {
 		if (!externalReferences.toFile().exists()) {
 			throw new IOException("'external_task_reference.csv' does not exist in the specified location.");
 		}
+		ActivityCsvValidation.validate(activities, java.time.Instant.now());
 		EntityTransaction transaction = entityManager.getTransaction();
 		try {
 			transaction.begin();

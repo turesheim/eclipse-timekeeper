@@ -31,6 +31,15 @@ public record Activity(ActivityId id, TaskId taskId, OwnerId ownerId, Instant st
 				version + 1);
 	}
 
+	/** Validate a recorded start against the owning backend's clock. */
+	public static void validateStart(Instant start, Instant now) {
+		Values.required(start, "start");
+		Values.required(now, "now");
+		if (start.isAfter(now)) {
+			throw new DomainValidationException("start", "An activity cannot start in the future.");
+		}
+	}
+
 	public Activity edit(Instant newStart, Instant newEnd, String newSummary, Set<LabelId> newLabelIds) {
 		return new Activity(id, taskId, ownerId, newStart, Optional.ofNullable(newEnd), newSummary,
 				newLabelIds, true, version + 1);
