@@ -1,6 +1,8 @@
 # Connect Eclipse to the Timekeeper server
 
-Install **Timekeeper for Eclipse** from the [update site](https://turesheim.github.io/eclipse-timekeeper/updates/).
+Install **Timekeeper for Eclipse** from the [testing update site](https://turesheim.github.io/eclipse-timekeeper/updates/testing/)
+for verified unreleased 2.0 main builds, or the [stable update site](https://turesheim.github.io/eclipse-timekeeper/updates/)
+for published releases.
 In **Help > Install New Software... > Add...**, paste that URL into **Location**,
 select the feature and restart. Add **Timekeeper Mylyn integration** if you want
 Task List integration. Timekeeper 2.0 requires Eclipse 2026-09 and Java 21;

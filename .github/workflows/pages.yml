@@ -1,10 +1,8 @@
 name: Website and p2 update site
 
 on:
-  push:
-    branches: [main]
   workflow_run:
-    workflows: [Release p2 and server distributions]
+    workflows: [Build, Release p2 and server distributions]
     types: [completed]
   release:
     types: [edited, deleted]
@@ -20,12 +18,19 @@ concurrency:
 
 jobs:
   build:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       (github.event.workflow_run.name != 'Build' ||
+        (github.event.workflow_run.event == 'push' &&
+         github.event.workflow_run.head_branch == github.event.repository.default_branch &&
+         github.event.workflow_run.head_repository.full_name == github.repository)))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
       pages: read
+      actions: read
     steps:
       # Always use the trusted default branch, including workflow_run events.
       - uses: actions/checkout@v7.0.1
@@ -48,7 +53,7 @@ jobs:
         run: |
           # Jekyll's Docker action writes root-owned output.
           sudo chown -R "$(id -u):$(id -g)" _site
-          python3 scripts/p2_release.py site --repo "$GITHUB_REPOSITORY" --output _site
+          python3 scripts/p2_release.py site --repo "$GITHUB_REPOSITORY" --output _site --include-testing
 
       - name: Upload website and p2 repositories
         uses: actions/upload-pages-artifact@v4

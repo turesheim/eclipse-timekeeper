@@ -94,3 +94,40 @@ checks initial names/colors, distinct owner UUIDs and unchanged data across
 restart. The earlier merged-main receipt above predates this follow-up; its
 source/checksum is retained as recorded rather than presented as this change's
 validation.
+
+The corrected follow-up head `08f956a3e2c540fe9c385cb4cf653e9c4ba008c9` passed
+all eight [Build jobs in run 38382631394](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38382631394)
+and [container verification 38382631454](https://github.com/turesheim/eclipse-timekeeper/actions/runs/38382631454).
+Downloaded reports contain 65 server cases, eight browser cases and all nine
+installed cases, without failures/errors/skips. All 64 installed phase markers
+passed. The packaged server receipt confirms `defaultLabelsVerified=true` and
+both restart modes. The shared server/browser/installed checksum is
+`a3b021dfc388b72c05cd828bc9c5addcc5f09a15fbacb9706ff829afd4f95adb`.
+The tested PR merge source is `c6d91a96dfdb401fa0dad453c07fd87d809820f9`, rather
+than the head alone. The first follow-up exposed a fixture opening label
+preferences before direct cleanup deletions had reached its ready snapshot;
+the corrected fixture waits for canonical projects/tasks/labels before opening
+that page.
+
+## Installable main builds
+
+Pages now follows a successful main Build workflow, including the complete
+platform matrix and **Installed client tests** (the renamed Remote-Eclipse job).
+Its separate `/updates/testing/` channel uses only that verified main p2
+artifact; stable and preview remain release-only. The website explains the
+installation steps and channel choice. The publisher checks source/run identity,
+GitHub's artifact SHA-256, p2 metadata and every referenced JAR. PR/fork runs,
+incomplete/skipped client tests, wrong source/checksum and expired artifacts
+cannot populate testing.
+
+The publication follow-up passes 23 script/documentation tests and actionlint.
+A complete site was also assembled from the actual main artifact for run
+`38368609913`, with feature `2.0.0.202610130820`, source `102a341`, and artifact
+SHA-256 `98cf4ee7dfd8c3080cc1ea8d825a7f068259a65ed9e8e2b9c093a8202ae3a0b1`.
+Its testing composite contains a real child repository with all declared files.
+Publication of this channel occurs after the workflow changes merge and Pages
+deploys; local assembly alone is not a live installation check.
+The later workflow correction puts **Update site checks** after the complete
+matrix and acceptance jobs. Its site uses the current run's downloaded p2
+artifact, while **Publication tooling tests** runs separately in parallel.
+Pages has no immediate main-push deployment; it follows successful Build.
