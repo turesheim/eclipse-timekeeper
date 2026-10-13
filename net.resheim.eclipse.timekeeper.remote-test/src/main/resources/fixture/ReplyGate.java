@@ -26,10 +26,17 @@ public class ReplyGate {
                         case "/__fixture/health" -> reply(exchange,200,"ready");
                         case "/__fixture/hold" -> {
                             String target=new String(exchange.getRequestBody().readAllBytes(),StandardCharsets.UTF_8);
-                            String method=target.startsWith("POST ") ? "POST" : "PUT";
-                            if(method.equals("POST")) target=target.substring(5);
-                            if(!(method.equals("PUT") ? target.matches("/api/v1/tasks/[0-9a-f-]{36}")
-                                    : (target.matches("/api/v1/(projects|tasks|activities|labels)") || target.equals("/api/v1/activities/start") || target.matches("/api/v1/activities/[0-9a-f-]{36}/stop")))) throw new IllegalArgumentException("Invalid fixture route");
+                            String method="PUT";
+                            if(target.startsWith("POST ")) {method="POST";target=target.substring(5);}
+                            else if(target.startsWith("DELETE ")) {method="DELETE";target=target.substring(7);}
+                            boolean valid=switch(method) {
+                                case "PUT" -> target.matches("/api/v1/tasks/[0-9a-f-]{36}");
+                                case "DELETE" -> target.matches("/api/v1/(projects|tasks|activities|labels)/[0-9a-f-]{36}");
+                                case "POST" -> target.matches("/api/v1/(projects|tasks|activities|labels)")
+                                    || target.equals("/api/v1/activities/start") || target.matches("/api/v1/activities/[0-9a-f-]{36}/stop");
+                                default -> false;
+                            };
+                            if(!valid) throw new IllegalArgumentException("Invalid fixture route");
                             var next=new Gate(method,target,new CountDownLatch(1),new CountDownLatch(1),new AtomicReference<>(0));
                             var previous=gate.get();if(previous!=null && previous.release().getCount()!=0) throw new IllegalStateException("Previous gate not released");
                             gate.set(next);armed.set(next);reply(exchange,200,"armed");

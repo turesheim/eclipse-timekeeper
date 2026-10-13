@@ -73,7 +73,7 @@ final class UncertainTrackingScenario {
         try {return RemoteTestSupport.onUi(()->TimekeeperUiPlugin.getDefault().getTimekeeperService().activeActivity(OwnerId.LOCAL));}
         catch(Exception failure) {throw new IllegalStateException(failure);}
     }
-    private static void outcome(boolean cancel,String jobName,String title) throws Exception {
+    static void outcome(boolean cancel,String jobName,String title) throws Exception {
         Job operation=null;
         if(cancel) {
             operation=Arrays.stream(Job.getJobManager().find(null)).filter(job->job.getName().equals(jobName) && job.getState()==Job.RUNNING).findFirst().orElseThrow();
