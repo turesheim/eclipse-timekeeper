@@ -112,11 +112,25 @@ final class RemotePreferenceScenario {
         NativeGtkDialog.choose("Please choose a folder to import from",export,()->prefs.bot().button("Import...").click());bot.shell("Import server data").bot().button("OK").click();bot.shell("Data imported").bot().button("OK").click();
         var after=api.metadata();assertEquals(before.projects().size()*2,after.projects().size());assertEquals(before.tasks().size()*2,after.tasks().size());assertEquals(before.labels().size()*2,after.labels().size());
         var imported=api.activities(query).activities().stream().filter(a->activities.stream().noneMatch(old->old.id().equals(a.id()))).toList();assertEquals(activities.size(),imported.size());
-        for(var old:activities) {assertEquals(old,api.activity(old.id()).orElseThrow());assertTrue(imported.stream().anyMatch(a->a.start().equals(old.start()) && a.end().equals(old.end()) && a.summary().equals(old.summary())));}
+        for(var old:activities) {
+            assertEquals(old,api.activity(old.id()).orElseThrow());
+            var copy=imported.stream().filter(a->a.start().equals(old.start()) && a.end().equals(old.end()) && a.summary().equals(old.summary())).findFirst().orElseThrow();
+            assertEquals(old.ownerId(),copy.ownerId());assertNotEquals(old.taskId(),copy.taskId());
+            var oldTask=before.tasks().stream().filter(t->t.id().equals(old.taskId())).findFirst().orElseThrow();
+            var newTask=after.tasks().stream().filter(t->t.id().equals(copy.taskId())).findFirst().orElseThrow();
+            assertEquals(oldTask.summary(),newTask.summary());assertEquals(oldTask.url(),newTask.url());
+            var oldProject=before.projects().stream().filter(p->oldTask.projectId().filter(p.id()::equals).isPresent()).findFirst().orElseThrow();
+            var newProject=after.projects().stream().filter(p->newTask.projectId().filter(p.id()::equals).isPresent()).findFirst().orElseThrow();
+            assertNotEquals(oldProject.id(),newProject.id());assertEquals(oldProject.name(),newProject.name());
+            var oldLabels=before.labels().stream().filter(l->old.labelIds().contains(l.id())).map(l->l.name()+":"+l.color()).collect(java.util.stream.Collectors.toSet());
+            var newLabels=after.labels().stream().filter(l->copy.labelIds().contains(l.id())).map(l->l.name()+":"+l.color()).collect(java.util.stream.Collectors.toSet());
+            assertEquals(oldLabels,newLabels);assertTrue(java.util.Collections.disjoint(old.labelIds(),copy.labelIds()));
+        }
         for(var value:imported) api.deleteActivity(new DeleteActivity(value.id(),value.version()));
         for(var value:after.tasks()) if(before.tasks().stream().noneMatch(old->old.id().equals(value.id()))) api.deleteTask(new DeleteTask(value.id(),value.version()));
         for(var value:after.projects()) if(before.projects().stream().noneMatch(old->old.id().equals(value.id()))) api.deleteProject(new DeleteProject(value.id(),value.version()));
         for(var value:after.labels()) if(before.labels().stream().noneMatch(old->old.id().equals(value.id()))) api.deleteLabel(new DeleteLabel(value.id(),value.version()));
+        RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->{var s=TimekeeperUiPlugin.getDefault().getTimekeeperService();return s.projects().equals(before.projects()) && s.tasks().equals(before.tasks()) && s.labels().equals(before.labels());});}catch(Exception loading) {return false;}},"Imported copies remained in the native cache after cleanup");
         prefs.bot().button("Cancel").click();RemoteTestSupport.waitFor(()->!prefs.isOpen(),"CSV preferences did not close");RemoteTestSupport.closedLocalStorage();RemoteBootstrap.receipt().setProperty("phase.native.folder-dialogs","passed");
     }
     private static String clipboard() throws Exception {return RemoteTestSupport.onUi(()->{var clipboard=new Clipboard(PlatformUI.getWorkbench().getDisplay());try {return (String)clipboard.getContents(TextTransfer.getInstance());}finally {clipboard.dispose();}});}
