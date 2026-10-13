@@ -210,12 +210,20 @@ public final class RemoteBootstrap implements IApplication {
         proof.setProperty("server.reply-gate-pid",String.valueOf(active.replyGate.pid()));writeProof();
     }
     public static void holdNextTaskReply(java.util.UUID id) throws Exception {control("hold","/api/v1/tasks/"+id);}
+    public static void holdNextCreateReply(String collection) throws Exception {
+        if(!java.util.Set.of("projects","tasks","activities","labels").contains(collection)) throw new IllegalArgumentException("Unsupported create fixture");
+        control("hold","POST /api/v1/"+collection);
+    }
+    public static void awaitCreateReplyCommitted() throws Exception {awaitReplyCommitted(201);}
     public static void awaitTaskReplyCommitted() throws Exception {
+        awaitReplyCommitted(200);
+    }
+    private static void awaitReplyCommitted(int status) throws Exception {
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
         while(System.nanoTime()<deadline) {
             String value=control("state",null);
             if(value.startsWith("committed=")) {
-                if(!value.equals("committed=200")) throw new IllegalStateException("Fixture update was not acknowledged by the backend: "+value);
+                if(!value.equals("committed="+status)) throw new IllegalStateException("Fixture mutation was not acknowledged by the backend: "+value);
                 return;
             }
             Thread.sleep(25);
