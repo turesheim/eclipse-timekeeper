@@ -52,9 +52,35 @@ public class RemoteMylynTest {
                 return null;
             });
             RemoteTestSupport.waitFor(barrier::get,"Late event barrier did not complete");assertEquals(successor,api.activeActivity(OwnerId.LOCAL).orElseThrow());
-            RemoteTestSupport.onUi(()->{TasksUi.getTaskActivityManager().deactivateTask(secondProjection);return null;});
+            // Hold the serialized worker so Workweek observes the active snapshot
+            // throughout the click. This reproduces #275's duplicate stale stop.
+            var workerHeld=new java.util.concurrent.CountDownLatch(1);
+            var releaseWorker=new java.util.concurrent.CountDownLatch(1);
+            RemoteTestSupport.onUi(()->{
+                TimekeeperUiPlugin.getDefault().runRead("Hold worker before Workweek stop",()->{
+                    workerHeld.countDown();
+                    try {if(!releaseWorker.await(30,java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException("Stop fixture timed out");}
+                    catch(InterruptedException interrupted) {Thread.currentThread().interrupt();throw new IllegalStateException(interrupted);}
+                    return null;
+                },value->{},failure->{throw new AssertionError(failure);});return null;
+            });
+            assertTrue(workerHeld.await(30,java.util.concurrent.TimeUnit.SECONDS));
+            try {
+                var bot=new org.eclipse.swtbot.eclipse.finder.SWTWorkbenchBot();
+                bot.viewByTitle("Workweek").bot().tree().getTreeItem(project.name()).expand()
+                    .getNode(second.summary()).select().contextMenu("Deactivate task").click();
+            } finally {releaseWorker.countDown();}
             RemoteTestSupport.waitFor(()->api.activeActivity(OwnerId.LOCAL).isEmpty(),"Mylyn deactivation did not stop remote tracking");
-            assertTrue(api.activity(successor.id()).orElseThrow().end().isPresent());
+            barrier.set(false);
+            RemoteTestSupport.onUi(()->{
+                TimekeeperUiPlugin.getDefault().runRead("Observe all Workweek stop commands",()->null,value->barrier.set(true),failure->{throw new AssertionError(failure);});return null;
+            });
+            RemoteTestSupport.waitFor(barrier::get,"Workweek stop barrier did not complete");
+            assertFalse("Workweek must not report its own stop as a server conflict",RemoteTestSupport.onUi(()->
+                java.util.Arrays.stream(PlatformUI.getWorkbench().getDisplay().getShells())
+                    .anyMatch(shell->shell.isVisible() && shell.getText().equals("Timekeeper"))));
+            var stopped=api.activity(successor.id()).orElseThrow();
+            assertTrue(stopped.end().isPresent());assertEquals(successor.version()+1,stopped.version());
             var taskUi=org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getDefault();
             var dataDirectory=java.nio.file.Path.of(taskUi.getDataDirectory()).toAbsolutePath();
             assertTrue("Mylyn fixture data must remain in the isolated test installation",dataDirectory.startsWith(RemoteBootstrap.fixtureFolder().getParent()));
