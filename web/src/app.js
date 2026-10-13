@@ -21,6 +21,7 @@ function errorText(error) { return error instanceof ApiError ? error.message : '
 function setStatus(text) { $('status').textContent = text; }
 function readOnlyWhileDisconnected() {
   for (const id of ['add-task', 'add-project', 'add-label', 'add-activity', 'settings', 'stop']) $(id).disabled = !connected;
+  for (const action of document.querySelectorAll('td.actions button')) action.disabled = !connected;
 }
 function tab(name) {
   for (const item of ['week', 'tasks', 'projects', 'labels']) $(`${item}-panel`).hidden = item !== name;
@@ -67,6 +68,9 @@ async function refresh() {
       const current = await session.snapshot(zone => weekRange(date, zone));
       if (session !== api) return;
       if (date !== $('week-date').value) { reloadAgain = true; continue; }
+      // A save may have queued another read while this older snapshot was in
+      // flight. Publish only the final snapshot before enabling dependent forms.
+      if (reloadAgain) continue;
       snapshot = current; connected = true;
       render(); setStatus('Up to date');
     } while (reloadAgain && session === api);
@@ -234,6 +238,7 @@ $('editor-form').addEventListener('submit', async event => {
     await current.session.request(path, {method, body, etag: current.etag, key: current.key});
     if (current.session !== api || current !== editor) return;
     editor = null; $('editor').close(); $('fields').replaceChildren();
+    connected = false; readOnlyWhileDisconnected(); setStatus('Refreshing saved changes…');
     // Acknowledged saves remain successful even if the following read fails.
     await refresh().catch(() => {});
   } catch (error) {

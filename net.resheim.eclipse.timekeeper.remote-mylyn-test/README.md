@@ -1,5 +1,20 @@
 # Installed remote Mylyn acceptance
 
+The account-switch phase also launches a real headless Chromium client against
+the same packaged server and verifies bidirectional Workweek changes, preserved
+conflicting drafts, activation/deactivation and exact daily/weekly reports.
+Prepare its locked test dependencies before running `-Premote-client-tests`:
+
+```sh
+npm ci --ignore-scripts --prefix web
+cd web && npx playwright install --with-deps chromium && cd ..
+```
+
+Node must be on the test JVM's PATH. CI installs it and the browser explicitly.
+There is no production Node dependency. The token goes only through the child
+environment; the line protocol and retained diagnostics contain no credentials.
+Details and limits: [WEB-ECLIPSE.md](../baseline/WEB-ECLIPSE.md).
+
 This module extends the isolated packaged-server bootstrap from `remote-test`
 and installs the official optional Timekeeper/Mylyn feature using p2. It runs
 in its own workspace and credential fixture, separate from the native-only

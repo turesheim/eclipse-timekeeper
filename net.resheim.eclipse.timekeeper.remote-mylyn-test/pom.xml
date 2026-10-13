@@ -7,10 +7,10 @@
   <packaging>eclipse-test-plugin</packaging>
   <properties>
     <timekeeper.remote.distribution>${project.basedir}/../server/target/distribution/timekeeper-server.zip</timekeeper.remote.distribution>
-    <remote.vmargs>-Xmx1024m -Dtimekeeper.remote.switch-tests=true -Dtimekeeper.remote.distribution=${timekeeper.remote.distribution} -Dtimekeeper.remote.fixture=${project.build.directory}/acceptance-data -Dorg.eclipse.swtbot.search.timeout=15000</remote.vmargs>
+    <remote.vmargs>-Xmx1024m -Dtimekeeper.remote.switch-tests=true -Dtimekeeper.web.root=${project.basedir}/.. -Dtimekeeper.remote.distribution=${timekeeper.remote.distribution} -Dtimekeeper.remote.fixture=${project.build.directory}/acceptance-data -Dorg.eclipse.swtbot.search.timeout=15000</remote.vmargs>
   </properties>
   <profiles><profile><id>macosx</id><activation><os><family>mac</family></os></activation>
-    <properties><remote.vmargs>-XstartOnFirstThread -Xmx1024m -Dtimekeeper.remote.switch-tests=true -Dtimekeeper.remote.distribution=${timekeeper.remote.distribution} -Dtimekeeper.remote.fixture=${project.build.directory}/acceptance-data -Dorg.eclipse.swtbot.search.timeout=15000</remote.vmargs></properties>
+    <properties><remote.vmargs>-XstartOnFirstThread -Xmx1024m -Dtimekeeper.remote.switch-tests=true -Dtimekeeper.web.root=${project.basedir}/.. -Dtimekeeper.remote.distribution=${timekeeper.remote.distribution} -Dtimekeeper.remote.fixture=${project.build.directory}/acceptance-data -Dorg.eclipse.swtbot.search.timeout=15000</remote.vmargs></properties>
   </profile></profiles>
   <build><plugins>
     <plugin><groupId>org.eclipse.tycho</groupId><artifactId>target-platform-configuration</artifactId>

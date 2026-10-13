@@ -59,6 +59,7 @@ public class RemoteMylynAccountTest {
             RemoteTaskFailureScenario.run(api,project);
             RemoteSynchronizationScenario.run(api,project);
             RemoteOwnerBindingScenario.run(api,project);
+            RemoteWebScenario.run(api);
             assertEquals(1,api.projects().size());assertEquals(1,api.tasks().size());
             assertEquals(previous,original.metadata());assertEquals(history,original.activity(history.id()).orElseThrow());assertEquals(successor,original.activity(successor.id()).orElseThrow());
             assertEquals(3,RemoteBootstrap.receipt().getProperty("server.pids").split(",").length);
@@ -155,8 +156,11 @@ public class RemoteMylynAccountTest {
         tree.getTreeItem(project.name()).getNode(task.summary()).contextMenu("Edit task...").click();
         var shell=bot.shell("Edit task");var editor=shell.bot();
         String draft="Unsaved read-only task draft";editor.textWithLabel("Summary").setText(draft);editor.button("OK").click();
-        RemoteTestSupport.waitFor(()->editor.button("OK").isEnabled()
-            && TimekeeperUiPlugin.getDefault().backendStatus().contains("does not permit"),"Permission-rejected editor did not release the form");
+        RemoteTestSupport.waitFor(()->{
+            try {return editor.button("OK").isEnabled()
+                && RemoteTestSupport.onUi(()->hasVisibleText(shell.widget,"This token does not permit the requested change."));}
+            catch(Exception loading) {return false;}
+        },"Permission-rejected editor did not release the form");
         assertTrue(shell.isOpen());assertTrue(editor.textWithLabel("Summary").isEnabled());
         assertEquals(draft,editor.textWithLabel("Summary").getText());
         assertTrue("Editor did not display the permission error",RemoteTestSupport.onUi(()->hasVisibleText(shell.widget,"This token does not permit the requested change.")));
