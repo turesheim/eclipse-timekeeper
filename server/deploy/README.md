@@ -1,25 +1,17 @@
 # Timekeeper on Synology Container Manager
 
-This deployment runs two stateless Timekeeper servers, three PostgreSQL 18 nodes
-managed by Patroni, three etcd members for leader election, and HAProxy for HTTP
-load balancing and routing database connections to the current primary.
+This deployment runs two stateless Timekeeper servers, one PostgreSQL 18 instance
+using the official `postgres:18.6-bookworm` image, and HAProxy for HTTP load balancing.
 It targets the DS923+ (AMD64), DSM 7.4.1 and Container Manager. The published
-server and database images support Linux AMD64 and ARM64.
+server image and official PostgreSQL image support Linux AMD64 and ARM64.
 
-Each PostgreSQL node has its own files. Acknowledged writes are synchronously
-replicated to at least one standby, and automatic promotion is restricted to
-eligible synchronized nodes. If no synchronous standby is available, writes
-wait rather than silently falling back to asynchronous durability. Normal
-primary failure causes a brief interruption while Patroni promotes a standby;
-clients should retry a failed command with its original command ID.
-
-All containers on this NAS share its power, disks, Docker daemon and operating
-system. This setup tolerates individual container/member failures; it does not
-provide availability during a NAS failure. HAProxy is also a single gateway.
-For availability across host failures, distribute database/etcd members and API
-replicas across independent hosts with redundant ingress, using an orchestrator
-or a managed PostgreSQL HA service. Running these same containers in VMM on the
-same NAS does not remove those shared failure points.
+The API updater drains and replaces one server at a time while the other keeps
+serving requests. PostgreSQL is left running throughout an API update. There is
+no database failover: a database restart or failure interrupts both servers until
+PostgreSQL recovers. Container restarts preserve the host-mounted database files.
+All containers also share the NAS's power, disks, Docker daemon and operating
+system. For host-level availability, use independent hosts or an external HA
+PostgreSQL service. VMM on the same NAS does not remove these shared failure points.
 
 ## Install on the NAS
 
@@ -54,7 +46,7 @@ same NAS does not remove those shared failure points.
    Save the generated bearer token in the Eclipse client's credential store.
    It is shown once; the registry stores only its hash. Setup preserves existing
    secrets, tokens and databases when run again. Do not regenerate missing
-   database credentials for an existing cluster: restore the original files.
+   database credentials for an existing database: restore the original files.
 4. In **Container Manager → Project → Create**, set the project name to
    `timekeeper` (matching `compose.yaml` and `.env`), choose the `deploy` directory
    and its `compose.yaml`, then start the project. The equivalent SSH command is:
@@ -67,21 +59,21 @@ same NAS does not remove those shared failure points.
 
    On older Compose clients, `docker compose pull` may include the optional
    maintenance client. This is harmless. Allow a few minutes for the first
-   PostgreSQL clones to initialize and for all health checks to become healthy.
+   database to initialize and for all health checks to become healthy.
 5. In **Control Panel → Login Portal → Advanced → Reverse Proxy**, create an
    HTTPS entry for your chosen Timekeeper hostname, targeting
    `http://127.0.0.1:8080`. Assign the hostname's certificate. Set proxy timeouts
    above 30 seconds because the API supports 25-second change polls. Test
    `/q/health/ready` and configure the client with `https://<hostname>/api/v1`.
    If using a separate reverse proxy host, bind to the NAS LAN address and
-   restrict access to that proxy. The database, etcd and Patroni management
-   ports are never published by this Compose file.
+   restrict access to that proxy. The database and the gateway administrative
+   socket are never published by this Compose file.
 
    The contract permits unusually long percent-encoded provider identities.
    HAProxy accepts the required request line size; any additional HTTPS proxy
    must also allow request lines up to 128 KiB for those extreme lookup URLs.
 
-The images are published by the **Server containers** workflow after successful
+The server image is published by the **Server containers** workflow after successful
 server/Compose tests. `edge` tracks tested `main`; semantic release tags use the
 version without the leading `v`, and immutable `sha-<full-commit>` tags are also
 published. Images first become available after that workflow runs on `main` or
@@ -100,30 +92,31 @@ sha256sum -c checksums.sha256
 docker load -i timekeeper-images-linux-amd64.tar.gz
 ```
 
-Copy the two image values from `images.env` into the deployment `.env` before
+Copy the image values from `images.env` into the deployment `.env` before
 starting the project. These imported immutable candidates do not auto-update;
 after the PR is merged and images are published, switch the API reference to
 the GHCR channel you want to follow. Configure `.env` and run setup as described
 above; deployment bundles and image archives contain no production credentials.
 
-Keep the PostgreSQL image on an explicit `sha-<commit>` or version tag after the
-initial installation. Updating the API does not automatically update database
-software. Do not change PostgreSQL's major version against existing data files;
+Keep the official PostgreSQL image on the explicit version tag in `.env`.
+Updating the API does not automatically update database software.
+Do not change PostgreSQL's major version against existing data files;
 major upgrades require a planned migration and verified backup.
 
 ## Durable files and backups
 
-The state directory contains `postgres-1`, `postgres-2`, `postgres-3`, `etcd-1`,
-`etcd-2`, `etcd-3`, `config`, `secrets` and `backups`. Removing or recreating the
-containers leaves these directories in place. Do not delete them using File
-Station or project cleanup. The database directories must remain separate.
+The state directory contains `postgres`, `config`, `secrets` and `backups`.
+PostgreSQL 18 stores its files under `postgres/18/docker`. Removing or recreating
+containers leaves these directories in place. Keep them outside the Container
+Manager project directory, and preserve them during project cleanup.
+The application uses a separate, non-superuser database role.
 
 The server database is separate from Eclipse's embedded H2 database. Existing
 H2 files cannot be mounted as PostgreSQL storage. Move user data through the
 API's supported export/import flow; this deployment never converts or merges
 historical databases automatically.
 
-Create a consistent logical backup through the current primary:
+Create a consistent logical backup:
 
 ```sh
 sh backup.sh
@@ -133,8 +126,7 @@ The resulting directory contains a PostgreSQL custom-format dump, the token
 registry and the deployed image list. Configure a daily DSM task to run this
 command, monitor failures, and back up `backups`, `config`, `.env` and `secrets`
 to another host/location using Hyper Backup. Set retention for those backups.
-Replication does not protect against accidental deletion or a bad application
-change. Copying live PostgreSQL data directories is not a consistent backup.
+Copying live PostgreSQL data directories is not a consistent backup.
 
 Restore a verified backup during maintenance:
 
@@ -142,10 +134,10 @@ Restore a verified backup during maintenance:
 sh restore.sh /volume1/docker/timekeeper/state/backups/<backup-directory>
 ```
 
-The script stops both API replicas, restores into the current PostgreSQL primary,
+The script stops both API replicas, restores into PostgreSQL,
 atomically restores the token registry and starts the replicas. A restore failure
 leaves the API stopped for inspection. It replaces current application data.
-For a fresh NAS/cluster, first restore the original secrets and start the cluster,
+For a fresh NAS, first restore the original secrets and start the database,
 then apply the logical backup. Test restores periodically on separate storage.
 
 ## Automatic server image updates
@@ -157,12 +149,14 @@ with Docker access, for example every 10 minutes:
 sh /volume1/docker/timekeeper/deploy/update.sh
 ```
 
-The updater checks both current replicas, pulls the API image, skips unchanged
-images, creates a logical backup, updates `api-1`, waits for its readiness, and
-then updates `api-2`. A failed replacement restores both previous image IDs.
-It does not delete images or data and does not modify the PostgreSQL/etcd
-cluster. Retain the previous images for rollback and enable task failure
-notifications. The `edge` channel is for tested development builds; choose a
+The updater checks both replicas and their gateway routing, pulls the API image,
+skips unchanged images and creates a logical backup. It tells HAProxy to drain
+`api-1`, waits for existing requests to finish, replaces the container, and waits
+for both application readiness and healthy gateway routing before touching
+`api-2`. A failed replacement restores the previous image IDs one at a time.
+It does not delete images or data, or restart/update PostgreSQL. Retain the
+previous images for rollback and enable task failure notifications.
+The `edge` channel is for tested development builds; choose a
 release channel/tag for a deployment that should change only on release.
 On DSM, choose `root` as the task user, or a deployment user with Docker access
 and rights to the state directory. Authenticate to a private registry as that
@@ -177,17 +171,24 @@ An incompatible image fails readiness and is rolled back. A future schema
 migration must be coordinated separately, with a tested database restore plan;
 rolling back an image alone cannot undo a migration.
 
-View cluster membership and sync state from any running database member:
+## Moving from the earlier three-node deployment
 
-```sh
-docker compose exec postgres-1 curl -fsS http://localhost:8008/cluster
-docker compose exec postgres-1 psql -U postgres -c \
-  'SELECT application_name,state,sync_state FROM pg_stat_replication'
-```
+Use a logical backup and restore; the previous Patroni files cannot simply be
+mounted at the new data path. This migration requires a maintenance window.
 
-Choose another member if `postgres-1` is down. Update persistent Patroni settings
-using `patronictl`/the authenticated API; editing `bootstrap.dcs` in an image
-only changes new clusters. Keep quorum (at least two etcd members) available.
+1. With the old deployment still running, run its `backup.sh`. Verify and retain
+   the resulting backup, `.env`, `config` and original `secrets` outside the project.
+2. Pause client access and stop the old project with `docker compose down` from
+   its original deployment directory. Keep all old state directories intact.
+3. Install this new bundle and set `TIMEKEEPER_STATE_DIR` to a **new empty** host
+   directory. Copy the old `secrets` and `config` into it before running `setup.py`.
+   Keep the PostgreSQL image set to `postgres:18.6-bookworm`.
+4. Start the new project, then run its `restore.sh` with the absolute path to the
+   verified old backup. Check the restored data before reopening client access.
+
+Setup refuses to initialize over the old HA layout, and refuses to generate
+replacement passwords for an existing single-instance database. It never deletes
+old files. Retain the original deployment and backup until the migration is verified.
 
 ## Build and verify from source
 
@@ -195,7 +196,7 @@ From a source checkout:
 
 ```sh
 docker build -t timekeeper-server:test -f server/Dockerfile .
-docker build -t timekeeper-postgres:test -f server/deploy/postgres/Dockerfile .
+docker pull postgres:18.6-bookworm
 python3 -m venv /tmp/timekeeper-compose-venv
 /tmp/timekeeper-compose-venv/bin/pip install -r api/tests/requirements.txt
 /tmp/timekeeper-compose-venv/bin/python server/scripts/compose_acceptance.py
@@ -204,10 +205,14 @@ python3 -m venv /tmp/timekeeper-compose-venv
 The test creates its own project, credentials, ports and state directories. It
 checks both server replicas, all twelve HTTP contract cases, concurrent tracking,
 long Unicode provider identities, exact nanoseconds, graceful and SIGKILL
-primary failover, server failover,
+database restart recovery, server failover,
 durable command replay, backup/restore and a complete container teardown/restart.
 It also publishes temporary images to an isolated local registry and verifies
-rolling replacement and automatic rollback of a deliberately broken image.
+rolling replacement and automatic rollback of a deliberately broken image while
+continuous authenticated HTTP requests check availability. It verifies that the
+database container remains unchanged during updates and rollback, and that
+25-second change polls finish while replicas drain. Failures of either replacement
+replica exercise rollback with the surviving replica still serving requests.
 It never connects to the NAS's production project. Evidence is written under
 `server/target/compose-acceptance`.
 
@@ -221,5 +226,5 @@ docker compose -f compose.yaml -f compose.build.yaml up -d
 ```
 
 References: [Synology projects](https://kb.synology.com/en-global/DSM/help/ContainerManager/docker_project),
-[Patroni replication](https://patroni.readthedocs.io/en/latest/replication_modes.html),
+[Official PostgreSQL image](https://hub.docker.com/_/postgres),
 [PostgreSQL backup](https://www.postgresql.org/docs/18/backup-dump.html).

@@ -12,7 +12,7 @@ state_dir=${TIMEKEEPER_STATE_DIR:-./state}
 docker compose stop api-1 api-2
 docker compose run --rm --no-deps -T --entrypoint sh maintenance -ec '
   export PGPASSWORD="$(cat /run/secrets/timekeeper_database_password)"
-  exec pg_restore -h gateway -U timekeeper -d timekeeper --clean --if-exists --no-owner --exit-on-error
+  exec pg_restore -h postgres -U timekeeper -d timekeeper --clean --if-exists --no-owner --exit-on-error
 ' < "$backup_dir/database.dump"
 cp "$backup_dir/tokens.json" "$state_dir/config/tokens.json.new"
 chmod 644 "$state_dir/config/tokens.json.new"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the shipped Compose stack, HTTP contract, primary failover and durable restart."""
+"""Exercise the shipped Compose stack, HTTP contract, rolling updates and durable restart."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
@@ -12,6 +12,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+from threading import Event
 import time
 import unittest
 from urllib.error import HTTPError, URLError
@@ -26,11 +27,12 @@ import http_acceptance as contract
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--server-image', default='timekeeper-server:test')
-    parser.add_argument('--postgres-image', default='timekeeper-postgres:test')
+    parser.add_argument('--postgres-image', default='postgres:18.6-bookworm')
     parser.add_argument('--output', type=Path, default=ROOT / 'server/target/compose-acceptance')
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
+    (output / 'acceptance.json').unlink(missing_ok=True)
     temporary = Path(tempfile.mkdtemp(prefix='timekeeper-compose-'))
     deployment = temporary / 'deploy'
     shutil.copytree(ROOT / 'server/deploy', deployment, ignore=shutil.ignore_patterns('.env', 'state', '__pycache__'))
@@ -79,18 +81,13 @@ def main():
             time.sleep(.5)
         raise AssertionError('Compose gateway did not recover readiness')
 
-    def cluster():
-        for member in ('postgres-1', 'postgres-2', 'postgres-3'):
-            try:
-                return json.loads(compose('exec', '-T', member, 'curl', '-fsS', 'http://localhost:8008/cluster'))
-            except RuntimeError:
-                pass
-        raise AssertionError('No Patroni member is reachable')
-
-    receipt = {'httpContractCases': 0, 'twoReplicas': False, 'primaryFailover': False,
-               'primaryCrashFailover': False,
+    receipt = {'httpContractCases': 0, 'twoReplicas': False, 'singleDatabase': False,
+               'databaseRestart': False, 'databaseCrashRecovery': False,
                'serverFailover': False, 'durableRestart': False, 'backupRestore': False,
-               'rollingUpdate': False, 'failedUpdateRollback': False}
+               'rollingUpdate': False, 'failedUpdateRollback': False, 'secondReplicaRollback': False,
+               'requestsDuringUpdate': 0, 'requestsDuringRollback': 0,
+               'longPollsDuringUpdate': 0, 'longPollsDuringRollback': 0,
+               'requestsDuringSecondRollback': 0, 'longPollsDuringSecondRollback': 0}
     registry_container = project + '-registry'
     registry_started = False
     try:
@@ -102,6 +99,11 @@ def main():
                                          input='Authorization: Bearer ' + tokens['a'] + '\n'))
             client.assertEqual('owner-a', identity['ownerId'])
         receipt['twoReplicas'] = True
+        client.assertEqual({'postgres', 'api-1', 'api-2', 'gateway'}, set(compose('ps', '--services').split()))
+        roles = compose('exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-Atc',
+                        "SELECT rolsuper FROM pg_roles WHERE rolname='timekeeper'").strip()
+        client.assertEqual('f', roles)
+        receipt['singleDatabase'] = True
         suite = unittest.defaultTestLoader.loadTestsFromTestCase(contract.HttpAcceptance)
         result = unittest.TextTestRunner(verbosity=2).run(suite)
         if not result.wasSuccessful() or result.skipped:
@@ -138,38 +140,30 @@ def main():
         stop_key = {**client.key(), 'If-Match': headers['ETag']}
         stopped, stopped_headers = client.call('POST', '/activities/' + active['id'] + '/stop', headers=stop_key)
         expected, _ = client.call('GET', '/data/export')
-        leader = next(member['name'] for member in cluster()['members'] if member['role'] == 'leader')
-        compose('stop', leader)
-        wait_ready()
-        new_leader = next(member['name'] for member in cluster()['members'] if member['role'] == 'leader')
-        client.assertNotEqual(leader, new_leader)
-        actual, _ = client.call('GET', '/data/export')
-        client.assertEqual(expected, actual)
-        replay, replay_headers = client.call('POST', '/activities/' + active['id'] + '/stop', headers=stop_key)
-        client.assertEqual(stopped, replay)
-        client.assertEqual(stopped_headers['ETag'], replay_headers['ETag'])
-        client.create('projects', {'name': 'Write after primary failover'})
-        receipt['primaryFailover'] = True
-        print('Primary failover preserved data and exact command replay: PASS', flush=True)
-        compose('start', leader)
+        # One database means planned/failed database restarts interrupt the API.
+        compose('stop', 'postgres')
+        compose('start', 'postgres')
         compose('up', '-d', '--wait', '--wait-timeout', '120')
-        # Abrupt primary loss must preserve acknowledged writes, not only graceful switchover.
-        expected, _ = client.call('GET', '/data/export')
-        crash_leader = next(member['name'] for member in cluster()['members'] if member['role'] == 'leader')
-        crash_container = compose('ps', '-q', crash_leader).strip()
-        subprocess.run(['docker', 'update', '--restart=no', crash_container], check=True, capture_output=True)
-        compose('kill', '-s', 'SIGKILL', crash_leader)
         wait_ready()
         actual, _ = client.call('GET', '/data/export')
         client.assertEqual(expected, actual)
         replay, replay_headers = client.call('POST', '/activities/' + active['id'] + '/stop', headers=stop_key)
         client.assertEqual(stopped, replay)
         client.assertEqual(stopped_headers['ETag'], replay_headers['ETag'])
-        client.create('projects', {'name': 'Write after abrupt primary loss'})
-        receipt['primaryCrashFailover'] = True
-        print('SIGKILL primary loss preserved acknowledged data and command replay: PASS', flush=True)
-        compose('start', crash_leader)
+        receipt['databaseRestart'] = True
+        container = compose('ps', '-q', 'postgres').strip()
+        subprocess.run(['docker', 'update', '--restart=no', container], check=True, capture_output=True)
+        compose('kill', '-s', 'SIGKILL', 'postgres')
+        compose('start', 'postgres')
         compose('up', '-d', '--wait', '--wait-timeout', '120')
+        wait_ready()
+        actual, _ = client.call('GET', '/data/export')
+        client.assertEqual(expected, actual)
+        replay, replay_headers = client.call('POST', '/activities/' + active['id'] + '/stop', headers=stop_key)
+        client.assertEqual(stopped, replay)
+        client.assertEqual(stopped_headers['ETag'], replay_headers['ETag'])
+        receipt['databaseCrashRecovery'] = True
+        print('Single PostgreSQL restart and crash recovery preserved data and command replay: PASS', flush=True)
         compose('stop', 'api-1')
         wait_ready()
         replay, replay_headers = client.call('POST', '/activities/' + active['id'] + '/stop', headers=stop_key)
@@ -180,7 +174,7 @@ def main():
         compose('start', 'api-1')
         compose('up', '-d', '--wait', '--wait-timeout', '120')
         expected, _ = client.call('GET', '/data/export')
-        # Back up from a separate client; it remains usable after any member changes roles.
+        # Back up and restore through a separate client using the actual application role.
         backup_result = subprocess.run(['sh', str(deployment / 'backup.sh')], cwd=deployment,
                                        env={**environment, 'COMPOSE_PROJECT_NAME': project}, check=True, capture_output=True, text=True)
         backup_dir = backup_result.stdout.strip().splitlines()[-1]
@@ -205,9 +199,14 @@ def main():
         image_context.mkdir()
         dockerfile = image_context / 'Dockerfile'
 
-        def publish_replacement(broken=False):
+        def publish_replacement(broken=False, broken_second=False):
+            if broken_second:
+                (image_context / 'entrypoint.sh').write_text(
+                    '#!/bin/sh\nif [ "$(hostname)" = api-2 ]; then exit 1; fi\nexec /app/entrypoint.sh\n')
             dockerfile.write_text(f'FROM {args.server_image}\nLABEL compose-acceptance="{secrets.token_hex(8)}"\n'
-                                  + ('ENTRYPOINT ["sh", "-c", "exit 1"]\n' if broken else ''))
+                                  + ('ENTRYPOINT ["sh", "-c", "exit 1"]\n' if broken else '')
+                                  + ('COPY --chmod=755 entrypoint.sh /app/acceptance-entrypoint.sh\n'
+                                     'ENTRYPOINT ["/app/acceptance-entrypoint.sh"]\n' if broken_second else ''))
             subprocess.run(['docker', 'build', '-t', image, str(image_context)], check=True, capture_output=True)
             subprocess.run(['docker', 'push', image], check=True, capture_output=True)
 
@@ -220,20 +219,71 @@ def main():
         env_file.write_text(original_environment.replace(args.server_image, image))
         publish_replacement()
         update_environment = {**environment, 'COMPOSE_PROJECT_NAME': project, 'TIMEKEEPER_UPDATE_ATTEMPTS': '15'}
-        subprocess.run(['sh', str(deployment / 'update.sh')], cwd=deployment, env=update_environment,
-                       check=True, capture_output=True)
+        database_container = compose('ps', '-q', 'postgres').strip()
+
+        def update_with_requests():
+            finished = Event()
+            polling = Event()
+            head, _ = client.call('GET', '/projects')
+
+            def probe():
+                requests = 0
+                while not finished.is_set():
+                    projects, _ = client.call('GET', '/projects')
+                    client.assertEqual(head['revision'], projects['revision'])
+                    requests += 1
+                    time.sleep(.1)
+                return requests
+
+            def long_polls():
+                requests = 0
+                while not finished.is_set():
+                    polling.set()
+                    changes, _ = client.call('GET', '/changes?' + urlencode(
+                        {'after': head['revision'], 'waitSeconds': 25}))
+                    client.assertEqual([], changes['items'])
+                    requests += 1
+                return requests
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                pending = pool.submit(probe)
+                pending_polls = pool.submit(long_polls)
+                client.assertTrue(polling.wait(5))
+                time.sleep(.5)
+                try:
+                    update = subprocess.run(['sh', str(deployment / 'update.sh')], cwd=deployment,
+                                            env=update_environment, capture_output=True, text=True)
+                finally:
+                    finished.set()
+                requests = pending.result()
+                polls = pending_polls.result()
+            client.assertGreater(requests, 10)
+            client.assertGreater(polls, 0)
+            client.assertEqual(database_container, compose('ps', '-q', 'postgres').strip())
+            return update, requests, polls
+
+        updated, receipt['requestsDuringUpdate'], receipt['longPollsDuringUpdate'] = update_with_requests()
+        if updated.returncode:
+            raise AssertionError('Rolling update failed: ' + updated.stderr + updated.stdout)
         replacement_id = subprocess.check_output(['docker', 'image', 'inspect', '--format', '{{.Id}}', image], text=True).strip()
         client.assertEqual(replacement_id, deployed_image('api-1'))
         client.assertEqual(replacement_id, deployed_image('api-2'))
         receipt['rollingUpdate'] = True
         publish_replacement(broken=True)
-        failed = subprocess.run(['sh', str(deployment / 'update.sh')], cwd=deployment,
-                                env=update_environment, capture_output=True)
+        failed, receipt['requestsDuringRollback'], receipt['longPollsDuringRollback'] = update_with_requests()
         client.assertNotEqual(0, failed.returncode)
         client.assertEqual(replacement_id, deployed_image('api-1'))
         client.assertEqual(replacement_id, deployed_image('api-2'))
         wait_ready()
         receipt['failedUpdateRollback'] = True
+        publish_replacement(broken_second=True)
+        failed_second, receipt['requestsDuringSecondRollback'], receipt['longPollsDuringSecondRollback'] = update_with_requests()
+        client.assertNotEqual(0, failed_second.returncode)
+        client.assertIn('Second replica failed replacement', failed_second.stderr)
+        client.assertEqual(replacement_id, deployed_image('api-1'))
+        client.assertEqual(replacement_id, deployed_image('api-2'))
+        wait_ready()
+        receipt['secondReplicaRollback'] = True
         env_file.write_text(original_environment)
         print('Rolling image update and broken-image rollback: PASS', flush=True)
         compose('down')

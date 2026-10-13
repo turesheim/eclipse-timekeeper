@@ -6,38 +6,6 @@ x-logging: &logging
     max-size: 10m
     max-file: '3'
 
-x-etcd: &etcd
-  image: quay.io/coreos/etcd:v3.7.2
-  restart: unless-stopped
-  networks: [database]
-  logging: *logging
-  environment: &etcd-environment
-    ETCD_DATA_DIR: /etcd-data
-    ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
-    ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
-    ETCD_INITIAL_CLUSTER: etcd-1=http://etcd-1:2380,etcd-2=http://etcd-2:2380,etcd-3=http://etcd-3:2380
-    ETCD_INITIAL_CLUSTER_STATE: new
-    ETCD_INITIAL_CLUSTER_TOKEN: timekeeper
-    ETCD_AUTO_COMPACTION_RETENTION: '1'
-  healthcheck:
-    test: [CMD, etcdctl, --endpoints=http://127.0.0.1:2379, endpoint, health]
-    interval: 10s
-    timeout: 5s
-    retries: 5
-
-x-postgres: &postgres
-  image: ${TIMEKEEPER_POSTGRES_IMAGE:-ghcr.io/turesheim/eclipse-timekeeper-postgres:edge}
-  restart: unless-stopped
-  stop_grace_period: 60s
-  shm_size: 256mb
-  networks: [database]
-  logging: *logging
-  secrets: [postgres_admin_password, postgres_replication_password, patroni_api_password, timekeeper_database_password]
-  depends_on:
-    etcd-1: {condition: service_healthy}
-    etcd-2: {condition: service_healthy}
-    etcd-3: {condition: service_healthy}
-
 x-api: &api
   image: ${TIMEKEEPER_SERVER_IMAGE:-ghcr.io/turesheim/eclipse-timekeeper-server:edge}
   restart: unless-stopped
@@ -47,10 +15,10 @@ x-api: &api
   tmpfs: [/tmp]
   cap_drop: [ALL]
   security_opt: [no-new-privileges:true]
-  networks: [application]
+  networks: [application, database]
   logging: *logging
   environment:
-    TIMEKEEPER_SERVER_DB_URL: jdbc:postgresql://gateway:5432/timekeeper
+    TIMEKEEPER_SERVER_DB_URL: jdbc:postgresql://postgres:5432/timekeeper
     TIMEKEEPER_SERVER_DB_USER: timekeeper
     TIMEKEEPER_SERVER_DB_PASSWORD_FILE: /run/secrets/timekeeper_database_password
     TIMEKEEPER_SERVER_TOKENS_FILE: /config/tokens.json
@@ -61,78 +29,49 @@ x-api: &api
   volumes:
     - ${TIMEKEEPER_STATE_DIR:-./state}/config:/config:ro
   depends_on:
-    gateway: {condition: service_healthy}
+    postgres: {condition: service_healthy}
 
 services:
-  etcd-1:
-    <<: *etcd
+  postgres:
+    image: ${TIMEKEEPER_POSTGRES_IMAGE:-postgres:18.6-bookworm}
+    restart: unless-stopped
+    stop_grace_period: 60s
+    shm_size: 256mb
+    networks: [database]
+    logging: *logging
     environment:
-      <<: *etcd-environment
-      ETCD_NAME: etcd-1
-      ETCD_ADVERTISE_CLIENT_URLS: http://etcd-1:2379
-      ETCD_INITIAL_ADVERTISE_PEER_URLS: http://etcd-1:2380
-    volumes: ["${TIMEKEEPER_STATE_DIR:-./state}/etcd-1:/etcd-data"]
-  etcd-2:
-    <<: *etcd
-    environment:
-      <<: *etcd-environment
-      ETCD_NAME: etcd-2
-      ETCD_ADVERTISE_CLIENT_URLS: http://etcd-2:2379
-      ETCD_INITIAL_ADVERTISE_PEER_URLS: http://etcd-2:2380
-    volumes: ["${TIMEKEEPER_STATE_DIR:-./state}/etcd-2:/etcd-data"]
-  etcd-3:
-    <<: *etcd
-    environment:
-      <<: *etcd-environment
-      ETCD_NAME: etcd-3
-      ETCD_ADVERTISE_CLIENT_URLS: http://etcd-3:2379
-      ETCD_INITIAL_ADVERTISE_PEER_URLS: http://etcd-3:2380
-    volumes: ["${TIMEKEEPER_STATE_DIR:-./state}/etcd-3:/etcd-data"]
-  postgres-1:
-    <<: *postgres
-    hostname: postgres-1
-    environment:
-      PATRONI_NAME: postgres-1
-      PATRONI_POSTGRESQL_CONNECT_ADDRESS: postgres-1:5432
-      PATRONI_RESTAPI_CONNECT_ADDRESS: postgres-1:8008
-    volumes: ["${TIMEKEEPER_STATE_DIR:-./state}/postgres-1:/var/lib/postgresql"]
-  postgres-2:
-    <<: *postgres
-    hostname: postgres-2
-    environment:
-      PATRONI_NAME: postgres-2
-      PATRONI_POSTGRESQL_CONNECT_ADDRESS: postgres-2:5432
-      PATRONI_RESTAPI_CONNECT_ADDRESS: postgres-2:8008
-    volumes: ["${TIMEKEEPER_STATE_DIR:-./state}/postgres-2:/var/lib/postgresql"]
-  postgres-3:
-    <<: *postgres
-    hostname: postgres-3
-    environment:
-      PATRONI_NAME: postgres-3
-      PATRONI_POSTGRESQL_CONNECT_ADDRESS: postgres-3:5432
-      PATRONI_RESTAPI_CONNECT_ADDRESS: postgres-3:8008
-    volumes: ["${TIMEKEEPER_STATE_DIR:-./state}/postgres-3:/var/lib/postgresql"]
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_admin_password
+      PGDATA: /var/lib/postgresql/18/docker
+    secrets: [postgres_admin_password, timekeeper_database_password]
+    volumes:
+      - ${TIMEKEEPER_STATE_DIR:-./state}/postgres:/var/lib/postgresql
+      - ./postgres/bootstrap.sql:/docker-entrypoint-initdb.d/10-timekeeper.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, 'PGPASSWORD="$$(cat /run/secrets/timekeeper_database_password)" psql -h 127.0.0.1 -U timekeeper -d timekeeper --no-password -tAc "SELECT 1" > /dev/null']
+      interval: 5s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+  api-1: {<<: *api, hostname: api-1}
+  api-2: {<<: *api, hostname: api-2}
   gateway:
     image: haproxy:3.2-alpine
     restart: unless-stopped
-    networks: [application, database]
+    networks: [application]
     logging: *logging
     ports: ["${TIMEKEEPER_BIND_ADDRESS:-127.0.0.1}:${TIMEKEEPER_HTTP_PORT:-8080}:8080"]
     volumes: ["./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro"]
     healthcheck:
-      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/q/health/database]
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/q/health/ready]
       interval: 10s
       timeout: 5s
-      start_period: 120s
+      start_period: 60s
       retries: 3
     depends_on:
-      postgres-1: {condition: service_healthy}
-      postgres-2: {condition: service_healthy}
-      postgres-3: {condition: service_healthy}
-  api-1: {<<: *api}
-  api-2: {<<: *api}
+      api-1: {condition: service_healthy}
+      api-2: {condition: service_healthy}
   maintenance:
-    image: postgres:18.6-bookworm
+    image: ${TIMEKEEPER_POSTGRES_IMAGE:-postgres:18.6-bookworm}
     profiles: [tools]
     networks: [database]
     secrets: [timekeeper_database_password]
@@ -145,9 +84,5 @@ networks:
 secrets:
   postgres_admin_password:
     file: ${TIMEKEEPER_STATE_DIR:-./state}/secrets/postgres_admin_password
-  postgres_replication_password:
-    file: ${TIMEKEEPER_STATE_DIR:-./state}/secrets/postgres_replication_password
-  patroni_api_password:
-    file: ${TIMEKEEPER_STATE_DIR:-./state}/secrets/patroni_api_password
   timekeeper_database_password:
     file: ${TIMEKEEPER_STATE_DIR:-./state}/secrets/timekeeper_database_password
