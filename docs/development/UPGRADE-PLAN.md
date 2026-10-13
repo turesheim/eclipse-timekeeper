@@ -7,6 +7,15 @@ Goal: Timekeeper can be installed and used in Eclipse IDE 2026-09
 Historical data migrations are explicitly out of scope.
 This was the latest stable Eclipse release when the plan was created.
 
+October 13 update: the maintainer deferred [#243](https://github.com/turesheim/eclipse-timekeeper/issues/243)
+beyond 2.0 and removed it from that milestone. The optional-Mylyn tooltip parser
+error remains a documented accepted exception; no experimental Mylyn bundle is
+distributed. The older open/blocking descriptions below record previous
+checkpoints and are superseded by this decision. Client/server #187 and its
+children are now complete; [CLIENT-SERVER-ACCEPTANCE.md](../verification/CLIENT-SERVER-ACCEPTANCE.md)
+records their merged evidence. Final release artifacts and public installation
+remain separate acceptance work.
+
 Recorded checkpoint: October 12, 2026. Timekeeper 2.0 requires Eclipse 4.41 and
 Java 21 and uses **H2 2.5.250 / schema version 2**. The native domain, service,
 project/task/activity UI and optional Mylyn adapter from #211 are implemented.
@@ -335,11 +344,12 @@ for the support boundaries.
   Restart and stored activity were verified during the package update. The
   follow-up installed-IDE run verified preference switching and restart across
   workspace, shared, explicit file and local H2 TCP storage.
-- [ ] Check the Eclipse Error Log for Timekeeper and dependency errors.
+- [x] Check the Eclipse Error Log for Timekeeper and dependency errors.
   All retained installed and current test-runtime logs are classified in the
   [Error Log report](../verification/ERROR-LOG.md). Timekeeper-owned errors are fixed or
   belong to deliberate negative scenarios, but the installed Mylyn theme-parser
-  dependency error remains an open release blocker.
+  dependency error remains open in #243 and was explicitly deferred beyond 2.0
+  by the maintainer on October 13.
 - [x] Update version numbers, README, CHANGES and any migration instructions.
   Version 2.0.0 is confirmed in the Maven, OSGi bundle and feature metadata.
   Maven `-SNAPSHOT` and OSGi `.qualifier` suffixes remain intentionally so

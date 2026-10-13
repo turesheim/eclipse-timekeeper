@@ -62,9 +62,10 @@ preferences/pickers, backend switches, web interoperability, real H2 restore
 and interrupted-operation/restart checks now have the evidence above.
 
 This is functional client/server acceptance, not a published 2.0 release. The
-optional Mylyn symbolic-color Error Log issue [#243](https://github.com/turesheim/eclipse-timekeeper/issues/243),
-final tagged artifacts and public p2 installation remain separate release
-gates in the [release process](../development/RELEASING.md). H2 restoration with
+optional Mylyn symbolic-color Error Log issue [#243](https://github.com/turesheim/eclipse-timekeeper/issues/243)
+was deferred beyond 2.0 by the maintainer on October 13 and remains open. Final
+tagged artifacts and public p2 installation remain separate release gates in the
+[release process](../development/RELEASING.md). H2 restoration with
 both live UIs and PostgreSQL Compose restoration are separate tested scenarios;
 this does not claim both live UIs were exercised during PostgreSQL restoration.
 Failure scenarios establish the behaviors listed above, not every possible
