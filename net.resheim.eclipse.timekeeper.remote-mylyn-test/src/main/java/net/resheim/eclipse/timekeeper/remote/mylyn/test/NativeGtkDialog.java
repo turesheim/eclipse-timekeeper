@@ -8,9 +8,16 @@ import org.eclipse.swt.SWT;
 
 /** Operates the real GTK chooser in CI's private Xvfb display, without replacing SWT dialogs. */
 final class NativeGtkDialog {
-    static void choose(String title,Path path,Runnable open) throws Exception {interact(title,path,open);}
+    static void choose(String title,Path path,Runnable open) throws Exception {interact(title,path.toAbsolutePath().toString(),open);}
+    static void saveFile(String title,Path path,String suffix,Runnable open) throws Exception {
+        String location=path.toAbsolutePath().toString();
+        // GTK adds the selected filter's suffix. Typing it in the location
+        // entry as well produces .txt.txt in the tested SWT 3.135 runtime.
+        assertTrue(location.endsWith(suffix));
+        interact(title,location.substring(0,location.length()-suffix.length()),open);
+    }
     static void cancel(String title,Runnable open) throws Exception {interact(title,null,open);}
-    private static void interact(String title,Path path,Runnable open) throws Exception {
+    private static void interact(String title,String path,Runnable open) throws Exception {
         assertEquals("Native chooser acceptance requires GTK","gtk",SWT.getPlatform());
         var worker=Executors.newSingleThreadExecutor();
         try {
@@ -21,7 +28,7 @@ final class NativeGtkDialog {
                 run(true,"xdotool","windowfocus","--sync",id);
                 if(path==null) run(true,"xdotool","key","--window",id,"Escape");
                 else {
-                    run(true,"xdotool","key","--window",id,"ctrl+l");run(true,"xdotool","type","--window",id,"--clearmodifiers","--delay","1",path.toAbsolutePath().toString());
+                    run(true,"xdotool","key","--window",id,"ctrl+l");run(true,"xdotool","type","--window",id,"--clearmodifiers","--delay","1",path);
                     // GTK location entry first navigates; a further Enter accepts the folder.
                     for(int attempt=0;attempt<8;attempt++) {run(false,"xdotool","key","--window",id,"Return");Thread.sleep(250);if(run(false,"xdotool","search","--onlyvisible","--name","^"+title+"$").trim().isEmpty()) return null;}
                 }
