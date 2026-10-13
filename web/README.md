@@ -41,6 +41,7 @@ Remote-Eclipse.
 
 Browser tests cover core tracking, authorization/validation, peer synchronization,
 stale drafts, lost committed replies, exact nanoseconds, autumn DST, mobile
-layout and memory-only credentials. Actual web-to-installed-Eclipse bidirectional
-acceptance and final release installation remain separate gates; two browser
-sessions do not certify them.
+layout and memory-only credentials. The `remote-client-tests` Eclipse profile
+also launches a real browser peer against its installed runtime's server;
+[WEB-ECLIPSE.md](../baseline/WEB-ECLIPSE.md) records that bidirectional verification.
+Final release installation remains a separate gate.
