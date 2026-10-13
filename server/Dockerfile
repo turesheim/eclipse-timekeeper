@@ -1,11 +1,7 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /source
 COPY server server
-COPY timekeeper-domain timekeeper-domain
-COPY timekeeper-service-api timekeeper-service-api
-COPY timekeeper-http-client timekeeper-http-client
-COPY api api
-COPY web/src web/src
+COPY common common
 RUN mvn -B -ntp -f server/pom.xml package -DskipTests -Dquarkus.profile=postgresql
 
 FROM eclipse-temurin:21-jre-jammy

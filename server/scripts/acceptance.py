@@ -21,7 +21,7 @@ from urllib.request import Request, urlopen
 from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / 'api/tests'))
+sys.path.insert(0, str(ROOT / 'common/api/tests'))
 import http_acceptance as contract
 
 

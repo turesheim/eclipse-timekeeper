@@ -20,7 +20,7 @@ from urllib.parse import urlencode
 from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / 'api/tests'))
+sys.path.insert(0, str(ROOT / 'common/api/tests'))
 import http_acceptance as contract
 
 

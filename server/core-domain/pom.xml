@@ -9,7 +9,7 @@
   </dependencies>
   <build>
     <!-- Compile the canonical core sources; do not duplicate them or inherit Tycho. -->
-    <sourceDirectory>${project.basedir}/../../timekeeper-domain/src/main/java</sourceDirectory>
-    <testSourceDirectory>${project.basedir}/../../timekeeper-domain/src/test/java</testSourceDirectory>
+    <sourceDirectory>${project.basedir}/../../common/timekeeper-domain/src/main/java</sourceDirectory>
+    <testSourceDirectory>${project.basedir}/../../common/timekeeper-domain/src/test/java</testSourceDirectory>
   </build>
 </project>

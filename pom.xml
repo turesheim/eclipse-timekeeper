@@ -103,12 +103,7 @@
 				<version>${tycho.version}</version>
 				<configuration>
 					<target>
-						<artifact>
-							<groupId>net.resheim.eclipse.timekeeper</groupId>
-							<artifactId>net.resheim.eclipse.timekeeper-parent</artifactId>
-							<version>2.0.0-SNAPSHOT</version>
-							<classifier>default</classifier>
-						</artifact>
+						<file>${maven.multiModuleProjectDirectory}/eclipse/default.target</file>
 					</target>
 					<environments>
 						<environment>
@@ -154,31 +149,31 @@
 	</build>
 
 	<modules>
-		<module>timekeeper-domain</module>
-		<module>timekeeper-service-api</module>
-        <module>timekeeper-http-client</module>
-		<module>net.resheim.eclipse.timekeeper-feature</module>
-		<module>net.resheim.eclipse.timekeeper.db</module>
-		<module>net.resheim.eclipse.timekeeper.ui</module>
-		<module>net.resheim.eclipse.timekeeper.mylyn</module>
-		<module>net.resheim.eclipse.timekeeper.mylyn-feature</module>
-		<module>net.resheim.eclipse.timekeeper.test</module>
-		<module>net.resheim.eclipse.timekeeper.native-test</module>
-		<module>net.resheim.eclipse.timekeeper-site</module>
+		<module>common/timekeeper-domain</module>
+		<module>common/timekeeper-service-api</module>
+        <module>common/timekeeper-http-client</module>
+		<module>eclipse/net.resheim.eclipse.timekeeper-feature</module>
+		<module>eclipse/net.resheim.eclipse.timekeeper.db</module>
+		<module>eclipse/net.resheim.eclipse.timekeeper.ui</module>
+		<module>eclipse/net.resheim.eclipse.timekeeper.mylyn</module>
+		<module>eclipse/net.resheim.eclipse.timekeeper.mylyn-feature</module>
+		<module>eclipse/net.resheim.eclipse.timekeeper.test</module>
+		<module>eclipse/net.resheim.eclipse.timekeeper.native-test</module>
+		<module>eclipse/net.resheim.eclipse.timekeeper-site</module>
 	</modules>
 
 	<profiles>
         <profile>
             <id>remote-client-tests</id>
             <modules>
-                <module>net.resheim.eclipse.timekeeper.remote-test</module>
-                <module>net.resheim.eclipse.timekeeper.remote-mylyn-test</module>
+                <module>eclipse/net.resheim.eclipse.timekeeper.remote-test</module>
+                <module>eclipse/net.resheim.eclipse.timekeeper.remote-mylyn-test</module>
             </modules>
         </profile>
 		<profile>
 			<id>jira-connector-tests</id>
 			<modules>
-				<module>net.resheim.eclipse.timekeeper.jira-test</module>
+				<module>eclipse/net.resheim.eclipse.timekeeper.jira-test</module>
 			</modules>
 		</profile>
 	</profiles>
