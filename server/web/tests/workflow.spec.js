@@ -161,4 +161,14 @@ test('workweek groups linked tasks under projects with seven day columns and con
   expect(report.total).toBe('PT24H59M59.876543211S');
   await page.getByRole('button',{name:'Tasks',exact:true}).click();
   await expect(page.locator('#tasks').getByRole('link',{name:'PLATFORM-3396: Clean registry '+suffix,exact:true})).toHaveAttribute('href',jiraUrl);
+  await page.locator('#tasks tr').filter({hasText:'#17: Check registry '+suffix}).getByRole('button',{name:'Start',exact:true}).click();
+  await expect(page.getByLabel('Task',{exact:true})).toHaveValue(child.id);
+  await expect(page.getByLabel('Task',{exact:true}).locator('option:checked')).toHaveText('#17: Check registry '+suffix);
+  await page.locator('#editor').getByRole('button',{name:'Start',exact:true}).click();
+  await expect(page.locator('#editor')).not.toBeVisible();
+  await expect(page.locator('#active-title').getByRole('link')).toHaveAttribute('href',githubUrl);
+  await expect(page.locator('#active-title')).toHaveText('#17: Check registry '+suffix);
+  await page.getByRole('button',{name:'Stop tracking',exact:true}).click();
+  await page.locator('#editor').getByRole('button',{name:'Stop',exact:true}).click();
+  await expect(page.locator('#editor')).not.toBeVisible();
 });
