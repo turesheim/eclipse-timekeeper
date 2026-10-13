@@ -6,7 +6,9 @@ import java.nio.file.*;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.*;
-import org.eclipse.swt.widgets.*;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Text;
 import org.eclipse.swtbot.eclipse.finder.SWTWorkbenchBot;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotShell;
 import org.eclipse.ui.PlatformUI;
@@ -24,7 +26,7 @@ final class InstalledImportScenario {
         if(!enabled()) {mark("phase.import.native","not-run-on-this-platform");return;}
         assertTrue("Previous successful imports retained an unresolved key",keys().isEmpty());
         var before=api.metadata();var originals=api.activities(query(api)).activities();
-        var prefs=open();var bot=new SWTWorkbenchBot();
+        var prefs=open();
         Path parent=Files.createDirectories(RemoteBootstrap.fixtureFolder().resolve("lost-import-export"));
         NativeGtkDialog.choose(EXPORT,parent,()->prefs.bot().button("Export...").click());
         shell("Data exported").bot().button("OK").click();
