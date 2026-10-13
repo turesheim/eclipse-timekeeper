@@ -25,6 +25,16 @@ async function zone(value) {
 }
 async function command(input) {
   switch (input.action) {
+    case 'attach':
+      record.project = input.project; record.task = input.summary;
+      await page.goto('/web/'); await page.getByLabel('Access token').fill(process.env.TIMEKEEPER_WEB_TOKEN);
+      await page.getByRole('button', {name:'Sign in', exact:true}).click(); await expect(page.locator('#status')).toHaveText('Up to date');
+      break;
+    case 'offline-draft':
+      await expect(page.locator('#status')).toContainText('Reconnecting', {timeout:15000});
+      await expect(page.getByLabel('Summary', {exact:true})).toHaveValue(input.draft);
+      await expect(page.getByLabel('URL (optional)', {exact:true})).toHaveValue(input.url);
+      break;
     case 'create':
       record.project = input.prefix + ' project'; record.task = input.prefix + ' task'; record.label = input.prefix + ' label';
       await page.goto('/web/'); await page.getByLabel('Access token').fill(process.env.TIMEKEEPER_WEB_TOKEN);
@@ -51,6 +61,7 @@ async function command(input) {
       await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click();
       await expect(page.locator('#editor-error')).toContainText('This record changed');
       await expect(page.getByLabel('Summary', {exact:true})).toHaveValue(input.draft); await expect(page.getByLabel('Summary', {exact:true})).toBeEnabled();
+      if (input.draftUrl) await expect(page.getByLabel('URL (optional)', {exact:true})).toHaveValue(input.draftUrl);
       await page.getByRole('button', {name:'Cancel', exact:true}).click(); record.task = input.summary;
       break;
     case 'observe-active':

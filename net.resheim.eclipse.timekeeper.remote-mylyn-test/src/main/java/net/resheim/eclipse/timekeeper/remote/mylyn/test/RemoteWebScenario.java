@@ -107,7 +107,7 @@ final class RemoteWebScenario {
         var result=new StringBuilder("\"");
         for(char c:value.toCharArray()) {if(c=='"' || c=='\\') result.append('\\').append(c);else if(c<32) result.append(String.format("\\u%04x",(int)c));else result.append(c);}return result.append('"').toString();
     }
-    private static final class BrowserPeer implements AutoCloseable {
+    static final class BrowserPeer implements AutoCloseable {
         private final Process process;
         private final BufferedReader output;
         private final BufferedWriter input;

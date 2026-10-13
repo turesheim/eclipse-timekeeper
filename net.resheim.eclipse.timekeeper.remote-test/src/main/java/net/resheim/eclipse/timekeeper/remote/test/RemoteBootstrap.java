@@ -169,6 +169,22 @@ public final class RemoteBootstrap implements IApplication {
         proof.setProperty("server.recovery-pids",previous.isEmpty() ? String.valueOf(active.server.pid()) : previous+","+active.server.pid());writeProof();
         return active.server.pid();
     }
+    /** Cold snapshot of the isolated packaged-server H2 file, never the app's local database. */
+    public static void backupFixtureServer() throws Exception {
+        stopFixtureServer();
+        try {
+            Path backup=folder.resolve("cold-server-backup.mv.db");
+            Files.copy(folder.resolve("server data/timekeeper.mv.db"),backup,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            proof.setProperty("server.backup.sha256",hash(backup));writeProof();
+        } finally {restartFixtureServer();}
+    }
+    public static void restoreStoppedFixtureServer() throws Exception {
+        if(active.server.isAlive()) throw new IllegalStateException("Cold restore requires the fixture server to be stopped");
+        Path backup=folder.resolve("cold-server-backup.mv.db"),database=folder.resolve("server data/timekeeper.mv.db");
+        if(!hash(backup).equals(proof.getProperty("server.backup.sha256"))) throw new IllegalStateException("Fixture backup checksum changed");
+        Files.copy(backup,database,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        proof.setProperty("server.restored.sha256",hash(database));writeProof();restartFixtureServer();
+    }
     @Override public void stop() {if(delegate!=null) delegate.stop();stopReplyGate();stopServer();stopAlternate();}
     private void stopAlternate() {
         if(alternate==null) return;alternate.destroy();
