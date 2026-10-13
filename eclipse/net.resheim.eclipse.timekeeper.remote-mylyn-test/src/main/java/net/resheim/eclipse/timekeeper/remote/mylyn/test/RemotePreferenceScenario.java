@@ -134,7 +134,13 @@ final class RemotePreferenceScenario {
             if(Boolean.getBoolean("timekeeper.native.dialog-tests")) {
                 Path output=RemoteBootstrap.fixtureFolder().resolve("native-week.txt");
                 NativeGtkDialog.saveFile("Save Timekeeper report",output,".txt",()->bot.viewByTitle("Workweek").toolbarDropDownButton("Export selected week to clipboard").menuItem("Save as").click().menu(prefix+" report").click());
-                RemoteTestSupport.waitFor(()->{try {return Files.readString(output).startsWith(expected) && Files.readString(output).contains(task.summary());}catch(Exception loading) {return false;}},"Native report file chooser did not produce the exact remote report");
+                try {
+                    RemoteTestSupport.waitFor(()->{try {return Files.readString(output).startsWith(expected) && Files.readString(output).contains(task.summary());}catch(Exception loading) {return false;}},"Native report file chooser did not produce the exact remote report");
+                } catch(RuntimeException failure) {
+                    try(var files=Files.list(output.getParent())) {
+                        throw new AssertionError("Native report target exists="+Files.exists(output)+"; fixture filenames="+files.map(file->file.getFileName().toString()).sorted().toList(),failure);
+                    }
+                }
             }
         } finally {RemoteTestSupport.onUi(()->{var clipboard=new Clipboard(PlatformUI.getWorkbench().getDisplay());try {if(old==null) clipboard.clearContents();else clipboard.setContents(new Object[]{old},new Transfer[]{TextTransfer.getInstance()});}finally {clipboard.dispose();}return null;});}
         var cleanup=open(TEMPLATES);cleanup.bot().list().select(prefix+" report");cleanup.bot().button("Remove").click();cleanup.bot().button("Apply and Close").click();RemoteTestSupport.waitFor(()->!cleanup.isOpen(),"Temporary report template did not clear");
