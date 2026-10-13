@@ -26,6 +26,7 @@ public class RemoteRestartTest {
             for(String outcome:java.util.List.of("timeout","cancel"))
                 for(String kind:java.util.List.of("tasks","projects","activities"))
                     assertEquals("passed",RemoteBootstrap.proof.getProperty("phase.deletion."+outcome+"."+kind));
+            InstalledImportScenario.recover(api);
             RemoteBootstrap.proof.setProperty("phase.restart","passed");RemoteBootstrap.writeProof();
         }
         RemoteTestSupport.ready();

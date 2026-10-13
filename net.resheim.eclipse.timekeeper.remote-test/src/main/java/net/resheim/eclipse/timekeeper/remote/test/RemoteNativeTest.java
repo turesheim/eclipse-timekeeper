@@ -69,6 +69,7 @@ public class RemoteNativeTest {
             RemoteBootstrap.proof.setProperty("stopped.id",stopped.id().value().toString());RemoteBootstrap.proof.setProperty("manual.id",manual.id().value().toString());
             UncertainTrackingScenario.run(api);
             UncertainDeletionScenario.run(api);
+            InstalledImportScenario.prepare(api);
             RemoteBootstrap.proof.setProperty("phase.native","passed");RemoteBootstrap.writeProof();
         }
         RemoteTestSupport.ready();
