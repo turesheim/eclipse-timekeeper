@@ -21,6 +21,7 @@ function errorText(error) { return error instanceof ApiError ? error.message : '
 function setStatus(text) { $('status').textContent = text; }
 function readOnlyWhileDisconnected() {
   for (const id of ['add-task', 'add-project', 'add-label', 'add-activity', 'settings', 'stop']) $(id).disabled = !connected;
+  for (const action of document.querySelectorAll('td.actions button')) action.disabled = !connected;
 }
 function tab(name) {
   for (const item of ['week', 'tasks', 'projects', 'labels']) $(`${item}-panel`).hidden = item !== name;
