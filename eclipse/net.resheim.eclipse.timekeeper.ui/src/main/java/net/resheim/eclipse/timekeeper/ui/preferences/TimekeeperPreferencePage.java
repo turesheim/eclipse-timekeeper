@@ -35,6 +35,8 @@ public class TimekeeperPreferencePage extends FieldEditorPreferencePage implemen
 				"Number of minutes before user is considered &away", getFieldEditorParent()));
 		addField(new BooleanFieldEditor(PreferenceConstants.DEACTIVATE_WHEN_AWAY,
 				"Automatically &stop tracking when away", getFieldEditorParent()));
+		addField(new BooleanFieldEditor(PreferenceConstants.DECIMAL_HOURS,
+				"Show durations as decimal hours", getFieldEditorParent()));
 		if (TimekeeperUiPlugin.getDefault().getTaskIntegration().isPresent()) {
 			addField(new BooleanFieldEditor(PreferenceConstants.PROJECT_NATIVE_TASKS,
 					"Show new Timekeeper projects and tasks in Mylyn Task List", getFieldEditorParent()));

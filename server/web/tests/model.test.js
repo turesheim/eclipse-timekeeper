@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {dayStart, weekRange, durationNanos, durationText, dateInZone, instantNanos, taskPresentation, activityDayNanos, workweekGroups} from '../src/model.js';
+import {dayStart, weekRange, durationNanos, durationText, dateInZone, instantNanos, taskPresentation, activityDayNanos, workweekGroups, decimalHoursText} from '../src/model.js';
 test('Oslo report ranges include 23- and 25-hour days and Monday boundaries', () => {
   assert.equal(dayStart('2026-03-29', 'Europe/Oslo'), '2026-03-28T23:00:00.000Z');
   assert.equal(dayStart('2026-03-30', 'Europe/Oslo'), '2026-03-29T22:00:00.000Z');
@@ -42,4 +42,10 @@ test('workweek hierarchy retains parents and clips exact activity time across DS
 test('daily clipping compares instants, including exact boundaries and submilliseconds', () => {
   assert.equal(instantNanos('2026-10-25T23:00:00Z'), instantNanos('2026-10-25T23:00:00.000Z'));
   assert.equal(instantNanos('2026-10-25T23:00:00.000000001Z') - instantNanos('2026-10-25T23:00:00Z'), 1n);
+});
+test('decimal hours round exact aggregates and preserve arbitrarily large hour counts', () => {
+  assert.equal(decimalHoursText(durationNanos('PT1H30M0.000000001S')),'1.50h');
+  assert.equal(decimalHoursText(durationNanos('PT17.999999999S')),'0.00h');
+  assert.equal(decimalHoursText(durationNanos('PT9S')+durationNanos('PT9S')),'0.01h');
+  assert.equal(decimalHoursText(durationNanos('PT9007199254740993H')),'9007199254740993.00h');
 });

@@ -188,11 +188,13 @@ public class WorkWeekView extends ViewPart {
 		private void updateColumHeaders() {
 			TreeColumn[] columns = viewer.getTree().getColumns();
 			String[] headings = TimekeeperUiPlugin.getDefault().getHeadings(getFirstDayOfWeek());
-			for (int i = 1; i < columns.length; i++) {
+			for (int i = 1; i <= 7; i++) {
 				LocalDate date = getFirstDayOfWeek().plusDays((long) i - 1);
 				columns[i].setText(headings[i - 1]);
 				columns[i].setToolTipText(getFormattedPeriod(contentProvider.seconds(WeekViewContentProvider.WEEKLY_SUMMARY, date)));
 			}
+            columns[8].setText("Weekly total");
+            columns[8].setToolTipText(decimalHours() ? "Decimal hours, rounded to two places" : "Hours and minutes");
 		}
 
 		private void updateWeekLabel() {
@@ -222,6 +224,15 @@ public class WorkWeekView extends ViewPart {
 	private Action showAllTasksAction;
 	private Action collapseAllAction;
 	private Action expandAllAction;
+    private Action decimalHoursAction;
+    private boolean activitiesCollapsed;
+    private final org.eclipse.jface.util.IPropertyChangeListener durationPreferenceListener=event->{
+        if(!PreferenceConstants.DECIMAL_HOURS.equals(event.getProperty()) || viewer==null || viewer.getControl().isDisposed()) return;
+        viewer.getControl().getDisplay().asyncExec(()->{
+            if(viewer.getControl().isDisposed()) return;
+            decimalHoursAction.setChecked(decimalHours());((ContentProvider)contentProvider).updateColumHeaders();viewer.refresh();
+        });
+    };
 
 	private Action nextWeekAction;
 
@@ -318,6 +329,9 @@ public class WorkWeekView extends ViewPart {
 				.getBoolean(PreferenceConstants.SHOW_ALL_TASKS));
 		TimekeeperUiPlugin.getDefault().addBackendListener(contentProvider);
 		viewer.setContentProvider(contentProvider);
+        viewer.addFilter(new org.eclipse.jface.viewers.ViewerFilter() {
+            @Override public boolean select(Viewer source,Object parent,Object element) {return !activitiesCollapsed || !(element instanceof Activity);}
+        });
 		GridData layoutData = GridDataFactory.fillDefaults().grab(true, true).span(3, 1).create();
 		viewer.getControl().setLayoutData(layoutData);
 
@@ -326,6 +340,7 @@ public class WorkWeekView extends ViewPart {
 		for (int i = 0; i < 7; i++) {
 			createTimeColumn(i);
 		}
+        createWeeklyTotalColumn();
 
 		Tree tree = viewer.getTree();
 		viewer.setComparator(new ViewerComparatorExtension());
@@ -401,6 +416,7 @@ public class WorkWeekView extends ViewPart {
 		contentProvider.setFirstDayOfWeek(date.minusDays(day - 1));
 
 		makeActions();
+        TimekeeperUiPlugin.getDefault().getPreferenceStore().addPropertyChangeListener(durationPreferenceListener);
 		hookContextMenu();
 		hookDoubleClickAction();
 		contributeToActionBars();
@@ -435,14 +451,19 @@ public class WorkWeekView extends ViewPart {
 			@Override
 			public String getText(Object element) {
 				LocalDate date = contentProvider.getFirstDayOfWeek().plusDays(weekday);
-				long seconds = contentProvider.seconds(element, date);
-				if (seconds > 0) {
-					return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
-				}
-				return "";
+                return displayDuration(contentProvider.duration(element,date));
 			}
 		});
 	}
+
+    private void createWeeklyTotalColumn() {
+        var column=createTableViewerColumn("Weekly total",80,8);column.getColumn().setAlignment(SWT.RIGHT);
+        column.setLabelProvider(new TimeColumnLabelProvider(contentProvider) {
+            @Override public String getText(Object element) {return displayDuration(contentProvider.weeklyDuration(element));}
+        });
+    }
+    private boolean decimalHours() {return TimekeeperUiPlugin.getDefault().getPreferenceStore().getBoolean(PreferenceConstants.DECIMAL_HOURS);}
+    private String displayDuration(Duration duration) {return duration.isZero() ? "" : net.resheim.eclipse.timekeeper.domain.DurationDisplay.format(duration,decimalHours());}
 
 	private void createTitleColumn() {
 		TreeViewerColumn column = createTableViewerColumn("Activity", 400, 1);
@@ -452,6 +473,7 @@ public class WorkWeekView extends ViewPart {
 
 	@Override
 	public void dispose() {
+        TimekeeperUiPlugin.getDefault().getPreferenceStore().removePropertyChangeListener(durationPreferenceListener);
 		activityLabelPainter.disposeImages();
 		super.dispose();
 	}
@@ -588,6 +610,7 @@ public class WorkWeekView extends ViewPart {
 		manager.add(newTaskAction);
 		manager.add(new Separator("filter"));
 		manager.add(showAllTasksAction);
+		manager.add(decimalHoursAction);
 		manager.add(new Separator("tree"));
 		manager.add(collapseAllAction);
 		manager.add(expandAllAction);
@@ -610,7 +633,7 @@ public class WorkWeekView extends ViewPart {
 
 	private String getFormattedPeriod(long seconds) {
 		if (seconds > 0) {
-			return DurationFormatUtils.formatDuration(seconds * 1000, "H:mm", true);
+			return net.resheim.eclipse.timekeeper.domain.DurationDisplay.format(Duration.ofSeconds(seconds),decimalHours());
 		}
 		// TODO: Fix dates with no entries "0:00"
 		return "";
@@ -659,17 +682,21 @@ public class WorkWeekView extends ViewPart {
 				.getBoolean(PreferenceConstants.SHOW_ALL_TASKS));
 		showAllTasksAction.setToolTipText("Show all tasks, including those without time in the displayed week");
 		collapseAllAction = new Action("Collapse all") {
-			@Override public void run() { viewer.collapseAll(); }
+			@Override public void run() {activitiesCollapsed=true;viewer.refresh();viewer.expandAll();}
 		};
-		collapseAllAction.setToolTipText("Collapse all projects and tasks");
+		collapseAllAction.setToolTipText("Hide activities and keep projects and tasks visible");
 		collapseAllAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
 				.getImageDescriptor(ISharedImages.IMG_ELCL_COLLAPSEALL));
 		expandAllAction = new Action("Expand all") {
-			@Override public void run() { viewer.expandAll(); }
+			@Override public void run() {activitiesCollapsed=false;viewer.refresh();viewer.expandAll();}
 		};
 		expandAllAction.setToolTipText("Expand all projects and tasks");
 		expandAllAction.setImageDescriptor(PlatformUI.getWorkbench().getSharedImages()
 				.getImageDescriptor(ISharedImages.IMG_ELCL_EXPANDALL));
+        decimalHoursAction=new Action("Show durations as decimal hours",Action.AS_CHECK_BOX) {
+            @Override public void run() {TimekeeperUiPlugin.getDefault().getPreferenceStore().setValue(PreferenceConstants.DECIMAL_HOURS,isChecked());}
+        };
+        decimalHoursAction.setChecked(decimalHours());
 		newProjectAction = new Action("New project...") {
 			@Override public void run() { editProject(null); }
 		};

@@ -44,6 +44,11 @@ export function nanosText(total) {
   if (seconds % 60n) value += ` ${seconds % 60n}s`;
   return value;
 }
+export function decimalHoursText(total) {
+  // Round the exact aggregate, never its individual activities or daily cells.
+  const hundredths = (total * 100n + 1800000000000n) / 3600000000000n;
+  return `${hundredths / 100n}.${(hundredths % 100n).toString().padStart(2, '0')}h`;
+}
 export function instantText(instant, zone) {
   if (!instant) return 'In progress';
   return new Intl.DateTimeFormat(undefined, {timeZone: zone, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'}).format(new Date(instant));

@@ -12,6 +12,7 @@
 package net.resheim.eclipse.timekeeper.ui.views;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Collections;
@@ -139,15 +140,28 @@ public abstract class WeekViewContentProvider implements ITreeContentProvider, D
 	}
 
 	public long seconds(Object element, LocalDate date) {
-		Instant now = Instant.now();
-		return activities.stream().filter(activity -> {
-			if (element instanceof Activity selected) return activity.id().equals(selected.id());
-			if (element instanceof Task task) return activity.taskId().equals(task.id());
-			if (element instanceof Project project) return task(activity.taskId())
-					.map(task -> task.projectId().equals(Optional.of(project.id()))).orElse(false);
-			return element instanceof WeeklySummary;
-		}).mapToLong(activity -> activity.duration(date, getZoneId(), now).getSeconds()).sum();
+		return duration(element,date).getSeconds();
 	}
+    public Duration duration(Object element,LocalDate date) {return duration(element,date,date.plusDays(1));}
+    public Duration weeklyDuration(Object element) {return duration(element,firstDayOfWeek,firstDayOfWeek.plusDays(7));}
+    private Duration duration(Object element,LocalDate from,LocalDate to) {
+        Instant now=Instant.now(),first=from.atStartOfDay(getZoneId()).toInstant(),last=to.atStartOfDay(getZoneId()).toInstant();
+        return activities.stream().filter(activity->matches(element,activity))
+            .map(activity->activity.durationBetween(first,last,now)).reduce(Duration.ZERO,Duration::plus);
+    }
+    private boolean matches(Object element,Activity activity) {
+        if(element instanceof Activity selected) return activity.id().equals(selected.id());
+        if(element instanceof Task selected) {
+            TaskId id=activity.taskId();var visited=new java.util.HashSet<TaskId>();
+            while(id!=null && visited.add(id)) {
+                if(id.equals(selected.id())) return true;
+                var task=tasks.get(id);id=task==null ? null : task.parentTaskId().orElse(null);
+            }
+            return false;
+        }
+        if(element instanceof Project project) return task(activity.taskId()).map(task->task.projectId().equals(Optional.of(project.id()))).orElse(false);
+        return element instanceof WeeklySummary;
+    }
 	public boolean active(Object element) {
 		return activities.stream().filter(activity -> activity.end().isEmpty()).anyMatch(activity -> {
 			if (element instanceof Activity selected) return activity.id().equals(selected.id());
