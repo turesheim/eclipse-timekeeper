@@ -93,6 +93,8 @@ public final class MylynBackendScope {
         if(!maySynchronize(category)) return Optional.empty();
         String handle=category.getHandleIdentifier();
         try {
+            String prefix="timekeeper-project-"+scope+"-";
+            if(handle.startsWith(prefix)) return Optional.of(new ProjectId(UUID.fromString(handle.substring(prefix.length()))));
             for(String key:projects.keys()) if(handle.equals(projects.get(key,null))) return Optional.of(new ProjectId(UUID.fromString(key)));
             if(legacyAllowed) for(String key:root.keys()) if(key.startsWith(LEGACY_PROJECT_PREFIX) && handle.equals(root.get(key,null)))
                 return Optional.of(new ProjectId(UUID.fromString(key.substring(LEGACY_PROJECT_PREFIX.length()))));
