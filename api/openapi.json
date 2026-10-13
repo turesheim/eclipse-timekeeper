@@ -34,6 +34,15 @@
                   "$ref": "#/components/schemas/ProjectPage"
                 }
               }
+            },
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
             }
           },
           "400": {
@@ -64,6 +73,9 @@
           },
           {
             "$ref": "#/components/parameters/Query"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ]
       },
@@ -94,6 +106,13 @@
                   "type": "string"
                 },
                 "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -134,7 +153,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
       }
     },
     "/projects/{id}": {
@@ -164,6 +188,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -182,7 +213,12 @@
           "503": {
             "$ref": "#/components/responses/503"
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
       },
       "put": {
         "operationId": "updateProject",
@@ -205,6 +241,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -245,6 +288,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ],
         "requestBody": {
@@ -264,7 +310,16 @@
         "x-required-permission": "write",
         "responses": {
           "204": {
-            "description": "Successful operation."
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/400"
@@ -300,6 +355,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ]
       }
@@ -317,6 +375,15 @@
                 "schema": {
                   "$ref": "#/components/schemas/TaskPage"
                 }
+              }
+            },
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -373,6 +440,9 @@
               "type": "boolean"
             },
             "description": "true selects tasks without a project; cannot be combined with projectId."
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ]
       },
@@ -403,6 +473,13 @@
                   "type": "string"
                 },
                 "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -444,7 +521,12 @@
             }
           }
         },
-        "description": "Create the task and optional externalReferences atomically. Missing externalReferences means an empty list. Any identity already linked within this owner returns 409 without creating an orphan task. On an ambiguous response with a provider identity, reconcile through findTaskByExternalReference."
+        "description": "Create the task and optional externalReferences atomically. Missing externalReferences means an empty list. Any identity already linked within this owner returns 409 without creating an orphan task. On an ambiguous response with a provider identity, reconcile through findTaskByExternalReference.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
       }
     },
     "/tasks/{id}": {
@@ -474,6 +556,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -492,7 +581,12 @@
           "503": {
             "$ref": "#/components/responses/503"
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
       },
       "put": {
         "operationId": "updateTask",
@@ -515,6 +609,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -555,6 +656,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ],
         "requestBody": {
@@ -574,7 +678,16 @@
         "x-required-permission": "write",
         "responses": {
           "204": {
-            "description": "Successful operation."
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/400"
@@ -610,6 +723,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ]
       }
@@ -627,6 +743,15 @@
                 "schema": {
                   "$ref": "#/components/schemas/LabelPage"
                 }
+              }
+            },
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -658,6 +783,9 @@
           },
           {
             "$ref": "#/components/parameters/Query"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ]
       },
@@ -688,6 +816,13 @@
                   "type": "string"
                 },
                 "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -728,7 +863,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
       }
     },
     "/labels/{id}": {
@@ -758,6 +898,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -776,7 +923,12 @@
           "503": {
             "$ref": "#/components/responses/503"
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
       },
       "put": {
         "operationId": "updateLabel",
@@ -799,6 +951,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -839,6 +998,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ],
         "requestBody": {
@@ -858,7 +1020,16 @@
         "x-required-permission": "write",
         "responses": {
           "204": {
-            "description": "Successful operation."
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/400"
@@ -894,6 +1065,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ]
       }
@@ -920,6 +1094,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -975,6 +1156,9 @@
               "maxLength": 1000,
               "pattern": "\\S"
             }
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ]
       }
@@ -1006,6 +1190,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -1046,6 +1237,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ],
         "requestBody": {
@@ -1080,6 +1274,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -1150,6 +1351,9 @@
               "maxLength": 1000,
               "pattern": "\\S"
             }
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ]
       }
@@ -1167,6 +1371,15 @@
                 "schema": {
                   "$ref": "#/components/schemas/ActivityPage"
                 }
+              }
+            },
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -1238,6 +1451,9 @@
           },
           {
             "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ]
       },
@@ -1268,6 +1484,13 @@
                   "type": "string"
                 },
                 "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -1308,7 +1531,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
       }
     },
     "/activities/{id}": {
@@ -1338,6 +1566,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -1356,7 +1591,12 @@
           "503": {
             "$ref": "#/components/responses/503"
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
       },
       "put": {
         "operationId": "updateActivity",
@@ -1379,6 +1619,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -1419,6 +1666,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ],
         "requestBody": {
@@ -1438,7 +1688,16 @@
         "x-required-permission": "write",
         "responses": {
           "204": {
-            "description": "Successful operation."
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/400"
@@ -1474,6 +1733,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ]
       }
@@ -1500,6 +1762,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -1516,10 +1785,24 @@
             "$ref": "#/components/responses/503"
           },
           "204": {
-            "description": "No open activity for this owner."
+            "description": "No open activity for this owner.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
           }
         },
-        "description": "200 with an Activity and ETag, or 204 with no body when no activity is open."
+        "description": "200 with an Activity and ETag, or 204 with no body when no activity is open.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
       }
     },
     "/activities/start": {
@@ -1550,6 +1833,13 @@
                   "type": "string"
                 },
                 "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -1593,6 +1883,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -1604,6 +1901,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ],
         "requestBody": {
@@ -1645,6 +1945,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -1686,6 +1993,9 @@
           },
           {
             "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ]
       }
@@ -1712,6 +2022,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -1727,7 +2044,12 @@
           "503": {
             "$ref": "#/components/responses/503"
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
       },
       "put": {
         "operationId": "updateProfile",
@@ -1750,6 +2072,13 @@
                   "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
                 },
                 "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -1790,6 +2119,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ],
         "requestBody": {
@@ -1817,6 +2149,15 @@
                 "schema": {
                   "$ref": "#/components/schemas/Report"
                 }
+              }
+            },
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -1888,6 +2229,9 @@
             "schema": {
               "$ref": "#/components/schemas/ZoneId"
             }
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ]
       }
@@ -1905,6 +2249,15 @@
                 "schema": {
                   "$ref": "#/components/schemas/ChangePage"
                 }
+              }
+            },
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -1950,6 +2303,9 @@
               "maximum": 25,
               "default": 0
             }
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ]
       }
@@ -1967,6 +2323,15 @@
                 "schema": {
                   "$ref": "#/components/schemas/TransferSnapshot"
                 }
+              }
+            },
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -1986,7 +2351,12 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Read all four resource types and the owner zone in one consistent snapshot. Maximum 10,000 records per resource type and 20 MiB serialized JSON; larger exports return 413 without a partial body. This format is not a database backup or legacy migration."
+        "description": "Read all four resource types and the owner zone in one consistent snapshot. Maximum 10,000 records per resource type and 20 MiB serialized JSON; larger exports return 413 without a partial body. This format is not a database backup or legacy migration.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
       }
     },
     "/data/import": {
@@ -2002,6 +2372,15 @@
                 "schema": {
                   "$ref": "#/components/schemas/ImportResult"
                 }
+              }
+            },
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -2037,6 +2416,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
           }
         ],
         "requestBody": {
@@ -3281,6 +3663,18 @@
           "maxLength": 200
         },
         "description": "Trimmed, case-insensitive substring match on project/label name or task summary."
+      },
+      "OwnerBinding": {
+        "name": "X-Timekeeper-Owner",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1100,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "description": "Optional expected owner for a bound client session: canonical unpadded base64url of its UTF-8 owner ID. Invalid encoding: 400; a different authenticated owner: 401 OWNER_CHANGED before any resource read or mutation. Omission retains stateless token-owner semantics."
       }
     },
     "responses": {
@@ -3301,7 +3695,7 @@
         }
       },
       "401": {
-        "description": "Missing, invalid, expired or revoked bearer token.",
+        "description": "Missing, invalid, expired or revoked bearer token, or OWNER_CHANGED when its authenticated owner differs from the expected session owner.",
         "content": {
           "application/problem+json": {
             "schema": {

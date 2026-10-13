@@ -1,5 +1,20 @@
 # Installed remote Mylyn acceptance
 
+The account-switch phase also launches a real headless Chromium client against
+the same packaged server and verifies bidirectional Workweek changes, preserved
+conflicting drafts, activation/deactivation and exact daily/weekly reports.
+Prepare its locked test dependencies before running `-Premote-client-tests`:
+
+```sh
+npm ci --ignore-scripts --prefix web
+cd web && npx playwright install --with-deps chromium && cd ..
+```
+
+Node must be on the test JVM's PATH. CI installs it and the browser explicitly.
+There is no production Node dependency. The token goes only through the child
+environment; the line protocol and retained diagnostics contain no credentials.
+Details and limits: [WEB-ECLIPSE.md](../baseline/WEB-ECLIPSE.md).
+
 This module extends the isolated packaged-server bootstrap from `remote-test`
 and installs the official optional Timekeeper/Mylyn feature using p2. It runs
 in its own workspace and credential fixture, separate from the native-only
@@ -25,8 +40,9 @@ server data starts empty; account A's saved projection remains in Task List but
 must neither resolve in account B nor stop account B's active interval. The test
 creates a project/task with the same visible names and requires distinct
 projections and remote UUIDs, then checks that account A's revision and history
-are unchanged. Both fixture credentials are encrypted in the isolated keyring;
-the registry contains only their hashes and fixed owner mappings.
+are unchanged. The account credentials and a second owner-B session credential
+are encrypted in the isolated keyring; the registry contains only their hashes
+and fixed owner mappings.
 
 The account-B phase also deletes a projected task with recorded time and its
 nonempty project category through the real Task List. Both server conflicts
@@ -62,8 +78,10 @@ Offline acceptance stops the actual packaged-server process while a native
 task draft remains open. The failed save preserves its enabled fields and
 error; local storage stays closed. A Mylyn deletion made while disconnected
 remains pending. Restart uses the same server database/port and records a new
-recovery PID separately from the Eclipse-fork PIDs. Server metadata is unchanged
-before retry; the same editor then saves once and the pending deletion completes.
+recovery PID separately from the Eclipse-fork PIDs. The server retains the
+original task, projects, labels and active interval before retry; automatic
+reconnect may already complete the explicitly queued deletion. The same editor
+then saves once and the pending deletion completes.
 A subsequent real Task List edit must still synchronize with one version
 increment.
 
@@ -99,14 +117,46 @@ handles legacy JPA project-renaming version side effects while preserving newer
 changed backend fields. The existing Mylyn test bundle validates its normal
 rename/CRUD/activation/connecting/scope workflows alongside remote acceptance.
 
+The account-B runtime also uses a separately authorized owner-B HTTP session to
+create tasks, labels and precise intervals, edit a task while its native editor
+has a draft, and update/delete intervals. Eclipse must update its cached records,
+Workweek rows and existing report totals without manual refresh. Notification
+refresh cannot replace the open draft or upgrade its captured expected version;
+Save still rejects the stale edit. Owner A receives none of those events. The
+selected owner-B token is then revoked while the second session commits another
+task. Restoring the selected token must recover that missed record automatically,
+without replaying a command. Peer deletions must also remove cached records and
+Mylyn projections. Receipts record `phase.changes.owner-scope`,
+`phase.changes.activity-report`, `phase.changes.live-draft` and
+`phase.changes.reconnect`.
+
 `remote-client-tests` includes both native-only and Mylyn modules. CI's
-`Remote-Eclipse` job runs all five installed phases and uploads reports and
+`Remote-Eclipse` job runs all nine installed phases and uploads reports and
 credential-free receipts/logs. The fixture password, keyring and token registry
 are excluded. The known upstream theme-color/Error Log issue #243 is still a
 separate release gate; these functional tests do not certify a clean Error Log.
 
-Still required in #220: switching server endpoints and local/remote backends,
-remaining native label/report/CSV preference flows, and form preservation
+Four further JVMs retain the workspace through server A/account B, a second
+server with the same account, embedded storage, server A again and embedded
+storage again. All selections use the actual backend preference page and restart
+notice. Applying settings must retain the running identity, task snapshot and
+connection until restart. The second server and local database must not receive
+copies of the first server's tasks. Workweek creates same-named native records
+in each backend; Mylyn activation records time only against that backend's UUID
+and owner. Foreign projections reject resolution. Returning to the first server
+and local storage must reuse the saved projection handles and random markers,
+record IDs and exact intervals. Both inactive servers retain their state.
+
+The embedded phase deliberately opens and updates the existing local fixture.
+Its new checksum is accepted only after successful embedded acceptance and must
+stay unchanged when server mode is selected again. All remote phases keep the
+app connection null; both isolated server processes stop on runtime exit. The
+bootstrap honors persisted backend settings after its first initialization.
+See [backend-switch acceptance](../baseline/REMOTE-BACKEND-SWITCH.md).
+
+Still required in #220: remaining native label/report/CSV preference flows, and form preservation
 through authentication/offline/timeout/cancellation/conflict failures, including
-uncertain-command and failed-deletion outcomes. #219 notification/reconnect and
-#221 web UI remain required before 2.0.
+uncertain-command and failed-deletion outcomes. The Eclipse portion of #219 is
+covered by the synchronization checkpoint; web synchronization and #221 web UI
+remain required before 2.0. See [the checkpoint](../baseline/REMOTE-SYNCHRONIZATION.md)
+for full-resynchronization tests and evidence limits.

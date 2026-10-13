@@ -79,7 +79,7 @@ If startup fails, inspect the logs:
 docker compose logs --tail=100 postgres api-1 api-2 gateway
 ```
 
-## 4. Verify the API and connect Eclipse
+## 4. Open the web interface and connect Eclipse
 
 Check readiness:
 
@@ -89,6 +89,11 @@ curl --fail --silent --show-error http://127.0.0.1:8080/q/health/ready
 
 The response's `status` should be `UP`. If you changed the port, use that
 port in all URLs below.
+
+Open **http://127.0.0.1:8080/web/** in your browser and sign in with the bearer
+token saved during setup. The web client is bundled in the server image; no
+separate frontend service is needed. The token stays in memory for that tab,
+so reloading the page or signing out ends the session.
 
 To check the account, enter the saved token at the prompt. These Bash commands
 keep it out of shell history and curl's command-line arguments:

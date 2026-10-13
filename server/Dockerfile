@@ -5,6 +5,7 @@ COPY timekeeper-domain timekeeper-domain
 COPY timekeeper-service-api timekeeper-service-api
 COPY timekeeper-http-client timekeeper-http-client
 COPY api api
+COPY web/src web/src
 RUN mvn -B -ntp -f server/pom.xml package -DskipTests -Dquarkus.profile=postgresql
 
 FROM eclipse-temurin:21-jre-jammy

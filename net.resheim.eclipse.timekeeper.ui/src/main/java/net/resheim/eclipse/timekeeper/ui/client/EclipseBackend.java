@@ -33,6 +33,9 @@ public final class EclipseBackend implements AutoCloseable {
         public boolean contains(org.eclipse.core.runtime.jobs.ISchedulingRule other) {return other==this;}
         public boolean isConflicting(org.eclipse.core.runtime.jobs.ISchedulingRule other) {return other==this;}
     };
+    private final Job notifications;
+    private final java.util.concurrent.atomic.AtomicBoolean eventRefreshPending=new java.util.concurrent.atomic.AtomicBoolean();
+    private final java.util.concurrent.atomic.AtomicBoolean resetVersions=new java.util.concurrent.atomic.AtomicBoolean();
     private volatile HttpTimekeeperService.Metadata metadata;
     private volatile String status="Connecting to the Timekeeper server.";
     private volatile boolean ready,closed;
@@ -47,7 +50,8 @@ public final class EclipseBackend implements AutoCloseable {
         this.remoteMode=remoteMode;this.configurationFailure=configurationFailure;
         if(configurationFailure!=null) status=configurationFailure;
         facade=!remoteMode ? null : (TimekeeperService)Proxy.newProxyInstance(TimekeeperService.class.getClassLoader(),new Class<?>[]{TimekeeperService.class},this::invoke);
-        if(remote!=null) refresh();
+        notifications=remote==null ? null : changeWatcher();
+        if(remote!=null) {refresh();notifications.schedule(1000);}
     }
     public boolean remote() {return remoteMode;}
     public boolean ready() {return !remoteMode ? TimekeeperPlugin.getDefault().isReady() : ready;}
@@ -95,15 +99,22 @@ public final class EclipseBackend implements AutoCloseable {
         };
     }
     private ActivityReport cachedReport(ActivityQuery query) {
+        if(missingFilter(metadata,query)) return new ActivityReport(query,Instant.now(),List.of(),Duration.ZERO);
         ActivityReport report=reports.get(query);if(report==null && ready && loading.add(query)) {
             read("Load Timekeeper week",()->{var loaded=remote.activities(query);reports.put(query,loaded);return loaded;},value->{loading.remove(query);changed();},error->{loading.remove(query);});
         }
         return report==null ? new ActivityReport(query,Instant.now(),List.of(),Duration.ZERO) : report;
     }
+    private static boolean missingFilter(HttpTimekeeperService.Metadata snapshot,ActivityQuery query) {
+        if(snapshot==null || query.ownerId().filter(owner->!owner.equals(OwnerId.LOCAL) && !owner.equals(snapshot.profile().owner())).isPresent()) return false;
+        return query.taskId().filter(id->snapshot.tasks().stream().noneMatch(task->task.id().equals(id))).isPresent()
+                || query.projectId().filter(id->snapshot.projects().stream().noneMatch(project->project.id().equals(id))).isPresent();
+    }
     private void reload() {
         var next=remote.metadata();
         if(metadata!=null && !metadata.profile().owner().equals(next.profile().owner())) throw new RemoteFailure(RemoteFailure.Kind.AUTHENTICATION,"OWNER_CHANGED");
-        Map<ActivityQuery,ActivityReport> nextReports=new HashMap<>();for(var query:reports.keySet()) nextReports.put(query,remote.activities(query));
+        Map<ActivityQuery,ActivityReport> nextReports=new HashMap<>();for(var query:reports.keySet())
+            nextReports.put(query,missingFilter(next,query) ? new ActivityReport(query,Instant.now(),List.of(),Duration.ZERO) : remote.activities(query));
         metadata=next;reports.putAll(nextReports);ready=true;status="";
     }
     public Activity activateInWorker(TaskId task) {
@@ -118,12 +129,12 @@ public final class EclipseBackend implements AutoCloseable {
         read("Connect to Timekeeper server",()->{reload();return null;},value->changed(),error->changed());
     }
     public <T> Job execute(String name,Supplier<T> work,Consumer<T> success,Consumer<RuntimeException> failure) {
-        return execute(name,work,success,failure,true);
+        return execute(name,work,success,failure,true,true);
     }
     public <T> Job read(String name,Supplier<T> work,Consumer<T> success,Consumer<RuntimeException> failure) {
-        return execute(name,work,success,failure,false);
+        return execute(name,work,success,failure,false,true);
     }
-    private <T> Job execute(String name,Supplier<T> work,Consumer<T> success,Consumer<RuntimeException> failure,boolean refreshAfterSuccess) {
+    private <T> Job execute(String name,Supplier<T> work,Consumer<T> success,Consumer<RuntimeException> failure,boolean refreshAfterSuccess,boolean user) {
         if(!remoteMode) {try {T value=work.get();success.accept(value);}catch(RuntimeException e) {failure.accept(e);}return null;}
         if(remote==null) {failure.accept(new IllegalStateException(configurationFailure));return null;}
         Job job=new Job(name) {
@@ -149,8 +160,57 @@ public final class EclipseBackend implements AutoCloseable {
             }
             @Override protected void canceling() {Thread thread=worker;if(thread!=null) thread.interrupt();}
         };
-        jobs.add(job);job.setRule(serial);job.setUser(true);job.schedule();return job;
+        jobs.add(job);job.setRule(serial);job.setUser(user);job.setSystem(!user);job.schedule();return job;
+    }
+    private Job changeWatcher() {
+        var watcher=new Job("Watch Timekeeper changes") {
+            private volatile Thread worker;
+            private long retryDelay=1000;
+            @Override protected IStatus run(IProgressMonitor monitor) {
+                worker=Thread.currentThread();long nextDelay=1000;
+                try {
+                    if(closed || monitor.isCanceled()) return Status.CANCEL_STATUS;
+                    var snapshot=metadata;
+                    if(!ready || snapshot==null) {
+                        refreshFromChanges(false);nextDelay=retryDelay;retryDelay=Math.min(30000,retryDelay*2);
+                    } else {
+                        var batch=remote.changeBatch(snapshot.revision(),5);retryDelay=1000;
+                        var current=metadata;
+                        if(batch.resynchronize() || current==null || batch.nextSequence()>current.revision())
+                            refreshFromChanges(batch.resynchronize());
+                        nextDelay=batch.changed() || batch.resynchronize() ? 1000 : 100;
+                    }
+                    return Status.OK_STATUS;
+                } catch(RemoteFailure failure) {
+                    if(closed || monitor.isCanceled()) return Status.CANCEL_STATUS;
+                    if(failure.kind()==RemoteFailure.Kind.CONFLICT && failure.code().equals("RESYNC_REQUIRED")) {
+                        ready=false;status="Refreshing Timekeeper after missed changes.";ui(EclipseBackend.this::changed);
+                        refreshFromChanges(true);
+                    } else {
+                        ready=false;status=failure.getMessage();ui(EclipseBackend.this::changed);
+                    }
+                    nextDelay=retryDelay;retryDelay=Math.min(30000,retryDelay*2);return Status.CANCEL_STATUS;
+                } finally {
+                    worker=null;Thread.interrupted();if(!closed && !monitor.isCanceled()) schedule(nextDelay);
+                }
+            }
+            @Override protected void canceling() {var thread=worker;if(thread!=null) thread.interrupt();}
+        };
+        watcher.setSystem(true);watcher.setPriority(Job.LONG);return watcher;
+    }
+    private void refreshFromChanges(boolean reset) {
+        if(reset) resetVersions.set(true);
+        if(closed || !eventRefreshPending.compareAndSet(false,true)) return;
+        execute("Refresh Timekeeper changes",()->{
+            if(resetVersions.getAndSet(false)) remote.invalidateVersions();
+            reload();return null;
+        },value->completedChangesRefresh(),failure->completedChangesRefresh(),false,false);
+    }
+    private void completedChangesRefresh() {
+        eventRefreshPending.set(false);changed();
+        // A cursor reset can arrive while an earlier refresh is already reading its snapshot.
+        if(resetVersions.get()) refreshFromChanges(true);
     }
     private void ui(Runnable runnable) {if(!display.isDisposed()) display.asyncExec(runnable);}
-    @Override public void close() {closed=true;jobs.forEach(Job::cancel);if(remote!=null) remote.close();listeners.clear();}
+    @Override public void close() {closed=true;if(notifications!=null) notifications.cancel();jobs.forEach(Job::cancel);if(remote!=null) remote.close();listeners.clear();}
 }

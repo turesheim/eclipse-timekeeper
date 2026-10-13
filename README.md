@@ -44,8 +44,10 @@ The complete client/server deployment is required before 2.0 publication:
 versioned REST API/ownership, Quarkus server, remote Eclipse operation, web
 frontend and client synchronization. See [#187](https://github.com/turesheim/eclipse-timekeeper/issues/187)
 and the [HTTP API contract](api/README.md) for the design and acceptance boundaries.
-The contract does not certify a delivered remote backend; the embedded mode
-remains the current implementation.
+The server supports the remote Eclipse client and includes a browser client at
+`/web/`. See the [local Docker setup guide](server/deploy/LOCAL.md) to run both
+against the same server. Final release acceptance remains required before 2.0
+publication.
 
 ## Database configuration
 

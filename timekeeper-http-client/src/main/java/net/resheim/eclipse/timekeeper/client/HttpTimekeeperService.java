@@ -22,6 +22,7 @@ import net.resheim.eclipse.timekeeper.service.Queries.*;
 /** Synchronous HTTP port for worker threads. UI adapters must dispatch before calling. */
 public final class HttpTimekeeperService implements TimekeeperService,AutoCloseable {
     public record Profile(OwnerId owner,ZoneId zone,long version) { }
+    public record ChangeBatch(long nextSequence,boolean changed,boolean resynchronize) { }
     public record Metadata(Profile profile,List<Project> projects,List<Task> tasks,List<Label> labels,Optional<Activity> active,long revision) { }
     private record Result(int status,JsonElement body,String etag) { }
     private record VersionTag(long version,String tag) { }
@@ -31,6 +32,7 @@ public final class HttpTimekeeperService implements TimekeeperService,AutoClosea
     private final Duration timeout;
     private final HttpClient http;
     private final ConcurrentMap<String,VersionTag> tags=new ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicReference<OwnerId> boundOwner=new java.util.concurrent.atomic.AtomicReference<>();
     private volatile Profile profile;
     public HttpTimekeeperService(URI server,Supplier<String> token,Duration timeout) {
         base=baseUri(server);this.token=Objects.requireNonNull(token);this.timeout=Objects.requireNonNull(timeout);
@@ -48,6 +50,7 @@ public final class HttpTimekeeperService implements TimekeeperService,AutoClosea
     private Result request(String method,String path,JsonElement body,Map<String,String> headers) {
         String credential=token.get();if(credential==null || credential.isBlank()) throw new RemoteFailure(RemoteFailure.Kind.AUTHENTICATION,"UNAUTHENTICATED");
         var builder=HttpRequest.newBuilder(URI.create(base+path)).timeout(timeout).header("Authorization","Bearer "+credential).header("Accept","application/json, application/problem+json");
+        var expectedOwner=boundOwner.get();if(expectedOwner!=null) builder.header("X-Timekeeper-Owner",Base64.getUrlEncoder().withoutPadding().encodeToString(expectedOwner.value().getBytes(StandardCharsets.UTF_8)));
         headers.forEach(builder::header);if(body!=null) builder.header("Content-Type","application/json");
         builder.method(method,body==null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body.toString(),StandardCharsets.UTF_8));
         var future=http.sendAsync(builder.build(),HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
@@ -60,11 +63,30 @@ public final class HttpTimekeeperService implements TimekeeperService,AutoClosea
                 String code=value.isJsonObject() && value.getAsJsonObject().has("code") ? value.getAsJsonObject().get("code").getAsString() : "UNAVAILABLE";
                 throw failure(response.statusCode(),code);
             }
+            response.headers().firstValue("X-Timekeeper-Owner").ifPresent(header->bindOwner(decodeOwner(header)));
+            if(value.isJsonObject() && value.getAsJsonObject().has("ownerId")) {
+                var owner=value.getAsJsonObject().get("ownerId");
+                if(!owner.isJsonPrimitive() || !owner.getAsJsonPrimitive().isString()) throw new IllegalStateException();
+                bindOwner(new OwnerId(owner.getAsString()));
+            }
             return new Result(response.statusCode(),value,response.headers().firstValue("ETag").orElse(null));
         } catch(InterruptedException interrupted) {future.cancel(true);Thread.currentThread().interrupt();throw new RemoteFailure(RemoteFailure.Kind.CANCELLED,"CANCELLED");}
         catch(CancellationException error) {throw new RemoteFailure(RemoteFailure.Kind.CANCELLED,"CANCELLED");}
         catch(ExecutionException error) {if(error.getCause() instanceof HttpTimeoutException) throw new RemoteFailure(RemoteFailure.Kind.TIMEOUT,"TIMEOUT");throw new RemoteFailure(RemoteFailure.Kind.OFFLINE,"OFFLINE");}
         catch(JsonParseException | IllegalStateException error) {throw new RemoteFailure(RemoteFailure.Kind.UNAVAILABLE,"INVALID_RESPONSE");}
+    }
+    private void bindOwner(OwnerId owner) {
+        boundOwner.compareAndSet(null,owner);
+        if(!owner.equals(boundOwner.get())) throw new RemoteFailure(RemoteFailure.Kind.AUTHENTICATION,"OWNER_CHANGED");
+    }
+    private static OwnerId decodeOwner(String header) {
+        try {
+            if(header.length()>1100 || !header.matches("[A-Za-z0-9_-]+")) throw new IllegalArgumentException();
+            String owner=StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(Base64.getUrlDecoder().decode(header))).toString();
+            if(owner.isBlank() || !owner.equals(owner.trim()) || owner.codePointCount(0,owner.length())>200
+                    || !header.equals(Base64.getUrlEncoder().withoutPadding().encodeToString(owner.getBytes(StandardCharsets.UTF_8)))) throw new IllegalArgumentException();
+            return new OwnerId(owner);
+        } catch(IllegalArgumentException | java.nio.charset.CharacterCodingException invalid) {throw new RemoteFailure(RemoteFailure.Kind.UNAVAILABLE,"INVALID_RESPONSE");}
     }
     private static RemoteFailure failure(int status,String code) {
         return new RemoteFailure(switch(status) {case 401->RemoteFailure.Kind.AUTHENTICATION;case 403->RemoteFailure.Kind.FORBIDDEN;case 404->RemoteFailure.Kind.NOT_FOUND;case 409,412->RemoteFailure.Kind.CONFLICT;case 400,413,422,428->RemoteFailure.Kind.VALIDATION;default->RemoteFailure.Kind.UNAVAILABLE;},code);
@@ -113,7 +135,7 @@ public final class HttpTimekeeperService implements TimekeeperService,AutoClosea
         for(int attempt=0;attempt<3;attempt++) {
             Profile profile=profile();Page projects=page("projects",Map.of()),tasks=page("tasks",Map.of()),labels=page("labels",Map.of());var active=activeActivity(OwnerId.LOCAL);
             Profile confirmed=profile();long end=page("projects",Map.of()).revision();
-            if(profile.version()==confirmed.version() && projects.revision()==tasks.revision() && tasks.revision()==labels.revision() && end==labels.revision())
+            if(profile.owner().equals(confirmed.owner()) && profile.version()==confirmed.version() && projects.revision()==tasks.revision() && tasks.revision()==labels.revision() && end==labels.revision())
                 return new Metadata(profile,projects.items().stream().map(WireValues::project).toList(),tasks.items().stream().map(WireValues::task).toList(),labels.items().stream().map(WireValues::label).toList(),active,end);
         }throw new RemoteFailure(RemoteFailure.Kind.CONFLICT,"CURSOR_EXPIRED");
     }
@@ -179,5 +201,21 @@ public final class HttpTimekeeperService implements TimekeeperService,AutoClosea
         }
     }
     public JsonObject changes(long after,int waitSeconds) {return request("GET","/changes?after="+after+"&waitSeconds="+waitSeconds,null).body().getAsJsonObject();}
+    public ChangeBatch changeBatch(long after,int waitSeconds) {
+        try {
+            var page=changes(after,waitSeconds);var items=page.getAsJsonArray("items");
+            long next=page.get("nextSequence").getAsLong(),previous=after;
+            boolean more=page.get("hasMore").getAsBoolean();
+            for(var item:items) {
+                long sequence=item.getAsJsonObject().get("sequence").getAsLong();
+                if(sequence<=previous) throw new IllegalStateException("Invalid change order");previous=sequence;
+            }
+            if(next!=previous || next<after) throw new IllegalStateException("Invalid change cursor");
+            return new ChangeBatch(next,!items.isEmpty(),items.isEmpty() && more);
+        } catch(RemoteFailure failure) {throw failure;}
+        catch(RuntimeException invalid) {throw new RemoteFailure(RemoteFailure.Kind.UNAVAILABLE,"INVALID_CHANGE_PAGE");}
+    }
+    /** Used only inside serialized full resynchronization after a server cursor reset. */
+    public void invalidateVersions() {tags.clear();}
     @Override public void close() {http.shutdownNow();}
 }
