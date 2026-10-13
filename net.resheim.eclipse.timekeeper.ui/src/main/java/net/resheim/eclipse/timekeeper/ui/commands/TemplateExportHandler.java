@@ -77,6 +77,7 @@ public class TemplateExportHandler extends AbstractHandler implements IHandler {
 		String filename = null;
 		if (save) {
 			FileDialog dialog = new FileDialog(shell, SWT.SAVE);
+			dialog.setText("Save Timekeeper report");
 			dialog.setFilterExtensions(new String[] { "*." + getFileExtension(template) });
 			dialog.setFileName(fileNameFormat.format(firstDay));
 			filename = dialog.open();
