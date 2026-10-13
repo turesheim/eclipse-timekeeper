@@ -12,10 +12,12 @@ for capabilities and release status.
 
 ## Install the Eclipse plugins
 
-The project website and update site are hosted together on GitHub Pages:
+The project website and update sites are hosted together on GitHub Pages.
+While 2.0 is under development, install a verified main build from the
+[testing update site](https://turesheim.github.io/eclipse-timekeeper/updates/testing/):
 
 ```text
-https://turesheim.github.io/eclipse-timekeeper/updates/
+https://turesheim.github.io/eclipse-timekeeper/updates/testing/
 ```
 
 1. In Eclipse, open **Help > Install New Software... > Add...**.
@@ -27,9 +29,12 @@ https://turesheim.github.io/eclipse-timekeeper/updates/
 
 Timekeeper 2.0 requires **Eclipse 2026-09 (4.41) and Java 21**. Keep the
 Eclipse 2026-09 software site enabled so Eclipse can resolve dependencies.
-Published prereleases use the separate [preview update site](https://turesheim.github.io/eclipse-timekeeper/updates/preview/).
-An empty channel means no matching release has been published; 2.0 is still
-under development. See the [installation guide](https://github.com/turesheim/eclipse-timekeeper/wiki/Installing-Timekeeper-2.0)
+The test channel updates only after all main platform, server, web and installed
+client tests pass. It contains unreleased builds. Published stable versions use
+the [stable update site](https://turesheim.github.io/eclipse-timekeeper/updates/);
+published release candidates use the [preview update site](https://turesheim.github.io/eclipse-timekeeper/updates/preview/).
+An empty release channel means no matching release has been published. See the
+[installation guide](https://github.com/turesheim/eclipse-timekeeper/wiki/Installing-Timekeeper-2.0)
 for candidate builds and installing a downloaded p2 archive.
 
 ## Repository

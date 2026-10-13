@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import shutil
 import subprocess
 import tempfile
 import time
@@ -100,14 +101,99 @@ def extract_verified(assets, destination, tag):
         provenance = json.loads(zipped.read(PROVENANCE))
         if provenance.get("tag") != tag or not re.fullmatch(r"[0-9a-f]{40}", provenance.get("commit", "")):
             raise ValueError(f"Release provenance does not match: {tag}")
-        for member in zipped.infolist():
-            path = PurePosixPath(member.filename)
-            mode = member.external_attr >> 16
-            if path.is_absolute() or ".." in path.parts or "\\" in member.filename or (mode & 0o170000) == 0o120000:
-                raise ValueError(f"Unsafe ZIP member: {member.filename}")
-        zipped.extractall(destination)
+        extract_repository_zip(zipped, destination)
     if validate_repository(destination, tag) != provenance.get("version"):
         raise ValueError(f"Release version does not match provenance: {tag}")
+
+
+def extract_repository_zip(zipped, destination):
+    for member in zipped.infolist():
+        path = PurePosixPath(member.filename)
+        mode = member.external_attr >> 16
+        if path.is_absolute() or ".." in path.parts or "\\" in member.filename or (mode & 0o170000) == 0o120000:
+            raise ValueError(f"Unsafe ZIP member: {member.filename}")
+    if zipped.testzip() is not None:
+        raise ValueError("Invalid p2 repository archive")
+    zipped.extractall(destination)
+
+
+def download_testing_artifact(repo, artifact_id, destination):
+    with destination.open("wb") as output:
+        subprocess.run(["gh", "api", f"repos/{repo}/actions/artifacts/{artifact_id}/zip"],
+                       stdout=output, check=True)
+
+
+def add_testing_channel(repo, output):
+    branch=gh("api",f"repos/{repo}","--jq",".default_branch").strip()
+    runs=json.loads(gh("api",f"repos/{repo}/actions/workflows/build.yml/runs",
+                      "--method","GET","-f",f"branch={branch}","-f","event=push",
+                      "-f","status=success","-f","per_page=10"))["workflow_runs"]
+    required={"Publication","API-contract","Server","Web","Build (ubuntu-latest)",
+              "Build (macos-latest)","Build (windows-latest)"}
+    for run in runs:
+        if (run.get("status")!="completed" or run.get("conclusion")!="success"
+                or run.get("event")!="push" or run.get("head_branch")!=branch
+                or run.get("path")!=".github/workflows/build.yml"
+                or run.get("head_repository",{}).get("full_name")!=repo):
+            continue
+        commit=run["head_sha"]
+        if not re.fullmatch(r"[0-9a-f]{40}",commit):
+            raise ValueError("Invalid testing source commit")
+        jobs=json.loads(gh("api",f"repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100"))["jobs"]
+        passed={job["name"] for job in jobs if job.get("status")=="completed" and job.get("conclusion")=="success"}
+        if not required.issubset(passed) or not passed.intersection({"Remote-Eclipse","Installed client tests"}):
+            continue
+        artifacts=json.loads(gh("api",f"repos/{repo}/actions/runs/{run['id']}/artifacts?per_page=100"))["artifacts"]
+        available=[artifact for artifact in artifacts if artifact["name"]=="p2-repository" and not artifact["expired"]]
+        if not available:
+            continue
+        if len(available)!=1:
+            raise ValueError("Ambiguous testing p2 artifact")
+        artifact=available[0]
+        source=artifact.get("workflow_run",{})
+        if source.get("id")!=run["id"] or source.get("head_sha")!=commit or source.get("head_branch")!=branch:
+            raise ValueError("Testing artifact source does not match the verified build")
+        digest=artifact.get("digest","")
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}",digest):
+            raise ValueError("Testing artifact has no SHA-256 digest")
+        with tempfile.TemporaryDirectory() as temporary:
+            archive=Path(temporary)/"p2-artifact.zip"
+            download_testing_artifact(repo,artifact["id"],archive)
+            if "sha256:"+hashlib.sha256(archive.read_bytes()).hexdigest()!=digest:
+                raise ValueError("Testing artifact checksum does not match")
+            repository=Path(temporary)/"repository"
+            with zipfile.ZipFile(archive) as zipped:
+                extract_repository_zip(zipped,repository)
+            units=read_repository_xml(repository,"content").findall("./units/unit")
+            base=[unit for unit in units if unit.get("id")==FEATURE]
+            if len(base)!=1:
+                raise ValueError("Testing repository has no unique Timekeeper feature")
+            version=validate_repository(repository,"v"+".".join(base[0].get("version","").split(".")[:3]))
+            provenance={"kind":"testing","commit":commit,"version":version,
+                        "run":run["id"],"artifactSha256":digest.removeprefix("sha256:")}
+            (repository/"timekeeper-build.json").write_text(json.dumps(provenance,indent=2)+"\n")
+            testing=output/"updates/testing"
+            build_path=f"builds/{run['id']}-{artifact['id']}"
+            destination=testing/build_path
+            shutil.copytree(repository,destination,dirs_exist_ok=True)
+        composite(testing,"Timekeeper tested main builds",[build_path])
+        (testing/"index.html").write_text(f'''<!doctype html><html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timekeeper testing update site</title><h1>Timekeeper testing update site</h1>
+<p>In Eclipse, use this page's URL in <strong>Help &gt; Install New Software… &gt; Add…</strong>.</p>
+<p>Select <strong>Timekeeper for Eclipse</strong> and optionally <strong>Timekeeper Mylyn integration</strong>.
+Version 2.0 requires Eclipse 2026-09 and Java 21. Keep the Eclipse 2026-09 software site enabled.</p>
+<p>This is an unreleased main build that passed the platform matrix, server, web and installed-client tests.
+It is separate from <a href="../">stable releases</a> and <a href="../preview/">release candidates</a>.</p>
+<p>Version: <code>{html.escape(version)}</code>. Source: <code>{commit}</code>.
+<a href="https://github.com/{repo}/actions/runs/{run['id']}">Verified build</a>.
+<a href="{build_path}/timekeeper-build.json">Build identity</a>.</p>
+<p>Restart Eclipse after installation, then open <strong>Window &gt; Show View &gt; Other… &gt; Timekeeper &gt; Workweek</strong>.</p>
+</html>\n''',encoding="utf-8")
+        print(json.dumps(provenance))
+        return provenance
+    print("No complete verified main p2 artifact is available for the testing channel.")
+    return None
 
 
 def composite(directory, name, children):
@@ -153,6 +239,8 @@ def assemble_site(releases, output, download):
     updates = output / "updates"
     composite(updates, "Timekeeper stable releases", [f"releases/{tag}" for _, _, tag in stable])
     composite(updates / "preview", "Timekeeper prereleases", [f"../releases/{tag}" for _, _, tag in preview])
+    composite(updates / "testing", "Timekeeper tested main builds", [])
+    (updates / "testing/index.html").write_text('<!doctype html><html lang="en"><meta charset="utf-8"><title>Timekeeper testing builds</title><h1>Timekeeper testing builds</h1><p>No complete verified main p2 artifact is available yet. <a href="../">Stable releases</a>.</p></html>\n')
     listing = "\n".join(links) or "<li>No release repositories have been published yet.</li>"
     (updates / "index.html").write_text(f"""<!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -163,6 +251,7 @@ def assemble_site(releases, output, download):
 <p>Select <strong>Timekeeper for Eclipse</strong>. Mylyn users can also select
 <strong>Timekeeper Mylyn integration</strong>. Version 2.0 requires Eclipse 2026-09 and Java 21.</p>
 <p>This address contains stable releases. <a href="preview/">Prereleases</a> are available separately.</p>
+<p>For unreleased 2.0 development builds, use the <a href="testing/">tested main update site</a>.</p>
 <h2>Published repositories</h2><ul>{listing}</ul>
 <p><a href="../">Project documentation</a></p></body></html>
 """, encoding="utf-8")
@@ -216,7 +305,7 @@ def prepare(repo, tag, require_server=False):
         print("Existing release assets will be retained; Pages will verify them before publishing.")
 
 
-def site(repo, output):
+def site(repo, output, include_testing=False):
     pages = json.loads(gh("api", f"repos/{repo}/releases", "--paginate", "--slurp"))
     releases = [release for page in pages for release in page]
 
@@ -224,6 +313,8 @@ def site(repo, output):
         gh("release", "download", release["tag_name"], "--repo", repo, "--pattern", ARCHIVE, "--pattern", CHECKSUM, "--dir", str(assets))
 
     assemble_site(releases, output, download)
+    if include_testing:
+        add_testing_channel(repo, output)
 
 
 def main():
@@ -241,13 +332,14 @@ def main():
     publish = commands.add_parser("site")
     publish.add_argument("--repo", required=True)
     publish.add_argument("--output", required=True, type=Path)
+    publish.add_argument("--include-testing", action="store_true", help="Add a separate channel from a fully verified main Build artifact")
     args = parser.parse_args()
     if args.command == "prepare":
         prepare(args.repo, args.tag, args.require_server)
     elif args.command == "package":
         package(args.repository, args.tag, args.commit, args.output)
     else:
-        site(args.repo, args.output)
+        site(args.repo, args.output, args.include_testing)
 
 
 if __name__ == "__main__":

@@ -36,6 +36,11 @@ See [remote Eclipse acceptance](REMOTE-ECLIPSE.md),
 [remote Mylyn acceptance](REMOTE-MYLYN.md),
 [web acceptance](WEB-CLIENT.md) and [release packaging](RELEASING.md)
 for the installed-client and distribution checks.
+The **Installed client tests** CI job (formerly **Remote-Eclipse**) installs the
+base and optional features in isolated Eclipse runtimes and verifies real
+server/browser interaction, preferences, Mylyn tracking and retained-workspace
+restart. Pages publishes its main p2 build only after the entire Build workflow,
+including this job and the platform matrix, passes.
 
 ## Eclipse import
 

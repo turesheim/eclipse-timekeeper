@@ -88,6 +88,13 @@ rollback mechanism.
 
 ## Installing
 
+For unreleased 2.0 builds, use the [testing update site](https://turesheim.github.io/eclipse-timekeeper/updates/testing/)
+in **Help > Install New Software... > Add...**. It is populated from the
+`p2-repository` artifact only after a complete successful main Build workflow,
+including the platform matrix and installed client tests. The page records the
+tested source, feature version and build identity. This is separate from release
+candidates and stable releases.
+
 Published releases are hosted on GitHub Pages. In **Help > Install New
 Software... > Add...**, use this stable update-site URL:
 

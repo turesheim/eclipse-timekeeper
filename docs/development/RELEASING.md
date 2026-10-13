@@ -32,8 +32,8 @@ from the default branch. The existing project website continues to be built
 with GitHub's Jekyll action; generated p2 repositories are added after Jekyll,
 so binary metadata and JARs are served without transformation.
 
-The **Website and p2 update site** workflow runs after a successful release
-build, on main pushes, on release edits/deletions, and on manual dispatch. It
+The **Website and p2 update site** workflow runs after a successful main Build
+workflow or release build, on main pushes, on release edits/deletions, and on manual dispatch. It
 always checks out the default branch and reconstructs the complete site from
 published release assets. Drafts and historical releases without the new asset
 pair are excluded. Checksums, embedded release identity, feature version and
@@ -44,9 +44,27 @@ Install locations:
 
 | Location | Contents |
 | --- | --- |
+| `https://turesheim.github.io/eclipse-timekeeper/updates/testing/` | Latest available main build that passed the complete platform/server/web/installed-client workflow; unreleased |
 | `https://turesheim.github.io/eclipse-timekeeper/updates/` | All stable releases; p2 selects the newest compatible version |
 | `https://turesheim.github.io/eclipse-timekeeper/updates/preview/` | Published prereleases only |
 | `https://turesheim.github.io/eclipse-timekeeper/updates/releases/<tag>/` | One release's original p2 repository |
+
+The testing channel comes from the successful main workflow's `p2-repository`
+artifact. Pages rejects PR/fork runs and requires all three platform jobs,
+API, Server, Web, Publication and **Installed client tests** to pass. It verifies
+the artifact's run/source identity and GitHub SHA-256 digest, then validates p2
+metadata and every declared plugin/feature file. `timekeeper-build.json` records
+the commit, version, run and artifact checksum. The testing repository has a
+build/artifact-specific path; stable and preview channels remain release-only.
+
+A main push can initially rebuild the website using the preceding successful
+main artifact. When the full new Build workflow succeeds, `workflow_run`
+publishes its artifact. Failed, skipped or PR builds cannot advance testing.
+If no qualifying unexpired artifact exists, its page explains that no testing
+build is available. It does not substitute an unchecked candidate. Action
+artifacts have finite retention; rerun main Build to repopulate an expired test
+channel. Publishing tested main builds does not publish a GitHub release or
+complete final release acceptance.
 
 The channels are p2 composite repositories pointing to retained release
 directories. New prereleases cannot update the stable channel. Promoting a
@@ -99,7 +117,7 @@ python3 scripts/p2_release.py package \
 
 The packaging command validates an existing build; run the normal clean
 `./mvnw ... verify` first to create it. With authenticated `gh` available,
-`python3 scripts/p2_release.py site --repo turesheim/eclipse-timekeeper --output /tmp/timekeeper-site`
+`python3 scripts/p2_release.py site --repo turesheim/eclipse-timekeeper --output /tmp/timekeeper-site --include-testing`
 reconstructs the update repositories locally without uploading or publishing.
 
 The workflow uses GitHub's [custom Pages deployment](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
