@@ -4,6 +4,15 @@ Reviewed September 22, 2026 against Eclipse Platform 4.41, Mylyn 4.12,
 Temurin 21.0.12.1 and macOS aarch64. The current `main` commit was
 `6f0cf237a15a8271fa578892521c18183dac9558`.
 
+## October 13 maintainer decision
+
+The maintainer deferred [#243](https://github.com/turesheim/eclipse-timekeeper/issues/243)
+beyond 2.0. It remains open, but has been removed from the 2.0 milestone and no
+longer blocks that release. The known optional-Mylyn tooltip parser error is an
+accepted exception for 2.0, not a fixed dependency or a clean Mylyn Error Log.
+Timekeeper continues to use released, unmodified Mylyn. Upstream submission and
+official-fix acceptance remain future work.
+
 ## October 11 installed-package recheck
 
 The Mylyn theme-parser finding was reproduced in a fresh Eclipse Platform
@@ -13,8 +22,9 @@ and JiraConnector `6.0.0.202605160149`. Opening Task List logged the same
 `GradientToolTip` during `TaskListToolTip` creation. The clean workspace log is
 retained locally at
 `/private/tmp/timekeeper-2-release-runtime/jira/workspace/.metadata/.log`.
-It remains an open dependency-error acceptance gate for the optional
-integration; successful p2 resolution and automated tests do not close it.
+It was an open dependency-error acceptance gate for the optional integration
+at this checkpoint. The October 13 decision above defers it; successful p2
+resolution and automated tests do not establish a fix.
 
 The base feature installed and opened Workweek without Mylyn. The optional
 installation additionally exposed headless service activation and a connecting
@@ -45,7 +55,7 @@ recorded in [HEADLESS-PROVISIONING.md](HEADLESS-PROVISIONING.md).
 
 | Entry | Classification | Disposition |
 | --- | --- | --- |
-| `org.eclipse.mylyn.commons.ui`: `NumberFormatException: For input string: "or" under radix 16` | Installed dependency error, reproduced when Task List creates its tooltip colors | **Open release blocker.** Workweek remains usable, but dependency-error acceptance is not clean. |
+| `org.eclipse.mylyn.commons.ui`: `NumberFormatException: For input string: "or" under radix 16` | Installed dependency error, reproduced when Task List creates its tooltip colors | **Deferred beyond 2.0** by the maintainer on October 13; #243 remains open. Workweek remains usable, but dependency-error acceptance is not clean. |
 | `StringFieldEditor.doStore()`: null `textField` from the Timekeeper database preference page | Historical Timekeeper error | Fixed by PR #202. The SWTBot preference test now visits the page and uses **Apply and Close**; it passed in the current build. |
 | Null `lastActiveTime` during interrupted-activity cleanup | Historical Timekeeper error | Fixed by PR #206 and covered by the current idle/recovery tests. |
 | `No search provider was registered` from Mylyn Tasks | Historical packaging error | Fixed by PR #197, which installs the complete Mylyn Tasks feature. It is absent from the corrected installed sessions. |
@@ -54,7 +64,7 @@ recorded in [HEADLESS-PROVISIONING.md](HEADLESS-PROVISIONING.md).
 | p2 version conflict before the tested uninstall/install transaction | Expected negative provisioning scenario | The corrected atomic transaction succeeded; the director recorded severity-zero satisfiable requests. |
 | EclipseLink deprecated password-encryption warning | Dependency console warning, not an Eclipse Error Log entry | Triggered by the synthetic H2 `sa`/empty-password configuration. Removing the redundant empty password property did not suppress it, so no ineffective configuration change was retained. |
 
-## Remaining Mylyn blocker
+## Deferred Mylyn follow-up
 
 Mylyn's `E4ThemeColor.getRGBFromCssString` accepts literal `rgb(...)` and hex
 values. Eclipse 4.41 can instead return a symbolic CSS color beginning with
@@ -65,8 +75,8 @@ still present on Mylyn's official `main` at commit
 
 There is no released or current upstream replacement to select in the target
 platform. Timekeeper should not fork the Mylyn bundle or override workbench-wide
-theme CSS merely to hide the entry. Acceptance therefore remains open until an
-upstream fix can be consumed. After that update, rebuild the p2 repository,
+theme CSS merely to hide the entry. The dependency issue remains open until an
+upstream fix can be consumed, without blocking 2.0. After that update, rebuild the p2 repository,
 install it in a clean Eclipse 4.41, open both Workweek and Task List, exercise a
 tooltip, and verify that the fresh workspace Error Log contains no Timekeeper or
 dependency errors.
@@ -74,8 +84,7 @@ dependency errors.
 ## Decision
 
 The Error Log has been inspected and all Timekeeper-owned findings are either
-fixed and regression-tested or belong to deliberate negative scenarios. Step 6
-is nevertheless **blocked**, because the installed Mylyn theme-parser error does
-not meet the plan's completion criterion of operation without dependency
-errors. The remaining release-documentation work can proceed independently,
-but the Error Log checkbox and final publication approval must stay open.
+fixed and regression-tested or belong to deliberate negative scenarios. The
+original clean-dependency criterion is not met for optional Mylyn; the maintainer
+accepted the documented #243 exception for 2.0 on October 13. Final tagged-build
+and public-installation acceptance still require their own evidence.

@@ -1,10 +1,11 @@
 import {Api, ApiError} from './api.js';
-import {addDays, dateInZone, dayStart, durationText, instantText, instantNanos, weekRange} from './model.js';
+import {addDays, dateInZone, dayStart, durationText, instantText, instantNanos, weekRange, taskPresentation, activityDayNanos, nanosText, workweekGroups} from './model.js';
 
 const $ = id => document.getElementById(id);
 let api = null, snapshot = null, connected = false, refreshing = null, reloadAgain = false;
 let editor = null, selectedActivity = null, selectedDay = null;
 let watchSession = null;
+const collapsed = new Set();
 function startWatch(session) {
   if (watchSession === session) return;
   watchSession = session;
@@ -49,6 +50,7 @@ $('login-form').addEventListener('submit', async event => {
 });
 $('sign-out').addEventListener('click', () => {
   api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null;
+  collapsed.clear();
   $('editor').close(); $('fields').replaceChildren(); $('token').value = '';
   $('login').hidden = false; $('workspace').hidden = true; $('session').hidden = true;
   for (const id of ['projects', 'tasks', 'labels', 'activities', 'days']) $(id).replaceChildren();
@@ -109,23 +111,30 @@ function table(container, headings, rows) {
   for (const row of rows) tbody.append(row); root.append(node);
 }
 function row(values, actions = []) {
-  const node = element('tr'); for (const value of values) node.append(element('td', value));
+  const node = element('tr'); for (const value of values) { const cell = element('td'); cell.append(value instanceof Node ? value : document.createTextNode(value)); node.append(cell); }
   const cell = element('td', undefined, 'actions'); for (const action of actions) cell.append(action); node.append(cell); return node;
 }
 function action(text, operation) {
   const node = button(text, () => { void operation().catch(error => setStatus(errorText(error))); }); node.disabled = !connected; return node;
 }
-function name(list, id, field = 'name') { return list.find(v => v.id === id)?.[field] ?? 'Unassigned'; }
+function name(list, id, field = 'name') { const value = list.find(v => v.id === id); return value && field === 'summary' ? taskPresentation(value).title : value?.[field] ?? 'Unassigned'; }
+function taskLabel(task) {
+  if (!task) return element('span', 'Unassigned');
+  const {title, url} = taskPresentation(task), node = element(url ? 'a' : 'span', title, 'task-title');
+  node.dataset.taskId = task.id;
+  if (url) { node.href = url; node.target = '_blank'; node.rel = 'noopener noreferrer'; }
+  return node;
+}
 function render() {
   const s = snapshot, zone = s.profile.data.zoneId;
   $('owner').textContent = s.profile.data.ownerId;
   $('zone-caption').textContent = `${s.dates.first} – ${addDays(s.dates.first, 6)} · ${zone}`;
   const active = s.active.data;
-  $('active-title').textContent = active ? name(s.tasks, active.taskId, 'summary') : 'Ready when you are';
+  $('active-title').replaceChildren(active ? taskLabel(s.tasks.find(task => task.id === active.taskId)) : document.createTextNode('Ready when you are'));
   $('active-details').textContent = active ? `Started ${instantText(active.start, zone)} · ${active.summary || 'Tracking time'}` : 'Choose a task below to start tracking.';
   $('stop').hidden = !active; readOnlyWhileDisconnected();
   table('projects', ['Name', 'Actions'], s.projects.map(value => row([value.name], [action('Edit', () => openRecord('projects', value.id)), action('Delete', () => openDelete('projects', value.id))])));
-  table('tasks', ['Task', 'Project', 'Parent', 'Actions'], s.tasks.map(value => row([value.summary, name(s.projects, value.projectId), value.parentTaskId ? name(s.tasks, value.parentTaskId, 'summary') : '—'], [action('Start', () => openStart(value.id)), action('Edit', () => openRecord('tasks', value.id)), action('Delete', () => openDelete('tasks', value.id))])));
+  table('tasks', ['Task', 'Project', 'Parent', 'Actions'], s.tasks.map(value => row([taskLabel(value), name(s.projects, value.projectId), value.parentTaskId ? name(s.tasks, value.parentTaskId, 'summary') : '—'], [action('Start', () => openStart(value.id)), action('Edit', () => openRecord('tasks', value.id)), action('Delete', () => openDelete('tasks', value.id))])));
   table('labels', ['Name', 'Color', 'Actions'], s.labels.map(value => row([value.name, value.color || '—'], [action('Edit', () => openRecord('labels', value.id)), action('Delete', () => openDelete('labels', value.id))])));
   $('week-total').textContent = durationText(s.report.total); $('days').replaceChildren();
   for (let index = 0; index < 7; index++) {
@@ -137,15 +146,50 @@ function render() {
     card.append(pick); $('days').append(card);
   }
   $('activities-heading').textContent = selectedDay ? `Activities — ${selectedDay}` : 'Activities';
-  const activities = s.activities.filter(value => !selectedDay || (instantNanos(value.start) < instantNanos(dayStart(addDays(selectedDay, 1), zone)) && (!value.end || instantNanos(value.end) > instantNanos(dayStart(selectedDay, zone)))));
-  table('activities', ['Activity', 'Task', 'Start', 'End', 'Labels', 'Actions'], activities.map(value => {
-    const node = row([value.summary || 'Activity', name(s.tasks, value.taskId, 'summary'), instantText(value.start, zone), instantText(value.end, zone), value.labelIds.map(id => name(s.labels, id)).join(', ') || '—'], [action('Edit', () => openRecord('activities', value.id)), action('Delete', () => openDelete('activities', value.id))]);
+  renderWorkweek(s, zone);
+}
+function renderWorkweek(s, zone) {
+  const dates = Array.from({length: 7}, (_, index) => addDays(s.dates.first, index));
+  const visible = value => !selectedDay || (instantNanos(value.start) < instantNanos(dayStart(addDays(selectedDay, 1), zone)) && (!value.end || instantNanos(value.end) > instantNanos(dayStart(selectedDay, zone))));
+  const allActivities = node => [...node.activities, ...node.children.flatMap(allActivities)];
+  const totals = activities => dates.map(date => { const value = activities.reduce((sum, activity) => sum + activityDayNanos(activity, date, zone, s.report.generatedAt), 0n); return value ? nanosText(value) : '—'; });
+  const titleCell = (content, level, key, title) => {
+    const node = element('div', undefined, 'tree-title'); node.style.setProperty('--level', level);
+    if (key) {
+      const toggle = button(collapsed.has(key) ? '▸' : '▾', () => { if (collapsed.has(key)) collapsed.delete(key); else collapsed.add(key); render(); });
+      toggle.className = 'tree-toggle'; toggle.setAttribute('aria-label', `${collapsed.has(key) ? 'Expand' : 'Collapse'} ${title}`); toggle.setAttribute('aria-expanded', String(!collapsed.has(key))); node.append(toggle);
+    } else node.append(element('span', '◷', 'activity-icon'));
+    node.append(content); return node;
+  };
+  const rows = [];
+  const addActivity = (value, level) => {
+    const title = element('span', undefined, 'activity-title'); title.append(element('span', value.summary || 'Activity'), element('small', `${instantText(value.start, zone)} → ${instantText(value.end, zone)}`));
+    const node = row([titleCell(title, level), ...totals([value]), value.labelIds.map(id => name(s.labels, id)).join(', ') || '—'], [action('Edit', () => openRecord('activities', value.id)), action('Delete', () => openDelete('activities', value.id))]);
+    node.dataset.kind = 'activity'; node.dataset.activityId = value.id; node.dataset.taskId = value.taskId;
+    if (s.active.data?.id === value.id) node.classList.add('active-activity');
     node.tabIndex = 0; node.setAttribute('aria-selected', String(selectedActivity === value.id));
     const select = () => { selectedActivity = value.id; for (const item of $('activities').querySelectorAll('tr[aria-selected]')) item.setAttribute('aria-selected', String(item === node)); };
-    node.addEventListener('click', event => { if (event.target.closest('button')) return; if (selectedActivity === value.id && connected) void openRecord('activities', value.id).catch(error => setStatus(errorText(error))); else select(); });
+    node.addEventListener('click', event => { if (event.target.closest('button,a')) return; if (selectedActivity === value.id && connected) void openRecord('activities', value.id).catch(error => setStatus(errorText(error))); else select(); });
     node.addEventListener('keydown', event => { if (event.key !== 'Enter' || event.target !== node) return; event.preventDefault(); if (selectedActivity === value.id && connected) void openRecord('activities', value.id).catch(error => setStatus(errorText(error))); else select(); });
-    return node;
-  }));
+    rows.push(node);
+  };
+  const addTask = (node, level) => {
+    const activities = allActivities(node); if (!activities.some(visible)) return;
+    const key = `task:${node.task.id}`, title = taskPresentation(node.task).title;
+    const taskRow = row([titleCell(taskLabel(node.task), level, key, title), ...totals(activities), ''], [action('Start', () => openStart(node.task.id)), action('Edit task', () => openRecord('tasks', node.task.id))]);
+    taskRow.dataset.kind = 'task'; rows.push(taskRow);
+    if (!collapsed.has(key)) { for (const child of node.children) addTask(child, level + 1); for (const value of node.activities.filter(visible)) addActivity(value, level + 1); }
+  };
+  for (const group of workweekGroups(s.tasks, s.projects, s.activities)) {
+    const activities = group.tasks.flatMap(allActivities); if (!activities.some(visible)) continue;
+    const key = `project:${group.id}`;
+    const projectRow = row([titleCell(element('span', group.name), 0, key, group.name), ...totals(activities), '']);
+    projectRow.dataset.kind = 'project'; rows.push(projectRow);
+    if (!collapsed.has(key)) for (const node of group.tasks) addTask(node, 1);
+  }
+  const headings = dates.map(date => new Intl.DateTimeFormat(undefined, {weekday: 'short', day: 'numeric', timeZone: 'UTC'}).format(new Date(`${date}T12:00:00Z`)));
+  table('activities', ['Activity', ...headings, 'Labels', 'Actions'], rows);
+  $('activities').querySelector('table')?.classList.add('workweek-table');
 }
 function field(labelText, key, value = '', options = {}) {
   const label = element('label', labelText), input = element(options.choices ? 'select' : 'input'); input.name = key;
@@ -179,11 +223,11 @@ async function openRecord(collection, id = null) {
   if (collection === 'tasks') {
     field('Summary', 'summary', value.summary, {required: true, max: 1000});
     field('Project', 'projectId', value.projectId, {choices: [['', 'Unassigned'], ...snapshot.projects.map(v => [v.id, v.name])]});
-    field('Parent task', 'parentTaskId', value.parentTaskId, {choices: [['', 'No parent'], ...snapshot.tasks.filter(v => v.id !== id).map(v => [v.id, v.summary])]});
+    field('Parent task', 'parentTaskId', value.parentTaskId, {choices: [['', 'No parent'], ...snapshot.tasks.filter(v => v.id !== id).map(v => [v.id, taskPresentation(v).title])]});
     field('URL (optional)', 'url', value.url, {type: 'url', max: 4096});
   }
   if (collection === 'activities') {
-    const task = field('Task', 'taskId', value.taskId, {required: true, choices: [['', 'Choose task'], ...snapshot.tasks.map(v => [v.id, v.summary])]}); task.disabled = !!id;
+    const task = field('Task', 'taskId', value.taskId, {required: true, choices: [['', 'Choose task'], ...snapshot.tasks.map(v => [v.id, taskPresentation(v).title])]}); task.disabled = !!id;
     field('Summary', 'summary', value.summary, {max: 2000});
     field('Start (UTC)', 'start', value.start || new Date().toISOString(), {required: true, hint: `UTC timestamp, e.g. 2026-10-13T08:30:00Z. Your reports use ${snapshot.profile.data.zoneId}. Up to nine fractional digits are preserved.`});
     field('End (UTC, blank while tracking)', 'end', value.end); labelFields(value.labelIds);
@@ -198,7 +242,7 @@ async function openDelete(collection, id) {
 }
 async function openStart(id) {
   if (!begin('Start tracking', {command: 'start', key: crypto.randomUUID(), expected: snapshot.active.data})) return;
-  field('Task', 'taskId', id, {required: true, choices: snapshot.tasks.map(v => [v.id, v.summary])});
+  field('Task', 'taskId', id, {required: true, choices: snapshot.tasks.map(v => [v.id, taskPresentation(v).title])});
   field('Summary', 'summary', '', {max: 2000}); labelFields(); $('save').textContent = 'Start';
   if (snapshot.active.data) $('editor-notice').textContent = 'Starting this task stops the current activity.'; showEditor();
 }

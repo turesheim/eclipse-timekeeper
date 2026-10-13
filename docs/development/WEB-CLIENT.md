@@ -15,7 +15,13 @@ explicit retry of the same frozen payload/key. Acknowledged saves remain
 successful when a subsequent refresh fails.
 
 Reports use the account's IANA time zone and the server's exact daily/weekly
-totals. UTC activity fields retain up to nine fractional digits. First click
+totals. The default Workweek groups projects, tasks, subtasks and activities,
+with seven daily duration columns and expandable rows like the Eclipse view.
+Daily and weekly summaries show whole seconds; stored times and calculations
+retain nanoseconds. Linked task titles include their external ID (the Jira browse
+key or GitHub issue number when available) and open the recorded HTTP/HTTPS issue
+URL in a separate tab. Native task UUIDs are not display IDs.
+UTC activity fields retain up to nine fractional digits. First click
 selects an activity; another click or Enter while selected opens its editor.
 Long polling loads consistent owner-scoped snapshots without replacing drafts.
 Offline reads reconnect with backoff and never replay writes. Sessions bind to
@@ -41,7 +47,8 @@ Remote-Eclipse.
 
 Browser tests cover core tracking, authorization/validation, peer synchronization,
 stale drafts, lost committed replies, exact nanoseconds, autumn DST, mobile
-layout and memory-only credentials. The `remote-client-tests` Eclipse profile
+layout, expandable project/task hierarchy, external issue links and memory-only
+credentials. The `remote-client-tests` Eclipse profile
 also launches a real browser peer against its installed runtime's server;
 [WEB-ECLIPSE.md](../verification/WEB-ECLIPSE.md) records that bidirectional verification.
 Final release installation remains a separate gate.

@@ -570,8 +570,14 @@ public class WorkWeekView extends ViewPart {
 
 	private void deactivateTask(Task task) {
 		var plugin = TimekeeperUiPlugin.getDefault();
-		plugin.getTaskIntegration().filter(integration -> integration.isLinked(task))
-				.ifPresent(integration -> integration.deactivate(task.id()));
+		var activeIntegration = plugin.getTaskIntegration()
+				.filter(integration -> integration.isLinked(task) && integration.isActive(task));
+		if (activeIntegration.isPresent()) {
+			// The provider's deactivation listener owns the stop command. A second
+			// command captured from the UI snapshot would retain its old version.
+			activeIntegration.orElseThrow().deactivate(task.id());
+			return;
+		}
         plugin.getTimekeeperService().activeActivity(OwnerId.LOCAL).filter(activity -> activity.taskId().equals(task.id()))
                 .ifPresent(activity -> perform(()->plugin.getTimekeeperService().stopActivity(new StopActivity(activity.id(),activity.version()))));
 	}
