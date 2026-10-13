@@ -8,7 +8,8 @@ Documentation is grouped by responsibility:
 
 - Architecture: [data model](architecture/DATA-MODEL.md) and [API v1](architecture/API-V1.md).
 - Operations: [server](operations/SERVER.md), [local Docker setup](operations/LOCAL-DOCKER.md),
-  [deployment](operations/DEPLOYMENT.md) and [database recovery](operations/DATABASE-RECOVERY.md).
+  [Eclipse connection](operations/ECLIPSE-CLIENT.md), [deployment](operations/DEPLOYMENT.md)
+  and [database recovery](operations/DATABASE-RECOVERY.md).
 - Development: [repository layout](development/REPOSITORY.md),
   [web client](development/WEB-CLIENT.md), [release process](development/RELEASING.md),
   [change history](development/CHANGES.md) and [dated upgrade plan](development/UPGRADE-PLAN.md).
@@ -58,6 +59,9 @@ The server supports the remote Eclipse client and includes a browser client at
 `/web/`. See the [local Docker setup guide](operations/LOCAL-DOCKER.md) to run both
 against the same server. Final release acceptance remains required before 2.0
 publication.
+The [client/server acceptance report](verification/CLIENT-SERVER-ACCEPTANCE.md)
+maps #187's requirements to inspected merged-main server, browser and installed
+Eclipse evidence, including synchronization and interrupted-operation recovery.
 
 ## Database configuration
 

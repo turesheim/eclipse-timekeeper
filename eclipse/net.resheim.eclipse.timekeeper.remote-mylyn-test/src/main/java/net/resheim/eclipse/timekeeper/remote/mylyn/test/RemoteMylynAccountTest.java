@@ -30,7 +30,7 @@ public class RemoteMylynAccountTest {
             var history=original.activity(new ActivityId(UUID.fromString(RemoteBootstrap.receipt().getProperty("mylyn.original")))).orElseThrow();
             var successor=original.activity(new ActivityId(UUID.fromString(RemoteBootstrap.receipt().getProperty("mylyn.successor")))).orElseThrow();
             assertTrue("Eclipse retained tasks from account A",RemoteTestSupport.onUi(()->TimekeeperUiPlugin.getDefault().getTimekeeperService().tasks().isEmpty()));
-            var initial=api.metadata();assertTrue(initial.projects().isEmpty());assertTrue(initial.tasks().isEmpty());assertTrue(initial.labels().isEmpty());assertTrue(initial.active().isEmpty());
+            var initial=api.metadata();assertTrue(initial.projects().isEmpty());assertTrue(initial.tasks().isEmpty());assertEquals(net.resheim.eclipse.timekeeper.domain.DefaultLabels.definitions().size(),initial.labels().size());assertTrue(initial.active().isEmpty());
             RemoteTestSupport.waitFor(()->MylynIntegration.getDefault()!=null && TimekeeperUiPlugin.getDefault().getTaskIntegration().isPresent(),"Account B Mylyn integration did not start");
             var foreign=org.eclipse.mylyn.internal.tasks.ui.TasksUiPlugin.getTaskList().getAllTasks().stream()
                 .filter(task->RemoteBootstrap.receipt().getProperty("mylyn.marker").equals(task.getAttribute("timekeeper.remote.restart-marker"))).findFirst().orElseThrow();

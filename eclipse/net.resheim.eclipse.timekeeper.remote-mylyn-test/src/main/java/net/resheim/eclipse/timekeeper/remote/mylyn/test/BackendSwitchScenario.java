@@ -46,7 +46,7 @@ final class BackendSwitchScenario {
         assertServersUnchanged();
         try(var api=selected();var primary=primaryB()) {
             var initial=api.metadata();assertTrue(initial.projects().isEmpty());assertTrue(initial.tasks().isEmpty());
-            assertTrue(initial.labels().isEmpty());assertTrue(initial.active().isEmpty());
+            assertEquals(net.resheim.eclipse.timekeeper.domain.DefaultLabels.definitions().size(),initial.labels().size());assertTrue(initial.active().isEmpty());
             assertForeign("primary",primary.task(taskId("switch.primary.task")).orElseThrow());
             assertEquals(initial,api.metadata());
             var task=createThroughWorkweek();assertNotEquals(taskId("switch.primary.task"),task.id());

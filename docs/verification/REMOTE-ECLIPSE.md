@@ -460,7 +460,11 @@ Uncertain create/start/stop/import/delete outcomes and the remaining editor,
 backend-switch and preference flows remain open. It does not imply those cases
 are solved by optimistic task-update protection.
 
-## Remaining before #220 can be completed
+## Remaining at this historical checkpoint
+
+The October 13 [client/server acceptance report](CLIENT-SERVER-ACCEPTANCE.md)
+records the merged-main result and the later installed evidence that supersedes
+this list. The items below retain their status at this report's checkpoint.
 
 - Verify the server CSV preference-page flow in the installed Eclipse runtime,
   including cancellation, restart after a lost response and unchanged local
