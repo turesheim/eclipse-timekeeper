@@ -238,6 +238,46 @@ SynoCommunity inclusion remains subject to upstream acceptance.
 The catalog fields follow the [SynoCommunity NAS catalog implementation](https://github.com/SynoCommunity/spkrepo/blob/main/spkrepo/domain/catalog.py)
 and its [repository setup guide](https://docs.synocommunity.com/developer-guide/publishing/package-server/).
 
+## Pages package sources
+
+The Pages workflow assembles separate DSM channels alongside the documentation
+and Eclipse update sites. It reacts to both the main build matrix and Server
+containers, and to release publication workflows. These source URLs become
+available **after the Pages changes are merged and deployed**:
+
+- Stable: `https://turesheim.github.io/eclipse-timekeeper/synology/stable/r1000/catalog.json`
+- Preview: `https://turesheim.github.io/eclipse-timekeeper/synology/preview/r1000/catalog.json`
+
+Use the complete JSON URL in **Package Center → Settings → Package Sources**.
+The landing page at `/synology/` and `channels.json` describe which channels have
+a package. An unavailable channel has an empty package list; it does not advertise
+an untested package as a stable release. Configure the separate SynoCommunity
+source for the PostgreSQL dependency.
+
+Stable metadata is reconstructed from the complete published distribution and
+its operator acceptance report. The catalog links to the immutable GitHub release
+SPK; icons, checksums and provenance are published in Pages. A partial upload,
+missing report or mismatched source/checksum cannot create a stable entry.
+
+Preview publication defaults to **off**. After the first successful manual NAS
+installation, an operator may set the repository Actions variable
+`SYNOLOGY_PREVIEW_ENABLED=true` and run the Website and p2 update site workflow.
+The preview channel is for subsequent NAS acceptance testing; a green CI run
+alone does not establish real-NAS compatibility for each new candidate.
+Only successful main Server containers artifacts with a complete matching build
+matrix are eligible. PR/fork artifacts are excluded. The binary commit must be
+an ancestor of the current website source, so a documentation-only change can
+reuse a tested candidate. Expired or absent artifacts cannot supply a package;
+downloaded artifact and package hashes are checked before copying files.
+
+Turning the variable off and deploying Pages withdraws the preview entry. Site
+assembly clears the previous generated channels before reconstructing them, so
+a missing artifact or removed release cannot leave an obsolete catalog behind.
+This tooling does not itself enable the repository variable or configure DSM.
+Actual source discovery and upgrade must still pass on the NAS. Pages is a
+candidate host for GET clients; if this DSM requires POST, use a repository
+service and keep the static source disabled.
+
 ## Promoting a NAS-tested package
 
 Keep the downloaded candidate SPK and its adjacent provenance JSON together. To

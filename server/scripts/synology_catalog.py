@@ -15,16 +15,22 @@ from synology_acceptance import RECORD
 from validate_synology import validate
 
 
-def entry(version,base_url,size,md5):
+def entry(version,base_url,size,md5,package_url=None):
     if not re.fullmatch(r'(1\.99\.0|2\.0\.0)-[1-9][0-9]*',version):
         raise ValueError('Use a preview or stable DSM package version')
     channel='preview' if version.startswith('1.99.0-') else 'stable'
     url=urlsplit(base_url)
     if url.scheme!='https' or not url.netloc or url.username or url.password or url.query or url.fragment or not url.path.endswith('/'+channel+'/r1000/'):
         raise ValueError('Use a public HTTPS '+channel+'/r1000/ catalog directory without credentials, query or fragment')
+    filename='timekeeper-'+version+'-r1000.spk'
+    if package_url is not None:
+        download=urlsplit(package_url)
+        if (channel!='stable' or download.scheme!='https' or not download.netloc or download.username or
+            download.password or download.query or download.fragment or not download.path.endswith('/'+filename)):
+            raise ValueError('Only stable catalogs may link to an immutable HTTPS release SPK')
     return {'package':'timekeeper','version':version,'dname':'Timekeeper (preview)' if channel=='preview' else 'Timekeeper',
             'desc':'Timekeeper for DS923+ / r1000. Requires Container Manager and SynoCommunity PostgreSQL 17.',
-            'link':base_url+'timekeeper-'+version+'-r1000.spk',
+            'link':package_url or base_url+filename,
             'thumbnail':[base_url+'timekeeper-64.png'],
             'thumbnail_retina':[base_url+'timekeeper-256.png']*2,
             'qinst':False,'qupgrade':False,'qstart':False,'startable':'yes',
@@ -34,7 +40,7 @@ def entry(version,base_url,size,md5):
             'md5':md5,'size':size}
 
 
-def build(package,base_url):
+def build(package,base_url,package_url=None):
     package=Path(package).resolve()
     checked=validate(package)
     provenance=json.loads(package.with_suffix('.json').read_text())
@@ -43,7 +49,7 @@ def build(package,base_url):
     if package.name!=expected_name or provenance.get('channel')!=channel or provenance.get('commit')!=checked['sourceCommit'] or provenance.get('sha256')!=checked['sha256'] or provenance.get('imageId')!=checked['imageId']:
         raise ValueError('Catalog must match the verified package provenance')
     with package.open('rb') as source:md5=hashlib.file_digest(source,'md5').hexdigest()
-    result={'packages':[entry(checked['version'],base_url,package.stat().st_size,md5)]}
+    result={'packages':[entry(checked['version'],base_url,package.stat().st_size,md5,package_url)]}
     with tarfile.open(package) as source:
         if channel=='stable':
             receipt=source.extractfile(RECORD).read()
@@ -63,5 +69,6 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--package',required=True,type=Path)
     parser.add_argument('--base-url',required=True)
+    parser.add_argument('--package-url',help='Immutable public release SPK URL (stable only)')
     args=parser.parse_args()
-    print(build(args.package,args.base_url))
+    print(build(args.package,args.base_url,args.package_url))

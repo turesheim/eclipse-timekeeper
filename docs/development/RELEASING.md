@@ -32,8 +32,9 @@ from the default branch. The existing project website continues to be built
 with GitHub's Jekyll action; generated p2 repositories are added after Jekyll,
 so binary metadata and JARs are served without transformation.
 
-The **Website and p2 update site** workflow runs after a successful main Build
-workflow or release build, on release edits/deletions, and on manual dispatch. It
+The **Website and p2 update site** workflow runs after successful main Build and
+Server containers workflows, p2/server and Synology release workflows, release
+edits/deletions, and manual dispatch. It
 always checks out the default branch. After a main Build it fetches that run's
 prepared site; other triggers reconstruct the site from published release
 assets and the latest qualifying main build. Drafts and historical releases without the new asset
@@ -78,7 +79,8 @@ jobs are skipped. Only the small packaging/channel tests and website assembly
 run. Documentation publication reuses the latest available fully tested main
 p2 artifact and released channels; it does not create or promote new binaries.
 The site receipt records the new documentation commit/run separately from the
-retained p2 commit/run. Pages still deploys the exact prepared site artifact.
+retained p2 commit/run. Pages retains that prepared documentation and p2 content,
+then appends separately verified Synology distribution channels.
 Tags, manually dispatched container builds, mixed code/documentation changes,
 workflow changes and unavailable diff history retain full validation.
 
@@ -137,11 +139,25 @@ site** on main. No personal access token or separate hosting secret is required:
 the release job uses `contents: write`; Pages deployment uses `pages: write`
 and `id-token: write` through the repository's `GITHUB_TOKEN`.
 
+## Synology distribution
+
+Synology release packaging uses a separate **Release Synology distribution**
+workflow. It promotes the exact main candidate tested on the NAS, requires the
+complete matching matrix/container runs and operator acceptance report, and
+attaches the SPK/checksum/provenance/publication evidence without rebuilding.
+Pages validates those release assets before creating a stable DSM catalog. The
+preview DSM catalog is disabled until an operator enables
+`SYNOLOGY_PREVIEW_ENABLED` after manual NAS installation; it can then use only
+verified main candidates with a matching full matrix. These channels do not
+change Eclipse's p2 channel selection. See the [Synology distribution guide](../operations/SYNOLOGY-PACKAGE.md)
+for exact source URLs, manual acceptance, release inputs and the remaining real
+DSM discovery checks. No automatic publication substitutes for those checks.
+
 ## Local verification
 
 ```sh
 python3 -m unittest discover -s scripts/tests -v
-actionlint .github/workflows/build.yml .github/workflows/release-p2.yml .github/workflows/pages.yml
+actionlint .github/workflows/build.yml .github/workflows/release-p2.yml .github/workflows/release-synology.yml .github/workflows/pages.yml
 python3 scripts/p2_release.py package \
   --repository eclipse/net.resheim.eclipse.timekeeper-site/target/repository \
   --tag v2.0.0 --commit "$(git rev-parse HEAD)" --output /tmp/timekeeper-release

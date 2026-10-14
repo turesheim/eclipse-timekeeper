@@ -18,3 +18,11 @@ class SynologyCatalogTest(unittest.TestCase):
                     'http://example.invalid/synology/preview/r1000/','https://secret:password@example.invalid/preview/r1000/',
                     'https://example.invalid/preview/r1000/?token=secret'):
             with self.subTest(url=url),self.assertRaises(ValueError):entry('1.99.0-42',url,12345,'a'*32)
+
+    def test_only_stable_catalog_can_link_to_an_immutable_https_release_package(self):
+        url='https://github.com/example/timekeeper/releases/download/v2.0.0/timekeeper-2.0.0-42-r1000.spk'
+        base='https://example.invalid/synology/stable/r1000/'
+        self.assertEqual(url,entry('2.0.0-42',base,12345,'a'*32,url)['link'])
+        for invalid in (url.replace('https:', 'http:'),url+'?token=secret',url.replace('2.0.0-42-r1000.spk','2.0.0-43-r1000.spk')):
+            with self.subTest(url=invalid),self.assertRaises(ValueError):entry('2.0.0-42',base,12345,'a'*32,invalid)
+        with self.assertRaises(ValueError):entry('1.99.0-42','https://example.invalid/synology/preview/r1000/',12345,'a'*32,url)

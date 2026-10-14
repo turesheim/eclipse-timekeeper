@@ -23,6 +23,10 @@ MATRIX_JOBS = {'API-contract', 'Server', 'Web', 'Build (ubuntu-latest)',
                'Build website and update site'}
 
 
+class CandidateUnavailable(ValueError):
+    """A successful run's candidate is absent or has expired."""
+
+
 def api(repo, path):
     return json.loads(gh('api', f'repos/{repo}' + ('/' + path if path else '')))
 
@@ -58,9 +62,13 @@ def trusted_run(run, repo, branch, commit, workflow):
             and run.get('path') == '.github/workflows/' + workflow)
 
 
-def require_jobs(repo, run_id, required):
+def passed_jobs(repo, run_id):
     jobs = pages(repo, f'actions/runs/{run_id}/jobs?per_page=100', 'jobs')
-    passed = {job['name'] for job in jobs if job.get('status') == 'completed' and job.get('conclusion') == 'success'}
+    return {job['name'] for job in jobs if job.get('status') == 'completed' and job.get('conclusion') == 'success'}
+
+
+def require_jobs(repo, run_id, required):
+    passed = passed_jobs(repo, run_id)
     if not required.issubset(passed):
         raise ValueError('Required jobs did not pass: ' + ', '.join(sorted(required - passed)))
 
@@ -72,8 +80,10 @@ def candidate_artifact(repo, run_id, branch, commit):
     require_jobs(repo, run_id, {'verify', 'Synology candidate and PostgreSQL 17'})
     found = [artifact for artifact in pages(repo, f'actions/runs/{run_id}/artifacts?per_page=100', 'artifacts')
              if artifact['name'] == 'synology-preview-candidate' and not artifact['expired']]
+    if not found:
+        raise CandidateUnavailable('A unique, unexpired Synology candidate artifact is required')
     if len(found) != 1:
-        raise ValueError('A unique, unexpired Synology candidate artifact is required')
+        raise ValueError('Ambiguous Synology candidate artifacts')
     artifact = found[0]
     source = artifact.get('workflow_run', {})
     if source.get('id') != run_id or source.get('head_sha') != commit or source.get('head_branch') != branch:
