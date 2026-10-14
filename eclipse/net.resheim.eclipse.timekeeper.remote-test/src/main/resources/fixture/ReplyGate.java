@@ -50,7 +50,7 @@ public class ReplyGate {
                     return;
                 }
                 var request=HttpRequest.newBuilder(URI.create(upstream+exchange.getRequestURI().toASCIIString())).timeout(Duration.ofSeconds(30));
-                for(String header:Set.of("Authorization","Accept","Content-Type","If-Match","Idempotency-Key","X-Timekeeper-Owner")) {
+                for(String header:Set.of("Authorization","Accept","Content-Type","If-Match","Idempotency-Key","X-Timekeeper-Owner","Cookie","X-CSRF-Token","Origin")) {
                     String value=exchange.getRequestHeaders().getFirst(header);if(value!=null) request.header(header,value);
                 }
                 byte[] body=exchange.getRequestBody().readAllBytes();
@@ -61,9 +61,9 @@ public class ReplyGate {
                     selected.status().set(response.statusCode());selected.committed().countDown();
                     if(!selected.release().await(60,TimeUnit.SECONDS)) throw new IllegalStateException("Fixture gate not released");
                 }
-                response.headers().firstValue("Content-Type").ifPresent(value->exchange.getResponseHeaders().set("Content-Type",value));
-                response.headers().firstValue("ETag").ifPresent(value->exchange.getResponseHeaders().set("ETag",value));
-                response.headers().firstValue("X-Timekeeper-Owner").ifPresent(value->exchange.getResponseHeaders().set("X-Timekeeper-Owner",value));
+                for(String header:Set.of("Content-Type","ETag","X-Timekeeper-Owner","Set-Cookie","Cache-Control","Content-Security-Policy","X-Content-Type-Options","Referrer-Policy","WWW-Authenticate")) {
+                    var values=response.headers().allValues(header);if(!values.isEmpty()) exchange.getResponseHeaders().put(header,values);
+                }
                 exchange.sendResponseHeaders(response.statusCode(),response.body().length==0 ? -1 : response.body().length);
                 if(response.body().length>0) exchange.getResponseBody().write(response.body());
             } catch(Exception failure) {
