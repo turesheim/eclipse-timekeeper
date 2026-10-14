@@ -1,5 +1,5 @@
 import {Api, ApiError} from './api.js';
-import {savedToken, forgetToken} from './credentials.js';
+import {savedToken, forgetToken, isSecureOrigin} from './credentials.js';
 import {openAccount, closeAccount} from './account.js';
 
 const $ = id => document.getElementById(id);
@@ -17,13 +17,13 @@ export function authentication({connect, clear, updateAccount}) {
   }
   $('auth-mode').addEventListener('change',mode); mode();
   async function publicRequest(path, body) {
-    if (location.protocol !== 'https:' && !['localhost','127.0.0.1','[::1]'].includes(location.hostname)) throw new Error();
+    if (!isSecureOrigin()) throw new Error();
     const response = await fetch(`/api/v1/auth/${path}`, {method:body ? 'POST':'GET', credentials:'same-origin', redirect:'error', cache:'no-store', headers:{Accept:'application/json', ...(body ? {'Content-Type':'application/json'} : {})}, ...(body ? {body:JSON.stringify(body)} : {})});
     const data = await response.json(); if (!response.ok) throw new ApiError(data.code, response.status); return data;
   }
   async function attach(data, current) {
     if (current !== generation) return;
-    const session = new Api(null, undefined, data); active = session;
+    const session = new Api(null, undefined, data); active = session; forgetToken();
     $('login-form').reset(); mode(); $('login-error').textContent = '';
     await connect(session, data);
   }
@@ -32,6 +32,7 @@ export function authentication({connect, clear, updateAccount}) {
     $('login-form').reset(); mode(); $('login-error').textContent = message;
   }
   async function exchange(token, current) {
+    if(!isSecureOrigin()) throw new Error();
     const bearer = new Api(token);
     try { const {data} = await bearer.request('/auth/token-login',{method:'POST'}); forgetToken(token); await attach(data,current); }
     catch (error) { if (error.status === 401) forgetToken(token); throw error; }
@@ -61,12 +62,13 @@ export function authentication({connect, clear, updateAccount}) {
   $('account').addEventListener('click', () => {if(active) void openAccount(active,reset,updateAccount);});
   return {clear:reset, async initialize() {
     const current = ++generation;
+    const submit=$('login-form').querySelector('button');submit.disabled=true;
     try { const session = new Api(); const {data} = await session.request('/auth/session'); session.close(); forgetToken(); await attach(data,current); }
     catch(error) {
       if(current !== generation) return;
       const token = savedToken();
       if(token) {try {await exchange(token,current); return;} catch(failure) {$('login-error').textContent = errorText(failure);}}
       try {const status = await publicRequest('status'); if(current === generation && status.setupRequired && $('auth-mode').value === 'login') {$('auth-mode').value = 'setup';mode();}} catch { /* The sign-in form remains usable during an outage. */ }
-    }
+    } finally {submit.disabled=false;}
   }};
 }
