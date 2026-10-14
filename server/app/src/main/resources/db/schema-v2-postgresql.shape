@@ -80,8 +80,8 @@ COLUMN|tk_resource|5|payload|text|t|||
 COLUMN|tk_schema|1|id|integer|t|||
 COLUMN|tk_schema|2|schema_version|integer|t|||
 COLUMN|tk_schema|3|state|character varying(16)|t|||
-CONSTRAINT|tk_account|c|CHECK ((((username IS NULL) AND (password_hash IS NULL) AND ((state)::text = 'UNCLAIMED'::text)) OR ((username IS NOT NULL) AND (password_hash IS NOT NULL) AND ((state)::text = ANY ((ARRAY['ENABLED'::character varying, 'DISABLED'::character varying])::text[])))))
-CONSTRAINT|tk_account|c|CHECK (((state)::text = ANY ((ARRAY['UNCLAIMED'::character varying, 'ENABLED'::character varying, 'DISABLED'::character varying])::text[])))
+CONSTRAINT|tk_account|c|CHECK ((((state)::text = 'UNCLAIMED'::text) OR ((state)::text = 'ENABLED'::text) OR ((state)::text = 'DISABLED'::text)))
+CONSTRAINT|tk_account|c|CHECK ((((username IS NULL) AND (password_hash IS NULL) AND ((state)::text = 'UNCLAIMED'::text)) OR ((username IS NOT NULL) AND (password_hash IS NOT NULL) AND (((state)::text = 'ENABLED'::text) OR ((state)::text = 'DISABLED'::text)))))
 CONSTRAINT|tk_account|c|CHECK ((version >= 0))
 CONSTRAINT|tk_account|f|FOREIGN KEY (owner_id) REFERENCES tk_owner(id)
 CONSTRAINT|tk_account|n|NOT NULL administrator
@@ -98,8 +98,8 @@ CONSTRAINT|tk_active|n|NOT NULL activity_id
 CONSTRAINT|tk_active|n|NOT NULL entity_type
 CONSTRAINT|tk_active|n|NOT NULL owner_id
 CONSTRAINT|tk_active|p|PRIMARY KEY (owner_id)
-CONSTRAINT|tk_api_token|c|CHECK (((permissions)::text = ANY ((ARRAY['READ'::character varying, 'READ_WRITE'::character varying])::text[])))
-CONSTRAINT|tk_api_token|c|CHECK (((source)::text = ANY ((ARRAY['LEGACY'::character varying, 'MANAGED'::character varying])::text[])))
+CONSTRAINT|tk_api_token|c|CHECK ((((permissions)::text = 'READ'::text) OR ((permissions)::text = 'READ_WRITE'::text)))
+CONSTRAINT|tk_api_token|c|CHECK ((((source)::text = 'LEGACY'::text) OR ((source)::text = 'MANAGED'::text)))
 CONSTRAINT|tk_api_token|c|CHECK ((version >= 0))
 CONSTRAINT|tk_api_token|f|FOREIGN KEY (owner_id) REFERENCES tk_account(owner_id)
 CONSTRAINT|tk_api_token|n|NOT NULL created_at
@@ -114,7 +114,7 @@ CONSTRAINT|tk_api_token|n|NOT NULL version
 CONSTRAINT|tk_api_token|p|PRIMARY KEY (digest)
 CONSTRAINT|tk_api_token|u|UNIQUE (id)
 CONSTRAINT|tk_api_token|u|UNIQUE (owner_id, digest)
-CONSTRAINT|tk_auth_challenge|c|CHECK (((purpose)::text = ANY ((ARRAY['SETUP'::character varying, 'RECOVERY'::character varying])::text[])))
+CONSTRAINT|tk_auth_challenge|c|CHECK ((((purpose)::text = 'SETUP'::text) OR ((purpose)::text = 'RECOVERY'::text)))
 CONSTRAINT|tk_auth_challenge|f|FOREIGN KEY (owner_id) REFERENCES tk_owner(id)
 CONSTRAINT|tk_auth_challenge|n|NOT NULL consumed
 CONSTRAINT|tk_auth_challenge|n|NOT NULL digest
@@ -125,7 +125,7 @@ CONSTRAINT|tk_auth_control|c|CHECK ((id = 1))
 CONSTRAINT|tk_auth_control|n|NOT NULL bootstrap_completed
 CONSTRAINT|tk_auth_control|n|NOT NULL id
 CONSTRAINT|tk_auth_control|p|PRIMARY KEY (id)
-CONSTRAINT|tk_auth_session|c|CHECK (((permissions)::text = ANY ((ARRAY['READ'::character varying, 'READ_WRITE'::character varying])::text[])))
+CONSTRAINT|tk_auth_session|c|CHECK ((((permissions)::text = 'READ'::text) OR ((permissions)::text = 'READ_WRITE'::text)))
 CONSTRAINT|tk_auth_session|f|FOREIGN KEY (owner_id) REFERENCES tk_account(owner_id)
 CONSTRAINT|tk_auth_session|f|FOREIGN KEY (owner_id, parent_digest) REFERENCES tk_api_token(owner_id, digest)
 CONSTRAINT|tk_auth_session|n|NOT NULL created_at

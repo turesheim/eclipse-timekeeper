@@ -64,6 +64,21 @@ class PostgresSchemaIT {
             try(var rows=statement.executeQuery("SELECT version,revision FROM tk_owner")) {rows.next();assertEquals(7,rows.getLong(1));assertEquals(19,rows.getLong(2));}
         }
     }
+    @Test void checkConstraintsRemainCanonicalAfterLogicalDumpRestoreDeparsing() throws Exception {
+        try(var connection=connection();var statement=connection.createStatement()) {
+            ServerSchema.initializeOrValidate(connection);var before=PostgresSchema.shape(connection);
+            var checks=new java.util.ArrayList<String[]>();
+            try(var rows=statement.executeQuery("SELECT c.relname,k.conname,pg_get_constraintdef(k.oid) FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND k.contype='c'")) {
+                while(rows.next()) checks.add(new String[]{rows.getString(1),rows.getString(2),rows.getString(3)});
+            }
+            for(var check:checks) {
+                assertTrue(check[0].matches("[a-z_]+") && check[1].matches("[a-z_0-9]+"));
+                statement.execute("ALTER TABLE "+check[0]+" DROP CONSTRAINT "+check[1]);
+                statement.execute("ALTER TABLE "+check[0]+" ADD CONSTRAINT "+check[1]+" "+check[2]);
+            }
+            assertEquals(before,PostgresSchema.shape(connection));ServerSchema.validate(connection);
+        }
+    }
     @ParameterizedTest @ValueSource(strings={
         "UPDATE tk_schema SET state='INITIALIZING'", "UPDATE tk_schema SET schema_version=99",
         "DELETE FROM tk_schema", "DROP TABLE tk_receipt", "DROP TABLE tk_relation",
