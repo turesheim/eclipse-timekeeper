@@ -17,4 +17,6 @@ docker compose run --rm --no-deps -T --entrypoint sh maintenance -ec '
 cp "$backup_dir/tokens.json" "$state_dir/config/tokens.json.new"
 chmod 644 "$state_dir/config/tokens.json.new"
 mv "$state_dir/config/tokens.json.new" "$state_dir/config/tokens.json"
-docker compose start api-1 api-2
+# Wait for both members before returning; a single ready load-balanced request
+# does not prove that the other restored replica has completed startup.
+docker compose up -d --no-recreate --wait --wait-timeout 180 api-1 api-2
