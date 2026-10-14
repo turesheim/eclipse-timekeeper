@@ -27,7 +27,7 @@ public class TimekeeperResource {
     @Inject CommandReceipts receipts;
     @Inject Pages pages;
     @Context UriInfo uri;
-    private Response tx(Supplier<ApiReplies> work) { return store.transaction(identity.owner(),() -> work.get().response()); }
+    private Response tx(Supplier<ApiReplies> work) { return store.authenticated(identity,() -> work.get().response()); }
     private static ApiReplies json(JsonNode value) { return new ApiReplies(200,value,null,null); }
     private static ApiReplies empty() { return new ApiReplies(204,null,null,null); }
     private JsonNode required(String type,UUID id) { return store.find(type,id).orElseThrow(ApiFailure::notFound); }

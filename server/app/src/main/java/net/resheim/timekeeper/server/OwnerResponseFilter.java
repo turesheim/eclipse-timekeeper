@@ -12,6 +12,7 @@ import jakarta.ws.rs.ext.Provider;
 public class OwnerResponseFilter implements ContainerResponseFilter {
     @Inject RequestIdentity identity;
     @Override public void filter(ContainerRequestContext request,ContainerResponseContext response) {
+        if(request.getUriInfo().getPath().contains("api/v1/auth/")) response.getHeaders().putSingle("Cache-Control","no-store");
         identity.authenticatedOwner().ifPresent(owner->response.getHeaders().putSingle(OwnerBinding.HEADER,OwnerBinding.encode(owner)));
     }
 }

@@ -41,7 +41,7 @@ class DailyActivityTest {
     @AfterEach void clear() throws Exception {
         try(var connection=store.datasource.getConnection()) {
             connection.setAutoCommit(false);
-            for(var table:List.of("tk_active","tk_relation","tk_external_reference","tk_receipt","tk_change","tk_resource","tk_owner"))
+            for(var table:List.of("tk_auth_session","tk_api_token","tk_auth_challenge","tk_account","tk_active","tk_relation","tk_external_reference","tk_receipt","tk_change","tk_resource","tk_owner"))
                 try(var statement=connection.createStatement()) {statement.executeUpdate("DELETE FROM "+table+" WHERE "+(table.equals("tk_owner") ? "id" : "owner_id")+"='a'");}
             connection.commit();
         } finally {clock.set(null);}

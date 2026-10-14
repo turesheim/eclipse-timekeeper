@@ -46,19 +46,21 @@ def package(output, tag, commit):
     output.mkdir(parents=True, exist_ok=True)
     archive = output / 'timekeeper-server.zip'
     manifest = {'format': 1, 'kind': 'candidate' if tag is None else 'release', 'tag': tag, 'commit': commit, 'java': 21,
-                'quarkus': '3.40.1', 'h2': '2.5.250', 'apiMajor': 1, 'serverSchema': 1}
+                'quarkus': '3.40.1', 'h2': '2.5.250', 'apiMajor': 1, 'serverSchema': 2}
     files = [(p, 'timekeeper-server/' + p.relative_to(app).as_posix()) for p in sorted(app.rglob('*')) if p.is_file()]
     guides = {'docs/operations/SERVER.md': 'README.md',
               'docs/architecture/API-V1.md': 'API-POLICY.md',
               'docs/operations/DEPLOYMENT.md': 'DEPLOYMENT.md',
               'docs/operations/LOCAL-DOCKER.md': 'LOCAL-DOCKER.md',
               'docs/operations/TAILSCALE.md': 'TAILSCALE.md',
+              'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
               'docs/development/WEB-CLIENT.md': 'WEB-CLIENT.md'}
     destinations = {**guides, 'common/api/openapi.json': 'openapi.json'}
     files += [(ROOT / source, 'timekeeper-server/' + destination)
               for source, destination in guides.items()]
     files += [(ROOT / 'common/api/openapi.json', 'timekeeper-server/openapi.json'),
               (ROOT / 'server/scripts/create_token.py', 'timekeeper-server/create_token.py'),
+              (ROOT / 'server/scripts/configure_accounts.py', 'timekeeper-server/configure_accounts.py'),
               (ROOT / 'LICENSE', 'timekeeper-server/LICENSE')]
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as target:
         for source, name in files:

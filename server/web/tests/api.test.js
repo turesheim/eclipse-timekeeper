@@ -31,3 +31,20 @@ test('pagination rejects repeated cursors and mixed-owner resources', async () =
   const foreign = new Api('token', async () => reply({items:[{ownerId:'owner-b'}], revision:1, nextCursor:null}));
   await assert.rejects(foreign.page('/tasks'), error => error.code === 'OWNER_CHANGED');
 });
+test('cookie requests use same-origin credentials and memory-only CSRF with stable owner binding', async () => {
+  const api=new Api(null,async(url,options)=>{
+    assert.equal(options.credentials,'same-origin');assert.equal(options.headers.Authorization,undefined);
+    assert.equal(options.headers['X-Timekeeper-Owner'],'b3duZXItYQ');
+    assert.equal(options.headers['X-CSRF-Token'],options.method==='GET' ? undefined:'csrf-fixture');return reply({ownerId:'owner-a'});
+  },{ownerId:'owner-a',csrf:'csrf-fixture'});
+  await api.request('/me');await api.request('/clients',{method:'POST',body:{name:'Private',color:'#123456'}});
+});
+test('a response arriving after logout cannot expose the previous account', async () => {
+  let finish;const api=new Api(null,()=>new Promise(resolve=>{finish=resolve;}));
+  const pending=api.request('/me');api.close();finish(reply({ownerId:'owner-a',private:'old draft'}));
+  await assert.rejects(pending,error=>error.code==='UNAUTHENTICATED');
+});
+test('explicit bearer-to-cookie exchange accepts a Set-Cookie response without putting credentials in storage',async()=>{
+  const api=new Api('existing-token',async(url,options)=>{assert.equal(url,'/api/v1/auth/token-login');assert.equal(options.credentials,'same-origin');assert.equal(options.headers.Authorization,'Bearer existing-token');return reply({ownerId:'owner-a',csrf:'csrf'});});
+  await api.request('/auth/token-login',{method:'POST'});
+});

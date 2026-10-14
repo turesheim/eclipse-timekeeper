@@ -144,6 +144,9 @@ public final class RemoteBootstrap implements IApplication {
         var builder=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",folder.resolve("distribution/timekeeper-server/quarkus-run.jar").toString());
         builder.environment().put("TIMEKEEPER_SERVER_DB_URL","jdbc:h2:"+database);
         builder.environment().put("TIMEKEEPER_SERVER_TOKENS_FILE",folder.resolve("server-tokens.json").toString());builder.environment().put("QUARKUS_HTTP_PORT",String.valueOf(port));
+        builder.environment().put("TIMEKEEPER_SERVER_SETUP_FILE","NONE");
+        builder.environment().put("TIMEKEEPER_ALLOW_SCHEMA_UPGRADE","false");
+        builder.environment().put("TIMEKEEPER_PUBLIC_ORIGIN",name.equals("main") && upstreamPort>0 ? serverUrl.toString() : "NONE");
         builder.redirectErrorStream(true).redirectOutput(folder.resolve("server-"+name+"-"+System.nanoTime()+".log").toFile());
         Process process=builder.start();
         try(var http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build()) {

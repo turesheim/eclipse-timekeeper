@@ -20,10 +20,7 @@ public class ChangeResource {
         long after=ContractInputs.sequence(query.getFirst("after"));int limit=ContractInputs.number(query.getFirst("limit"),100,1,500),wait=ContractInputs.number(query.getFirst("waitSeconds"),0,0,25);
         String owner=identity.owner();long deadline=System.nanoTime()+wait*1_000_000_000L;
         while(true) {
-            var principal=tokens.authenticate(headers.getHeaderString("Authorization"));
-            if(!principal.owner().equals(owner)) throw new ApiFailure(401,"OWNER_CHANGED");
-            if(!principal.permissions().contains("read")) throw ApiFailure.unauthorized(true);
-            ObjectNode page=store.transaction(owner,() -> page(after,limit));
+            ObjectNode page=store.authenticated(identity,() -> page(after,limit));
             if(!page.get("items").isEmpty() || System.nanoTime()>=deadline) return new ApiReplies(200,page,null,null).response();
             // Release connection/owner lock while waiting; cancellation does not mutate data.
             try {Thread.sleep(Math.min(250,Math.max(1,(deadline-System.nanoTime())/1_000_000)));}

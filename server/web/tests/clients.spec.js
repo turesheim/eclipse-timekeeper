@@ -9,7 +9,7 @@ async function save(page) {await page.locator('#save').click();await expect(page
 test('clients maintain names and colors, own projects and color titled work sessions after reload',async({page,request})=>{
   const prefix='Client '+randomUUID().slice(0,6);let client,session;const projects=[];
   try {
-    await page.goto('/web/');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+    await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
     await page.getByRole('button',{name:'Clients',exact:true}).click();await page.getByRole('button',{name:'New client',exact:true}).click();
     await page.getByLabel('Name',{exact:true}).fill(prefix);await page.getByLabel('Color',{exact:true}).fill('#ffee00');await save(page);
     client=(await (await api(request,'GET','/clients?q='+encodeURIComponent(prefix))).json()).items[0];

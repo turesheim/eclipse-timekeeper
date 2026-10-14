@@ -17,9 +17,12 @@ import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 final class RemoteRestoreScenario {
     static void run(HttpTimekeeperService api,Project project) throws Exception {
         String prefix="Restore "+UUID.randomUUID().toString().substring(0,8);
-        try(var peer=new HttpTimekeeperService(RemoteBootstrap.endpoint(),RemoteBootstrap::observerBToken,Duration.ofSeconds(5))) {
+        try(var peer=new HttpTimekeeperService(RemoteBootstrap.endpoint(),RemoteBootstrap::observerBToken,Duration.ofSeconds(5));var browser=new RemoteWebScenario.BrowserPeer()) {
             var baseline=peer.createTask(new CreateTask(Optional.of(project.id()),prefix+" baseline",Optional.empty()));
             awaitTask(baseline);
+            // Include the browser credential in the backup. A session created later must
+            // correctly disappear on restore and clear its drafts instead of resuming them.
+            browser.command(Map.of("action","attach","project",project.name(),"summary",baseline.summary()));
             RemoteBootstrap.backupFixtureServer();
             assertEquals(baseline,peer.task(baseline.id()).orElseThrow());
             var later=peer.updateTask(new UpdateTask(baseline.id(),baseline.version(),baseline.projectId(),baseline.parentTaskId(),prefix+" before restore",Optional.of("https://example.invalid/before-restore")));
@@ -32,7 +35,6 @@ final class RemoteRestoreScenario {
             tree.getTreeItem(project.name()).getNode(later.summary()).contextMenu("Edit task...").click();
             var nativeEditor=bot.shell("Edit task");String nativeDraft=prefix+" native draft",nativeUrl="https://example.invalid/native-restore-draft";
             nativeEditor.bot().textWithLabel("Summary").setText(nativeDraft);nativeEditor.bot().textWithLabel("URL (optional)").setText(nativeUrl);
-            try(var browser=new RemoteWebScenario.BrowserPeer()) {
                 browser.command(Map.of("action","attach","project",project.name(),"summary",later.summary()));
                 String webDraft=prefix+" browser draft",webUrl="https://example.invalid/browser-restore-draft";
                 browser.command(Map.of("action","draft","summary",webDraft,"url",webUrl));
@@ -64,7 +66,6 @@ final class RemoteRestoreScenario {
                 var accepted=peer.task(current.id()).orElseThrow();peer.deleteTask(new DeleteTask(accepted.id(),accepted.version()));
                 RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->TimekeeperUiPlugin.getDefault().getTimekeeperService().task(accepted.id()).isEmpty());}catch(Exception pending) {return false;}},"Restore test task did not clear from installed cache");
                 for(String part:List.of("cold-file","history-reset","native-draft","web-draft","reviewed-save")) RemoteBootstrap.receipt().setProperty("phase.restore."+part,"passed");RemoteBootstrap.writeProof();
-            }
         }
     }
     private static void awaitTask(Task expected) {RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->TimekeeperUiPlugin.getDefault().getTimekeeperService().task(expected.id()).filter(expected::equals).isPresent());}catch(Exception loading) {return false;}},"Actual restored history did not automatically reach installed snapshot");}

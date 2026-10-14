@@ -13,6 +13,9 @@ import time
 from urllib.error import URLError
 from urllib.request import urlopen
 import zipfile
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+from configure_accounts import create_challenge
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -39,11 +42,13 @@ def main():
         registry = data / 'tokens.json'
         registry.write_text(json.dumps([{'ownerId':'web-owner', 'sha256':hashlib.sha256(token.encode()).hexdigest(), 'permissions':['read','write'] if index == 0 else ['read']} for index, token in enumerate(tokens)]))
         registry.chmod(0o600)
+        code, _ = create_challenge(data / 'setup.json', owner='web-owner')
+        password = secrets.token_urlsafe(32)
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0)); port = sock.getsockname()[1]
         base = f'http://127.0.0.1:{port}'
-        environment = {**os.environ, 'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:' + str(data / 'database'), 'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry),
-                       'TIMEKEEPER_DEPLOYED_AT':'2026-10-13T08:30:00Z', 'TIMEKEEPER_WEB_BUILD_COMMIT':manifest['commit']}
+        environment = {**os.environ, 'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:' + str(data / 'database'), 'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry), 'TIMEKEEPER_SERVER_SETUP_FILE':str(data / 'setup.json'),
+                       'TIMEKEEPER_PUBLIC_ORIGIN':'NONE', 'TIMEKEEPER_DEPLOYED_AT':'2026-10-13T08:30:00Z', 'TIMEKEEPER_WEB_BUILD_COMMIT':manifest['commit']}
         server_log = ROOT / 'server/web/target/server.log'
         server_log.parent.mkdir(parents=True, exist_ok=True)
         with server_log.open('w') as log:
@@ -63,7 +68,7 @@ def main():
                     if b'id="login-form"' not in response.read(): raise AssertionError('Missing bundled web client')
                     if "frame-ancestors 'none'" not in response.headers.get('Content-Security-Policy',''): raise AssertionError('Missing web security policy')
                 command = ['npm', 'run', 'test:browser'] + (['--', '--grep', args.grep] if args.grep else [])
-                result = subprocess.run(command, cwd=ROOT / 'server/web', env={**environment, 'TIMEKEEPER_WEB_URL':base, 'TIMEKEEPER_WEB_TOKEN':tokens[0], 'TIMEKEEPER_WEB_READ_TOKEN':tokens[1], 'TIMEKEEPER_WEB_REGISTRY':str(registry)}, timeout=600)
+                result = subprocess.run(command, cwd=ROOT / 'server/web', env={**environment, 'TIMEKEEPER_WEB_URL':base, 'TIMEKEEPER_WEB_TOKEN':tokens[0], 'TIMEKEEPER_WEB_READ_TOKEN':tokens[1], 'TIMEKEEPER_WEB_REGISTRY':str(registry), 'TIMEKEEPER_WEB_SETUP_CODE':code, 'TIMEKEEPER_WEB_PASSWORD':password}, timeout=600)
                 if result.returncode: raise RuntimeError('Browser acceptance failed')
                 (output / 'acceptance.json').write_text(json.dumps({'distributionSha256':digest, 'sourceCommit':manifest['commit'], 'serverPid':process.pid, 'browser':'chromium', 'passed':True}, indent=2) + '\n')
             finally:

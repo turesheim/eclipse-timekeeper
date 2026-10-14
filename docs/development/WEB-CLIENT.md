@@ -11,12 +11,14 @@ build time in the server, and Docker builds receive Git identity as build args.
 
 The standalone server serves its bundled client at `/web/`. Production uses
 native browser modules; no Node process, CDN or separate database is needed.
-Maven includes `server/web/src` in the server JAR. An administrator issues access tokens
-as described in [server/README.md](../operations/SERVER.md). Use HTTPS outside loopback.
-The browser remembers the token in same-origin local storage and signs in
-automatically after reload. **Sign out** removes the remembered token. Records
-and editor drafts stay in memory. If browser storage is blocked, sign-in still
-works and the client explains that it cannot remember the token.
+Maven includes `server/web/src` in the server JAR. Users sign in with username and
+password; the [account guide](../operations/ACCOUNTS.md) describes first setup,
+legacy owner migration and recovery. The browser restores an HttpOnly Secure
+cookie after reload. **Remember me** controls persistence across browser restarts.
+API tokens for Eclipse are created under **Account**, shown once, and stored only
+as hashes on the server. New credentials never enter browser storage. Existing
+saved tokens are exchanged for a parent-bound cookie and then removed. Sign out
+revokes the cookie session and clears records, drafts, requests and clipboard.
 
 Font Awesome Free 7.3.1 supplies locally bundled icon fonts for larger tree
 controls and action buttons. Buttons retain accessible names and hover titles;
@@ -25,7 +27,8 @@ fonts and their upstream license are included in the server distribution.
 Projects, tasks, labels, activities and work sessions use API v1. Start/stop uses durable
 idempotency keys. Editors/deletion retain the original opaque ETag, including
 across full resynchronization, rather than upgrading a stale draft. Validation,
-permission, network and concurrency failures preserve drafts. An uncertain
+permission, network and concurrency failures preserve drafts. Loss of authorization
+or a changed owner clears the account view and its drafts. An uncertain
 ordinary write requires cancel, refresh and review; uncertain start/stop offers
 explicit retry of the same frozen payload/key. Acknowledged saves remain
 successful when a subsequent refresh fails.

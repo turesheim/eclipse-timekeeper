@@ -6,7 +6,7 @@ const token = process.env.TIMEKEEPER_WEB_TOKEN;
 const readToken = process.env.TIMEKEEPER_WEB_READ_TOKEN;
 test.beforeAll(async({request})=>{const clients=(await (await api(request,'GET','/clients')).json()).items;if(!clients.length) await api(request,'POST','/clients',{name:'Browser client',color:'#2563eb'});});
 async function signIn(page, credential = token) {
-  await page.goto('/web/'); await page.getByLabel('Access token').fill(credential); await page.getByRole('button', {name:'Sign in', exact:true}).click();
+  await page.goto('/web/'); await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(credential); await page.getByRole('button', {name:'Sign in', exact:true}).click();
   await expect(page.locator('#status')).toHaveText('Up to date');
 }
 async function api(request, method, path, data, headers = {}) {
@@ -229,14 +229,15 @@ test('same-token owner reassignment cannot switch a live browser session', async
   await signIn(page); await page.getByRole('button', {name:'Projects', exact:true}).click(); await page.getByRole('button', {name:'New project', exact:true}).click(); await page.getByLabel('Name', {exact:true}).fill('Keep in original account');
   try {
     const registry = JSON.parse(original); registry[0].ownerId = 'web-other-owner'; const temporary = file + '.new'; await writeFile(temporary, JSON.stringify(registry), {mode:0o600}); await rename(temporary, file);
-    await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click(); await expect(page.locator('#editor-error')).toContainText('account for this session has changed'); await expect(page.getByLabel('Name', {exact:true})).toHaveValue('Keep in original account');
+    await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click(); await expect(page.locator('#login')).toBeVisible();await expect(page.locator('#workspace')).not.toBeVisible();await expect(page.locator('#fields')).toBeEmpty();
     expect((await (await api(request,'GET','/projects')).json()).items).toHaveLength(0);
   } finally { const temporary = file + '.new'; await writeFile(temporary, original, {mode:0o600}); await rename(temporary, file); }
 });
-test('reload signs in with the remembered token and sign-out forgets it', async ({page}) => {
+test('reload restores the HttpOnly session and sign-out removes it', async ({page}) => {
   await signIn(page); expect(await page.locator('#token').inputValue()).toBe('');
-  expect(await page.evaluate(value => localStorage.getItem('timekeeper.access-token') === value, token)).toBeTruthy();
-  expect(await page.evaluate(() => ({keys:Object.keys(localStorage), session:sessionStorage.length}))).toEqual({keys:['timekeeper.access-token'], session:0});
+  expect(await page.evaluate(() => localStorage.getItem('timekeeper.access-token'))).toBeNull();
+  const cookie=(await page.context().cookies()).find(value=>value.name==='__Host-timekeeper-session');expect(cookie.httpOnly).toBe(true);expect(cookie.secure).toBe(true);
+  expect(await page.evaluate(() => ({keys:Object.keys(localStorage), session:sessionStorage.length}))).toEqual({keys:[], session:0});
   await page.reload(); await expect(page.locator('#workspace')).toBeVisible(); await expect(page.locator('#status')).toHaveText('Up to date');
   await expect(page.locator('#login')).not.toBeVisible(); expect(await page.locator('#token').inputValue()).toBe('');
   await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#tasks')).toBeEmpty();
@@ -247,13 +248,13 @@ test('an invalid remembered token is forgotten and a valid replacement can sign 
   await page.addInitScript(() => localStorage.setItem('timekeeper.access-token', 'invalid-saved-fixture'));
   await page.goto('/web/'); await expect(page.locator('#login-error')).toContainText('no longer authorized');
   expect(await page.evaluate(() => localStorage.getItem('timekeeper.access-token'))).toBeNull();
-  await page.getByLabel('Access token').fill(token); await page.getByRole('button', {name:'Sign in', exact:true}).click();
+  await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token); await page.getByRole('button', {name:'Sign in', exact:true}).click();
   await expect(page.locator('#status')).toHaveText('Up to date');
 });
-test('blocked browser storage keeps sign-in usable and explains why reload needs a token', async ({page}) => {
+test('blocked legacy storage still allows cookie sign-in and reload', async ({page}) => {
   await page.addInitScript(() => Object.defineProperty(window, 'localStorage', {get() {throw new DOMException('Blocked', 'SecurityError');}}));
-  await signIn(page); await expect(page.locator('#remember-notice')).toContainText('could not remember');
-  await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#login-error')).toContainText('could not forget');
+  await signIn(page);await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');
+  await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#login')).toBeVisible();await page.reload();await expect(page.locator('#workspace')).not.toBeVisible();
 });
 test('future starts are rejected without losing browser drafts or changing recorded time', async ({page, request}) => {
   const task = await createTask(request, 'Future boundary ' + randomUUID());

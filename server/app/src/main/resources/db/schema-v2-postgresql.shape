@@ -1,0 +1,233 @@
+COLUMN|tk_account|1|owner_id|character varying(400)|t|||
+COLUMN|tk_account|2|username|character varying(64)|f|||
+COLUMN|tk_account|3|password_hash|character varying(400)|f|||
+COLUMN|tk_account|4|display_name|character varying(400)|t|||
+COLUMN|tk_account|5|state|character varying(16)|t|||
+COLUMN|tk_account|6|administrator|boolean|t|||
+COLUMN|tk_account|7|initialized|boolean|t|false||
+COLUMN|tk_account|8|version|bigint|t|||
+COLUMN|tk_active|1|owner_id|character varying(400)|t|||
+COLUMN|tk_active|2|entity_type|character varying(16)|t|||
+COLUMN|tk_active|3|activity_id|uuid|t|||
+COLUMN|tk_api_token|10|last_used_at|character varying(40)|f|||
+COLUMN|tk_api_token|11|version|bigint|t|||
+COLUMN|tk_api_token|12|legacy_digest|character varying(64)|f|||
+COLUMN|tk_api_token|1|digest|character varying(64)|t|||
+COLUMN|tk_api_token|2|id|uuid|t|||
+COLUMN|tk_api_token|3|owner_id|character varying(400)|t|||
+COLUMN|tk_api_token|4|name|character varying(400)|t|||
+COLUMN|tk_api_token|5|permissions|character varying(16)|t|||
+COLUMN|tk_api_token|6|expires_at|character varying(40)|f|||
+COLUMN|tk_api_token|7|revoked|boolean|t|||
+COLUMN|tk_api_token|8|source|character varying(16)|t|||
+COLUMN|tk_api_token|9|created_at|character varying(40)|t|||
+COLUMN|tk_auth_challenge|1|digest|character varying(64)|t|||
+COLUMN|tk_auth_challenge|2|purpose|character varying(16)|t|||
+COLUMN|tk_auth_challenge|3|owner_id|character varying(400)|f|||
+COLUMN|tk_auth_challenge|4|expires_at|character varying(40)|t|||
+COLUMN|tk_auth_challenge|5|consumed|boolean|t|||
+COLUMN|tk_auth_control|1|id|integer|t|||
+COLUMN|tk_auth_control|2|bootstrap_completed|boolean|t|||
+COLUMN|tk_auth_session|1|digest|character varying(64)|t|||
+COLUMN|tk_auth_session|2|owner_id|character varying(400)|t|||
+COLUMN|tk_auth_session|3|csrf|character varying(64)|t|||
+COLUMN|tk_auth_session|4|permissions|character varying(16)|t|||
+COLUMN|tk_auth_session|5|created_at|character varying(40)|t|||
+COLUMN|tk_auth_session|6|expires_at|character varying(40)|t|||
+COLUMN|tk_auth_session|7|last_seen_at|character varying(40)|t|||
+COLUMN|tk_auth_session|8|persistent|boolean|t|||
+COLUMN|tk_auth_session|9|parent_digest|character varying(64)|f|||
+COLUMN|tk_auth_throttle|1|id|character varying(64)|t|||
+COLUMN|tk_auth_throttle|2|attempts|integer|t|||
+COLUMN|tk_auth_throttle|3|window_start|character varying(40)|t|||
+COLUMN|tk_change|1|owner_id|character varying(400)|t|||
+COLUMN|tk_change|2|sequence|bigint|t|||
+COLUMN|tk_change|3|entity_type|character varying(16)|t|||
+COLUMN|tk_change|4|entity_id|character varying(400)|t|||
+COLUMN|tk_change|5|change_type|character varying(16)|t|||
+COLUMN|tk_change|6|occurred_at|character varying(40)|t|||
+COLUMN|tk_external_reference|1|owner_id|character varying(400)|t|||
+COLUMN|tk_external_reference|2|provider_id|character varying(400)|t|||
+COLUMN|tk_external_reference|3|repository_id|character varying(8192)|t|||
+COLUMN|tk_external_reference|4|external_id|character varying(2000)|t|||
+COLUMN|tk_external_reference|5|entity_type|character varying(16)|t|||
+COLUMN|tk_external_reference|6|task_id|uuid|t|||
+COLUMN|tk_external_reference|7|reference_key|character varying(64)|t|||
+COLUMN|tk_owner|1|id|character varying(400)|t|||
+COLUMN|tk_owner|2|zone_id|character varying(100)|t|||
+COLUMN|tk_owner|3|version|bigint|t|||
+COLUMN|tk_owner|4|revision|bigint|t|||
+COLUMN|tk_owner|5|cursor_secret|character varying(64)|t|||
+COLUMN|tk_receipt|1|owner_id|character varying(400)|t|||
+COLUMN|tk_receipt|2|command_id|uuid|t|||
+COLUMN|tk_receipt|3|fingerprint|character varying(64)|t|||
+COLUMN|tk_receipt|4|status|integer|t|||
+COLUMN|tk_receipt|5|body|text|t|||
+COLUMN|tk_receipt|6|etag|character varying(200)|f|||
+COLUMN|tk_receipt|7|location|character varying(4096)|f|||
+COLUMN|tk_receipt|8|created_at|character varying(40)|t|||
+COLUMN|tk_relation|1|owner_id|character varying(400)|t|||
+COLUMN|tk_relation|2|from_type|character varying(16)|t|||
+COLUMN|tk_relation|3|from_id|uuid|t|||
+COLUMN|tk_relation|4|kind|character varying(16)|t|||
+COLUMN|tk_relation|5|to_type|character varying(16)|t|||
+COLUMN|tk_relation|6|to_id|uuid|t|||
+COLUMN|tk_resource|1|owner_id|character varying(400)|t|||
+COLUMN|tk_resource|2|entity_type|character varying(16)|t|||
+COLUMN|tk_resource|3|id|uuid|t|||
+COLUMN|tk_resource|4|version|bigint|t|||
+COLUMN|tk_resource|5|payload|text|t|||
+COLUMN|tk_schema|1|id|integer|t|||
+COLUMN|tk_schema|2|schema_version|integer|t|||
+COLUMN|tk_schema|3|state|character varying(16)|t|||
+CONSTRAINT|tk_account|c|CHECK ((((state)::text = 'UNCLAIMED'::text) OR ((state)::text = 'ENABLED'::text) OR ((state)::text = 'DISABLED'::text)))
+CONSTRAINT|tk_account|c|CHECK ((((username IS NULL) AND (password_hash IS NULL) AND ((state)::text = 'UNCLAIMED'::text)) OR ((username IS NOT NULL) AND (password_hash IS NOT NULL) AND (((state)::text = 'ENABLED'::text) OR ((state)::text = 'DISABLED'::text)))))
+CONSTRAINT|tk_account|c|CHECK ((version >= 0))
+CONSTRAINT|tk_account|f|FOREIGN KEY (owner_id) REFERENCES tk_owner(id)
+CONSTRAINT|tk_account|n|NOT NULL administrator
+CONSTRAINT|tk_account|n|NOT NULL display_name
+CONSTRAINT|tk_account|n|NOT NULL initialized
+CONSTRAINT|tk_account|n|NOT NULL owner_id
+CONSTRAINT|tk_account|n|NOT NULL state
+CONSTRAINT|tk_account|n|NOT NULL version
+CONSTRAINT|tk_account|p|PRIMARY KEY (owner_id)
+CONSTRAINT|tk_account|u|UNIQUE (username)
+CONSTRAINT|tk_active|c|CHECK (((entity_type)::text = 'ACTIVITY'::text))
+CONSTRAINT|tk_active|f|FOREIGN KEY (owner_id, entity_type, activity_id) REFERENCES tk_resource(owner_id, entity_type, id)
+CONSTRAINT|tk_active|n|NOT NULL activity_id
+CONSTRAINT|tk_active|n|NOT NULL entity_type
+CONSTRAINT|tk_active|n|NOT NULL owner_id
+CONSTRAINT|tk_active|p|PRIMARY KEY (owner_id)
+CONSTRAINT|tk_api_token|c|CHECK ((((permissions)::text = 'READ'::text) OR ((permissions)::text = 'READ_WRITE'::text)))
+CONSTRAINT|tk_api_token|c|CHECK ((((source)::text = 'LEGACY'::text) OR ((source)::text = 'MANAGED'::text)))
+CONSTRAINT|tk_api_token|c|CHECK ((version >= 0))
+CONSTRAINT|tk_api_token|f|FOREIGN KEY (owner_id) REFERENCES tk_account(owner_id)
+CONSTRAINT|tk_api_token|n|NOT NULL created_at
+CONSTRAINT|tk_api_token|n|NOT NULL digest
+CONSTRAINT|tk_api_token|n|NOT NULL id
+CONSTRAINT|tk_api_token|n|NOT NULL name
+CONSTRAINT|tk_api_token|n|NOT NULL owner_id
+CONSTRAINT|tk_api_token|n|NOT NULL permissions
+CONSTRAINT|tk_api_token|n|NOT NULL revoked
+CONSTRAINT|tk_api_token|n|NOT NULL source
+CONSTRAINT|tk_api_token|n|NOT NULL version
+CONSTRAINT|tk_api_token|p|PRIMARY KEY (digest)
+CONSTRAINT|tk_api_token|u|UNIQUE (id)
+CONSTRAINT|tk_api_token|u|UNIQUE (owner_id, digest)
+CONSTRAINT|tk_auth_challenge|c|CHECK ((((purpose)::text = 'SETUP'::text) OR ((purpose)::text = 'RECOVERY'::text)))
+CONSTRAINT|tk_auth_challenge|f|FOREIGN KEY (owner_id) REFERENCES tk_owner(id)
+CONSTRAINT|tk_auth_challenge|n|NOT NULL consumed
+CONSTRAINT|tk_auth_challenge|n|NOT NULL digest
+CONSTRAINT|tk_auth_challenge|n|NOT NULL expires_at
+CONSTRAINT|tk_auth_challenge|n|NOT NULL purpose
+CONSTRAINT|tk_auth_challenge|p|PRIMARY KEY (digest)
+CONSTRAINT|tk_auth_control|c|CHECK ((id = 1))
+CONSTRAINT|tk_auth_control|n|NOT NULL bootstrap_completed
+CONSTRAINT|tk_auth_control|n|NOT NULL id
+CONSTRAINT|tk_auth_control|p|PRIMARY KEY (id)
+CONSTRAINT|tk_auth_session|c|CHECK ((((permissions)::text = 'READ'::text) OR ((permissions)::text = 'READ_WRITE'::text)))
+CONSTRAINT|tk_auth_session|f|FOREIGN KEY (owner_id) REFERENCES tk_account(owner_id)
+CONSTRAINT|tk_auth_session|f|FOREIGN KEY (owner_id, parent_digest) REFERENCES tk_api_token(owner_id, digest)
+CONSTRAINT|tk_auth_session|n|NOT NULL created_at
+CONSTRAINT|tk_auth_session|n|NOT NULL csrf
+CONSTRAINT|tk_auth_session|n|NOT NULL digest
+CONSTRAINT|tk_auth_session|n|NOT NULL expires_at
+CONSTRAINT|tk_auth_session|n|NOT NULL last_seen_at
+CONSTRAINT|tk_auth_session|n|NOT NULL owner_id
+CONSTRAINT|tk_auth_session|n|NOT NULL permissions
+CONSTRAINT|tk_auth_session|n|NOT NULL persistent
+CONSTRAINT|tk_auth_session|p|PRIMARY KEY (digest)
+CONSTRAINT|tk_auth_throttle|c|CHECK ((attempts >= 0))
+CONSTRAINT|tk_auth_throttle|n|NOT NULL attempts
+CONSTRAINT|tk_auth_throttle|n|NOT NULL id
+CONSTRAINT|tk_auth_throttle|n|NOT NULL window_start
+CONSTRAINT|tk_auth_throttle|p|PRIMARY KEY (id)
+CONSTRAINT|tk_change|f|FOREIGN KEY (owner_id) REFERENCES tk_owner(id)
+CONSTRAINT|tk_change|n|NOT NULL change_type
+CONSTRAINT|tk_change|n|NOT NULL entity_id
+CONSTRAINT|tk_change|n|NOT NULL entity_type
+CONSTRAINT|tk_change|n|NOT NULL occurred_at
+CONSTRAINT|tk_change|n|NOT NULL owner_id
+CONSTRAINT|tk_change|n|NOT NULL sequence
+CONSTRAINT|tk_change|p|PRIMARY KEY (owner_id, sequence)
+CONSTRAINT|tk_external_reference|c|CHECK (((entity_type)::text = 'TASK'::text))
+CONSTRAINT|tk_external_reference|f|FOREIGN KEY (owner_id, entity_type, task_id) REFERENCES tk_resource(owner_id, entity_type, id)
+CONSTRAINT|tk_external_reference|n|NOT NULL entity_type
+CONSTRAINT|tk_external_reference|n|NOT NULL external_id
+CONSTRAINT|tk_external_reference|n|NOT NULL owner_id
+CONSTRAINT|tk_external_reference|n|NOT NULL provider_id
+CONSTRAINT|tk_external_reference|n|NOT NULL reference_key
+CONSTRAINT|tk_external_reference|n|NOT NULL repository_id
+CONSTRAINT|tk_external_reference|n|NOT NULL task_id
+CONSTRAINT|tk_external_reference|p|PRIMARY KEY (owner_id, reference_key)
+CONSTRAINT|tk_owner|c|CHECK ((revision >= 0))
+CONSTRAINT|tk_owner|c|CHECK ((version >= 0))
+CONSTRAINT|tk_owner|n|NOT NULL cursor_secret
+CONSTRAINT|tk_owner|n|NOT NULL id
+CONSTRAINT|tk_owner|n|NOT NULL revision
+CONSTRAINT|tk_owner|n|NOT NULL version
+CONSTRAINT|tk_owner|n|NOT NULL zone_id
+CONSTRAINT|tk_owner|p|PRIMARY KEY (id)
+CONSTRAINT|tk_receipt|f|FOREIGN KEY (owner_id) REFERENCES tk_owner(id)
+CONSTRAINT|tk_receipt|n|NOT NULL body
+CONSTRAINT|tk_receipt|n|NOT NULL command_id
+CONSTRAINT|tk_receipt|n|NOT NULL created_at
+CONSTRAINT|tk_receipt|n|NOT NULL fingerprint
+CONSTRAINT|tk_receipt|n|NOT NULL owner_id
+CONSTRAINT|tk_receipt|n|NOT NULL status
+CONSTRAINT|tk_receipt|p|PRIMARY KEY (owner_id, command_id)
+CONSTRAINT|tk_relation|f|FOREIGN KEY (owner_id, from_type, from_id) REFERENCES tk_resource(owner_id, entity_type, id)
+CONSTRAINT|tk_relation|f|FOREIGN KEY (owner_id, to_type, to_id) REFERENCES tk_resource(owner_id, entity_type, id)
+CONSTRAINT|tk_relation|n|NOT NULL from_id
+CONSTRAINT|tk_relation|n|NOT NULL from_type
+CONSTRAINT|tk_relation|n|NOT NULL kind
+CONSTRAINT|tk_relation|n|NOT NULL owner_id
+CONSTRAINT|tk_relation|n|NOT NULL to_id
+CONSTRAINT|tk_relation|n|NOT NULL to_type
+CONSTRAINT|tk_relation|p|PRIMARY KEY (owner_id, from_type, from_id, kind, to_type, to_id)
+CONSTRAINT|tk_resource|c|CHECK ((version >= 0))
+CONSTRAINT|tk_resource|f|FOREIGN KEY (owner_id) REFERENCES tk_owner(id)
+CONSTRAINT|tk_resource|n|NOT NULL entity_type
+CONSTRAINT|tk_resource|n|NOT NULL id
+CONSTRAINT|tk_resource|n|NOT NULL owner_id
+CONSTRAINT|tk_resource|n|NOT NULL payload
+CONSTRAINT|tk_resource|n|NOT NULL version
+CONSTRAINT|tk_resource|p|PRIMARY KEY (owner_id, entity_type, id)
+CONSTRAINT|tk_schema|c|CHECK ((id = 1))
+CONSTRAINT|tk_schema|n|NOT NULL id
+CONSTRAINT|tk_schema|n|NOT NULL schema_version
+CONSTRAINT|tk_schema|n|NOT NULL state
+CONSTRAINT|tk_schema|p|PRIMARY KEY (id)
+INDEX|tk_account|CREATE UNIQUE INDEX tk_account_pkey ON public.tk_account USING btree (owner_id)
+INDEX|tk_account|CREATE UNIQUE INDEX tk_account_username_key ON public.tk_account USING btree (username)
+INDEX|tk_active|CREATE UNIQUE INDEX tk_active_pkey ON public.tk_active USING btree (owner_id)
+INDEX|tk_api_token|CREATE INDEX tk_api_token_owner ON public.tk_api_token USING btree (owner_id)
+INDEX|tk_api_token|CREATE UNIQUE INDEX tk_api_token_id_key ON public.tk_api_token USING btree (id)
+INDEX|tk_api_token|CREATE UNIQUE INDEX tk_api_token_owner_id_digest_key ON public.tk_api_token USING btree (owner_id, digest)
+INDEX|tk_api_token|CREATE UNIQUE INDEX tk_api_token_pkey ON public.tk_api_token USING btree (digest)
+INDEX|tk_auth_challenge|CREATE UNIQUE INDEX tk_auth_challenge_pkey ON public.tk_auth_challenge USING btree (digest)
+INDEX|tk_auth_control|CREATE UNIQUE INDEX tk_auth_control_pkey ON public.tk_auth_control USING btree (id)
+INDEX|tk_auth_session|CREATE INDEX tk_auth_session_owner ON public.tk_auth_session USING btree (owner_id)
+INDEX|tk_auth_session|CREATE UNIQUE INDEX tk_auth_session_pkey ON public.tk_auth_session USING btree (digest)
+INDEX|tk_auth_throttle|CREATE UNIQUE INDEX tk_auth_throttle_pkey ON public.tk_auth_throttle USING btree (id)
+INDEX|tk_change|CREATE UNIQUE INDEX tk_change_pkey ON public.tk_change USING btree (owner_id, sequence)
+INDEX|tk_external_reference|CREATE UNIQUE INDEX tk_external_reference_pkey ON public.tk_external_reference USING btree (owner_id, reference_key)
+INDEX|tk_owner|CREATE UNIQUE INDEX tk_owner_pkey ON public.tk_owner USING btree (id)
+INDEX|tk_receipt|CREATE UNIQUE INDEX tk_receipt_pkey ON public.tk_receipt USING btree (owner_id, command_id)
+INDEX|tk_relation|CREATE UNIQUE INDEX tk_relation_pkey ON public.tk_relation USING btree (owner_id, from_type, from_id, kind, to_type, to_id)
+INDEX|tk_resource|CREATE UNIQUE INDEX tk_resource_pkey ON public.tk_resource USING btree (owner_id, entity_type, id)
+INDEX|tk_schema|CREATE UNIQUE INDEX tk_schema_pkey ON public.tk_schema USING btree (id)
+RELATION|tk_account|r|f|f
+RELATION|tk_active|r|f|f
+RELATION|tk_api_token|r|f|f
+RELATION|tk_auth_challenge|r|f|f
+RELATION|tk_auth_control|r|f|f
+RELATION|tk_auth_session|r|f|f
+RELATION|tk_auth_throttle|r|f|f
+RELATION|tk_change|r|f|f
+RELATION|tk_external_reference|r|f|f
+RELATION|tk_owner|r|f|f
+RELATION|tk_receipt|r|f|f
+RELATION|tk_relation|r|f|f
+RELATION|tk_resource|r|f|f
+RELATION|tk_schema|r|f|f

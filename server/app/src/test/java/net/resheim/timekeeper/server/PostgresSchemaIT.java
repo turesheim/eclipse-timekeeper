@@ -50,6 +50,35 @@ class PostgresSchemaIT {
             ServerSchema.validate(connection);
         }
     }
+    @Test void upgradesCanonicalV1WithoutChangingPrivateData() throws Exception {
+        try(var connection=connection();var statement=connection.createStatement()) {
+            try(var input=getClass().getResourceAsStream("/db/schema-v1-postgresql.sql")) {statement.execute(new String(input.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));}
+            statement.executeUpdate("UPDATE tk_schema SET state='READY'");
+            statement.executeUpdate("INSERT INTO tk_owner VALUES('existing-owner','Europe/Oslo',7,19,'aabb')");
+            var id=UUID.randomUUID();String payload="{\"start\":\"2025-10-20T08:00:00.123456789Z\",\"ownerId\":\"existing-owner\"}";
+            try(var insert=connection.prepareStatement("INSERT INTO tk_resource VALUES('existing-owner','WORK_SESSION',?,8,?)")) {insert.setObject(1,id);insert.setString(2,payload);insert.executeUpdate();}
+            assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(connection));
+            ServerSchema.initializeOrValidate(connection,true);ServerSchema.validate(connection);ServerSchema.initializeOrValidate(connection);
+            try(var rows=statement.executeQuery("SELECT id,version,payload FROM tk_resource")) {assertTrue(rows.next());assertEquals(id,rows.getObject(1,UUID.class));assertEquals(8,rows.getLong(2));assertEquals(payload,rows.getString(3));assertFalse(rows.next());}
+            try(var rows=statement.executeQuery("SELECT schema_version,state FROM tk_schema")) {rows.next();assertEquals(2,rows.getInt(1));assertEquals("READY",rows.getString(2));}
+            try(var rows=statement.executeQuery("SELECT version,revision FROM tk_owner")) {rows.next();assertEquals(7,rows.getLong(1));assertEquals(19,rows.getLong(2));}
+        }
+    }
+    @Test void checkConstraintsRemainCanonicalAfterLogicalDumpRestoreDeparsing() throws Exception {
+        try(var connection=connection();var statement=connection.createStatement()) {
+            ServerSchema.initializeOrValidate(connection);var before=PostgresSchema.shape(connection);
+            var checks=new java.util.ArrayList<String[]>();
+            try(var rows=statement.executeQuery("SELECT c.relname,k.conname,pg_get_constraintdef(k.oid) FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND k.contype='c'")) {
+                while(rows.next()) checks.add(new String[]{rows.getString(1),rows.getString(2),rows.getString(3)});
+            }
+            for(var check:checks) {
+                assertTrue(check[0].matches("[a-z_]+") && check[1].matches("[a-z_0-9]+"));
+                statement.execute("ALTER TABLE "+check[0]+" DROP CONSTRAINT "+check[1]);
+                statement.execute("ALTER TABLE "+check[0]+" ADD CONSTRAINT "+check[1]+" "+check[2]);
+            }
+            assertEquals(before,PostgresSchema.shape(connection));ServerSchema.validate(connection);
+        }
+    }
     @ParameterizedTest @ValueSource(strings={
         "UPDATE tk_schema SET state='INITIALIZING'", "UPDATE tk_schema SET schema_version=99",
         "DELETE FROM tk_schema", "DROP TABLE tk_receipt", "DROP TABLE tk_relation",

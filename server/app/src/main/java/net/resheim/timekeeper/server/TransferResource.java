@@ -24,7 +24,7 @@ public class TransferResource {
     private static final Map<String,String> TYPES=Map.of("clients","CLIENT","projects","PROJECT","tasks","TASK","labels","LABEL","activities","ACTIVITY","workSessions","WORK_SESSION");
     @GET @Path("/export") public Response exportData() {
         ContractInputs.queries(uri.getQueryParameters());
-        return store.transaction(identity.owner(),() -> {
+        return store.authenticated(identity,() -> {
             var value=object();value.put("format","timekeeper-domain-v3");value.put("zoneId",store.profile().get("zoneId").asText());
             TYPES.forEach((name,type) -> {
                 var records=store.list(type);if(records.size()>10000) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
@@ -39,7 +39,7 @@ public class TransferResource {
             if(body.has(name) && body.get(name).isArray() && body.get(name).size()>10000) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
         }
         JsonNode input=inputs.validate("TransferSnapshot",body);ContractInputs.zone(input.get("zoneId").asText());ContractInputs.queries(uri.getQueryParameters());
-        return store.transaction(identity.owner(),() -> receipts.execute(key,"POST","/data/import",null,input,() -> importRecords(input)).response());
+        return store.authenticated(identity,() -> receipts.execute(key,"POST","/data/import",null,input,() -> importRecords(input)).response());
     }
     private ApiReplies importRecords(JsonNode input) {
         Map<UUID,UUID> clients=new HashMap<>();

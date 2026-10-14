@@ -23,7 +23,7 @@ class DistributionDocumentationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for name in ('docs/operations/SERVER.md', 'docs/architecture/API.md',
-                         'server/scripts/create_token.py'):
+                         'server/scripts/create_token.py', 'server/scripts/configure_accounts.py'):
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.touch()
@@ -74,7 +74,7 @@ class DistributionDocumentationTest(unittest.TestCase):
                          'server/app/target/quarkus-app/app/fixture.jar',
                          'server/app/target/quarkus-app/lib/fixture.jar',
                          'server/app/target/quarkus-app/quarkus/fixture.jar',
-                         'common/api/openapi.json','server/scripts/create_token.py','LICENSE'):
+                         'common/api/openapi.json','server/scripts/create_token.py', 'server/scripts/configure_accounts.py','LICENSE'):
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('Packaging fixture')
             with zipfile.ZipFile(root/'server/app/target/quarkus-app/app/fixture.jar','w') as jar:
                 jar.writestr('timekeeper-build.properties', f'commit={COMMIT}\ndirty=false\n')

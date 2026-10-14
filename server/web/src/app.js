@@ -1,6 +1,6 @@
 import {Api, ApiError} from './api.js';
 import {addDays, dateInZone, dayStart, durationText, durationNanos, instantText, instantNanos, weekRange, taskPresentation, activityDayNanos, nanosText, decimalHoursText, workweekGroups, sessionTimeNanos, localDateTime, localDateTimeToInstant} from './model.js';
-import {savedToken, rememberToken, forgetToken} from './credentials.js';
+import {authentication} from './auth.js';
 import {icon, iconButton} from './icons.js';
 import {WeekCalendar} from './calendar.js';
 import {sameSession} from './calendar-model.js';
@@ -9,7 +9,7 @@ const $ = id => document.getElementById(id);
 let api = null, snapshot = null, connected = false, refreshing = null, reloadAgain = false;
 let editor = null, selectedActivity = null, selectedDay = null;
 let watchSession = null;
-let activeCredential = '';
+let accountName = '';
 let serverInfoRequest = 0;
 let selectedWorkSession = null, snapshotAt = 0, sessionAsOf = 0n;
 const collapsed = new Set();
@@ -75,42 +75,26 @@ function tab(name) {
 }
 for (const node of document.querySelectorAll('[data-tab]')) node.addEventListener('click', () => tab(node.dataset.tab));
 
-$('login-form').addEventListener('submit', event => { event.preventDefault(); void signIn($('token').value); });
-async function signIn(token) {
-  const form = $('login-form');
-  const session = new Api(token); $('token').value = ''; $('login-error').textContent = '';
-  form.querySelector('button').disabled = true;
-  try {
-    // Reject remote clear-text deployments before sending credentials.
-    if (location.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) throw new Error('Use HTTPS to sign in to this server.');
-    const {data: profile} = await session.request('/me');
-    activeCredential = token;
-    $('remember-notice').textContent = rememberToken(token) ? '' : 'Signed in, but this browser could not remember your token. You will need it after reloading.';
+const auth = authentication({
+  async connect(session, account) {
+    api = session; accountName = account.displayName;
+    const {data:profile} = await session.request('/me');
+    if(session !== api) return;
     $('week-date').value = dateInZone(Date.now(), profile.zoneId);
-    api = session; $('login').hidden = true; $('workspace').hidden = false; $('session').hidden = false;
+    $('login').hidden = true; $('workspace').hidden = false; $('session').hidden = false;
     await refresh(); startWatch(session);
-  } catch (error) {
-    if (api === session) { api = null; $('login').hidden = false; $('workspace').hidden = true; $('session').hidden = true; }
-    session.close();
-    if (error.status === 401) forgetToken(token);
-    else $('token').value = token;
-    activeCredential = '';
-    $('login-error').textContent = error instanceof ApiError ? error.message : 'Use HTTPS and a valid server time zone to sign in.';
-  } finally { form.querySelector('button').disabled = false; }
-}
-$('sign-out').addEventListener('click', () => {
-  ++serverInfoRequest; clearServerInfo();
-  const forgotten = forgetToken(activeCredential);
-  activeCredential = '';
-  api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null;
-  calendar.reset();
-  collapsed.clear(); selectedWorkSession = null; $('session-activities').replaceChildren();
-  $('editor').close(); $('fields').replaceChildren(); $('token').value = '';
-  $('login').hidden = false; $('workspace').hidden = true; $('session').hidden = true;
-  for (const id of ['projects', 'tasks', 'labels', 'activities', 'days']) $(id).replaceChildren();
-  $('owner').textContent = ''; $('token').focus();
-  $('remember-notice').textContent = '';
-  $('login-error').textContent = forgotten ? '' : 'This browser could not forget your token. Clear site data in the browser settings.';
+  },
+  updateAccount(account) {accountName = account.displayName;},
+  clear() {
+    refreshing = null; reloadAgain = false;
+    ++serverInfoRequest; clearServerInfo(); api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null; accountName = '';
+    calendar.reset(); collapsed.clear(); selectedWorkSession = null;
+    $('editor').close(); $('fields').replaceChildren(); $('editor-error').textContent = ''; $('editor-notice').textContent = '';
+    for(const id of ['clients','projects','tasks','labels','activities','days','session-activities','work-session-choice']) $(id).replaceChildren();
+    for(const id of ['owner','status','active-title','active-details','work-session-current','work-session-state','work-session-started','session-warning','zone-caption','week-total','ws-duration','ws-tracked','ws-covered','ws-unallocated']) $(id).textContent = '';
+    $('login').hidden = false; $('workspace').hidden = true; $('session').hidden = true; $('remember-notice').textContent = '';
+    tab('week');
+  }
 });
 $('refresh').addEventListener('click', () => { const session = api; void refresh().then(() => { if (session === api) startWatch(session); }).catch(() => {}); });
 $('week-date').addEventListener('change', () => { selectedDay = null; void refresh().catch(() => {}); });
@@ -122,7 +106,7 @@ async function refresh() {
   if (!api) return;
   if (refreshing) { reloadAgain = true; await refreshing; return; }
   const session = api;
-  refreshing = (async () => {
+  const pending = (async () => {
     do {
       reloadAgain = false;
       const date = $('week-date').value, selected = selectedWorkSession;
@@ -137,11 +121,12 @@ async function refresh() {
       void refreshServerInfo(session);
     } while (reloadAgain && session === api);
   })();
-  try { await refreshing; }
+  refreshing = pending;
+  try { await pending; }
   catch (error) {
-    if (session === api) { connected = false; setStatus(errorText(error)); readOnlyWhileDisconnected(); }
+    if (session === api) { if(error.status === 401) auth.clear(errorText(error)); else {connected = false; setStatus(errorText(error)); readOnlyWhileDisconnected();} }
     throw error;
-  } finally { refreshing = null; }
+  } finally { if(refreshing === pending) refreshing = null; }
 }
 async function watch(session) {
   let delay = 1000;
@@ -158,7 +143,8 @@ async function watch(session) {
       if (session !== api) return;
       if (error.code === 'RESYNC_REQUIRED') { connected = false; continue; }
       connected = false; setStatus(errorText(error)); readOnlyWhileDisconnected();
-      if (error.status === 401 || error.status === 403) return;
+      if (error.status === 401) {auth.clear(errorText(error));return;}
+      if (error.status === 403) return;
       await new Promise(resolve => setTimeout(resolve, delay)); delay = Math.min(delay * 2, 10000);
     }
   }
@@ -190,7 +176,7 @@ function taskLabel(task) {
 }
 function render() {
   const s = snapshot, zone = s.profile.data.zoneId;
-  $('owner').textContent = s.profile.data.ownerId;
+  $('owner').textContent = accountName;
   $('zone-caption').textContent = `${s.dates.first} – ${addDays(s.dates.first, 6)} · ${zone}`;
   const active = s.active.data;
   $('active-title').closest('.tracking').dataset.active=String(!!active);
@@ -431,6 +417,7 @@ async function saveEditor(event) {
     if(saved.data?.outsideSession) setStatus('Saved. This activity extends outside the selected work session.');
   } catch (error) {
     if (current !== editor || current.session !== api) return;
+    if(error.status === 401) {auth.clear(errorText(error));return;}
     $('editor-error').textContent = error instanceof ApiError ? errorText(error) : error.message;
     if (error.uncertain) {
       current.uncertain = true;
@@ -522,10 +509,10 @@ $('session-stop').addEventListener('click',()=> {
 for(const [id,work] of [['session-new',()=>openRecord('work-sessions')],['session-edit',()=>openRecord('work-sessions',snapshot.workSessionReport.session.id)],['session-delete',()=>openDelete('work-sessions',snapshot.workSessionReport.session.id)],['session-add',()=>openRecord('activities',null,snapshot.workSessionReport.session.id)],['session-associate',()=>openAssociation()]]) $(id).addEventListener('click',()=> {void work().catch(error=>setStatus(errorText(error)));});
 for(const [id,glyph,label] of [['session-start','start','Start work session'],['session-stop','stop','Stop work session'],['session-new','add','Record work session'],['session-edit','edit','Edit work session'],['session-delete','delete','Delete work session'],['session-add','add','Add activity to session'],['session-associate','link','Associate activity']]) iconButton($(id),glyph,label);
 setInterval(renderSessionTime,1000);
-window.addEventListener('pagehide', () => api?.close());
+window.addEventListener('pagehide', () => auth.clear());
+window.addEventListener('pageshow', event => {if(event.persisted) void auth.initialize();});
 iconButton($('refresh'), 'refresh', 'Refresh');
 iconButton($('collapse-activities'), 'collapse', 'Hide activities');
 iconButton($('expand-activities'), 'expand', 'Show activities');
 $('stop').prepend(icon('stop'));
-const remembered = savedToken();
-if (remembered) void signIn(remembered);
+void auth.initialize();

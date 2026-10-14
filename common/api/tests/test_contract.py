@@ -28,7 +28,7 @@ class ContractTest(unittest.TestCase):
             Draft202012Validator.check_schema(schema)
 
     def test_all_private_operations_require_token_and_permission(self):
-        self.assertEqual([{'bearerAuth': []}], CONTRACT['security'])
+        self.assertEqual([{'bearerAuth': []}, {'browserSession': []}], CONTRACT['security'])
         ids = []
         for path, item in CONTRACT['paths'].items():
             for method in ('get', 'post', 'put', 'delete'):
@@ -36,11 +36,11 @@ class ContractTest(unittest.TestCase):
                     continue
                 operation = item[method]
                 ids.append(operation['operationId'])
-                if path == '/openapi.json':
+                if path in ('/openapi.json', '/auth/status', '/auth/login', '/auth/setup', '/auth/recover'):
                     self.assertEqual([], operation['security'])
                     continue
                 self.assertNotIn('security', operation)
-                self.assertEqual('read' if method == 'get' else 'write',
+                self.assertEqual(('write' if path.startswith('/auth/users') else 'read') if method == 'get' else ('read' if path in ('/auth/logout', '/auth/token-login') else 'write'),
                                  operation['x-required-permission'])
                 self.assertIn('401', operation['responses'])
                 self.assertIn('403', operation['responses'])
@@ -106,7 +106,7 @@ class ContractTest(unittest.TestCase):
     def test_versioned_mutations_and_durable_commands(self):
         for path, item in CONTRACT['paths'].items():
             for method in ('put', 'delete'):
-                if method in item:
+                if method in item and path != '/auth/tokens/{id}':
                     op = item[method]
                     self.assertIn({'$ref': '#/components/parameters/IfMatch'}, op['parameters'])
                     self.assertIn('412', op['responses'])
@@ -185,6 +185,7 @@ class ContractTest(unittest.TestCase):
             'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',
             'createWorkSession', 'getWorkSession', 'updateWorkSession', 'deleteWorkSession', 'listWorkSessions',
             'getActiveWorkSession', 'startWorkSession', 'stopWorkSession', 'associateWorkSession', 'reportWorkSession',
+            'getAuthStatus', 'login', 'setupAccount', 'recoverAccount', 'exchangeApiToken', 'getAuthSession', 'logout', 'getAccount', 'updateAccount', 'changePassword', 'listPersonalTokens', 'createPersonalToken', 'revokePersonalToken', 'listUserAccounts', 'createUserAccount', 'getUserAccount', 'updateUserAccount',
             'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()

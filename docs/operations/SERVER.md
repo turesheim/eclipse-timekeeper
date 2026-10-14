@@ -2,7 +2,7 @@
 
 The server implements the [owner-scoped v1 API](../architecture/API-V1.md) for #218.
 It uses Quarkus **3.40.1 LTS**, Java **21**, H2 **2.5.250**, and its own schema
-version **1**. The same ordinary Java domain/application-service sources are
+version **2**. The same ordinary Java domain/application-service sources are
 compiled by the standalone Maven reactor and the Eclipse build. The server has
 no Eclipse Platform, workspace, SWT, Mylyn, OSGi or JPA dependency.
 
@@ -44,14 +44,10 @@ the previous images on failure. Database upgrades are separate maintenance work.
 
 Use a separate empty server database; the embedded Eclipse schema 3 and
 historical databases are unsupported. The server never copies or merges embedded
-data automatically. Set an explicit JDBC URL and a token registry file:
-
-```sh
-python create_token.py --owner alice --file /secure/timekeeper/tokens.json
-export TIMEKEEPER_SERVER_DB_URL='jdbc:h2:/data/timekeeper/server'
-export TIMEKEEPER_SERVER_TOKENS_FILE='/secure/timekeeper/tokens.json'
-java -jar quarkus-run.jar
-```
+data automatically. Follow [account setup and migration](ACCOUNTS.md) to create
+the first administrator, claim existing owners explicitly, and issue personal
+Eclipse API tokens. The same guide describes password recovery and session
+lifetimes. Configure an explicit JDBC URL before starting the JVM.
 
 The authenticated `GET /api/v1/server` reports this server's build identity and
 timestamps, which the web client displays in its footer. For a direct JVM
@@ -60,20 +56,10 @@ deployment, set `TIMEKEEPER_DEPLOYED_AT` to the actual UTC deployment timestamp
 environment across restarts. Without a recorded deployment timestamp, the web
 client shows **Not recorded**; process-start time remains available separately.
 
-The token command prints one newly generated 256-bit bearer token. Save it in the
-client's credential store; the registry contains only SHA-256 hashes. Run from
-the extracted `timekeeper-server` distribution directory. From a source checkout,
-the corresponding paths are `server/scripts/create_token.py` and
-`server/app/target/quarkus-app/quarkus-run.jar`.
-
-The database directory and registry are administrator-owned. Registry entries
-use `ownerId`, `sha256`, `permissions` (`read`, optionally `write`) and optional
-`expiresAt` (UTC timestamp). Owners are stable, nonblank IDs; `local` is reserved
-for embedded mode. Multiple generated tokens can belong to one owner. New
-owners receive a UTC profile at startup, or on their first successful operation
-after being added to a running server, and can set an
-IANA reporting zone through `PUT /api/v1/me` with its ETag. API requests never
-select another owner.
+Each account has a stable owner ID; usernames and display names can change.
+All business data is private to that owner, including for administrators. New
+owners receive a UTC profile and can set their IANA reporting zone through
+`PUT /api/v1/me` with its ETag. API requests never select another owner.
 
 Each account starts with the same eight labels as embedded Eclipse:
 Production issue, Testing, Prototyping, Planning, Programming, Debugging,
@@ -85,19 +71,15 @@ restores the defaults, matching embedded initialization. New owners added while
 running are initialized atomically on their first successful operation. Both
 deployments use the shared catalog in `common/timekeeper-domain`.
 
-Use `--read-only` or `--expires-at 2026-12-31T23:59:59Z` when generating a token.
-Rotate by adding a new token for the same owner, configuring the client, then
-removing the old hash. Replace the registry atomically when editing it. Every
-request/retry reloads it; revocation and permission reduction also apply to
-previously stored command responses. Pending change polls recheck authorization.
-A malformed or missing registry fails startup or makes readiness DOWN, and
-private API requests fail with 503.
+The legacy token registry remains available during migration; new personal API
+tokens are managed under **Account** in the web client. An unset registry or an
+empty array is valid. A configured missing/malformed registry fails startup or
+readiness and private API requests return 503.
 
 By default the server binds `127.0.0.1:8080`. `QUARKUS_HTTP_PORT` changes the port;
-`QUARKUS_HTTP_HOST` changes the bind address. Use TLS at Quarkus or a TLS reverse
-proxy before exposing it beyond loopback. Bearer tokens are sent only in the
-Authorization header, never URL parameters or database records. The server has
-no account-sharing/admin-data API and no anonymous local-owner fallback.
+`QUARKUS_HTTP_HOST` changes the bind address. Use TLS outside loopback and set
+`TIMEKEEPER_PUBLIC_ORIGIN` when terminating HTTPS at a reverse proxy. There is no
+cross-account sharing or anonymous local-owner fallback.
 
 Optional JDBC credentials use `TIMEKEEPER_SERVER_DB_USER` (default `sa`) and
 `TIMEKEEPER_SERVER_DB_PASSWORD`. The server database account requires schema
@@ -110,7 +92,7 @@ storage is suitable for tests; production uses durable file/server storage.
 ## Data and operational behavior
 
 `GET /api/v1/openapi.json` serves the canonical public contract. All data routes
-require the token's read/write permission and bind repository operations to its
+require the session or token's read/write permission and bind repository operations to its
 owner. Database foreign keys include owner/type/UUID; external identities are
 unique per owner and only one interval may be open per owner. Resource updates
 use both strong opaque ETags and SQL version predicates. An owner row lock
@@ -124,8 +106,9 @@ version marker before accepting existing storage. Unknown tables/views,
 non-public schemas, user sequences/domains, incomplete initialization and missing
 ownership constraints fail without schema/data repair. H2 DDL commits during
 initialization, so interrupted creation retains `INITIALIZING` and requires an
-operator to select new storage or restore a known valid backup. No historical or
-embedded-schema migration is provided.
+operator to select new storage or restore a known valid backup. The canonical
+server schema 1 upgrades to schema 2 as described in the [account guide](ACCOUNTS.md);
+no historical or embedded-schema migration is provided.
 
 After schema validation, the server sets
 [`WRITE_DELAY=0`](https://h2database.com/html/commands.html#set_write_delay)

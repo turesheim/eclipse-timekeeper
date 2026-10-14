@@ -31,20 +31,23 @@ public class ServerStore {
     @Inject AgroalDataSource datasource;
     @Inject TokenRegistry tokens;
     @Inject BackendClock clock;
+    @Inject AccountStore accounts;
     private final java.util.concurrent.ConcurrentMap<String,String> partitionDates=new java.util.concurrent.ConcurrentHashMap<>();
     private java.util.concurrent.ScheduledExecutorService maintenance;
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="quarkus.datasource.jdbc.url") String jdbcUrl;
     private final ThreadLocal<Context> context = new ThreadLocal<>();
     record Context(String owner, Connection connection, Instant now) { }
+    @org.eclipse.microprofile.config.inject.ConfigProperty(name="timekeeper.schema.allow-upgrade",defaultValue="false") boolean allowSchemaUpgrade;
     void start(@Observes StartupEvent event) throws Exception {
         DatabaseConfiguration.validate(jdbcUrl);
         try (var connection = datasource.getConnection()) {
-            ServerSchema.initializeOrValidate(connection);
+            ServerSchema.initializeOrValidate(connection,allowSchemaUpgrade);
             // Apply only after validation: an acknowledged commit must survive process kill.
             if (!postgres()) {
                 try(var statement=connection.createStatement()) {statement.execute("SET WRITE_DELAY 0");}
             }
         }
+        accounts.initialize();
         initializeConfiguredOwners();
         maintenance=java.util.concurrent.Executors.newSingleThreadScheduledExecutor(work -> {
             var thread=new Thread(work,"Timekeeper day boundaries");thread.setDaemon(true);return thread;
@@ -108,7 +111,11 @@ public class ServerStore {
                     lock.setString(1,owner); try (var rows = lock.executeQuery()) { if (!rows.next()) throw new SQLException("Missing owner"); }
                 }
                 context.set(new Context(owner,connection,clock.now()));
-                if (created) initializeDefaultLabels();
+                AccountStore.ensureAccount(connection,owner);
+                try(var initialized=statement("SELECT initialized FROM tk_account WHERE owner_id=?",owner);var rows=initialized.executeQuery()) {
+                    if(!rows.next()) throw new SQLException("Missing account identity");
+                    if(!rows.getBoolean(1)) {initializeDefaultLabels();update("UPDATE tk_account SET initialized=TRUE WHERE owner_id=?",owner);}
+                }
                 String date=partitionDate(profile().get("zoneId").asText(),now());
                 if(!date.equals(partitionDates.get(owner))) service().rolloverActivities(new OwnerId(owner));
                 T result = work.get(); connection.commit(); partitionDates.put(owner,date);return result;
@@ -117,6 +124,9 @@ public class ServerStore {
                 throw e;
             } finally { context.remove(); }
         } catch (SQLException e) { throw databaseFailure(e); }
+    }
+    public <T> T authenticated(RequestIdentity identity,Supplier<T> work) {
+        return transaction(identity.owner(),()->{identity.guard(current().connection());return work.get();});
     }
     private RuntimeException databaseFailure(SQLException e) {
         if ("23505".equals(e.getSQLState()) || "23503".equals(e.getSQLState()) || "23506".equals(e.getSQLState())) return ApiFailure.conflict();
