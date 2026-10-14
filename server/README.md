@@ -6,6 +6,7 @@ root with `./mvnw -B -ntp -f server/pom.xml clean verify`.
 
 - [Server configuration and behavior](../docs/operations/SERVER.md)
 - [Local Docker setup and Tailscale access](../docs/operations/LOCAL-DOCKER.md)
+- [Synology DSM package candidate and native PostgreSQL](../docs/operations/SYNOLOGY-PACKAGE.md)
 - [Deployment, backup and rolling updates](../docs/operations/DEPLOYMENT.md)
 - [Web client development](../docs/development/WEB-CLIENT.md)
 - [API v1 contract](../docs/architecture/API-V1.md)

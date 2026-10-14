@@ -132,9 +132,29 @@ def main():
             if copied.read_text()!=tokens:raise AssertionError('Migration changed legacy token ownership')
             helper('import-postgresql18',native_archive,expected=1)
             helper('cancel-empty-import',expected=1)
-            print(json.dumps({'source':'postgres:18.6-bookworm','target':'postgres:17.11-bookworm','tablesCompared':len(exporter.TABLES),
+            # Disaster recovery uses a freshly provisioned dedicated role/database;
+            # business ownership must not depend on the old PostgreSQL service role.
+            native_backup=helper('backup').stdout.strip()
+            command('docker','exec','--user','10001:10001',target,'cp',native_backup,'/var/packages/timekeeper/native-recovery.tar')
+            previous_password=folder/'previous-password'
+            command('docker','cp',target+':/var/packages/timekeeper/shares/timekeeper-data/server/secrets/database_password',str(previous_password))
+            command('docker','exec','--user','10001:10001',target,'mv','/var/packages/timekeeper/shares/timekeeper-data/server','/var/packages/timekeeper/shares/timekeeper-data/retained-before-recovery')
+            env['wizard_database']='timekeeper_recovered';env['wizard_database_role']='timekeeper_recovered_app'
+            env_file.write_text(''.join(key+'='+value+'\n' for key,value in env.items()))
+            helper('install')
+            recovered_schema="SET ROLE timekeeper_recovered_app; "+(DB/'schema-v1-postgresql.sql').read_text()+(DB/'auth-v2.sql').read_text()+"UPDATE tk_schema SET schema_version=2,state='READY';"
+            command('docker','exec','-i',target,'psql','-X','-q','-v','ON_ERROR_STOP=1','-U','postgres','-p','5433','-d','timekeeper_recovered',input=recovered_schema)
+            helper('restore','/var/packages/timekeeper/native-recovery.tar')
+            restored=command('docker','exec','-i',target,'psql','-X','-q','-A','-t','-U','postgres','-p','5433','-d','timekeeper_recovered',input='\n'.join(exporter.fingerprint_sql(table) for table in exporter.TABLES)).stdout.strip()
+            if restored!=fingerprints:raise AssertionError('Fresh-installation recovery changed owner data')
+            recovered_password=folder/'recovered-password'
+            command('docker','cp',target+':/var/packages/timekeeper/shares/timekeeper-data/server/secrets/database_password',str(recovered_password))
+            if recovered_password.read_bytes()==previous_password.read_bytes():raise AssertionError('Fresh recovery reused the source service credential')
+            previous=command('docker','exec','-i',target,'psql','-X','-q','-A','-t','-U','postgres','-p','5433','-d','timekeeper_fixture',input='\n'.join(exporter.fingerprint_sql(table) for table in exporter.TABLES)).stdout.strip()
+            if previous!=fingerprints:raise AssertionError('Recovery changed a database outside its dedicated target')
+            print(json.dumps({'source':'postgres:18.6-bookworm' ,'target':'postgres:17.11-bookworm','tablesCompared':len(exporter.TABLES),
                 'allTableFingerprintsMatch':True,'twoOwnersWithSharedResourceIds':True,'exactNanosecondTimestampsAndLargeRevisions':True,
-                'accountAndTokenSessionHashesPreserved':True,'legacyRegistryPreserved':True,'usedTargetRefused':True,'fingerprintMismatchRollsBackAtomically':True,'emptyFailedImportCanBeCancelled':True}))
+                'accountAndTokenSessionHashesPreserved':True,'legacyRegistryPreserved':True,'usedTargetRefused':True,'fingerprintMismatchRollsBackAtomically':True,'emptyFailedImportCanBeCancelled':True,'freshInstallationRestoreWithNewServiceCredential':True,'otherDatabaseUntouched':True}))
         finally:
             for name in names:command('docker','rm','-f','-v',name,check=False)
 

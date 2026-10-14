@@ -93,9 +93,19 @@ fails, leave the package stopped and resolve the error before retrying. Restorin
 an older backup also restores its older password, token and session state; follow
 [account recovery guidance](ACCOUNTS.md) for subsequent credential changes.
 
-This command targets an existing, provisioned installation. Rebuilding a lost native
-PostgreSQL installation from an archive still requires an explicit recovery flow;
-do not replace PostgreSQL's data directory with files from another major version.
+For disaster recovery, install/provision a fresh Timekeeper database and role,
+allow the application to create its canonical schema, then stop it and restore the
+native archive using the same command. The new service credential remains in use;
+business owners and their credentials come from the backup. This recovery is tested
+with a different role/password/database, leaving the original database untouched.
+
+If retained settings point at a lost database, keep the package stopped and move
+its private `server` directory aside using an administrator Task Scheduler task.
+Keep that directory and the original archive. Reinstall through Package Center,
+choose unused database/role names, and restore a copy of the archive into the
+freshly provisioned installation. Give the new package account ownership of the
+copied archive. Do not overwrite the retained original or remove unrelated roles,
+databases or the shared PostgreSQL package.
 
 ## Migrating from containerized PostgreSQL 18
 
@@ -180,6 +190,34 @@ python3 server/scripts/package_synology.py --commit "$COMMIT" --image "ghcr.io/t
 Preview SPKs use `1.99.0-<revision>` so the eventual stable `2.0.0` package sorts
 higher in DSM. Both identify the actual server build in the web footer. Preloading
 the tested image avoids unpublished PR tags and moving registry aliases.
+
+## Candidate downloads and repository discovery
+
+The **Server containers → Synology candidate and PostgreSQL 17** CI job uploads
+`synology-preview-candidate` after both PostgreSQL major versions pass. Download
+that artifact from the successful PR/main workflow and verify the adjacent SHA-256
+before a manual NAS installation. It includes the SPK, source/image provenance,
+preview `catalog.json`, icons and automated acceptance evidence.
+
+The catalog uses a separate `/synology/preview/r1000/` HTTPS directory and links to
+the immutable versioned SPK beside it. Its install/upgrade flags keep the wizard
+interactive. Configure SynoCommunity separately for the PostgreSQL dependency.
+The generator can be run against a verified candidate directory:
+
+```sh
+python3 server/scripts/synology_catalog.py --package server/target/synology/timekeeper-1.99.0-1-r1000.spk --base-url https://turesheim.github.io/eclipse-timekeeper/synology/preview/r1000/
+```
+
+This generates files locally. **No Timekeeper package source is live yet.** First
+validate manual install on the actual NAS, then test catalog discovery over HTTPS,
+including the request method DSM uses, dependency resolution and version updates.
+A static Pages catalog is suitable only if the tested client accepts GET requests;
+a POST-requiring client needs a repository service. Stable publication remains
+separate and disabled until the required NAS acceptance and hosting are resolved.
+SynoCommunity inclusion remains subject to upstream acceptance.
+
+The catalog fields follow the [SynoCommunity NAS catalog implementation](https://github.com/SynoCommunity/spkrepo/blob/main/spkrepo/domain/catalog.py)
+and its [repository setup guide](https://docs.synocommunity.com/developer-guide/publishing/package-server/).
 
 ## Verification status
 

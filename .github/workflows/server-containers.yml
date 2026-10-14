@@ -139,6 +139,8 @@ jobs:
           python server/scripts/compose_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --postgres-image postgres:17.11-bookworm --output server/target/synology-acceptance
       - name: Build and validate the self-contained preview package
         run: python server/scripts/package_synology.py --commit "$GITHUB_SHA" --image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --revision "$GITHUB_RUN_NUMBER" --output server/target/synology
+      - name: Generate preview discovery metadata for NAS acceptance
+        run: python server/scripts/synology_catalog.py --package "server/target/synology/timekeeper-1.99.0-$GITHUB_RUN_NUMBER-r1000.spk" --base-url "https://turesheim.github.io/eclipse-timekeeper/synology/preview/r1000/"
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
@@ -147,6 +149,7 @@ jobs:
             server/target/synology/*.spk
             server/target/synology/*.spk.sha256
             server/target/synology/*.json
+            server/target/synology/*.png
             server/target/synology-acceptance/acceptance.json
             server/**/target/surefire-reports/
 

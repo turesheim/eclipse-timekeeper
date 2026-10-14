@@ -56,7 +56,7 @@ def verify_image(image, commit, directory):
     inspected = json.loads(subprocess.check_output(['docker','image','inspect',image], text=True))[0]
     if inspected['Architecture'] != 'amd64' or inspected['Os'] != 'linux':
         raise ValueError('The initial DS923+ package requires a linux/amd64 image')
-    created = subprocess.check_output(['docker','create','--network','none',image], text=True).strip()
+    created = subprocess.check_output(['docker','create','--platform','linux/amd64','--network','none',image], text=True).strip()
     app = directory / 'app'
     app.mkdir()
     try:
