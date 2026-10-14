@@ -48,7 +48,7 @@ def main():
             sock.bind(('127.0.0.1', 0)); port = sock.getsockname()[1]
         base = f'http://127.0.0.1:{port}'
         environment = {**os.environ, 'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:' + str(data / 'database'), 'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry), 'TIMEKEEPER_SERVER_SETUP_FILE':str(data / 'setup.json'),
-                       'TIMEKEEPER_DEPLOYED_AT':'2026-10-13T08:30:00Z', 'TIMEKEEPER_WEB_BUILD_COMMIT':manifest['commit']}
+                       'TIMEKEEPER_PUBLIC_ORIGIN':'NONE', 'TIMEKEEPER_DEPLOYED_AT':'2026-10-13T08:30:00Z', 'TIMEKEEPER_WEB_BUILD_COMMIT':manifest['commit']}
         server_log = ROOT / 'server/web/target/server.log'
         server_log.parent.mkdir(parents=True, exist_ok=True)
         with server_log.open('w') as log:

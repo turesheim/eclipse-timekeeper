@@ -3,7 +3,7 @@ import {savedToken, forgetToken} from './credentials.js';
 import {openAccount, closeAccount} from './account.js';
 
 const $ = id => document.getElementById(id);
-export function authentication({connect, clear}) {
+export function authentication({connect, clear, updateAccount}) {
   let active = null, generation = 0;
   const errorText = error => error instanceof ApiError ? error.message : 'Unable to sign in. Use HTTPS and check your account details.';
   function mode() {
@@ -58,7 +58,7 @@ export function authentication({connect, clear}) {
       if(error.status === 401) reset(); else $('status').textContent = 'Sign-out could not be confirmed. Please retry while connected.';
     }).finally(() => {$('sign-out').disabled = false;});
   });
-  $('account').addEventListener('click', () => {if(active) void openAccount(active,reset);});
+  $('account').addEventListener('click', () => {if(active) void openAccount(active,reset,updateAccount);});
   return {clear:reset, async initialize() {
     const current = ++generation;
     try { const session = new Api(); const {data} = await session.request('/auth/session'); session.close(); forgetToken(); await attach(data,current); }

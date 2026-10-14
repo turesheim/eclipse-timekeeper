@@ -5,10 +5,10 @@ const node = (tag,text) => {const value=document.createElement(tag);if(text!==un
 export function closeAccount() {++generation;$('account-dialog').close();$('account-content').replaceChildren();$('account-error').textContent='';}
 $('account-close').addEventListener('click',closeAccount);
 $('account-dialog').addEventListener('cancel',event=>{event.preventDefault();closeAccount();});
-export async function openAccount(session,signOut) {
+export async function openAccount(session,signOut,updateAccount) {
   const current=++generation, root=$('account-content');root.replaceChildren();$('account-error').textContent='';$('account-dialog').showModal();
   const valid=()=>current===generation;
-  const run=async work=>{if(!valid()) return;$('account-error').textContent='';try {await work();}catch(error){if(valid()) $('account-error').textContent=error.message;}};
+  const run=async work=>{if(!valid()) return;$('account-error').textContent='';try {await work();}catch(error){if(valid()) {if(error.status===401) signOut(error.message);else $('account-error').textContent=error.message;}}};
   function field(form,label,value='',type='text') {
     const wrapper=node('label',label),input=node('input');input.type=type;
     if(type==='checkbox') {input.checked=!!value;wrapper.className='check';} else {input.value=value;input.required=true;}
@@ -25,7 +25,7 @@ export async function openAccount(session,signOut) {
     root.append(node('p',`Signed in as ${account.displayName}. Your records are private to this account.`));
     if(account.state==='UNCLAIMED') root.append(node('p','Ask the server operator for an account recovery code to add a username and password to this existing account.'));
     else {
-      const profile=form('Profile','Save profile',async()=>{const reply=await session.request('/auth/account',{method:'PUT',etag:loaded.etag,body:{username:username.value,displayName:display.value}});loaded.etag=reply.etag;if(valid()) $('owner').textContent=reply.data.displayName;});
+      const profile=form('Profile','Save profile',async()=>{const reply=await session.request('/auth/account',{method:'PUT',etag:loaded.etag,body:{username:username.value,displayName:display.value}});loaded.etag=reply.etag;if(valid()) {updateAccount(reply.data);$('owner').textContent=reply.data.displayName;}});
       const username=field(profile.value,'Account username',account.username),display=field(profile.value,'Account display name',account.displayName);username.autocomplete='username';profile.finish();
       const password=form('Change password','Change password',async()=>{await session.request('/auth/password',{method:'POST',body:{currentPassword:old.value,newPassword:next.value}});if(valid()) signOut('Password changed. Sign in again. Existing sessions and API tokens have been revoked.');});
       const old=field(password.value,'Current password','','password'),next=field(password.value,'New password','','password');old.autocomplete='current-password';old.minLength=0;password.finish();
@@ -58,7 +58,8 @@ export async function openAccount(session,signOut) {
             const path=`/auth/users/${ownerHeader(user.ownerId)}`,loaded=await session.request(path);
             // The values rendered above must still match the account version being edited.
             if(loaded.data.user.version!==user.version) throw new Error('This account changed. Close and reopen Account before editing it.');
-            await session.request(path,{method:'PUT',etag:loaded.etag,body:{username:username.value,displayName:display.value,enabled:enabled.checked,administrator:admin.checked}});
+            const saved=await session.request(path,{method:'PUT',etag:loaded.etag,body:{username:username.value,displayName:display.value,enabled:enabled.checked,administrator:admin.checked}});
+            if(valid() && user.ownerId===account.ownerId) {updateAccount(saved.data.user);$('owner').textContent=saved.data.user.displayName;}
             if(user.ownerId===account.ownerId && (!enabled.checked || !admin.checked)) {if(valid()) signOut('Account access changed. Sign in again.');return;}
             await loadUsers();
           }).finally(()=>{save.disabled=false;});});

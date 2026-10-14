@@ -22,6 +22,7 @@ from urllib.request import urlopen
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'common/api/tests'))
 import http_acceptance as contract
+from configure_accounts import create_challenge
 
 
 def main():
@@ -47,6 +48,8 @@ def main():
                                     'TIMEKEEPER_DEPLOYED_AT=2026-10-13T08:30:00Z\n')
     subprocess.run([sys.executable, str(deployment / 'setup.py'), '--owner', 'owner-a'],
                    check=True, stdout=subprocess.DEVNULL)
+    setup_code, _ = create_challenge(state / 'config/account-setup.json', owner='owner-a', replace=True)
+    (state / 'config/account-setup.json').chmod(0o644)
     tokens = {role: secrets.token_urlsafe(32) for role in ('a', 'b', 'read', 'expired')}
     registry = [{'ownerId': 'owner-b' if role == 'b' else 'owner-a',
                  'sha256': hashlib.sha256(token.encode()).hexdigest(),
@@ -55,7 +58,7 @@ def main():
                 for role, token in tokens.items()]
     (state / 'config/tokens.json').write_text(json.dumps(registry))
     environment = dict(os.environ)
-    for name in ('TIMEKEEPER_STATE_DIR', 'TIMEKEEPER_SERVER_IMAGE', 'TIMEKEEPER_POSTGRES_IMAGE', 'TIMEKEEPER_HTTP_PORT', 'TIMEKEEPER_DEPLOYED_AT'):
+    for name in ('TIMEKEEPER_STATE_DIR', 'TIMEKEEPER_SERVER_IMAGE', 'TIMEKEEPER_POSTGRES_IMAGE', 'TIMEKEEPER_HTTP_PORT', 'TIMEKEEPER_DEPLOYED_AT', 'TIMEKEEPER_SERVER_SETUP_FILE', 'TIMEKEEPER_PUBLIC_ORIGIN'):
         environment.pop(name, None)
     command = ['docker', 'compose', '-p', project]
 
@@ -115,6 +118,44 @@ def main():
                                          'http://localhost:8080/api/v1/me',
                                          input='Authorization: Bearer ' + tokens['a'] + '\n'))
             client.assertEqual('owner-a', identity['ownerId'])
+        # Exercise the same cookie on both actual JVMs; configuration contains no raw credentials.
+        def node_request(member, method, path, body=None, cookie=None, csrf=None, expected_status=200, bearer=None):
+            options = {'url': 'http://localhost:8080/api/v1' + path, 'request': method,
+                       'write-out': '\n%{http_code}'}
+            lines = ['silent', 'show-error', 'include']
+            if body is not None:
+                lines += ['header = ' + json.dumps('Content-Type: application/json')]
+                options['data'] = json.dumps(body)
+            if cookie: lines += ['header = ' + json.dumps('Cookie: ' + cookie)]
+            if csrf: lines += ['header = ' + json.dumps('X-CSRF-Token: ' + csrf)]
+            if bearer: lines += ['header = ' + json.dumps('Authorization: Bearer ' + bearer)]
+            lines += [key + ' = ' + json.dumps(value) for key,value in options.items()]
+            raw = compose('exec', '-T', member, 'curl', '--config', '-', input='\n'.join(lines)+'\n')
+            message, status = raw.rsplit('\n', 1)
+            # Do not include response text in failures: token issuance is deliberately one-time.
+            client.assertEqual(expected_status, int(status), method + ' ' + path)
+            header_text, payload = message.split('\n\n', 1)
+            headers = dict(line.split(': ',1) for line in header_text.splitlines()[1:] if ': ' in line)
+            return (json.loads(payload) if payload.strip() else None), headers
+        password = secrets.token_urlsafe(32)
+        signed, headers = node_request('api-1','POST','/auth/setup',
+                                      {'code':setup_code,'username':'compose-admin','password':password,'displayName':'Compose administrator'})
+        cookie = next(value for key,value in headers.items() if key.lower()=='set-cookie').split(';',1)[0]
+        for member in ('api-1','api-2'):
+            context, _ = node_request(member,'GET','/auth/session',cookie=cookie)
+            client.assertEqual('owner-a',context['ownerId'])
+        node_request('api-2','POST','/auth/setup',{'code':setup_code,'username':'imposter','password':password,'displayName':'Imposter'},expected_status=401)
+        issued, _ = node_request('api-1','POST','/auth/tokens',{'name':'Cross-replica Eclipse','permissions':['read','write'],'expiresAt':None},cookie,signed['csrf'],201)
+        raw_token=issued.pop('token')
+        for member in ('api-1','api-2'):
+            identity=json.loads(compose('exec','-T',member,'curl','-fsS','-H','@-','http://localhost:8080/api/v1/me',input='Authorization: Bearer '+raw_token+'\n'))
+            client.assertEqual('owner-a',identity['ownerId'])
+        node_request('api-2','DELETE','/auth/tokens/'+issued['id'],cookie=cookie,csrf=signed['csrf'],expected_status=204)
+        node_request('api-1','GET','/me',bearer=raw_token,expected_status=401)
+        node_request('api-2','POST','/auth/logout',cookie=cookie,csrf=signed['csrf'],expected_status=204)
+        node_request('api-1','GET','/auth/session',cookie=cookie,expected_status=401)
+        node_request('api-2','POST','/auth/setup',{'code':setup_code,'username':'again','password':password,'displayName':'Again'},expected_status=401)
+        receipt['sharedAccountSessionsAndRevocation'] = True
         receipt['twoReplicas'] = True
         receipt['bundledWeb'] = True
         client.assertEqual({'postgres', 'api-1', 'api-2', 'gateway'}, set(compose('ps', '--services').split()))

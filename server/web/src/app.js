@@ -84,7 +84,9 @@ const auth = authentication({
     $('login').hidden = true; $('workspace').hidden = false; $('session').hidden = false;
     await refresh(); startWatch(session);
   },
+  updateAccount(account) {accountName = account.displayName;},
   clear() {
+    refreshing = null; reloadAgain = false;
     ++serverInfoRequest; clearServerInfo(); api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null; accountName = '';
     calendar.reset(); collapsed.clear(); selectedWorkSession = null;
     $('editor').close(); $('fields').replaceChildren(); $('editor-error').textContent = ''; $('editor-notice').textContent = '';
@@ -104,7 +106,7 @@ async function refresh() {
   if (!api) return;
   if (refreshing) { reloadAgain = true; await refreshing; return; }
   const session = api;
-  refreshing = (async () => {
+  const pending = (async () => {
     do {
       reloadAgain = false;
       const date = $('week-date').value, selected = selectedWorkSession;
@@ -119,11 +121,12 @@ async function refresh() {
       void refreshServerInfo(session);
     } while (reloadAgain && session === api);
   })();
-  try { await refreshing; }
+  refreshing = pending;
+  try { await pending; }
   catch (error) {
     if (session === api) { if(error.status === 401) auth.clear(errorText(error)); else {connected = false; setStatus(errorText(error)); readOnlyWhileDisconnected();} }
     throw error;
-  } finally { refreshing = null; }
+  } finally { if(refreshing === pending) refreshing = null; }
 }
 async function watch(session) {
   let delay = 1000;
