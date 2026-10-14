@@ -1,6 +1,8 @@
 package net.resheim.eclipse.timekeeper.mylyn;
 
 import java.util.HashSet;
+import java.util.ArrayDeque;
+import java.util.Comparator;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -8,6 +10,8 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTask;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTaskCategory;
 import org.eclipse.mylyn.internal.tasks.core.AbstractTaskContainer;
+import org.eclipse.mylyn.internal.tasks.core.RepositoryQuery;
+import org.eclipse.mylyn.internal.tasks.core.UnmatchedTaskContainer;
 import org.eclipse.mylyn.tasks.core.IRepositoryManager;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.mylyn.tasks.core.TaskRepository;
@@ -38,16 +42,26 @@ public final class MylynMetadata {
 
 	public static String getParentContainerSummary(ITask task) {
 		Set<ITask> visited = new HashSet<>();
-		ITask current = task;
-		while (current instanceof AbstractTask concrete && visited.add(current)) {
+		var pending = new ArrayDeque<ITask>();
+		pending.add(task);
+		Set<AbstractTaskContainer> queries = new HashSet<>();
+		var order = Comparator.comparing(AbstractTaskContainer::getSummary)
+				.thenComparing(AbstractTaskContainer::getHandleIdentifier);
+		while (!pending.isEmpty()) {
+			ITask current = pending.removeFirst();
+			if (!(current instanceof AbstractTask concrete) || !visited.add(current))
+				continue;
 			Optional<AbstractTaskContainer> category = concrete.getParentContainers().stream()
-					.filter(AbstractTaskCategory.class::isInstance).findFirst();
+					.filter(AbstractTaskCategory.class::isInstance)
+					.filter(container -> !(container instanceof UnmatchedTaskContainer)).sorted(order).findFirst();
 			if (category.isPresent())
 				return category.orElseThrow().getSummary();
-			current = concrete.getParentContainers().stream().filter(AbstractTask.class::isInstance)
-					.map(AbstractTask.class::cast).findFirst().orElse(null);
+			concrete.getParentContainers().stream().filter(RepositoryQuery.class::isInstance).forEach(queries::add);
+			concrete.getParentContainers().stream().filter(AbstractTask.class::isInstance)
+					.sorted(order).map(AbstractTask.class::cast).forEach(pending::addLast);
 		}
-		return "Uncategorized";
+		return queries.stream().filter(query -> query.getSummary() != null && !query.getSummary().isBlank())
+				.sorted(order).map(AbstractTaskContainer::getSummary).findFirst().orElse("Uncategorized");
 	}
 
 	public static String getMylynProjectName(ITask task) {
