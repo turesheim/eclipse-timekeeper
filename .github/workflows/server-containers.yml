@@ -119,7 +119,7 @@ jobs:
           go test -C server/synology/installer ./...
           go vet -C server/synology/installer ./...
           python server/synology/tests/acceptance.py
-          python server/synology/tests/migration_acceptance.py
+          python server/synology/tests/migration_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA"
       - name: Verify PostgreSQL 17 schema and concurrent bootstrap
         env:
           TIMEKEEPER_TEST_PG_URL: jdbc:postgresql://127.0.0.1:55433/postgres

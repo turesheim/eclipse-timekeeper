@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Verify the actual PostgreSQL 18 data-only export and unprivileged native-17 importer."""
+import argparse
 import base64
 import hashlib
 import importlib.util
@@ -37,7 +38,11 @@ def fixture_sql():
         sql+=f"INSERT INTO tk_account VALUES({quote(owner)},'account{index}',{quote(password)},'Private account','ENABLED',{str(index==0)},TRUE,8);\n"
         for kind,identifier in ids.items():
             payload={'ownerId':owner,'id':identifier,'version':9,'summary':'Norwegian æøå and β; tab\tnewline\nquote \' slash\\', 'start':now,'end':None}
+            if kind in ('CLIENT','PROJECT','LABEL'):payload['name']='Private '+kind.lower()
+            if kind in ('CLIENT','LABEL'):payload['color']='#2563eb'
             if kind in ('PROJECT','WORK_SESSION'):payload['clientId']=ids['CLIENT']
+            if kind=='TASK':payload.update(projectId=ids['PROJECT'],parentTaskId=None,url=None,externalReferences=[{'providerId':'mylyn','repositoryId':'https://example.invalid/repository','externalId':'issue-123','externalUrl':None}])
+            if kind=='ACTIVITY':payload.update(taskId=ids['TASK'],projectId=ids['PROJECT'],workSessionId=ids['WORK_SESSION'],labelIds=[ids['LABEL']],manual=True)
             if kind=='WORK_SESSION':payload['title']='Private work session'
             sql+=f"INSERT INTO tk_resource VALUES({quote(owner)},'{kind}','{identifier}',9,{quote(json.dumps(payload,ensure_ascii=False))});\n"
         for from_type,kind,to_type in (('TASK','project','PROJECT'),('PROJECT','client','CLIENT'),('WORK_SESSION','client','CLIENT'),('ACTIVITY','task','TASK'),('ACTIVITY','workSession','WORK_SESSION'),('ACTIVITY','label','LABEL')):
@@ -55,6 +60,9 @@ def fixture_sql():
 
 
 def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--server-image')
+    args=parser.parse_args()
     suffix=secrets.token_hex(4);source='timekeeper-migrate18-'+suffix;target='timekeeper-migrate17-'+suffix
     names=[]
     with tempfile.TemporaryDirectory(prefix='timekeeper-native-migration-') as temporary:
@@ -152,9 +160,13 @@ def main():
             if recovered_password.read_bytes()==previous_password.read_bytes():raise AssertionError('Fresh recovery reused the source service credential')
             previous=command('docker','exec','-i',target,'psql','-X','-q','-A','-t','-U','postgres','-p','5433','-d','timekeeper_fixture',input='\n'.join(exporter.fingerprint_sql(table) for table in exporter.TABLES)).stdout.strip()
             if previous!=fingerprints:raise AssertionError('Recovery changed a database outside its dedicated target')
+            native={}
+            if args.server_image:
+                from native_server import verify
+                native=verify(command,target,folder,args.server_image)
             print(json.dumps({'source':'postgres:18.6-bookworm' ,'target':'postgres:17.11-bookworm','tablesCompared':len(exporter.TABLES),
                 'allTableFingerprintsMatch':True,'twoOwnersWithSharedResourceIds':True,'exactNanosecondTimestampsAndLargeRevisions':True,
-                'accountAndTokenSessionHashesPreserved':True,'legacyRegistryPreserved':True,'usedTargetRefused':True,'fingerprintMismatchRollsBackAtomically':True,'emptyFailedImportCanBeCancelled':True,'freshInstallationRestoreWithNewServiceCredential':True,'otherDatabaseUntouched':True}))
+                'accountAndTokenSessionHashesPreserved':True,'legacyRegistryPreserved':True,'usedTargetRefused':True,'fingerprintMismatchRollsBackAtomically':True,'emptyFailedImportCanBeCancelled':True,'freshInstallationRestoreWithNewServiceCredential':True,'otherDatabaseUntouched':True,**native}))
         finally:
             for name in names:command('docker','rm','-f','-v',name,check=False)
 
