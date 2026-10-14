@@ -75,8 +75,9 @@ daily records and retain the association.
 
 Expand **Session details** to show history, associated activities and editing
 actions. Use **Record session** for an earlier interval, or choose a session in the history
-list and use **Edit session**. These editors accept exact UTC timestamps,
-including fractional seconds. Leave the end blank for a running session.
+list and use **Edit session**. These editors use the user’s Timekeeper time zone and retain fractional
+seconds. Repeated clock times include an explicit offset so the intended instant
+is retained; nonexistent local times are rejected. Leave the end blank for a running session.
 **Add activity** assigns the new interval to the selected session; choosing a
 task is optional, and a taskless activity can optionally belong directly to a
 project. **Associate activity** links an existing interval without changing its

@@ -51,7 +51,7 @@ async function command(input) {
       await page.getByLabel('Summary', {exact:true}).fill(record.task); await page.getByLabel('Project', {exact:true}).selectOption({label:record.project}); await save();
       await tab('Workweek'); await page.getByLabel('Week containing').fill(input.date); await page.getByRole('button', {name:'Add time', exact:true}).click();
       await page.getByLabel('Task', {exact:true}).selectOption({label:record.task}); await page.getByLabel('Summary', {exact:true}).fill(input.prefix + ' precise interval');
-      await page.getByLabel('Start (UTC)', {exact:true}).fill(input.start); await page.getByLabel('End (UTC, blank while tracking)', {exact:true}).fill(input.end);
+      await page.getByLabel('Start (local time)', {exact:true}).fill(input.start); await page.getByLabel('End (local time, blank while tracking)', {exact:true}).fill(input.end);
       await page.getByLabel(record.label, {exact:true}).check(); await save();
       break;
     case 'edit':

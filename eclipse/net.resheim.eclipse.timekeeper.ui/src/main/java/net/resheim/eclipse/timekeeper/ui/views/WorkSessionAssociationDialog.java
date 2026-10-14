@@ -28,7 +28,8 @@ final class WorkSessionAssociationDialog extends AsyncRecordDialog {
         choice.getCombo().setData("org.eclipse.swtbot.widget.key","session-association-choice");choice.setContentProvider(ArrayContentProvider.getInstance());
         var titles=new java.util.HashMap<TaskId,String>();
         for(var task:TimekeeperUiPlugin.getDefault().getTimekeeperService().tasks()) titles.put(task.id(),WorkSessionPanel.taskTitle(task));
-        choice.setLabelProvider(new LabelProvider() {public String getText(Object value) {var activity=(Activity)value;return WorkSessionPanel.activityTitle(activity,titles)+" · "+activity.start();}});
+        var zone=TimekeeperUiPlugin.getCalendarZone();
+        choice.setLabelProvider(new LabelProvider() {public String getText(Object value) {var activity=(Activity)value;return WorkSessionPanel.activityTitle(activity,titles)+" · "+LocalTimeInput.format(activity.start(),zone)+" · "+zone;}});
         choice.setInput(activities);choice.setSelection(new StructuredSelection(activities.getFirst()));choice.addSelectionChangedListener(event->warning());warning();return area;
     }
     private Activity selected() {return (Activity)choice.getStructuredSelection().getFirstElement();}

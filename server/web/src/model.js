@@ -51,7 +51,59 @@ export function decimalHoursText(total) {
 }
 export function instantText(instant, zone) {
   if (!instant) return 'In progress';
-  return new Intl.DateTimeFormat(undefined, {timeZone: zone, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'}).format(new Date(instant));
+  return new Intl.DateTimeFormat(undefined, {timeZone: zone, year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short'}).format(new Date(instant));
+}
+
+const inputFormats = new Map();
+function civilTime(milliseconds, zone) {
+  if (!inputFormats.has(zone)) inputFormats.set(zone, new Intl.DateTimeFormat('en-CA', {
+    timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }));
+  const parts = inputFormats.get(zone).formatToParts(new Date(milliseconds));
+  const part = type => parts.find(value => value.type === type).value;
+  return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}:${part('second')}`;
+}
+function offsetSeconds(milliseconds, zone) {
+  return (Date.parse(civilTime(milliseconds, zone) + 'Z') - Math.floor(milliseconds / 1000) * 1000) / 1000;
+}
+function localCandidates(civil, zone) {
+  const nominal = Date.parse(civil + 'Z'), offsets = new Set();
+  // Sample both sides of offset transitions, including half-hour changes and skipped dates.
+  for (let hours = -36; hours <= 36; hours += 6) offsets.add(offsetSeconds(nominal + hours * 3600000, zone));
+  return [...offsets].map(offset => nominal - offset * 1000).filter(value => civilTime(value, zone) === civil).sort((a,b) => a-b);
+}
+function offsetText(seconds) {
+  const magnitude = Math.abs(seconds), pad = value => String(value).padStart(2, '0');
+  return `${seconds < 0 ? '-' : '+'}${pad(Math.floor(magnitude / 3600))}:${pad(Math.floor(magnitude / 60) % 60)}${magnitude % 60 ? ':' + pad(magnitude % 60) : ''}`;
+}
+/** Editable wall time; an offset distinguishes the two occurrences of a repeated clock time. */
+export function localDateTime(instant, zone) {
+  if (!instant) return '';
+  instantNanos(instant);
+  const milliseconds = Date.parse(instant), civil = civilTime(milliseconds, zone);
+  const fraction = /\.(\d+)Z$/.exec(instant)?.[1];
+  return civil + (fraction ? '.' + fraction : '') + (localCandidates(civil, zone).length > 1 ? offsetText(offsetSeconds(milliseconds, zone)) : '');
+}
+/** Resolve local input strictly, preserving all nine fractional digits in the UTC API value. */
+export function localDateTimeToInstant(value, zone) {
+  const match = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:\d{2}(?::\d{2})?)?$/.exec(value.trim());
+  if (!match) throw new Error(`Enter a date and time in ${zone}, for example 2026-10-13T08:30:00.`);
+  const civil = `${match[1]}T${match[2]}:${match[3] || '00'}`, nominal = Date.parse(civil + 'Z');
+  if (!Number.isFinite(nominal) || new Date(nominal).toISOString().slice(0,19) !== civil) throw new Error('Choose a valid date and time.');
+  let milliseconds;
+  if (match[5]) {
+    const offset = match[5] === 'Z' ? [0,0,0] : match[5].slice(1).split(':').map(Number);
+    const seconds = offset[0] * 3600 + offset[1] * 60 + (offset[2] || 0);
+    if (offset[1] > 59 || (offset[2] || 0) > 59 || seconds > 18 * 3600) throw new Error('Choose a valid UTC offset.');
+    milliseconds = nominal - (match[5][0] === '-' ? -seconds : seconds) * 1000;
+  } else {
+    const candidates = localCandidates(civil, zone);
+    if (!candidates.length) throw new Error(`This clock time does not exist in ${zone} because the clocks move forward.`);
+    if (candidates.length > 1) throw new Error(`This clock time occurs twice in ${zone}. Include its UTC offset (${candidates.map(value => offsetText(offsetSeconds(value, zone))).join(' or ')}).`);
+    [milliseconds] = candidates;
+  }
+  return new Date(milliseconds).toISOString().slice(0,19) + (match[4] ? '.' + match[4] : '') + 'Z';
 }
 export function instantNanos(instant) {
   const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?Z$/.exec(instant);
