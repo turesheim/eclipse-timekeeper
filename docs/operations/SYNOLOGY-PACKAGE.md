@@ -208,6 +208,8 @@ The **Server containers → Synology candidate and PostgreSQL 17** CI job upload
 that artifact from the successful PR/main workflow and verify the adjacent SHA-256
 before a manual NAS installation. It includes the SPK, source/image provenance,
 preview `catalog.json`, icons and automated acceptance evidence.
+An **incomplete** `dsm-acceptance-template.json` binds the real-NAS test record to
+that exact candidate. Automated CI does not fill in the manual test results.
 
 The catalog uses a separate `/synology/preview/r1000/` HTTPS directory and links to
 the immutable versioned SPK beside it. Its install/upgrade flags keep the wizard
@@ -223,11 +225,49 @@ validate manual install on the actual NAS, then test catalog discovery over HTTP
 including the request method DSM uses, dependency resolution and version updates.
 A static Pages catalog is suitable only if the tested client accepts GET requests;
 a POST-requiring client needs a repository service. Stable publication remains
-separate and disabled until the required NAS acceptance and hosting are resolved.
+separate until the required NAS acceptance and hosting are resolved.
 SynoCommunity inclusion remains subject to upstream acceptance.
 
 The catalog fields follow the [SynoCommunity NAS catalog implementation](https://github.com/SynoCommunity/spkrepo/blob/main/spkrepo/domain/catalog.py)
 and its [repository setup guide](https://docs.synocommunity.com/developer-guide/publishing/package-server/).
+
+## Promoting a NAS-tested package
+
+Keep the downloaded candidate SPK and its adjacent provenance JSON together. To
+create an acceptance template locally (CI also supplies one):
+
+```sh
+python3 server/scripts/promote_synology.py --package /private/candidate/timekeeper-1.99.0-42-r1000.spk --write-template /private/candidate/dsm-acceptance.json
+```
+
+Record the full DSM, Container Manager and PostgreSQL package versions from the
+tested NAS and the UTC completion time in `testedAt`. Set a check to `true` only
+after that scenario passes on the actual NAS. The scenarios include both client
+connections, package/reboot lifecycle and failed-upgrade recovery, migration,
+backup/restore, uninstall retention and repository discovery/update. Local Docker
+tests do not satisfy these checks. Do not put passwords, setup codes, tokens,
+hostnames or user data in the record; additional fields are refused.
+
+After all scenarios pass, promote the tested archive:
+
+```sh
+python3 server/scripts/promote_synology.py --package /private/candidate/timekeeper-1.99.0-42-r1000.spk --acceptance /private/candidate/dsm-acceptance.json --output /private/stable
+python3 server/scripts/synology_catalog.py --package /private/stable/timekeeper-2.0.0-42-r1000.spk --base-url https://turesheim.github.io/eclipse-timekeeper/synology/stable/r1000/
+```
+
+Promotion changes only the DSM version in `INFO` and adds the acceptance record;
+it copies the server image, payload, installer and lifecycle scripts unchanged.
+It verifies the tested archive SHA-256, source commit, actual Docker image ID and
+a digest covering all installed bytes, permissions and ownership. Stable
+validation and catalog generation also verify this record. Existing stable
+files are never overwritten. This preserves the exact tested contents without
+rebuilding the installer or server. The record is an operator's test report;
+it does not perform or replace those tests.
+
+The output contains the stable SPK, checksum and provenance. It does **not** upload
+a release or activate a package source. Keep preview and stable catalogs in
+separate directories and publish only after the NAS discovery checks establish
+which hosting method works.
 
 ## Verification status
 

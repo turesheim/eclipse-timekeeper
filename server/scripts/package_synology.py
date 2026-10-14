@@ -72,7 +72,7 @@ def build(output, commit, image, revision, channel):
     if channel not in VERSION or not 1 <= revision <= 2147483647:
         raise ValueError('Choose preview/stable and a positive package revision')
     if channel == 'stable':
-        raise ValueError('Stable DSM packaging is disabled until real NAS acceptance is recorded')
+        raise ValueError('Use promote_synology.py with real NAS acceptance; stable payloads are never rebuilt')
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     epoch = int(subprocess.check_output(['git','show','-s','--format=%ct',commit], cwd=ROOT, text=True))

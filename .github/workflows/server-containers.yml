@@ -140,7 +140,9 @@ jobs:
       - name: Build and validate the self-contained preview package
         run: python server/scripts/package_synology.py --commit "$GITHUB_SHA" --image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --revision "$GITHUB_RUN_NUMBER" --output server/target/synology
       - name: Generate preview discovery metadata for NAS acceptance
-        run: python server/scripts/synology_catalog.py --package "server/target/synology/timekeeper-1.99.0-$GITHUB_RUN_NUMBER-r1000.spk" --base-url "https://turesheim.github.io/eclipse-timekeeper/synology/preview/r1000/"
+        run: |
+          python server/scripts/synology_catalog.py --package "server/target/synology/timekeeper-1.99.0-$GITHUB_RUN_NUMBER-r1000.spk" --base-url "https://turesheim.github.io/eclipse-timekeeper/synology/preview/r1000/"
+          python server/scripts/promote_synology.py --package "server/target/synology/timekeeper-1.99.0-$GITHUB_RUN_NUMBER-r1000.spk" --write-template server/target/synology/dsm-acceptance-template.json
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:

@@ -10,6 +10,8 @@ import re
 import struct
 import tarfile
 
+from synology_acceptance import RECORD, content_digest, validate_record
+
 REQUIRED = {'INFO','LICENSE','PACKAGE_ICON.PNG','PACKAGE_ICON_256.PNG','package.tgz',
             'conf/privilege','conf/resource','WIZARD_UIFILES/install_uifile.sh',
             'scripts/timekeeper-dsm','scripts/release.json',
@@ -102,11 +104,22 @@ def validate(path):
                 manifest=json.load(image.extractfile('manifest.json'))
                 if len(manifest)!=1 or release['image'] not in manifest[0]['RepoTags']:
                     raise ValueError('Preloaded image differs from the pinned project image')
-                config=json.load(image.extractfile(manifest[0]['Config']))
+                config_bytes=image.extractfile(manifest[0]['Config']).read()
+                image_id='sha256:'+hashlib.sha256(config_bytes).hexdigest()
+                config=json.loads(config_bytes)
                 if config['architecture']!='amd64' or config['os']!='linux':
                     raise ValueError('Incorrect image platform')
-    return {'package':info['package'],'version':info['version'],'sourceCommit':release['commit'],
-            'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'realDsmAcceptance':'required'}
+        checked={'package':info['package'],'version':info['version'],'sourceCommit':release['commit'],
+                 'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'imageId':image_id,
+                 'contentSha256':content_digest(outer),'realDsmAcceptance':'required'}
+        if info['version'].startswith('2.0.0-'):
+            if RECORD not in members:
+                raise ValueError('Stable packages require recorded real DSM acceptance')
+            validate_record(json.loads(read(RECORD)),checked)
+            checked['realDsmAcceptance']='recorded'
+        elif RECORD in members:
+            raise ValueError('Keep the incomplete acceptance record outside the preview package')
+    return checked
 
 
 if __name__=='__main__':
