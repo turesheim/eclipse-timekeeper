@@ -45,7 +45,7 @@
           <label>Calendar date<input id="calendar-date" type="date" required></label>
           <div class="calendar-tools"><button id="calendar-new">Record work session at selected time</button><button id="calendar-edit">Edit selected work session</button><button id="calendar-copy">Copy work session</button><button id="calendar-paste">Paste work session</button></div>
         </div>
-        <p class="hint">Blue strips are work sessions; task cards list recorded activities. Drag a strip to move it, or its top/bottom edge to resize. Moving preserves duration and leaves activities unchanged.</p>
+        <details class="calendar-help"><summary>Using the calendar</summary><p class="hint">Blue strips are work sessions; task cards list recorded activities. Drag a strip to move it, or its top/bottom edge to resize. Moving preserves duration and leaves activities unchanged. With a strip focused, arrow keys move it and Ctrl/Cmd+C copies it. Select a day and use Ctrl/Cmd+V to paste a separate session without its activities.</p></details>
         <p id="calendar-dst" class="hint" hidden>The clocks change this week. Repeated times have an extra row; shaded slots do not occur on that day.</p>
         <p id="calendar-selection" class="hint"></p><p id="calendar-message" class="hint" role="status" aria-live="polite"></p>
         <div class="calendar-scroll card" aria-label="Weekly calendar"><div id="calendar-grid" class="calendar-grid"></div></div>

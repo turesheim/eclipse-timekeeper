@@ -54,7 +54,7 @@ export class WeekCalendar {
     for(const value of this.root.querySelectorAll('.calendar-task button,.calendar-unrecorded button')) value.disabled=!available;
     for(const value of this.root.querySelectorAll('.calendar-session')) value.setAttribute('aria-disabled',String(!available));
   }
-  text(value) {this.message.textContent=value;}
+  text(value) {this.message.textContent=value;this.message.title=value;}
   render() {
     const data=this.data,zone=data.profile.data.zoneId,key=`${data.dates.first}/${zone}`;
     const active=document.activeElement;
@@ -63,6 +63,9 @@ export class WeekCalendar {
       this.calendarKey=key;this.calendar=calendarWeek(data.dates.first,zone);this.selection=null;
     }
     const calendar=this.calendar;
+    const month=new Intl.DateTimeFormat(undefined,{month:'long',year:'numeric',timeZone:'UTC'});
+    const firstMonth=month.format(new Date(`${calendar.first}T12:00:00Z`)),lastMonth=month.format(new Date(`${addDays(calendar.first,6)}T12:00:00Z`));
+    this.root.querySelector('#calendar-title').textContent=firstMonth===lastMonth ? firstMonth : `${firstMonth} – ${lastMonth}`;
     this.root.querySelector('#calendar-date').value=data.dates.first;
     this.root.querySelector('#calendar-zone').textContent=`${calendar.first} – ${addDays(calendar.first,6)} · ${zone}`;
     this.root.querySelector('#calendar-dst').hidden=!calendar.hasTransitions;
@@ -146,6 +149,7 @@ export class WeekCalendar {
     bar.setAttribute('aria-pressed',String(this.selectedId===session.id));
     bar.append(node('span',session.summary || 'Work session','calendar-session-title'));
     if(!preview) {
+      bar.addEventListener('focus',()=>this.selectSession(session,piece.date,Math.floor(piece.top)));
       bar.addEventListener('click',()=>this.selectSession(session,piece.date,Math.floor(piece.top)));
       bar.addEventListener('dblclick',()=>this.edit());
       bar.addEventListener('pointerdown',event=>this.beginDrag(event,session,piece));
@@ -162,10 +166,11 @@ export class WeekCalendar {
   taskNode(piece) {
     const block=piece.block,task=this.data.tasks.find(value=>value.id===block.taskId),card=node('article',undefined,'calendar-event calendar-task');
     this.bounds(card,piece,'task');card.dataset.taskId=block.taskId || '';card.dataset.date=piece.date;
-    const title=node('h3');title.append(task ? this.callbacks.taskLabel(task) : node('span',block.activities[0].summary || 'Unassigned activity'));card.append(title);
+    const title=node('h3');title.append(task ? this.callbacks.taskLabel(task) : node('span',block.activities[0].summary || 'Unassigned activity'));title.title=title.textContent;card.append(title);
     const list=node('ul');
     for(const activity of block.activities.filter(value=>instantNanos(value.start)<piece.end && (instantNanos(value.end || this.data.report.generatedAt)>piece.start || value.start===value.end && instantNanos(value.start)>=piece.start))) {
       const item=node('li'),edit=button(activity.summary || 'Activity',()=>this.callbacks.onEditActivity(activity.id));
+      item.title=`${activity.summary || 'Activity'} · ${instantText(activity.start,this.calendar.zone)} → ${instantText(activity.end,this.calendar.zone)}`;
       edit.dataset.activityId=activity.id;edit.disabled=!this.connected;
       edit.setAttribute('aria-label',`Edit activity ${activity.summary || 'Activity'}`);
       item.append(edit,node('small',`${this.clock(activity.start)} – ${activity.end ? this.clock(activity.end) : 'Running'}`));list.append(item);
@@ -209,7 +214,7 @@ export class WeekCalendar {
   }
   edit() {const value=this.selected();if(value && this.connected && !this.busy) this.callbacks.onEditSession(value.id);}
   async commit(session,proposal) {
-    if(this.busy || !this.connected) return;
+    if(this.busy || !this.connected) {this.text('This change was not saved. Wait for the connection to recover before trying again.');return;}
     if(instantNanos(session.start)===instantNanos(proposal.start) && (session.end===null && proposal.end===null || session.end && proposal.end && instantNanos(session.end)===instantNanos(proposal.end))) return;
     const scope=this.scope;this.busy=true;this.buttons();
     try {await this.callbacks.onChange(structuredClone(session),proposal,scope);}

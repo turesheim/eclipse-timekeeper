@@ -193,6 +193,7 @@ function render() {
   $('owner').textContent = s.profile.data.ownerId;
   $('zone-caption').textContent = `${s.dates.first} – ${addDays(s.dates.first, 6)} · ${zone}`;
   const active = s.active.data;
+  $('active-title').closest('.tracking').dataset.active=String(!!active);
   $('active-title').replaceChildren(active ? taskLabel(s.tasks.find(task => task.id === active.taskId)) : document.createTextNode('Ready when you are'));
   $('active-details').textContent = active ? `Started ${instantText(active.start, zone)} · ${active.summary || 'Tracking time'}` : 'Choose a task below to start tracking.';
   $('stop').hidden = !active; readOnlyWhileDisconnected();
