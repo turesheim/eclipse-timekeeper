@@ -1,0 +1,4 @@
+#!/bin/sh
+# The resource worker removes this package's project. Shared data and the native
+# PostgreSQL database/role are deliberately retained, including on uninstall.
+exit 0

@@ -1,0 +1,9 @@
+{
+  "data-share": {
+    "shares": [{"name": "timekeeper-data", "permission": {"rw": ["timekeeper"]}}]
+  },
+  "docker-project": {
+    "preload-image": "image.tar.gz",
+    "projects": [{"name": "timekeeper-server", "path": "project", "build_params": {"force_pull": false, "force_recreate": true, "build": false}}]
+  }
+}

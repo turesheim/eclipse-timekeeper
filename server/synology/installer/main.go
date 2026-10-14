@@ -1,0 +1,108 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+func validate(root string, w Wizard, r Release) error {
+	if retained, err := loadSettings(root); err == nil {
+		if retained.Release.Schema != r.Schema {
+			return errors.New("Upgrade requires an explicit schema migration; the existing installation is unchanged")
+		}
+		if retained.Phase != "READY" {
+			w.Settings = retained
+			return probe(w, nativePSQL, true)
+		}
+		password, err := os.ReadFile(filepath.Join(root, "secrets", "database_password"))
+		if err != nil {
+			return errors.New("Restore the original database credential before reinstalling")
+		}
+		_, err = psql(nativePSQL, retained.DatabasePort, retained.Role, strings.TrimSpace(string(password)), retained.Database, "SELECT 1;")
+		return err
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return errors.New("Retained Timekeeper settings are invalid and will not be replaced")
+	}
+	if err := probe(w, nativePSQL, false); err != nil {
+		return err
+	}
+	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", w.Settings.HTTPPort))
+	if listener != nil {
+		listener.Close()
+	}
+	if err != nil {
+		return errors.New("The selected local HTTP port is in use")
+	}
+	return nil
+}
+func ready(root string) error {
+	s, err := loadSettings(root)
+	if err != nil {
+		return err
+	}
+	if s.Phase != "READY" {
+		return errors.New("Installation is incomplete")
+	}
+	client := http.Client{Timeout: 2 * time.Second}
+	response, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/q/health/ready", s.HTTPPort))
+	if err != nil {
+		return errors.New("Timekeeper is not ready")
+	}
+	defer response.Body.Close()
+	if response.StatusCode != 200 {
+		return errors.New("Timekeeper is not ready")
+	}
+	return nil
+}
+func run(action, root, target, releasePath string, env func(string) string) error {
+	if action == "wizard" {
+		return wizard(os.Stdout)
+	}
+	if env("SYNOPKG_PKGNAME") != packageID {
+		return errors.New("Run this helper through DSM Package Center")
+	}
+	switch action {
+	case "stop", "start":
+		return nil // Container Manager's worker owns the lifecycle.
+	case "status":
+		return ready(root)
+	case "validate", "install", "upgrade":
+		release, err := releaseAt(releasePath)
+		if err != nil {
+			return err
+		}
+		var w Wizard
+		if retained, loadErr := loadSettings(root); loadErr != nil || retained.Phase != "READY" {
+			w, err = parseWizard(env)
+			if err != nil {
+				return err
+			}
+		}
+		if action == "validate" {
+			return validate(root, w, release)
+		}
+		return install(root, target, w, release)
+	default:
+		return errors.New("Unknown package action")
+	}
+}
+func main() {
+	if len(os.Args) != 2 {
+		fmt.Fprintln(os.Stderr, "Use wizard, validate, install, upgrade, start, stop or status")
+		os.Exit(2)
+	}
+	executable, err := os.Executable()
+	if err == nil {
+		err = run(os.Args[1], stateRoot(), os.Getenv("SYNOPKG_PKGDEST"), filepath.Dir(executable), os.Getenv)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
