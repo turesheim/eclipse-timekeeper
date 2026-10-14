@@ -15,9 +15,13 @@ import net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin;
 final class UncertainDeletionScenario {
     static void run(HttpTimekeeperService api) throws Exception {
         var original=api.metadata();
-        var day=LocalDate.now(api.profile().zone());
+        // Keep the fixture in the past even when CI runs before 08:00.
+        var day=LocalDate.now(api.profile().zone()).minusWeeks(1);
         var query=new ActivityQuery(day.atStartOfDay(api.profile().zone()).toInstant(),day.plusDays(1).atStartOfDay(api.profile().zone()).toInstant(),Optional.of(OwnerId.LOCAL),Optional.empty(),Optional.empty(),api.profile().zone());
         var originalActivities=api.activities(query);
+        var view=new SWTWorkbenchBot().viewByTitle("Workweek");
+        view.toolbarButton("Show current week").click();
+        view.toolbarButton("Show previous week").click();
         for(boolean cancel:List.of(false,true)) {
             String prefix="Unknown deletion "+UUID.randomUUID().toString().substring(0,8);
             var project=api.createProject(new CreateProject(prefix+" project"));
@@ -47,6 +51,7 @@ final class UncertainDeletionScenario {
             assertEquals(originalActivities.activities(),api.activities(query).activities());assertEquals(originalActivities.total(),api.activities(query).total());
             RemoteTestSupport.closedLocalStorage();
         }
+        view.toolbarButton("Show current week").click();
         RemoteBootstrap.writeProof();
     }
     private static void held(String collection,UUID id,boolean cancel,Runnable delete,BooleanSupplier deleted,BooleanSupplier reconciled) throws Exception {
