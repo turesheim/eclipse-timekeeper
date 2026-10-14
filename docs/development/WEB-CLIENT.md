@@ -42,7 +42,8 @@ Daily and weekly summaries show whole seconds; stored times and calculations
 retain nanoseconds. Linked task titles include their external ID (the Jira browse
 key or GitHub issue number when available) and open the recorded HTTP/HTTPS issue
 URL in a separate tab. Native task UUIDs are not display IDs.
-UTC activity fields retain up to nine fractional digits. Intervals across
+Activity fields show and accept local dates and times in the account’s configured
+time zone, retaining up to nine fractional digits. Intervals across
 midnight are stored as separate activities in the account's time zone, including
 manual entries. Live tracking continues into the next day with the same active
 identity and labels. Each day's activity is edited or deleted separately; a
@@ -79,8 +80,9 @@ Tracked time sums clipped intervals; covered time is their union. Unallocated
 time subtracts covered time from session duration, so overlap is not counted
 twice. Out-of-bounds activities are accepted with a warning. Sessions can span
 midnight without stopping, and activity day parts retain their association.
-Deleting a session requires removing its activity associations first. Exact UTC
-editor fields retain nanoseconds. Stale versions preserve the user's draft;
+Deleting a session requires removing its activity associations first. Local editor fields retain nanoseconds. Repeated clock times include an offset;
+nonexistent or ambiguous local input is rejected instead of silently moved.
+An open editor keeps its original time zone if account settings change. Stale versions preserve the user's draft;
 lost start/stop replies offer retry with the same frozen command key and payload.
 
 Portable domain-v2 JSON/CSV export includes work sessions and association IDs.

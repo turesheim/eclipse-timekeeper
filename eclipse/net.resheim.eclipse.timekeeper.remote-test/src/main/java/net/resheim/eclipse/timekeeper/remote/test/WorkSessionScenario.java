@@ -29,8 +29,8 @@ final class WorkSessionScenario {
         var from=LocalDate.now(ZoneOffset.UTC).minusDays(3).atTime(8,0,0,123456789).toInstant(ZoneOffset.UTC);
         var until=from.plus(Duration.ofHours(10));var tasks=api.tasks();
         bot.button("Record session").click();var editor=bot.shell("Record work session").bot();
-        editor.textWithLabel("Summary").setText("Installed work session");editor.textWithLabel("Start (UTC)").setText(from.toString());
-        editor.textWithLabel("End (UTC, blank while running)").setText(until.toString());editor.button("Save").click();
+        editor.textWithLabel("Summary").setText("Installed work session");editor.textWithLabel("Start (local time)").setText(net.resheim.eclipse.timekeeper.ui.views.LocalTimeInput.format(from,net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin.getCalendarZone()));
+        editor.textWithLabel("End (local time, blank while running)").setText(net.resheim.eclipse.timekeeper.ui.views.LocalTimeInput.format(until,net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin.getCalendarZone()));editor.button("Save").click();
         RemoteTestSupport.waitFor(()->api.workSessions(OwnerId.LOCAL).stream().anyMatch(value->value.summary().equals("Installed work session")),"Retrospective session not stored");
         var session=api.workSessions(OwnerId.LOCAL).stream().filter(value->value.summary().equals("Installed work session")).findFirst().orElseThrow();
         RemoteTestSupport.waitFor(()->bot.comboBoxWithId("work-session-history").selection().contains("Installed work session"),"Manual session not selected");

@@ -1,3 +1,4 @@
+import {localDateTime} from '../src/model.js';
 import {test, expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import {readFile, writeFile, rename} from 'node:fs/promises';
@@ -11,6 +12,10 @@ async function api(request, method, path, data, headers = {}) {
   const response = await request.fetch(`/api/v1${path}`, {method, data, headers:{Authorization:`Bearer ${token}`, ...headers}});
   expect(response.ok()).toBeTruthy(); return response;
 }
+async function editorTime(request, instant) {
+  const profile = await (await api(request, 'GET', '/me')).json();
+  return localDateTime(instant, profile.zoneId);
+}
 async function createTask(request, summary = 'Browser task ' + randomUUID()) {
   return (await api(request, 'POST', '/tasks', {summary, projectId:null, parentTaskId:null, url:null})).json();
 }
@@ -21,6 +26,66 @@ async function newNamed(page, tab, singular, name) {
   await page.getByRole('button', {name:tab, exact:true}).click(); await page.getByRole('button', {name:`New ${singular}`, exact:true}).click();
   await page.getByLabel('Name', {exact:true}).fill(name); await save(page);
 }
+test('account time zone controls local editors and build dates across DST and browser zones', async ({browser, request}) => {
+  const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,timezoneId:'America/Los_Angeles',locale:'en-GB'}), page=await context.newPage();
+  const original=await (await api(request,'GET','/me')).json();
+  const summary='Local clock '+randomUUID(); let session, activity;
+  try {
+    await signIn(page);
+    await page.getByRole('button',{name:'Time zone',exact:true}).click();
+    await page.getByRole('textbox',{name:'Time zone',exact:true}).fill('Europe/Oslo');await save(page);
+    await expect(page.locator('#server-build')).toContainText('10:30:00');
+    session=await (await api(request,'POST','/work-sessions',{summary,start:'2025-10-25T22:30:00.123456789Z',end:'2025-10-26T02:30:00.987654321Z'})).json();
+    await page.getByRole('button',{name:'Refresh',exact:true}).click();
+    await page.locator('#work-session-choice').selectOption(session.id);
+    await page.locator('#session-edit').click();
+    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-26T00:30:00.123456789');
+    await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-26T03:30:00.987654321');
+    await expect(page.locator('#hint-start')).toContainText('Europe/Oslo');
+    // A peer's preference change cannot reinterpret this editor's unchanged wall times.
+    const profile=await api(request,'GET','/me');
+    await api(request,'PUT','/me',{zoneId:'America/New_York'},{'If-Match':profile.headers().etag});
+    await expect(page.locator('#zone-caption')).toContainText('America/New_York');
+    await page.getByLabel('Summary',{exact:true}).fill(summary+' edited');await save(page);
+    let saved=await (await api(request,'GET',`/work-sessions/${session.id}`)).json();
+    expect([saved.start,saved.end]).toEqual([session.start,session.end]);
+    await page.getByRole('button',{name:'Time zone',exact:true}).click();
+    await page.getByRole('textbox',{name:'Time zone',exact:true}).fill('Europe/Oslo');await save(page);
+    await page.locator('#session-edit').click();
+    await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-26T02:30:00.123456789');
+    await page.locator('#save').click();await expect(page.locator('#editor-error')).toContainText('occurs twice');
+    await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-26T02:30:00.123456789+01:00');await save(page);
+    saved=await (await api(request,'GET',`/work-sessions/${session.id}`)).json();
+    expect(saved.start).toBe('2025-10-26T01:30:00.123456789Z');
+    await page.getByLabel('Week containing').fill('2025-10-26');
+    await page.getByRole('button',{name:'Add time',exact:true}).click();
+    await page.getByLabel('Summary',{exact:true}).fill(summary+' activity');
+    await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-26T02:30:00.123456789+02:00');
+    await page.getByLabel('End (local time, blank while tracking)',{exact:true}).fill('2025-10-26T02:30:00.123456790+02:00');await save(page);
+    activity=(await (await api(request,'GET','/activities?from=2025-10-25T00:00:00Z&to=2025-10-27T00:00:00Z')).json()).items.find(value=>value.summary===summary+' activity');
+    expect(activity.start).toBe('2025-10-26T00:30:00.123456789Z');
+    expect(activity.end).toBe('2025-10-26T00:30:00.123456790Z');
+    await page.locator('#activities tr').filter({hasText:activity.summary}).getByRole('button',{name:'Edit',exact:true}).click();
+    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-26T02:30:00.123456789+02:00');
+    await save(page);
+    const unchanged=await (await api(request,'GET',`/activities/${activity.id}`)).json();
+    expect([unchanged.start,unchanged.end]).toEqual([activity.start,activity.end]);
+    await page.getByRole('button',{name:'Add time',exact:true}).click();
+    await page.getByLabel('Start (local time)',{exact:true}).fill('2025-03-30T02:30:00');
+    await page.getByLabel('End (local time, blank while tracking)',{exact:true}).fill('2025-03-30T03:30:00');
+    await page.locator('#save').click();await expect(page.locator('#editor-error')).toContainText('does not exist');
+    await page.getByRole('button',{name:'Cancel',exact:true}).click();
+    await page.screenshot({path:'test-results/local-time-zone.png',fullPage:true});
+  } finally {
+    for (const [collection,value] of [['activities',activity],['work-sessions',session]]) if(value) {
+      const read=await api(request,'GET',`/${collection}/${value.id}`);
+      await api(request,'DELETE',`/${collection}/${value.id}`,undefined,{'If-Match':read.headers().etag});
+    }
+    const current=await api(request,'GET','/me');
+    await api(request,'PUT','/me',{zoneId:original.zoneId},{'If-Match':current.headers().etag});
+    await context.close();
+  }
+});
 test('server build and deployment details describe the actual packaged server after reload', async ({page, request}) => {
   const information = await (await api(request, 'GET', '/server')).json();
   expect(information.commit).toBe(process.env.TIMEKEEPER_WEB_BUILD_COMMIT);
@@ -57,14 +122,14 @@ test('core browser workflow manages records, tracks time, and preserves exact re
   await page.getByRole('button', {name:'Workweek', exact:true}).click(); await page.getByLabel('Week containing').fill('2025-10-26');
   await expect(page.locator('#zone-caption')).toContainText('2025-10-20'); await page.getByRole('button', {name:'Add time', exact:true}).click();
   await page.getByLabel('Task', {exact:true}).selectOption({label:task}); await page.getByLabel('Summary', {exact:true}).fill('Autumn DST');
-  await page.getByLabel('Start (UTC)', {exact:true}).fill('2025-10-25T22:00:00Z'); await page.getByLabel('End (UTC, blank while tracking)', {exact:true}).fill('2025-10-26T23:00:00Z'); await save(page);
+  await page.getByLabel('Start (local time)', {exact:true}).fill('2025-10-25T22:00:00Z'); await page.getByLabel('End (local time, blank while tracking)', {exact:true}).fill('2025-10-26T23:00:00Z'); await save(page);
   await expect(page.locator('#week-total')).toHaveText('25h 0m'); await expect(page.locator('#days .day').filter({hasText:'2025-10-26'})).toContainText('25h 0m');
   const activity = page.locator('#activities tr').filter({hasText:'Autumn DST'});
   await activity.getByText('Autumn DST', {exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible();
   await activity.press('Enter'); await expect(page.locator('#editor')).toBeVisible();
-  await page.getByLabel('Summary', {exact:true}).fill('One nanosecond'); await page.getByLabel('Start (UTC)', {exact:true}).fill('2025-10-25T22:00:00.123456789Z'); await page.getByLabel('End (UTC, blank while tracking)', {exact:true}).fill('2025-10-25T22:00:00.123456790Z'); await save(page);
+  await page.getByLabel('Summary', {exact:true}).fill('One nanosecond'); await page.getByLabel('Start (local time)', {exact:true}).fill('2025-10-25T22:00:00.123456789Z'); await page.getByLabel('End (local time, blank while tracking)', {exact:true}).fill('2025-10-25T22:00:00.123456790Z'); await save(page);
   await expect(page.locator('#week-total')).toHaveText('0h 0m');
-  await page.locator('#activities tr').filter({hasText:'One nanosecond'}).getByRole('button', {name:'Edit', exact:true}).click(); await expect(page.getByLabel('Start (UTC)', {exact:true})).toHaveValue('2025-10-25T22:00:00.123456789Z');
+  await page.locator('#activities tr').filter({hasText:'One nanosecond'}).getByRole('button', {name:'Edit', exact:true}).click(); await expect(page.getByLabel('Start (local time)', {exact:true})).toHaveValue(await editorTime(request, '2025-10-25T22:00:00.123456789Z'));
   await page.getByRole('button', {name:'Cancel', exact:true}).click();
   await page.screenshot({path:'test-results/workweek-desktop.png', fullPage:true});
   await page.setViewportSize({width:390, height:844}); await page.screenshot({path:'test-results/workweek-mobile.png', fullPage:true});
@@ -92,8 +157,8 @@ test('manual intervals spanning midnight create editable daily records with exac
   await page.getByRole('button', {name:'Add time', exact:true}).click();
   await page.getByLabel('Task', {exact:true}).selectOption({label:task.summary});
   await page.getByLabel('Summary', {exact:true}).fill(summary);
-  await page.getByLabel('Start (UTC)', {exact:true}).fill('2025-10-25T21:59:59.123456789Z');
-  await page.getByLabel('End (UTC, blank while tracking)', {exact:true}).fill('2025-10-27T22:00:00.987654321Z');
+  await page.getByLabel('Start (local time)', {exact:true}).fill('2025-10-25T21:59:59.123456789Z');
+  await page.getByLabel('End (local time, blank while tracking)', {exact:true}).fill('2025-10-27T22:00:00.987654321Z');
   await page.locator('#editor').getByLabel(label.name, {exact:true}).check(); await save(page);
   const range = `/activities?from=2025-10-25T00:00:00Z&to=2025-10-28T00:00:00Z&taskId=${task.id}`;
   const before = (await (await api(request, 'GET', range)).json()).items.sort((a,b) => a.start.localeCompare(b.start));
@@ -109,8 +174,8 @@ test('manual intervals spanning midnight create editable daily records with exac
   await page.getByLabel('Week containing').fill('2025-10-27');
   const row = page.locator('#activities tr').filter({hasText:summary}); await expect(row).toHaveCount(1);
   await row.getByRole('button', {name:'Edit', exact:true}).click();
-  await expect(page.getByLabel('Start (UTC)', {exact:true})).toHaveValue(before[2].start);
-  await page.getByLabel('End (UTC, blank while tracking)', {exact:true}).fill('2025-10-27T22:00:00.987654322Z'); await save(page);
+  await expect(page.getByLabel('Start (local time)', {exact:true})).toHaveValue(await editorTime(request, before[2].start));
+  await page.getByLabel('End (local time, blank while tracking)', {exact:true}).fill('2025-10-27T22:00:00.987654322Z'); await save(page);
   const after = (await (await api(request, 'GET', range)).json()).items.sort((a,b) => a.start.localeCompare(b.start));
   expect(after.slice(0,2)).toEqual(before.slice(0,2)); expect(after[2].id).toBe(before[2].id);
   expect(after[2].end).toBe('2025-10-27T22:00:00.987654322Z');
@@ -197,8 +262,8 @@ test('future starts are rejected without losing browser drafts or changing recor
   await signIn(page); await page.getByRole('button', {name:'Add time', exact:true}).click();
   await page.getByLabel('Task', {exact:true}).selectOption({label:task.summary});
   await page.getByLabel('Summary', {exact:true}).fill('Keep future draft');
-  await page.getByLabel('Start (UTC)', {exact:true}).fill(future);
-  await page.getByLabel('End (UTC, blank while tracking)', {exact:true}).fill(later);
+  await page.getByLabel('Start (local time)', {exact:true}).fill(future);
+  await page.getByLabel('End (local time, blank while tracking)', {exact:true}).fill(later);
   await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click();
   await expect(page.locator('#editor-error')).toContainText('Check the values');
   await expect(page.getByLabel('Summary', {exact:true})).toHaveValue('Keep future draft');
@@ -207,8 +272,8 @@ test('future starts are rejected without losing browser drafts or changing recor
   const activity = await (await api(request, 'POST', '/activities', {taskId:task.id, start:'2025-10-25T12:00:00Z', end:'2025-10-25T13:00:00Z', summary:'Original recorded time', labelIds:[]})).json();
   await page.getByLabel('Week containing').fill('2025-10-26');
   await page.locator('#activities tr').filter({hasText:'Original recorded time'}).getByRole('button', {name:'Edit', exact:true}).click();
-  await page.getByLabel('Start (UTC)', {exact:true}).fill(future);
-  await page.getByLabel('End (UTC, blank while tracking)', {exact:true}).fill(later);
+  await page.getByLabel('Start (local time)', {exact:true}).fill(future);
+  await page.getByLabel('End (local time, blank while tracking)', {exact:true}).fill(later);
   await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click();
   await expect(page.locator('#editor-error')).toContainText('Check the values');
   expect(await (await api(request, 'GET', '/activities/' + activity.id)).json()).toEqual(activity);
@@ -278,7 +343,7 @@ test('workweek groups linked tasks under projects with seven day columns and con
   await page.getByLabel('Duration format',{exact:true}).selectOption('clock');
   await intervalRow.getByRole('button',{name:'Edit',exact:true}).click();
   await expect(page.getByLabel('Task',{exact:true})).toHaveValue(child.id);
-  await expect(page.getByLabel('Start (UTC)',{exact:true})).toHaveValue('2025-10-25T22:00:00.123456789Z');
+  await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue(await editorTime(request, '2025-10-25T22:00:00.123456789Z'));
   await page.getByRole('button',{name:'Cancel',exact:true}).click();
   await page.screenshot({path:'test-results/workweek-hierarchy-desktop.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});
@@ -363,25 +428,25 @@ test('session editors and taskless activities preserve exact overlap accounting 
   const tasksBefore = (await (await api(request,'GET','/tasks')).json()).items.length;await signIn(page);
   await page.getByRole('button',{name:'Record work session',exact:true}).click();
   await page.getByLabel('Summary',{exact:true}).fill('Browser session '+randomUUID());
-  await page.getByLabel('Start (UTC)',{exact:true}).fill('2025-10-25T22:00:00.123456789Z');
-  await page.getByLabel('End (UTC, blank while running)',{exact:true}).fill('2025-10-26T23:00:00.123456789Z');await save(page);
+  await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-25T22:00:00.123456789Z');
+  await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2025-10-26T23:00:00.123456789Z');await save(page);
   const session = (await (await api(request,'GET','/work-sessions')).json()).items[0];
   const label = (await (await api(request,'GET','/labels')).json()).items[0];
   for (const [summary,start,end] of [['First overlap','2025-10-26T08:00:00.123456789Z','2025-10-26T12:00:00.123456789Z'],['Second overlap','2025-10-26T10:00:00.123456789Z','2025-10-26T14:00:00.123456789Z']]) {
     await page.getByRole('button',{name:'Add activity to session',exact:true}).click();
     await expect(page.getByLabel('Task',{exact:true})).toHaveValue('');await expect(page.locator('#editor').getByLabel('Work session',{exact:true})).toHaveValue(session.id);
-    await page.getByLabel('Summary',{exact:true}).fill(summary);await page.getByLabel('Start (UTC)',{exact:true}).fill(start);
-    await page.getByLabel('End (UTC, blank while tracking)',{exact:true}).fill(end);await page.locator('#editor').getByLabel(label.name,{exact:true}).check();await save(page);
+    await page.getByLabel('Summary',{exact:true}).fill(summary);await page.getByLabel('Start (local time)',{exact:true}).fill(start);
+    await page.getByLabel('End (local time, blank while tracking)',{exact:true}).fill(end);await page.locator('#editor').getByLabel(label.name,{exact:true}).check();await save(page);
   }
   await expect(page.locator('#ws-duration')).toHaveText('25h 0m');await expect(page.locator('#ws-tracked')).toHaveText('8h 0m');
   await expect(page.locator('#ws-covered')).toHaveText('6h 0m');await expect(page.locator('#ws-unallocated')).toHaveText('19h 0m');
   expect((await (await api(request,'GET','/tasks')).json()).items.length).toBe(tasksBefore);
   await page.getByRole('button',{name:'Edit work session',exact:true}).click();
-  await expect(page.getByLabel('Start (UTC)',{exact:true})).toHaveValue(session.start);
-  await page.getByLabel('End (UTC, blank while running)',{exact:true}).fill('2025-10-26T23:00:00.123456790Z');await save(page);
+  await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue(await editorTime(request, session.start));
+  await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2025-10-26T23:00:00.123456790Z');await save(page);
   expect((await (await api(request,'GET',`/work-sessions/${session.id}`)).json()).end).toBe('2025-10-26T23:00:00.123456790Z');
   await page.getByRole('button',{name:'Add activity to session',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill('Outside session');
-  await page.getByLabel('Start (UTC)',{exact:true}).fill('2025-10-27T00:00:00Z');await page.getByLabel('End (UTC, blank while tracking)',{exact:true}).fill('2025-10-27T01:00:00Z');
+  await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-27T00:00:00Z');await page.getByLabel('End (local time, blank while tracking)',{exact:true}).fill('2025-10-27T01:00:00Z');
   await expect(page.locator('#activity-session-warning')).toContainText('outside the session');await save(page);
   await expect(page.locator('#session-warning')).toContainText('outside this session');
   await page.screenshot({path:'test-results/work-session-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});

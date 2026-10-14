@@ -1,5 +1,5 @@
 import {Api, ApiError} from './api.js';
-import {addDays, dateInZone, dayStart, durationText, durationNanos, instantText, instantNanos, weekRange, taskPresentation, activityDayNanos, nanosText, decimalHoursText, workweekGroups, sessionTimeNanos} from './model.js';
+import {addDays, dateInZone, dayStart, durationText, durationNanos, instantText, instantNanos, weekRange, taskPresentation, activityDayNanos, nanosText, decimalHoursText, workweekGroups, sessionTimeNanos, localDateTime, localDateTimeToInstant} from './model.js';
 import {savedToken, rememberToken, forgetToken} from './credentials.js';
 import {icon, iconButton} from './icons.js';
 
@@ -37,7 +37,7 @@ async function refreshServerInfo(session) {
   try {
     const {data} = await session.request('/server');
     if (session !== api || request !== serverInfoRequest) return;
-    const date = value => value ? new Date(value).toLocaleString(undefined, {timeZoneName:'short'}) : 'Not recorded';
+    const date = value => value ? instantText(value, snapshot.profile.data.zoneId) : 'Not recorded';
     const build = `${data.version}${data.commit ? ` · ${data.commit.slice(0, 8)}` : ' · commit not recorded'}${data.dirty ? ' · modified source' : ''}`;
     $('server-build').textContent = `Server ${build} · Deployed ${date(data.deployedAt)}`;
     $('server-version').textContent = data.version;
@@ -279,7 +279,7 @@ function refreshLabelFields(ids = []) {
 }
 function begin(title, state) {
   if ($('editor').open) return false;
-  editor = {...state, session: api, busy: false, uncertain: false}; $('fields').replaceChildren(); $('editor-error').textContent = ''; $('editor-notice').textContent = '';
+  editor = {...state, session: api, zone: snapshot.profile.data.zoneId, busy: false, uncertain: false}; $('fields').replaceChildren(); $('editor-error').textContent = ''; $('editor-notice').textContent = '';
   $('editor-title').textContent = title; $('save').textContent = 'Save'; $('save').disabled = false; $('cancel').disabled = false; return true;
 }
 function showEditor() { $('editor').showModal(); $('fields').querySelector('input,select')?.focus(); }
@@ -301,16 +301,19 @@ async function openRecord(collection, id = null, activitySession = null) {
     const task = field('Task', 'taskId', value.taskId, {choices: [['', 'No task'], ...snapshot.tasks.map(v => [v.id, taskPresentation(v).title])]}); task.disabled = !!id;
     if (!id) { field('Project (without task)', 'projectId', '', {choices:[['','No project'],...snapshot.projects.map(v => [v.id,v.name])]}); field('Work session', 'workSessionId', activitySession, {choices:sessionChoices()}); }
     field('Summary', 'summary', value.summary, {max: 2000});
-    field('Start (UTC)', 'start', value.start || new Date().toISOString(), {required: true, hint: `UTC timestamp, e.g. 2026-10-13T08:30:00Z. Start cannot be in the future. Your reports use ${snapshot.profile.data.zoneId}. Up to nine fractional digits are preserved.`});
-    field('End (UTC, blank while tracking)', 'end', value.end); labelFields(value.labelIds);
+    timeFields(value, 'tracking'); labelFields(value.labelIds);
   }
   if (collection === 'work-sessions') {
     field('Summary','summary',value.summary || '',{max:2000});
-    field('Start (UTC)','start',value.start || new Date().toISOString(),{required:true,hint:'The start cannot be in the future.'});
-    field('End (UTC, blank while running)','end',value.end || '');
+    timeFields(value, 'running');
   }
   if(collection==='activities' && !id) addSessionWarning();
   showEditor();
+}
+function timeFields(value, ongoing) {
+  const hint = `Local date and time in ${editor.zone}, for example 2026-10-13T08:30:00. Fractional seconds are preserved. Repeated clock times include an offset. Start cannot be in the future.`;
+  field('Start (local time)', 'start', localDateTime(value.start || new Date().toISOString(), editor.zone), {required: true, hint});
+  field(`End (local time, blank while ${ongoing})`, 'end', localDateTime(value.end, editor.zone));
 }
 async function openDelete(collection, id) {
   const session = api, loaded = await session.request(`/${collection}/${id}`);
@@ -345,8 +348,8 @@ function values() {
     case 'projects': return {name: get('name')};
     case 'labels': return {name: get('name'), color: get('color') || null};
     case 'tasks': return {summary: get('summary'), projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null};
-    case 'activities': return {...(editor.id ? {} : {taskId: get('taskId') || null, projectId:get('taskId') ? null : get('projectId') || null, workSessionId:get('workSessionId') || null}), summary: get('summary'), start: get('start'), end: get('end') || null, labelIds: labels()};
-    case 'work-sessions': return {summary:get('summary'),start:get('start'),end:get('end') || null};
+    case 'activities': return {...(editor.id ? {} : {taskId: get('taskId') || null, projectId:get('taskId') ? null : get('projectId') || null, workSessionId:get('workSessionId') || null}), summary: get('summary'), start: localDateTimeToInstant(get('start'), editor.zone), end: get('end') ? localDateTimeToInstant(get('end'), editor.zone) : null, labelIds: labels()};
+    case 'work-sessions': return {summary:get('summary'),start:localDateTimeToInstant(get('start'),editor.zone),end:get('end') ? localDateTimeToInstant(get('end'),editor.zone) : null};
     case 'me': return {zoneId: get('zoneId')};
   }
 }
@@ -369,7 +372,7 @@ async function saveEditor(event) {
     if(saved.data?.outsideSession) setStatus('Saved. This activity extends outside the selected work session.');
   } catch (error) {
     if (current !== editor || current.session !== api) return;
-    $('editor-error').textContent = errorText(error);
+    $('editor-error').textContent = error instanceof ApiError ? errorText(error) : error.message;
     if (error.uncertain) {
       current.uncertain = true;
       if (current.key) { $('save').textContent = 'Retry same command'; $('editor-notice').textContent = 'The outcome is unknown. Retry reuses this exact command and cannot record it twice.'; }
@@ -383,7 +386,7 @@ $('editor-form').addEventListener('submit', saveEditor);
 $('cancel').addEventListener('click', () => { if (editor?.busy) return; editor = null; $('editor').close(); $('fields').replaceChildren(); });
 $('editor').addEventListener('cancel', event => { if (editor?.busy) event.preventDefault(); else { editor = null; $('fields').replaceChildren(); } });
 function sessionLabel(value) {
-  return `${new Date(value.start).toLocaleString(undefined,{timeZone:snapshot.profile.data.zoneId,year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})} · ${value.end ? 'Completed' : 'Running'}${value.summary ? ' · '+value.summary : ''}`;
+  return `${instantText(value.start,snapshot.profile.data.zoneId)} · ${value.end ? 'Completed' : 'Running'}${value.summary ? ' · '+value.summary : ''}`;
 }
 function sessionChoices() {return [['','Standalone'],...snapshot.workSessions.map(value => [value.id,sessionLabel(value)])];}
 function refreshSessionChoices() {
@@ -422,7 +425,7 @@ function addSessionWarning() {
   const update=()=> {
     try {
       const session=snapshot.workSessions.find(value=>value.id===$('field-workSessionId').value);
-      const from=instantNanos($('field-start').value),end=$('field-end').value ? instantNanos($('field-end').value) : instantNanos(snapshot.report.generatedAt);
+      const from=instantNanos(localDateTimeToInstant($('field-start').value,editor.zone)),end=$('field-end').value ? instantNanos(localDateTimeToInstant($('field-end').value,editor.zone)) : instantNanos(snapshot.report.generatedAt);
       warning.textContent=session && (from<instantNanos(session.start) || (session.end && end>instantNanos(session.end))) ? 'This activity extends outside the session. Only the overlapping time counts toward covered time.' : '';
     } catch {warning.textContent='';}
   };

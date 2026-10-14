@@ -29,7 +29,7 @@ final class WorkSessionPanel {
     private WorkSessionId selected;
     private boolean loading,busy;
     private Supplier<?> pending;
-    private final DateTimeFormatter date=DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private final DateTimeFormatter date=DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm z");
     WorkSessionPanel(Composite parent) {
         group=new Composite(parent,SWT.BORDER);
         group.setData("org.eclipse.swtbot.widget.key","work-session-panel");
@@ -121,7 +121,7 @@ final class WorkSessionPanel {
     private void render() {
         var current=snapshot.active().or(()->Optional.ofNullable(snapshot.report()).map(WorkSessionService.Report::session));
         status.setText("Work session: "+(snapshot.active().isPresent() ? "Running" : "Stopped")+current.map(value->" · Started "+time(value.start())).orElse(""));
-        status.setToolTipText(current.map(value->"Started "+value.start()+value.end().map(end->" · Ended "+end).orElse(" · Running")).orElse("No work session recorded"));
+        status.setToolTipText(current.map(value->"Started "+time(value.start())+value.end().map(end->" · Ended "+time(end)).orElse(" · Running")).orElse("No work session recorded"));
         history.removeAll();
         for(var value:snapshot.sessions()) history.add(time(value.start())+" · "+(value.end().isEmpty() ? "Running" : "Completed")+" · "+value.summary());
         var previouslySelected=selectedActivity();activities.removeAll();var report=snapshot.report();

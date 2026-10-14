@@ -73,8 +73,8 @@ public class WorkSessionTest {
         if(!bot.toggleButton("Session details").isPressed()) bot.toggleButton("Session details").click();
         waitFor(()->bot.button("Record session").isEnabled(),"Record button unavailable");
         bot.button("Record session").click();bot.shell("Record work session").activate();
-        bot.textWithLabel("Summary").setText("Retrospective session");bot.textWithLabel("Start (UTC)").setText(from.toString());
-        bot.textWithLabel("End (UTC, blank while running)").setText(until.toString());bot.button("Save").click();
+        bot.textWithLabel("Summary").setText("Retrospective session");bot.textWithLabel("Start (local time)").setText(net.resheim.eclipse.timekeeper.ui.views.LocalTimeInput.format(from,TimekeeperUiPlugin.getCalendarZone()));
+        bot.textWithLabel("End (local time, blank while running)").setText(net.resheim.eclipse.timekeeper.ui.views.LocalTimeInput.format(until,TimekeeperUiPlugin.getCalendarZone()));bot.button("Save").click();
         waitFor(()->sessions.workSessions(OwnerId.LOCAL).stream().anyMatch(value->value.summary().equals("Retrospective session")),"Manual session was not saved");
         var session=sessions.workSessions(OwnerId.LOCAL).stream().filter(value->value.summary().equals("Retrospective session")).findFirst().orElseThrow();
         var independent=activities.createActivity(new CreateActivity(null,OwnerId.LOCAL,from.minusSeconds(3600),Optional.of(until.plusSeconds(3600)),"Outside association",Set.of()));
@@ -121,8 +121,8 @@ public class WorkSessionTest {
             assertEquals(peer,sessions.workSession(session.id()).orElseThrow());bot.button("Cancel").click();
             waitFor(()->bot.button("Edit session").isEnabled() && bot.comboBoxWithId("work-session-history").selection().contains("Peer edit"),"Reviewed session snapshot did not refresh");
             bot.button("Edit session").click();bot.shell("Edit work session").activate();
-            assertEquals(from.toString(),bot.textWithLabel("Start (UTC)").getText());
-            assertEquals(until.toString(),bot.textWithLabel("End (UTC, blank while running)").getText());
+            assertEquals(net.resheim.eclipse.timekeeper.ui.views.LocalTimeInput.format(from,TimekeeperUiPlugin.getCalendarZone()),bot.textWithLabel("Start (local time)").getText());
+            assertEquals(net.resheim.eclipse.timekeeper.ui.views.LocalTimeInput.format(until,TimekeeperUiPlugin.getCalendarZone()),bot.textWithLabel("End (local time, blank while running)").getText());
             bot.textWithLabel("Summary").setText("Reviewed edit");bot.button("Save").click();
             waitFor(()->sessions.workSession(session.id()).orElseThrow().summary().equals("Reviewed edit"),"Reviewed edit did not save");
             assertEquals(from,sessions.workSession(session.id()).orElseThrow().start());

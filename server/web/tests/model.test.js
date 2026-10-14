@@ -1,6 +1,33 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {dayStart, weekRange, durationNanos, durationText, dateInZone, instantNanos, taskPresentation, activityDayNanos, workweekGroups, decimalHoursText, sessionTimeNanos} from '../src/model.js';
+import {dayStart, weekRange, durationNanos, durationText, dateInZone, instantNanos, taskPresentation, activityDayNanos, workweekGroups, decimalHoursText, sessionTimeNanos, localDateTime, localDateTimeToInstant, instantText} from '../src/model.js';
+test('local editor values preserve civil dates and nanoseconds across user time zones', () => {
+  for (const [instant, zone, text] of [
+    ['2026-07-01T22:30:00.123456789Z','Europe/Oslo','2026-07-02T00:30:00.123456789'],
+    ['2026-01-01T23:30:00.000000001Z','Europe/Oslo','2026-01-02T00:30:00.000000001'],
+    ['2026-01-01T23:30:00Z','Asia/Kathmandu','2026-01-02T05:15:00'],
+    ['2026-01-01T02:30:00Z','America/Los_Angeles','2025-12-31T18:30:00'],
+  ]) {
+    assert.equal(localDateTime(instant,zone),text);
+    assert.equal(localDateTimeToInstant(text,zone),instant);
+  }
+  assert.equal(localDateTimeToInstant('2026-07-02 00:30','Europe/Oslo'),'2026-07-01T22:30:00Z');
+  assert.equal(localDateTimeToInstant('2026-01-01T23:30:00.123456789Z','Europe/Oslo'),'2026-01-01T23:30:00.123456789Z');
+  assert.match(instantText('2026-07-01T22:30:00Z','Europe/Oslo'), /2026/);
+});
+test('local editors reject skipped and ambiguous clock times and retain either repeated instant', () => {
+  assert.throws(()=>localDateTimeToInstant('2026-03-29T02:30:00','Europe/Oslo'),/does not exist/);
+  assert.throws(()=>localDateTimeToInstant('2026-10-25T02:30:00','Europe/Oslo'),/occurs twice/);
+  assert.throws(()=>localDateTimeToInstant('2011-12-30T12:00:00','Pacific/Apia'),/does not exist/);
+  assert.throws(()=>localDateTimeToInstant('2026-02-30T12:00:00','Europe/Oslo'),/valid date/);
+  for (const [instant,offset] of [['2026-10-25T00:30:00.123456789Z','+02:00'],['2026-10-25T01:30:00.123456789Z','+01:00']]) {
+    const text='2026-10-25T02:30:00.123456789'+offset;
+    assert.equal(localDateTime(instant,'Europe/Oslo'),text);
+    assert.equal(localDateTimeToInstant(text,'Europe/Oslo'),instant);
+  }
+  assert.equal(localDateTime('2026-04-04T14:45:00Z','Australia/Lord_Howe'),'2026-04-05T01:45:00+11:00');
+  assert.equal(localDateTimeToInstant('2026-04-05T01:45:00+10:30','Australia/Lord_Howe'),'2026-04-04T15:15:00Z');
+});
 test('Oslo report ranges include 23- and 25-hour days and Monday boundaries', () => {
   assert.equal(dayStart('2026-03-29', 'Europe/Oslo'), '2026-03-28T23:00:00.000Z');
   assert.equal(dayStart('2026-03-30', 'Europe/Oslo'), '2026-03-29T22:00:00.000Z');
