@@ -46,8 +46,9 @@ PostgreSQL service. VMM on the same NAS does not remove these shared failure poi
      python:3.13-alpine python setup.py --owner torkild
    ```
 
-   Save the generated bearer token in the Eclipse client's credential store.
-   It is shown once; the registry stores only its hash. Setup preserves existing
+   Save the one-time administrator code (15-minute lifetime), open `/web/` and
+   complete first setup. Then create a personal Eclipse token under **Account**.
+   See the [account guide](ACCOUNTS.md) for migration and recovery. Setup preserves existing
    secrets, tokens and databases when run again. Do not regenerate missing
    database credentials for an existing database: restore the original files.
 4. In **Container Manager → Project → Create**, set the project name to
@@ -183,9 +184,9 @@ If a task was forcibly killed and left `state/update.lock`, verify that no updat
 is running before removing that empty lock directory and rerunning the task.
 
 Automatic API updates require backward-compatible database schemas. Current
-startup validates schema version 1 and does not upgrade existing schemas.
-An incompatible image fails readiness and is rolled back. A future schema
-migration must be coordinated separately, with a tested database restore plan;
+startup upgrades the canonical schema 1 to schema 2. Stop both replicas and
+back up before this first account upgrade; follow the [account migration guide](ACCOUNTS.md).
+Subsequent incompatible migrations must be coordinated separately with a restore plan;
 rolling back an image alone cannot undo a migration.
 
 For the first upgrade to a build supporting Work Sessions, disable scheduled

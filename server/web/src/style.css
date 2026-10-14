@@ -49,3 +49,5 @@ td.actions .icon-button{margin-left:.25rem}
 @media(max-width:640px){#workspace[data-view=calendar] #work-session-current{display:none}#workspace[data-view=calendar] .work-session-heading>div:first-child{min-width:0}.calendar-toolbar h2{font-size:1.1rem}.calendar-toolbar>div:first-child{width:auto;flex:1 1 10rem}.calendar-toolbar input{width:10rem}}
 
 .client-color{display:inline-flex;align-items:center;gap:.5rem}.client-color:before{content:"";width:1.2rem;height:1.2rem;border:1px solid #526257;border-radius:4px;background:var(--client-color)}.calendar-resize:after{background:currentColor}.calendar-resize{color:inherit}
+
+.check {display:flex;align-items:center;gap:.6rem}.check input {width:auto}#account-dialog {width:min(42rem,94vw)}#account-content section {border-bottom:1px solid var(--line,#dce2e8);padding-block:.8rem}#account-content form {display:grid;gap:.7rem}#account-content details {margin-block:.6rem}#account-content input[readonly] {font-family:monospace}#account-error {color:#b42318}

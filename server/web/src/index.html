@@ -10,12 +10,22 @@
   <script type="module" src="./app.js"></script>
 </head>
 <body>
-  <header><a class="brand" href="./">Timekeeper <small>2.0</small></a><div id="session" hidden><span id="owner"></span><button id="settings">Time zone</button><button id="sign-out">Sign out</button></div></header>
+  <header><a class="brand" href="./">Timekeeper <small>2.0</small></a><div id="session" hidden><span id="owner"></span><button id="settings">Time zone</button><button id="account">Account</button><button id="sign-out">Sign out</button></div></header>
   <main>
     <section id="login" class="card login">
       <p class="eyebrow">YOUR WORK, RECORDED</p><h1>Make time count.</h1>
       <p>Track work and manage your projects in the browser.</p>
-      <form id="login-form"><label>Access token<input id="token" type="password" autocomplete="off" required></label><p class="hint">Use a token issued by your server administrator. This browser remembers it for automatic sign-in after reload. Sign out to forget it.</p><p id="login-error" role="alert"></p><button class="primary" type="submit">Sign in</button></form>
+      <form id="login-form">
+        <label>Sign-in method<select id="auth-mode"><option value="login">Username and password</option><option value="setup">First administrator setup</option><option value="recover">Recover account</option><option value="token">Existing API token</option></select></label>
+        <label id="code-field" hidden>One-time setup or recovery code<input id="setup-code" type="password" autocomplete="off"></label>
+        <label id="username-field">Username<input id="username" autocomplete="username" required maxlength="64"></label>
+        <label id="password-field">Password<input id="password" type="password" autocomplete="current-password" required></label>
+        <label id="display-field" hidden>Display name<input id="display-name" autocomplete="name" maxlength="200"></label>
+        <label id="remember-field" class="check"><input id="remember" type="checkbox"> Remember me on this browser</label>
+        <label id="token-field" hidden>Access token<input id="token" type="password" autocomplete="off"></label>
+        <p id="auth-hint" class="hint">Use your Timekeeper account. API tokens are managed after signing in.</p>
+        <p id="login-error" role="alert"></p><button class="primary" type="submit">Sign in</button>
+      </form>
     </section>
     <div id="workspace" hidden>
       <div class="status-line"><p id="status" role="status" aria-live="polite"></p><button id="refresh">Refresh</button></div>
@@ -62,6 +72,7 @@
       </footer>
     </div>
   </main>
+  <dialog id="account-dialog" aria-labelledby="account-title"><h2 id="account-title">Account</h2><div id="account-content"></div><p id="account-error" role="alert"></p><button id="account-close" type="button">Close</button></dialog>
   <dialog id="editor" aria-labelledby="editor-title"><form id="editor-form"><h2 id="editor-title"></h2><div id="fields"></div><p id="editor-error" role="alert"></p><p id="editor-notice" role="status"></p><div class="dialog-actions"><button id="cancel" type="button">Cancel</button><button id="save" class="primary" type="submit">Save</button></div></form></dialog>
 </body>
 </html>

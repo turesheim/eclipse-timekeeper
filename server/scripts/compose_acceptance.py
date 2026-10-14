@@ -36,6 +36,7 @@ def main():
     temporary = Path(tempfile.mkdtemp(prefix='timekeeper-compose-'))
     deployment = temporary / 'deploy'
     shutil.copytree(ROOT / 'server/deploy', deployment, ignore=shutil.ignore_patterns('.env', 'state', '__pycache__'))
+    shutil.copyfile(ROOT / 'server/scripts/configure_accounts.py', deployment / 'configure_accounts.py')
     state = temporary / 'state'
     with socket.socket() as sock:
         sock.bind(('127.0.0.1', 0))

@@ -1,7 +1,7 @@
 const messages = {
-  UNAUTHENTICATED: 'Your session is no longer authorized. Sign out and sign in with a valid token.',
+  UNAUTHENTICATED: 'Your session is no longer authorized. Sign out and sign in with a your account.',
   OWNER_CHANGED: 'The account for this session has changed. Sign out before using the intended account.',
-  FORBIDDEN: 'This token does not have permission to make this change.',
+  FORBIDDEN: 'Your account does not have permission to make this change.',
   STALE_VERSION: 'This record changed. Your draft is kept; cancel and reopen the editor to review the current record.',
   PRECONDITION_FAILED: 'This record changed. Your draft is kept; cancel and reopen the editor to review the current record.',
   ACTIVE_STATE_CHANGED: 'Tracking changed in another client. Review the current activity before trying again.',
@@ -17,7 +17,7 @@ export class ApiError extends Error {
   constructor(code, status = 0) { super(messages[code] || 'The request was rejected. Review the current records and try again.'); this.code = code; this.status = status; }
   get uncertain() { return this.status === 0 || this.status >= 500; }
 }
-function ownerHeader(owner) {
+export function ownerHeader(owner) {
   return btoa(String.fromCharCode(...new TextEncoder().encode(owner))).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
 }
 function decodeOwner(value) {
@@ -30,21 +30,23 @@ function decodeOwner(value) {
   } catch { throw new ApiError('UNAVAILABLE'); }
 }
 export class Api {
-  #token; #owner = null; #requests = new Set(); #closed = false;
-  constructor(token, fetcher = (...args) => globalThis.fetch(...args)) { this.#token = token; this.fetcher = fetcher; }
+  #token; #csrf; #owner = null; #requests = new Set(); #closed = false;
+  constructor(token = null, fetcher = (...args) => globalThis.fetch(...args), context = {}) { this.#token = token; this.#csrf = context.csrf; this.#owner = context.ownerId ?? null; this.fetcher = fetcher; }
   get owner() { return this.#owner; }
-  close() { this.#closed = true; this.#token = ''; for (const request of this.#requests) request.abort(); }
+  close() { this.#closed = true; this.#token = ''; this.#csrf = null; for (const request of this.#requests) request.abort(); }
   async request(path, {method = 'GET', body, etag, key, timeout = 15000} = {}) {
     if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);
     const controller = new AbortController(); this.#requests.add(controller);
     const timer = setTimeout(() => controller.abort(), timeout);
     try {
-      const headers = {Authorization: `Bearer ${this.#token}`, Accept: 'application/json'};
+      const headers = {Accept: 'application/json'};
+      if (this.#token) headers.Authorization = `Bearer ${this.#token}`;
+      else if (this.#csrf && !['GET', 'HEAD', 'OPTIONS'].includes(method)) headers['X-CSRF-Token'] = this.#csrf;
       if (this.#owner !== null) headers['X-Timekeeper-Owner'] = ownerHeader(this.#owner);
       if (body !== undefined) headers['Content-Type'] = 'application/json';
       if (etag) headers['If-Match'] = etag;
       if (key) headers['Idempotency-Key'] = key;
-      const response = await this.fetcher(`/api/v1${path}`, {method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, redirect: 'error', credentials: 'omit', cache: 'no-store'});
+      const response = await this.fetcher(`/api/v1${path}`, {method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, redirect: 'error', credentials: this.#token ? 'omit' : 'same-origin', cache: 'no-store'});
       const data = response.status === 204 ? null : await response.json();
       if (!response.ok) throw new ApiError(typeof data?.code === 'string' ? data.code : 'UNAVAILABLE', response.status);
       if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);

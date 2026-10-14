@@ -14,7 +14,7 @@ async function signIn() {
   await page.goto('/web/');
   await expect.poll(async () => await page.locator('#workspace').isVisible() || await page.locator('#login-form button').isEnabled()).toBe(true);
   if (!await page.locator('#workspace').isVisible()) {
-    await page.getByLabel('Access token').fill(process.env.TIMEKEEPER_WEB_TOKEN);
+    await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(process.env.TIMEKEEPER_WEB_TOKEN);
     await page.getByRole('button', {name:'Sign in', exact:true}).click();
   }
   await expect(page.locator('#status')).toHaveText('Up to date');

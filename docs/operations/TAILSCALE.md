@@ -72,8 +72,12 @@ Use the full HTTPS DNS name printed by Serve. For example:
 
 Replace the example hostname with your host's printed name. Use that DNS name
 for certificate validation; Eclipse requires HTTPS outside loopback. Browser
-and Eclipse sessions still require the bearer token from server setup and use
-the same account and persistent database as local sessions.
+sessions use normal account sign-in; Eclipse uses a personal API token created
+under **Account**. Set `TIMEKEEPER_PUBLIC_ORIGIN` to the exact HTTPS origin
+(including the port when non-default) and recreate both server replicas. This
+allows browser Origin validation behind Tailscale Serve. Both use the same
+private account and persistent database as local sessions. See the
+[account guide](ACCOUNTS.md).
 
 ## Verify and remove the endpoint
 

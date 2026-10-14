@@ -14,6 +14,7 @@ FILES = ('compose.yaml', '.env.example', 'haproxy.cfg', 'setup.py', 'backup.sh',
 GUIDES = {'docs/operations/DEPLOYMENT.md': 'README.md',
           'docs/operations/LOCAL-DOCKER.md': 'LOCAL.md',
           'docs/operations/TAILSCALE.md': 'TAILSCALE.md',
+              'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
           'docs/operations/SERVER.md': 'SERVER.md',
           'docs/architecture/API-V1.md': 'API-POLICY.md'}
 
@@ -29,6 +30,7 @@ def package(output, commit, root=ROOT):
             if source.is_symlink() or not source.is_file():
                 raise ValueError('Missing or unexpected deployment input: ' + name)
             archive.add(source, arcname=name, recursive=False)
+        archive.add(root / 'server/scripts/configure_accounts.py', arcname='configure_accounts.py', recursive=False)
         for source, destination in GUIDES.items():
             content = render_document(root, source, GUIDES, commit).encode()
             entry = tarfile.TarInfo(destination)

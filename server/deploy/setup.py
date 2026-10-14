@@ -6,6 +6,9 @@ import json
 import os
 from pathlib import Path
 import secrets
+import sys
+sys.path[:0] = [str(Path(__file__).resolve().parent), str(Path(__file__).resolve().parents[1] / "scripts")]
+from configure_accounts import create_challenge
 
 HERE = Path(__file__).resolve().parent
 SECRET_NAMES = ('postgres_admin_password', 'timekeeper_database_password')
@@ -25,10 +28,10 @@ def configuration():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--owner', required=True)
+    parser.add_argument('--owner', help='Explicit legacy owner to claim; omit for a new identity')
     parser.add_argument('--state-dir', type=Path)
     args = parser.parse_args()
-    if (not args.owner.strip() or args.owner != args.owner.strip()
+    if args.owner is not None and (not args.owner.strip() or args.owner != args.owner.strip()
             or args.owner == 'local' or len(args.owner) > 200):
         parser.error('Choose a stable owner ID of 1–200 characters; local is reserved')
     state = (args.state_dir or Path(configuration().get('TIMEKEEPER_STATE_DIR', HERE / 'state'))).resolve()
@@ -55,22 +58,30 @@ def main():
     config.mkdir(parents=True, exist_ok=True)
     config.chmod(0o755)
     token_file = config / 'tokens.json'
+    setup_created = False
     if not token_file.exists():
-        token = secrets.token_urlsafe(32)
+        if any((state / 'postgres').rglob('PG_VERSION')):
+            parser.error('Existing data requires its original token registry or explicit account migration; see SERVER.md')
         with token_file.open('x') as output:
-            json.dump([{'ownerId': args.owner, 'sha256': hashlib.sha256(token.encode()).hexdigest(),
-                        'permissions': ['read', 'write']}], output, indent=2)
-            output.write('\n')
+            output.write('[]\n')
         token_file.chmod(0o644)
-        print('Save this bearer token in the client credential store; it is shown once:')
-        print(token)
+        code, _ = create_challenge(config / 'account-setup.json', owner=args.owner)
+        # Only the digest is mounted; make it readable by the server's container UID.
+        (config / 'account-setup.json').chmod(0o644)
+        setup_created = True
+        print('First administrator code (expires in 15 minutes; shown once):')
+        print(code)
+        print('Open /web/ and choose First administrator setup. API tokens can be created after signing in.')
     else:
-        print('Existing token registry preserved.')
+        print('Existing token registry and account setup preserved.')
     for name in ('postgres', 'backups'):
         (state / name).mkdir(parents=True, exist_ok=True)
     env_file = HERE / '.env'
     if not env_file.exists():
         env_file.write_text(f'TIMEKEEPER_STATE_DIR={state}\nTIMEKEEPER_BIND_ADDRESS=127.0.0.1\nTIMEKEEPER_HTTP_PORT=8080\n')
+    if setup_created:
+        with env_file.open('a') as output:
+            output.write('\nTIMEKEEPER_SERVER_SETUP_FILE=/config/account-setup.json\n')
     print(f'Durable state: {state}')
     print('Start with: docker compose up -d')
 

@@ -12,12 +12,15 @@ import org.h2.tools.RunScript;
 /** Validate the complete canonical server schema before accepting existing storage. */
 public final class ServerSchema {
     private ServerSchema() { }
-    private static final Set<String> TABLES=Set.of("TK_SCHEMA","TK_OWNER","TK_RESOURCE","TK_RELATION","TK_EXTERNAL_REFERENCE","TK_ACTIVE","TK_RECEIPT","TK_CHANGE");
+    private static final Set<String> LEGACY_TABLES=Set.of("TK_SCHEMA","TK_OWNER","TK_RESOURCE","TK_RELATION","TK_EXTERNAL_REFERENCE","TK_ACTIVE","TK_RECEIPT","TK_CHANGE");
+    public static final int CURRENT=2;
+    private static final Set<String> TABLES;
+    static {var tables=new HashSet<>(LEGACY_TABLES);tables.addAll(Set.of("TK_ACCOUNT","TK_AUTH_CONTROL","TK_AUTH_CHALLENGE","TK_AUTH_SESSION","TK_API_TOKEN","TK_AUTH_THROTTLE"));TABLES=Set.copyOf(tables);}
     private static class Reference {
         static final List<String> SHAPE=referenceShape();
         private static List<String> referenceShape() {
             try(var connection=DriverManager.getConnection("jdbc:h2:mem:schema_reference_"+UUID.randomUUID())) {
-                create(connection);return shape(connection);
+                create(connection);applyAuth(connection);return shape(connection,TABLES);
             } catch(Exception e) {throw new ExceptionInInitializerError(e);}
         }
     }
@@ -27,16 +30,35 @@ public final class ServerSchema {
             RunScript.execute(connection,new InputStreamReader(input,StandardCharsets.UTF_8));
         }
     }
+    static void applyAuth(Connection connection) throws Exception {
+        try(var input=ServerSchema.class.getResourceAsStream("/db/auth-v2.sql")) {
+            if(input==null) throw new SQLException("Missing authentication schema resource");
+            RunScript.execute(connection,new InputStreamReader(input,StandardCharsets.UTF_8));
+        }
+    }
+    private static List<String> legacyShape() throws Exception {
+        try(var connection=DriverManager.getConnection("jdbc:h2:mem:legacy_reference_"+UUID.randomUUID())) {create(connection);return shape(connection,LEGACY_TABLES);}
+    }
     public static void initializeOrValidate(Connection connection) throws Exception {
         if (connection.getMetaData().getDatabaseProductName().equals("PostgreSQL")) {
             PostgresSchema.initializeOrValidate(connection);
             return;
         }
         if(tables(connection).isEmpty()) {
-            create(connection);
+            create(connection);applyAuth(connection);
             validateShape(connection);
             // H2 commits DDL. Interrupted initialization remains explicitly INITIALIZING.
-            try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET state='READY' WHERE id=1");}
+            try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET schema_version=2,state='READY' WHERE id=1");}
+        }
+        if(tables(connection).equals(LEGACY_TABLES)) {
+            if(!shape(connection,LEGACY_TABLES).equals(legacyShape())) throw new SQLException("Unsupported legacy server schema");
+            try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT id,schema_version,state FROM tk_schema")) {
+                if(!rows.next() || rows.getInt(1)!=1 || rows.getInt(2)!=1 || !"READY".equals(rows.getString(3)) || rows.next()) throw new SQLException("Unsupported or incomplete legacy schema");
+            }
+            // H2 DDL commits: interruption remains MIGRATING and is never accepted as READY.
+            try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET state='MIGRATING' WHERE id=1");}
+            applyAuth(connection);validateShape(connection);
+            try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET schema_version=2,state='READY' WHERE id=1");}
         }
         validate(connection);
     }
@@ -65,15 +87,15 @@ public final class ServerSchema {
         }
         validateShape(connection);
         try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT id,schema_version,state FROM tk_schema")) {
-            if(!rows.next() || rows.getInt(1)!=1 || rows.getInt(2)!=1 || !"READY".equals(rows.getString(3)) || rows.next()) throw new SQLException("Unsupported or incomplete server schema version");
+            if(!rows.next() || rows.getInt(1)!=1 || rows.getInt(2)!=CURRENT || !"READY".equals(rows.getString(3)) || rows.next()) throw new SQLException("Unsupported or incomplete server schema version");
         }
     }
     private static void validateShape(Connection connection) throws SQLException {
-        if(!tables(connection).equals(TABLES) || !shape(connection).equals(Reference.SHAPE)) throw new SQLException("Unsupported or incomplete server schema");
+        if(!tables(connection).equals(TABLES) || !shape(connection,TABLES).equals(Reference.SHAPE)) throw new SQLException("Unsupported or incomplete server schema");
     }
-    private static List<String> shape(Connection connection) throws SQLException {
+    private static List<String> shape(Connection connection,Set<String> expectedTables) throws SQLException {
         List<String> result=new ArrayList<>();var metadata=connection.getMetaData();
-        for(String table:new TreeSet<>(TABLES)) {
+        for(String table:new TreeSet<>(expectedTables)) {
             try(var rows=metadata.getColumns(null,"PUBLIC",table,"%")) {
                 while(rows.next()) result.add(table+" COLUMN "+rows.getString("COLUMN_NAME")+" "+rows.getString("TYPE_NAME")+" "+rows.getInt("COLUMN_SIZE")+" "+rows.getInt("DECIMAL_DIGITS")+" "+rows.getInt("NULLABLE")+" "+rows.getString("COLUMN_DEF"));
             }

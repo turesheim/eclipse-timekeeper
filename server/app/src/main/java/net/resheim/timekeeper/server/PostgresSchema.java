@@ -25,10 +25,16 @@ public final class PostgresSchema {
                 // Two server replicas may start against the same new database at once.
                 statement.execute("SELECT pg_advisory_xact_lock(92751638246)");
                 if (shape(connection).isEmpty()) {
-                    statement.execute(resource("schema-v1-postgresql.sql"));
+                    statement.execute(resource("schema-v1-postgresql.sql"));statement.execute(resource("auth-v2.sql"));
                     validateShape(connection);
-                    statement.executeUpdate("UPDATE tk_schema SET state='READY' WHERE id=1");
+                    statement.executeUpdate("UPDATE tk_schema SET schema_version=2,state='READY' WHERE id=1");
                 }
+            }
+            if(shape(connection).equals(resource("schema-v1-postgresql.shape").lines().toList())) {
+                try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT id,schema_version,state FROM tk_schema")) {
+                    if(!rows.next() || rows.getInt(1)!=1 || rows.getInt(2)!=1 || !"READY".equals(rows.getString(3)) || rows.next()) throw new SQLException("Unsupported legacy PostgreSQL schema");
+                }
+                try(var statement=connection.createStatement()) {statement.execute(resource("auth-v2.sql"));statement.executeUpdate("UPDATE tk_schema SET schema_version=2 WHERE id=1");}
             }
             validate(connection);
             connection.commit();
@@ -42,14 +48,14 @@ public final class PostgresSchema {
         validateShape(connection);
         try (var statement = connection.createStatement();
                 var rows = statement.executeQuery("SELECT id,schema_version,state FROM tk_schema")) {
-            if (!rows.next() || rows.getInt(1) != 1 || rows.getInt(2) != 1
+            if (!rows.next() || rows.getInt(1) != 1 || rows.getInt(2) != ServerSchema.CURRENT
                     || !"READY".equals(rows.getString(3)) || rows.next())
                 throw new SQLException("Unsupported or incomplete PostgreSQL server schema version");
         }
     }
 
     private static void validateShape(Connection connection) throws SQLException {
-        if (!shape(connection).equals(resource("schema-v1-postgresql.shape").lines().toList()))
+        if (!shape(connection).equals(resource("schema-v2-postgresql.shape").lines().toList()))
             throw new SQLException("Unsupported or incomplete PostgreSQL server schema");
     }
 

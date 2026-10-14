@@ -23,9 +23,13 @@ change resource ownership. A valid read-only token can query its owner's data
 but mutations return 403. Missing, invalid, expired or revoked tokens return
 401 with `WWW-Authenticate: Bearer`. No owner is selected from a query, body,
 external provider identity, Eclipse workspace or token text supplied as data.
-The server administrator provisions owners/tokens; v1 has no account-management
-or cross-owner sharing endpoint. TLS is required outside loopback development.
-Tokens are never returned in DTOs, URLs, logs, errors or change notifications.
+The `/auth` endpoints provide account management, web sign-in and personal API
+tokens; see [account operations](../operations/ACCOUNTS.md). There is no cross-owner
+sharing endpoint. Administrator roles never grant another owner’s business data. TLS is required outside loopback development.
+New personal API tokens are returned once by their creation endpoint; token
+secrets never appear in resource DTOs, URLs, logs, errors or change notifications.
+Web requests may instead use the HttpOnly Secure cookie; unsafe cookie requests
+require the memory-only CSRF value returned by `/auth/session`.
 
 Stateful clients bind their session to the first authenticated owner. Authorized
 responses include `X-Timekeeper-Owner`, the canonical unpadded base64url encoding

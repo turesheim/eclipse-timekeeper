@@ -53,11 +53,11 @@ Create credentials and the initial account:
 python3 setup.py --owner alice
 ```
 
-Replace `alice` with your stable account identifier. Save the bearer token
-printed by setup: it is shown once and is used by the client. Setup generates
-the database passwords and a token registry containing only the token hash.
-Running setup again preserves existing credentials and data. Changing `--owner`
-on a second run does not replace the existing token registry.
+Replace `alice` with the stable owner ID to initialize, or omit `--owner` for a
+new generated identity. Save the one-time administrator code printed by setup;
+it expires after 15 minutes. Setup creates database passwords and an empty legacy
+token registry. Re-running preserves credentials and data. See the
+[account guide](ACCOUNTS.md) for expired codes and migration of existing owners.
 
 ## 3. Build and start
 
@@ -99,12 +99,13 @@ curl --fail --silent --show-error http://127.0.0.1:8080/q/health/ready
 The response's `status` should be `UP`. If you changed the port, use that
 port in all URLs below.
 
-Open **http://127.0.0.1:8080/web/** in your browser and sign in with the bearer
-token saved during setup. The web client is bundled in the server image; no
-separate frontend service is needed. The token stays in memory for that tab,
-so reloading the page or signing out ends the session.
+Open **http://127.0.0.1:8080/web/**, choose **First administrator setup**, and use
+the code to choose your username and password. Subsequent visits use normal
+sign-in. Reload restores the browser cookie. Create a personal Eclipse API token
+under **Account** and copy it while it is shown once. The web client is bundled
+in the server image; no separate frontend service is needed.
 
-To check the account, enter the saved token at the prompt. These Bash commands
+To check the account, enter the personal API token at the prompt. These Bash commands
 keep it out of shell history and curl's command-line arguments:
 
 ```sh
@@ -122,7 +123,7 @@ In Eclipse, open **Preferences → Timekeeper → Backend**, select **Timekeeper
 server**, and set:
 
 - **Server URL:** `http://127.0.0.1:8080/api/v1`
-- **Token:** the bearer token from setup
+- **Token:** the personal API token created under Account
 
 Apply the settings and restart Eclipse. Tokens are kept in Eclipse secure
 storage. Existing local Eclipse records remain in their original database;
