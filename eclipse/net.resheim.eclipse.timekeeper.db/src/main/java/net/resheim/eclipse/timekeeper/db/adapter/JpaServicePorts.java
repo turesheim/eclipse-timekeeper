@@ -17,6 +17,10 @@ import javax.persistence.EntityTransaction;
 import net.resheim.eclipse.timekeeper.db.model.ActivityLabel;
 import net.resheim.eclipse.timekeeper.db.model.OwnerIdentity;
 import net.resheim.eclipse.timekeeper.domain.Activity;
+import net.resheim.eclipse.timekeeper.domain.WorkSession;
+import net.resheim.eclipse.timekeeper.domain.WorkSessionId;
+import net.resheim.eclipse.timekeeper.service.Ports.WorkSessionRepository;
+import net.resheim.eclipse.timekeeper.service.Ports.WorkSessionPorts;
 import net.resheim.eclipse.timekeeper.domain.ActivityId;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
@@ -40,7 +44,7 @@ import net.resheim.eclipse.timekeeper.service.ServiceException;
 
 /** JPA implementation of the pure-Java application-service ports. */
 public final class JpaServicePorts implements ProjectRepository, TaskRepository, ActivityRepository,
-		LabelRepository, IdentifierSource, TransactionRunner {
+		LabelRepository, WorkSessionRepository, IdentifierSource, TransactionRunner {
 	private final Supplier<EntityManager> managers;
 	private final Object transactionLock = new Object();
 	private final ThreadLocal<EntityManager> transactionManagers = new ThreadLocal<>();
@@ -57,6 +61,10 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 		};
 		return new ServicePorts(this, this, this, this, this, time, this, events);
 	}
+
+    public WorkSessionPorts workSessionPorts(EventSink events) {
+        return new WorkSessionPorts(this,this,WorkSessionId::random,Clock.systemUTC()::instant,this,events);
+    }
 
 	@Override
 	public <T> T required(Supplier<T> work) {
@@ -75,8 +83,12 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 				transaction.begin();
 				afterCommitActions = new ArrayList<>();
 			}
-			try {
-				result = work.get();
+            try {
+                if(owner) {
+                    manager.createNativeQuery("MERGE INTO TIMEKEEPER_WRITE_LOCK KEY(ID) VALUES(1)").executeUpdate();
+                    manager.getEntityManagerFactory().getCache().evictAll();
+                }
+                result = work.get();
 				if (owner) {
 					transaction.commit();
 					committedActions = List.copyOf(afterCommitActions);
@@ -257,12 +269,12 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 		String id = snapshot.id().value().toString();
 		net.resheim.eclipse.timekeeper.db.model.Activity entity = manager.find(
 				net.resheim.eclipse.timekeeper.db.model.Activity.class, id);
-		net.resheim.eclipse.timekeeper.db.model.Task tracked = manager.find(
+		net.resheim.eclipse.timekeeper.db.model.Task tracked = snapshot.taskId()==null ? null : manager.find(
 				net.resheim.eclipse.timekeeper.db.model.Task.class, snapshot.taskId().value().toString());
 		if (entity == null) {
 			entity = new net.resheim.eclipse.timekeeper.db.model.Activity(id, tracked,
 					new OwnerIdentity(snapshot.ownerId().value()), snapshot.start());
-			tracked.addActivity(entity);
+            if(tracked!=null) tracked.addActivity(entity);
 			manager.persist(entity);
 		} else {
 			expectNext(snapshot.version(), activityVersion(entity), "activity");
@@ -274,8 +286,21 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 		entity.setManual(snapshot.manual());
 		entity.setLabels(snapshot.labelIds().stream().map(labelId -> manager.find(ActivityLabel.class,
 				labelId.value().toString())).toList());
-		if (snapshot.end().isEmpty()) tracked.setCurrentActivity(entity);
-		else if (tracked.getCurrentActivity().orElse(null) == entity) tracked.setCurrentActivity(null);
+        var session=snapshot.workSessionId().map(value -> manager.find(net.resheim.eclipse.timekeeper.db.model.WorkSession.class,value.value().toString())).orElse(null);
+        if(snapshot.workSessionId().isPresent() && (session==null || !session.getOwnerId().equals(snapshot.ownerId().value())))
+            throw ServiceException.notFound("workSession",snapshot.workSessionId().get());
+        entity.setWorkSession(session);
+        var directProject=snapshot.projectId().map(idValue -> findProject(idValue).orElseThrow(
+                () -> ServiceException.notFound("project",idValue))).orElse(null);
+        if(entity.getProject()!=directProject) {
+            if(entity.getProject()!=null) entity.getProject().removeActivity(entity);
+            if(directProject!=null) directProject.addActivity(entity);
+            entity.setProject(directProject);
+        }
+        if(tracked!=null) {
+            if (snapshot.end().isEmpty()) tracked.setCurrentActivity(entity);
+            else if (tracked.getCurrentActivity().orElse(null) == entity) tracked.setCurrentActivity(null);
+        }
 		manager.flush();
 		return activity(entity);
 	}
@@ -287,9 +312,49 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 				net.resheim.eclipse.timekeeper.db.model.Activity.class, id.value().toString());
 		if (entity != null) {
 			if (entity.getTrackedTask() != null) entity.getTrackedTask().removeActivity(entity);
+            if(entity.getProject()!=null) entity.getProject().removeActivity(entity);
 			manager.remove(entity);
 		}
 	}
+
+    @Override public Optional<WorkSession> find(WorkSessionId id) {
+        return Optional.ofNullable(manager().find(net.resheim.eclipse.timekeeper.db.model.WorkSession.class,id.value().toString())).map(this::workSession);
+    }
+    @Override public Optional<WorkSession> findOpenWorkSessionByOwner(OwnerId owner) {
+        return manager().createQuery("SELECT s FROM WorkSession s WHERE s.ownerId=:owner AND s.end IS NULL",net.resheim.eclipse.timekeeper.db.model.WorkSession.class)
+                .setParameter("owner",owner.value()).getResultStream().findFirst().map(this::workSession);
+    }
+    @Override public List<WorkSession> findWorkSessions(OwnerId owner) {
+        return manager().createQuery("SELECT s FROM WorkSession s WHERE s.ownerId=:owner ORDER BY s.start",net.resheim.eclipse.timekeeper.db.model.WorkSession.class)
+                .setParameter("owner",owner.value()).getResultStream().map(this::workSession).toList();
+    }
+    @Override public List<Activity> findSessionActivities(WorkSessionId id) {
+        return manager().createQuery("SELECT a FROM Activity a WHERE a.workSession.id=:id ORDER BY a.start",net.resheim.eclipse.timekeeper.db.model.Activity.class)
+                .setParameter("id",id.value().toString()).getResultStream().map(this::activity).toList();
+    }
+    @Override public WorkSession save(WorkSession snapshot) {
+        var manager=manager();var entity=manager.find(net.resheim.eclipse.timekeeper.db.model.WorkSession.class,snapshot.id().value().toString());
+        if(entity==null) {
+            entity=new net.resheim.eclipse.timekeeper.db.model.WorkSession(snapshot.id().value().toString(),snapshot.ownerId().value(),snapshot.start(),snapshot.end().orElse(null),snapshot.summary());
+            manager.persist(entity);manager.flush();
+        } else {
+            expectNext(snapshot.version(),entity.getVersion(),"work session");
+            int updated=manager.createNativeQuery("UPDATE WORK_SESSION SET VERSION=?1,START_TIME=?2,END_TIME=?3,SUMMARY=?4,STATE=?5 WHERE ID=?6 AND OWNER_ID=?7 AND VERSION=?8")
+                    .setParameter(1,snapshot.version()).setParameter(2,snapshot.start().toString()).setParameter(3,snapshot.end().map(java.time.Instant::toString).orElse(null))
+                    .setParameter(4,snapshot.summary()).setParameter(5,snapshot.state().name()).setParameter(6,entity.getId()).setParameter(7,snapshot.ownerId().value())
+                    .setParameter(8,entity.getVersion()).executeUpdate();
+            if(updated!=1) throw ServiceException.conflict("workSession","stale work session version");
+            manager.refresh(entity);
+        }
+        return workSession(entity);
+    }
+    @Override public void delete(WorkSessionId id) {
+        var entity=manager().find(net.resheim.eclipse.timekeeper.db.model.WorkSession.class,id.value().toString());if(entity!=null) manager().remove(entity);
+    }
+    private WorkSession workSession(net.resheim.eclipse.timekeeper.db.model.WorkSession entity) {
+        var snapshot=new WorkSession(new WorkSessionId(UUID.fromString(entity.getId())),new OwnerId(entity.getOwnerId()),entity.getStart(),Optional.ofNullable(entity.getEnd()),entity.getSummary(),entity.getVersion());
+        if(!snapshot.state().name().equals(entity.getState())) throw new IllegalStateException("Invalid stored work session state");return snapshot;
+    }
 
 	@Override
 	public Optional<Label> find(LabelId id) {
@@ -408,8 +473,8 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 	private long activityVersion(net.resheim.eclipse.timekeeper.db.model.Activity entity) {
 		String labels = entity.getLabels().stream().map(ActivityLabel::getId).sorted(Comparator.naturalOrder())
 				.reduce("", (left, right) -> left + "\u001f" + right);
-		return contentVersion(entity.getStart(), entity.getEnd(), entity.getSummary(), entity.getOwner().value(),
-				entity.isEdited(), labels);
+        return contentVersion(entity.getStart(), entity.getEnd(), entity.getSummary(), entity.getOwner().value(),
+                entity.isEdited(), labels,entity.getWorkSession()==null ? null : entity.getWorkSession().getId(),entity.getProject()==null ? null : entity.getProject().getName());
 	}
 
 	/** Stable content token for legacy tables that predate explicit version columns. */
@@ -448,9 +513,9 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 				.map(value -> new LabelId(UUID.fromString(value.getId())))
 				.collect(java.util.stream.Collectors.toSet());
 		return new Activity(new ActivityId(UUID.fromString(entity.getId())),
-				new TaskId(UUID.fromString(entity.getTrackedTask().getId())), new OwnerId(entity.getOwner().value()),
+				entity.getTrackedTask()==null ? null : new TaskId(UUID.fromString(entity.getTrackedTask().getId())), new OwnerId(entity.getOwner().value()),
 				entity.getStart(), Optional.ofNullable(entity.getEnd()), entity.getSummary(), labels,
-				entity.isEdited(), activityVersion(entity));
+				entity.isEdited(), activityVersion(entity), Optional.ofNullable(entity.getWorkSession()).map(value -> new WorkSessionId(UUID.fromString(value.getId()))), Optional.ofNullable(entity.getProject()).map(this::project).map(Project::id));
 	}
 
 	private Label label(ActivityLabel entity) {

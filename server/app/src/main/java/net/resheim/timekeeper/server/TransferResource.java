@@ -21,14 +21,14 @@ public class TransferResource {
     @Inject ContractInputs inputs;
     @Inject CommandReceipts receipts;
     @Context UriInfo uri;
-    private static final Map<String,String> TYPES=Map.of("projects","PROJECT","tasks","TASK","labels","LABEL","activities","ACTIVITY");
+    private static final Map<String,String> TYPES=Map.of("projects","PROJECT","tasks","TASK","labels","LABEL","activities","ACTIVITY","workSessions","WORK_SESSION");
     @GET @Path("/export") public Response exportData() {
         ContractInputs.queries(uri.getQueryParameters());
         return store.transaction(identity.owner(),() -> {
-            var value=object();value.put("format","timekeeper-domain-v1");value.put("zoneId",store.profile().get("zoneId").asText());
+            var value=object();value.put("format","timekeeper-domain-v2");value.put("zoneId",store.profile().get("zoneId").asText());
             TYPES.forEach((name,type) -> {
                 var records=store.list(type);if(records.size()>10000) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
-                var array=value.putArray(name);for(JsonNode record:records) {var copy=((ObjectNode)record).deepCopy();copy.remove(List.of("ownerId","version"));array.add(copy);}
+                var array=value.putArray(name);for(JsonNode record:records) {var copy=((ObjectNode)record).deepCopy();copy.remove(List.of("ownerId","version","state"));array.add(copy);}
             });
             if(value.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8).length>20*1024*1024) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
             return new ApiReplies(200,value,null,null).response();
@@ -42,13 +42,14 @@ public class TransferResource {
         return store.transaction(identity.owner(),() -> receipts.execute(key,"POST","/data/import",null,input,() -> importRecords(input)).response());
     }
     private ApiReplies importRecords(JsonNode input) {
-        Map<UUID,ProjectId> projects=new HashMap<>();Map<UUID,TaskId> tasks=new HashMap<>();Map<UUID,LabelId> labels=new HashMap<>();Set<UUID> sourceIds=new HashSet<>();
+        Map<UUID,ProjectId> projects=new HashMap<>();Map<UUID,TaskId> tasks=new HashMap<>();Map<UUID,LabelId> labels=new HashMap<>();Map<UUID,WorkSessionId> sessions=new HashMap<>();Set<UUID> sourceIds=new HashSet<>();
         var result=object();var mappings=result.putArray("ids");var service=store.service();
         // Validate source identity uniqueness before any record is created.
-        TYPES.forEach((name,type) -> {for(JsonNode item:input.get(name)) if(!sourceIds.add(uuid(item.get("id")))) throw ApiFailure.validation();});
-        Set<UUID> sourceProjects=new HashSet<>(),sourceLabels=new HashSet<>();Map<UUID,JsonNode> sourceTasks=new HashMap<>();
+        TYPES.forEach((name,type) -> {for(JsonNode item:input.path(name)) if(!sourceIds.add(uuid(item.get("id")))) throw ApiFailure.validation();});
+        Set<UUID> sourceProjects=new HashSet<>(),sourceLabels=new HashSet<>(),sourceSessions=new HashSet<>();Map<UUID,JsonNode> sourceTasks=new HashMap<>();
         input.get("projects").forEach(item -> sourceProjects.add(uuid(item.get("id"))));
         input.get("labels").forEach(item -> sourceLabels.add(uuid(item.get("id"))));
+        input.path("workSessions").forEach(item -> sourceSessions.add(uuid(item.get("id"))));
         input.get("tasks").forEach(item -> sourceTasks.put(uuid(item.get("id")),item));
         for(JsonNode item:input.get("tasks")) {
             var project=optionalText(item.get("projectId")).map(UUID::fromString);
@@ -63,9 +64,28 @@ public class TransferResource {
         }
         for(JsonNode item:input.get("activities")) {
             Activity.validateStart(Instant.parse(item.get("start").asText()),store.now());
-            if(!sourceTasks.containsKey(uuid(item.get("taskId")))) throw ApiFailure.validation();
+            var task=optionalText(item.get("taskId")).map(UUID::fromString);
+            if(task.isPresent() && !sourceTasks.containsKey(task.get())) throw ApiFailure.validation();
+            var project=optionalText(item.get("projectId")).map(UUID::fromString);
+            if(project.isPresent() && (!sourceProjects.contains(project.get()) || (task.isPresent() && !optionalText(sourceTasks.get(task.get()).get("projectId")).equals(optionalText(item.get("projectId")))))) throw ApiFailure.validation();
+            var session=optionalText(item.get("workSessionId")).map(UUID::fromString);
+            if(session.isPresent() && !sourceSessions.contains(session.get())) throw ApiFailure.validation();
             for(JsonNode label:item.get("labelIds")) if(!sourceLabels.contains(uuid(label))) throw ApiFailure.validation();
             var end=optionalText(item.get("end")).map(Instant::parse);if(end.isPresent() && end.get().isBefore(Instant.parse(item.get("start").asText()))) throw ApiFailure.validation();
+        }
+        int openSessions=0;
+        for(JsonNode item:input.path("workSessions")) {
+            Instant start=Instant.parse(item.get("start").asText());WorkSession.validateStart(start,store.now());
+            var end=optionalText(item.get("end")).map(Instant::parse);
+            if(end.filter(value -> value.isBefore(start)).isPresent()) throw ApiFailure.validation();
+            if(end.isEmpty()) openSessions++;
+        }
+        if(openSessions>1) throw ApiFailure.validation();
+        if(openSessions==1 && store.workSessionService().activeWorkSession(new OwnerId(store.owner())).isPresent()) throw ApiFailure.conflict();
+        for(JsonNode item:input.path("workSessions")) {
+            var created=store.workSessionService().createWorkSession(new CreateWorkSession(new OwnerId(store.owner()),Instant.parse(item.get("start").asText()),
+                    optionalText(item.get("end")).map(Instant::parse),item.get("summary").asText()));
+            sessions.put(uuid(item.get("id")),created.id());mapping(mappings,"WORK_SESSION",item,created.id().value());
         }
         for(JsonNode item:input.get("projects")) {
             var created=service.createProject(new CreateProject(item.get("name").asText()));projects.put(uuid(item.get("id")),created.id());mapping(mappings,"PROJECT",item,created.id().value());
@@ -91,10 +111,10 @@ public class TransferResource {
         }
         for(JsonNode item:input.get("activities")) {
             Set<LabelId> assigned=new HashSet<>();item.get("labelIds").forEach(label -> assigned.add(required(labels,uuid(label))));
-            TaskId task=required(tasks,uuid(item.get("taskId")));Instant start=Instant.parse(item.get("start").asText());var end=optionalText(item.get("end")).map(Instant::parse);
+            TaskId task=optionalText(item.get("taskId")).map(UUID::fromString).map(id -> required(tasks,id)).orElse(null);Instant start=Instant.parse(item.get("start").asText());var end=optionalText(item.get("end")).map(Instant::parse);
             // Preserve the transfer's manual flag while reusing domain validation and owned persistence.
             if(end.isEmpty() && store.active().isPresent()) throw ApiFailure.conflict();
-            Activity created=new Activity(new ActivityId(UUID.randomUUID()),task,new OwnerId(store.owner()),start,end,item.get("summary").asText(),assigned,item.get("manual").asBoolean(),0);
+            Activity created=new Activity(new ActivityId(UUID.randomUUID()),task,new OwnerId(store.owner()),start,end,item.get("summary").asText(),assigned,item.get("manual").asBoolean(),0,optionalText(item.get("workSessionId")).map(UUID::fromString).map(id -> required(sessions,id)),optionalText(item.get("projectId")).map(UUID::fromString).map(id -> required(projects,id)));
             store.save("ACTIVITY",created);store.change("ACTIVITY","CREATED",created.id().value().toString());mapping(mappings,"ACTIVITY",item,created.id().value());
         }
         service.rolloverActivities(new OwnerId(store.owner()));

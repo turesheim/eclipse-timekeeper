@@ -67,6 +67,18 @@ public final class EclipseBackend implements AutoCloseable {
         return "remote:"+endpoint+"."+owner;
     }
     public TimekeeperService service() {return !remoteMode ? embedded.get() : facade;}
+    public WorkSessionService workSessions() {
+        if(Display.getCurrent()!=null && remoteMode) throw new IllegalStateException("Work sessions require a background operation");
+        if(remoteMode) {if(remote==null) throw new IllegalStateException(configurationFailure);return remote;}
+        var service=embedded.get();if(service instanceof WorkSessionService sessions) return sessions;
+        throw new IllegalStateException("Work Session service is unavailable");
+    }
+    public List<Activity> sessionActivityCandidates() {
+        if(Display.getCurrent()!=null) throw new IllegalStateException("Activity choices require a background operation");
+        if(remoteMode) {if(remote==null) throw new IllegalStateException(configurationFailure);return remote.allActivities();}
+        return embedded.get().activities(new ActivityQuery(Instant.parse("0000-01-01T00:00:00Z"),Instant.parse("9999-12-31T23:59:59.999999999Z"),
+                Optional.of(OwnerId.LOCAL),Optional.empty(),Optional.empty(),ZoneId.systemDefault())).activities();
+    }
     public int exportCsv(java.nio.file.Path folder) throws java.io.IOException {
         if(Display.getCurrent()!=null || remote==null) throw new IllegalStateException("Remote transfer requires an available background client");
         return remote.exportCsv(folder);
@@ -134,9 +146,15 @@ public final class EclipseBackend implements AutoCloseable {
     public <T> Job read(String name,Supplier<T> work,Consumer<T> success,Consumer<RuntimeException> failure) {
         return execute(name,work,success,failure,false,true);
     }
+    public <T> Job readBackground(String name,Supplier<T> work,Consumer<T> success,Consumer<RuntimeException> failure) {
+        return execute(name,work,success,failure,false,false,true);
+    }
     private <T> Job execute(String name,Supplier<T> work,Consumer<T> success,Consumer<RuntimeException> failure,boolean refreshAfterSuccess,boolean user) {
-        if(!remoteMode) {try {T value=work.get();success.accept(value);}catch(RuntimeException e) {failure.accept(e);}return null;}
-        if(remote==null) {failure.accept(new IllegalStateException(configurationFailure));return null;}
+        return execute(name,work,success,failure,refreshAfterSuccess,user,false);
+    }
+    private <T> Job execute(String name,Supplier<T> work,Consumer<T> success,Consumer<RuntimeException> failure,boolean refreshAfterSuccess,boolean user,boolean backgroundLocal) {
+        if(!remoteMode && !backgroundLocal) {try {T value=work.get();success.accept(value);}catch(RuntimeException e) {failure.accept(e);}return null;}
+        if(remoteMode && remote==null) {failure.accept(new IllegalStateException(configurationFailure));return null;}
         Job job=new Job(name) {
             private volatile Thread worker;
             @Override protected IStatus run(IProgressMonitor monitor) {
@@ -144,7 +162,7 @@ public final class EclipseBackend implements AutoCloseable {
                 try {
                     if(closed || monitor.isCanceled()) return Status.CANCEL_STATUS;
                     T value=work.get();
-                    if(refreshAfterSuccess) {
+                    if(refreshAfterSuccess && remoteMode) {
                         try {reload();} catch(RuntimeException refreshFailure) {
                             // The command was acknowledged. Do not present it as a failed save
                             // or repeat it merely because fetching the next snapshot failed.

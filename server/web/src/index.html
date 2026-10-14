@@ -20,6 +20,17 @@
     <div id="workspace" hidden>
       <div class="status-line"><p id="status" role="status" aria-live="polite"></p><button id="refresh">Refresh</button></div>
       <p id="remember-notice" class="hint" role="status"></p>
+      <section id="work-session" class="card work-session" aria-label="Work session">
+        <div class="work-session-heading"><div><p class="eyebrow">WORK SESSION</p><h2 id="work-session-state">Stopped</h2><p id="work-session-current" class="hint"></p></div>
+          <div class="session-actions"><button id="session-start">Start work session</button><button id="session-stop" hidden>Stop work session</button><button id="session-new">Record work session</button></div></div>
+        <label>Session details<select id="work-session-choice" aria-label="Session details"></select></label>
+        <div id="work-session-details" hidden><p id="work-session-started" class="hint"></p>
+          <dl class="session-totals"><div><dt>Duration</dt><dd id="ws-duration">—</dd></div><div><dt>Tracked activities</dt><dd id="ws-tracked">—</dd></div><div><dt>Covered time</dt><dd id="ws-covered">—</dd></div><div><dt>Unallocated</dt><dd id="ws-unallocated">—</dd></div></dl>
+          <p class="hint">Overlapping activities count once toward covered time. Stopping a work session leaves activity timers running.</p>
+          <div class="session-actions"><button id="session-edit">Edit work session</button><button id="session-delete">Delete work session</button><button id="session-add">Add activity to session</button><button id="session-associate">Associate activity</button></div>
+          <div id="session-activities" class="table-wrap"></div><p id="session-warning" class="hint" role="status"></p>
+        </div>
+      </section>
       <section class="card tracking"><div><p class="eyebrow">IN PROGRESS</p><h1 id="active-title">Ready when you are</h1><p id="active-details">Choose a task below to start tracking.</p></div><button id="stop" class="primary" hidden>Stop tracking</button></section>
       <nav aria-label="Workspace"><button data-tab="week" aria-current="page">Workweek</button><button data-tab="tasks">Tasks</button><button data-tab="projects">Projects</button><button data-tab="labels">Labels</button></nav>
       <section id="week-panel">

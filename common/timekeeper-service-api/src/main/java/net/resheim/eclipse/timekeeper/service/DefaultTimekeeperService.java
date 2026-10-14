@@ -56,9 +56,13 @@ import net.resheim.eclipse.timekeeper.service.TimekeeperEvent.EntityType;
 /** Default application service. Every public operation owns one transaction boundary. */
 public class DefaultTimekeeperService implements TimekeeperService {
 	private final ServicePorts ports;
+    private final WorkSessionService workSessions;
 
 	public DefaultTimekeeperService(ServicePorts ports) {
-		this.ports = Objects.requireNonNull(ports, "ports");
+        this(ports,null);
+    }
+    public DefaultTimekeeperService(ServicePorts ports,WorkSessionService workSessions) {
+        this.ports = Objects.requireNonNull(ports, "ports");this.workSessions=workSessions;
 	}
 
 	@Override
@@ -93,7 +97,9 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			if (ports.tasks().existsByProject(current.id())) {
 				throw conflict("project", "project still contains tasks");
 			}
-			ports.projects().delete(current.id());
+            if(ports.activities().findAllActivities().stream().anyMatch(value -> value.projectId().equals(Optional.of(current.id()))))
+                throw conflict("project", "project still contains activities");
+            ports.projects().delete(current.id());
 			publish(PROJECT, DELETED, current.id().value().toString());
 			return null;
 		});
@@ -282,12 +288,12 @@ public class DefaultTimekeeperService implements TimekeeperService {
 	public Activity startActivity(StartActivity command) {
 		return tx(() -> {
 			required(command, "command");
-			Task task = requiredTask(command.taskId());
+			Task task = command.taskId() == null ? null : requiredTask(command.taskId());
 			OwnerId owner = required(command.ownerId(), "ownerId");
 			ensureNoOpenActivity(owner, null);
-			validateLabels(command.labelIds());
-			Activity created = ports.activities().save(new Activity(ports.identifiers().newActivityId(), task.id(),
-					owner, ports.timeSource().now(), Optional.empty(), command.summary(), command.labelIds(), false, 0));
+            validateLabels(command.labelIds());validateActivityContext(task,owner,command.workSessionId(),command.projectId());
+            Activity created = ports.activities().save(new Activity(ports.identifiers().newActivityId(), task == null ? null : task.id(),
+					owner, ports.timeSource().now(), Optional.empty(), command.summary(), command.labelIds(), false, 0, command.workSessionId(), command.projectId()));
 			publish(ACTIVITY, CREATED, created.id().value().toString());
 			return created;
 		});
@@ -318,7 +324,7 @@ public class DefaultTimekeeperService implements TimekeeperService {
 				if (!current.ownerId().equals(ownerId)) continue;
 				if (ActivityDailySegments.split(current, ports.timeSource().zone(ownerId), now).size() < 2) continue;
 				var changed = new Activity(current.id(), current.taskId(), current.ownerId(), current.start(), current.end(),
-						current.summary(), current.labelIds(), current.manual(), current.version() + 1);
+						current.summary(), current.labelIds(), current.manual(), current.version() + 1, current.workSessionId(), current.projectId());
 				saveDailyActivities(changed, true, now);
 			}
 			return null;
@@ -330,12 +336,12 @@ public class DefaultTimekeeperService implements TimekeeperService {
 		return tx(() -> {
 			required(command, "command");
 			Activity.validateStart(command.start(), ports.timeSource().now());
-			Task task = requiredTask(command.taskId());
+			Task task = command.taskId() == null ? null : requiredTask(command.taskId());
 			OwnerId owner = required(command.ownerId(), "ownerId");
-			validateLabels(command.labelIds());
-			if (command.end().isEmpty()) ensureNoOpenActivity(owner, null);
-			return saveDailyActivities(new Activity(ports.identifiers().newActivityId(), task.id(),
-					owner, command.start(), command.end(), command.summary(), command.labelIds(), true, 0), false,
+            validateLabels(command.labelIds());validateActivityContext(task,owner,command.workSessionId(),command.projectId());
+            if (command.end().isEmpty()) ensureNoOpenActivity(owner, null);
+            return saveDailyActivities(new Activity(ports.identifiers().newActivityId(), task == null ? null : task.id(),
+					owner, command.start(), command.end(), command.summary(), command.labelIds(), true, 0, command.workSessionId(), command.projectId()), false,
 					ports.timeSource().now());
 		});
 	}
@@ -364,7 +370,7 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			boolean original = index == retainedIndex;
 			var part = new Activity(original ? requested.id() : ActivityDailySegments.identifier(requested.id(), interval.start()), requested.taskId(),
 					requested.ownerId(), interval.start(), interval.end(), requested.summary(), requested.labelIds(),
-					requested.manual(), original ? requested.version() : 0);
+					requested.manual(), original ? requested.version() : 0, requested.workSessionId(), requested.projectId());
 			if (!original && ports.activities().find(part.id()).isPresent())
 				throw conflict("activity", "A daily activity already uses this interval. Edit that day's activity separately.");
 			part = ports.activities().save(part);
@@ -409,8 +415,17 @@ public class DefaultTimekeeperService implements TimekeeperService {
 	}
 
 	private boolean matchesProject(Activity activity, Optional<ProjectId> projectId) {
-		return projectId.isEmpty() || requiredTask(activity.taskId()).projectId().equals(projectId);
+		return projectId.isEmpty() || (activity.taskId() == null ? activity.projectId().equals(projectId) : requiredTask(activity.taskId()).projectId().equals(projectId));
 	}
+
+    private void validateActivityContext(Task task,OwnerId owner,Optional<net.resheim.eclipse.timekeeper.domain.WorkSessionId> sessionId,Optional<ProjectId> projectId) {
+        projectId.ifPresent(this::requiredProject);
+        if(task!=null && projectId.isPresent() && !task.projectId().equals(projectId)) throw conflict("projectId","The activity project must match its task's project.");
+        if(sessionId.isPresent()) {
+            var session=workSessions==null ? Optional.<net.resheim.eclipse.timekeeper.domain.WorkSession>empty() : workSessions.workSession(sessionId.get());
+            if(session.isEmpty() || !session.get().ownerId().equals(owner)) throw ServiceException.notFound("workSession",sessionId.get());
+        }
+    }
 
 	private void validateLabels(Set<LabelId> labels) {
 		required(labels, "labelIds").forEach(this::requiredLabel);

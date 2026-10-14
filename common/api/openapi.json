@@ -2353,7 +2353,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Read all four resource types and the owner zone in one consistent snapshot. Maximum 10,000 records per resource type and 20 MiB serialized JSON; larger exports return 413 without a partial body. This format is not a database backup or legacy migration.",
+        "description": "Read an owner-neutral timekeeper-domain-v2 snapshot of projects, tasks, labels, activities and work sessions in one consistent transaction. Includes optional session and direct-project associations. Clients must understand v2 before exporting it to CSV; old CSV clients reject the new format. Limits are 10,000 per type and 20 MiB.",
         "parameters": [
           {
             "$ref": "#/components/parameters/OwnerBinding"
@@ -2414,7 +2414,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Validate the complete graph, unique source IDs, parent cycles, reference uniqueness, temporal rules and open-activity limit before commit. Allocate fresh Timekeeper UUIDs for every record and rewrite internal relations; return source-to-new ID mappings. Never overwrite existing data or accept owner identities. Existing external identities conflict with 409; invalid graph returns 422. No record survives a failed import. Maximum 10,000 per type and 20 MiB. Do not change the owner’s configured zone implicitly. Imported multi-day activities are split at elapsed local day boundaries, with source activity IDs mapped to the last part.",
+        "description": "Validate the complete graph, unique source IDs, parent cycles, reference uniqueness, temporal rules and open-activity limit before commit. Allocate fresh Timekeeper UUIDs for every record and rewrite internal relations; return source-to-new ID mappings. Never overwrite existing data or accept owner identities. Existing external identities conflict with 409; invalid graph returns 422. No record survives a failed import. Maximum 10,000 per type and 20 MiB. Do not change the owner’s configured zone implicitly. Imported multi-day activities are split at elapsed local day boundaries, with source activity IDs mapped to the last part. Accept v1 snapshots without sessions and v2 snapshots containing work sessions and optional task/project/session relations. Remap session IDs, enforce the independent one-running-session limit and preserve associations on all daily activity portions.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -2483,6 +2483,748 @@
           }
         }
       }
+    },
+    "/work-sessions": {
+      "get": {
+        "operationId": "listWorkSessions",
+        "summary": "List owned work sessions",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkSessionPage"
+                }
+              }
+            },
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Query"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "tags": [
+          "WorkSessions"
+        ]
+      },
+      "post": {
+        "operationId": "createWorkSession",
+        "summary": "Create a work session with recorded times",
+        "x-required-permission": "write",
+        "responses": {
+          "201": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkSession"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkSessionInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "tags": [
+          "WorkSessions"
+        ]
+      }
+    },
+    "/work-sessions/{id}": {
+      "get": {
+        "operationId": "getWorkSession",
+        "summary": "Read a work session",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkSession"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "tags": [
+          "WorkSessions"
+        ]
+      },
+      "put": {
+        "operationId": "updateWorkSession",
+        "summary": "Adjust a work session",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkSession"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkSessionInput"
+              }
+            }
+          }
+        },
+        "tags": [
+          "WorkSessions"
+        ]
+      },
+      "delete": {
+        "operationId": "deleteWorkSession",
+        "summary": "Delete a session without associated activities",
+        "x-required-permission": "write",
+        "responses": {
+          "204": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "tags": [
+          "WorkSessions"
+        ]
+      },
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ]
+    },
+    "/work-sessions/active": {
+      "get": {
+        "operationId": "getActiveWorkSession",
+        "summary": "Read the running work session",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkSession"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "204": {
+            "description": "No open activity for this owner.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "tags": [
+          "WorkSessions"
+        ]
+      }
+    },
+    "/work-sessions/start": {
+      "post": {
+        "operationId": "startWorkSession",
+        "summary": "Start an independent work session",
+        "x-required-permission": "write",
+        "responses": {
+          "201": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkSession"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartWorkSessionInput"
+              }
+            }
+          }
+        },
+        "tags": [
+          "WorkSessions"
+        ],
+        "description": "Start an independent work session. A user may have only one running session. Same-key replay returns the original response. Midnight and activity controls never stop a session."
+      }
+    },
+    "/work-sessions/{id}/stop": {
+      "post": {
+        "operationId": "stopWorkSession",
+        "summary": "Stop a work session",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkSession"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "tags": [
+          "WorkSessions"
+        ],
+        "description": "Stop only this session, leaving associated activities unchanged. Same-key replay returns the original response and ETag. A new key with the current ETag of a stopped session returns it unchanged."
+      },
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ]
+    },
+    "/activities/{id}/work-session": {
+      "put": {
+        "operationId": "associateWorkSession",
+        "summary": "Associate or unassign an activity",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkSessionAssociation"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkSessionAssociationInput"
+              }
+            }
+          }
+        },
+        "tags": [
+          "WorkSessions"
+        ],
+        "description": "Associate or unassign this activity using its original ETag. Outside intervals are allowed and reported as a warning. The response ETag identifies the activity, allowing a subsequent edit with the returned version."
+      },
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ]
+    },
+    "/work-sessions/{id}/report": {
+      "get": {
+        "operationId": "reportWorkSession",
+        "summary": "Calculate exact session coverage and unallocated time",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkSessionReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "tags": [
+          "WorkSessions"
+        ],
+        "description": "Read session, associated activities and exact totals in one owner-locked snapshot. Tracked time sums clipped activity durations; allocated time is their union. Unallocated time subtracts this union, so overlaps never count twice. Outside intervals are identified."
+      },
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ]
     }
   },
   "components": {
@@ -2669,7 +3411,14 @@
         "description": "A recorded interval. Start must not be after the backend clock, whether the interval is open or closed; a future start returns 422 VALIDATION.",
         "properties": {
           "taskId": {
-            "$ref": "#/components/schemas/Id"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "start": {
             "$ref": "#/components/schemas/Instant"
@@ -2694,6 +3443,26 @@
             },
             "uniqueItems": true,
             "maxItems": 500
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workSessionId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -2746,7 +3515,14 @@
         "type": "object",
         "properties": {
           "taskId": {
-            "$ref": "#/components/schemas/Id"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "summary": {
             "$ref": "#/components/schemas/Summary"
@@ -2773,6 +3549,26 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Version"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workSessionId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
               },
               {
                 "type": "null"
@@ -2988,7 +3784,14 @@
             "$ref": "#/components/schemas/Version"
           },
           "taskId": {
-            "$ref": "#/components/schemas/Id"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "start": {
             "$ref": "#/components/schemas/Instant"
@@ -3016,6 +3819,26 @@
           },
           "manual": {
             "type": "boolean"
+          },
+          "workSessionId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -3210,7 +4033,14 @@
                     "type": "object",
                     "properties": {
                       "taskId": {
-                        "$ref": "#/components/schemas/Id"
+                        "anyOf": [
+                          {
+                            "$ref": "#/components/schemas/Id"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       },
                       "total": {
                         "$ref": "#/components/schemas/Duration"
@@ -3257,7 +4087,8 @@
               "TASK",
               "ACTIVITY",
               "LABEL",
-              "PROFILE"
+              "PROFILE",
+              "WORK_SESSION"
             ]
           },
           "changeType": {
@@ -3414,7 +4245,14 @@
             "$ref": "#/components/schemas/Id"
           },
           "taskId": {
-            "$ref": "#/components/schemas/Id"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "start": {
             "$ref": "#/components/schemas/Instant"
@@ -3442,6 +4280,26 @@
           },
           "manual": {
             "type": "boolean"
+          },
+          "workSessionId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -3459,7 +4317,11 @@
         "type": "object",
         "properties": {
           "format": {
-            "const": "timekeeper-domain-v1"
+            "type": "string",
+            "enum": [
+              "timekeeper-domain-v1",
+              "timekeeper-domain-v2"
+            ]
           },
           "zoneId": {
             "$ref": "#/components/schemas/ZoneId"
@@ -3491,6 +4353,13 @@
               "$ref": "#/components/schemas/TransferActivity"
             },
             "maxItems": 10000
+          },
+          "workSessions": {
+            "type": "array",
+            "maxItems": 10000,
+            "items": {
+              "$ref": "#/components/schemas/TransferWorkSession"
+            }
           }
         },
         "required": [
@@ -3501,7 +4370,54 @@
           "labels",
           "activities"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "timekeeper-domain-v2"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "workSessions"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "timekeeper-domain-v1"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "workSessions": {
+                  "maxItems": 0
+                },
+                "activities": {
+                  "items": {
+                    "properties": {
+                      "taskId": {
+                        "$ref": "#/components/schemas/Id"
+                      },
+                      "workSessionId": {
+                        "type": "null"
+                      },
+                      "projectId": {
+                        "type": "null"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
       },
       "ImportResult": {
         "type": "object",
@@ -3517,7 +4433,8 @@
                     "PROJECT",
                     "TASK",
                     "ACTIVITY",
-                    "LABEL"
+                    "LABEL",
+                    "WORK_SESSION"
                   ]
                 },
                 "sourceId": {
@@ -3683,6 +4600,247 @@
             "$ref": "#/components/schemas/Instant"
           }
         }
+      },
+      "WorkSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "start": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "COMPLETED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "version",
+          "start",
+          "end",
+          "summary",
+          "state"
+        ]
+      },
+      "WorkSessionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "start": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "$ref": "#/components/schemas/Summary"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "summary"
+        ]
+      },
+      "StartWorkSessionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/Summary"
+          }
+        },
+        "required": [
+          "summary"
+        ]
+      },
+      "WorkSessionAssociationInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "workSessionId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "workSessionId"
+        ]
+      },
+      "WorkSessionAssociation": {
+        "type": "object",
+        "properties": {
+          "activity": {
+            "$ref": "#/components/schemas/Activity"
+          },
+          "outsideSession": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "activity",
+          "outsideSession"
+        ]
+      },
+      "WorkSessionTime": {
+        "type": "object",
+        "properties": {
+          "duration": {
+            "$ref": "#/components/schemas/Duration"
+          },
+          "trackedActivityTime": {
+            "$ref": "#/components/schemas/Duration"
+          },
+          "allocatedTime": {
+            "$ref": "#/components/schemas/Duration"
+          },
+          "unallocatedTime": {
+            "$ref": "#/components/schemas/Duration"
+          },
+          "outsideSession": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "duration",
+          "trackedActivityTime",
+          "allocatedTime",
+          "unallocatedTime",
+          "outsideSession"
+        ]
+      },
+      "WorkSessionReport": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/WorkSession"
+          },
+          "activities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Activity"
+            }
+          },
+          "time": {
+            "$ref": "#/components/schemas/WorkSessionTime"
+          },
+          "generatedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "session",
+          "activities",
+          "time",
+          "generatedAt",
+          "revision"
+        ]
+      },
+      "WorkSessionPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkSession"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "revision"
+        ],
+        "additionalProperties": true
+      },
+      "TransferWorkSession": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "start": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "id",
+          "start",
+          "end",
+          "summary"
+        ]
       }
     },
     "parameters": {
@@ -3942,5 +5100,11 @@
         }
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "WorkSessions",
+      "description": "Independent work periods and optional activity associations."
+    }
+  ]
 }

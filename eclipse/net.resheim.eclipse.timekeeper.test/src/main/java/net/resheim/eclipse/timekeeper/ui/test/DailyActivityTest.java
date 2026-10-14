@@ -73,6 +73,42 @@ public class DailyActivityTest {
             service.deleteProject(new DeleteProject(project.id(),service.project(project.id()).orElseThrow().version()));
         }
     }
+    @Test public void tasklessActivitiesAppearAndCanBeEditedWithoutAPlaceholderTask() throws Exception {
+        var bot=new SWTWorkbenchBot();
+        bot.waitUntil(new DefaultCondition() {
+            public boolean test() {return TimekeeperPlugin.getDefault().isReady();}
+            public String getFailureMessage() {return "Embedded database did not become ready";}
+        },30000);
+        onUi(()->{try {var window=PlatformUI.getWorkbench().getActiveWorkbenchWindow();window.getShell().forceActive();window.getActivePage().showView(WorkWeekView.VIEW_ID);}
+            catch(Exception failure) {throw new AssertionError(failure);}});
+        var service=TimekeeperUiPlugin.getDefault().getTimekeeperService();var zone=TimekeeperUiPlugin.getCalendarZone();
+        var monday=LocalDate.now(zone).with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks(1);
+        var from=monday.atTime(9,0).atZone(zone).toInstant();var end=from.plusSeconds(3600);
+        var label=service.labels().getFirst();var tasks=service.tasks();
+        var project=service.createProject(new CreateProject("Taskless project "+UUID.randomUUID()));
+        var standalone=service.createActivity(new CreateActivity(null,OwnerId.LOCAL,from,Optional.of(end),"Unassigned activity check",Set.of(label.id())));
+        var direct=service.createActivity(new CreateActivity(null,OwnerId.LOCAL,from,Optional.of(end),"Direct project check",Set.of(),Optional.empty(),Optional.of(project.id())));
+        try {
+            bot.viewByTitle("Workweek").setFocus();bot.viewByTitle("Workweek").toolbarButton("Show current week").click();
+            bot.viewByTitle("Workweek").toolbarButton("Show previous week").click();
+            bot.waitUntil(new DefaultCondition() {
+                public boolean test() {try {return bot.treeWithId("workweek-editor-tree").getTreeItem("Unassigned activity check")!=null
+                        && bot.treeWithId("workweek-editor-tree").getTreeItem(project.name()).expand().getNode("Direct project check")!=null;}
+                    catch(RuntimeException failure) {return false;}}
+                public String getFailureMessage() {return "Taskless activities did not appear at the root and under their direct project";}
+            });
+            bot.treeWithId("workweek-editor-tree").getTreeItem("Unassigned activity check").contextMenu("Edit activity...").click();
+            bot.shell("Edit activity").activate();bot.textWithLabel("Summary").setText("Edited unassigned activity");bot.button("Save").click();
+            var edited=service.activity(standalone.id()).orElseThrow();assertTrue(edited.task().isEmpty());assertEquals(standalone.labelIds(),edited.labelIds());
+            assertEquals("Edited unassigned activity",edited.summary());assertEquals(standalone.start(),edited.start());assertEquals(standalone.end(),edited.end());
+            assertEquals(tasks,service.tasks());
+        } finally {
+            for(var value:List.of(standalone,direct)) {
+                var current=service.activity(value.id()).orElseThrow();service.deleteActivity(new DeleteActivity(current.id(),current.version()));
+            }
+            service.deleteProject(new DeleteProject(project.id(),service.project(project.id()).orElseThrow().version()));
+        }
+    }
     private static void onUi(Runnable work) throws Exception {
         var task=new FutureTask<Void>(work,null);PlatformUI.getWorkbench().getDisplay().syncExec(task);task.get(5,TimeUnit.SECONDS);
     }

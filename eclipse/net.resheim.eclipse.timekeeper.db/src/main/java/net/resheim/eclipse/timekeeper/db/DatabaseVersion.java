@@ -9,7 +9,7 @@ import java.util.Set;
 /** Durable schema identity and initialization state, not a record of every data write. */
 final class DatabaseVersion {
 	static final String TABLE = "TIMEKEEPER_SCHEMA";
-	static final int CURRENT = 2;
+	static final int CURRENT = 3;
 	static final Set<String> COLUMNS = Set.of("ID", "VERSION", "STATE", "ORIGIN");
 	private static final Set<String> ORIGINS = Set.of("NEW", "MIGRATION");
 	private static final Set<String> STATES = Set.of("CREATING", "MIGRATING", "READY");
@@ -32,17 +32,18 @@ final class DatabaseVersion {
 			if (!rows.next() || !Integer.valueOf(1).equals(rows.getObject("ID"))) {
 				throw new SQLException("Missing or invalid Timekeeper schema-version record. Do not retry initialization in place.");
 			}
-			if (!Integer.valueOf(CURRENT).equals(rows.getObject("VERSION"))) {
+			if (!Integer.valueOf(CURRENT).equals(rows.getObject("VERSION")) && !Integer.valueOf(2).equals(rows.getObject("VERSION"))) {
 				throw new SQLException("Unsupported Timekeeper database version: " + rows.getObject("VERSION")
 						+ ". This plugin supports version " + CURRENT + "; no schema changes were made.");
 			}
-			String state = rows.getString("STATE");
+			int version = rows.getInt("VERSION");
+            String state = rows.getString("STATE");
 			String origin = rows.getString("ORIGIN");
 			if (state == null || origin == null || !STATES.contains(state) || !ORIGINS.contains(origin)
 					|| (state.equals("MIGRATING") && origin.equals("NEW")) || rows.next()) {
 				throw new SQLException("Invalid Timekeeper schema-version state. Preserve the database for diagnosis.");
 			}
-			return new Stamp(CURRENT, state, origin);
+			return new Stamp(version, state, origin);
 		}
 	}
 

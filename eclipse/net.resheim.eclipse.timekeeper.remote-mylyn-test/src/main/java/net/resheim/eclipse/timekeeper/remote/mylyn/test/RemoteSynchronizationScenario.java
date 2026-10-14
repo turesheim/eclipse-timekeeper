@@ -35,12 +35,14 @@ final class RemoteSynchronizationScenario {
                 try {return RemoteTestSupport.onUi(()->TimekeeperUiPlugin.getDefault().getTimekeeperService().label(label.id()).isPresent());}
                 catch(Exception loading) {return false;}
             },"Peer label did not arrive without manual refresh");
-            var bot=new SWTWorkbenchBot();var tree=bot.viewByTitle("Workweek").bot().treeWithId("workweek-editor-tree");
+            var bot=new SWTWorkbenchBot();var view=bot.viewByTitle("Workweek");
+            view.toolbarButton("Show current week").click();view.toolbarButton("Show previous week").click();
+            var tree=view.bot().treeWithId("workweek-editor-tree");
             RemoteTestSupport.waitFor(()->{
                 try {return tree.getTreeItem(project.name()).expand().getNode(task.summary())!=null;}
                 catch(RuntimeException loading) {return false;}
             },"Peer task was not rendered automatically");
-            var date=LocalDate.now(ZoneOffset.UTC);
+            var date=LocalDate.now(ZoneOffset.UTC).minusWeeks(1);
             var start=date.atTime(8,0,0,123456789).toInstant(ZoneOffset.UTC);
             var end=date.atTime(9,0,0,987654321).toInstant(ZoneOffset.UTC);
             var activity=peer.createActivity(new CreateActivity(task.id(),OwnerId.LOCAL,start,Optional.of(end),"Automatically synchronized interval",Set.of(label.id())));
@@ -91,6 +93,7 @@ final class RemoteSynchronizationScenario {
             },"Peer deletions were not removed from the Eclipse cache automatically");
             awaitReport(query,Optional.empty());
             RemoteTestSupport.waitFor(()->MylynIntegration.getDefault().linked(changed).isEmpty() && MylynIntegration.getDefault().linked(missed).isEmpty(),"Live peer deletion left stale Mylyn projections");
+            view.toolbarButton("Show current week").click();
             RemoteBootstrap.receipt().setProperty("phase.changes.owner-scope","passed");
             RemoteBootstrap.receipt().setProperty("phase.changes.activity-report","passed");
             RemoteBootstrap.receipt().setProperty("phase.changes.live-draft","passed");

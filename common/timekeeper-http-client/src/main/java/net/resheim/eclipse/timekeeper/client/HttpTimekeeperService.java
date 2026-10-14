@@ -20,7 +20,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.*;
 import net.resheim.eclipse.timekeeper.service.Queries.*;
 
 /** Synchronous HTTP port for worker threads. UI adapters must dispatch before calling. */
-public final class HttpTimekeeperService implements TimekeeperService,AutoCloseable {
+public final class HttpTimekeeperService implements TimekeeperService,WorkSessionService,AutoCloseable {
     @Override public void rolloverActivities(OwnerId owner) {activeActivity(owner);}
     public record Profile(OwnerId owner,ZoneId zone,long version) { }
     public record ChangeBatch(long nextSequence,boolean changed,boolean resynchronize) { }
@@ -164,16 +164,20 @@ public final class HttpTimekeeperService implements TimekeeperService,AutoClosea
     @Override public Optional<Label> label(LabelId id) {return get("/labels/"+id.value()).map(WireValues::label);}
     @Override public List<Label> labels() {return page("labels",Map.of()).items().stream().map(WireValues::label).toList();}
     @Override public Optional<Activity> activeActivity(OwnerId requested) {owner(requested);return get("/activities/active").map(value -> {tags.put("/activities/"+value.get("id").getAsString(),tags.get("/activities/active"));return WireValues.activity(value);});}
-    @Override public Activity startActivity(StartActivity command) {owner(command.ownerId());return activate(command.taskId(),command.summary(),command.labelIds(),activeActivity(OwnerId.LOCAL));}
+    @Override public Activity startActivity(StartActivity command) {owner(command.ownerId());return activate(command.taskId(),command.summary(),command.labelIds(),activeActivity(OwnerId.LOCAL),command.workSessionId(),command.projectId());}
     /** Compare the activity actually observed by the caller; never silently overwrite a successor. */
     public Activity activate(TaskId task,String summary,Set<LabelId> labels,Optional<Activity> observed) {
-        var body=object();body.addProperty("taskId",task.value().toString());body.addProperty("summary",summary);body.add("labelIds",WireValues.labels(labels));optional(body,"expectedActiveId",observed.map(value -> value.id().value()));
+        return activate(task,summary,labels,observed,Optional.empty(),Optional.empty());
+    }
+    public Activity activate(TaskId task,String summary,Set<LabelId> labels,Optional<Activity> observed,Optional<WorkSessionId> session,Optional<ProjectId> project) {
+        var body=object();optional(body,"taskId",Optional.ofNullable(task).map(TaskId::value));
+        session.ifPresent(id -> body.addProperty("workSessionId",id.value().toString()));project.ifPresent(id -> body.addProperty("projectId",id.value().toString()));body.addProperty("summary",summary);body.add("labelIds",WireValues.labels(labels));optional(body,"expectedActiveId",observed.map(value -> value.id().value()));
         if(observed.isEmpty()) body.add("expectedActiveVersion",JsonNull.INSTANCE);else body.addProperty("expectedActiveVersion",observed.get().version());
         Result result=request("POST","/activities/start",body,Map.of("Idempotency-Key",UUID.randomUUID().toString()));var value=result.body().getAsJsonObject();return WireValues.activity(remember("/activities/"+value.get("id").getAsString(),result));
     }
     @Override public Activity stopActivity(StopActivity command) {String path="/activities/"+command.id().value();return WireValues.activity(remember(path,request("POST",path+"/stop",null,Map.of("If-Match",match(path,command.expectedVersion()),"Idempotency-Key",UUID.randomUUID().toString()))));}
     private static JsonObject interval(Instant start,Optional<Instant> end,String summary,Set<LabelId> labels) {var body=object();body.addProperty("start",start.toString());optional(body,"end",end);body.addProperty("summary",summary);body.add("labelIds",WireValues.labels(labels));return body;}
-    @Override public Activity createActivity(CreateActivity command) {owner(command.ownerId());var body=interval(command.start(),command.end(),command.summary(),command.labelIds());body.addProperty("taskId",command.taskId().value().toString());return WireValues.activity(create("activities",body));}
+    @Override public Activity createActivity(CreateActivity command) {owner(command.ownerId());var body=interval(command.start(),command.end(),command.summary(),command.labelIds());optional(body,"taskId",Optional.ofNullable(command.taskId()).map(TaskId::value));command.workSessionId().ifPresent(id -> body.addProperty("workSessionId",id.value().toString()));command.projectId().ifPresent(id -> body.addProperty("projectId",id.value().toString()));return WireValues.activity(create("activities",body));}
     @Override public Activity updateActivity(UpdateActivity command) {return WireValues.activity(put("/activities/"+command.id().value(),command.expectedVersion(),interval(command.start(),command.end(),command.summary(),command.labelIds())));}
     @Override public void deleteActivity(DeleteActivity command) {delete("/activities/"+command.id().value(),command.expectedVersion());}
     @Override public Optional<Activity> activity(ActivityId id) {return get("/activities/"+id.value()).map(WireValues::activity);}
@@ -184,6 +188,59 @@ public final class HttpTimekeeperService implements TimekeeperService,AutoClosea
             JsonObject report=request("GET","/reports/activities?"+query(reportFilters),null).body().getAsJsonObject();
             if(page.revision()==report.get("revision").getAsLong()) return new ActivityReport(input,Instant.parse(report.get("generatedAt").getAsString()),page.items().stream().map(WireValues::activity).toList(),Duration.parse(report.get("total").getAsString()));
         }throw new RemoteFailure(RemoteFailure.Kind.CONFLICT,"CURSOR_EXPIRED");
+    }
+    /** Full owned activity choices without constructing a multi-century daily report. */
+    public List<Activity> allActivities() {
+        return page("activities",Map.of("from","0000-01-01T00:00:00Z","to","9999-12-31T23:59:59.999999999Z")).items().stream().map(WireValues::activity).toList();
+    }
+    private static JsonObject workSessionInterval(Instant start,Optional<Instant> end,String summary) {
+        var body=object();body.addProperty("start",start.toString());optional(body,"end",end);body.addProperty("summary",summary);return body;
+    }
+    @Override public WorkSession createWorkSession(CreateWorkSession command) {
+        owner(command.ownerId());return WireValues.workSession(create("work-sessions",workSessionInterval(command.start(),command.end(),command.summary())));
+    }
+    @Override public WorkSession updateWorkSession(UpdateWorkSession command) {
+        return WireValues.workSession(put("/work-sessions/"+command.id().value(),command.expectedVersion(),workSessionInterval(command.start(),command.end(),command.summary())));
+    }
+    @Override public void deleteWorkSession(DeleteWorkSession command) {delete("/work-sessions/"+command.id().value(),command.expectedVersion());}
+    @Override public Optional<WorkSession> workSession(WorkSessionId id) {return get("/work-sessions/"+id.value()).map(WireValues::workSession);}
+    @Override public List<WorkSession> workSessions(OwnerId requested) {owner(requested);return page("work-sessions",Map.of()).items().stream().map(WireValues::workSession).toList();}
+    @Override public Optional<WorkSession> activeWorkSession(OwnerId requested) {
+        owner(requested);return get("/work-sessions/active").map(value -> {
+            tags.put("/work-sessions/"+value.get("id").getAsString(),tags.get("/work-sessions/active"));return WireValues.workSession(value);
+        });
+    }
+    @Override public WorkSession startWorkSession(StartWorkSession command) {return startWorkSession(command,UUID.randomUUID());}
+    public WorkSession startWorkSession(StartWorkSession command,UUID commandId) {
+        owner(command.ownerId());var body=object();body.addProperty("summary",command.summary());
+        var result=request("POST","/work-sessions/start",body,Map.of("Idempotency-Key",commandId.toString()));var value=result.body().getAsJsonObject();
+        return WireValues.workSession(remember("/work-sessions/"+value.get("id").getAsString(),result));
+    }
+    @Override public WorkSession stopWorkSession(StopWorkSession command) {return stopWorkSession(command,UUID.randomUUID());}
+    public WorkSession stopWorkSession(StopWorkSession command,UUID commandId) {
+        return prepareWorkSessionStop(command,commandId).get();
+    }
+    /** Capture before the first write; retain this operation to retry an unknown outcome. */
+    public Supplier<WorkSession> prepareWorkSessionStop(StopWorkSession command,UUID commandId) {
+        String path="/work-sessions/"+command.id().value();
+        var headers=Map.of("If-Match",match(path,command.expectedVersion()),"Idempotency-Key",commandId.toString());
+        return ()->WireValues.workSession(remember(path,request("POST",path+"/stop",null,headers)));
+    }
+    @Override public Association associateWorkSession(AssociateWorkSession command) {
+        String path="/activities/"+command.activityId().value();var body=object();optional(body,"workSessionId",command.workSessionId().map(WorkSessionId::value));
+        var result=request("PUT",path+"/work-session",body,Map.of("If-Match",match(path,command.expectedActivityVersion())));
+        var response=result.body().getAsJsonObject();var activity=response.getAsJsonObject("activity");
+        return new Association(WireValues.activity(remember(path,new Result(result.status(),activity,result.etag()))),response.get("outsideSession").getAsBoolean());
+    }
+    @Override public WorkSessionService.Report workSessionReport(WorkSessionId id) {
+        var value=request("GET","/work-sessions/"+id.value()+"/report",null).body().getAsJsonObject();
+        var session=WireValues.workSession(value.getAsJsonObject("session"));var activities=new ArrayList<Activity>();
+        value.getAsJsonArray("activities").forEach(activity -> activities.add(WireValues.activity(activity.getAsJsonObject())));
+        var time=value.getAsJsonObject("time");var outside=new HashSet<ActivityId>();
+        time.getAsJsonArray("outsideSession").forEach(activity -> outside.add(new ActivityId(WireValues.id(activity))));
+        return new WorkSessionService.Report(session,activities,new WorkSessionTime(Duration.parse(time.get("duration").getAsString()),
+                Duration.parse(time.get("trackedActivityTime").getAsString()),Duration.parse(time.get("allocatedTime").getAsString()),
+                Duration.parse(time.get("unallocatedTime").getAsString()),Set.copyOf(outside)));
     }
     public JsonObject exportData() {return request("GET","/data/export",null).body().getAsJsonObject();}
     public JsonObject importData(JsonObject data) {return request("POST","/data/import",data,Map.of("Idempotency-Key",UUID.randomUUID().toString())).body().getAsJsonObject();}

@@ -107,10 +107,36 @@ export function workweekGroups(tasks, projects, activities) {
       groups.get(id).tasks.push(node);
     }
   }
+  for (const activity of activities.filter(value => !value.taskId)) {
+    const id = activity.projectId || '';
+    if (!groups.has(id)) groups.set(id, {id, name: projects.find(project => project.id === id)?.name || 'Unassigned', tasks: []});
+    (groups.get(id).activities ||= []).push(activity);
+  }
   const sort = nodes => {
     nodes.sort((a, b) => taskPresentation(a.task).title.localeCompare(taskPresentation(b.task).title));
     for (const node of nodes) sort(node.children);
   };
   for (const group of groups.values()) sort(group.tasks);
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Recompute live coverage from one server-derived instant without rounding records.
+export function sessionTimeNanos(session, activities, asOf) {
+  const start = instantNanos(session.start), end = session.end ? instantNanos(session.end) : asOf;
+  const duration = end > start ? end - start : 0n, intervals = [];
+  let tracked = 0n, allocated = 0n;
+  for (const activity of activities) {
+    const first = instantNanos(activity.start), last = activity.end ? instantNanos(activity.end) : asOf;
+    const from = first > start ? first : start, to = last < end ? last : end;
+    if (to > from) { intervals.push([from,to]); tracked += to - from; }
+  }
+  intervals.sort((a,b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+  let first = null, last = null;
+  for (const [from,to] of intervals) {
+    if (last === null) { first = from; last = to; }
+    else if (from <= last) { if (to > last) last = to; }
+    else { allocated += last - first; first = from; last = to; }
+  }
+  if (last !== null) allocated += last - first;
+  return {duration, tracked, allocated, unallocated: duration - allocated};
 }

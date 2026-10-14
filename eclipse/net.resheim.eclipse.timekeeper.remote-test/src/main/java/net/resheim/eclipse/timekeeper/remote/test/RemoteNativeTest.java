@@ -64,14 +64,17 @@ public class RemoteNativeTest {
             activityEditor.textWithLabel("End (yyyy-MM-dd HH:mm)").setText(date+" 09:00");activityEditor.button("Save").click();
             RemoteTestSupport.waitFor(()->api.activity(manual.id()).orElseThrow().summary().equals("Edited precise interval"),"Activity edit was not stored remotely");
             var edited=api.activity(manual.id()).orElseThrow();assertEquals(from,edited.start());assertEquals(Optional.of(until),edited.end());
+            WorkSessionScenario.prepare(api);
             var exported=RemoteBootstrap.folder.resolve("csv-export");
             assertTrue(TimekeeperUiPlugin.getDefault().exportRemoteCsv(exported)>=4);
+            assertTrue(java.nio.file.Files.isRegularFile(exported.resolve("workSessions.csv")));
             assertTrue(TimekeeperUiPlugin.getDefault().importRemoteCsv(exported)>=4);
             RemoteBootstrap.proof.setProperty("manual.start",from.toString());RemoteBootstrap.proof.setProperty("manual.end",until.toString());
             RemoteBootstrap.proof.setProperty("project.id",project.id().value().toString());RemoteBootstrap.proof.setProperty("task.id",task.id().value().toString());
             RemoteBootstrap.proof.setProperty("stopped.id",stopped.id().value().toString());RemoteBootstrap.proof.setProperty("manual.id",manual.id().value().toString());
             view.toolbarButton("Show current week").click();
             UncertainTrackingScenario.run(api);
+            WorkSessionScenario.uncertainCommands(api);
             UncertainDeletionScenario.run(api);
             InstalledImportScenario.prepare(api);
             RemoteBootstrap.proof.setProperty("phase.native","passed");RemoteBootstrap.writeProof();

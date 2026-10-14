@@ -46,6 +46,7 @@ import net.resheim.eclipse.timekeeper.db.converters.InstantAttributeConverter;
  * @author Torkild U. Resheim
  */
 @Entity
+@javax.persistence.Cacheable(false)
 @Table(name = "ACTIVITY")
 public class Activity implements Comparable<Activity>, Serializable {
 
@@ -68,6 +69,10 @@ public class Activity implements Comparable<Activity>, Serializable {
 	/** Whether or not activity properties have been manually adjusted or created */
 	@Column(name = "ADJUSTED")
 	private boolean manual = false;
+
+    @ManyToOne @JoinColumn(name="WORK_SESSION_ID") private WorkSession workSession;
+    public WorkSession getWorkSession() {return workSession;}
+    public void setWorkSession(WorkSession session) {workSession=session;}
 
 	/** The task the activity is associated with */
 	@ManyToOne

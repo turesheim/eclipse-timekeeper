@@ -1,11 +1,11 @@
 # Database baseline, backups and future migrations
 
-Timekeeper 2.0 establishes **H2 2.5.250, schema version 2** as the
+Timekeeper 2.0 establishes **H2 2.5.250, schema version 3** as the
 supported baseline. Historical H2 databases, unversioned databases, and Mylyn
 attribute storage are not migration inputs. The maintainer removed historical
 migration support because there are no users depending on those formats.
 
-There is no upgrade/recovery wizard, legacy driver, Flyway runtime or active
+There is no upgrade/recovery wizard, legacy driver, Flyway runtime or historical
 migration recipe. Old conversion receipts are not used. Earlier migration
 reports under `docs/verification/` describe superseded work, not supported procedures.
 
@@ -20,6 +20,30 @@ initialization or migration targets are refused without schema changes.
 If an unsupported database is selected, preserve it and choose a different,
 empty path. Never delete or overwrite it merely to make startup succeed. The
 plugin does not rewrite stored JDBC URLs or silently switch to another database.
+
+## Upgrading the known version-2 baseline
+
+A READY database with the exact supported version-2 layout is upgraded to
+version 3 for Work Sessions. The plugin first writes a private SQL backup and
+restores it into isolated temporary storage to verify that it is readable. For
+local file databases, backups are stored in `.timekeeper-backups` beside the
+original database. Memory and TCP/SSL databases use `~/.timekeeper/backups` on
+the Eclipse client's computer. Administrators may set
+`net.resheim.eclipse.timekeeper.db.upgrade-backup-directory` to another writable
+location.
+
+If backup creation or verification fails, the original schema and records stay
+unchanged. The upgrade adds the Work Session table, a nullable activity relation
+and a transaction-lock table; all previous data rows, IDs, timestamps, labels
+and task/project relationships are retained. The existing JDBC URL remains in
+use. Subsequent restarts do not repeat the upgrade.
+
+H2 commits DDL independently. An interrupted upgrade stays marked MIGRATING and
+is refused at startup. Its error identifies the verified backup; stop all
+clients and restore that SQL into separate empty storage before retrying.
+Unknown layouts and historical/unversioned files remain unsupported. An older
+plugin cannot use schema 3; rolling back requires restoring the pre-upgrade
+backup with the matching earlier plugin, preserving later work separately.
 
 ## Backing up and restoring the current baseline
 
@@ -37,14 +61,14 @@ plugin does not rewrite stored JDBC URLs or silently switch to another database.
 Closed-file copy, restart and SQL export/restore have automated synthetic
 coverage. Current-schema CSV import/export is a convenience interchange format,
 **not** a database backup, historical migration or rollback mechanism. It covers
-projects, tasks, activities, labels, external references and their relationships;
+projects, tasks, activities, work sessions, labels, external references and their relationships;
 it does not replace the closed-file backup procedure above. Installed-IDE
 acceptance remains in the upgrade plan.
 
 ## Infrastructure retained for future migrations
 
 `DatabaseVersion` records a singleton schema `VERSION`, `STATE` and `ORIGIN`.
-Version 2 is the current starting point for future supported migrations. Earlier
+Version 3 is the current baseline. Earlier
 experimental version-1 files are unsupported and are not upgraded automatically.
 
 - New database: `CREATING / NEW` → `READY / NEW` after schema verification.
@@ -52,13 +76,12 @@ experimental version-1 files are unsupported and are not upgraded automatically.
   → `READY / MIGRATION` only after explicit validation.
 - `DatabaseStartup.openMigrationTarget` is package-private infrastructure. It
   creates only an empty target and rejects existing or interrupted attempts.
-  Normal startup never opens a pending target or invokes migration logic.
+  Normal startup never opens a pending target. The sole registered upgrade is the verified version-2 Work Session extension described above.
 - `DatabaseVersion.migrationValidated` checks the prior state, full current
   table/column layout and an idle writable connection before advancing the
   marker. The caller must validate the **data** first; the marker method cannot
   establish data equivalence itself.
-- Unknown schema versions fail closed. No migration steps are registered, and
-  no old version is implicitly accepted or stamped during normal startup.
+- Unknown schema versions fail closed. Only the exact version-2 table/column layout and a valid READY marker are accepted for upgrade.
 
 When a future schema change is needed:
 

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {dayStart, weekRange, durationNanos, durationText, dateInZone, instantNanos, taskPresentation, activityDayNanos, workweekGroups, decimalHoursText} from '../src/model.js';
+import {dayStart, weekRange, durationNanos, durationText, dateInZone, instantNanos, taskPresentation, activityDayNanos, workweekGroups, decimalHoursText, sessionTimeNanos} from '../src/model.js';
 test('Oslo report ranges include 23- and 25-hour days and Monday boundaries', () => {
   assert.equal(dayStart('2026-03-29', 'Europe/Oslo'), '2026-03-28T23:00:00.000Z');
   assert.equal(dayStart('2026-03-30', 'Europe/Oslo'), '2026-03-29T22:00:00.000Z');
@@ -48,4 +48,23 @@ test('decimal hours round exact aggregates and preserve arbitrarily large hour c
   assert.equal(decimalHoursText(durationNanos('PT17.999999999S')),'0.00h');
   assert.equal(decimalHoursText(durationNanos('PT9S')+durationNanos('PT9S')),'0.01h');
   assert.equal(decimalHoursText(durationNanos('PT9007199254740993H')),'9007199254740993.00h');
+});
+
+test('session coverage clips overlaps exactly and remains independent of local midnight', () => {
+  const session={start:'2025-10-25T22:00:00.123456789Z',end:'2025-10-26T23:00:00.123456789Z'};
+  const activities=[{start:'2025-10-26T08:00:00.123456789Z',end:'2025-10-26T12:00:00.123456789Z'},
+    {start:'2025-10-26T10:00:00.123456789Z',end:'2025-10-26T14:00:00.123456789Z'},
+    {start:'2025-10-24T00:00:00Z',end:session.start}];
+  assert.deepEqual(sessionTimeNanos(session,activities,instantNanos(session.end)),{
+    duration:25n*3600000000000n,tracked:8n*3600000000000n,allocated:6n*3600000000000n,unallocated:19n*3600000000000n});
+});
+test('running session and activity counters preserve a one-nanosecond gap', () => {
+  const start='2025-01-01T00:00:00Z',session={start,end:null};
+  assert.deepEqual(sessionTimeNanos(session,[{start:'2025-01-01T00:00:00.000000001Z',end:null}],instantNanos('2025-01-01T00:00:00.000000010Z')),
+    {duration:10n,tracked:9n,allocated:9n,unallocated:1n});
+});
+test('taskless activities belong to their direct project or Unassigned without fake tasks', () => {
+  const groups=workweekGroups([],[{id:'p',name:'Project'}],[{id:'a',taskId:null,projectId:'p'},{id:'b',taskId:null,projectId:null}]);
+  assert.equal(groups.length,2);assert.equal(groups.find(v=>v.id==='p').activities[0].id,'a');
+  assert.equal(groups.find(v=>v.id==='').activities[0].id,'b');assert.ok(groups.every(v=>v.tasks.length===0));
 });

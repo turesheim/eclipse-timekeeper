@@ -183,7 +183,7 @@ public class RemoteChangeJobTest {
                     if(after>revision) {resets.incrementAndGet();status=409;body="{\"code\":\"RESYNC_REQUIRED\"}";}
                     else {pollingAgain.countDown();closed.await(10,TimeUnit.SECONDS);body="{\"items\":[],\"nextSequence\":"+after+",\"hasMore\":false}";}
                 } else if(path.equals("/api/v1/me")) body="{\"ownerId\":\"fixture-owner\",\"zoneId\":\"UTC\",\"version\":0}";
-                else if(path.equals("/api/v1/activities/active")) {status=204;body="";}
+                else if(path.equals("/api/v1/activities/active") || path.equals("/api/v1/work-sessions/active")) {status=204;body="";}
                 // Other UI tests can leave Workweek open; its read-only report loads must
                 // remain valid while this isolated backend is temporarily selected.
                 else if(path.equals("/api/v1/activities")) body="{\"items\":[],\"revision\":"+revision+",\"nextCursor\":null}";
@@ -196,7 +196,7 @@ public class RemoteChangeJobTest {
                         summary=name.group(1);writes.incrementAndGet();version++;revision++;
                     }
                     body=task();etag=tag();
-                } else if(Set.of("/api/v1/tasks","/api/v1/projects","/api/v1/labels").contains(path))
+                } else if(Set.of("/api/v1/tasks","/api/v1/projects","/api/v1/labels","/api/v1/work-sessions").contains(path))
                     body="{\"items\":["+(path.endsWith("/tasks") ? task() : "")+"],\"revision\":"+revision+",\"nextCursor\":null}";
                 else throw new AssertionError("Unexpected fixture route: "+path);
                 byte[] bytes=body.getBytes(StandardCharsets.UTF_8);

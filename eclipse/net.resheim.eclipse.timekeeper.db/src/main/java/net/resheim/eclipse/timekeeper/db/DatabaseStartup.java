@@ -12,7 +12,7 @@ import javax.persistence.EntityManagerFactory;
 import org.eclipse.persistence.config.PersistenceUnitProperties;
 import org.eclipse.persistence.jpa.PersistenceProvider;
 
-/** Opens only an empty or versioned current-model database. Never migrates in place. */
+/** Opens current storage and upgrades only the known version-2 schema after a verified backup. */
 public final class DatabaseStartup {
 	private DatabaseStartup() { }
 
@@ -59,6 +59,9 @@ public final class DatabaseStartup {
 				throw new SQLException("The Timekeeper database is read-only; time tracking requires writable storage.");
 			}
 			DatabaseSchema.Kind schema = DatabaseSchema.inspect(inspection);
+            if(!migration && schema==DatabaseSchema.Kind.UPGRADE_REQUIRED) {
+                DatabaseUpgrade.workSessions(inspection,jdbcUrl);schema=DatabaseSchema.inspect(inspection);
+            }
 			if (schema == DatabaseSchema.Kind.INCOMPLETE || schema == DatabaseSchema.Kind.MIGRATING) {
 				throw new SQLException("Incomplete Timekeeper database initialization or migration."
 						+ " Preserve this attempt and retry from a backup into new storage; no schema changes were made.");

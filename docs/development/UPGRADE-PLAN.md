@@ -16,6 +16,11 @@ children are now complete; [CLIENT-SERVER-ACCEPTANCE.md](../verification/CLIENT-
 records their merged evidence. Final release artifacts and public installation
 remain separate acceptance work.
 
+Work-session update: the current embedded baseline is H2 2.5.250 / schema 3.
+Known, correctly stamped schema-2 databases receive an additive upgrade only
+after a verified private backup. This does not enable historical migrations.
+See [database recovery](../operations/DATABASE-RECOVERY.md) for the current policy.
+
 Recorded checkpoint: October 12, 2026. Timekeeper 2.0 requires Eclipse 4.41 and
 Java 21 and uses **H2 2.5.250 / schema version 2**. The native domain, service,
 project/task/activity UI and optional Mylyn adapter from #211 are implemented.

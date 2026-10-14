@@ -22,7 +22,7 @@ Font Awesome Free 7.3.1 supplies locally bundled icon fonts for larger tree
 controls and action buttons. Buttons retain accessible names and hover titles;
 fonts and their upstream license are included in the server distribution.
 
-Projects, tasks, labels and activities use API v1. Start/stop uses durable
+Projects, tasks, labels, activities and work sessions use API v1. Start/stop uses durable
 idempotency keys. Editors/deletion retain the original opaque ETag, including
 across full resynchronization, rather than upgrading a stale draft. Validation,
 permission, network and concurrency failures preserve drafts. An uncertain
@@ -59,6 +59,33 @@ A selected label deleted by another client stays visible as deleted until the
 user reviews it; saving cannot silently drop that reference.
 Offline reads reconnect with backoff and never replay writes. Sessions bind to
 the authenticated owner and reject live token owner reassignment.
+
+## Work sessions
+
+The persistent **Work Session** card shows the account's running status and
+lets the user start or stop a session independently of activity timers. History
+selects the session whose start/end, duration, tracked, covered and unallocated
+time are displayed. Counters use the report's server timestamp and elapsed
+browser time; when offline they freeze at the last confirmed report.
+
+The card provides retrospective session creation/editing, associated activity
+editing, taskless activity creation, existing-activity association and removal
+of associations. A session can contain activities from several projects or no
+project/task at all. Generic activity creation remains standalone; the card's
+**Add activity** defaults explicitly to its selected session. A task timer can
+choose the current session or remain standalone.
+
+Tracked time sums clipped intervals; covered time is their union. Unallocated
+time subtracts covered time from session duration, so overlap is not counted
+twice. Out-of-bounds activities are accepted with a warning. Sessions can span
+midnight without stopping, and activity day parts retain their association.
+Deleting a session requires removing its activity associations first. Exact UTC
+editor fields retain nanoseconds. Stale versions preserve the user's draft;
+lost start/stop replies offer retry with the same frozen command key and payload.
+
+Portable domain-v2 JSON/CSV export includes work sessions and association IDs.
+Import remaps the complete graph into the destination account; v1 exports
+remain readable. Native Eclipse CSV and portable server CSV are distinct formats.
 
 ## Automated verification
 

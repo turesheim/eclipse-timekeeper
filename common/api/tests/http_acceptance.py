@@ -113,7 +113,7 @@ class HttpAcceptance(unittest.TestCase):
             self.assertIsNone(page.get('nextCursor'), 'Fixture cleanup must include every daily record')
             self.created.extend((owner,'activities',value['id']) for value in page['items'])
         # Clean only records created by this suite, including commands/imports.
-        order = {'activities': 0, 'tasks': 1, 'labels': 2, 'projects': 3}
+        order = {'activities': 0, 'work-sessions': 1, 'tasks': 2, 'labels': 3, 'projects': 4}
         unique = list(dict.fromkeys(reversed(self.created)))
         for owner, resource, identifier in sorted(unique, key=lambda row: order[row[1]]):
             value, headers = self.call('GET', f'/{resource}/{identifier}', owner=owner)
@@ -258,6 +258,116 @@ class HttpAcceptance(unittest.TestCase):
         replay_after_stop, _ = self.call('POST', '/activities/start', body=body, headers=key, status=201)
         self.assertEqual(first, replay_after_stop)
         self.call('GET', '/activities/active', status=204)
+
+    def test_work_session_commands_are_durable_independent_and_owner_scoped(self):
+        self.call('GET', '/work-sessions/active', status=204)
+        keys = [self.key(), self.key()]
+        body = {'summary': self.prefix}
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(lambda key: self.call('POST', '/work-sessions/start',
+                body=body, headers=key, status=(201, 409)), keys))
+        winners = [(index, value, headers) for index, (value, headers) in enumerate(results) if 'id' in value]
+        for _, value, _ in winners:
+            self.created.append(('a', 'work-sessions', value['id']))
+        self.assertEqual(1, len(winners), 'Concurrent starts must create one running session')
+        index, session, session_headers = winners[0]
+        replay, _ = self.call('POST', '/work-sessions/start', body=body, headers=keys[index], status=201)
+        self.assertEqual(session, replay)
+        other, _ = self.call('POST', '/work-sessions/start', body=body, headers=keys[index], owner='b', status=201)
+        self.created.append(('b', 'work-sessions', other['id']))
+        self.assertNotEqual(session['id'], other['id'])
+        self.call('POST', '/work-sessions/start', body=body, headers=self.key(), owner='read', status=403, code='FORBIDDEN')
+        activity, activity_headers, _ = self.start(self.task)
+        self.assertIsNone(activity.get('workSessionId'), 'Existing tracking may remain standalone')
+        association, _ = self.call('PUT', f'/activities/{activity["id"]}/work-session',
+            body={'workSessionId': session['id']}, headers={'If-Match': activity_headers['ETag']})
+        self.assertEqual(session['id'], association['activity']['workSessionId'])
+        stop_key = {**self.key(), 'If-Match': session_headers['ETag']}
+        stopped, stopped_headers = self.call('POST', f'/work-sessions/{session["id"]}/stop', headers=stop_key)
+        repeated, repeated_headers = self.call('POST', f'/work-sessions/{session["id"]}/stop', headers=stop_key)
+        self.assertEqual(stopped, repeated)
+        self.assertEqual(stopped_headers['ETag'], repeated_headers['ETag'])
+        active, _ = self.call('GET', '/activities/active')
+        self.assertEqual(association['activity'], active, 'Stopping the session must not modify its active activity')
+        self.assertIsNone(active['end'])
+        self.call('GET', '/work-sessions/active', status=204)
+        second, _ = self.call('POST', '/work-sessions/start', body=body, headers=self.key(), status=201)
+        self.created.append(('a', 'work-sessions', second['id']))
+        self.assertNotEqual(session['id'], second['id'])
+
+    def test_work_session_reports_clip_overlap_and_guard_retrospective_associations(self):
+        interval = {'start': '2025-10-25T22:00:00.123456789Z',
+                    'end': '2025-10-26T23:00:00.123456789Z', 'summary': self.prefix}
+        session = self.create('work-sessions', interval)
+        other_project = self.create('projects', {'name': self.prefix + ' second project'})
+        other_task = self.create('tasks', {'projectId': other_project['id'], 'parentTaskId': None,
+                                         'summary': self.prefix + ' second task', 'url': None})
+        for task, start, end in ((self.task, '08:00:00', '12:00:00'), (other_task, '10:00:00', '14:00:00')):
+            self.create('activities', {'taskId': task['id'], 'start': f'2025-10-26T{start}Z',
+                'end': f'2025-10-26T{end}Z', 'summary': self.prefix, 'labelIds': [], 'workSessionId': session['id']})
+        outside = self.create('activities', {'taskId': None, 'projectId': self.project['id'],
+            'start': '2025-10-27T00:00:00Z', 'end': '2025-10-27T01:00:00Z', 'summary': self.prefix, 'labelIds': []})
+        _, tag = self.call('GET', f'/activities/{outside["id"]}')
+        assigned, assigned_tag = self.call('PUT', f'/activities/{outside["id"]}/work-session',
+            body={'workSessionId': session['id']}, headers={'If-Match': tag['ETag']})
+        self.assertTrue(assigned['outsideSession'])
+        self.assertEqual(outside['start'], assigned['activity']['start'])
+        self.assertEqual(outside['end'], assigned['activity']['end'])
+        self.assertIsNone(assigned['activity']['taskId'])
+        report, _ = self.call('GET', f'/work-sessions/{session["id"]}/report')
+        self.assertEqual('PT25H', report['time']['duration'])
+        self.assertEqual('PT8H', report['time']['trackedActivityTime'])
+        self.assertEqual('PT6H', report['time']['allocatedTime'])
+        self.assertEqual('PT19H', report['time']['unallocatedTime'])
+        self.assertEqual([outside['id']], report['time']['outsideSession'])
+        _, tag = self.call('GET', f'/work-sessions/{session["id"]}')
+        self.call('DELETE', f'/work-sessions/{session["id"]}', headers={'If-Match': tag['ETag']}, status=409)
+        changed, _ = self.call('PUT', f'/work-sessions/{session["id"]}',
+            body={**interval, 'summary': self.prefix + ' reviewed'}, headers={'If-Match': tag['ETag']})
+        self.call('PUT', f'/work-sessions/{session["id"]}', body=interval,
+            headers={'If-Match': tag['ETag']}, status=412, code='STALE_VERSION')
+        self.assertEqual(interval['start'], changed['start'])
+        self.call('GET', f'/work-sessions/{session["id"]}', owner='b', status=404, code='NOT_FOUND')
+        self.call('GET', f'/work-sessions/{session["id"]}/report', owner='b', status=404, code='NOT_FOUND')
+        foreign = self.create('activities', {'taskId': None, 'start': outside['start'], 'end': outside['end'],
+            'summary': self.prefix, 'labelIds': []}, owner='b')
+        _, foreign_tag = self.call('GET', f'/activities/{foreign["id"]}', owner='b')
+        self.call('PUT', f'/activities/{foreign["id"]}/work-session', owner='b', body={'workSessionId': session['id']},
+            headers={'If-Match': foreign_tag['ETag']}, status=404, code='NOT_FOUND')
+        detached, _ = self.call('PUT', f'/activities/{outside["id"]}/work-session',
+            body={'workSessionId': None}, headers={'If-Match': assigned_tag['ETag']})
+        self.assertIsNone(detached['activity'].get('workSessionId'))
+
+    def test_domain_v2_transfer_remaps_taskless_session_graph_atomically(self):
+        project, session, activity = [str(uuid4()) for _ in range(3)]
+        start, end = '2026-03-29T08:00:00.123456789Z', '2026-03-29T12:00:00.987654321Z'
+        data = {'format': 'timekeeper-domain-v2', 'zoneId': 'UTC',
+            'projects': [{'id': project, 'name': self.prefix + ' imported'}], 'tasks': [], 'labels': [],
+            'workSessions': [{'id': session, 'start': start, 'end': end, 'summary': self.prefix}],
+            'activities': [{'id': activity, 'taskId': None, 'projectId': project, 'workSessionId': str(uuid4()),
+                'start': start, 'end': end, 'summary': self.prefix, 'labelIds': [], 'manual': True}]}
+        before, _ = self.call('GET', '/data/export', owner='b')
+        self.call('POST', '/data/import', owner='b', body=data, headers=self.key(), status=422, code='VALIDATION')
+        after, _ = self.call('GET', '/data/export', owner='b')
+        self.assertEqual(before, after)
+        data['activities'][0]['workSessionId'] = session
+        key = self.key()
+        imported, _ = self.call('POST', '/data/import', owner='b', body=data, headers=key, status=201)
+        kinds = {'PROJECT': 'projects', 'WORK_SESSION': 'work-sessions', 'ACTIVITY': 'activities'}
+        for value in imported['ids']:
+            self.created.append(('b', kinds[value['entityType']], value['id']))
+            self.assertNotEqual(value['sourceId'], value['id'])
+        self.assertEqual(3, len(imported['ids']))
+        repeated, _ = self.call('POST', '/data/import', owner='b', body=data, headers=key, status=201)
+        self.assertEqual(imported, repeated)
+        ids = {value['sourceId']: value['id'] for value in imported['ids']}
+        stored, _ = self.call('GET', f'/activities/{ids[activity]}', owner='b')
+        self.assertIsNone(stored['taskId'])
+        self.assertEqual(ids[project], stored['projectId'])
+        self.assertEqual(ids[session], stored['workSessionId'])
+        self.assertEqual((start, end), (stored['start'], stored['end']))
+        report, _ = self.call('GET', f'/work-sessions/{ids[session]}/report', owner='b')
+        self.assertEqual('PT4H0.864197532S', report['time']['allocatedTime'])
 
     def test_atomic_switch_and_active_state_conflicts(self):
         self.call('GET', '/activities/active', status=204)

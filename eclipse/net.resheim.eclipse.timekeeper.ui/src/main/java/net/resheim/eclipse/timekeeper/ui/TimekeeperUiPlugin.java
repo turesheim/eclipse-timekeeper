@@ -113,6 +113,8 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
         return backend.service();
 	}
 
+    public net.resheim.eclipse.timekeeper.service.WorkSessionService getWorkSessionService() {return backend.workSessions();}
+    public java.util.List<Activity> getSessionActivityCandidates() {return backend.sessionActivityCandidates();}
     public boolean isBackendReady() {return backend!=null && backend.ready();}
     public boolean snapshotsAvailable() {return backend!=null && backend.snapshotsAvailable();}
     public boolean isRemote() {return backend!=null && backend.remote();}
@@ -134,6 +136,10 @@ public class TimekeeperUiPlugin extends AbstractUIPlugin implements IPropertyCha
     public <T> org.eclipse.core.runtime.jobs.Job runRead(String name,java.util.function.Supplier<T> action,
             java.util.function.Consumer<T> success,java.util.function.Consumer<RuntimeException> failure) {
         return backend.read(name,action,success,failure);
+    }
+    public <T> org.eclipse.core.runtime.jobs.Job runBackgroundRead(String name,java.util.function.Supplier<T> action,
+            java.util.function.Consumer<T> success,java.util.function.Consumer<RuntimeException> failure) {
+        return backend.readBackground(name,action,success,failure);
     }
 	public Optional<TaskIntegration> getTaskIntegration() {
 		return Optional.ofNullable(integrationTracker == null ? null : integrationTracker.getService());

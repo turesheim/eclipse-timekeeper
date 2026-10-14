@@ -26,7 +26,8 @@ final class RemoteWebScenario {
         String prefix="Web Eclipse "+UUID.randomUUID().toString().substring(0,8);
         ZoneId originalZone=api.profile().zone(),zone=ZoneId.of("Europe/Oslo");
         LocalDate date=LocalDate.now(zone),first=date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        Instant start=date.atTime(8,0,0,123456789).atZone(zone).toInstant(),end=start.plusNanos(1);
+        // Stay in the current reporting week without assuming CI runs after 08:00.
+        Instant start=date.atStartOfDay(zone).toInstant(),end=start.plusNanos(1);
         var query=new ActivityQuery(first.atStartOfDay(zone).toInstant(),first.plusDays(7).atStartOfDay(zone).toInstant(),Optional.of(OwnerId.LOCAL),Optional.empty(),Optional.empty(),zone);
         try(var peer=new BrowserPeer()) {
             peer.command(Map.of("action","create","prefix",prefix,"zone",zone.getId(),"date",date.toString(),"start",start.toString(),"end",end.toString()));

@@ -73,18 +73,22 @@ export class Api {
     } while (cursor !== null);
     return {items, revision};
   }
-  async snapshot(range) {
+  async snapshot(range, selectedSession = null) {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const profile = await this.request('/me');
         const dates = range(profile.data.zoneId);
         const projects = await this.page('/projects'), tasks = await this.page('/tasks'), labels = await this.page('/labels');
+        const workSessions = await this.page('/work-sessions');
+        const activeWorkSession = await this.request('/work-sessions/active');
+        const chosen = workSessions.items.find(value => value.id === selectedSession) || activeWorkSession.data || [...workSessions.items].sort((a,b) => b.start.localeCompare(a.start))[0];
+        const workSessionReport = chosen ? (await this.request(`/work-sessions/${chosen.id}/report`)).data : null;
         const activities = await this.page('/activities', {from: dates.from, to: dates.to});
         const active = await this.request('/activities/active');
         const report = await this.request(`/reports/activities?${new URLSearchParams({from: dates.from, to: dates.to, zoneId: profile.data.zoneId})}`);
         const confirmed = await this.request('/me'), head = await this.page('/projects');
-        if ([tasks, labels, activities, head, report.data].some(v => v.revision !== projects.revision) || profile.data.version !== confirmed.data.version) throw new ApiError('BUSY');
-        return {profile, dates, projects: projects.items, tasks: tasks.items, labels: labels.items, activities: activities.items, active, report: report.data, revision: projects.revision};
+        if ([tasks, labels, activities, workSessions, head, report.data, ...(workSessionReport ? [workSessionReport] : [])].some(v => v.revision !== projects.revision) || profile.data.version !== confirmed.data.version) throw new ApiError('BUSY');
+        return {profile, dates, projects: projects.items, tasks: tasks.items, labels: labels.items, activities: activities.items, active, workSessions: workSessions.items, activeWorkSession, workSessionReport, report: report.data, revision: projects.revision};
       } catch (error) { if (!['BUSY', 'CURSOR_EXPIRED'].includes(error.code) || attempt === 2) throw error; }
     }
   }

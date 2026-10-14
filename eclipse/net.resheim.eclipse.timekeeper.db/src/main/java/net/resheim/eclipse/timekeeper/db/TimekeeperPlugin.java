@@ -304,9 +304,12 @@ public class TimekeeperPlugin extends Plugin {
 		Path externalReferences = path.resolve("external_task_reference.csv");
 		Path labels = path.resolve("activitylabel.csv");
 		Path activityLabels = path.resolve("activity_activitylabel.csv");
+        Path workSessions = path.resolve("work_session.csv");
 		EntityTransaction transaction = entityManager.getTransaction();
-		transaction.begin();
-		int projectTypesExported = entityManager
+        transaction.begin();
+        entityManager.createNativeQuery("MERGE INTO TIMEKEEPER_WRITE_LOCK KEY(ID) VALUES(1)").executeUpdate();
+        int sessionsExported=entityManager.createNativeQuery("CALL CSVWRITE('"+workSessions.toString().replace("'","''")+"', 'SELECT * FROM WORK_SESSION');").executeUpdate();
+        int projectTypesExported = entityManager
 				.createNativeQuery("CALL CSVWRITE('" + projectTypes + "', 'SELECT * FROM PROJECT_TYPE');")
 				.executeUpdate();
 		int projectsExported = entityManager
@@ -327,7 +330,7 @@ public class TimekeeperPlugin extends Plugin {
 		int labelsExported = entityManager.createNativeQuery("CALL CSVWRITE('" + labels + "', 'SELECT * FROM ACTIVITYLABEL');").executeUpdate();
 		entityManager.createNativeQuery("CALL CSVWRITE('" + activityLabels + "', 'SELECT * FROM ACTIVITY_ACTIVITYLABEL');").executeUpdate();
 		transaction.commit();
-		return projectTypesExported + projectsExported + tasksExported + activitiesExported + referencesExported + labelsExported;
+		return projectTypesExported + projectsExported + tasksExported + activitiesExported + referencesExported + labelsExported + sessionsExported;
 	}
 
 	/**
@@ -344,86 +347,80 @@ public class TimekeeperPlugin extends Plugin {
 		}
 	}
 
-	private int importDailyRows(ActivityCsvDays prepared) throws IOException {
-		Path path=prepared.folder;
-		Path projectTypes = path.resolve("project_type.csv");
-		Path projects = path.resolve("project.csv");
-		Path tasks = path.resolve("trackedtask.csv");
-		Path activities = path.resolve("activity.csv");
-		Path relations = path.resolve("trackedtask_activity.csv");
-		Path projectTasks = path.resolve("project_task.csv");
-		Path projectActivities = path.resolve("project_activity.csv");
-		Path externalReferences = path.resolve("external_task_reference.csv");
-		if (!projectTypes.toFile().exists()) {
-			throw new IOException("'project_type.csv' does not exist in the specified location.");
-		}
-		if (!projects.toFile().exists()) {
-			throw new IOException("'project.csv' does not exist in the specified location.");
-		}
-		if (!tasks.toFile().exists()) {
-			throw new IOException("'trackedtask.csv' does not exist in the specified location.");
-		}
-		if (!activities.toFile().exists()) {
-			throw new IOException("'activity.csv' does not exist in the specified location.");
-		}
-		if (!relations.toFile().exists()) {
-			throw new IOException("'trackedtask_activity.csv' does not exist in the specified location.");
-		}
-		if (!projectTasks.toFile().exists()) {
-			throw new IOException("'project_task.csv' does not exist in the specified location.");
-		}
-		if (!projectActivities.toFile().exists()) {
-			throw new IOException("'project_activity.csv' does not exist in the specified location.");
-		}
-		if (!externalReferences.toFile().exists()) {
-			throw new IOException("'external_task_reference.csv' does not exist in the specified location.");
-		}
-		Path labels=path.resolve("activitylabel.csv"), activityLabels=path.resolve("activity_activitylabel.csv");
-		if (Files.exists(labels) != Files.exists(activityLabels)) throw new IOException("The activity label export is incomplete.");
-		EntityTransaction transaction = entityManager.getTransaction();
-		try {
-			transaction.begin();
-
-			int projectTypesImported = entityManager
-					.createNativeQuery("MERGE INTO PROJECT_TYPE (SELECT * FROM CSVREAD('" + projectTypes + "'));")
-					.executeUpdate();
-			int projectsImported = entityManager
-					.createNativeQuery("MERGE INTO PROJECT (SELECT * FROM CSVREAD('" + projects + "'));")
-					.executeUpdate();
-			int tasksImported = entityManager
-					.createNativeQuery("MERGE INTO TASK (SELECT * FROM CSVREAD('" + tasks + "'));")
-					.executeUpdate();
-			if (Files.exists(labels)) entityManager.createNativeQuery("MERGE INTO ACTIVITYLABEL (SELECT * FROM CSVREAD('"+labels+"')); ").executeUpdate();
-			int activitiesImported = entityManager
-					.createNativeQuery("MERGE INTO ACTIVITY (SELECT * FROM CSVREAD('" + activities + "'));")
-					.executeUpdate();
-			entityManager
-					.createNativeQuery("MERGE INTO TASK_ACTIVITY (SELECT * FROM CSVREAD('" + relations + "'));")
-					.executeUpdate();
-			entityManager
-					.createNativeQuery("MERGE INTO PROJECT_TASK (SELECT * FROM CSVREAD('" + projectTasks + "'));")
-					.executeUpdate();
-			entityManager.createNativeQuery(
-					"MERGE INTO PROJECT_ACTIVITY (SELECT * FROM CSVREAD('" + projectActivities + "'));")
-					.executeUpdate();
-			int referencesImported = entityManager.createNativeQuery("MERGE INTO EXTERNAL_TASK_REFERENCE "
-					+ "(SELECT * FROM CSVREAD('" + externalReferences + "'));").executeUpdate();
-			if (Files.exists(activityLabels)) entityManager.createNativeQuery("MERGE INTO ACTIVITY_ACTIVITYLABEL (SELECT * FROM CSVREAD('"+activityLabels+"')); ").executeUpdate();
-			else for (var archive : prepared.originals.entrySet()) entityManager.createNativeQuery(
-					"MERGE INTO ACTIVITY_ACTIVITYLABEL SELECT ?1, LABELS_ID FROM ACTIVITY_ACTIVITYLABEL WHERE ACTIVITY_ID=?2")
-					.setParameter(1,archive.getKey()).setParameter(2,archive.getValue()).executeUpdate();
-
-			transaction.commit();
-			// Refresh cached task state after importing persisted records.
-			importGeneration++;
-			List<Task> restoredTasks = entityManager.createQuery("SELECT t FROM Task t", Task.class).getResultList();
-			for (Task restoredTask : restoredTasks) entityManager.refresh(restoredTask);
-			return projectTypesImported + projectsImported + tasksImported + activitiesImported + referencesImported;
-		} catch (PersistenceException e) {
-			if (transaction.isActive()) transaction.rollback();
-			throw new IOException(e.getMessage());
-		}
-	}
+    private int mergeCsv(String table,Path file) throws IOException {
+        var columns=new java.util.ArrayList<String>();
+        try(var data=new org.h2.tools.Csv().read(file.toString(),null,"UTF-8")) {
+            var metadata=data.getMetaData();for(int index=1;index<=metadata.getColumnCount();index++) {
+                String name=metadata.getColumnName(index).toUpperCase(java.util.Locale.ROOT);
+                if(!DatabaseSchema.CURRENT.get(table).contains(name) || columns.contains(name)) throw new IOException("Unexpected CSV column for "+table);
+                columns.add(name);
+            }
+        } catch(java.sql.SQLException failure) {throw new IOException("Could not read CSV columns",failure);}
+        String names=columns.stream().map(name -> "\""+name+"\"").collect(java.util.stream.Collectors.joining(","));
+        return entityManager.createNativeQuery("MERGE INTO "+table+" ("+names+") SELECT * FROM CSVREAD('"+file.toString().replace("'","''")+"')").executeUpdate();
+    }
+    private int mergeWorkSessions(Path path) throws IOException {
+        if(!Files.isRegularFile(path)) return 0;int count=0;
+        try(var rows=new org.h2.tools.Csv().read(path.toString(),null,"UTF-8")) {
+            while(rows.next()) {
+                String id=rows.getString("ID"),owner=rows.getString("OWNER_ID"),start=rows.getString("START_TIME"),end=rows.getString("END_TIME"),summary=rows.getString("SUMMARY"),state=rows.getString("STATE");
+                java.util.UUID.fromString(id);new net.resheim.eclipse.timekeeper.domain.OwnerId(owner);
+                long version=rows.getLong("VERSION");if(version<0) throw new IOException("Invalid work session version");
+                var existing=entityManager.createNativeQuery("SELECT OWNER_ID,START_TIME,END_TIME,SUMMARY,STATE FROM WORK_SESSION WHERE ID=?1").setParameter(1,id).getResultList();
+                if(existing.isEmpty()) entityManager.createNativeQuery("INSERT INTO WORK_SESSION(ID,VERSION,OWNER_ID,START_TIME,END_TIME,SUMMARY,STATE) VALUES(?1,?2,?3,?4,?5,?6,?7)")
+                        .setParameter(1,id).setParameter(2,version).setParameter(3,owner).setParameter(4,start).setParameter(5,end).setParameter(6,summary).setParameter(7,state).executeUpdate();
+                else {
+                    var original=(Object[])existing.getFirst();if(!owner.equals(original[0])) throw new IOException("A work session cannot change owner on import");
+                    if(!java.util.Arrays.equals(original,new Object[]{owner,start,end,summary,state})) entityManager.createNativeQuery(
+                            "UPDATE WORK_SESSION SET VERSION=VERSION+1,START_TIME=?1,END_TIME=?2,SUMMARY=?3,STATE=?4 WHERE ID=?5")
+                            .setParameter(1,start).setParameter(2,end).setParameter(3,summary).setParameter(4,state).setParameter(5,id).executeUpdate();
+                }
+                count++;
+            }
+        } catch(java.sql.SQLException | IllegalArgumentException failure) {throw new IOException("Invalid work session CSV",failure);}
+        return count;
+    }
+    private int importDailyRows(ActivityCsvDays prepared) throws IOException {
+        Path path=prepared.folder;
+        var files=java.util.Map.of("PROJECT_TYPE","project_type.csv","PROJECT","project.csv","TASK","trackedtask.csv","ACTIVITY","activity.csv",
+                "TASK_ACTIVITY","trackedtask_activity.csv","PROJECT_TASK","project_task.csv","PROJECT_ACTIVITY","project_activity.csv","EXTERNAL_TASK_REFERENCE","external_task_reference.csv");
+        for(var name:files.values()) if(!Files.isRegularFile(path.resolve(name))) throw new IOException("Missing required export file: "+name);
+        Path labels=path.resolve("activitylabel.csv"),activityLabels=path.resolve("activity_activitylabel.csv");
+        if(Files.exists(labels)!=Files.exists(activityLabels)) throw new IOException("The activity label export is incomplete.");
+        EntityTransaction transaction=entityManager.getTransaction();
+        try {
+            transaction.begin();entityManager.createNativeQuery("MERGE INTO TIMEKEEPER_WRITE_LOCK KEY(ID) VALUES(1)").executeUpdate();
+            int imported=0;
+            imported+=mergeCsv("PROJECT_TYPE",path.resolve(files.get("PROJECT_TYPE")));
+            imported+=mergeCsv("PROJECT",path.resolve(files.get("PROJECT")));
+            imported+=mergeCsv("TASK",path.resolve(files.get("TASK")));
+            imported+=mergeWorkSessions(path.resolve("work_session.csv"));
+            if(Files.exists(labels)) imported+=mergeCsv("ACTIVITYLABEL",labels);
+            imported+=mergeCsv("ACTIVITY",path.resolve(files.get("ACTIVITY")));
+            for(var table:java.util.List.of("TASK_ACTIVITY","PROJECT_TASK","PROJECT_ACTIVITY")) mergeCsv(table,path.resolve(files.get(table)));
+            imported+=mergeCsv("EXTERNAL_TASK_REFERENCE",path.resolve(files.get("EXTERNAL_TASK_REFERENCE")));
+            if(Files.exists(activityLabels)) mergeCsv("ACTIVITY_ACTIVITYLABEL",activityLabels);
+            else for(var archive:prepared.originals.entrySet()) entityManager.createNativeQuery(
+                    "MERGE INTO ACTIVITY_ACTIVITYLABEL SELECT ?1,LABELS_ID FROM ACTIVITY_ACTIVITYLABEL WHERE ACTIVITY_ID=?2")
+                    .setParameter(1,archive.getKey()).setParameter(2,archive.getValue()).executeUpdate();
+            for(var active:prepared.currentActivities.entrySet()) entityManager.createNativeQuery("UPDATE TASK SET CURRENTACTIVITY_ID=?1 WHERE ID=?2")
+                    .setParameter(1,active.getValue()).setParameter(2,active.getKey()).executeUpdate();
+            if(!entityManager.createNativeQuery("SELECT t.ID FROM TASK t JOIN ACTIVITY a ON t.CURRENTACTIVITY_ID=a.ID WHERE a.TASK_ID IS DISTINCT FROM t.ID OR a.END_TIME IS NOT NULL").getResultList().isEmpty())
+                throw new IOException("An active task must refer to its own open activity");
+            // Legacy exports do not name sessions; preserve existing associations when splitting their rows.
+            for(var archive:prepared.originals.entrySet()) entityManager.createNativeQuery(
+                    "UPDATE ACTIVITY SET WORK_SESSION_ID=COALESCE(WORK_SESSION_ID,(SELECT WORK_SESSION_ID FROM ACTIVITY WHERE ID=?1)) WHERE ID=?2")
+                    .setParameter(1,archive.getValue()).setParameter(2,archive.getKey()).executeUpdate();
+            var duplicates=entityManager.createNativeQuery("SELECT OWNER_ID FROM WORK_SESSION WHERE END_TIME IS NULL GROUP BY OWNER_ID HAVING COUNT(*)>1").getResultList();
+            if(!duplicates.isEmpty()) throw new IOException("Only one work session may run per owner");
+            if(!entityManager.createNativeQuery("SELECT a.ID FROM ACTIVITY a JOIN WORK_SESSION s ON a.WORK_SESSION_ID=s.ID WHERE a.OWNER_ID<>s.OWNER_ID").getResultList().isEmpty())
+                throw new IOException("An activity and its work session must have the same owner");
+            transaction.commit();importGeneration++;entityManager.clear();entityManager.getEntityManagerFactory().getCache().evictAll();
+            return imported;
+        } catch(RuntimeException | IOException failure) {
+            if(transaction.isActive()) transaction.rollback();throw new IOException(failure.getMessage(),failure);
+        }
+    }
 
 	/**
 	 * <p>

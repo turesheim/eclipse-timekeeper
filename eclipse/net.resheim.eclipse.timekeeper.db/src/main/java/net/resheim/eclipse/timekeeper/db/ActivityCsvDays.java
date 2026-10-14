@@ -18,6 +18,7 @@ import net.resheim.eclipse.timekeeper.domain.ActivityDailySegments;
 final class ActivityCsvDays implements AutoCloseable {
     final Path folder;
     final Map<String,String> originals=new HashMap<>();
+    final Map<String,String> currentActivities=new HashMap<>();
     private record Table(List<String> columns,List<String[]> rows) { }
     private ActivityCsvDays(Path folder) {this.folder=folder;}
     static ActivityCsvDays prepare(Path source,ZoneId zone,Instant now) throws IOException {
@@ -25,11 +26,44 @@ final class ActivityCsvDays implements AutoCloseable {
         try {
             try(var files=Files.list(source)) {
                 var names=Set.of("project_type.csv","project.csv","trackedtask.csv","activity.csv","trackedtask_activity.csv",
-                        "project_task.csv","project_activity.csv","external_task_reference.csv","activitylabel.csv","activity_activitylabel.csv");
+                        "project_task.csv","project_activity.csv","external_task_reference.csv","activitylabel.csv","activity_activitylabel.csv","work_session.csv");
                 for(var file:files.filter(Files::isRegularFile).filter(file->names.contains(file.getFileName().toString())).toList())
                     Files.copy(file,result.folder.resolve(file.getFileName()));
             }
+            var taskFile=source.resolve("trackedtask.csv");
+            if(Files.isRegularFile(taskFile)) {
+                var tasks=read(taskFile);int taskId=column(tasks,"ID"),parent=column(tasks,"PARENT_TASK"),active=column(tasks,"CURRENTACTIVITY_ID");
+                var pending=new LinkedHashMap<String,String[]>();var ordered=new ArrayList<String[]>();var placed=new HashSet<String>();
+                for(var row:tasks.rows()) {
+                    var copy=row.clone();if(copy[active]!=null && !copy[active].isBlank()) {result.currentActivities.put(copy[taskId],copy[active]);copy[active]=null;}
+                    if(pending.put(copy[taskId],copy)!=null) throw new IOException("Duplicate task in export");
+                }
+                while(!pending.isEmpty()) {
+                    int before=pending.size();var iterator=pending.entrySet().iterator();
+                    while(iterator.hasNext()) {var entry=iterator.next();String owner=entry.getValue()[parent];
+                        if(owner==null || owner.isBlank() || placed.contains(owner)) {ordered.add(entry.getValue());placed.add(entry.getKey());iterator.remove();}}
+                    if(pending.size()==before) throw new IOException("Task parents are missing or cyclic");
+                }
+                write(result.folder.resolve("trackedtask.csv"),new Table(tasks.columns(),ordered));
+            }
+            var sessionFile=source.resolve("work_session.csv");
+            if(Files.isRegularFile(sessionFile)) {
+                var sessions=read(sessionFile);int from=column(sessions,"START_TIME"),until=column(sessions,"END_TIME"),state=column(sessions,"STATE");
+                for(var row:sessions.rows()) {
+                    var first=Instant.parse(row[from]);Activity.validateStart(first,now);
+                    var last=Optional.ofNullable(row[until]).filter(value->!value.isBlank()).map(Instant::parse);
+                    if(last.filter(value->value.isBefore(first)).isPresent() || !(last.isEmpty() ? "RUNNING" : "COMPLETED").equals(row[state]))
+                        throw new IOException("Invalid work session interval or state");
+                }
+            }
             var table=read(source.resolve("activity.csv"));
+            if(!Files.isRegularFile(sessionFile)) {
+                for(int index=0;index<table.columns().size();index++) if(table.columns().get(index).equalsIgnoreCase("WORK_SESSION_ID")) {
+                    final int sessionColumn=index;
+                    if(table.rows().stream().anyMatch(row -> row[sessionColumn]!=null && !row[sessionColumn].isBlank()))
+                        throw new IOException("work_session.csv is required for exported session associations");
+                }
+            }
             int id=column(table,"ID"),start=column(table,"START_TIME"),end=column(table,"END_TIME");
             var rows=new ArrayList<String[]>();var archives=new HashMap<String,List<String>>();
             for(var row:table.rows()) {

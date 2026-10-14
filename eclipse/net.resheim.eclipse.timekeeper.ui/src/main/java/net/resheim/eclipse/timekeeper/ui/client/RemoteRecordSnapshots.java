@@ -21,6 +21,7 @@ public final class RemoteRecordSnapshots {
         else if(original instanceof Project project) current=service.project(project.id());
         else if(original instanceof Activity activity) current=service.activity(activity.id());
         else if(original instanceof Label label) current=service.label(label.id());
+        else if(original instanceof net.resheim.eclipse.timekeeper.domain.WorkSession session) current=TimekeeperUiPlugin.getDefault().getWorkSessionService().workSession(session.id());
         else throw new IllegalArgumentException("Unsupported record snapshot");
         if(current.isEmpty()) throw new RemoteFailure(RemoteFailure.Kind.NOT_FOUND,"NOT_FOUND");
         // The serialized operation reads current fields and supplies the ETag

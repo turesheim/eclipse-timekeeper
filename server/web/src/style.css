@@ -38,3 +38,6 @@ td.actions .icon-button{margin-left:.25rem}
 .server-info dl{display:grid;grid-template-columns:auto 1fr;gap:.3rem 1rem;margin:.5rem 0}
 .server-info dd{margin:0;font-variant-numeric:tabular-nums}
 @media(max-width:640px){.tree-toggle,.icon-button{width:2.75rem;height:2.75rem}.activity-icon{width:2.75rem}.icon{font-size:1.2rem}}
+
+.work-session {margin-bottom:1rem;padding:1.25rem}.work-session-heading {display:flex;justify-content:space-between;gap:1rem;align-items:center}.work-session h2 {margin:.2rem 0}.session-actions {display:flex;flex-wrap:wrap;gap:.5rem;margin:.7rem 0}.session-totals {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem}.session-totals dt {font-size:.85rem;color:var(--muted)}.session-totals dd {margin:.25rem 0;font-weight:700;font-size:1.15rem}.work-session select {max-width:100%;width:100%}.outside-session {color:#9c3c24}.session-activities table {width:100%}
+@media(max-width:650px){.work-session-heading {align-items:flex-start;flex-direction:column}.session-totals {grid-template-columns:repeat(2,minmax(0,1fr))}}

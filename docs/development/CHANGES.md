@@ -3,7 +3,7 @@
 ## 2.0.0 (unreleased)
 
 Timekeeper 2.0.0 updates the plug-in for Eclipse 2026-09 (4.41), Mylyn Tasks
-4.12 and Java 21. It establishes H2 2.5.250 schema version 2 as the supported
+4.12 and Java 21. It establishes H2 2.5.250 schema version 3 as the supported
 database baseline.
 
 ### Highlights
@@ -22,7 +22,7 @@ database baseline.
   immutable commands and snapshots, transactional repository ports, stable
   validation failures and in-memory-tested standalone CRUD and time tracking.
 - Added the embedded JPA service adapter and OSGi service registration, with
-  atomic rollback coverage and UI service lookup, plus schema-v2 startup,
+  atomic rollback coverage and UI service lookup, plus versioned startup,
   backup and storage coverage.
 - Added bidirectional synchronization between native Timekeeper projects/tasks
   and the standard Mylyn Task List: categories map to projects, local tasks map
@@ -51,10 +51,19 @@ database baseline.
 - Added Linux/X11, macOS and Windows CI coverage. Installed-IDE acceptance was
   completed on macOS Apple Silicon.
 
+- Added independent work sessions in Eclipse and the web client: start/stop,
+  retrospective editing, taskless activities, association of existing intervals,
+  and exact tracked, covered and unallocated time. Sessions can span midnight;
+  stopping a session leaves activity timers running.
+- Added portable domain-v2 JSON/CSV interchange with work-session associations,
+  plus native CSV session storage and guarded schema-2-to-3 upgrades after a
+  verified private backup.
+
 ### Upgrade notes
 
-Historical databases and Mylyn attribute records are not migrated. Preserve any
-existing database, then select a separate empty location for Timekeeper 2.0.0.
+Known, correctly stamped schema-2 databases are upgraded to schema 3 after a
+verified backup. Historical databases and Mylyn attribute records are not migrated.
+Preserve unsupported storage, then select a separate empty location for Timekeeper 2.0.0.
 CSV export/import is a convenience interchange format, not a database backup or
 rollback mechanism. See the [database policy](../operations/DATABASE-RECOVERY.md) and the
 [installation and rollback instructions](../README.md#upgrade-and-rollback).
@@ -62,13 +71,13 @@ rollback mechanism. See the [database policy](../operations/DATABASE-RECOVERY.md
 ### Known limitations
 
 - Mylyn 4.12 logs a theme color parsing error when a Task List tooltip is
-  created on Eclipse 4.41. This upstream dependency error remains a release
-  blocker even though the Workweek view continues to function.
+  created on Eclipse 4.41. The maintainer deferred #243 beyond 2.0; the upstream
+  parser error remains an accepted exception, and no experimental fix is bundled.
 - Native idle detection requires X11/XScreenSaver on Linux and is unavailable
   in a pure Wayland session.
-- Concurrent clients do not receive live cross-process cache invalidation, and
-  an active activity has no client owner or lease. Restart reloads committed
-  records; simultaneous edits to the same task are unsupported.
+- Server-backed clients receive owner-scoped change notifications and reject
+  stale writes. Embedded clients serialize database writes and validate record
+  versions, but do not provide the server's cross-process change notifications.
 - Externally managed remote H2 servers, authentication, encryption and network
   failure behavior have not received installed-runtime acceptance.
 

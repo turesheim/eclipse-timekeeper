@@ -284,6 +284,7 @@ public class WorkWeekView extends ViewPart {
 		main.setBackgroundMode(SWT.INHERIT_FORCE);
 		GridLayout layout2 = GridLayoutFactory.fillDefaults().numColumns(3).equalWidth(false).create();
 		main.setLayout(layout2);
+        new WorkSessionPanel(main);
 
 		// text before the date chooser
 		dateTimeLabel = new Label(main, SWT.NONE);
@@ -564,7 +565,7 @@ public class WorkWeekView extends ViewPart {
 	private boolean isTaskActive(Task task) {
 		var plugin = TimekeeperUiPlugin.getDefault();
 		return plugin.getTimekeeperService().activeActivity(OwnerId.LOCAL)
-				.filter(activity -> activity.taskId().equals(task.id())).isPresent()
+				.filter(activity -> task.id().equals(activity.taskId())).isPresent()
 				|| plugin.getTaskIntegration().filter(integration -> integration.isActive(task)).isPresent();
 	}
 
@@ -580,7 +581,7 @@ public class WorkWeekView extends ViewPart {
 		// Provider activation can outlive an interval stopped directly in Workweek.
 		plugin.getTaskIntegration().ifPresent(integration -> integration.deactivateActiveTask());
 		var active = service.activeActivity(OwnerId.LOCAL);
-		if (active.filter(activity -> activity.taskId().equals(current.id())).isPresent()) return;
+		if (active.filter(activity -> current.id().equals(activity.taskId())).isPresent()) return;
 		        if(plugin.isRemote()) {
             plugin.activateRemoteTask(current.id(),active);
         } else {
@@ -599,7 +600,7 @@ public class WorkWeekView extends ViewPart {
 			activeIntegration.orElseThrow().deactivate(task.id());
 			return;
 		}
-        plugin.getTimekeeperService().activeActivity(OwnerId.LOCAL).filter(activity -> activity.taskId().equals(task.id()))
+        plugin.getTimekeeperService().activeActivity(OwnerId.LOCAL).filter(activity -> task.id().equals(activity.taskId()))
                 .ifPresent(activity -> perform(()->plugin.getTimekeeperService().stopActivity(new StopActivity(activity.id(),activity.version()))));
 	}
 

@@ -44,6 +44,19 @@ class JpaDailyActivitiesTest {
         for(var part:report.activities()) {assertTrue(part.manual());assertEquals(Set.of(label.id()),part.labelIds());assertEquals("Exact manual",part.summary());}
         assertEquals(3L,manager.createNativeQuery("SELECT COUNT(*) FROM ACTIVITY").getSingleResult());
     }
+    @Test void tasklessLocalActivitiesAndDirectProjectsKeepDailyTimeWithoutCreatingTasks() throws Exception {
+        var api=service();var project=api.createProject(new CreateProject("Direct local project"));
+        var start=Instant.parse("2025-10-25T21:59:59.123456789Z");var end=Instant.parse("2025-10-27T22:00:00.987654321Z");
+        api.createActivity(new CreateActivity(null,OwnerId.LOCAL,start,Optional.of(end),"Taskless local",Set.of(),Optional.empty(),Optional.of(project.id())));
+        var report=api.activities(query(start.minusSeconds(1),end.plusSeconds(1)));assertEquals(3,report.activities().size());
+        assertEquals(Duration.between(start,end),report.total());assertTrue(api.tasks().isEmpty());
+        for(var part:report.activities()) {assertTrue(part.task().isEmpty());assertEquals(Optional.of(project.id()),part.projectId());}
+        assertEquals(3L,manager.createNativeQuery("SELECT COUNT(*) FROM PROJECT_ACTIVITY").getSingleResult());
+        assertThrows(ServiceException.class,()->api.deleteProject(new DeleteProject(project.id(),project.version())));
+        for(var part:report.activities()) api.deleteActivity(new DeleteActivity(part.id(),part.version()));
+        assertEquals(0L,manager.createNativeQuery("SELECT COUNT(*) FROM PROJECT_ACTIVITY").getSingleResult());
+        api.deleteProject(new DeleteProject(project.id(),api.project(project.id()).orElseThrow().version()));
+    }
     @Test void jpaMidnightRolloverKeepsActiveIdentityAndFailedArchivesRollbackEvents() throws Exception {
         var api=service();now.set(Instant.parse("2025-10-25T21:59:59.123456789Z"));
         var task=api.createTask(new CreateTask(Optional.empty(),"Daily JPA tracking",Optional.empty()));

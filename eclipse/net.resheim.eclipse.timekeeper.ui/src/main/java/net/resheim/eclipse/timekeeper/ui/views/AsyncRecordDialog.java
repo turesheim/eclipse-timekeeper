@@ -17,12 +17,13 @@ abstract class AsyncRecordDialog extends TitleAreaDialog {
     protected AsyncRecordDialog(Shell shell,net.resheim.eclipse.timekeeper.service.TimekeeperService service,Object original) {
         super(shell);this.service=service;this.original=original;
     }
+    protected void verifyOriginal() {RecordDialogErrors.verifyRemoteSnapshot(service,original);}
     protected <T> void save(String title,Supplier<T> operation,Consumer<T> saved) {
         if(pending!=null || uncertainCreate) return;
         getDialogArea().setEnabled(false);
         getButton(IDialogConstants.OK_ID).setEnabled(false);setErrorMessage(null);
         pending=TimekeeperUiPlugin.getDefault().runOperation(title,()->{
-            RecordDialogErrors.verifyRemoteSnapshot(service,original);return operation.get();
+            verifyOriginal();return operation.get();
         },value->{
             pending=null;if(getShell()==null || getShell().isDisposed()) return;
             saved.accept(value);AsyncRecordDialog.super.okPressed();

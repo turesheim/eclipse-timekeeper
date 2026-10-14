@@ -609,7 +609,7 @@ public class IntegrationTest {
 			Assert.assertEquals("\"ID\",\"TASK_SUMMARY\",\"TASK_URL\",\"TICK\",\"VERSION\",\"PARENT_TASK\",\"TASK_PROJECT\",\"CURRENTACTIVITY_ID\"",
 					Files.readAllLines(path.resolve("trackedtask.csv")).get(0));
 			Assert.assertEquals(
-					"\"ID\",\"END_TIME\",\"ADJUSTED\",\"OWNER_ID\",\"START_TIME\",\"SUMMARY\",\"ACTIVITY_PROJECT\",\"TASK_ID\"",
+					"\"ID\",\"END_TIME\",\"ADJUSTED\",\"OWNER_ID\",\"START_TIME\",\"SUMMARY\",\"ACTIVITY_PROJECT\",\"TASK_ID\",\"WORK_SESSION_ID\"",
 					Files.readAllLines(path.resolve("activity.csv")).get(0));
 			Assert.assertEquals("\"TASK_ID\",\"ACTIVITIES_ID\"",
 					Files.readAllLines(path.resolve("trackedtask_activity.csv")).get(0));
@@ -619,6 +619,8 @@ public class IntegrationTest {
 					Files.readAllLines(path.resolve("project_activity.csv")).get(0));
 			Assert.assertEquals("\"ID\",\"EXTERNAL_ID\",\"EXTERNAL_URL\",\"PROVIDER_ID\",\"REPOSITORY_ID\",\"TASK_ID\"",
 					Files.readAllLines(path.resolve("external_task_reference.csv")).get(0));
+            Assert.assertEquals(java.util.Set.of("ID","VERSION","OWNER_ID","START_TIME","END_TIME","SUMMARY","STATE"),
+                    java.util.Set.of(Files.readAllLines(path.resolve("work_session.csv")).getFirst().replace("\"","").split(",")));
 			int imported = TimekeeperPlugin.getDefault().importFrom(path);
 			Assert.assertTrue("Current-schema CSV round trip imported no rows", imported > 0);
 		} catch (IOException e) {
