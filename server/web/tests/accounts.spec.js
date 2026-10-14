@@ -62,3 +62,17 @@ test('another tab changing the cookie clears the old account and rejects a late 
     await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));await expect(page.locator('#owner')).toHaveText('Other tab user');await expect(page.locator('#status')).toHaveText('Up to date');
   } finally {release();await peer.close();}
 });
+test('API token expiry uses the account time zone even when the browser uses another zone',async({browser,request})=>{
+  const profile=await call(request,'GET','/me'),original=await profile.json();
+  const year=new Date().getUTCFullYear()+1,wall=`${year}-01-15T12:34`,name='Zone token '+randomUUID().slice(0,8);
+  const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,timezoneId:'America/Los_Angeles',locale:'en-GB'}),page=await context.newPage();
+  try {
+    expect((await call(request,'PUT','/me',{zoneId:'Europe/Oslo'},{'If-Match':profile.headers().etag})).status()).toBe(200);
+    await login(page);await page.getByRole('button',{name:'Account',exact:true}).click();
+    await expect(page.locator('#account-content')).toContainText('Expiry times use Europe/Oslo');
+    await page.getByLabel('Token name',{exact:true}).fill(name);await page.getByLabel('Token expiry (local time, optional)',{exact:true}).fill(wall);await page.getByRole('button',{name:'Create token',exact:true}).click();await expect(page.getByLabel('New API token',{exact:true})).toBeVisible();
+    const list=await (await call(request,'GET','/auth/tokens')).json(),token=list.items.find(value=>value.name===name);expect(token.expiresAt).toBe(`${year}-01-15T11:34:00Z`);
+    await expect(page.locator('#account-content p').filter({hasText:name})).toContainText('12:34');
+    expect((await call(request,'DELETE','/auth/tokens/'+token.id)).status()).toBe(204);
+  } finally {const current=await call(request,'GET','/me');await call(request,'PUT','/me',{zoneId:original.zoneId},{'If-Match':current.headers().etag});await context.close();}
+});

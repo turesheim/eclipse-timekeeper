@@ -1,4 +1,5 @@
 import {ownerHeader} from './api.js';
+import {instantText, localDateTimeToInstant} from './model.js';
 const $ = id => document.getElementById(id);
 let generation = 0;
 const node = (tag,text) => {const value=document.createElement(tag);if(text!==undefined) value.textContent=text;return value;};
@@ -20,7 +21,8 @@ export async function openAccount(session,signOut,updateAccount) {
     return {value,finish:()=>value.append(button)};
   }
   await run(async()=>{
-    const loaded=await session.request('/auth/account');if(!valid()) return;
+    const [loaded,profile]=await Promise.all([session.request('/auth/account'),session.request('/me')]);if(!valid()) return;
+    const zone=profile.data.zoneId;
     const account=loaded.data;
     root.append(node('p',`Signed in as ${account.displayName}. Your records are private to this account.`));
     if(account.state==='UNCLAIMED') root.append(node('p','Ask the server operator for an account recovery code to add a username and password to this existing account.'));
@@ -34,16 +36,17 @@ export async function openAccount(session,signOut,updateAccount) {
     async function tokens() {
       const {data}=await session.request('/auth/tokens');if(!valid()) return;list.replaceChildren();
       for(const token of data.items) {
-        const row=node('p',`${token.name} · ${token.permissions.join(', ')} · ${token.revoked ? 'Revoked' : token.expiresAt ? 'Expires '+new Date(token.expiresAt).toLocaleString() : 'No expiry'}`);
+        const row=node('p',`${token.name} · ${token.permissions.join(', ')} · ${token.revoked ? 'Revoked' : token.expiresAt ? 'Expires '+instantText(token.expiresAt,zone) : 'No expiry'}`);
         if(!token.revoked) {const revoke=node('button','Revoke');revoke.type='button';revoke.addEventListener('click',()=>void run(async()=>{await session.request(`/auth/tokens/${token.id}`,{method:'DELETE'});await tokens();}));row.append(' ',revoke);}list.append(row);
       }
     }
     await tokens();if(!valid()) return;
     const tokenForm=form('Create API token','Create token',async()=>{
-      const expiresAt=expiry.value ? new Date(expiry.value).toISOString() : null;
+      const expiresAt=expiry.value ? localDateTimeToInstant(expiry.value,zone) : null;
       const {data}=await session.request('/auth/tokens',{method:'POST',body:{name:name.value,permissions:write.checked ? ['read','write']:['read'],expiresAt}});if(!valid()) return;
       secret.replaceChildren(node('p','Copy this token now. It will not be shown again.'));const value=node('input');value.readOnly=true;value.value=data.token;value.setAttribute('aria-label','New API token');secret.append(value);name.value='';await tokens();
     });
+    tokenForm.value.append(node('p',`Expiry times use ${zone}.`));
     const name=field(tokenForm.value,'Token name'),expiry=field(tokenForm.value,'Token expiry (local time, optional)','','datetime-local'),write=field(tokenForm.value,'Allow changes',true,'checkbox');expiry.required=false;tokenForm.finish();const secret=node('div');root.append(secret);
     if(account.administrator) {
       const heading=node('h3','User accounts');root.append(heading,node('p','Administrators manage account access. They cannot read another account’s work records.'));
