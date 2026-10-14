@@ -28,6 +28,14 @@ describes private HTTPS access for local Docker and Synology deployments. The se
 records; selecting a backend does not copy or merge databases. Mylyn activation
 uses the selected backend after restart.
 
+GitHub tasks activated from the Task List use their Mylyn category as the
+Timekeeper project, or their query name when there is no category. Queries can
+therefore represent separate projects within the same repository. For a task in
+several queries, new imports use the first query by name, then by query handle;
+an existing explicit project assignment is retained. Activating a GitHub task
+previously imported under **Uncategorized** or **Unmatched** repairs its grouping
+while retaining its task ID, external reference and recorded activities.
+
 Eclipse and the web client share projects, tasks, activities, labels and work sessions when
 their tokens belong to the same server account. Different accounts have separate
 records, even on the same server. Open label preferences and activity editors

@@ -110,8 +110,17 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 							.linkExternalReference(new LinkExternalReference(task.id(), task.version(), reference));
 				}
 				var url = Optional.ofNullable(external.getUrl()).filter(value -> !value.isBlank());
-				if (!task.summary().equals(external.getSummary()) || !task.url().equals(url)) {
-					task = service.updateTask(new UpdateTask(task.id(), task.version(), task.projectId(),
+				var projectId = task.projectId();
+				// Recover provider tasks previously imported without their query grouping.
+				// Keep explicit project assignments and the original task/history identity.
+				if (MylynMetadata.KIND_GITHUB.equals(external.getConnectorKind())
+						&& projectId.flatMap(service::project).map(project -> Set.of("Uncategorized", "Unmatched").contains(project.name())).orElse(true)) {
+					String name = MylynMetadata.getMylynProjectName(external);
+					if (!name.equals("Uncategorized"))
+						projectId = Optional.of(project(service, name).id());
+				}
+				if (!task.summary().equals(external.getSummary()) || !task.url().equals(url) || !task.projectId().equals(projectId)) {
+					task = service.updateTask(new UpdateTask(task.id(), task.version(), projectId,
 							task.parentTaskId(), external.getSummary(), url));
 				}
 			}
@@ -122,8 +131,7 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
                 && !"true".equals(external.getAttribute(MylynBackendScope.ATTR_PROVIDER_SOURCE)))
             throw new IllegalStateException("This legacy Task List projection has no link to the selected backend. Switch back to its original local database.");
 		String name = MylynMetadata.getMylynProjectName(external);
-		Project project = service.projects().stream().filter(value -> value.name().equals(name)).findFirst()
-				.orElseGet(() -> service.createProject(new CreateProject(name)));
+		Project project = project(service, name);
 		Task created;
 		try {
 			created = service.createTask(new CreateTask(Optional.of(project.id()), Optional.empty(),
@@ -136,6 +144,11 @@ public final class MylynIntegration extends AbstractUIPlugin implements IStartup
 		}
 		scope.remember(external,created.id(),false);
 		return created;
+	}
+
+	private Project project(TimekeeperService service, String name) {
+		return service.projects().stream().filter(value -> value.name().equals(name)).findFirst()
+				.orElseGet(() -> service.createProject(new CreateProject(name)));
 	}
 
 	public void activated(ITask external) {
