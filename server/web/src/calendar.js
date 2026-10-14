@@ -1,5 +1,5 @@
 import {addDays,dateInZone,instantNanos,instantText,nanosInstant,localDateTime} from './model.js';
-import {calendarWeek,calendarPieces,calendarAnchor,calendarLanes,calendarTaskBlocks,shiftSession,shiftSessionDays,pasteSession,CALENDAR_STEP} from './calendar-model.js';
+import {calendarWeek,calendarPieces,calendarAnchor,calendarLanes,calendarTaskBlocks,shiftSession,shiftSessionDays,pasteSession,clientColors,CALENDAR_STEP} from './calendar-model.js';
 import {iconButton} from './icons.js';
 
 const ROW_HEIGHT=16;
@@ -144,10 +144,12 @@ export class WeekCalendar {
   sessionNode(piece,preview=false) {
     const session=piece.session,bar=node('div',undefined,`calendar-event calendar-session${preview ? ' preview' : ''}`);
     bar.dataset.sessionId=session.id;bar.dataset.date=piece.date;bar.dataset.version=String(session.version);this.bounds(bar,piece,'session');
-    const description=`${session.summary || 'Work session'} · ${instantText(session.start,this.calendar.zone)} → ${instantText(session.end,this.calendar.zone)}`;
+    const client=this.data.clients.find(client=>client.id===session.clientId),colors=clientColors(client?.color);
+    bar.style.backgroundColor=colors.background;bar.style.color=colors.foreground;bar.style.borderColor=colors.foreground;
+    const description=`${client?.name || 'Client'} · ${session.title || 'Work session'}${session.summary ? ' · '+session.summary : ''} · ${instantText(session.start,this.calendar.zone)} → ${instantText(session.end,this.calendar.zone)}`;
     bar.title=description;bar.setAttribute('aria-label',description);bar.setAttribute('role','button');bar.tabIndex=preview ? -1 : 0;
     bar.setAttribute('aria-pressed',String(this.selectedId===session.id));
-    bar.append(node('span',session.summary || 'Work session','calendar-session-title'));
+    bar.append(node('span',session.title || 'Work session','calendar-session-title'));
     if(!preview) {
       bar.addEventListener('focus',()=>this.selectSession(session,piece.date,Math.floor(piece.top)));
       bar.addEventListener('click',()=>this.selectSession(session,piece.date,Math.floor(piece.top)));
@@ -158,7 +160,7 @@ export class WeekCalendar {
         const endpoint=edge==='start' ? instantNanos(session.start) : instantNanos(session.end || this.data.report.generatedAt);
         if(edge==='start' ? endpoint!==piece.start : endpoint!==piece.end) continue;
         const handle=button('',()=>{},`calendar-resize ${edge}`);handle.dataset.edge=edge;handle.dataset.sessionId=session.id;handle.dataset.date=piece.date;
-        handle.setAttribute('aria-label',`Resize ${edge} of ${session.summary || 'work session'}`);handle.title=`Resize ${edge}; arrow keys adjust 15 minutes`;
+        handle.setAttribute('aria-label',`Resize ${edge} of ${session.title || 'work session'}`);handle.title=`Resize ${edge}; arrow keys adjust 15 minutes`;
         bar.append(handle);
       }
     }return bar;
@@ -196,7 +198,7 @@ export class WeekCalendar {
     if(!this.selection) return;
     const cursor=node('div',undefined,'calendar-cursor');cursor.style.top=`${this.selection.row*ROW_HEIGHT}px`;this.dayNodes.get(this.selection.date)?.append(cursor);
     const selected=this.selected(),zone=this.data.profile.data.zoneId;
-    this.root.querySelector('#calendar-selection').textContent=selected ? `${selected.summary || 'Work session'} · ${instantText(selected.start,zone)} → ${instantText(selected.end,zone)}` : `${this.selection.date} · ${this.calendar.rows[this.selection.row]?.split('/')[0]} · ${zone}`;
+    this.root.querySelector('#calendar-selection').textContent=selected ? `${selected.title || 'Work session'} · ${instantText(selected.start,zone)} → ${instantText(selected.end,zone)}` : `${this.selection.date} · ${this.calendar.rows[this.selection.row]?.split('/')[0]} · ${zone}`;
   }
   copy() {
     const value=this.selected();if(!value || !this.connected || this.busy) return;
@@ -209,7 +211,7 @@ export class WeekCalendar {
   }
   create() {
     if(!this.connected || this.busy || !this.selection) return;
-    try {const start=calendarAnchor(this.calendar,this.selection.date,this.selection.row);this.callbacks.onNew({summary:'',start:nanosInstant(start),end:nanosInstant(start+3600000000000n)});}
+    try {const start=calendarAnchor(this.calendar,this.selection.date,this.selection.row);this.callbacks.onNew({title:'',clientId:this.selected()?.clientId,summary:'',start:nanosInstant(start),end:nanosInstant(start+3600000000000n)});}
     catch(error) {this.text(error.message);}
   }
   edit() {const value=this.selected();if(value && this.connected && !this.busy) this.callbacks.onEditSession(value.id);}

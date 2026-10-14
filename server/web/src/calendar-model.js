@@ -71,7 +71,7 @@ export function shiftSession(session, delta, mode='move', asOf=null) {
   else if(mode==='end') end=(end ?? instantNanos(asOf))+delta;
   else throw new Error('Unknown calendar operation.');
   if(end!==null && end<start) throw new Error('End must not be before start.');
-  return {summary:session.summary,start:nanosInstant(start),end:end===null ? null : nanosInstant(end)};
+  return {clientId:session.clientId,title:session.title,summary:session.summary,start:nanosInstant(start),end:end===null ? null : nanosInstant(end)};
 }
 
 export function pasteSession(session, target, zone) {
@@ -80,7 +80,7 @@ export function pasteSession(session, target, zone) {
   const clock=localDateTime(session.start,zone).slice(11),parts=/^\d{2}:(\d{2}):(\d{2})/.exec(clock);
   const fraction=((start%1000000000n)+1000000000n)%1000000000n;
   const remainder=BigInt((Number(parts[1])%15)*60+Number(parts[2]))*1000000000n+fraction;
-  return {summary:session.summary,start:nanosInstant(target+remainder),end:end===null ? null : nanosInstant(target+remainder+end-start)};
+  return {clientId:session.clientId,title:session.title,summary:session.summary,start:nanosInstant(target+remainder),end:end===null ? null : nanosInstant(target+remainder+end-start)};
 }
 
 export function shiftSessionDays(session, days, zone) {
@@ -91,7 +91,7 @@ export function shiftSessionDays(session, days, zone) {
 }
 
 export function sameSession(a,b) {
-  return ['id','version','ownerId','start','end','summary','state'].every(key=>(a[key] ?? null)===(b[key] ?? null));
+  return ['id','version','ownerId','start','end','summary','state','clientId','title'].every(key=>(a[key] ?? null)===(b[key] ?? null));
 }
 
 /** Group touching intervals for the same task; gaps remain visibly unallocated. */
@@ -124,4 +124,12 @@ export function calendarLanes(pieces, minimum=0) {
     ends[lane]=piece.bottom;piece.lane=lane;component.push(piece);
   }
   finish();return sorted;
+}
+
+/** Validated client colors also work for very light and very dark choices. */
+export function clientColors(color) {
+  const background=/^#[0-9a-f]{6}$/i.test(color) ? color : '#2563eb';
+  const linear=background.slice(1).match(/../g).map(value=>{const s=parseInt(value,16)/255;return s<=.04045 ? s/12.92 : ((s+.055)/1.055)**2.4;});
+  const luminance=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];
+  return {background,foreground:luminance>.179 ? '#000000' : '#ffffff'};
 }

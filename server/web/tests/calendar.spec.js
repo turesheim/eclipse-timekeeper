@@ -10,7 +10,7 @@ async function api(request,method,path,data,headers={}) {
 async function read(request,collection,id) {return (await api(request,'GET',`/${collection}/${id}`)).json();}
 async function put(request,collection,value,changes) {
   const response=await api(request,'GET',`/${collection}/${value.id}`);
-  return (await api(request,'PUT',`/${collection}/${value.id}`,{summary:value.summary,start:value.start,end:value.end,...changes},{'If-Match':response.headers().etag})).json();
+  return (await api(request,'PUT',`/${collection}/${value.id}`,{clientId:value.clientId,title:value.title,summary:value.summary,start:value.start,end:value.end,...changes},{'If-Match':response.headers().etag})).json();
 }
 async function save(page) {await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');}
 async function calendar(page,credential=token,date='2025-10-20') {
@@ -23,22 +23,23 @@ function bar(page,id,date=null) {return page.locator(`.calendar-session:not(.pre
 async function fixture(request) {
   const prefix='Calendar '+randomUUID().slice(0,6),profileResponse=await api(request,'GET','/me'),profile=await profileResponse.json();
   await api(request,'PUT','/me',{zoneId:'Europe/Oslo'},{'If-Match':profileResponse.headers().etag});
-  const project=await (await api(request,'POST','/projects',{name:prefix+' project'})).json();
+  const client=await (await api(request,'POST','/clients',{name:prefix+' client',color:'#ffdd88'})).json();
+  const project=await (await api(request,'POST','/projects',{name:prefix+' project',clientId:client.id})).json();
   const issue=String(100+parseInt(randomUUID().slice(0,4),16));
   const url=`https://github.com/example/calendar/issues/${issue}`;
   const task=await (await api(request,'POST','/tasks',{summary:prefix+' task',projectId:project.id,parentTaskId:null,url,externalReferences:[{providerId:'github',repositoryId:'https://github.com/example/calendar',externalId:issue,externalUrl:url}]})).json();
   const empty=await (await api(request,'POST','/tasks',{summary:prefix+' unrecorded',projectId:project.id,parentTaskId:null,url:null})).json();
-  const session=await (await api(request,'POST','/work-sessions',{summary:prefix+' session',start:'2025-10-20T06:03:00.123456789Z',end:'2025-10-20T14:03:00.987654321Z'})).json();
+  const session=await (await api(request,'POST','/work-sessions',{clientId:client.id,title:prefix+' planning',summary:prefix+' session',start:'2025-10-20T06:03:00.123456789Z',end:'2025-10-20T14:03:00.987654321Z'})).json();
   const activities=[];
   for(const [start,end,summary] of [['2025-10-20T06:10:00.123456789Z','2025-10-20T07:00:00Z','first interval'],['2025-10-20T07:00:00Z','2025-10-20T08:00:00.987654321Z','second interval']])
     activities.push(await (await api(request,'POST','/activities',{taskId:task.id,summary:prefix+' '+summary,start,end,labelIds:[],workSessionId:session.id})).json());
-  return {prefix,profile,project,task,empty,session,activities,url,issue,
+  return {prefix,profile,client,project,task,empty,session,activities,url,issue,
     async close() {
       const active=await api(request,'GET','/activities/active');
       if(active.status()!==204) {const value=await active.json();if(value.summary.startsWith(prefix)) await api(request,'POST',`/activities/${value.id}/stop`,undefined,{'If-Match':active.headers().etag,'Idempotency-Key':randomUUID()});}
       const all=(await (await api(request,'GET','/activities?from=1900-01-01T00:00:00Z&to=2200-01-01T00:00:00Z&limit=500')).json()).items;
       const sessions=(await (await api(request,'GET','/work-sessions?limit=500')).json()).items.filter(value=>value.summary.startsWith(prefix));
-      for(const [collection,values] of [['activities',all.filter(value=>value.summary.startsWith(prefix))],['work-sessions',sessions],['tasks',[empty,task]],['projects',[project]]])
+      for(const [collection,values] of [['activities',all.filter(value=>value.summary.startsWith(prefix))],['work-sessions',sessions],['tasks',[empty,task]],['projects',[project]],['clients',[client]]])
         for(const value of values) {const current=await api(request,'GET',`/${collection}/${value.id}`);await api(request,'DELETE',`/${collection}/${value.id}`,undefined,{'If-Match':current.headers().etag});}
       const current=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:profile.zoneId},{'If-Match':current.headers().etag});
     },
@@ -69,10 +70,13 @@ async function unchangedActivities(request,f) {for(const value of f.activities) 
 test('calendar shows seven days, task links and activity lists beside multi-day work sessions',async({page,request})=>{
   const f=await fixture(request);
   try {
-    const long=await (await api(request,'POST','/work-sessions',{summary:f.prefix+' overnight',start:'2025-10-25T21:30:00.123456789Z',end:'2025-10-27T00:30:00.987654321Z'})).json();
+    const long=await (await api(request,'POST','/work-sessions',{clientId:f.client.id,title:'Overnight work',summary:f.prefix+' overnight',start:'2025-10-25T21:30:00.123456789Z',end:'2025-10-27T00:30:00.987654321Z'})).json();
     await calendar(page);
     await expect(page.locator('[data-tab=calendar]')).toHaveAttribute('aria-current','page');
     await expect(bar(page,f.session.id)).toBeAttached();
+    await expect(bar(page,f.session.id)).toHaveCSS('background-color','rgb(255, 221, 136)');
+    await expect(bar(page,f.session.id)).toHaveCSS('color','rgb(0, 0, 0)');
+    await expect(bar(page,f.session.id).locator('.calendar-session-title')).toHaveText(f.session.title);
     await expect(page.locator('.calendar-task').getByRole('link',{name:`#${f.issue}: ${f.task.summary}`,exact:true})).toHaveAttribute('href',f.url);
     for(const activity of f.activities) await expect(page.locator('.calendar-task').getByRole('button',{name:`Edit activity ${activity.summary}`,exact:true})).toBeAttached();
     await expect(page.locator(`.calendar-session[data-session-id="${long.id}"]`)).toHaveCount(2);
@@ -139,7 +143,7 @@ test('calendar lost paste replies cannot create duplicates and future pastes rem
 test('calendar copying a running session leaves it running and lets the copy receive an end',async({page,request})=>{
   const f=await fixture(request);let running;
   try {
-    running=await (await api(request,'POST','/work-sessions/start',{summary:f.prefix+' running session'},{'Idempotency-Key':randomUUID()})).json();
+    running=await (await api(request,'POST','/work-sessions/start',{clientId:f.client.id,title:'Running work',summary:f.prefix+' running session'},{'Idempotency-Key':randomUUID()})).json();
     const today=dateInZone(running.start,'Europe/Oslo');await calendar(page,token,today);
     await expect(bar(page,running.id)).toBeAttached();await bar(page,running.id).focus();await bar(page,running.id).press('ControlOrMeta+c');
     await page.getByRole('button',{name:`Select ${today}`,exact:true}).click();await page.locator('#calendar-paste').click();
@@ -178,7 +182,7 @@ test('calendar copy and paste create only a new session and clear the clipboard 
     await expect(page.locator('#editor-title')).toHaveText('Paste work session');
     await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-21T08:03:00.123456789');await save(page);
     let sessions=(await (await api(request,'GET','/work-sessions')).json()).items.filter(value=>value.summary===f.session.summary);expect(sessions).toHaveLength(2);
-    const copy=sessions.find(value=>value.id!==f.session.id);expect(copy.start).toBe('2025-10-21T06:03:00.123456789Z');expect(copy.end).toBe('2025-10-21T14:03:00.987654321Z');
+    const copy=sessions.find(value=>value.id!==f.session.id);expect(copy.clientId).toBe(f.client.id);expect(copy.title).toBe(f.session.title);expect(copy.start).toBe('2025-10-21T06:03:00.123456789Z');expect(copy.end).toBe('2025-10-21T14:03:00.987654321Z');
     expect((await (await api(request,'GET',`/work-sessions/${copy.id}/report`)).json()).activities).toEqual([]);
     await page.locator('#calendar-copy').click();await page.getByRole('button',{name:'Select 2025-10-22',exact:true}).click();await page.locator('#calendar-paste').click();await save(page);
     sessions=(await (await api(request,'GET','/work-sessions')).json()).items.filter(value=>value.summary===f.session.summary);expect(sessions).toHaveLength(3);

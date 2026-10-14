@@ -122,7 +122,8 @@ chosen week and the account's time zone. Use the arrows, **Today**, or the date
 field to navigate. On smaller screens, scroll inside the calendar to see the
 remaining days and hours.
 
-Blue strips represent work sessions. Select a strip to see its full interval;
+Strips represent work sessions, using the associated client’s color and the
+session title. Select a strip to see its full interval;
 double-click it or use **Edit selected work session** to edit. Drag the strip
 to move it between times or days, and drag its top or bottom handle to resize.
 With a strip focused, Up/Down moves it by 15 minutes and Left/Right by one local
@@ -133,7 +134,7 @@ identity while appearing in each affected day.
 Use **Copy work session** and **Paste work session**, or Ctrl/Cmd+C and Ctrl/Cmd+V,
 to create a separate session. Select a day heading to retain the copied start
 clock time, or select a calendar slot to choose a new time. The paste editor
-lets you review the interval before saving. Only the interval and summary are
+lets you review the interval before saving. The client, title, interval and summary are
 copied; activities and task references are not. The copy buffer is private to
 the signed-in browser session and is cleared on sign-out. A running source keeps
 its blank end in the copy; finish the copy's interval if another session is
@@ -151,3 +152,28 @@ day. A drag retains the original session snapshot and saves with its opaque
 version precondition. Peer edits, rejected changes and unknown save outcomes
 preserve the proposed interval for review instead of silently overwriting data
 or repeating an ordinary write.
+
+## Clients, projects and work sessions
+
+Use **Clients** to create, rename, recolor or delete a client. A client has a
+required name and hex color. Each project belongs to exactly one client; choose
+it in the project editor. A client may have many projects. Each work session also
+belongs to exactly one client and has a required title plus an optional summary.
+Choose these when starting or recording a session. The calendar uses the title
+and client color; light colors receive dark text and dark colors receive light
+text. Changing a client’s color updates all its sessions without editing them.
+
+Create a client before creating your first project or work session. Clients in
+use by projects or sessions cannot be deleted; reassign or remove those records
+first. A project’s client and a session’s client can be changed independently.
+Existing activities and their times are retained when these associations change.
+
+On server upgrade, existing projects and sessions are assigned to **General**.
+Existing session summaries remain descriptions and also supply the initial title
+(or **Work session** when empty). General can be renamed and recolored like any
+other client. Import/export v3 preserves clients, project ownership, session
+titles and colors. Older v1/v2 imports receive General automatically.
+
+Client management and session titles are server/web features. Eclipse project
+creation receives General on the server, and Eclipse project edits preserve its
+client. No client selection or title fields are added to Eclipse.

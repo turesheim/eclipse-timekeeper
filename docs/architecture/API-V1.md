@@ -135,10 +135,12 @@ existing records at additional boundaries; it never joins independently edited
 records. Day maintenance and all parts of a write commit atomically under the
 same per-owner lock, including across server replicas.
 
-Portable interchange exports `timekeeper-domain-v2` JSON, including work sessions
-and optional task, direct-project and session associations. Import also accepts
-older `timekeeper-domain-v1` snapshots without these features. Neither format
-contains SQL/JPA table names. CSV v2 includes `workSessions.csv`; every declared
+Portable interchange exports `timekeeper-domain-v3` JSON, including clients, mandatory
+project/session client links, session titles and optional task, direct-project
+and session associations. Import also accepts older `timekeeper-domain-v1` and
+`timekeeper-domain-v2` snapshots, assigning their projects/sessions to General.
+The formats contain no SQL/JPA table names. CSV v3 adds `clients.csv` and client/title
+columns; v2 includes `workSessions.csv`. Every declared
 file must be present. Older CSV clients reject the new format instead of silently
 discarding session associations.
 Export reads a consistent owned snapshot. Import validates the entire graph,
@@ -313,3 +315,30 @@ do not prove server enforcement. #218 must run this suite against the real
 Quarkus server/database and separately verify restart/durable receipts, concurrent
 requests, schema guards and operational configuration. #220/#221/#219 add actual
 client behavior, unsaved-edit and reconnect acceptance before the parent closes.
+
+## Clients in the server and web client
+
+`/clients` provides owned, paginated CRUD for a name and required `#RRGGBB` color,
+using the same authorization, opaque ETags and change feed as projects. A project
+has exactly one `clientId`, and a client can own many projects. Work sessions
+have exactly one `clientId` and a nonblank `title`, separate from `summary`.
+`/projects` and `/work-sessions` accept a `clientId` list filter. A referenced
+client must belong to the authenticated owner. Deleting a referenced client is
+409, with the whole transaction rolled back.
+
+Client associations and titles are server metadata stored in the canonical
+resource payload and owned foreign-key relations. The common interval/project
+models and Eclipse persistence/UI do not need client fields. Web writes supply
+clientId and title. Legacy API writes omitting these fields create records under
+General (title from summary or Work session) and preserve existing values on
+update; explicit null clients or blank titles are rejected. A server stop retains
+both fields. Each mutation commits metadata and its domain changes under one
+owner lock, version and change event, and responses/ETags cover the complete
+stored representation.
+
+Startup backfills existing records for all stored owners, including owners no
+longer in the token file. The backfill creates one owned General client, preserves
+record IDs and exact intervals, increments changed resource versions and emits
+change events. Repeated startup is idempotent. The generic SQL table schema is
+unchanged. Back up the server data before upgrading, and upgrade all replicas
+together to avoid older binaries dropping the new metadata.

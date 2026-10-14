@@ -62,6 +62,6 @@ public class ContractInputs {
         try { return Instant.parse(value); } catch(Exception e) { throw ApiFailure.badRequest(); }
     }
     public static ZoneId zone(String value) { try { if(!ZoneId.getAvailableZoneIds().contains(value)) throw ApiFailure.validation(); return ZoneId.of(value); } catch(Exception e) { throw ApiFailure.validation(); } }
-    public static String type(String plural) { return switch(plural) { case "projects"->"PROJECT"; case "tasks"->"TASK"; case "labels"->"LABEL"; case "activities"->"ACTIVITY"; case "work-sessions"->"WORK_SESSION"; default->throw ApiFailure.notFound(); }; }
-    public static String input(String type,boolean create) { return switch(type) { case "PROJECT"->"ProjectInput"; case "TASK"->create ? "TaskCreateInput" : "TaskInput"; case "LABEL"->"LabelInput"; case "ACTIVITY"->create ? "ActivityInput" : "ActivityUpdate"; case "WORK_SESSION"->"WorkSessionInput"; default->throw ApiFailure.notFound(); }; }
+    public static String type(String plural) { return switch(plural) { case "clients"->"CLIENT"; case "projects"->"PROJECT"; case "tasks"->"TASK"; case "labels"->"LABEL"; case "activities"->"ACTIVITY"; case "work-sessions"->"WORK_SESSION"; default->throw ApiFailure.notFound(); }; }
+    public static String input(String type,boolean create) { return switch(type) { case "CLIENT"->"ClientInput"; case "PROJECT"->"ProjectInput"; case "TASK"->create ? "TaskCreateInput" : "TaskInput"; case "LABEL"->"LabelInput"; case "ACTIVITY"->create ? "ActivityInput" : "ActivityUpdate"; case "WORK_SESSION"->"WorkSessionInput"; default->throw ApiFailure.notFound(); }; }
 }

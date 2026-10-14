@@ -78,6 +78,7 @@ export class Api {
       try {
         const profile = await this.request('/me');
         const dates = range(profile.data.zoneId);
+        const clients = await this.page('/clients');
         const projects = await this.page('/projects'), tasks = await this.page('/tasks'), labels = await this.page('/labels');
         const workSessions = await this.page('/work-sessions');
         const activeWorkSession = await this.request('/work-sessions/active');
@@ -87,8 +88,8 @@ export class Api {
         const active = await this.request('/activities/active');
         const report = await this.request(`/reports/activities?${new URLSearchParams({from: dates.from, to: dates.to, zoneId: profile.data.zoneId})}`);
         const confirmed = await this.request('/me'), head = await this.page('/projects');
-        if ([tasks, labels, activities, workSessions, head, report.data, ...(workSessionReport ? [workSessionReport] : [])].some(v => v.revision !== projects.revision) || profile.data.version !== confirmed.data.version) throw new ApiError('BUSY');
-        return {profile, dates, projects: projects.items, tasks: tasks.items, labels: labels.items, activities: activities.items, active, workSessions: workSessions.items, activeWorkSession, workSessionReport, report: report.data, revision: projects.revision};
+        if ([clients, tasks, labels, activities, workSessions, head, report.data, ...(workSessionReport ? [workSessionReport] : [])].some(v => v.revision !== projects.revision) || profile.data.version !== confirmed.data.version) throw new ApiError('BUSY');
+        return {profile, dates, clients: clients.items, projects: projects.items, tasks: tasks.items, labels: labels.items, activities: activities.items, active, workSessions: workSessions.items, activeWorkSession, workSessionReport, report: report.data, revision: projects.revision};
       } catch (error) { if (!['BUSY', 'CURSOR_EXPIRED'].includes(error.code) || attempt === 2) throw error; }
     }
   }

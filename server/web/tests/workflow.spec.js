@@ -4,6 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {readFile, writeFile, rename} from 'node:fs/promises';
 const token = process.env.TIMEKEEPER_WEB_TOKEN;
 const readToken = process.env.TIMEKEEPER_WEB_READ_TOKEN;
+test.beforeAll(async({request})=>{const clients=(await (await api(request,'GET','/clients')).json()).items;if(!clients.length) await api(request,'POST','/clients',{name:'Browser client',color:'#2563eb'});});
 async function signIn(page, credential = token) {
   await page.goto('/web/'); await page.getByLabel('Access token').fill(credential); await page.getByRole('button', {name:'Sign in', exact:true}).click();
   await expect(page.locator('#status')).toHaveText('Up to date');
@@ -24,7 +25,7 @@ async function save(page) {
 }
 async function newNamed(page, tab, singular, name) {
   await page.getByRole('button', {name:tab, exact:true}).click(); await page.getByRole('button', {name:`New ${singular}`, exact:true}).click();
-  await page.getByLabel('Name', {exact:true}).fill(name); await save(page);
+  await page.getByLabel('Name', {exact:true}).fill(name);if(singular==='project') await page.getByLabel('Client',{exact:true}).selectOption({index:1});await save(page);
 }
 test('account time zone controls local editors and build dates across DST and browser zones', async ({browser, request}) => {
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,timezoneId:'America/Los_Angeles',locale:'en-GB'}), page=await context.newPage();
@@ -406,7 +407,7 @@ async function removeSessionFixture(request, sessionIds) {
 }
 test('work session controls start once and stop independently of a task activity', async ({page,request}) => {
   const task = await createTask(request,'Session browser task '+randomUUID());await signIn(page);
-  await page.getByRole('button',{name:'Start work session',exact:true}).click();
+  await page.getByRole('button',{name:'Start work session',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('Browser work session');await page.getByLabel('Client',{exact:true}).selectOption({index:1});await page.locator('#save').click();
   await expect(page.locator('#work-session-state')).toHaveText('Running');await expect(page.locator('#editor')).not.toBeVisible();
   const first = await (await api(request,'GET','/work-sessions/active')).json();
   await page.getByRole('button',{name:'Tasks',exact:true}).click();
@@ -416,7 +417,7 @@ test('work session controls start once and stop independently of a task activity
   const active = await (await api(request,'GET','/activities/active')).json();expect(active.workSessionId).toBe(first.id);
   await page.getByRole('button',{name:'Stop work session',exact:true}).click();await expect(page.locator('#work-session-state')).toHaveText('Stopped');
   expect((await (await api(request,'GET','/activities/active')).json()).id).toBe(active.id);
-  await page.getByRole('button',{name:'Start work session',exact:true}).click();await expect(page.locator('#work-session-state')).toHaveText('Running');
+  await page.getByRole('button',{name:'Start work session',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('Browser work session');await page.getByLabel('Client',{exact:true}).selectOption({index:1});await page.locator('#save').click();await expect(page.locator('#work-session-state')).toHaveText('Running');
   const second = await (await api(request,'GET','/work-sessions/active')).json();expect(second.id).not.toBe(first.id);
   await page.getByRole('button',{name:'Stop tracking',exact:true}).click();await page.locator('#editor').getByRole('button',{name:'Stop',exact:true}).click();await expect(page.locator('#editor')).not.toBeVisible();
   expect((await (await api(request,'GET','/work-sessions/active')).json()).id).toBe(second.id);
@@ -426,7 +427,7 @@ test('work session controls start once and stop independently of a task activity
 });
 test('session editors and taskless activities preserve exact overlap accounting and warn outside bounds', async ({page,request}) => {
   const tasksBefore = (await (await api(request,'GET','/tasks')).json()).items.length;await signIn(page);
-  await page.getByRole('button',{name:'Record work session',exact:true}).click();
+  await page.getByRole('button',{name:'Record work session',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('Recorded work session');await page.getByLabel('Client',{exact:true}).selectOption({index:1});
   await page.getByLabel('Summary',{exact:true}).fill('Browser session '+randomUUID());
   await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-25T22:00:00.123456789Z');
   await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2025-10-26T23:00:00.123456789Z');await save(page);
@@ -456,7 +457,7 @@ test('session editors and taskless activities preserve exact overlap accounting 
 test('lost session start and stop replies retry the exact durable command', async ({page,request}) => {
   await signIn(page);const keys=[];
   await page.route('**/api/v1/work-sessions/start',async route=>{keys.push(route.request().headers()['idempotency-key']);const response=await route.fetch();expect(response.status()).toBe(201);await route.abort('failed');},{times:1});
-  await page.getByRole('button',{name:'Start work session',exact:true}).click();await expect(page.locator('#editor-notice')).toContainText('outcome is unknown');
+  await page.getByRole('button',{name:'Start work session',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('Browser work session');await page.getByLabel('Client',{exact:true}).selectOption({index:1});await page.locator('#save').click();await expect(page.locator('#editor-notice')).toContainText('outcome is unknown');
   page.on('request',r=>{if(r.url().endsWith('/work-sessions/start')) keys.push(r.headers()['idempotency-key']);});
   await page.getByRole('button',{name:'Retry same command',exact:true}).click();await expect(page.locator('#editor')).not.toBeVisible();expect(new Set(keys).size).toBe(1);
   const active=await (await api(request,'GET','/work-sessions/active')).json();
