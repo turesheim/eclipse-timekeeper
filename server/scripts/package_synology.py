@@ -92,6 +92,9 @@ def build(output, commit, image, revision, channel):
             if source.is_file():
                 shutil.copyfile(source, outer/'scripts'/source.name)
                 (outer/'scripts'/source.name).chmod(0o755)
+        (outer/'scripts/migration').mkdir()
+        for name in ('postgresql-shape.sql','schema-v2-postgresql.shape'):
+            shutil.copyfile(ROOT/'server/app/src/main/resources/db'/name,outer/'scripts/migration'/name)
         release = {'commit':commit,'image':image,'serverSchema':2}
         (outer/'scripts/release.json').write_text(json.dumps(release, indent=2)+'\n')
         environment = {**os.environ, 'GOOS':'linux', 'GOARCH':'amd64', 'GOAMD64':'v1', 'CGO_ENABLED':'0',

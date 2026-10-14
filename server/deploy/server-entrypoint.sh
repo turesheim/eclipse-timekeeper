@@ -1,5 +1,9 @@
 #!/bin/sh
 set -eu
+if [ -n "${TIMEKEEPER_MAINTENANCE_FILE:-}" ] && [ -e "$TIMEKEEPER_MAINTENANCE_FILE" ]; then
+    echo "Timekeeper maintenance is incomplete; keep the package stopped and retry the maintenance operation." >&2
+    exit 1
+fi
 if [ -n "${TIMEKEEPER_SERVER_DB_PASSWORD_FILE:-}" ]; then
     TIMEKEEPER_SERVER_DB_PASSWORD=$(cat "$TIMEKEEPER_SERVER_DB_PASSWORD_FILE")
     export TIMEKEEPER_SERVER_DB_PASSWORD

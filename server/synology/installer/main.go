@@ -74,6 +74,13 @@ func run(action, root, target, releasePath string, env func(string) string, argu
 			fmt.Fprintln(os.Stdout, path)
 		}
 		return err
+	case "cancel-empty-import":
+		return cancelEmptyImport(root)
+	case "import-postgresql18":
+		if !filepath.IsAbs(argument) {
+			return errors.New("Provide the absolute migration archive path")
+		}
+		return importPostgreSQL18(root, argument, filepath.Join(releasePath, "migration"))
 	case "restore":
 		if !filepath.IsAbs(argument) {
 			return errors.New("Provide the absolute path to a verified native PostgreSQL 17 backup")
@@ -117,8 +124,8 @@ func run(action, root, target, releasePath string, env func(string) string, argu
 	}
 }
 func main() {
-	if len(os.Args) < 2 || len(os.Args) > 3 || (len(os.Args) == 3 && os.Args[1] != "restore") {
-		fmt.Fprintln(os.Stderr, "Use wizard, validate, install, upgrade, start, stop, status, backup or restore /absolute/backup.tar")
+	if len(os.Args) < 2 || len(os.Args) > 3 || (len(os.Args) == 3 && os.Args[1] != "restore" && os.Args[1] != "import-postgresql18") {
+		fmt.Fprintln(os.Stderr, "Use wizard, validate, install, upgrade, start, stop, status, backup, restore /absolute/backup.tar, import-postgresql18 /absolute/migration.tar or cancel-empty-import")
 		os.Exit(2)
 	}
 	executable, err := os.Executable()

@@ -70,6 +70,9 @@ func backup(root string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if _, err = os.Stat(filepath.Join(root, "config/maintenance-pending.json")); !errors.Is(err, os.ErrNotExist) {
+		return "", errors.New("Complete the interrupted maintenance operation before making a new backup")
+	}
 	base := filepath.Join(root, "backups")
 	if err = os.MkdirAll(base, 0700); err != nil {
 		return "", err
@@ -234,6 +237,9 @@ func restore(root, path string) error {
 	if _, err = unpackBackup(path, stage); err != nil {
 		return err
 	}
+	if err = beginMaintenance(root, path, "native-restore"); err != nil {
+		return err
+	}
 	dump, err := os.Open(filepath.Join(stage, "database.dump"))
 	if err != nil {
 		return err
@@ -254,5 +260,32 @@ func restore(root, path string) error {
 			return err
 		}
 	}
-	return nil
+	return os.Remove(filepath.Join(root, "config/maintenance-pending.json"))
+}
+
+func beginMaintenance(root, path, operation string) error {
+	digest, err := fileDigest(path)
+	if err != nil {
+		return err
+	}
+	journal := filepath.Join(root, "config/maintenance-pending.json")
+	type pending struct {
+		Operation     string `json:"operation"`
+		ArchiveSHA256 string `json:"archiveSha256"`
+	}
+	var retained pending
+	err = readJSON(journal, &retained)
+	if err == nil {
+		if retained.Operation == operation && operation == "native-restore" {
+			return writeJSON(journal, pending{operation, digest}, 0644)
+		}
+		if retained.Operation != operation || retained.ArchiveSHA256 != digest {
+			return errors.New("Retry the same archive and operation to complete interrupted maintenance")
+		}
+		return nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return errors.New("Restore the original maintenance journal before proceeding")
+	}
+	return writeJSON(journal, pending{operation, digest}, 0644)
 }

@@ -13,6 +13,7 @@ import tarfile
 REQUIRED = {'INFO','LICENSE','PACKAGE_ICON.PNG','PACKAGE_ICON_256.PNG','package.tgz',
             'conf/privilege','conf/resource','WIZARD_UIFILES/install_uifile.sh',
             'scripts/timekeeper-dsm','scripts/release.json',
+            'scripts/migration/postgresql-shape.sql','scripts/migration/schema-v2-postgresql.shape',
             *('scripts/'+name for name in ('preinst','postinst','preupgrade','postupgrade','preuninst','postuninst','start-stop-status'))}
 
 
@@ -65,7 +66,7 @@ def validate(path):
         if helper[:5]!=b'\x7fELF\x02' or struct.unpack('<H',helper[18:20])[0]!=62:
             raise ValueError('Expected a static Linux amd64 installer')
         for name in REQUIRED:
-            if name.startswith('scripts/') and name!='scripts/release.json' and not members[name].mode & 0o111:
+            if name.startswith('scripts/') and '/' not in name[len('scripts/'):] and name!='scripts/release.json' and not members[name].mode & 0o111:
                 raise ValueError('Package controller is not executable')
         privilege=json.loads(read('conf/privilege'))
         if privilege!={'defaults':{'run-as':'package'},'username':'timekeeper','groupname':'timekeeper'}:

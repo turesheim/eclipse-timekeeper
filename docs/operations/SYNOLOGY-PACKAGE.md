@@ -97,6 +97,74 @@ This command targets an existing, provisioned installation. Rebuilding a lost na
 PostgreSQL installation from an archive still requires an explicit recovery flow;
 do not replace PostgreSQL's data directory with files from another major version.
 
+## Migrating from containerized PostgreSQL 18
+
+The supported logical transfer is **PostgreSQL 18.6 → 17.11, canonical Timekeeper
+schema 2**. Upgrade the source server using the explicit schema-upgrade procedure in
+[account operations](ACCOUNTS.md) and complete its first-administrator setup before
+exporting. Existing owners must be claimed by their explicit IDs. The exporter
+refuses an older/custom schema, unfinished account setup or connected API clients.
+
+1. Use the updated deployment bundle with the source's existing `.env` and state.
+   Make a normal backup, pause clients, and stop **all** source API replicas:
+
+   ```sh
+   sh backup.sh
+   docker compose stop api-1 api-2
+   python3 export-synology.py --output /absolute/private/path/timekeeper-pg18-to17.tar
+   ```
+
+   The exporter checks the schema and fingerprints every table before and after
+   generating a data-only PostgreSQL 18 dump. It leaves the source stopped. The
+   mode-0600 archive includes the hashed legacy token registry and preserves all
+   owners, UUIDs, relationships, exact timestamp strings, revisions, cursor secrets,
+   command receipts and account/password/token/session state.
+
+2. Install the DSM candidate into an **unused** dedicated database. Leave the
+   wizard's existing-owner field blank and choose an unused HTTP port (for example
+   8081 while the source gateway still uses 8080). Allow the server to initialize its empty
+   schema, then stop Timekeeper in Package Center. **Do not create a target account**:
+   source accounts will be transferred. The importer refuses a used target.
+
+3. Transfer the archive through File Station to a private location on the NAS.
+   In an administrator Task Scheduler script, copy it to the retained backup
+   directory, give the package account ownership, then invoke the importer:
+
+   ```sh
+   cp /volume1/PRIVATE-TRANSFER/timekeeper-pg18-to17.tar /var/packages/timekeeper/shares/timekeeper-data/server/backups/migration.tar
+   chown timekeeper:timekeeper /var/packages/timekeeper/shares/timekeeper-data/server/backups/migration.tar
+   chmod 600 /var/packages/timekeeper/shares/timekeeper-data/server/backups/migration.tar
+   sudo -u timekeeper env SYNOPKG_PKGNAME=timekeeper /var/packages/timekeeper/scripts/timekeeper-dsm import-postgresql18 /var/packages/timekeeper/shares/timekeeper-data/server/backups/migration.tar
+   ```
+
+   The current dedicated database service role/password and DSM address/port are
+   retained. The importer applies only source data to the canonical PostgreSQL 17
+   schema, then compares fingerprints of **all 14 tables before committing** the
+   single transaction. No UUID remapping or timestamp conversion is performed.
+
+4. Start Timekeeper and sign in with an existing source account. Point clients at
+   the target address and check their own data. Existing API tokens remain bound
+   to the same owners. Command IDs and stored responses survive, so pending client
+   operations can replay their original receipts. A new HTTPS hostname requires
+   browser sign-in because cookies belong to the original hostname.
+
+Leave the source stopped after cutover. Keep its backup and state until the target
+has been verified. Restarting the source is a rollback to the export point; after
+the target has accepted new writes, those writes require a separate recovery plan.
+Never mount PostgreSQL 18 data files into PostgreSQL 17.
+
+An interrupted import/restore leaves a durable maintenance marker. The container
+entrypoint refuses to start the server while this marker exists. Retry the same
+migration archive to finish; a failed import whose transaction left the target
+empty can instead be cancelled with:
+
+```sh
+sudo -u timekeeper env SYNOPKG_PKGNAME=timekeeper /var/packages/timekeeper/scripts/timekeeper-dsm cancel-empty-import
+```
+
+Cancellation refuses a database containing imported owners. A native restore can
+be retried with a verified native backup while the package remains stopped.
+
 ## Building a candidate
 
 Build from a clean commit. The image must be `linux/amd64`, carry the same embedded
@@ -119,12 +187,16 @@ Automated PostgreSQL 17 schema/migration tests and an unprivileged installer tes
 against real PostgreSQL verify role privileges, retained credentials, interrupted
 provisioning, explicit owner mapping and absence of plaintext credentials in SQL
 statement logs. Native PostgreSQL 17 backup/restore and corrupt-archive refusal are
-also tested in the isolated package layout. These do not emulate DSM Package Center
+also tested in the isolated package layout. A real PostgreSQL 18.6 → 17.11 transfer
+compares all 14 tables with two owners, shared resource UUIDs, nanosecond timestamps,
+revisions above JavaScript's exact integer range and authentication state. A
+fingerprint mismatch rolls back the entire import; used targets are refused.
+These do not emulate DSM Package Center
 or its resource workers.
 
 Still required before stable distribution: real DS923+ installation/start/stop/
-restart/upgrade/reinstall testing, database migration from PostgreSQL 18, verification of native backup/restore on
-the actual NAS and package repository discovery. SynoCommunity catalog inclusion
+restart/upgrade/reinstall testing, verification of PostgreSQL 18 migration and native backup/restore on the actual
+NAS, and package repository discovery. SynoCommunity catalog inclusion
 requires upstream acceptance. An independent Timekeeper feed will require users
 to configure SynoCommunity separately; one configured source is not promised.
 
