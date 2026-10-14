@@ -1,7 +1,7 @@
 """Exercise the DSM project creation/postinst/start order with the actual server.
 
 A shared Linux network namespace stands in for DSM host networking. It does not
-emulate Package Center, Data Share or the Container Manager resource worker.
+emulate Package Center or the Container Manager resource worker.
 """
 import json
 from pathlib import Path

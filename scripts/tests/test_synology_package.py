@@ -31,7 +31,7 @@ def archive(files, compressed=False, extra=None):
 
 
 class SynologyPackageTest(unittest.TestCase):
-    def candidate(self, *, image_tag=IMAGE, architecture='amd64', missing_launcher=False, empty_project=False, elevated=False, outer_extra=None, checksum=None):
+    def candidate(self, *, image_tag=IMAGE, architecture='amd64', missing_launcher=False, empty_project=False, elevated=False, late_share=False, install_type=None, outer_extra=None, checksum=None):
         image=archive({'manifest.json':json.dumps([{'RepoTags':[image_tag],'Config':'config.json','Layers':[]}]).encode(),
                        'config.json':json.dumps({'architecture':architecture,'os':'linux'}).encode()},True)
         payload={'image.tar.gz':image,'project/compose.yaml':(ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',IMAGE).encode(),
@@ -43,6 +43,7 @@ class SynologyPackageTest(unittest.TestCase):
         info={'package':'timekeeper','arch':'r1000','os_min_ver':'7.2.2-72806','version':'1.99.0-1',
               'dsmuidir':'ui','dsmappname':'net.resheim.timekeeper','install_dep_packages':'ContainerManager:postgresql>=17.11-6',
               'precheckstartstop':'yes','checksum':checksum or hashlib.md5(payload,usedforsecurity=False).hexdigest()}
+        if install_type is not None:info['install_type']=install_type
         files={name:b'#!/bin/sh\nexit 0\n' for name in REQUIRED}
         helper=bytearray(64);helper[:5]=b'\x7fELF\x02';struct.pack_into('<H',helper,18,62)
         files.update({'INFO':''.join(key+'='+json.dumps(value)+'\n' for key,value in info.items()).encode(),
@@ -52,6 +53,10 @@ class SynologyPackageTest(unittest.TestCase):
                       'conf/resource':(ROOT/'server/synology/conf/resource').read_bytes(),
                       'PACKAGE_ICON.PNG':(ROOT/'server/synology/ui/images/timekeeper_64.png').read_bytes(),
                       'PACKAGE_ICON_256.PNG':(ROOT/'server/synology/ui/images/timekeeper_256.png').read_bytes()})
+        if late_share:
+            resource=json.loads(files['conf/resource'])
+            resource['data-share']={'shares':[{'name':'timekeeper-data','permission':{'rw':['timekeeper']}}]}
+            files['conf/resource']=json.dumps(resource).encode()
         return archive(files,extra=outer_extra)
 
     def check(self, content):
@@ -69,7 +74,7 @@ class SynologyPackageTest(unittest.TestCase):
             with self.subTest(overrides=overrides),self.assertRaises(ValueError):self.check(self.candidate(**overrides))
 
     def test_missing_launcher_privileged_controller_or_corrupted_payload_is_rejected(self):
-        for overrides in ({'missing_launcher':True},{'empty_project':True},{'elevated':True},{'checksum':'0'*32}):
+        for overrides in ({'missing_launcher':True},{'empty_project':True},{'elevated':True},{'late_share':True},{'install_type':'system'},{'checksum':'0'*32}):
             with self.subTest(overrides=overrides),self.assertRaises(ValueError):self.check(self.candidate(**overrides))
 
     def test_parent_path_and_symlink_escape_is_rejected(self):

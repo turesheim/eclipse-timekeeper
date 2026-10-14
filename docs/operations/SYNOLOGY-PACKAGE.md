@@ -48,11 +48,18 @@ and [script lifecycle](https://help.synology.com/developer-guide/synology_packag
 
 ## Data and lifecycle
 
-The `timekeeper-data` shared folder is managed through DSM's Data Share worker.
-Its private `server` directory contains settings, the application database
-credential, hashed setup/token configuration and backups. It survives package
-uninstallation. PostgreSQL data remains with the separate PostgreSQL package.
+The private `/var/packages/timekeeper/var/server` directory contains settings,
+the application database credential, hashed setup/token configuration and
+backups. DSM links `var` to permanent `@appdata/timekeeper` on the selected
+package volume. This directory exists during installation and survives package
+uninstallation. It uses mode 0700 under the package account; it is not an SMB
+shared folder. PostgreSQL data remains with the separate PostgreSQL package.
 Stopping or uninstalling Timekeeper never drops databases, roles or other packages.
+
+This uses DSM's [permanent appdata directory](https://help.synology.com/developer-guide/integrate_dsm/fhs.html),
+not a Data Share resource: the latter is acquired at enable/startup, after
+`postinst` needs to provision and save configuration. Creating directories under
+its future share link during installation would write into the wrong location.
 
 Reinstallation and upgrades reuse retained credentials and owner mappings.
 The retained-install wizard does not request the database administrator password.
@@ -66,7 +73,7 @@ time. Schema changes require explicit maintenance and are refused automatically.
 Back up before upgrades. A failed application upgrade leaves native data and
 retained configuration intact; retain the previous `.spk` for recovery. Real DSM
 checks must verify package repair, reinstallation permissions and failure recovery.
-Do not remove the native PostgreSQL package or the retained shared folder as part
+Do not remove the native PostgreSQL package or the retained appdata as part
 of an application rollback.
 
 ## Native backup and restore
@@ -92,7 +99,7 @@ SHA-256 for every member. No PostgreSQL administrator credential is included.
 To restore, keep Timekeeper stopped and run a task with the absolute backup path:
 
 ```sh
-sudo -u timekeeper env SYNOPKG_PKGNAME=timekeeper /var/packages/timekeeper/scripts/timekeeper-dsm restore /var/packages/timekeeper/shares/timekeeper-data/server/backups/timekeeper-EXAMPLE.tar
+sudo -u timekeeper env SYNOPKG_PKGNAME=timekeeper /var/packages/timekeeper/scripts/timekeeper-dsm restore /var/packages/timekeeper/var/server/backups/timekeeper-EXAMPLE.tar
 ```
 
 Restore validates the complete archive before touching data, then uses PostgreSQL
@@ -151,10 +158,10 @@ refuses an older/custom schema, unfinished account setup or connected API client
    directory, give the package account ownership, then invoke the importer:
 
    ```sh
-   cp /volume1/PRIVATE-TRANSFER/timekeeper-pg18-to17.tar /var/packages/timekeeper/shares/timekeeper-data/server/backups/migration.tar
-   chown timekeeper:timekeeper /var/packages/timekeeper/shares/timekeeper-data/server/backups/migration.tar
-   chmod 600 /var/packages/timekeeper/shares/timekeeper-data/server/backups/migration.tar
-   sudo -u timekeeper env SYNOPKG_PKGNAME=timekeeper /var/packages/timekeeper/scripts/timekeeper-dsm import-postgresql18 /var/packages/timekeeper/shares/timekeeper-data/server/backups/migration.tar
+   cp /volume1/PRIVATE-TRANSFER/timekeeper-pg18-to17.tar /var/packages/timekeeper/var/server/backups/migration.tar
+   chown timekeeper:timekeeper /var/packages/timekeeper/var/server/backups/migration.tar
+   chmod 600 /var/packages/timekeeper/var/server/backups/migration.tar
+   sudo -u timekeeper env SYNOPKG_PKGNAME=timekeeper /var/packages/timekeeper/scripts/timekeeper-dsm import-postgresql18 /var/packages/timekeeper/var/server/backups/migration.tar
    ```
 
    The current dedicated database service role/password and DSM address/port are
@@ -335,6 +342,6 @@ requires upstream acceptance. An independent Timekeeper feed will require users
 to configure SynoCommunity separately; one configured source is not promised.
 
 The packaging follows Synology's [Docker Project worker](https://help.synology.com/developer-guide/resource_acquisition/docker-project.html),
-[Data Share worker](https://help.synology.com/developer-guide/resource_acquisition/data_share.html)
+[permanent appdata layout](https://help.synology.com/developer-guide/integrate_dsm/fhs.html)
 and [package privilege model](https://help.synology.com/developer-guide/privilege/privilege_config.html).
 PostgreSQL connectivity follows [SynoCommunity's package documentation](https://docs.synocommunity.com/packages/postgresql/).

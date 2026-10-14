@@ -95,7 +95,7 @@ def main():
             command('go','-C',str(ROOT/'server/synology/installer'),'build','-o',str(binary),'.',
                 environment={**os.environ,'GOOS':'linux','GOARCH':arch,'CGO_ENABLED':'0','GOCACHE':str(folder/'go-cache')})
             command('docker','exec',target,'sh','-ec',
-                'mkdir -p /var/packages/timekeeper/scripts/migration /var/packages/timekeeper/target /var/packages/timekeeper/shares/timekeeper-data /var/packages/postgresql/target/bin; '
+                'mkdir -p /var/packages/timekeeper/scripts/migration /var/packages/timekeeper/target /var/packages/timekeeper/var /var/packages/postgresql/target/bin; '
                 'for tool in psql pg_dump pg_restore; do ln -s /usr/lib/postgresql/17/bin/$tool /var/packages/postgresql/target/bin/$tool; done; '
                 'chown -R 10001:10001 /var/packages/timekeeper')
             command('docker','cp',str(binary),target+':/var/packages/timekeeper/scripts/timekeeper-dsm')
@@ -118,8 +118,8 @@ def main():
             helper('install')
             canonical="SET ROLE timekeeper_fixture_app; "+(DB/'schema-v1-postgresql.sql').read_text()+(DB/'auth-v2.sql').read_text()+"UPDATE tk_schema SET schema_version=2,state='READY';"
             command('docker','exec','-i',target,'psql','-X','-q','-v','ON_ERROR_STOP=1','-U','postgres','-p','5433','-d','timekeeper_fixture',input=canonical)
-            archive.chmod(0o644);command('docker','cp',str(archive),target+':/var/packages/timekeeper/shares/timekeeper-data/server/backups/migration.tar')
-            native_archive='/var/packages/timekeeper/shares/timekeeper-data/server/backups/migration.tar'
+            archive.chmod(0o644);command('docker','cp',str(archive),target+':/var/packages/timekeeper/var/server/backups/migration.tar')
+            native_archive='/var/packages/timekeeper/var/server/backups/migration.tar'
             # A mismatched post-import fingerprint must roll back the entire data
             # transaction. It leaves a durable marker that blocks container startup.
             broken=folder/'mismatched.tar'
@@ -130,17 +130,17 @@ def main():
                         manifest=json.loads(value);manifest['tableFingerprints']['tk_resource']='0|empty'
                         value=json.dumps(manifest).encode();member.size=len(value)
                     destination.addfile(member,io.BytesIO(value))
-            broken.chmod(0o644);command('docker','cp',str(broken),target+':/var/packages/timekeeper/shares/timekeeper-data/server/backups/mismatched.tar')
-            helper('import-postgresql18','/var/packages/timekeeper/shares/timekeeper-data/server/backups/mismatched.tar',expected=1)
+            broken.chmod(0o644);command('docker','cp',str(broken),target+':/var/packages/timekeeper/var/server/backups/mismatched.tar')
+            helper('import-postgresql18','/var/packages/timekeeper/var/server/backups/mismatched.tar',expected=1)
             empty=command('docker','exec',target,'psql','-X','-At','-U','postgres','-p','5433','-d','timekeeper_fixture','-c','SELECT count(*) FROM tk_owner').stdout.strip()
             if empty!='0':raise AssertionError('Failed import committed partial data')
-            command('docker','exec',target,'test','-f','/var/packages/timekeeper/shares/timekeeper-data/server/config/maintenance-pending.json')
+            command('docker','exec',target,'test','-f','/var/packages/timekeeper/var/server/config/maintenance-pending.json')
             helper('cancel-empty-import')
             helper('import-postgresql18',native_archive)
             fingerprints=client('psql',['-X','-q','-A','-t'],sql='\n'.join(exporter.fingerprint_sql(table) for table in exporter.TABLES))
             actual=command('docker','exec','-i',target,'psql','-X','-q','-A','-t','-U','postgres','-p','5433','-d','timekeeper_fixture',input='\n'.join(exporter.fingerprint_sql(table) for table in exporter.TABLES)).stdout.strip()
             if actual!=fingerprints:raise AssertionError('Migration changed source data')
-            copied=folder/'target-tokens.json';command('docker','cp',target+':/var/packages/timekeeper/shares/timekeeper-data/server/config/tokens.json',str(copied))
+            copied=folder/'target-tokens.json';command('docker','cp',target+':/var/packages/timekeeper/var/server/config/tokens.json',str(copied))
             if copied.read_text()!=tokens:raise AssertionError('Migration changed legacy token ownership')
             helper('import-postgresql18',native_archive,expected=1)
             helper('cancel-empty-import',expected=1)
@@ -149,8 +149,8 @@ def main():
             native_backup=helper('backup').stdout.strip()
             command('docker','exec','--user','10001:10001',target,'cp',native_backup,'/var/packages/timekeeper/native-recovery.tar')
             previous_password=folder/'previous-password'
-            command('docker','cp',target+':/var/packages/timekeeper/shares/timekeeper-data/server/secrets/database_password',str(previous_password))
-            command('docker','exec','--user','10001:10001',target,'mv','/var/packages/timekeeper/shares/timekeeper-data/server','/var/packages/timekeeper/shares/timekeeper-data/retained-before-recovery')
+            command('docker','cp',target+':/var/packages/timekeeper/var/server/secrets/database_password',str(previous_password))
+            command('docker','exec','--user','10001:10001',target,'mv','/var/packages/timekeeper/var/server','/var/packages/timekeeper/var/retained-before-recovery')
             env['wizard_database']='timekeeper_recovered';env['wizard_database_role']='timekeeper_recovered_app'
             env_file.write_text(''.join(key+'='+value+'\n' for key,value in env.items()))
             helper('install')
@@ -160,7 +160,7 @@ def main():
             restored=command('docker','exec','-i',target,'psql','-X','-q','-A','-t','-U','postgres','-p','5433','-d','timekeeper_recovered',input='\n'.join(exporter.fingerprint_sql(table) for table in exporter.TABLES)).stdout.strip()
             if restored!=fingerprints:raise AssertionError('Fresh-installation recovery changed owner data')
             recovered_password=folder/'recovered-password'
-            command('docker','cp',target+':/var/packages/timekeeper/shares/timekeeper-data/server/secrets/database_password',str(recovered_password))
+            command('docker','cp',target+':/var/packages/timekeeper/var/server/secrets/database_password',str(recovered_password))
             if recovered_password.read_bytes()==previous_password.read_bytes():raise AssertionError('Fresh recovery reused the source service credential')
             previous=command('docker','exec','-i',target,'psql','-X','-q','-A','-t','-U','postgres','-p','5433','-d','timekeeper_fixture',input='\n'.join(exporter.fingerprint_sql(table) for table in exporter.TABLES)).stdout.strip()
             if previous!=fingerprints:raise AssertionError('Recovery changed a database outside its dedicated target')

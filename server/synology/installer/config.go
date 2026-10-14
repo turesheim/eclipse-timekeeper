@@ -168,7 +168,10 @@ func writeJSON(path string, value any, mode os.FileMode) error {
 	}
 	return atomic(path, append(content, '\n'), mode)
 }
-func stateRoot() string { return "/var/packages/" + packageID + "/shares/timekeeper-data/server" }
+
+// DSM creates permanent appdata during installation, before postinst. A
+// data-share resource is acquired only at enable/startup and is too late here.
+func stateRoot() string { return "/var/packages/" + packageID + "/var/server" }
 func loadSettings(root string) (Settings, error) {
 	var s Settings
 	err := readJSON(filepath.Join(root, "settings.json"), &s)

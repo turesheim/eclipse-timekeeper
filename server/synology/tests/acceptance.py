@@ -67,7 +67,7 @@ def main():
                 raise RuntimeError('Isolated PostgreSQL did not become ready')
             command('docker','exec',name,'sh','-ec',
                     'mkdir -p /var/packages/timekeeper/scripts /var/packages/timekeeper/target/project '
-                    '/var/packages/timekeeper/shares/timekeeper-data /var/packages/postgresql/target/bin /var/packages/ContainerManager; '
+                    '/var/packages/timekeeper/var /var/packages/postgresql/target/bin /var/packages/ContainerManager; '
                     'printf \'version="24.0.2-1432"\n\' > /var/packages/ContainerManager/INFO; '
                     'for tool in psql pg_dump pg_restore; do ln -s /usr/lib/postgresql/17/bin/$tool /var/packages/postgresql/target/bin/$tool; done; '
                     'chown -R 10001:10001 /var/packages/timekeeper')
@@ -91,10 +91,14 @@ def main():
 
             def read(relative):
                 path=folder/('read-'+secrets.token_hex(4))
-                command('docker','cp',name+':/var/packages/timekeeper/shares/timekeeper-data/server/'+relative,str(path))
+                command('docker','cp',name+':/var/packages/timekeeper/var/server/'+relative,str(path))
                 return path.read_bytes()
 
+            # DSM supplies permanent appdata before postinst. No data-share link
+            # exists at this point; its worker would run only at enable/startup.
+            command('docker','exec',name,'sh','-ec','test -d /var/packages/timekeeper/var; test ! -e /var/packages/timekeeper/shares')
             helper('validate'); helper('install')
+            command('docker','exec',name,'sh','-ec','test ! -e /var/packages/timekeeper/shares; test "$(stat -c %a /var/packages/timekeeper/var/server)" = 700')
             if helper('status',expected=1).returncode!=3:raise AssertionError('Stopped package does not return DSM status 3')
             helper('prestart')
             settings=json.loads(read('settings.json'))
@@ -139,8 +143,8 @@ def main():
             env_file.write_text(''.join(key+'='+value+'\n' for key,value in variables.items()))
             settings=json.loads(read('settings.json'));settings['phase']='PROVISIONING'
             pending=folder/'pending.json';pending.write_text(json.dumps(settings));pending.chmod(0o600)
-            command('docker','cp',str(pending),name+':/var/packages/timekeeper/shares/timekeeper-data/server/settings.json')
-            command('docker','exec',name,'chown','10001:10001','/var/packages/timekeeper/shares/timekeeper-data/server/settings.json')
+            command('docker','cp',str(pending),name+':/var/packages/timekeeper/var/server/settings.json')
+            command('docker','exec',name,'chown','10001:10001','/var/packages/timekeeper/var/server/settings.json')
             helper('validate'); helper('install')
             if read('secrets/database_password').decode().strip()!=application_password:
                 raise AssertionError('Interrupted provisioning replaced the application credential')
@@ -153,13 +157,13 @@ def main():
             value=command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-Atc','SELECT value FROM preserved_fixture').stdout.strip()
             if value!='owned private data':raise AssertionError('Native backup restore lost retained data')
             # A separate malformed backup is refused without replacing restored data.
-            command('docker','exec',name,'sh','-ec',"printf corrupt > /var/packages/timekeeper/shares/timekeeper-data/server/backups/corrupt.tar; chown 10001:10001 /var/packages/timekeeper/shares/timekeeper-data/server/backups/corrupt.tar")
-            helper('restore','/var/packages/timekeeper/shares/timekeeper-data/server/backups/corrupt.tar',expected=1)
+            command('docker','exec',name,'sh','-ec',"printf corrupt > /var/packages/timekeeper/var/server/backups/corrupt.tar; chown 10001:10001 /var/packages/timekeeper/var/server/backups/corrupt.tar")
+            helper('restore','/var/packages/timekeeper/var/server/backups/corrupt.tar',expected=1)
             log=command('docker','logs',name).stdout+command('docker','logs',name).stderr
             if any(secret in log for secret in (master_password,application_password,code)):
                 raise AssertionError('PostgreSQL statement log contains a plaintext credential')
             print(json.dumps({'postgresql':args.postgres_image,'architecture':architecture,
-                              'unprivilegedInstaller':True,'dedicatedNonSuperuser':True,
+                              'unprivilegedInstaller':True,'dedicatedNonSuperuser':True,'permanentAppdataBeforeResourceStartup':True,
                               'reinstallPreservesCredentials':True,'renewIncompleteSetupWithoutResettingAccounts':True,'interruptedProvisioningPreservesData':True,
                               'nativeBackupRestore':True,'corruptRestoreRefused':True,'noPlaintextCredentialsInStatementLog':True}))
         finally:

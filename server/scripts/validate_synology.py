@@ -56,6 +56,8 @@ def validate(path):
             info[key]=json.loads(raw)
         if info.get('package')!='timekeeper' or info.get('arch')!='r1000' or info.get('os_min_ver')!='7.2.2-72806':
             raise ValueError('Incorrect target DSM identity')
+        if info.get('install_type','')!='':
+            raise ValueError('Use DSM default volume installation and permanent appdata')
         if not re.fullmatch(r'(1\.99\.0|2\.0\.0)-[1-9][0-9]*',info.get('version','')):
             raise ValueError('Invalid monotonic package version')
         if info.get('precheckstartstop')!='yes':
@@ -76,8 +78,8 @@ def validate(path):
         if privilege!={'defaults':{'run-as':'package'},'username':'timekeeper','groupname':'timekeeper'}:
             raise ValueError('Installer must use the unprivileged package account')
         resource=json.loads(read('conf/resource'))
-        if resource['data-share']['shares']!=[{'name':'timekeeper-data','permission':{'rw':['timekeeper']}}]:
-            raise ValueError('Incorrect retained data-share ownership')
+        if set(resource)!={'docker-project'}:
+            raise ValueError('Retained state must use install-time FHS appdata, not a startup-time data-share')
         projects=resource['docker-project']
         if projects['preload-image']!='image.tar.gz' or projects['projects'][0]['path']!='project':
             raise ValueError('Incorrect Container Manager resource')
