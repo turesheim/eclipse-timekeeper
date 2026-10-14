@@ -1,3 +1,4 @@
+-- PostgreSQL 18 adds separate NOT NULL constraint objects; COLUMN attnotnull validates them on both 17 and 18.
 SELECT definition FROM (
   SELECT 'SCHEMA|' || nspname AS definition FROM pg_namespace
   WHERE nspname NOT LIKE 'pg_%' AND nspname NOT IN ('public','information_schema')
@@ -16,7 +17,7 @@ SELECT definition FROM (
   UNION ALL
   SELECT concat_ws('|','CONSTRAINT',c.relname,k.contype,pg_get_constraintdef(k.oid))
   FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid
-  JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public'
+  JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND k.contype<>'n'
   UNION ALL
   SELECT concat_ws('|','INDEX',tablename,indexdef) FROM pg_indexes WHERE schemaname='public'
   UNION ALL

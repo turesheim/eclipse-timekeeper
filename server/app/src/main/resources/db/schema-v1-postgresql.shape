@@ -43,65 +43,24 @@ COLUMN|tk_schema|2|schema_version|integer|t|||
 COLUMN|tk_schema|3|state|character varying(16)|t|||
 CONSTRAINT|tk_active|c|CHECK (((entity_type)::text = 'ACTIVITY'::text))
 CONSTRAINT|tk_active|f|FOREIGN KEY (owner_id, entity_type, activity_id) REFERENCES tk_resource(owner_id, entity_type, id)
-CONSTRAINT|tk_active|n|NOT NULL activity_id
-CONSTRAINT|tk_active|n|NOT NULL entity_type
-CONSTRAINT|tk_active|n|NOT NULL owner_id
 CONSTRAINT|tk_active|p|PRIMARY KEY (owner_id)
 CONSTRAINT|tk_change|f|FOREIGN KEY (owner_id) REFERENCES tk_owner(id)
-CONSTRAINT|tk_change|n|NOT NULL change_type
-CONSTRAINT|tk_change|n|NOT NULL entity_id
-CONSTRAINT|tk_change|n|NOT NULL entity_type
-CONSTRAINT|tk_change|n|NOT NULL occurred_at
-CONSTRAINT|tk_change|n|NOT NULL owner_id
-CONSTRAINT|tk_change|n|NOT NULL sequence
 CONSTRAINT|tk_change|p|PRIMARY KEY (owner_id, sequence)
 CONSTRAINT|tk_external_reference|c|CHECK (((entity_type)::text = 'TASK'::text))
 CONSTRAINT|tk_external_reference|f|FOREIGN KEY (owner_id, entity_type, task_id) REFERENCES tk_resource(owner_id, entity_type, id)
-CONSTRAINT|tk_external_reference|n|NOT NULL entity_type
-CONSTRAINT|tk_external_reference|n|NOT NULL external_id
-CONSTRAINT|tk_external_reference|n|NOT NULL owner_id
-CONSTRAINT|tk_external_reference|n|NOT NULL provider_id
-CONSTRAINT|tk_external_reference|n|NOT NULL reference_key
-CONSTRAINT|tk_external_reference|n|NOT NULL repository_id
-CONSTRAINT|tk_external_reference|n|NOT NULL task_id
 CONSTRAINT|tk_external_reference|p|PRIMARY KEY (owner_id, reference_key)
 CONSTRAINT|tk_owner|c|CHECK ((revision >= 0))
 CONSTRAINT|tk_owner|c|CHECK ((version >= 0))
-CONSTRAINT|tk_owner|n|NOT NULL cursor_secret
-CONSTRAINT|tk_owner|n|NOT NULL id
-CONSTRAINT|tk_owner|n|NOT NULL revision
-CONSTRAINT|tk_owner|n|NOT NULL version
-CONSTRAINT|tk_owner|n|NOT NULL zone_id
 CONSTRAINT|tk_owner|p|PRIMARY KEY (id)
 CONSTRAINT|tk_receipt|f|FOREIGN KEY (owner_id) REFERENCES tk_owner(id)
-CONSTRAINT|tk_receipt|n|NOT NULL body
-CONSTRAINT|tk_receipt|n|NOT NULL command_id
-CONSTRAINT|tk_receipt|n|NOT NULL created_at
-CONSTRAINT|tk_receipt|n|NOT NULL fingerprint
-CONSTRAINT|tk_receipt|n|NOT NULL owner_id
-CONSTRAINT|tk_receipt|n|NOT NULL status
 CONSTRAINT|tk_receipt|p|PRIMARY KEY (owner_id, command_id)
 CONSTRAINT|tk_relation|f|FOREIGN KEY (owner_id, from_type, from_id) REFERENCES tk_resource(owner_id, entity_type, id)
 CONSTRAINT|tk_relation|f|FOREIGN KEY (owner_id, to_type, to_id) REFERENCES tk_resource(owner_id, entity_type, id)
-CONSTRAINT|tk_relation|n|NOT NULL from_id
-CONSTRAINT|tk_relation|n|NOT NULL from_type
-CONSTRAINT|tk_relation|n|NOT NULL kind
-CONSTRAINT|tk_relation|n|NOT NULL owner_id
-CONSTRAINT|tk_relation|n|NOT NULL to_id
-CONSTRAINT|tk_relation|n|NOT NULL to_type
 CONSTRAINT|tk_relation|p|PRIMARY KEY (owner_id, from_type, from_id, kind, to_type, to_id)
 CONSTRAINT|tk_resource|c|CHECK ((version >= 0))
 CONSTRAINT|tk_resource|f|FOREIGN KEY (owner_id) REFERENCES tk_owner(id)
-CONSTRAINT|tk_resource|n|NOT NULL entity_type
-CONSTRAINT|tk_resource|n|NOT NULL id
-CONSTRAINT|tk_resource|n|NOT NULL owner_id
-CONSTRAINT|tk_resource|n|NOT NULL payload
-CONSTRAINT|tk_resource|n|NOT NULL version
 CONSTRAINT|tk_resource|p|PRIMARY KEY (owner_id, entity_type, id)
 CONSTRAINT|tk_schema|c|CHECK ((id = 1))
-CONSTRAINT|tk_schema|n|NOT NULL id
-CONSTRAINT|tk_schema|n|NOT NULL schema_version
-CONSTRAINT|tk_schema|n|NOT NULL state
 CONSTRAINT|tk_schema|p|PRIMARY KEY (id)
 INDEX|tk_active|CREATE UNIQUE INDEX tk_active_pkey ON public.tk_active USING btree (owner_id)
 INDEX|tk_change|CREATE UNIQUE INDEX tk_change_pkey ON public.tk_change USING btree (owner_id, sequence)
