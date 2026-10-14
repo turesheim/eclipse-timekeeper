@@ -32,7 +32,7 @@ final class UncertainCreateScenario {
             assertEquals("https://example.invalid/uncertain-create",taskForm.bot().textWithLabel("URL (optional)").getText());
         });
         var task=api.tasks().stream().filter(t->t.summary().equals(prefix+" task")).findFirst().orElseThrow();settledTask(task,project);
-        var date=LocalDate.now(api.profile().zone());
+        var date=LocalDate.now(api.profile().zone()).minusWeeks(1);
         view.bot().treeWithId("workweek-editor-tree").getTreeItem(project.name()).getNode(task.summary()).contextMenu("New activity").click();
         var activityForm=bot.shell("New activity");activityForm.bot().textWithLabel("Summary").setText(prefix+" interval");
         activityForm.bot().textWithLabel("Start (yyyy-MM-dd HH:mm)").setText(date+" 08:00");activityForm.bot().textWithLabel("End (yyyy-MM-dd HH:mm)").setText(date+" 09:00");
