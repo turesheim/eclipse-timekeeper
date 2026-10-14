@@ -37,10 +37,11 @@ public class ServerStore {
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="quarkus.datasource.jdbc.url") String jdbcUrl;
     private final ThreadLocal<Context> context = new ThreadLocal<>();
     record Context(String owner, Connection connection, Instant now) { }
+    @org.eclipse.microprofile.config.inject.ConfigProperty(name="timekeeper.schema.allow-upgrade",defaultValue="false") boolean allowSchemaUpgrade;
     void start(@Observes StartupEvent event) throws Exception {
         DatabaseConfiguration.validate(jdbcUrl);
         try (var connection = datasource.getConnection()) {
-            ServerSchema.initializeOrValidate(connection);
+            ServerSchema.initializeOrValidate(connection,allowSchemaUpgrade);
             // Apply only after validation: an acknowledged commit must survive process kill.
             if (!postgres()) {
                 try(var statement=connection.createStatement()) {statement.execute("SET WRITE_DELAY 0");}

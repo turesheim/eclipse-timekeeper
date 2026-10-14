@@ -509,7 +509,8 @@ $('session-stop').addEventListener('click',()=> {
 for(const [id,work] of [['session-new',()=>openRecord('work-sessions')],['session-edit',()=>openRecord('work-sessions',snapshot.workSessionReport.session.id)],['session-delete',()=>openDelete('work-sessions',snapshot.workSessionReport.session.id)],['session-add',()=>openRecord('activities',null,snapshot.workSessionReport.session.id)],['session-associate',()=>openAssociation()]]) $(id).addEventListener('click',()=> {void work().catch(error=>setStatus(errorText(error)));});
 for(const [id,glyph,label] of [['session-start','start','Start work session'],['session-stop','stop','Stop work session'],['session-new','add','Record work session'],['session-edit','edit','Edit work session'],['session-delete','delete','Delete work session'],['session-add','add','Add activity to session'],['session-associate','link','Associate activity']]) iconButton($(id),glyph,label);
 setInterval(renderSessionTime,1000);
-window.addEventListener('pagehide', () => api?.close());
+window.addEventListener('pagehide', () => auth.clear());
+window.addEventListener('pageshow', event => {if(event.persisted) void auth.initialize();});
 iconButton($('refresh'), 'refresh', 'Refresh');
 iconButton($('collapse-activities'), 'collapse', 'Hide activities');
 iconButton($('expand-activities'), 'expand', 'Show activities');

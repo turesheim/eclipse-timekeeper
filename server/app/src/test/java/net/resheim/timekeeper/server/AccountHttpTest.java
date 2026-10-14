@@ -63,7 +63,13 @@ class AccountHttpTest {
         assertEquals(204,call(admin,"POST","/auth/logout",null,true).statusCode());assertEquals(401,call(admin,"GET","/me",null,false).statusCode());
         assertEquals(200,call(second,"GET","/clients/"+id,null,false).statusCode());
         var token=call(second,"POST","/auth/tokens",node("{\"name\":\"Eclipse\",\"permissions\":[\"read\",\"write\"],\"expiresAt\":null}"),true);assertEquals(201,token.statusCode());
-        var raw=node(token.asString()).get("token").asText();assertEquals(200,given().header("Authorization","Bearer "+raw).get("/api/v1/me").statusCode());
+        var raw=node(token.asString()).get("token").asText();
+        try(var eclipseClient=new net.resheim.eclipse.timekeeper.client.HttpTimekeeperService(java.net.URI.create(io.restassured.RestAssured.baseURI+":"+io.restassured.RestAssured.port),()->raw,Duration.ofSeconds(5))) {
+            assertEquals(second.owner(),eclipseClient.profile().owner().value());
+            var project=eclipseClient.createProject(new net.resheim.eclipse.timekeeper.service.Commands.CreateProject("Managed Eclipse token project"));
+            assertTrue(eclipseClient.projects().stream().anyMatch(value->value.id().equals(project.id())));
+        }
+        assertEquals(200,given().header("Authorization","Bearer "+raw).get("/api/v1/me").statusCode());
         assertFalse(call(second,"GET","/auth/tokens",null,false).asString().contains(raw));
         String tokenId=node(token.asString()).get("id").asText();assertEquals(204,call(second,"DELETE","/auth/tokens/"+tokenId,null,true).statusCode());
         assertEquals(401,given().header("Authorization","Bearer "+raw).get("/api/v1/me").statusCode());assertEquals(200,call(second,"GET","/me",null,false).statusCode());
@@ -94,4 +100,18 @@ class AccountHttpTest {
         for(var token:tokens) if(token.get("permissions").size()==1) accounts.revokeToken(writable,UUID.fromString(token.get("id").asText()));
         assertEquals(401,call(session,"GET","/me",null,false).statusCode());
     }
+    @Test void concurrentLegacyRequestsAndCookieRequestsKeepTheSameLockOrder() throws Exception {
+        var session=browser(given().header("Authorization","Bearer test-a").post("/api/v1/auth/token-login"));
+        try(var pool=Executors.newFixedThreadPool(6)) {
+            var jobs=new ArrayList<Future<?>>();
+            for(int index=0;index<6;index++) {final boolean cookie=index%2==0;jobs.add(pool.submit(()->{
+                for(int attempt=0;attempt<12;attempt++) {
+                    var reply=cookie ? call(session,"GET","/projects",null,false) : given().header("Authorization","Bearer test-a").get("/api/v1/projects");
+                    assertEquals(200,reply.statusCode(),"Concurrent authorization failed");
+                }
+            }));}
+            for(var job:jobs) job.get(20,TimeUnit.SECONDS);
+        }
+    }
+
 }

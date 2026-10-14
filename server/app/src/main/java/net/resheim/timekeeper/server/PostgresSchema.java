@@ -17,7 +17,8 @@ public final class PostgresSchema {
         } catch (java.io.IOException e) { throw new SQLException("Cannot read PostgreSQL schema resource", e); }
     }
 
-    public static void initializeOrValidate(Connection connection) throws SQLException {
+    public static void initializeOrValidate(Connection connection) throws SQLException {initializeOrValidate(connection,false);}
+    public static void initializeOrValidate(Connection connection,boolean allowUpgrade) throws SQLException {
         if (!connection.getAutoCommit()) throw new SQLException("Schema bootstrap requires its own transaction");
         connection.setAutoCommit(false);
         try {
@@ -31,6 +32,7 @@ public final class PostgresSchema {
                 }
             }
             if(shape(connection).equals(resource("schema-v1-postgresql.shape").lines().toList())) {
+                if(!allowUpgrade) throw new SQLException("Schema upgrade requires explicit operator authorization after stopping older server replicas");
                 try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT id,schema_version,state FROM tk_schema")) {
                     if(!rows.next() || rows.getInt(1)!=1 || rows.getInt(2)!=1 || !"READY".equals(rows.getString(3)) || rows.next()) throw new SQLException("Unsupported legacy PostgreSQL schema");
                 }

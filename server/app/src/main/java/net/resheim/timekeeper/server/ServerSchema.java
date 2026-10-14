@@ -39,9 +39,10 @@ public final class ServerSchema {
     private static List<String> legacyShape() throws Exception {
         try(var connection=DriverManager.getConnection("jdbc:h2:mem:legacy_reference_"+UUID.randomUUID())) {create(connection);return shape(connection,LEGACY_TABLES);}
     }
-    public static void initializeOrValidate(Connection connection) throws Exception {
+    public static void initializeOrValidate(Connection connection) throws Exception {initializeOrValidate(connection,false);}
+    public static void initializeOrValidate(Connection connection,boolean allowUpgrade) throws Exception {
         if (connection.getMetaData().getDatabaseProductName().equals("PostgreSQL")) {
-            PostgresSchema.initializeOrValidate(connection);
+            PostgresSchema.initializeOrValidate(connection,allowUpgrade);
             return;
         }
         if(tables(connection).isEmpty()) {
@@ -51,6 +52,7 @@ public final class ServerSchema {
             try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET schema_version=2,state='READY' WHERE id=1");}
         }
         if(tables(connection).equals(LEGACY_TABLES)) {
+            if(!allowUpgrade) throw new SQLException("Schema upgrade requires explicit operator authorization after stopping older server replicas");
             if(!shape(connection,LEGACY_TABLES).equals(legacyShape())) throw new SQLException("Unsupported legacy server schema");
             try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT id,schema_version,state FROM tk_schema")) {
                 if(!rows.next() || rows.getInt(1)!=1 || rows.getInt(2)!=1 || !"READY".equals(rows.getString(3)) || rows.next()) throw new SQLException("Unsupported or incomplete legacy schema");

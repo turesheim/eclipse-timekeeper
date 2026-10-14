@@ -57,7 +57,8 @@ class PostgresSchemaIT {
             statement.executeUpdate("INSERT INTO tk_owner VALUES('existing-owner','Europe/Oslo',7,19,'aabb')");
             var id=UUID.randomUUID();String payload="{\"start\":\"2025-10-20T08:00:00.123456789Z\",\"ownerId\":\"existing-owner\"}";
             try(var insert=connection.prepareStatement("INSERT INTO tk_resource VALUES('existing-owner','WORK_SESSION',?,8,?)")) {insert.setObject(1,id);insert.setString(2,payload);insert.executeUpdate();}
-            ServerSchema.initializeOrValidate(connection);ServerSchema.validate(connection);ServerSchema.initializeOrValidate(connection);
+            assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(connection));
+            ServerSchema.initializeOrValidate(connection,true);ServerSchema.validate(connection);ServerSchema.initializeOrValidate(connection);
             try(var rows=statement.executeQuery("SELECT id,version,payload FROM tk_resource")) {assertTrue(rows.next());assertEquals(id,rows.getObject(1,UUID.class));assertEquals(8,rows.getLong(2));assertEquals(payload,rows.getString(3));assertFalse(rows.next());}
             try(var rows=statement.executeQuery("SELECT schema_version,state FROM tk_schema")) {rows.next();assertEquals(2,rows.getInt(1));assertEquals("READY",rows.getString(2));}
             try(var rows=statement.executeQuery("SELECT version,revision FROM tk_owner")) {rows.next();assertEquals(7,rows.getLong(1));assertEquals(19,rows.getLong(2));}

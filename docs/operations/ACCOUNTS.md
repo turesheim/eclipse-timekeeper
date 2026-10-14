@@ -49,7 +49,13 @@ Back up before upgrading. Schema 2 upgrades only the exact canonical server
 schema 1, preserving owner IDs, UUIDs, timestamps, relations, versions and
 revisions. PostgreSQL upgrades transactionally under a database advisory lock.
 Stop both replicas for the first schema upgrade: an older replica cannot serve
-schema 2. H2 marks an upgrade `MIGRATING` before its committing DDL; interruption
+schema 2. Upgrading is refused by default. After backing up and stopping both
+older replicas, set `TIMEKEEPER_ALLOW_SCHEMA_UPGRADE=true` in `.env` (or the JVM
+environment), select the same new image for both replicas, and start them. Remove
+the flag after successful migration. A fresh database needs no upgrade flag.
+Automatic rolling updates therefore fail safely against schema 1 and retain the
+old schema instead of silently upgrading one replica under an older peer.
+H2 marks an upgrade `MIGRATING` before its committing DDL; interruption
 fails closed and requires restoring the pre-upgrade backup. There is no downgrade
 or embedded Eclipse database migration.
 

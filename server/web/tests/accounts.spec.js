@@ -44,3 +44,21 @@ test('remember me persists a cookie while local storage holds no password or bea
   const cookie=(await page.context().cookies()).find(value=>value.name==='__Host-timekeeper-session');expect(cookie.expires).toBeGreaterThan(Date.now()/1000+28*86400);expect(await page.evaluate(()=>localStorage.length)).toBe(0);
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();expect((await page.context().cookies()).some(value=>value.name==='__Host-timekeeper-session')).toBe(false);
 });
+test('another tab changing the cookie clears the old account and rejects a late refresh',async({page,request})=>{
+  const username='switched-'+randomUUID().slice(0,8),secret='separate account passphrase';
+  const created=await call(request,'POST','/auth/users',{username,password:secret,displayName:'Other tab user',administrator:false});expect(created.status()).toBe(201);
+  await login(page);
+  let captured,release;const arrived=new Promise(resolve=>{captured=resolve;}),gate=new Promise(resolve=>{release=resolve;});
+  await page.route('**/api/v1/clients?*',async route=>{const response=await route.fetch();captured();await gate;await route.fulfill({response});});
+  await page.locator('#refresh').click();await arrived;
+  const peer=await page.context().newPage();
+  try {
+    await peer.goto('/web/');await expect(peer.locator('#status')).toHaveText('Up to date');
+    expect(await peer.evaluate(async body=>(await fetch('/api/v1/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).status,{username,password:secret,remember:false})).toBe(200);
+    await peer.reload();await expect(peer.locator('#owner')).toHaveText('Other tab user');release();
+    await expect(page.locator('#login')).toBeVisible();await expect(page.locator('#workspace')).not.toBeVisible();await expect(page.locator('#clients')).toBeEmpty();await expect(page.locator('#fields')).toBeEmpty();
+    await page.unroute('**/api/v1/clients?*');await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await expect(page.locator('#owner')).toHaveText('Other tab user');
+    await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true})));await expect(page.locator('#workspace')).not.toBeVisible();await expect(page.locator('#clients')).toBeEmpty();
+    await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));await expect(page.locator('#owner')).toHaveText('Other tab user');await expect(page.locator('#status')).toHaveText('Up to date');
+  } finally {release();await peer.close();}
+});

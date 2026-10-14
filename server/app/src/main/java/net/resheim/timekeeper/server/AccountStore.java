@@ -17,6 +17,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 @ApplicationScoped
 public class AccountStore {
     @Inject AgroalDataSource datasource;
+    @Inject TokenRegistry registry;
     @ConfigProperty(name="timekeeper.auth.setup-file",defaultValue="NONE") String setupFile;
     @ConfigProperty(name="quarkus.datasource.jdbc.url") String jdbcUrl;
     private static final String DUMMY=AccountPasswords.hash("This is a dummy password for constant work");
@@ -175,8 +176,8 @@ public class AccountStore {
             try(var statement=query(c,"SELECT digest FROM tk_api_token WHERE digest=?",digest);var rows=statement.executeQuery()) {
                 if(!rows.next()) execute(c,"INSERT INTO tk_api_token(digest,id,owner_id,name,permissions,expires_at,revoked,source,created_at,last_used_at,version,legacy_digest) VALUES(?,?,?,?,?,NULL,FALSE,'LEGACY',?,NULL,0,?)",digest,UUID.nameUUIDFromBytes(digest.getBytes(java.nio.charset.StandardCharsets.UTF_8)),owner,"Imported API token",permissions(permissions),Instant.now().toString(),rawDigest);
             }catch(SQLException failure) {throw databaseFailure(failure);}
-            execute(c,"UPDATE tk_api_token SET permissions=? WHERE digest=?",permissions(permissions),digest);
-            var principal=new TokenRegistry.Principal(owner,permissions,"LEGACY",digest,rawDigest);guard(c,principal);return principal;
+            var principal=new TokenRegistry.Principal(owner,permissions,"LEGACY",digest,rawDigest);guard(c,principal);
+            execute(c,"UPDATE tk_api_token SET permissions=? WHERE digest=?",permissions(permissions),digest);return principal;
         });
     }
     TokenRegistry.Principal managed(String digest) {
@@ -189,6 +190,7 @@ public class AccountStore {
     }
     /** Held until the business transaction commits: disable/revoke waits for already-authorized work. */
     void guard(Connection c,TokenRegistry.Principal principal) {
+        if(!registry.recheck(principal).permissions().containsAll(principal.permissions())) throw new ApiFailure(403,"FORBIDDEN");
         var account=account(c,principal.owner(),true);
         if(account.get("state").asText().equals("DISABLED")) throw ApiFailure.unauthorized(true);
         if(principal.kind().equals("SESSION")) {
