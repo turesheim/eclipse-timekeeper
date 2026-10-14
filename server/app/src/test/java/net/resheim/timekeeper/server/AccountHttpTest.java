@@ -87,7 +87,7 @@ class AccountHttpTest {
         assertEquals(401,call(other,"GET","/clients/"+id,null,false).statusCode());
     }
     @Test void tokenMigrationUsesAnHttpOnlySessionAndStillHonorsParentTokenRevocation() {
-        var reply=given().header("Authorization","Bearer test-read").post("/api/v1/auth/token-login");var session=browser(reply);
+        var reply=given().header("Cookie",AuthenticationFilter.COOKIE+"=obsolete-cookie").header("Authorization","Bearer test-read").post("/api/v1/auth/token-login");var session=browser(reply);
         assertEquals("[\"read\"]",node(reply.asString()).get("permissions").toString());
         assertEquals(403,call(session,"POST","/clients",node("{\"name\":\"Forbidden\",\"color\":\"#ffffff\"}"),true).statusCode());
         var writable=registry.authenticate("Bearer test-a");var tokens=accounts.tokens(writable).get("items");

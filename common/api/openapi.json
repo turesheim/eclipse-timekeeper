@@ -4902,7 +4902,7 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "__Host-timekeeper-session",
-        "description": "Opaque HttpOnly; Secure; SameSite=Lax cookie. Unsafe requests also require X-CSRF-Token from /auth/session and a same-origin Origin when present. Do not send Authorization and this cookie together."
+        "description": "Opaque HttpOnly; Secure; SameSite=Lax cookie. Unsafe requests also require X-CSRF-Token from /auth/session and a same-origin Origin when present. Data requests must not send Authorization and this cookie together. The explicit /auth/token-login transition uses its bearer credential and replaces any browser cookie."
       }
     },
     "schemas": {

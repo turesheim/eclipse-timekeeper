@@ -44,3 +44,7 @@ test('a response arriving after logout cannot expose the previous account', asyn
   const pending=api.request('/me');api.close();finish(reply({ownerId:'owner-a',private:'old draft'}));
   await assert.rejects(pending,error=>error.code==='UNAUTHENTICATED');
 });
+test('explicit bearer-to-cookie exchange accepts a Set-Cookie response without putting credentials in storage',async()=>{
+  const api=new Api('existing-token',async(url,options)=>{assert.equal(url,'/api/v1/auth/token-login');assert.equal(options.credentials,'same-origin');assert.equal(options.headers.Authorization,'Bearer existing-token');return reply({ownerId:'owner-a',csrf:'csrf'});});
+  await api.request('/auth/token-login',{method:'POST'});
+});

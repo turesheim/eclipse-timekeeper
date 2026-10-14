@@ -128,8 +128,9 @@ storage retains it. No CLIENT or WORK_SESSION UI is required in Eclipse.
 To rotate, create a replacement, configure the client, then revoke the old token.
 Revocation is independent per token and applies to pending polls and command
 replays. Browser sessions derived from that token are also invalidated; ordinary
-password sessions remain valid. Token and cookie credentials must not be sent
-together in one API request.
+password sessions remain valid. Data requests reject token and cookie credentials sent together. The explicit
+`/auth/token-login` transition instead uses the supplied bearer credential and
+replaces the browser cookie after checking its Origin.
 
 ## Operator recovery
 

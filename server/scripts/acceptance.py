@@ -255,7 +255,7 @@ def main():
         atomic_json(token_file, definitions)
         receipt['longPollVerified'] = True
         # Readiness reflects a malformed registry rather than merely a live TCP port.
-        atomic_json(token_file, [])
+        atomic_json(token_file, {})
         client.call('GET', '/projects', status=503, code='UNAVAILABLE')
         try:
             urlopen(base.replace('/api/v1', '/q/health/ready'), timeout=3)

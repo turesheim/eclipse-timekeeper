@@ -25,7 +25,8 @@ public class AuthenticationFilter implements ContainerRequestFilter {
                 if(cookie!=null || pair.length!=2) throw ApiFailure.badRequest();cookie=pair[1];
             }
         }
-        if(headers!=null && cookie!=null) throw ApiFailure.badRequest();
+        // Explicit token exchange replaces the browser session; other routes reject ambiguous credentials.
+        if(headers!=null && cookie!=null && !path.equals("api/v1/auth/token-login")) throw ApiFailure.badRequest();
         TokenRegistry.Principal principal;
         if(headers!=null) {
             if(headers.size()!=1) throw ApiFailure.unauthorized(true);principal=tokens.authenticate(headers.getFirst());

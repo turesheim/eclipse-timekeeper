@@ -80,7 +80,7 @@ public class AccountStore {
             if(!digest.matches("[a-f0-9]{64}") || !Set.of("SETUP","RECOVERY").contains(purpose)) throw new IllegalStateException("Invalid account setup file");
             var expires=Instant.parse(input.path("expiresAt").asText());String target=optionalText(input.get("ownerId")).orElse(null);
             if(target!=null) {
-                if(target.isBlank() || target.equals("local") || target.codePointCount(0,target.length())>200) throw new IllegalStateException("Invalid setup owner");
+                if(target.isBlank() || !target.equals(target.strip()) || target.equals("local") || target.codePointCount(0,target.length())>200) throw new IllegalStateException("Invalid setup owner");
                 if(purpose.equals("SETUP")) owner(c,target);
                 ensureAccount(c,target); // RECOVERY must refer to an existing owned identity (FK).
             } else if(purpose.equals("RECOVERY")) throw new IllegalStateException("Recovery requires an explicit existing owner");
@@ -175,6 +175,7 @@ public class AccountStore {
             try(var statement=query(c,"SELECT digest FROM tk_api_token WHERE digest=?",digest);var rows=statement.executeQuery()) {
                 if(!rows.next()) execute(c,"INSERT INTO tk_api_token(digest,id,owner_id,name,permissions,expires_at,revoked,source,created_at,last_used_at,version,legacy_digest) VALUES(?,?,?,?,?,NULL,FALSE,'LEGACY',?,NULL,0,?)",digest,UUID.nameUUIDFromBytes(digest.getBytes(java.nio.charset.StandardCharsets.UTF_8)),owner,"Imported API token",permissions(permissions),Instant.now().toString(),rawDigest);
             }catch(SQLException failure) {throw databaseFailure(failure);}
+            execute(c,"UPDATE tk_api_token SET permissions=? WHERE digest=?",permissions(permissions),digest);
             var principal=new TokenRegistry.Principal(owner,permissions,"LEGACY",digest,rawDigest);guard(c,principal);return principal;
         });
     }

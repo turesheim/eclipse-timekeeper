@@ -1,5 +1,5 @@
 const messages = {
-  UNAUTHENTICATED: 'Your session is no longer authorized. Sign out and sign in with a your account.',
+  UNAUTHENTICATED: 'Your session is no longer authorized. Sign in again with your account.',
   OWNER_CHANGED: 'The account for this session has changed. Sign out before using the intended account.',
   FORBIDDEN: 'Your account does not have permission to make this change.',
   STALE_VERSION: 'This record changed. Your draft is kept; cancel and reopen the editor to review the current record.',
@@ -46,7 +46,7 @@ export class Api {
       if (body !== undefined) headers['Content-Type'] = 'application/json';
       if (etag) headers['If-Match'] = etag;
       if (key) headers['Idempotency-Key'] = key;
-      const response = await this.fetcher(`/api/v1${path}`, {method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, redirect: 'error', credentials: this.#token ? 'omit' : 'same-origin', cache: 'no-store'});
+      const response = await this.fetcher(`/api/v1${path}`, {method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, redirect: 'error', credentials: this.#token && path !== '/auth/token-login' ? 'omit' : 'same-origin', cache: 'no-store'});
       const data = response.status === 204 ? null : await response.json();
       if (!response.ok) throw new ApiError(typeof data?.code === 'string' ? data.code : 'UNAVAILABLE', response.status);
       if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);
