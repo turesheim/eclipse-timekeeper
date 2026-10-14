@@ -13,6 +13,19 @@ from documentation import render_document
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def verify_build_identity(app, commit):
+    """The embedded runtime identity must agree with the distribution manifest."""
+    identities = []
+    for jar in (app / 'app').glob('*.jar'):
+        with zipfile.ZipFile(jar) as archive:
+            if 'timekeeper-build.properties' in archive.namelist():
+                properties = dict(line.split('=', 1) for line in archive.read('timekeeper-build.properties').decode().splitlines()
+                                  if '=' in line and not line.startswith('#'))
+                identities.append(properties)
+    if len(identities) != 1 or identities[0].get('commit') != commit or identities[0].get('dirty') != 'false':
+        raise ValueError('Packaged server build identity must match the exact clean source commit; rebuild before packaging')
+
+
 def package(output, tag, commit):
     if tag is not None and not re.fullmatch(r'v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?', tag):
         raise ValueError('Expected a semantic release/candidate tag')
@@ -29,6 +42,7 @@ def package(output, tag, commit):
     for path in [app / 'quarkus-run.jar', app / 'app', app / 'lib', app / 'quarkus']:
         if not path.exists():
             raise ValueError('Build the complete Quarkus JVM distribution before packaging')
+    verify_build_identity(app, commit)
     output.mkdir(parents=True, exist_ok=True)
     archive = output / 'timekeeper-server.zip'
     manifest = {'format': 1, 'kind': 'candidate' if tag is None else 'release', 'tag': tag, 'commit': commit, 'java': 21,

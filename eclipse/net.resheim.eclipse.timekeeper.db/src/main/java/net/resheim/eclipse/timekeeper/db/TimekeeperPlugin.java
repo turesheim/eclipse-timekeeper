@@ -96,6 +96,8 @@ public class TimekeeperPlugin extends Plugin {
     private volatile String databaseIdentity = "connecting";
     /** Opaque identity of the database actually opened, unaffected by pending preference changes. */
     public String databaseIdentity() {return databaseIdentity;}
+    private volatile long importGeneration;
+    public long importGeneration() {return importGeneration;}
 
 	private static Job saveDatabaseJob;
 
@@ -300,6 +302,8 @@ public class TimekeeperPlugin extends Plugin {
 		Path projectTasks = path.resolve("project_task.csv");
 		Path projectActivities = path.resolve("project_activity.csv");
 		Path externalReferences = path.resolve("external_task_reference.csv");
+		Path labels = path.resolve("activitylabel.csv");
+		Path activityLabels = path.resolve("activity_activitylabel.csv");
 		EntityTransaction transaction = entityManager.getTransaction();
 		transaction.begin();
 		int projectTypesExported = entityManager
@@ -320,8 +324,10 @@ public class TimekeeperPlugin extends Plugin {
 				.executeUpdate();
 		int referencesExported = entityManager.createNativeQuery("CALL CSVWRITE('" + externalReferences
 				+ "', 'SELECT * FROM EXTERNAL_TASK_REFERENCE');").executeUpdate();
+		int labelsExported = entityManager.createNativeQuery("CALL CSVWRITE('" + labels + "', 'SELECT * FROM ACTIVITYLABEL');").executeUpdate();
+		entityManager.createNativeQuery("CALL CSVWRITE('" + activityLabels + "', 'SELECT * FROM ACTIVITY_ACTIVITYLABEL');").executeUpdate();
 		transaction.commit();
-		return projectTypesExported + projectsExported + tasksExported + activitiesExported + referencesExported;
+		return projectTypesExported + projectsExported + tasksExported + activitiesExported + referencesExported + labelsExported;
 	}
 
 	/**
@@ -332,6 +338,14 @@ public class TimekeeperPlugin extends Plugin {
 	 * @throws IOException
 	 */
 	public int importFrom(Path path) throws IOException {
+		ActivityCsvValidation.validate(path.resolve("activity.csv"), java.time.Instant.now());
+		try (var prepared = ActivityCsvDays.prepare(path, java.time.ZoneId.systemDefault(), java.time.Instant.now())) {
+			return importDailyRows(prepared);
+		}
+	}
+
+	private int importDailyRows(ActivityCsvDays prepared) throws IOException {
+		Path path=prepared.folder;
 		Path projectTypes = path.resolve("project_type.csv");
 		Path projects = path.resolve("project.csv");
 		Path tasks = path.resolve("trackedtask.csv");
@@ -364,11 +378,12 @@ public class TimekeeperPlugin extends Plugin {
 		if (!externalReferences.toFile().exists()) {
 			throw new IOException("'external_task_reference.csv' does not exist in the specified location.");
 		}
-		ActivityCsvValidation.validate(activities, java.time.Instant.now());
+		Path labels=path.resolve("activitylabel.csv"), activityLabels=path.resolve("activity_activitylabel.csv");
+		if (Files.exists(labels) != Files.exists(activityLabels)) throw new IOException("The activity label export is incomplete.");
 		EntityTransaction transaction = entityManager.getTransaction();
 		try {
 			transaction.begin();
-			entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE;").executeUpdate();
+
 			int projectTypesImported = entityManager
 					.createNativeQuery("MERGE INTO PROJECT_TYPE (SELECT * FROM CSVREAD('" + projectTypes + "'));")
 					.executeUpdate();
@@ -378,6 +393,7 @@ public class TimekeeperPlugin extends Plugin {
 			int tasksImported = entityManager
 					.createNativeQuery("MERGE INTO TASK (SELECT * FROM CSVREAD('" + tasks + "'));")
 					.executeUpdate();
+			if (Files.exists(labels)) entityManager.createNativeQuery("MERGE INTO ACTIVITYLABEL (SELECT * FROM CSVREAD('"+labels+"')); ").executeUpdate();
 			int activitiesImported = entityManager
 					.createNativeQuery("MERGE INTO ACTIVITY (SELECT * FROM CSVREAD('" + activities + "'));")
 					.executeUpdate();
@@ -392,14 +408,19 @@ public class TimekeeperPlugin extends Plugin {
 					.executeUpdate();
 			int referencesImported = entityManager.createNativeQuery("MERGE INTO EXTERNAL_TASK_REFERENCE "
 					+ "(SELECT * FROM CSVREAD('" + externalReferences + "'));").executeUpdate();
-			entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE;").executeUpdate();
+			if (Files.exists(activityLabels)) entityManager.createNativeQuery("MERGE INTO ACTIVITY_ACTIVITYLABEL (SELECT * FROM CSVREAD('"+activityLabels+"')); ").executeUpdate();
+			else for (var archive : prepared.originals.entrySet()) entityManager.createNativeQuery(
+					"MERGE INTO ACTIVITY_ACTIVITYLABEL SELECT ?1, LABELS_ID FROM ACTIVITY_ACTIVITYLABEL WHERE ACTIVITY_ID=?2")
+					.setParameter(1,archive.getKey()).setParameter(2,archive.getValue()).executeUpdate();
+
 			transaction.commit();
 			// Refresh cached task state after importing persisted records.
+			importGeneration++;
 			List<Task> restoredTasks = entityManager.createQuery("SELECT t FROM Task t", Task.class).getResultList();
 			for (Task restoredTask : restoredTasks) entityManager.refresh(restoredTask);
 			return projectTypesImported + projectsImported + tasksImported + activitiesImported + referencesImported;
 		} catch (PersistenceException e) {
-			transaction.rollback();
+			if (transaction.isActive()) transaction.rollback();
 			throw new IOException(e.getMessage());
 		}
 	}

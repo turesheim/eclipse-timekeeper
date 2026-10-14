@@ -74,7 +74,7 @@ class DefaultTimekeeperServiceTest {
 		transactions = new CountingTransactions();
 		events = new ArrayList<>();
 		service = new DefaultTimekeeperService(new ServicePorts(store, store, store, store,
-				new SequentialIdentifiers(), time::now, transactions, events::add));
+				new SequentialIdentifiers(), time, transactions, events::add));
 	}
 
 	@Test
@@ -191,7 +191,7 @@ class DefaultTimekeeperServiceTest {
 		Activity activity = service.createActivity(new CreateActivity(task.id(), new OwnerId("alice"), start,
 				Optional.of(start.plus(Duration.ofHours(2))), "review", Set.of(label.id())));
 
-		activity = service.updateActivity(new UpdateActivity(activity.id(), 0, start.plus(Duration.ofMinutes(15)),
+		activity = service.updateActivity(new UpdateActivity(activity.id(), 0, activity.start().plus(Duration.ofMinutes(15)),
 				Optional.of(start.plus(Duration.ofHours(2))), "API review", Set.of(label.id())));
 		assertEquals(activity, service.activity(activity.id()).orElseThrow());
 		ActivityQuery filtered = new ActivityQuery(Instant.parse("2026-09-21T00:00:00Z"),
@@ -205,10 +205,79 @@ class DefaultTimekeeperServiceTest {
 		assertEquals(FailureCode.CONFLICT, usedLabel.code());
 
 		service.deleteActivity(new DeleteActivity(activity.id(), activity.version()));
+		assertThrows(ServiceException.class, () -> service.deleteLabel(new DeleteLabel(label.id(), label.version())));
+		for (var remaining : service.activities(filtered).activities())
+			service.deleteActivity(new DeleteActivity(remaining.id(), remaining.version()));
 		service.deleteLabel(new DeleteLabel(label.id(), label.version()));
 		service.deleteTask(new DeleteTask(task.id(), task.version()));
 		service.deleteProject(new DeleteProject(project.id(), project.version()));
 		assertFalse(store.activities.containsKey(activity.id()));
+	}
+
+	@Test
+	void manualIntervalsPersistDailyActivitiesWithExactDstTimeAndSharedMetadata() {
+		time.zone = ZoneId.of("Europe/Oslo");
+		var task = service.createTask(new CreateTask(Optional.empty(), "Daily manual time", Optional.empty()));
+		var label = service.createLabel(new CreateLabel("Shared label", Optional.empty()));
+		var start = Instant.parse("2025-10-25T21:59:59.123456789Z");
+		var end = Instant.parse("2025-10-27T22:00:00.987654321Z");
+		events.clear();
+		var retained = service.createActivity(new CreateActivity(task.id(), OwnerId.LOCAL, start, Optional.of(end), "Shared summary", Set.of(label.id())));
+		var report = service.activities(query(start.minusSeconds(1), end.plusSeconds(1)));
+		assertEquals(3, report.activities().size());
+		assertEquals(Duration.between(start, end), report.total());
+		assertEquals(Duration.ofHours(25), Duration.between(report.activities().get(1).start(), report.activities().get(1).end().orElseThrow()));
+		assertEquals(retained, report.activities().getLast());
+		assertEquals(start, report.activities().getFirst().start());
+		assertEquals(Optional.of(end), retained.end());
+		for (var part : report.activities()) {
+			assertEquals(task.id(), part.taskId()); assertEquals(OwnerId.LOCAL, part.ownerId());
+			assertEquals("Shared summary", part.summary()); assertEquals(Set.of(label.id()), part.labelIds()); assertTrue(part.manual());
+		}
+		assertEquals(3, events.stream().filter(event -> event.entityType() == EntityType.ACTIVITY && event.changeType() == ChangeType.CREATED).count());
+		var earlier = report.activities().subList(0, 2);
+		var edited = service.updateActivity(new UpdateActivity(retained.id(), retained.version(), retained.start().plusNanos(1), retained.end(), "Reviewed day", Set.of()));
+		for (var part : earlier) assertEquals(part, service.activity(part.id()).orElseThrow());
+		assertEquals(Duration.between(start, end).minusNanos(1), service.activities(query(start.minusSeconds(1), end.plusSeconds(1))).total());
+		assertEquals(retained.id(), edited.id());
+	}
+
+	@Test
+	void elapsedMidnightsArchiveTrackingWithoutChangingTheActiveIdentityOrRoundingTime() {
+		time.zone = ZoneId.of("Europe/Oslo");
+		time.now = Instant.parse("2025-10-25T21:59:59.123456789Z");
+		var task = service.createTask(new CreateTask(Optional.empty(), "Daily tracking", Optional.empty()));
+		var started = service.startActivity(new StartActivity(task.id(), OwnerId.LOCAL, "Tracked summary", Set.of()));
+		time.advance(Duration.ofHours(26));
+		service.rolloverActivities(OwnerId.LOCAL);
+		var active = service.activeActivity(OwnerId.LOCAL).orElseThrow();
+		assertEquals(started.id(), active.id()); assertEquals(started.version() + 1, active.version());
+		assertEquals(Instant.parse("2025-10-26T23:00:00Z"), active.start()); assertFalse(active.manual());
+		var report = service.activities(query(started.start().minusSeconds(1), time.now().plusSeconds(1)));
+		assertEquals(3, report.activities().size()); assertEquals(Duration.ofHours(26), report.total());
+		assertEquals(1, report.activities().stream().filter(part -> part.end().isEmpty()).count());
+		int count = events.size(); service.rolloverActivities(OwnerId.LOCAL);
+		assertEquals(active, service.activeActivity(OwnerId.LOCAL).orElseThrow()); assertEquals(count, events.size());
+		assertThrows(ServiceException.class, () -> service.stopActivity(new StopActivity(started.id(), started.version())));
+		var stopped = service.stopActivity(new StopActivity(active.id(), active.version()));
+		assertEquals(active.id(), stopped.id()); assertFalse(stopped.manual()); assertTrue(service.activeActivity(OwnerId.LOCAL).isEmpty());
+		assertEquals(Duration.ofHours(26), service.activities(query(started.start().minusSeconds(1), time.now().plusSeconds(1))).total());
+	}
+
+	@Test
+	void futureEndedIntervalsPartitionOnlyElapsedDaysAndCompleteWhenTheClockCatchesUp() {
+		time.now = Instant.parse("2025-03-30T12:00:00Z"); time.zone = ZoneId.of("Europe/Oslo");
+		var task = service.createTask(new CreateTask(Optional.empty(), "Future ending", Optional.empty()));
+		var start = Instant.parse("2025-03-29T10:00:00.123456789Z");
+		var end = Instant.parse("2025-04-01T10:00:00.987654321Z");
+		var tail = service.createActivity(new CreateActivity(task.id(), OwnerId.LOCAL, start, Optional.of(end), "Future ending", Set.of()));
+		assertEquals(2, store.activities.size());
+		for (var part : store.activities.values()) assertFalse(part.start().isAfter(time.now()));
+		time.now = end.plusSeconds(1); service.rolloverActivities(OwnerId.LOCAL);
+		var report = service.activities(query(start.minusSeconds(1), end.plusSeconds(1)));
+		assertEquals(4, report.activities().size()); assertEquals(tail.id(), report.activities().getLast().id());
+		assertEquals(Duration.between(start, end), report.total());
+		for (var part : report.activities()) assertTrue(part.end().orElseThrow().isAfter(part.start()));
 	}
 
 	@Test
@@ -280,16 +349,18 @@ class DefaultTimekeeperServiceTest {
 
 	private record EventShape(EntityType entity, ChangeType change) { }
 
-	private static final class MutableTime {
+	private static final class MutableTime implements Ports.TimeSource {
+		ZoneId zone = ZoneId.of("UTC");
 		private Instant now;
 
 		MutableTime(Instant now) {
 			this.now = now;
 		}
 
-		Instant now() {
+		@Override public Instant now() {
 			return now;
 		}
+		@Override public ZoneId zone(OwnerId owner) {return zone;}
 
 		void advance(Duration duration) {
 			now = now.plus(duration);
@@ -321,6 +392,7 @@ class DefaultTimekeeperServiceTest {
 		final Map<TaskId, Task> tasks = new HashMap<>();
 		final Map<ActivityId, Activity> activities = new HashMap<>();
 		final Map<LabelId, Label> labels = new HashMap<>();
+		@Override public List<Activity> findAllActivities() {return List.copyOf(activities.values());}
 
 		@Override public Optional<Project> find(ProjectId id) { return Optional.ofNullable(projects.get(id)); }
 		@Override public List<Project> findAllProjects() { return List.copyOf(projects.values()); }

@@ -48,6 +48,19 @@ interval. Its start cannot be in the future, whether it is ongoing or completed.
 The selected backend validates its own clock; an invalid edit or import leaves
 stored records unchanged.
 
+Activities that cross midnight become separate daily records. This applies to
+ongoing tracking, manually entered intervals and imports. Tracking continues
+with the same active identity on the new day; summary, task and labels follow
+it. Each completed day can then be edited or deleted separately. Local storage
+uses the computer's calendar time zone; server storage uses the account's time
+zone. Missed boundaries are processed after startup, with exact elapsed time
+preserved through daylight-saving changes. An editor opened before rollover
+must reload the changed record before saving.
+
+CSV exports include label definitions and activity-label assignments. Older
+exports without these two files remain supported; when merging such an export,
+existing labels on a split activity are copied to its new daily records.
+
 ## If the token cannot be saved
 
 Timekeeper encrypts tokens using Eclipse secure storage. A storage error occurs

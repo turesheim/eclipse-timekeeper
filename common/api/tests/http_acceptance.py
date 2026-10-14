@@ -105,7 +105,14 @@ class HttpAcceptance(unittest.TestCase):
         return value
 
     def clean_records(self):
-        # Clean only IDs created by this suite, including commands/imports.
+        # Daily splitting can create extra IDs beneath this suite's own tasks.
+        for owner, resource, identifier in list(dict.fromkeys(self.created)):
+            if resource != 'tasks': continue
+            query = urlencode({'from':'2000-01-01T00:00:00Z','to':'2100-01-01T00:00:00Z','taskId':identifier,'limit':500})
+            page, _ = self.call('GET', '/activities?' + query, owner=owner)
+            self.assertIsNone(page.get('nextCursor'), 'Fixture cleanup must include every daily record')
+            self.created.extend((owner,'activities',value['id']) for value in page['items'])
+        # Clean only records created by this suite, including commands/imports.
         order = {'activities': 0, 'tasks': 1, 'labels': 2, 'projects': 3}
         unique = list(dict.fromkeys(reversed(self.created)))
         for owner, resource, identifier in sorted(unique, key=lambda row: order[row[1]]):
@@ -305,7 +312,7 @@ class HttpAcceptance(unittest.TestCase):
     def test_daylight_saving_report_preserves_actual_duration(self):
         activity = self.create('activities', {'taskId': self.task['id'], 'start': '2026-03-28T23:00:00Z',
             'end': '2026-03-29T22:00:00Z', 'summary': '', 'labelIds': []})
-        query = urlencode({'from': activity['start'], 'to': activity['end'],
+        query = urlencode({'from': '2026-03-28T23:00:00Z', 'to': '2026-03-29T22:00:00Z',
                            'zoneId': 'Europe/Oslo', 'taskId': self.task['id']})
         report, _ = self.call('GET', '/reports/activities?' + query)
         self.assertEqual('PT23H', report['total'])

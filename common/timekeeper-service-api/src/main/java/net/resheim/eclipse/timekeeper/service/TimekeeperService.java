@@ -56,6 +56,7 @@ public interface TimekeeperService {
 	List<Label> labels();
 
 	Activity startActivity(StartActivity command);
+	void rolloverActivities(OwnerId ownerId);
 	Activity stopActivity(StopActivity command);
 	Optional<Activity> activeActivity(OwnerId ownerId);
 	Activity createActivity(CreateActivity command);

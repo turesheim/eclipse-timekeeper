@@ -1,6 +1,7 @@
 package net.resheim.eclipse.timekeeper.service;
 
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -38,6 +39,7 @@ public final class Ports {
 	}
 
 	public interface ActivityRepository {
+		List<Activity> findAllActivities();
 		Optional<Activity> find(ActivityId id);
 		Optional<Activity> findOpenByOwner(OwnerId ownerId);
 		List<Activity> findOverlapping(Instant fromInclusive, Instant toExclusive,
@@ -65,6 +67,7 @@ public final class Ports {
 	@FunctionalInterface
 	public interface TimeSource {
 		Instant now();
+		default ZoneId zone(OwnerId owner) { return ZoneId.of("UTC"); }
 	}
 
 	@FunctionalInterface

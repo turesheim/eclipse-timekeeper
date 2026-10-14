@@ -38,14 +38,37 @@
     </resources>
     <plugins>
       <plugin>
-        <groupId>io.github.git-commit-id</groupId><artifactId>git-commit-id-maven-plugin</artifactId><version>10.0.0</version>
-        <executions><execution><goals><goal>revision</goal></goals><phase>initialize</phase></execution></executions>
-        <configuration>
-          <dotGitDirectory>${project.basedir}/../../.git</dotGitDirectory>
-          <failOnNoGitDirectory>false</failOnNoGitDirectory>
-          <commitIdGenerationMode>full</commitIdGenerationMode>
-          <includeOnlyProperties><includeOnlyProperty>^git.commit.id.full$</includeOnlyProperty><includeOnlyProperty>^git.dirty$</includeOnlyProperty></includeOnlyProperties>
-        </configuration>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-antrun-plugin</artifactId><version>3.2.0</version>
+        <executions><execution><id>build-identity</id><phase>initialize</phase><goals><goal>run</goal></goals>
+          <configuration><exportAntProperties>true</exportAntProperties><target>
+            <!-- Run in this checkout: resolving .git links loses linked-worktree HEADs. -->
+            <exec executable="git" dir="${project.basedir}" failonerror="false" failifexecutionfails="false"
+                  outputproperty="build.git.commit" resultproperty="build.git.commit.result">
+              <arg value="rev-parse"/><arg value="--verify"/><arg value="HEAD"/>
+            </exec>
+            <exec executable="git" dir="${project.basedir}" failonerror="false" failifexecutionfails="false"
+                  outputproperty="build.git.status" resultproperty="build.git.status.result">
+              <arg value="status"/><arg value="--porcelain"/>
+            </exec>
+            <condition property="timekeeper.build.commit" value="${git.commit.id.full}">
+              <not><equals arg1="${git.commit.id.full}" arg2="unknown"/></not>
+            </condition>
+            <condition property="timekeeper.build.commit" value="${build.git.commit}">
+              <equals arg1="${build.git.commit.result}" arg2="0"/>
+            </condition>
+            <property name="timekeeper.build.commit" value="unknown"/>
+            <condition property="timekeeper.build.dirty" value="${git.dirty}">
+              <not><equals arg1="${git.dirty}" arg2="unknown"/></not>
+            </condition>
+            <condition property="timekeeper.build.dirty" value="false">
+              <and><equals arg1="${build.git.status.result}" arg2="0"/><equals arg1="${build.git.status}" arg2=""/></and>
+            </condition>
+            <condition property="timekeeper.build.dirty" value="true">
+              <equals arg1="${build.git.status.result}" arg2="0"/>
+            </condition>
+            <property name="timekeeper.build.dirty" value="unknown"/>
+          </target></configuration>
+        </execution></executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId>

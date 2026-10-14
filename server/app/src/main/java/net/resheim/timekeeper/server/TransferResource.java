@@ -97,6 +97,7 @@ public class TransferResource {
             Activity created=new Activity(new ActivityId(UUID.randomUUID()),task,new OwnerId(store.owner()),start,end,item.get("summary").asText(),assigned,item.get("manual").asBoolean(),0);
             store.save("ACTIVITY",created);store.change("ACTIVITY","CREATED",created.id().value().toString());mapping(mappings,"ACTIVITY",item,created.id().value());
         }
+        service.rolloverActivities(new OwnerId(store.owner()));
         result.put("revision",store.revision());return new ApiReplies(201,result,null,null);
     }
     private static <T> T required(Map<UUID,T> values,UUID id) {T value=values.get(id);if(value==null) throw ApiFailure.validation();return value;}
