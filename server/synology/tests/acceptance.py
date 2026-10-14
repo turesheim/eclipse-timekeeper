@@ -66,13 +66,17 @@ def main():
             else:
                 raise RuntimeError('Isolated PostgreSQL did not become ready')
             command('docker','exec',name,'sh','-ec',
-                    'mkdir -p /var/packages/timekeeper/scripts /var/packages/timekeeper/target '
+                    'mkdir -p /var/packages/timekeeper/scripts /var/packages/timekeeper/target/project '
                     '/var/packages/timekeeper/shares/timekeeper-data /var/packages/postgresql/target/bin /var/packages/ContainerManager; '
                     'printf \'version="24.0.2-1432"\n\' > /var/packages/ContainerManager/INFO; '
                     'for tool in psql pg_dump pg_restore; do ln -s /usr/lib/postgresql/17/bin/$tool /var/packages/postgresql/target/bin/$tool; done; '
                     'chown -R 10001:10001 /var/packages/timekeeper')
             command('docker','cp',str(binary),name+':/var/packages/timekeeper/scripts/timekeeper-dsm')
             command('docker','cp',str(release),name+':/var/packages/timekeeper/scripts/release.json')
+            blueprint=folder/'compose.yaml'
+            blueprint.write_text((ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',json.loads(release.read_text())['image']))
+            command('docker','exec',name,'mkdir','-p','/var/packages/timekeeper/target/project')
+            command('docker','cp',str(blueprint),name+':/var/packages/timekeeper/target/project/compose.yaml')
             command('docker','exec',name,'chmod','755','/var/packages/timekeeper/scripts/timekeeper-dsm')
 
             def helper(action, *arguments, expected=0):
@@ -91,6 +95,8 @@ def main():
                 return path.read_bytes()
 
             helper('validate'); helper('install')
+            if helper('status',expected=1).returncode!=3:raise AssertionError('Stopped package does not return DSM status 3')
+            helper('prestart')
             settings=json.loads(read('settings.json'))
             application_password=read('secrets/database_password').decode().strip()
             if settings['phase']!='READY' or settings['ownerId']!='existing-owner':

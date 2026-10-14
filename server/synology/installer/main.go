@@ -86,8 +86,20 @@ func run(action, root, target, releasePath string, env func(string) string, argu
 			return errors.New("Provide the absolute path to a verified native PostgreSQL 17 backup")
 		}
 		return restore(root, argument)
-	case "stop", "start":
-		return nil // Container Manager's worker owns the lifecycle.
+	case "stop", "prestop":
+		return nil // The resource worker stops containers AFTER the stop script.
+	case "prestart":
+		if _, err := os.Stat(filepath.Join(root, "config/maintenance-pending.json")); !errors.Is(err, os.ErrNotExist) {
+			return errors.New("Complete the interrupted maintenance operation before starting Timekeeper")
+		}
+		s, err := loadSettings(root)
+		if err != nil {
+			return err
+		}
+		return publishConfiguration(root, target, s)
+	case "start":
+		// WHEN_STARTUP acquires the container worker before the start script.
+		return waitReady(root, 120*time.Second, time.Second)
 	case "status":
 		return ready(root)
 	case "validate", "install", "upgrade":
@@ -138,6 +150,22 @@ func main() {
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		if os.Args[1] == "status" {
+			os.Exit(3)
+		} // DSM: not running (no PID/lock files).
 		os.Exit(1)
+	}
+}
+
+func waitReady(root string, timeout, interval time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		if err := ready(root); err == nil {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return errors.New("Timekeeper did not become ready; inspect the container logs")
+		}
+		time.Sleep(interval)
 	}
 }

@@ -17,6 +17,7 @@ import (
 )
 
 const packageID = "timekeeper"
+const packageTarget = "/var/packages/timekeeper/target"
 const nativePSQL = "/var/packages/postgresql/target/bin/psql"
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)

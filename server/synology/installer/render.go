@@ -7,24 +7,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
 
 func render(root, target string, s Settings) error {
-	config := filepath.Join(root, "config")
-	secretFile := filepath.Join(root, "secrets", "database_password")
-	environment := map[string]string{"TIMEKEEPER_SERVER_DB_URL": fmt.Sprintf("jdbc:postgresql://127.0.0.1:%d/%s", s.DatabasePort, s.Database), "TIMEKEEPER_SERVER_DB_USER": s.Role, "TIMEKEEPER_SERVER_DB_PASSWORD_FILE": "/run/secrets/database_password", "TIMEKEEPER_SERVER_TOKENS_FILE": "/config/tokens.json", "TIMEKEEPER_SERVER_SETUP_FILE": "/config/account-setup.json", "TIMEKEEPER_PUBLIC_ORIGIN": s.PublicOrigin, "TIMEKEEPER_DEPLOYED_AT": s.DeployedAt, "TIMEKEEPER_ALLOW_SCHEMA_UPGRADE": "false", "TIMEKEEPER_MAINTENANCE_FILE": "/config/maintenance-pending.json", "QUARKUS_HTTP_HOST": "127.0.0.1", "QUARKUS_HTTP_PORT": strconv.Itoa(s.HTTPPort)}
-	service := map[string]any{"image": s.Release.Image, "network_mode": "host", "restart": "unless-stopped", "read_only": true, "init": true, "tmpfs": []string{"/tmp"}, "cap_drop": []string{"ALL"}, "security_opt": []string{"no-new-privileges:true"}, "environment": environment, "volumes": []any{map[string]any{"type": "bind", "source": config, "target": "/config", "read_only": true}, map[string]any{"type": "bind", "source": secretFile, "target": "/run/secrets/database_password", "read_only": true}}, "logging": map[string]any{"driver": "json-file", "options": map[string]string{"max-size": "10m", "max-file": "3"}}}
-	service["healthcheck"] = map[string]any{"test": []string{"CMD", "curl", "--fail", "--silent", fmt.Sprintf("http://127.0.0.1:%d/q/health/ready", s.HTTPPort)}, "interval": "10s", "timeout": "5s", "start_period": "60s", "retries": 3}
-	if err := os.MkdirAll(filepath.Join(target, "project"), 0755); err != nil {
+	if err := publishConfiguration(root, target, s); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Join(target, "ui"), 0755); err != nil {
-		return err
-	}
-	if err := writeJSON(filepath.Join(target, "project", "compose.yaml"), map[string]any{"services": map[string]any{"server": service}}, 0644); err != nil {
 		return err
 	}
 	launch := map[string]any{".url": map[string]any{"net.resheim.timekeeper": map[string]any{"type": "url", "title": "Timekeeper", "desc": "Timekeeper web client", "allUsers": true, "icon": "images/timekeeper_{0}.png", "url": s.PublicOrigin + "/web/"}}}
@@ -166,4 +157,69 @@ func renewSetup(root string, s Settings, code string) error {
 		}
 	}
 	return writeChallenge(root, Wizard{Settings: s, Code: code})
+}
+
+// Container Manager acquires the project BEFORE postinst. Compose and its bind
+// directories therefore ship in package.tgz. postinst writes only files inside
+// those existing directories; it never replaces a directory mounted by Docker.
+// The parent is private to the package account while each mounted directory is
+// readable by the server's distinct container UID.
+func publishConfiguration(root, target string, s Settings) error {
+	private := filepath.Join(target, "private")
+	if err := os.MkdirAll(private, 0700); err != nil {
+		return err
+	}
+	if err := os.Chmod(private, 0700); err != nil {
+		return err
+	}
+	for _, name := range []string{"config", "secrets"} {
+		if err := os.MkdirAll(filepath.Join(private, name), 0755); err != nil {
+			return err
+		}
+	}
+	for _, name := range []string{"config/tokens.json", "config/account-setup.json", "secrets/database_password"} {
+		content, err := os.ReadFile(filepath.Join(root, name))
+		if err != nil {
+			return err
+		}
+		mode := os.FileMode(0644)
+		if name == "secrets/database_password" {
+			mode = 0444
+		}
+		if err = atomic(filepath.Join(private, name), content, mode); err != nil {
+			return err
+		}
+	}
+	properties := fmt.Sprintf("quarkus.datasource.jdbc.url=jdbc:postgresql://127.0.0.1:%d/%s\nquarkus.datasource.username=%s\nquarkus.http.port=%d\ntimekeeper.auth.public-origin=%s\ntimekeeper.deployed-at=%s\ntimekeeper.schema.allow-upgrade=false\n", s.DatabasePort, s.Database, s.Role, s.HTTPPort, s.PublicOrigin, s.DeployedAt)
+	if err := atomic(filepath.Join(private, "config/runtime.properties"), []byte(properties), 0644); err != nil {
+		return err
+	}
+	if err := atomic(filepath.Join(private, "config/http-port"), []byte(fmt.Sprint(s.HTTPPort)+"\n"), 0644); err != nil {
+		return err
+	}
+	return syncMaintenanceMarker(root, target)
+}
+func syncMaintenanceMarker(root, target string) error {
+	marker := "config/maintenance-pending.json"
+	content, err := os.ReadFile(filepath.Join(root, marker))
+	if errors.Is(err, os.ErrNotExist) {
+		err = os.Remove(filepath.Join(target, "private", marker))
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	return atomic(filepath.Join(target, "private", marker), content, 0644)
+}
+func finishMaintenance(root string, s Settings) error {
+	if err := publishConfiguration(root, packageTarget, s); err != nil {
+		return err
+	}
+	if err := os.Remove(filepath.Join(root, "config/maintenance-pending.json")); err != nil {
+		return err
+	}
+	return syncMaintenanceMarker(root, packageTarget)
 }

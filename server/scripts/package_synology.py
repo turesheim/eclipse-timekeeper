@@ -84,7 +84,9 @@ def build(output, commit, image, revision, channel):
         package = ROOT/'server/synology'
         shutil.copytree(package/'ui', payload/'ui')
         (payload/'project').mkdir()
-        (payload/'project/compose.yaml').write_text('{"services":{}}\n')
+        (payload/'project/compose.yaml').write_text((package/'project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',image))
+        (payload/'private').mkdir(mode=0o700)
+        for name in ('config','secrets'):(payload/'private'/name).mkdir(mode=0o755)
         (outer/'scripts').mkdir()
         shutil.copytree(package/'conf', outer/'conf')
         shutil.copytree(package/'WIZARD_UIFILES', outer/'WIZARD_UIFILES')
@@ -125,7 +127,7 @@ def build(output, commit, image, revision, channel):
                 'os_min_ver':'7.2.2-72806', 'arch':'r1000', 'maintainer':'Timekeeper contributors',
                 'maintainer_url':'https://github.com/turesheim/eclipse-timekeeper',
                 'description':'Private time tracking with a bundled web client and SynoCommunity PostgreSQL.',
-                'thirdparty':'yes', 'startable':'yes', 'precheckstartstop':'no', 'silent_install':'no', 'silent_upgrade':'no',
+                'thirdparty':'yes', 'startable':'yes', 'precheckstartstop':'yes', 'silent_install':'no', 'silent_upgrade':'no',
                 'dsmuidir':'ui', 'dsmappname':'net.resheim.timekeeper',
                 'install_dep_packages':'ContainerManager:postgresql>=17.11-6',
                 'checksum':checksum}

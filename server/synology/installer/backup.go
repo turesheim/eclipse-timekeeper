@@ -260,7 +260,7 @@ func restore(root, path string) error {
 			return err
 		}
 	}
-	return os.Remove(filepath.Join(root, "config/maintenance-pending.json"))
+	return finishMaintenance(root, s)
 }
 
 func beginMaintenance(root, path, operation string) error {
@@ -277,15 +277,21 @@ func beginMaintenance(root, path, operation string) error {
 	err = readJSON(journal, &retained)
 	if err == nil {
 		if retained.Operation == operation && operation == "native-restore" {
-			return writeJSON(journal, pending{operation, digest}, 0644)
+			if err = writeJSON(journal, pending{operation, digest}, 0644); err != nil {
+				return err
+			}
+			return syncMaintenanceMarker(root, packageTarget)
 		}
 		if retained.Operation != operation || retained.ArchiveSHA256 != digest {
 			return errors.New("Retry the same archive and operation to complete interrupted maintenance")
 		}
-		return nil
+		return syncMaintenanceMarker(root, packageTarget)
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return errors.New("Restore the original maintenance journal before proceeding")
 	}
-	return writeJSON(journal, pending{operation, digest}, 0644)
+	if err = writeJSON(journal, pending{operation, digest}, 0644); err != nil {
+		return err
+	}
+	return syncMaintenanceMarker(root, packageTarget)
 }

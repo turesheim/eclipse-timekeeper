@@ -165,7 +165,7 @@ func importPostgreSQL18(root, path, resources string) error {
 	if err = atomic(filepath.Join(root, "config/tokens.json"), tokens, 0644); err != nil {
 		return err
 	}
-	return os.Remove(filepath.Join(root, "config/maintenance-pending.json"))
+	return finishMaintenance(root, s)
 }
 
 // Cancellation is safe only when the import transaction left the target unused.
@@ -194,5 +194,8 @@ func cancelEmptyImport(root string) error {
 	if value != "0\nf" {
 		return errors.New("The imported database contains data; retry the original archive to complete migration")
 	}
-	return os.Remove(path)
+	if err = os.Remove(path); err != nil {
+		return err
+	}
+	return syncMaintenanceMarker(root, packageTarget)
 }

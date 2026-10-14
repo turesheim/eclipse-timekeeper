@@ -4,9 +4,14 @@ import (
 	"archive/tar"
 	"bytes"
 	"encoding/json"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	syncatomic "sync/atomic"
 	"testing"
 	"time"
 )
@@ -123,12 +128,67 @@ func TestProjectUsesPinnedImageNativeDatabasePrivateFilesAndTheSelectedPort(t *t
 	s := w.Settings
 	s.Release = Release{Commit: strings.Repeat("a", 40), Image: "ghcr.io/turesheim/eclipse-timekeeper-server:sha-" + strings.Repeat("a", 40), Schema: 2}
 	s.Phase = "READY"
+	for _, name := range []string{"config", "secrets"} {
+		if err := os.Mkdir(filepath.Join(root, name), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{"config/tokens.json", "config/account-setup.json", "secrets/database_password"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte("fixture"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	blueprint, err := os.ReadFile("../project/compose.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := []byte(strings.ReplaceAll(string(blueprint), "@TIMEKEEPER_IMAGE@", s.Release.Image))
+	if err = os.Mkdir(filepath.Join(target, "project"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(target, "project/compose.yaml"), original, 0644); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"config", "secrets"} {
+		if err := os.MkdirAll(filepath.Join(target, "private", name), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mountedBefore, err := os.Stat(filepath.Join(target, "private/config"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := render(root, target, s); err != nil {
 		t.Fatal(err)
+	}
+	mountedAfter, err := os.Stat(filepath.Join(target, "private/config"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	private, err := os.Stat(filepath.Join(target, "private"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(mountedBefore, mountedAfter) || private.Mode().Perm() != 0700 {
+		t.Fatal("postinst replaced a mounted directory or exposed private configuration")
 	}
 	content, err := os.ReadFile(filepath.Join(target, "project", "compose.yaml"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !bytes.Equal(content, original) {
+		t.Fatal("postinst changed a project already acquired by Container Manager")
+	}
+	properties, err := os.ReadFile(filepath.Join(target, "private/config/runtime.properties"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := os.ReadFile(filepath.Join(target, "private/config/http-port"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(port) != "8098\n" {
+		t.Fatal("wrong runtime health port")
 	}
 	if bytes.Contains(content, []byte(w.AdminPassword)) || bytes.Contains(content, []byte(w.Code)) || bytes.Contains(content, []byte("latest")) {
 		t.Fatal("project exposes credentials or follows a moving image")
@@ -148,10 +208,10 @@ func TestProjectUsesPinnedImageNativeDatabasePrivateFilesAndTheSelectedPort(t *t
 		t.Fatal("DSM package must reuse native PostgreSQL")
 	}
 	server := project.Services["server"]
-	if server.NetworkMode != "host" || server.Environment["QUARKUS_HTTP_HOST"] != "127.0.0.1" || server.Environment["TIMEKEEPER_ALLOW_SCHEMA_UPGRADE"] != "false" {
+	if server.NetworkMode != "host" || server.Environment["QUARKUS_HTTP_HOST"] != "127.0.0.1" || !strings.Contains(string(properties), "timekeeper.schema.allow-upgrade=false") {
 		t.Fatal("unsafe listener or migration configuration")
 	}
-	if !strings.Contains(server.Environment["TIMEKEEPER_SERVER_DB_URL"], "127.0.0.1:5433/timekeeper") || !strings.Contains(strings.Join(server.Healthcheck.Test, " "), ":8098/") {
+	if !strings.Contains(string(properties), "127.0.0.1:5433/timekeeper") || !strings.Contains(strings.Join(server.Healthcheck.Test, " "), "/config/http-port") {
 		t.Fatal("database or healthcheck uses the wrong port")
 	}
 }
@@ -229,6 +289,38 @@ func TestRestoreRefusesUnrecognizedArchivePaths(t *testing.T) {
 		f.Close()
 		if _, err = unpackBackup(path, t.TempDir()); err == nil {
 			t.Fatalf("accepted member %q", name)
+		}
+	}
+}
+
+func TestStartWaitsForContainerWorkerReadiness(t *testing.T) {
+	for _, healthy := range []bool{true, false} {
+		var calls syncatomic.Int32
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			count := calls.Add(1)
+			if r.URL.Path != "/q/health/ready" {
+				t.Errorf("wrong readiness path")
+			}
+			if !healthy || count < 2 {
+				w.WriteHeader(503)
+				return
+			}
+			w.WriteHeader(200)
+		}))
+		_, port, _ := net.SplitHostPort(strings.TrimPrefix(server.URL, "http://"))
+		s := fixtureWizard(t).Settings
+		s.HTTPPort, _ = strconv.Atoi(port)
+		s.InstallationID, _ = secret()
+		s.Release.Schema = 2
+		s.Phase = "READY"
+		root := t.TempDir()
+		if err := writeJSON(filepath.Join(root, "settings.json"), s, 0600); err != nil {
+			t.Fatal(err)
+		}
+		err := waitReady(root, 50*time.Millisecond, 5*time.Millisecond)
+		server.Close()
+		if (err == nil) != healthy || calls.Load() < 2 {
+			t.Fatalf("incorrect startup readiness result: healthy=%t, calls=%d", healthy, calls.Load())
 		}
 	}
 }

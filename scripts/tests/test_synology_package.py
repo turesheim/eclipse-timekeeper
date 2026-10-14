@@ -20,7 +20,10 @@ def archive(files, compressed=False, extra=None):
     output=io.BytesIO()
     with tarfile.open(fileobj=output,mode='w:gz' if compressed else 'w') as tar:
         for name,value in files.items():
-            item=tarfile.TarInfo(name);item.size=len(value)
+            item=tarfile.TarInfo(name)
+            if value is None:
+                item.type=tarfile.DIRTYPE;item.mode=0o700 if name=='private' else 0o755;tar.addfile(item);continue
+            item.size=len(value)
             item.mode=0o755 if name.startswith('scripts/') and not name.endswith('.json') else 0o644
             tar.addfile(item,io.BytesIO(value))
         if extra is not None: tar.addfile(extra)
@@ -28,16 +31,18 @@ def archive(files, compressed=False, extra=None):
 
 
 class SynologyPackageTest(unittest.TestCase):
-    def candidate(self, *, image_tag=IMAGE, architecture='amd64', missing_launcher=False, elevated=False, outer_extra=None, checksum=None):
+    def candidate(self, *, image_tag=IMAGE, architecture='amd64', missing_launcher=False, empty_project=False, elevated=False, outer_extra=None, checksum=None):
         image=archive({'manifest.json':json.dumps([{'RepoTags':[image_tag],'Config':'config.json','Layers':[]}]).encode(),
                        'config.json':json.dumps({'architecture':architecture,'os':'linux'}).encode()},True)
-        payload={'image.tar.gz':image,'project/compose.yaml':b'{"services":{}}',
+        payload={'image.tar.gz':image,'project/compose.yaml':(ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',IMAGE).encode(),
+                 'private':None,'private/config':None,'private/secrets':None,
                  **{name:b'guide' for name in ('README.md','ACCOUNTS.md','TAILSCALE.md')}}
         if not missing_launcher:payload['ui/config']=(ROOT/'server/synology/ui/config').read_bytes()
+        if empty_project:payload['project/compose.yaml']=b'{"services":{}}'
         payload=archive(payload,True)
         info={'package':'timekeeper','arch':'r1000','os_min_ver':'7.2.2-72806','version':'1.99.0-1',
               'dsmuidir':'ui','dsmappname':'net.resheim.timekeeper','install_dep_packages':'ContainerManager:postgresql>=17.11-6',
-              'checksum':checksum or hashlib.md5(payload,usedforsecurity=False).hexdigest()}
+              'precheckstartstop':'yes','checksum':checksum or hashlib.md5(payload,usedforsecurity=False).hexdigest()}
         files={name:b'#!/bin/sh\nexit 0\n' for name in REQUIRED}
         helper=bytearray(64);helper[:5]=b'\x7fELF\x02';struct.pack_into('<H',helper,18,62)
         files.update({'INFO':''.join(key+'='+json.dumps(value)+'\n' for key,value in info.items()).encode(),
@@ -64,7 +69,7 @@ class SynologyPackageTest(unittest.TestCase):
             with self.subTest(overrides=overrides),self.assertRaises(ValueError):self.check(self.candidate(**overrides))
 
     def test_missing_launcher_privileged_controller_or_corrupted_payload_is_rejected(self):
-        for overrides in ({'missing_launcher':True},{'elevated':True},{'checksum':'0'*32}):
+        for overrides in ({'missing_launcher':True},{'empty_project':True},{'elevated':True},{'checksum':'0'*32}):
             with self.subTest(overrides=overrides),self.assertRaises(ValueError):self.check(self.candidate(**overrides))
 
     def test_parent_path_and_symlink_escape_is_rejected(self):

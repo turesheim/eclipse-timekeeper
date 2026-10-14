@@ -56,6 +56,8 @@ def validate(path):
             raise ValueError('Incorrect target DSM identity')
         if not re.fullmatch(r'(1\.99\.0|2\.0\.0)-[1-9][0-9]*',info.get('version','')):
             raise ValueError('Invalid monotonic package version')
+        if info.get('precheckstartstop')!='yes':
+            raise ValueError('Package start must synchronize retained configuration before the worker starts')
         if info.get('dsmuidir')!='ui' or info.get('dsmappname')!='net.resheim.timekeeper':
             raise ValueError('Missing Package Center Open integration')
         if info.get('install_dep_packages')!='ContainerManager:postgresql>=17.11-6':
@@ -85,8 +87,13 @@ def validate(path):
             raise ValueError('DSM payload checksum mismatch')
         with tarfile.open(fileobj=io.BytesIO(payload),mode='r:gz') as inner:
             contents=safe_members(inner)
-            if not {'ui/config','project/compose.yaml','image.tar.gz','README.md','ACCOUNTS.md','TAILSCALE.md'}.issubset(contents):
+            if not {'ui/config','project/compose.yaml','image.tar.gz','README.md','ACCOUNTS.md','TAILSCALE.md','private','private/config','private/secrets'}.issubset(contents):
                 raise ValueError('Incomplete payload/Open configuration')
+            if not contents['private'].isdir() or contents['private'].mode & 0o777 != 0o700:
+                raise ValueError('Package runtime configuration needs a private parent directory')
+            project=json.load(inner.extractfile('project/compose.yaml'))
+            if set(project.get('services',{}))!={'server'} or project['services']['server'].get('image')!=release['image']:
+                raise ValueError('Container Manager needs the complete pinned project before postinst')
             launch=json.load(inner.extractfile('ui/config'))
             if launch['.url']['net.resheim.timekeeper']['type']!='url':
                 raise ValueError('Invalid DSM launcher')

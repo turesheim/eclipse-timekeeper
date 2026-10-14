@@ -101,6 +101,10 @@ def main():
             command('docker','cp',str(binary),target+':/var/packages/timekeeper/scripts/timekeeper-dsm')
             release=folder/'release.json';release.write_text(json.dumps({'commit':'a'*40,'image':'ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+'a'*40,'serverSchema':2}))
             command('docker','cp',str(release),target+':/var/packages/timekeeper/scripts/release.json')
+            blueprint=folder/'compose.yaml'
+            blueprint.write_text((ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',json.loads(release.read_text())['image']))
+            command('docker','exec',target,'mkdir','-p','/var/packages/timekeeper/target/project')
+            command('docker','cp',str(blueprint),target+':/var/packages/timekeeper/target/project/compose.yaml')
             for file in ('postgresql-shape.sql','schema-v2-postgresql.shape'):
                 command('docker','cp',str(DB/file),target+':/var/packages/timekeeper/scripts/migration/'+file)
             env={'SYNOPKG_PKGNAME':'timekeeper','SYNOPKG_PKGDEST':'/var/packages/timekeeper/target','wizard_database':'timekeeper_fixture','wizard_database_role':'timekeeper_fixture_app',

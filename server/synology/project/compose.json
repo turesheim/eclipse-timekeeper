@@ -1,0 +1,31 @@
+{
+  "services": {
+    "server": {
+      "image": "@TIMEKEEPER_IMAGE@",
+      "network_mode": "host",
+      "restart": "unless-stopped",
+      "read_only": true,
+      "init": true,
+      "tmpfs": ["/tmp"],
+      "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges:true"],
+      "environment": {
+        "QUARKUS_CONFIG_LOCATIONS": "file:/config/runtime.properties",
+        "QUARKUS_HTTP_HOST": "127.0.0.1",
+        "TIMEKEEPER_SERVER_DB_PASSWORD_FILE": "/run/secrets/database_password",
+        "TIMEKEEPER_SERVER_TOKENS_FILE": "/config/tokens.json",
+        "TIMEKEEPER_SERVER_SETUP_FILE": "/config/account-setup.json",
+        "TIMEKEEPER_MAINTENANCE_FILE": "/config/maintenance-pending.json"
+      },
+      "volumes": [
+        {"type":"bind", "source":"/var/packages/timekeeper/target/private/config", "target":"/config", "read_only":true},
+        {"type":"bind", "source":"/var/packages/timekeeper/target/private/secrets", "target":"/run/secrets", "read_only":true}
+      ],
+      "healthcheck": {
+        "test": ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:$$(cat /config/http-port)/q/health/ready"],
+        "interval":"10s", "timeout":"5s", "start_period":"60s", "retries":3
+      },
+      "logging": {"driver":"json-file", "options":{"max-size":"10m", "max-file":"3"}}
+    }
+  }
+}

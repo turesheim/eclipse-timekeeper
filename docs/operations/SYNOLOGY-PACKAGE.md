@@ -36,6 +36,16 @@ binds its HTTP listener to **127.0.0.1**. HTTPS and the exact public origin are
 required for browser sign-in. The selected HTTP port is also used by the container
 health check. The application runs as UID 10001 with a read-only filesystem.
 
+The complete Compose project and empty bind directories ship in `package.tgz`:
+DSM acquires the project **before** `postinst`. The installer then copies retained
+configuration into those existing directories under a mode-0700 package-private
+parent. Quarkus reads runtime properties after container start, so project creation
+needs neither database credentials nor install-time environment substitution.
+`prestart` synchronizes retained files and checks maintenance state before startup;
+`start` waits for application readiness after the worker starts the container.
+Stopped status uses DSM exit code 3. See Synology's [resource timing](https://help.synology.com/developer-guide/resource_acquisition/timing.html)
+and [script lifecycle](https://help.synology.com/developer-guide/synology_package/scripts.html).
+
 ## Data and lifecycle
 
 The `timekeeper-data` shared folder is managed through DSM's Data Share worker.
@@ -224,7 +234,9 @@ and its [repository setup guide](https://docs.synocommunity.com/developer-guide/
 Automated PostgreSQL 17 schema/migration tests and an unprivileged installer test
 against real PostgreSQL verify role privileges, retained credentials, interrupted
 provisioning, explicit owner mapping and absence of plaintext credentials in SQL
-statement logs. Native PostgreSQL 17 backup/restore and corrupt-archive refusal are
+statement logs. The static project is created before runtime files are supplied,
+then the real server and its selected-port healthcheck are started against native
+loopback PostgreSQL; migrated passwords must authenticate as their original owners. Native PostgreSQL 17 backup/restore and corrupt-archive refusal are
 also tested in the isolated package layout. A real PostgreSQL 18.6 → 17.11 transfer
 compares all 14 tables with two owners, shared resource UUIDs, nanosecond timestamps,
 revisions above JavaScript's exact integer range and authentication state. A
