@@ -113,12 +113,55 @@ class HttpAcceptance(unittest.TestCase):
             self.assertIsNone(page.get('nextCursor'), 'Fixture cleanup must include every daily record')
             self.created.extend((owner,'activities',value['id']) for value in page['items'])
         # Clean only records created by this suite, including commands/imports.
-        order = {'activities': 0, 'work-sessions': 1, 'tasks': 2, 'labels': 3, 'projects': 4}
+        order = {'activities': 0, 'work-sessions': 1, 'tasks': 2, 'labels': 3, 'projects': 4, 'clients': 5}
         unique = list(dict.fromkeys(reversed(self.created)))
         for owner, resource, identifier in sorted(unique, key=lambda row: order[row[1]]):
             value, headers = self.call('GET', f'/{resource}/{identifier}', owner=owner)
             self.call('DELETE', f'/{resource}/{identifier}', owner=owner,
                       headers={'If-Match': headers['ETag']}, status=204)
+
+    def test_clients_own_projects_and_titled_sessions_with_portable_relations(self):
+        client = self.create('clients', {'name': self.prefix, 'color': '#ffee00'})
+        second = self.create('projects', {'name': self.prefix + ' second', 'clientId': client['id']})
+        _, project_headers = self.call('GET', '/projects/' + self.project['id'])
+        project, _ = self.call('PUT', '/projects/' + self.project['id'],
+                               headers={'If-Match': project_headers['ETag']},
+                               body={'name': self.project['name'], 'clientId': client['id']})
+        session = self.create('work-sessions', {'clientId': client['id'], 'title': 'Planning',
+                              'summary': 'Description', 'start': '2025-10-20T08:00:00.123456789Z',
+                              'end': '2025-10-20T16:00:00.987654321Z'})
+        report, _ = self.call('GET', '/work-sessions/' + session['id'] + '/report')
+        self.assertEqual(session, report['session'])
+        projects, _ = self.call('GET', '/projects?clientId=' + client['id'])
+        self.assertEqual({project['id'], second['id']}, {item['id'] for item in projects['items']})
+        _, headers = self.call('GET', '/clients/' + client['id'])
+        changed, _ = self.call('PUT', '/clients/' + client['id'], headers={'If-Match': headers['ETag']},
+                               body={'name': self.prefix + ' renamed', 'color': '#102030'})
+        self.assertEqual(client['version'] + 1, changed['version'])
+        self.call('PUT', '/clients/' + client['id'], headers={'If-Match': headers['ETag']},
+                  body={'name': 'Stale', 'color': '#ffffff'}, status=412, code='STALE_VERSION')
+        _, headers = self.call('GET', '/clients/' + client['id'])
+        self.call('DELETE', '/clients/' + client['id'], headers={'If-Match': headers['ETag']}, status=409)
+        self.call('GET', '/clients/' + client['id'], owner='b', status=404)
+        self.call('POST', '/clients', owner='read', body={'name': 'Read only', 'color': '#ffffff'}, status=403)
+        self.call('POST', '/projects', owner='b', body={'name': 'Foreign', 'clientId': client['id']}, status=404)
+        exported, _ = self.call('GET', '/data/export')
+        self.assertEqual('timekeeper-domain-v3', exported['format'])
+        wire = lambda item: {key: value for key, value in item.items() if key not in ('ownerId', 'version', 'state')}
+        data = {'format': 'timekeeper-domain-v3', 'zoneId': 'UTC', 'clients': [wire(changed)],
+                'projects': [wire(second)], 'tasks': [], 'labels': [], 'activities': [], 'workSessions': [wire(session)]}
+        result, _ = self.call('POST', '/data/import', owner='b', body=data, headers=self.key(), status=201)
+        kinds = {'CLIENT': 'clients', 'PROJECT': 'projects', 'WORK_SESSION': 'work-sessions'}
+        remapped = {item['sourceId']: item['id'] for item in result['ids']}
+        for item in result['ids']:
+            self.created.append(('b', kinds[item['entityType']], item['id']))
+        copied, _ = self.call('GET', '/work-sessions/' + remapped[session['id']], owner='b')
+        copied_project, _ = self.call('GET', '/projects/' + remapped[second['id']], owner='b')
+        self.assertEqual(remapped[client['id']], copied['clientId'])
+        self.assertEqual(copied['clientId'], copied_project['clientId'])
+        self.assertEqual('Planning', copied['title'])
+        self.assertEqual(session['start'], copied['start'])
+        self.assertNotEqual(client['id'], copied['clientId'])
 
     @staticmethod
     def key():

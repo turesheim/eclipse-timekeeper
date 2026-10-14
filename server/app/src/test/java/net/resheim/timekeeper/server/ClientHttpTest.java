@@ -74,7 +74,12 @@ class ClientHttpTest {
                 else {node.put("summary","Legacy session");node.put("start","2025-10-20T06:03:00.123456789Z");node.put("end","2025-10-20T14:03:00.987654321Z");node.put("state","COMPLETED");}
                 store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,?,?)",owner,entry.getKey(),entry.getValue(),4,node.toString());
             }
-            store.migrateClientDetails();var migrated=store.find("WORK_SESSION",session).orElseThrow();
+            return null;
+        });
+        // Startup must also upgrade owners no longer configured in the token registry.
+        store.initializeConfiguredOwners();
+        store.transaction(owner,()->{
+            var migrated=store.find("WORK_SESSION",session).orElseThrow();
             assertEquals("Legacy session",migrated.get("title").asText());assertEquals("2025-10-20T06:03:00.123456789Z",migrated.get("start").asText());
             assertEquals(5,migrated.get("version").asLong());assertEquals(migrated.get("clientId"),store.find("PROJECT",project).orElseThrow().get("clientId"));
             assertTrue(store.find("CLIENT",JsonValues.uuid(migrated.get("clientId"))).isPresent());assertEquals(1,store.list("CLIENT").size());
