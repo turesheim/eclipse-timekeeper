@@ -86,8 +86,71 @@ jobs:
             checksums.sha256
             images.env
 
-  publish:
+  verify-synology:
+    name: Synology candidate and PostgreSQL 17
     needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: server/**/pom.xml
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27'
+          cache: false
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: server-compose-evidence
+          path: server/target/synology-input
+      - name: Load the exact image already tested with PostgreSQL 18
+        run: |
+          docker load -i server/target/synology-input/timekeeper-images-linux-amd64.tar.gz
+          docker tag "timekeeper-server:sha-$GITHUB_SHA" "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA"
+      - name: Verify unprivileged package controls and native database provisioning
+        run: |
+          go test -C server/synology/installer ./...
+          go vet -C server/synology/installer ./...
+          python server/synology/tests/acceptance.py
+      - name: Verify PostgreSQL 17 schema and concurrent bootstrap
+        env:
+          TIMEKEEPER_TEST_PG_URL: jdbc:postgresql://127.0.0.1:55433/postgres
+          TIMEKEEPER_TEST_PG_USER: postgres
+          TIMEKEEPER_TEST_PG_PASSWORD: isolated-ci-test
+        run: |
+          docker run -d --name timekeeper-pg17-test -e POSTGRES_PASSWORD=isolated-ci-test -p 127.0.0.1:55433:5432 postgres:17.11-bookworm
+          for attempt in $(seq 1 60); do
+            if docker exec timekeeper-pg17-test pg_isready -U postgres; then break; fi
+            sleep 1
+          done
+          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT -Dsurefire.failIfNoSpecifiedTests=false
+          docker rm -f -v timekeeper-pg17-test
+      - name: Verify real API, backup, recovery and rolling updates with PostgreSQL 17
+        run: |
+          python -m pip install -r common/api/tests/requirements.txt
+          python server/scripts/compose_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --postgres-image postgres:17.11-bookworm --output server/target/synology-acceptance
+      - name: Build and validate the self-contained preview package
+        run: python server/scripts/package_synology.py --commit "$GITHUB_SHA" --image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --revision "$GITHUB_RUN_NUMBER" --output server/target/synology
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: synology-preview-candidate
+          path: |
+            server/target/synology/*.spk
+            server/target/synology/*.spk.sha256
+            server/target/synology/*.json
+            server/target/synology-acceptance/acceptance.json
+            server/**/target/surefire-reports/
+
+  publish:
+    needs: [verify, verify-synology]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30

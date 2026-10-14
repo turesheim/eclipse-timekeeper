@@ -67,16 +67,17 @@ def main():
                 raise RuntimeError('Isolated PostgreSQL did not become ready')
             command('docker','exec',name,'sh','-ec',
                     'mkdir -p /var/packages/timekeeper/scripts /var/packages/timekeeper/target '
-                    '/var/packages/timekeeper/shares/timekeeper-data /var/packages/postgresql/target/bin; '
-                    'ln -s /usr/lib/postgresql/17/bin/psql /var/packages/postgresql/target/bin/psql; '
+                    '/var/packages/timekeeper/shares/timekeeper-data /var/packages/postgresql/target/bin /var/packages/ContainerManager; '
+                    'printf \'version="24.0.2-1432"\n\' > /var/packages/ContainerManager/INFO; '
+                    'for tool in psql pg_dump pg_restore; do ln -s /usr/lib/postgresql/17/bin/$tool /var/packages/postgresql/target/bin/$tool; done; '
                     'chown -R 10001:10001 /var/packages/timekeeper')
             command('docker','cp',str(binary),name+':/var/packages/timekeeper/scripts/timekeeper-dsm')
             command('docker','cp',str(release),name+':/var/packages/timekeeper/scripts/release.json')
             command('docker','exec',name,'chmod','755','/var/packages/timekeeper/scripts/timekeeper-dsm')
 
-            def helper(action, expected=0):
+            def helper(action, *arguments, expected=0):
                 result = command('docker','exec','--user','10001:10001','--env-file',str(env_file),name,
-                                 '/var/packages/timekeeper/scripts/timekeeper-dsm',action,check=False)
+                                 '/var/packages/timekeeper/scripts/timekeeper-dsm',action,*arguments,check=False)
                 if (result.returncode == 0) != (expected == 0):
                     raise AssertionError('Installer action returned unexpected status: '+action)
                 for secret in (master_password,code):
@@ -99,7 +100,7 @@ def main():
                 raise AssertionError('Installer retained an invalid bootstrap challenge')
             snapshot={key:read(key) for key in ('settings.json','secrets/database_password','config/tokens.json','config/account-setup.json')}
             helper('validate'); helper('install')
-            for key in ('secrets/database_password','config/tokens.json','config/account-setup.json'):
+            for key in ('secrets/database_password','config/tokens.json'):
                 if read(key)!=snapshot[key]:
                     raise AssertionError('Reinstallation replaced retained credentials')
             role=command('docker','exec',name,'psql','-U','postgres','-p','5433','-Atc',
@@ -107,7 +108,29 @@ def main():
             if role!='f|f|f|f|f':
                 raise AssertionError('Application role has administrative privileges')
             command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-c',
-                    "CREATE TABLE preserved_fixture(value TEXT); INSERT INTO preserved_fixture VALUES('owned private data');")
+                    "SET ROLE timekeeper_fixture_app; CREATE TABLE tk_schema(id INTEGER PRIMARY KEY,schema_version INTEGER,state TEXT); INSERT INTO tk_schema VALUES(1,2,'READY'); CREATE TABLE preserved_fixture(value TEXT); INSERT INTO preserved_fixture VALUES('owned private data');")
+            # First setup can expire before the user reaches the web client. Reinstall
+            # renews it and invalidates the earlier pending code without master access.
+            command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-c',
+                    "SET ROLE timekeeper_fixture_app; CREATE TABLE tk_auth_control(id INTEGER PRIMARY KEY,bootstrap_completed BOOLEAN); INSERT INTO tk_auth_control VALUES(1,FALSE); CREATE TABLE tk_auth_challenge(digest TEXT,purpose TEXT,consumed BOOLEAN); INSERT INTO tk_auth_challenge VALUES('old-code','SETUP',FALSE);")
+            code=secrets.token_urlsafe(32)
+            variables['wizard_setup_code']=code
+            variables.pop('wizard_database_admin_password')
+            env_file.write_text(''.join(key+'='+value+'\n' for key,value in variables.items()))
+            helper('validate');helper('install')
+            if json.loads(read('config/account-setup.json'))['sha256']!=hashlib.sha256(code.encode()).hexdigest():
+                raise AssertionError('Reinstallation failed to renew incomplete setup')
+            consumed=command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-Atc',"SELECT consumed FROM tk_auth_challenge WHERE digest='old-code'").stdout.strip()
+            if consumed!='t': raise AssertionError('Earlier setup code was not invalidated')
+            command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-c',"UPDATE tk_auth_control SET bootstrap_completed=TRUE")
+            completed=read('config/account-setup.json')
+            variables['wizard_setup_code']=secrets.token_urlsafe(32)
+            env_file.write_text(''.join(key+'='+value+'\n' for key,value in variables.items()))
+            helper('install')
+            if read('config/account-setup.json')!=completed:
+                raise AssertionError('Reinstallation reopened completed administrator setup')
+            variables['wizard_database_admin_password']=master_password
+            env_file.write_text(''.join(key+'='+value+'\n' for key,value in variables.items()))
             settings=json.loads(read('settings.json'));settings['phase']='PROVISIONING'
             pending=folder/'pending.json';pending.write_text(json.dumps(settings));pending.chmod(0o600)
             command('docker','cp',str(pending),name+':/var/packages/timekeeper/shares/timekeeper-data/server/settings.json')
@@ -118,13 +141,21 @@ def main():
             value=command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-Atc','SELECT value FROM preserved_fixture').stdout.strip()
             if value!='owned private data':
                 raise AssertionError('Repair changed retained data')
+            backup_path=helper('backup').stdout.strip()
+            command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-c',"UPDATE preserved_fixture SET value='must disappear after restore'")
+            helper('restore',backup_path)
+            value=command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-Atc','SELECT value FROM preserved_fixture').stdout.strip()
+            if value!='owned private data':raise AssertionError('Native backup restore lost retained data')
+            # A separate malformed backup is refused without replacing restored data.
+            command('docker','exec',name,'sh','-ec',"printf corrupt > /var/packages/timekeeper/shares/timekeeper-data/server/backups/corrupt.tar; chown 10001:10001 /var/packages/timekeeper/shares/timekeeper-data/server/backups/corrupt.tar")
+            helper('restore','/var/packages/timekeeper/shares/timekeeper-data/server/backups/corrupt.tar',expected=1)
             log=command('docker','logs',name).stdout+command('docker','logs',name).stderr
             if any(secret in log for secret in (master_password,application_password,code)):
                 raise AssertionError('PostgreSQL statement log contains a plaintext credential')
             print(json.dumps({'postgresql':args.postgres_image,'architecture':architecture,
                               'unprivilegedInstaller':True,'dedicatedNonSuperuser':True,
-                              'reinstallPreservesCredentials':True,'interruptedProvisioningPreservesData':True,
-                              'noPlaintextCredentialsInStatementLog':True}))
+                              'reinstallPreservesCredentials':True,'renewIncompleteSetupWithoutResettingAccounts':True,'interruptedProvisioningPreservesData':True,
+                              'nativeBackupRestore':True,'corruptRestoreRefused':True,'noPlaintextCredentialsInStatementLog':True}))
         finally:
             command('docker','rm','-f','-v',name,check=False)
 

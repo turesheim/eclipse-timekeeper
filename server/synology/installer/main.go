@@ -60,19 +60,34 @@ func ready(root string) error {
 	}
 	return nil
 }
-func run(action, root, target, releasePath string, env func(string) string) error {
+func run(action, root, target, releasePath string, env func(string) string, argument string) error {
 	if action == "wizard" {
-		return wizard(os.Stdout)
+		return wizard(os.Stdout, root)
 	}
 	if env("SYNOPKG_PKGNAME") != packageID {
 		return errors.New("Run this helper through DSM Package Center")
 	}
 	switch action {
+	case "backup":
+		path, err := backup(root)
+		if err == nil {
+			fmt.Fprintln(os.Stdout, path)
+		}
+		return err
+	case "restore":
+		if !filepath.IsAbs(argument) {
+			return errors.New("Provide the absolute path to a verified native PostgreSQL 17 backup")
+		}
+		return restore(root, argument)
 	case "stop", "start":
 		return nil // Container Manager's worker owns the lifecycle.
 	case "status":
 		return ready(root)
 	case "validate", "install", "upgrade":
+		// preupgrade may run the installed controller against an incoming SPK.
+		if incoming := env("SYNOPKG_PKGINST_TEMP_DIR"); incoming != "" {
+			releasePath = filepath.Join(incoming, "scripts")
+		}
 		release, err := releaseAt(releasePath)
 		if err != nil {
 			return err
@@ -84,7 +99,16 @@ func run(action, root, target, releasePath string, env func(string) string) erro
 				return err
 			}
 		}
+		if action == "install" && w.Code == "" && env("wizard_setup_code") != "" {
+			w.Code = env("wizard_setup_code")
+			if !validInstallationID(w.Code) {
+				return errors.New("Reopen the installer to generate a new one-time code")
+			}
+		}
 		if action == "validate" {
+			if err := containerManagerAt("/var/packages/ContainerManager/INFO"); err != nil {
+				return err
+			}
 			return validate(root, w, release)
 		}
 		return install(root, target, w, release)
@@ -93,13 +117,17 @@ func run(action, root, target, releasePath string, env func(string) string) erro
 	}
 }
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "Use wizard, validate, install, upgrade, start, stop or status")
+	if len(os.Args) < 2 || len(os.Args) > 3 || (len(os.Args) == 3 && os.Args[1] != "restore") {
+		fmt.Fprintln(os.Stderr, "Use wizard, validate, install, upgrade, start, stop, status, backup or restore /absolute/backup.tar")
 		os.Exit(2)
 	}
 	executable, err := os.Executable()
 	if err == nil {
-		err = run(os.Args[1], stateRoot(), os.Getenv("SYNOPKG_PKGDEST"), filepath.Dir(executable), os.Getenv)
+		argument := ""
+		if len(os.Args) == 3 {
+			argument = os.Args[2]
+		}
+		err = run(os.Args[1], stateRoot(), os.Getenv("SYNOPKG_PKGDEST"), filepath.Dir(executable), os.Getenv, argument)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

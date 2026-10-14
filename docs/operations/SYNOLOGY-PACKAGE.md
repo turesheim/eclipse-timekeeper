@@ -1,6 +1,7 @@
 # Synology Package Center distribution
 
-This package is being prepared for **DS923+ / r1000**, DSM **7.2.2 or later**,
+The initial NAS acceptance target is **DS923+ / r1000, DSM 7.4.1-90080**.
+The package uses DSM **7.2.2 or later** resource interfaces,
 Container Manager with the Docker Project worker (**build 1432 or later**), and
 SynoCommunity PostgreSQL **17.11-6** on its normal port **5433**. Real DSM acceptance
 is required before this candidate can be described as supported or published in
@@ -44,6 +45,9 @@ uninstallation. PostgreSQL data remains with the separate PostgreSQL package.
 Stopping or uninstalling Timekeeper never drops databases, roles or other packages.
 
 Reinstallation and upgrades reuse retained credentials and owner mappings.
+The retained-install wizard does not request the database administrator password.
+Reinstallation renews an unfinished first-administrator setup code and invalidates
+earlier pending codes; it never reopens completed account setup.
 Provisioning records an installation ID on its dedicated role/database so an
 interrupted operation can resume without taking over an unrelated object.
 Same-schema upgrades replace the pinned application image and record deployment
@@ -54,6 +58,44 @@ retained configuration intact; retain the previous `.spk` for recovery. Real DSM
 checks must verify package repair, reinstallation permissions and failure recovery.
 Do not remove the native PostgreSQL package or the retained shared folder as part
 of an application rollback.
+
+## Native backup and restore
+
+Stop Timekeeper in Package Center before backing up or restoring. The maintenance
+helper refuses an active HTTP listener, other database clients, an incompatible
+schema or a PostgreSQL major version other than 17. PostgreSQL itself stays running.
+
+A DSM administrator can use **Control Panel → Task Scheduler → Create → Scheduled
+Task → User-defined script**, run as root, to invoke the package account without
+SSH. For an immediate backup, save and run this task:
+
+```sh
+sudo -u timekeeper env SYNOPKG_PKGNAME=timekeeper /var/packages/timekeeper/scripts/timekeeper-dsm backup
+```
+
+The task output gives the backup path in the retained private `server/backups`
+directory. The mode-0600 archive contains a consistent native `pg_dump`, setup/token
+configuration, retained settings and the database service credential. Keep the
+archive private and copy it to your normal backup destination. The manifest records
+SHA-256 for every member. No PostgreSQL administrator credential is included.
+
+To restore, keep Timekeeper stopped and run a task with the absolute backup path:
+
+```sh
+sudo -u timekeeper env SYNOPKG_PKGNAME=timekeeper /var/packages/timekeeper/scripts/timekeeper-dsm restore /var/packages/timekeeper/shares/timekeeper-data/server/backups/timekeeper-EXAMPLE.tar
+```
+
+Restore validates the complete archive before touching data, then uses PostgreSQL
+17 `pg_restore` in one transaction. It restores business/account data and setup/token
+configuration into the current dedicated database, retaining the current service
+role/password, HTTPS address and port. Start Timekeeper after success. If a restore
+fails, leave the package stopped and resolve the error before retrying. Restoring
+an older backup also restores its older password, token and session state; follow
+[account recovery guidance](ACCOUNTS.md) for subsequent credential changes.
+
+This command targets an existing, provisioned installation. Rebuilding a lost native
+PostgreSQL installation from an archive still requires an explicit recovery flow;
+do not replace PostgreSQL's data directory with files from another major version.
 
 ## Building a candidate
 
@@ -76,11 +118,13 @@ the tested image avoids unpublished PR tags and moving registry aliases.
 Automated PostgreSQL 17 schema/migration tests and an unprivileged installer test
 against real PostgreSQL verify role privileges, retained credentials, interrupted
 provisioning, explicit owner mapping and absence of plaintext credentials in SQL
-statement logs. These do not emulate DSM Package Center or its resource workers.
+statement logs. Native PostgreSQL 17 backup/restore and corrupt-archive refusal are
+also tested in the isolated package layout. These do not emulate DSM Package Center
+or its resource workers.
 
 Still required before stable distribution: real DS923+ installation/start/stop/
-restart/upgrade/reinstall testing, database migration from PostgreSQL 18, native
-backup/restore and package repository discovery. SynoCommunity catalog inclusion
+restart/upgrade/reinstall testing, database migration from PostgreSQL 18, verification of native backup/restore on
+the actual NAS and package repository discovery. SynoCommunity catalog inclusion
 requires upstream acceptance. An independent Timekeeper feed will require users
 to configure SynoCommunity separately; one configured source is not promised.
 

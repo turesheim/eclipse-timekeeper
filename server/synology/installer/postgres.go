@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,27 +22,31 @@ func pgEnvironment(values []string, host string, port int, user, database, passf
 	return append(out, "PGHOST="+host, "PGPORT="+strconv.Itoa(port), "PGUSER="+user, "PGDATABASE="+database, "PGPASSFILE="+passfile, "PGCONNECT_TIMEOUT=5", "PGSSLMODE=disable")
 }
 func passEscape(value string) string { return strings.NewReplacer(`\`, `\\`, ":", `\:`).Replace(value) }
-func psql(binary string, port int, user, password, database, sql string) (string, error) {
+func pgRun(binary string, port int, user, password, database string, args []string, input io.Reader, output io.Writer) error {
 	temporary, err := os.MkdirTemp("", "timekeeper-pg-")
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer os.RemoveAll(temporary)
 	path := filepath.Join(temporary, "pgpass")
 	line := strings.Join([]string{"127.0.0.1", strconv.Itoa(port), passEscape(database), passEscape(user), passEscape(password)}, ":") + "\n"
 	if err = os.WriteFile(path, []byte(line), 0600); err != nil {
-		return "", err
+		return err
 	}
-	cmd := exec.Command(binary, "-X", "-q", "-A", "-t", "-w", "-v", "ON_ERROR_STOP=1")
+	cmd := exec.Command(binary, args...)
 	cmd.Env = pgEnvironment(os.Environ(), "127.0.0.1", port, user, database, path)
-	cmd.Stdin = strings.NewReader(sql)
-	var output bytes.Buffer
-	cmd.Stdout = &output
+	cmd.Stdin = input
+	cmd.Stdout = output
 	// Never relay libpq/SQL diagnostics: provisioning input includes credentials.
 	if err = cmd.Run(); err != nil {
-		return "", errors.New("PostgreSQL operation failed; check the selected package, port and administrator credentials")
+		return errors.New("PostgreSQL operation failed; check the selected package, port and credentials")
 	}
-	return strings.TrimSpace(output.String()), nil
+	return nil
+}
+func psql(binary string, port int, user, password, database, sql string) (string, error) {
+	var output bytes.Buffer
+	err := pgRun(binary, port, user, password, database, []string{"-X", "-q", "-A", "-t", "-w", "-v", "ON_ERROR_STOP=1"}, strings.NewReader(sql), &output)
+	return strings.TrimSpace(output.String()), err
 }
 func probe(w Wizard, binary string, allowExisting bool) error {
 	value, err := psql(binary, w.Settings.DatabasePort, w.AdminUser, w.AdminPassword, "postgres", "SELECT current_setting('server_version_num');\n")

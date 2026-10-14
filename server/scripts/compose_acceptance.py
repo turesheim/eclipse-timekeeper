@@ -254,6 +254,7 @@ def main():
                        check=True, capture_output=True)
         registry_started = True
         image = f'localhost:{registry_port}/timekeeper:candidate'
+        platform = subprocess.check_output(['docker', 'image', 'inspect', '--format', '{{.Os}}/{{.Architecture}}', args.server_image], text=True).strip()
         image_context = temporary / 'image'
         image_context.mkdir()
         dockerfile = image_context / 'Dockerfile'
@@ -266,7 +267,7 @@ def main():
                                   + ('ENTRYPOINT ["sh", "-c", "exit 1"]\n' if broken else '')
                                   + ('COPY --chmod=755 entrypoint.sh /app/acceptance-entrypoint.sh\n'
                                      'ENTRYPOINT ["/app/acceptance-entrypoint.sh"]\n' if broken_second else ''))
-            subprocess.run(['docker', 'build', '-t', image, str(image_context)], check=True, capture_output=True)
+            subprocess.run(['docker', 'build', '--platform', platform, '-t', image, str(image_context)], check=True, capture_output=True)
             subprocess.run(['docker', 'push', image], check=True, capture_output=True)
 
         def deployed_image(member):

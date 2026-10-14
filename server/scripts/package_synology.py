@@ -14,6 +14,7 @@ import tempfile
 
 from documentation import render_document
 from package_server import verify_build_identity
+from validate_synology import validate
 
 ROOT = Path(__file__).resolve().parents[2]
 VERSION = {'preview': '1.99.0', 'stable': '2.0.0'}
@@ -121,7 +122,7 @@ def build(output, commit, image, revision, channel):
                 'os_min_ver':'7.2.2-72806', 'arch':'r1000', 'maintainer':'Timekeeper contributors',
                 'maintainer_url':'https://github.com/turesheim/eclipse-timekeeper',
                 'description':'Private time tracking with a bundled web client and SynoCommunity PostgreSQL.',
-                'thirdparty':'yes', 'startable':'yes', 'silent_install':'no', 'silent_upgrade':'no',
+                'thirdparty':'yes', 'startable':'yes', 'precheckstartstop':'no', 'silent_install':'no', 'silent_upgrade':'no',
                 'dsmuidir':'ui', 'dsmappname':'net.resheim.timekeeper',
                 'install_dep_packages':'ContainerManager:postgresql>=17.11-6',
                 'checksum':checksum}
@@ -135,6 +136,7 @@ def build(output, commit, image, revision, channel):
                   'architecture':'r1000','image':image,'imageId':image_id,'sha256':digest,
                   'serverSchema':2,'nativePostgreSQLMajor':17,'realDsmAcceptance':'required'}
         destination.with_suffix('.json').write_text(json.dumps(manifest,indent=2)+'\n')
+        validate(destination)
         return destination
 
 

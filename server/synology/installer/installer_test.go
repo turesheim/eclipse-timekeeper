@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
 	"encoding/json"
 	"os"
@@ -71,10 +72,10 @@ func TestNativeClientDoesNotInheritAdminCredentialsOrArbitraryPgSettings(t *test
 }
 func TestOneTimeWizardCodeIsRandomAndOnlyItsHashIsRetained(t *testing.T) {
 	var first, second bytes.Buffer
-	if err := wizard(&first); err != nil {
+	if err := wizard(&first, t.TempDir()); err != nil {
 		t.Fatal(err)
 	}
-	if err := wizard(&second); err != nil {
+	if err := wizard(&second, t.TempDir()); err != nil {
 		t.Fatal(err)
 	}
 	if bytes.Equal(first.Bytes(), second.Bytes()) {
@@ -173,5 +174,61 @@ func TestAtomicConfigurationRefusesSymlinksAndMalformedRetainedState(t *testing.
 	}
 	if _, err := loadSettings(dir); err == nil {
 		t.Fatal("accepted malformed retained settings")
+	}
+}
+
+func TestContainerManagerWorkerMustBeAvailable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "INFO")
+	for _, test := range []struct {
+		version   string
+		supported bool
+	}{
+		{`version="24.0.2-1432"`, true}, {`version="24.0.2-1630"`, true},
+		{`version="24.0.2-1431"`, false}, {`version="unknown"`, false},
+	} {
+		if err := os.WriteFile(path, []byte(test.version+"\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if got := containerManagerAt(path) == nil; got != test.supported {
+			t.Fatalf("incorrect dependency result: %s", test.version)
+		}
+	}
+}
+
+func TestRetainedWizardUsesExistingInstallationWithoutMasterPassword(t *testing.T) {
+	root := t.TempDir()
+	w := fixtureWizard(t)
+	s := w.Settings
+	s.InstallationID, _ = secret()
+	s.Phase = "READY"
+	s.Release.Schema = 2
+	if err := writeJSON(filepath.Join(root, "settings.json"), s, 0600); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := wizard(&output, root); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(output.String(), `"key":"wizard_database_admin_password"`) || !strings.Contains(output.String(), `"key":"wizard_setup_code"`) {
+		t.Fatal("retained wizard asks for new provisioning")
+	}
+}
+
+func TestRestoreRefusesUnrecognizedArchivePaths(t *testing.T) {
+	for _, name := range []string{"../outside", "/outside", "unexpected"} {
+		path := filepath.Join(t.TempDir(), "invalid.tar")
+		f, err := os.Create(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		writer := tar.NewWriter(f)
+		if err = writer.WriteHeader(&tar.Header{Name: name, Mode: 0600, Size: 0}); err != nil {
+			t.Fatal(err)
+		}
+		writer.Close()
+		f.Close()
+		if _, err = unpackBackup(path, t.TempDir()); err == nil {
+			t.Fatalf("accepted member %q", name)
+		}
 	}
 }

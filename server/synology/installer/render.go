@@ -62,10 +62,12 @@ func install(root, target string, w Wizard, r Release) error {
 			if err = provision(w, strings.TrimSpace(string(password)), nativePSQL); err != nil {
 				return err
 			}
-			if err = writeChallenge(root, w); err != nil {
+			retained.Phase = "READY"
+		}
+		if w.Code != "" && retained.Phase == "READY" {
+			if err = renewSetup(root, retained, w.Code); err != nil {
 				return err
 			}
-			retained.Phase = "READY"
 		}
 		// Reinstallation/upgrade never reset credentials or infer ownership from a name.
 		retained.Release = r
@@ -134,4 +136,34 @@ func install(root, target string, w Wizard, r Release) error {
 		return err
 	}
 	return render(root, target, s)
+}
+
+// Reinstall can renew an expired first-setup code, but never reopens a completed
+// bootstrap. The package is stopped while the control scripts run.
+func renewSetup(root string, s Settings, code string) error {
+	password, err := os.ReadFile(filepath.Join(root, "secrets", "database_password"))
+	if err != nil {
+		return err
+	}
+	query := func(sql string) (string, error) {
+		return psql(nativePSQL, s.DatabasePort, s.Role, strings.TrimSpace(string(password)), s.Database, sql)
+	}
+	table, err := query("SELECT COALESCE(to_regclass('public.tk_auth_control')::text,'');")
+	if err != nil {
+		return err
+	}
+	if table != "" {
+		// Serialize with account setup and invalidate earlier pending codes.
+		completed, err := query("BEGIN; SELECT bootstrap_completed FROM tk_auth_control WHERE id=1 FOR UPDATE; UPDATE tk_auth_challenge SET consumed=TRUE WHERE purpose='SETUP' AND NOT (SELECT bootstrap_completed FROM tk_auth_control WHERE id=1); COMMIT;")
+		if err != nil {
+			return err
+		}
+		if completed == "t" {
+			return nil
+		}
+		if completed != "f" {
+			return errors.New("Invalid retained account bootstrap state")
+		}
+	}
+	return writeChallenge(root, Wizard{Settings: s, Code: code})
 }
