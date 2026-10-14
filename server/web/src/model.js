@@ -110,6 +110,13 @@ export function instantNanos(instant) {
   if (!match) throw new Error('Invalid UTC instant.');
   return BigInt(Date.parse(match[1] + 'Z')) * 1000000n + BigInt((match[2] || '').padEnd(9, '0'));
 }
+export function nanosInstant(value) {
+  let seconds = value / 1000000000n, fraction = value % 1000000000n;
+  if (fraction < 0n) { seconds--; fraction += 1000000000n; }
+  const date = new Date(Number(seconds * 1000n)).toISOString().slice(0,19);
+  if (!/^\d{4}-/.test(date)) throw new Error('Choose a date between years 0000 and 9999.');
+  return date + (fraction ? '.' + fraction.toString().padStart(9,'0').replace(/0+$/,'') : '') + 'Z';
+}
 
 export function taskPresentation(task) {
   const references = [...(task.externalReferences || [])].sort((a, b) =>

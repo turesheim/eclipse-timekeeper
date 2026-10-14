@@ -114,3 +114,40 @@ credentials. The `remote-client-tests` Eclipse profile
 also launches a real browser peer against its installed runtime's server;
 [WEB-ECLIPSE.md](../verification/WEB-ECLIPSE.md) records that bidirectional verification.
 Final release installation remains a separate gate.
+
+## Calendar
+
+The **Calendar** tab beside Workweek shows all seven days. Both tabs share the
+chosen week and the account's time zone. Use the arrows, **Today**, or the date
+field to navigate. On smaller screens, scroll inside the calendar to see the
+remaining days and hours.
+
+Blue strips represent work sessions. Select a strip to see its full interval;
+double-click it or use **Edit selected work session** to edit. Drag the strip
+to move it between times or days, and drag its top or bottom handle to resize.
+With a strip focused, Up/Down moves it by 15 minutes and Left/Right by one local
+day. On a resize handle, arrow keys adjust that endpoint. Moving preserves exact
+elapsed duration and fractional seconds. Sessions spanning midnight retain one
+identity while appearing in each affected day.
+
+Use **Copy work session** and **Paste work session**, or Ctrl/Cmd+C and Ctrl/Cmd+V,
+to create a separate session. Select a day heading to retain the copied start
+clock time, or select a calendar slot to choose a new time. The paste editor
+lets you review the interval before saving. Only the interval and summary are
+copied; activities and task references are not. The copy buffer is private to
+the signed-in browser session and is cleared on sign-out. A running source keeps
+its blank end in the copy; finish the copy's interval if another session is
+still running. Starts in the future remain invalid.
+
+Task cards use the task's title and issue link and list its activities. Separate
+gaps remain visible. Taskless activity cards and overlapping intervals are also
+shown. Tasks without recorded time this week appear in the expandable list below
+the calendar. Activity times and associations remain unchanged when a work
+session is moved, resized or copied. Out-of-bounds activity warnings remain in
+the session details.
+
+Repeated clock times have separate rows; shaded slots do not occur on a given
+day. A drag retains the original session snapshot and saves with its opaque
+version precondition. Peer edits, rejected changes and unknown save outcomes
+preserve the proposed interval for review instead of silently overwriting data
+or repeating an ordinary write.
