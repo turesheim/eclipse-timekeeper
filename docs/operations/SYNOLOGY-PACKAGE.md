@@ -269,6 +269,50 @@ a release or activate a package source. Keep preview and stable catalogs in
 separate directories and publish only after the NAS discovery checks establish
 which hosting method works.
 
+## Attaching the distribution to a release
+
+After this tooling is merged, the manually started **Release Synology
+distribution** workflow publishes the stable SPK on an existing, published
+`v2.0.0` GitHub release. It does not build a new server or installer. Before
+starting it:
+
+1. Wait for both **Build** and **Server containers** to pass on `main` at the
+   release tag's exact commit. Download the candidate from that Server containers
+   run and retain its SPK, checksum and provenance. A PR candidate is useful for
+   development testing; release publication requires the candidate from `main`.
+2. Complete real NAS acceptance for that exact candidate. Attach the completed
+   report to the published release as `timekeeper-dsm-acceptance.json`. The
+   workflow will verify that it describes the downloaded CI artifact, source,
+   image and installed contents. The incomplete CI template cannot be used as a
+   passing report.
+3. Start the workflow from `main`, giving the release tag and **Server containers
+   workflow run ID**, not a job ID or the Build run ID. For example, after setting
+   `CANDIDATE_RUN` to the tested run ID:
+
+   ```sh
+   gh workflow run release-synology.yml --repo turesheim/eclipse-timekeeper --ref main -f tag=v2.0.0 -f candidate_run="$CANDIDATE_RUN"
+   ```
+
+The workflow verifies the complete build matrix, the PostgreSQL 17 and 18
+container jobs, artifact origin and SHA-256, tag identity and operator report
+before attaching four files: the stable SPK, its checksum, provenance JSON and
+`timekeeper-dsm-release.json`. The last file records the source commit, CI runs,
+artifact identity and report/package checksums. Existing files are compared
+before uploads; a retry can finish a partial upload, while different bytes under
+an existing filename cause a failure. No `--clobber` is used.
+
+For a local preparation without uploading, use the same tool without `--publish`:
+
+```sh
+python3 scripts/synology_release.py --repo turesheim/eclipse-timekeeper --tag v2.0.0 --candidate-run "$CANDIDATE_RUN" --output /private/prepared-synology-release
+```
+
+Keep the candidate artifact available until release preparation has completed.
+An expired/missing artifact is refused; rebuilding it requires testing the new
+candidate and a new matching report. Attaching a GitHub release distribution does
+not activate a Package Center source. Repository hosting and discovery must
+still be verified on DSM before publishing the feed.
+
 ## Verification status
 
 Automated PostgreSQL 17 schema/migration tests and an unprivileged installer test
