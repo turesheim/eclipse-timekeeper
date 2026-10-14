@@ -70,8 +70,13 @@ public class ServerStore {
         }
     }
     void initializeConfiguredOwners() {
-        for (String owner : tokens.load().stream().map(TokenRegistry.Token::owner).distinct().toList()) {
-            transaction(owner,() -> { initializeDefaultLabels(); return null; });
+        var owners=new java.util.HashSet<String>();
+        tokens.load().forEach(token -> owners.add(token.owner()));
+        try(var connection=datasource.getConnection();var query=connection.createStatement();var rows=query.executeQuery("SELECT id FROM tk_owner")) {
+            while(rows.next()) owners.add(rows.getString(1));
+        } catch(SQLException failure) {throw databaseFailure(failure);}
+        for (String owner : owners) {
+            transaction(owner,() -> { initializeDefaultLabels(); migrateClientDetails(); return null; });
         }
     }
     private void initializeDefaultLabels() {
@@ -169,7 +174,13 @@ public class ServerStore {
         return value;
     }
     public <T> T save(String type,T value) {
-        var node = snapshot(owner(),value); UUID id = uuid(node.get("id")); long version = node.get("version").asLong();
+        var node = snapshot(owner(),value);
+        if (type.equals("PROJECT") || type.equals("WORK_SESSION")) {
+            var previous=find(type,uuid(node.get("id"))).orElse(null);
+            node.put("clientId",previous!=null && previous.hasNonNull("clientId") ? previous.get("clientId").asText() : defaultClient().get("id").asText());
+            if(type.equals("WORK_SESSION")) node.put("title",previous!=null && previous.hasNonNull("title") ? previous.get("title").asText() : legacyTitle(node));
+        }
+        UUID id = uuid(node.get("id")); long version = node.get("version").asLong();
         if (version==0) update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,?,?)",owner(),type,id,version,node.toString());
         else if (update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version,node.toString(),owner(),type,id,version-1)!=1)
             throw new ApiFailure(412,"STALE_VERSION");
@@ -195,7 +206,56 @@ public class ServerStore {
             else if (active().isEmpty()) update("INSERT INTO tk_active(owner_id,entity_type,activity_id) VALUES(?,'ACTIVITY',?)",owner(),id);
             else if (!active().orElseThrow().get("id").asText().equals(id.toString())) throw ApiFailure.conflict();
         }
+        if (node.hasNonNull("clientId")) relation(type,id,"client","CLIENT",uuid(node.get("clientId")));
         return value;
+    }
+    /** Server-only client metadata: common/Eclipse interval and project models stay independent. */
+    private static String legacyTitle(JsonNode value) {
+        String summary=value.path("summary").asText().strip();
+        return summary.isEmpty() ? "Work session" : summary.substring(0,summary.offsetByCodePoints(0,Math.min(1000,summary.codePointCount(0,summary.length()))));
+    }
+    private JsonNode defaultClient() {
+        UUID id=UUID.nameUUIDFromBytes(("timekeeper-default-client:"+owner()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return find("CLIENT",id).orElseGet(() -> {
+            var node=object();node.put("id",id.toString());node.put("ownerId",owner());node.put("version",0);
+            node.put("name","General");node.put("color","#2563eb");writeClient(node);change("CLIENT","CREATED",id.toString());return node;
+        });
+    }
+    void migrateClientDetails() {
+        for(String type:List.of("PROJECT","WORK_SESSION")) for(var old:list(type)) {
+            if(old.hasNonNull("clientId") && (!type.equals("WORK_SESSION") || old.hasNonNull("title"))) continue;
+            var node=((ObjectNode)old).deepCopy();long version=node.get("version").asLong();
+            node.put("clientId",defaultClient().get("id").asText());
+            if(type.equals("WORK_SESSION")) node.put("title",legacyTitle(node));
+            node.put("version",version+1);
+            if(update("UPDATE tk_resource SET payload=?,version=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",node.toString(),version+1,owner(),type,uuid(node.get("id")),version)!=1) throw new ApiFailure(412,"STALE_VERSION");
+            relation(type,uuid(node.get("id")),"client","CLIENT",uuid(node.get("clientId")));
+            change(type,"UPDATED",node.get("id").asText());
+        }
+    }
+    JsonNode createClient(JsonNode input) {
+        var node=((ObjectNode)input).deepCopy();node.put("id",UUID.randomUUID().toString());node.put("ownerId",owner());node.put("version",0);
+        writeClient(node);change("CLIENT","CREATED",node.get("id").asText());return node;
+    }
+    JsonNode updateClient(UUID id,long version,JsonNode input) {
+        var node=((ObjectNode)input).deepCopy();node.put("id",id.toString());node.put("ownerId",owner());node.put("version",version+1);
+        writeClient(node);change("CLIENT","UPDATED",id.toString());return node;
+    }
+    private void writeClient(ObjectNode node) {
+        long version=node.get("version").asLong();UUID id=uuid(node.get("id"));
+        if(version==0) update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,'CLIENT',?,0,?)",owner(),id,node.toString());
+        else if(update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type='CLIENT' AND id=? AND version=?",version,node.toString(),owner(),id,version-1)!=1) throw new ApiFailure(412,"STALE_VERSION");
+    }
+    /** Completes a domain mutation in the same owner-locked transaction and version/event. */
+    JsonNode clientDetails(String type,UUID id,JsonNode input) {
+        var node=((ObjectNode)find(type,id).orElseThrow(ApiFailure::notFound)).deepCopy();
+        if(input.has("clientId")) {
+            UUID client=uuid(input.get("clientId"));find("CLIENT",client).orElseThrow(ApiFailure::notFound);node.put("clientId",client.toString());
+        }
+        if(type.equals("WORK_SESSION") && input.has("title")) node.put("title",input.get("title").asText().strip());
+        if(update("UPDATE tk_resource SET payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",node.toString(),owner(),type,id,node.get("version").asLong())!=1) throw new ApiFailure(412,"STALE_VERSION");
+        update("DELETE FROM tk_relation WHERE owner_id=? AND from_type=? AND from_id=? AND kind='client'",owner(),type,id);
+        relation(type,id,"client","CLIENT",uuid(node.get("clientId")));return node;
     }
     private void relation(String fromType,UUID fromId,String kind,String toType,UUID toId) {
         update("INSERT INTO tk_relation(owner_id,from_type,from_id,kind,to_type,to_id) VALUES(?,?,?,?,?,?)",owner(),fromType,fromId,kind,toType,toId);

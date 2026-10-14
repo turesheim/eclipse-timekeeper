@@ -32,14 +32,27 @@
         </div>
       </section>
       <section class="card tracking"><div><p class="eyebrow">IN PROGRESS</p><h1 id="active-title">Ready when you are</h1><p id="active-details">Choose a task below to start tracking.</p></div><button id="stop" class="primary" hidden>Stop tracking</button></section>
-      <nav aria-label="Workspace"><button data-tab="week" aria-current="page">Workweek</button><button data-tab="tasks">Tasks</button><button data-tab="projects">Projects</button><button data-tab="labels">Labels</button></nav>
+      <nav aria-label="Workspace"><button data-tab="week" aria-current="page">Workweek</button><button data-tab="calendar">Calendar</button><button data-tab="tasks">Tasks</button><button data-tab="clients">Clients</button><button data-tab="projects">Projects</button><button data-tab="labels">Labels</button></nav>
       <section id="week-panel">
         <div class="toolbar"><div><h2>Your workweek</h2><p id="zone-caption" class="hint"></p></div><label>Week containing<input id="week-date" type="date" required></label><label>Duration format<select id="duration-format" aria-label="Duration format"><option value="clock">Hours, minutes and seconds</option><option value="decimal">Decimal hours</option></select></label><button id="add-activity">Add time</button></div>
         <div class="outline-actions"><button id="collapse-activities">Hide activities</button><button id="expand-activities">Show activities</button></div>
         <h2 id="activities-heading">Activities</h2><div id="activities" class="card table-wrap"></div>
         <div class="card report"><div class="report-heading"><p>Daily totals</p><span>Week total <strong id="week-total">—</strong></span></div><div id="days" class="days"></div></div>
       </section>
+      <section id="calendar-panel" hidden aria-labelledby="calendar-title">
+        <div class="toolbar calendar-toolbar"><div><h2 id="calendar-title">Your calendar</h2><p id="calendar-zone" class="hint"></p></div>
+          <div class="calendar-navigation"><button id="calendar-previous">Previous week</button><button id="calendar-today">Today</button><button id="calendar-next">Next week</button></div>
+          <label>Calendar date<input id="calendar-date" type="date" required></label>
+          <div class="calendar-tools"><button id="calendar-new">Record work session at selected time</button><button id="calendar-edit">Edit selected work session</button><button id="calendar-copy">Copy work session</button><button id="calendar-paste">Paste work session</button></div>
+        </div>
+        <details class="calendar-help"><summary>Using the calendar</summary><p class="hint">Strips use the client’s color and show the work session title; task cards list recorded activities. Drag a strip to move it, or its top/bottom edge to resize. Moving preserves duration and leaves activities unchanged. With a strip focused, arrow keys move it and Ctrl/Cmd+C copies it. Select a day and use Ctrl/Cmd+V to paste a separate session without its activities.</p></details>
+        <p id="calendar-dst" class="hint" hidden>The clocks change this week. Repeated times have an extra row; shaded slots do not occur on that day.</p>
+        <p id="calendar-selection" class="hint"></p><p id="calendar-message" class="hint" role="status" aria-live="polite"></p>
+        <div class="calendar-scroll card" aria-label="Weekly calendar"><div id="calendar-grid" class="calendar-grid"></div></div>
+        <div id="calendar-unrecorded" class="calendar-unrecorded"></div>
+      </section>
       <section id="tasks-panel" hidden><div class="toolbar"><h2>Tasks</h2><button id="add-task" class="primary">New task</button></div><div id="tasks" class="card table-wrap"></div></section>
+      <section id="clients-panel" hidden><div class="toolbar"><h2>Clients</h2><button id="add-client" class="primary">New client</button></div><div id="clients" class="card table-wrap"></div></section>
       <section id="projects-panel" hidden><div class="toolbar"><h2>Projects</h2><button id="add-project" class="primary">New project</button></div><div id="projects" class="card table-wrap"></div></section>
       <section id="labels-panel" hidden><div class="toolbar"><h2>Labels</h2><button id="add-label" class="primary">New label</button></div><div id="labels" class="card table-wrap"></div></section>
       <footer id="server-info" class="server-info" aria-label="Server information">

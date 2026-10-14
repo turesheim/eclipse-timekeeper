@@ -76,6 +76,14 @@
           },
           {
             "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "clientId",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "Only records belonging to this client."
           }
         ]
       },
@@ -2540,6 +2548,14 @@
           },
           {
             "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "clientId",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "Only records belonging to this client."
           }
         ],
         "tags": [
@@ -3225,6 +3241,348 @@
           "$ref": "#/components/parameters/Id"
         }
       ]
+    },
+    "/clients": {
+      "get": {
+        "operationId": "listClients",
+        "summary": "List owned clients",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientPage"
+                }
+              }
+            },
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Query"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createClient",
+        "summary": "Create owned client",
+        "x-required-permission": "write",
+        "responses": {
+          "201": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Client"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      }
+    },
+    "/clients/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "get": {
+        "operationId": "getClient",
+        "summary": "Read owned client",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Client"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      },
+      "put": {
+        "operationId": "updateClient",
+        "summary": "Replace editable client fields",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Client"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteClient",
+        "summary": "Delete unused owned client",
+        "x-required-permission": "write",
+        "responses": {
+          "204": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -3331,12 +3689,16 @@
         "properties": {
           "name": {
             "$ref": "#/components/schemas/Name"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
           }
         },
         "required": [
           "name"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "clientId selects the owner-scoped client. Legacy clients may omit it: creation uses General and edits preserve the existing client."
       },
       "TaskInput": {
         "type": "object",
@@ -3661,13 +4023,17 @@
           },
           "name": {
             "$ref": "#/components/schemas/Name"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
           }
         },
         "required": [
           "id",
           "ownerId",
           "version",
-          "name"
+          "name",
+          "clientId"
         ],
         "additionalProperties": true
       },
@@ -4088,7 +4454,8 @@
               "ACTIVITY",
               "LABEL",
               "PROFILE",
-              "WORK_SESSION"
+              "WORK_SESSION",
+              "CLIENT"
             ]
           },
           "changeType": {
@@ -4146,6 +4513,9 @@
           },
           "name": {
             "$ref": "#/components/schemas/Name"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
           }
         },
         "required": [
@@ -4320,7 +4690,8 @@
             "type": "string",
             "enum": [
               "timekeeper-domain-v1",
-              "timekeeper-domain-v2"
+              "timekeeper-domain-v2",
+              "timekeeper-domain-v3"
             ]
           },
           "zoneId": {
@@ -4360,6 +4731,13 @@
             "items": {
               "$ref": "#/components/schemas/TransferWorkSession"
             }
+          },
+          "clients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferClient"
+            },
+            "maxItems": 10000
           }
         },
         "required": [
@@ -4416,6 +4794,84 @@
                 }
               }
             }
+          },
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "timekeeper-domain-v3"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "clients",
+                "workSessions"
+              ],
+              "properties": {
+                "projects": {
+                  "items": {
+                    "required": [
+                      "clientId"
+                    ]
+                  }
+                },
+                "workSessions": {
+                  "items": {
+                    "required": [
+                      "clientId",
+                      "title"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "enum": [
+                    "timekeeper-domain-v1",
+                    "timekeeper-domain-v2"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "clients": {
+                  "maxItems": 0
+                },
+                "projects": {
+                  "items": {
+                    "not": {
+                      "required": [
+                        "clientId"
+                      ]
+                    }
+                  }
+                },
+                "workSessions": {
+                  "items": {
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "clientId"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "title"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           }
         ]
       },
@@ -4434,7 +4890,8 @@
                     "TASK",
                     "ACTIVITY",
                     "LABEL",
-                    "WORK_SESSION"
+                    "WORK_SESSION",
+                    "CLIENT"
                   ]
                 },
                 "sourceId": {
@@ -4635,6 +5092,12 @@
               "RUNNING",
               "COMPLETED"
             ]
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Name"
           }
         },
         "required": [
@@ -4644,7 +5107,9 @@
           "start",
           "end",
           "summary",
-          "state"
+          "state",
+          "clientId",
+          "title"
         ]
       },
       "WorkSessionInput": {
@@ -4666,13 +5131,20 @@
           },
           "summary": {
             "$ref": "#/components/schemas/Summary"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Name"
           }
         },
         "required": [
           "start",
           "end",
           "summary"
-        ]
+        ],
+        "description": "Web clients supply clientId and title. Legacy interval-only clients may omit them; creation uses General and a title from summary, and edits preserve existing client/title. Null client or blank title is invalid."
       },
       "StartWorkSessionInput": {
         "type": "object",
@@ -4680,11 +5152,18 @@
         "properties": {
           "summary": {
             "$ref": "#/components/schemas/Summary"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Name"
           }
         },
         "required": [
           "summary"
-        ]
+        ],
+        "description": "Web clients supply clientId and title. Legacy interval-only clients may omit them; creation uses General and a title from summary, and edits preserve existing client/title. Null client or blank title is invalid."
       },
       "WorkSessionAssociationInput": {
         "type": "object",
@@ -4833,6 +5312,12 @@
           },
           "id": {
             "$ref": "#/components/schemas/Id"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Name"
           }
         },
         "required": [
@@ -4841,6 +5326,100 @@
           "end",
           "summary"
         ]
+      },
+      "ClientInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "color": {
+            "$ref": "#/components/schemas/Color"
+          }
+        },
+        "required": [
+          "name",
+          "color"
+        ],
+        "additionalProperties": false
+      },
+      "Client": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "color": {
+            "$ref": "#/components/schemas/Color"
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "version",
+          "name",
+          "color"
+        ],
+        "additionalProperties": true
+      },
+      "ClientPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Client"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "revision"
+        ],
+        "additionalProperties": true
+      },
+      "TransferClient": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "color": {
+            "$ref": "#/components/schemas/Color"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {

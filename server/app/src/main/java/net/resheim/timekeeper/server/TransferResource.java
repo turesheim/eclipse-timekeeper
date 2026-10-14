@@ -21,11 +21,11 @@ public class TransferResource {
     @Inject ContractInputs inputs;
     @Inject CommandReceipts receipts;
     @Context UriInfo uri;
-    private static final Map<String,String> TYPES=Map.of("projects","PROJECT","tasks","TASK","labels","LABEL","activities","ACTIVITY","workSessions","WORK_SESSION");
+    private static final Map<String,String> TYPES=Map.of("clients","CLIENT","projects","PROJECT","tasks","TASK","labels","LABEL","activities","ACTIVITY","workSessions","WORK_SESSION");
     @GET @Path("/export") public Response exportData() {
         ContractInputs.queries(uri.getQueryParameters());
         return store.transaction(identity.owner(),() -> {
-            var value=object();value.put("format","timekeeper-domain-v2");value.put("zoneId",store.profile().get("zoneId").asText());
+            var value=object();value.put("format","timekeeper-domain-v3");value.put("zoneId",store.profile().get("zoneId").asText());
             TYPES.forEach((name,type) -> {
                 var records=store.list(type);if(records.size()>10000) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
                 var array=value.putArray(name);for(JsonNode record:records) {var copy=((ObjectNode)record).deepCopy();copy.remove(List.of("ownerId","version","state"));array.add(copy);}
@@ -42,6 +42,7 @@ public class TransferResource {
         return store.transaction(identity.owner(),() -> receipts.execute(key,"POST","/data/import",null,input,() -> importRecords(input)).response());
     }
     private ApiReplies importRecords(JsonNode input) {
+        Map<UUID,UUID> clients=new HashMap<>();
         Map<UUID,ProjectId> projects=new HashMap<>();Map<UUID,TaskId> tasks=new HashMap<>();Map<UUID,LabelId> labels=new HashMap<>();Map<UUID,WorkSessionId> sessions=new HashMap<>();Set<UUID> sourceIds=new HashSet<>();
         var result=object();var mappings=result.putArray("ids");var service=store.service();
         // Validate source identity uniqueness before any record is created.
@@ -73,6 +74,15 @@ public class TransferResource {
             for(JsonNode label:item.get("labelIds")) if(!sourceLabels.contains(uuid(label))) throw ApiFailure.validation();
             var end=optionalText(item.get("end")).map(Instant::parse);if(end.isPresent() && end.get().isBefore(Instant.parse(item.get("start").asText()))) throw ApiFailure.validation();
         }
+        if(input.path("format").asText().equals("timekeeper-domain-v3")) {
+            var sourceClients=new HashSet<UUID>();input.path("clients").forEach(item -> sourceClients.add(uuid(item.get("id"))));
+            for(String collection:List.of("projects","workSessions")) for(var item:input.path(collection))
+                if(!sourceClients.contains(uuid(item.get("clientId")))) throw ApiFailure.validation();
+        }
+        for(var item:input.path("clients")) {
+            var fields=object();fields.put("name",item.get("name").asText());fields.put("color",item.get("color").asText());
+            var created=store.createClient(fields);clients.put(uuid(item.get("id")),uuid(created.get("id")));mapping(mappings,"CLIENT",item,uuid(created.get("id")));
+        }
         int openSessions=0;
         for(JsonNode item:input.path("workSessions")) {
             Instant start=Instant.parse(item.get("start").asText());WorkSession.validateStart(start,store.now());
@@ -85,10 +95,11 @@ public class TransferResource {
         for(JsonNode item:input.path("workSessions")) {
             var created=store.workSessionService().createWorkSession(new CreateWorkSession(new OwnerId(store.owner()),Instant.parse(item.get("start").asText()),
                     optionalText(item.get("end")).map(Instant::parse),item.get("summary").asText()));
+            details("WORK_SESSION",created.id().value(),item,clients);
             sessions.put(uuid(item.get("id")),created.id());mapping(mappings,"WORK_SESSION",item,created.id().value());
         }
         for(JsonNode item:input.get("projects")) {
-            var created=service.createProject(new CreateProject(item.get("name").asText()));projects.put(uuid(item.get("id")),created.id());mapping(mappings,"PROJECT",item,created.id().value());
+            var created=service.createProject(new CreateProject(item.get("name").asText()));details("PROJECT",created.id().value(),item,clients);projects.put(uuid(item.get("id")),created.id());mapping(mappings,"PROJECT",item,created.id().value());
         }
         for(JsonNode item:input.get("labels")) {
             var created=service.createLabel(new CreateLabel(item.get("name").asText(),optionalText(item.get("color"))));labels.put(uuid(item.get("id")),created.id());mapping(mappings,"LABEL",item,created.id().value());
@@ -119,6 +130,11 @@ public class TransferResource {
         }
         service.rolloverActivities(new OwnerId(store.owner()));
         result.put("revision",store.revision());return new ApiReplies(201,result,null,null);
+    }
+    private void details(String type,UUID id,JsonNode item,Map<UUID,UUID> clients) {
+        if(!item.has("clientId")) return;
+        var fields=object();fields.put("clientId",required(clients,uuid(item.get("clientId"))).toString());
+        if(item.has("title")) fields.put("title",item.get("title").asText());store.clientDetails(type,id,fields);
     }
     private static <T> T required(Map<UUID,T> values,UUID id) {T value=values.get(id);if(value==null) throw ApiFailure.validation();return value;}
     private static void mapping(com.fasterxml.jackson.databind.node.ArrayNode mappings,String type,JsonNode source,UUID id) {

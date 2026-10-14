@@ -15,6 +15,18 @@ import com.google.gson.JsonParser;
 class CsvSnapshotTest {
     @TempDir Path temporary;
 
+    @Test void v3CsvRetainsTheClientGraphAndCannotBeSilentlyDowngraded() throws Exception {
+        var data=JsonParser.parseString("""
+            {"format":"timekeeper-domain-v3","zoneId":"UTC",
+             "clients":[{"id":"client","name":"Client, æøå","color":"#ffDD00"}],
+             "projects":[{"id":"project","name":"Project","clientId":"client"}],
+             "workSessions":[{"id":"session","start":"2025-10-20T08:00:00.123456789Z","end":null,"summary":"Description","clientId":"client","title":"Planning"}],
+             "tasks":[],"labels":[],"activities":[]}
+            """).getAsJsonObject();
+        var folder=temporary.resolve("clients");assertEquals(3,CsvSnapshot.write(data,folder));assertEquals(data,CsvSnapshot.read(folder));
+        data.addProperty("format","timekeeper-domain-v2");assertThrows(IOException.class,()->CsvSnapshot.write(data,temporary.resolve("downgrade")));
+        Files.delete(folder.resolve("clients.csv"));assertThrows(IOException.class,()->CsvSnapshot.read(folder));
+    }
     @Test void v2CsvPreservesTasklessProjectAndSessionRelationsAndRequiresItsSessionFile() throws Exception {
         var data=JsonParser.parseString("""
             {"format":"timekeeper-domain-v2","zoneId":"UTC","projects":[],"tasks":[],"labels":[],

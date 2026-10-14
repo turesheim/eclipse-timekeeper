@@ -133,7 +133,7 @@ class ContractTest(unittest.TestCase):
         self.assertIn('WWW-Authenticate', CONTRACT['components']['responses']['401']['headers'])
 
     def test_new_response_fields_are_compatible(self):
-        value = {'id': ID, 'ownerId': 'alice', 'version': 0, 'name': 'Project',
+        value = {'id': ID, 'ownerId': 'alice', 'version': 0, 'name': 'Project', 'clientId': ID,
                  'futureField': {'value': 1}}
         validator('Project').validate(value)
         self.assertFalse(validator('ProjectInput').is_valid({'name': 'Project', 'futureField': 1}))
@@ -156,8 +156,27 @@ class ContractTest(unittest.TestCase):
         changed['format'] = 'legacy-h2'
         self.assertFalse(validator('TransferSnapshot').is_valid(changed))
 
+    def test_client_graph_and_title_are_required_in_v3_transfer(self):
+        value = {'format': 'timekeeper-domain-v3', 'zoneId': 'UTC',
+                 'clients': [{'id': ID, 'name': 'Client', 'color': '#ffdd88'}],
+                 'projects': [{'id': ID, 'name': 'Project', 'clientId': ID}],
+                 'tasks': [], 'labels': [], 'activities': [],
+                 'workSessions': [{'id': ID, 'clientId': ID, 'title': 'Planning',
+                                   'summary': '', 'start': '2025-10-20T08:00:00Z', 'end': None}]}
+        validator('TransferSnapshot').validate(value)
+        for collection, field in [('projects', 'clientId'), ('workSessions', 'clientId'), ('workSessions', 'title')]:
+            missing = copy.deepcopy(value)
+            del missing[collection][0][field]
+            self.assertFalse(validator('TransferSnapshot').is_valid(missing))
+        self.assertFalse(validator('ClientInput').is_valid({'name': 'Client', 'color': None}))
+        self.assertFalse(validator('WorkSessionInput').is_valid({'start': '2025-10-20T08:00:00Z', 'end': None, 'summary': '', 'clientId': None, 'title': 'Planning'}))
+        older = copy.deepcopy(value)
+        older['format'] = 'timekeeper-domain-v2'
+        self.assertFalse(validator('TransferSnapshot').is_valid(older))
+
     def test_every_reference_and_relation_workflow_is_present(self):
         expected = {
+            'createClient', 'updateClient', 'deleteClient', 'getClient', 'listClients',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTask', 'updateTask', 'deleteTask', 'getTask', 'listTasks',
             'linkExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',

@@ -42,6 +42,7 @@ public class TimekeeperResource {
         String type=ContractInputs.type(collection);JsonNode input=inputs.validate(ContractInputs.input(type,true),body);
         ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> {
+            if(type.equals("CLIENT")) {var node=store.createClient(input);return ApiReplies.resource(201,node,"/api/v1/clients/"+node.get("id").asText());}
             var service=store.service();Object value=switch(type) {
                 case "PROJECT" -> service.createProject(new CreateProject(input.get("name").asText()));
                 case "TASK" -> service.createTask(new CreateTask(project(input),parent(input),input.get("summary").asText(),optionalText(input.get("url")),references(input.get("externalReferences"))));
@@ -50,20 +51,22 @@ public class TimekeeperResource {
                 case "WORK_SESSION" -> store.workSessionService().createWorkSession(new CreateWorkSession(new OwnerId(store.owner()),Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText()));
                 default -> throw ApiFailure.notFound();
             };
-            JsonNode snapshot=snapshot(store.owner(),value);return ApiReplies.resource(201,snapshot,"/api/v1/"+collection+"/"+snapshot.get("id").asText());
+            JsonNode snapshot=stored(type,value,input);return ApiReplies.resource(201,snapshot,"/api/v1/"+collection+"/"+snapshot.get("id").asText());
         });
     }
     @PUT @Path("/{collection}/{id}") public Response update(@PathParam("collection") String collection,@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         String type=ContractInputs.type(collection);UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate(ContractInputs.input(type,false),body);
         ContractInputs.queries(uri.getQueryParameters());return tx(() -> {
-            long version=ApiReplies.match(required(type,key),match);var service=store.service();Object value=switch(type) {
+            long version=ApiReplies.match(required(type,key),match);
+            if(type.equals("CLIENT")) return ApiReplies.resource(200,store.updateClient(key,version,input),null);
+            var service=store.service();Object value=switch(type) {
                 case "PROJECT" -> service.updateProject(new UpdateProject(new ProjectId(key),version,input.get("name").asText()));
                 case "TASK" -> service.updateTask(new UpdateTask(new TaskId(key),version,project(input),parent(input),input.get("summary").asText(),optionalText(input.get("url"))));
                 case "LABEL" -> service.updateLabel(new UpdateLabel(new LabelId(key),version,input.get("name").asText(),optionalText(input.get("color"))));
                 case "ACTIVITY" -> service.updateActivity(new UpdateActivity(new ActivityId(key),version,Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText(),labels(input.get("labelIds"))));
                 case "WORK_SESSION" -> store.workSessionService().updateWorkSession(new UpdateWorkSession(new WorkSessionId(key),version,Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText()));
                 default -> throw ApiFailure.notFound();
-            };return ApiReplies.resource(200,snapshot(store.owner(),value),null);
+            };return ApiReplies.resource(200,stored(type,value,input),null);
         });
     }
     @DELETE @Path("/{collection}/{id}") public Response delete(@PathParam("collection") String collection,@PathParam("id") String id,@HeaderParam("If-Match") String match) {
@@ -71,6 +74,7 @@ public class TimekeeperResource {
         return tx(() -> {
             long version=ApiReplies.match(required(type,key),match);var service=store.service();
             switch(type) {
+                case "CLIENT" -> {store.delete(type,key);store.change(type,"DELETED",key.toString());}
                 case "PROJECT" -> service.deleteProject(new DeleteProject(new ProjectId(key),version));
                 case "TASK" -> service.deleteTask(new DeleteTask(new TaskId(key),version));
                 case "LABEL" -> service.deleteLabel(new DeleteLabel(new LabelId(key),version));
@@ -80,6 +84,11 @@ public class TimekeeperResource {
             }return empty();
         });
     }
+    private JsonNode stored(String type,Object value,JsonNode input) {
+        var node=snapshot(store.owner(),value);
+        return Set.of("PROJECT","WORK_SESSION").contains(type) ? store.clientDetails(type,uuid(node.get("id")),input) : node;
+    }
+    private JsonNode sessionSnapshot(WorkSession value) {return required("WORK_SESSION",value.id().value());}
     @GET @Path("/tasks/by-external-reference") public Response external() {
         ContractInputs.queries(uri.getQueryParameters(),"providerId","repositoryId","externalId");var query=uri.getQueryParameters();
         var ref=referenceQuery(query);return tx(() -> ApiReplies.resource(200,snapshot(store.owner(),store.service().findTask(ref).orElseThrow(ApiFailure::notFound)),null));
@@ -123,20 +132,20 @@ public class TimekeeperResource {
     }
     @GET @Path("/work-sessions/active") public Response activeWorkSession() {
         ContractInputs.queries(uri.getQueryParameters());return tx(() -> store.workSessionService().activeWorkSession(new OwnerId(store.owner()))
-                .map(value -> ApiReplies.resource(200,snapshot(store.owner(),value),null)).orElseGet(TimekeeperResource::empty));
+                .map(value -> ApiReplies.resource(200,sessionSnapshot(value),null)).orElseGet(TimekeeperResource::empty));
     }
     @POST @Path("/work-sessions/start") public Response startWorkSession(@HeaderParam("Idempotency-Key") String key,JsonNode body) {
         var input=inputs.validate("StartWorkSessionInput",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> receipts.execute(key,"POST","/work-sessions/start",null,input,() -> {
             var value=store.workSessionService().startWorkSession(new StartWorkSession(new OwnerId(store.owner()),input.get("summary").asText()));
-            return ApiReplies.resource(201,snapshot(store.owner(),value),"/api/v1/work-sessions/"+value.id().value());
+            return ApiReplies.resource(201,store.clientDetails("WORK_SESSION",value.id().value(),input),"/api/v1/work-sessions/"+value.id().value());
         }));
     }
     @POST @Path("/work-sessions/{id}/stop") public Response stopWorkSession(@PathParam("id") String id,@HeaderParam("If-Match") String match,@HeaderParam("Idempotency-Key") String key) {
         UUID session=ContractInputs.pathId(id);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> receipts.execute(key,"POST","/work-sessions/"+session+"/stop",match,null,() -> {
             var current=required("WORK_SESSION",session);long version=ApiReplies.match(current,match);
-            return ApiReplies.resource(200,snapshot(store.owner(),store.workSessionService().stopWorkSession(new StopWorkSession(new WorkSessionId(session),version))),null);
+            return ApiReplies.resource(200,sessionSnapshot(store.workSessionService().stopWorkSession(new StopWorkSession(new WorkSessionId(session),version))),null);
         }));
     }
     @PUT @Path("/activities/{id}/work-session") public Response associateWorkSession(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
@@ -152,7 +161,7 @@ public class TimekeeperResource {
     @GET @Path("/work-sessions/{id}/report") public Response workSessionReport(@PathParam("id") String id) {
         var session=new WorkSessionId(ContractInputs.pathId(id));ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> {
-            var report=store.workSessionService().workSessionReport(session);var response=object();response.set("session",snapshot(store.owner(),report.session()));
+            var report=store.workSessionService().workSessionReport(session);var response=object();response.set("session",sessionSnapshot(report.session()));
             var activities=response.putArray("activities");report.activities().forEach(value -> activities.add(snapshot(store.owner(),value)));
             var time=response.putObject("time");time.put("duration",report.time().duration().toString());time.put("trackedActivityTime",report.time().trackedActivityTime().toString());
             time.put("allocatedTime",report.time().allocatedTime().toString());time.put("unallocatedTime",report.time().unallocatedTime().toString());
@@ -169,13 +178,15 @@ public class TimekeeperResource {
         String type=ContractInputs.type(collection);var query=uri.getQueryParameters();
         if(type.equals("ACTIVITY")) ContractInputs.queries(query,"from","to","taskId","projectId","labelId","limit","cursor");
         else if(type.equals("TASK")) ContractInputs.queries(query,"q","projectId","parentTaskId","unassigned","limit","cursor");
+        else if(Set.of("PROJECT","WORK_SESSION").contains(type)) ContractInputs.queries(query,"q","clientId","limit","cursor");
         else ContractInputs.queries(query,"q","limit","cursor");
         int limit=ContractInputs.number(query.getFirst("limit"),100,1,500);String q=Optional.ofNullable(query.getFirst("q")).orElse("").trim().toLowerCase(Locale.ROOT);if(q.codePointCount(0,q.length())>200) throw ApiFailure.validation();
         return tx(() -> {
             validateFilters(query);List<JsonNode> values;
             if(type.equals("ACTIVITY")) values=activities(query).stream().map(value -> (JsonNode)snapshot(store.owner(),value)).toList();
             else values=store.list(type).stream().filter(value -> {
-                if(!value.get(Set.of("TASK","WORK_SESSION").contains(type) ? "summary" : "name").asText().toLowerCase(Locale.ROOT).contains(q)) return false;
+                if(!value.get(type.equals("WORK_SESSION") ? "title" : type.equals("TASK") ? "summary" : "name").asText().toLowerCase(Locale.ROOT).contains(q)) return false;
+                if(query.containsKey("clientId") && !value.path("clientId").asText().equals(ContractInputs.pathId(query.getFirst("clientId")).toString())) return false;
                 if(type.equals("TASK")) {
                     if(query.containsKey("projectId") && !value.get("projectId").asText().equals(ContractInputs.pathId(query.getFirst("projectId")).toString())) return false;
                     if(query.containsKey("parentTaskId") && !value.get("parentTaskId").asText().equals(ContractInputs.pathId(query.getFirst("parentTaskId")).toString())) return false;
@@ -193,7 +204,7 @@ public class TimekeeperResource {
         });
     }
     private void validateFilters(MultivaluedMap<String,String> query) {
-        for(var entry:Map.of("taskId","TASK","projectId","PROJECT","parentTaskId","TASK","labelId","LABEL").entrySet()) if(query.containsKey(entry.getKey())) required(entry.getValue(),ContractInputs.pathId(query.getFirst(entry.getKey())));
+        for(var entry:Map.of("clientId","CLIENT","taskId","TASK","projectId","PROJECT","parentTaskId","TASK","labelId","LABEL").entrySet()) if(query.containsKey(entry.getKey())) required(entry.getValue(),ContractInputs.pathId(query.getFirst(entry.getKey())));
         if("true".equals(query.getFirst("unassigned")) && query.containsKey("projectId")) throw ApiFailure.validation();
         if(query.containsKey("unassigned") && !Set.of("true","false").contains(query.getFirst("unassigned"))) throw ApiFailure.badRequest();
     }

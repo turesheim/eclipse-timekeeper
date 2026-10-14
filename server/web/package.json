@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/model.test.js tests/api.test.js tests/credentials.test.js",
+    "test": "node --test tests/model.test.js tests/api.test.js tests/credentials.test.js tests/calendar.test.js",
     "test:browser": "playwright test"
   },
   "devDependencies": { "@playwright/test": "1.64.0" }

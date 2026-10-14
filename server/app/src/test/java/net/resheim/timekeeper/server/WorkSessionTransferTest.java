@@ -24,7 +24,7 @@ class WorkSessionTransferTest {
     @Inject ServerStore store;
     @TempDir Path directory;
     private HttpTimekeeperService client(String token) {return new HttpTimekeeperService(endpoint,()->token,Duration.ofSeconds(5));}
-    @Test void v2CsvRoundTripRemapsSessionsLabelsAndTasklessDirectProjectsAtomically() throws Exception {
+    @Test void v3CsvRoundTripRemapsSessionsLabelsAndTasklessDirectProjectsAtomically() throws Exception {
         try(var source=client("test-a");var target=client("test-b")) {
             var from=Instant.parse("2025-10-25T21:59:59.123456789Z");var end=Instant.parse("2025-10-27T22:00:00.987654321Z");
             var session=source.createWorkSession(new CreateWorkSession(OwnerId.LOCAL,from,Optional.of(end),"Session, æøå"));
@@ -33,13 +33,19 @@ class WorkSessionTransferTest {
             source.createActivity(new CreateActivity(null,OwnerId.LOCAL,from,Optional.of(end),"Unassigned activity",Set.of(label.id()),Optional.of(session.id()),Optional.empty()));
             source.createActivity(new CreateActivity(null,OwnerId.LOCAL,from.plusSeconds(1),Optional.of(from.plusSeconds(61)),"Direct project",Set.of(),Optional.of(session.id()),Optional.of(project.id())));
             var before=source.workSessionReport(session.id());var export=source.exportData();
-            assertEquals("timekeeper-domain-v2",export.get("format").getAsString());
+            assertEquals("timekeeper-domain-v3",export.get("format").getAsString());
             assertFalse(export.getAsJsonArray("workSessions").get(0).getAsJsonObject().has("state"));
             var invalid=export.deepCopy();invalid.getAsJsonArray("activities").get(0).getAsJsonObject().addProperty("workSessionId",UUID.randomUUID().toString());
             var unchanged=target.exportData();assertThrows(RemoteFailure.class,()->target.importData(invalid));assertEquals(unchanged,target.exportData());
-            var folder=directory.resolve("export");source.exportCsv(folder);assertTrue(Files.isRegularFile(folder.resolve("workSessions.csv")));
+            var folder=directory.resolve("export");source.exportCsv(folder);assertTrue(Files.isRegularFile(folder.resolve("workSessions.csv")));assertTrue(Files.isRegularFile(folder.resolve("clients.csv")));
             int imported=target.importCsv(folder,directory.resolve("journal"));assertTrue(imported>0);
             var sessions=target.workSessions(OwnerId.LOCAL);assertEquals(1,sessions.size());var copied=sessions.getFirst();assertNotEquals(session.id(),copied.id());
+            var transferred=target.exportData();
+            var copiedWire=transferred.getAsJsonArray("workSessions").get(0).getAsJsonObject();
+            assertEquals("Session, æøå",copiedWire.get("title").getAsString());
+            var sourceClient=export.getAsJsonArray("workSessions").get(0).getAsJsonObject().get("clientId");
+            assertNotEquals(sourceClient,copiedWire.get("clientId"));
+            assertEquals(copiedWire.get("clientId"),transferred.getAsJsonArray("projects").get(0).getAsJsonObject().get("clientId"));
             var after=target.workSessionReport(copied.id());assertEquals(before.time(),after.time());assertEquals(4,after.activities().size());assertTrue(target.tasks().isEmpty());
             var copiedProject=target.projects().stream().filter(value->value.name().equals(project.name())).findFirst().orElseThrow();assertNotEquals(project.id(),copiedProject.id());
             var copiedLabel=target.labels().stream().filter(value->value.name().equals(label.name())).findFirst().orElseThrow();assertNotEquals(label.id(),copiedLabel.id());
