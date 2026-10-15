@@ -10,7 +10,10 @@ export function authentication({connect, clear, updateAccount}) {
     const value = $('auth-mode').value, code = ['setup','recover'].includes(value), token = value === 'token';
     for (const [field, visible] of [['code',code],['username',!token],['password',!token],['confirm',code],['remember',value === 'login'],['token',token]]) {
       $(`${field}-field`).hidden = !visible;
-      for (const input of $(`${field}-field`).querySelectorAll('input')) input.required = visible && input.type !== 'checkbox';
+      for (const input of $(`${field}-field`).querySelectorAll('input')) {
+        input.disabled = !visible;
+        input.required = visible && input.type !== 'checkbox';
+      }
     }
     $('password').autocomplete = code ? 'new-password' : 'current-password';
     $('auth-hint').textContent = code ? 'Get a one-time code from the server operator. New passwords must contain at least 15 characters.' : token ? 'Exchange an existing API token for a browser session. The token is never saved in browser storage.' : 'Use your Timekeeper account. API tokens are managed after signing in.';

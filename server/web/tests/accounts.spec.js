@@ -6,6 +6,23 @@ async function login(page,username='browser-admin',secret=password) {
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');await page.getByLabel('Username',{exact:true}).fill(username);await page.getByLabel('Password',{exact:true}).fill(secret);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
 }
 async function call(request,method,path,data,headers={}) {return request.fetch(`/api/v1${path}`,{method,data,headers:{Authorization:`Bearer ${token}`,...headers}});}
+test('setup and recovery keep one-time codes separate from password fields',async({page,request})=>{
+  await page.goto('/web/');await expect(page.locator('#auth-mode')).toHaveValue('setup');
+  const code=page.getByLabel('One-time setup or recovery code');
+  await expect(code).toHaveAttribute('type','text');await expect(code).toHaveAttribute('autocomplete','one-time-code');
+  await expect(page.locator('#login-form input[type="password"]:enabled')).toHaveCount(2);
+  await page.locator('#auth-mode').selectOption('login');await expect(code).toBeDisabled();await expect(page.locator('#password-confirm')).toBeDisabled();
+  await expect(page.locator('#password')).toHaveAttribute('autocomplete','current-password');
+  await page.locator('#auth-mode').selectOption('token');await expect(page.locator('#token')).toBeEnabled();await expect(page.locator('#password')).toBeDisabled();
+  await page.locator('#auth-mode').selectOption('recover');await expect(code).toBeEnabled();await expect(page.locator('#token')).toBeDisabled();
+  await expect(page.locator('#login-form input[type="password"]:enabled')).toHaveCount(2);
+  await page.locator('#auth-mode').selectOption('setup');await expect(page.locator('#password')).toHaveAttribute('autocomplete','new-password');
+  await code.fill(process.env.TIMEKEEPER_WEB_SETUP_CODE);
+  await page.getByLabel('Username',{exact:true}).fill('browser-admin');await page.getByLabel('Password',{exact:true}).fill(password);await page.getByLabel('Confirm password',{exact:true}).fill(password+' different');
+  await expect(code).toHaveValue(process.env.TIMEKEEPER_WEB_SETUP_CODE);
+  await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#login-error')).toHaveText('Passwords do not match.');
+  expect((await (await request.get('/api/v1/auth/status')).json()).setupRequired).toBe(true);
+});
 test('first administrator claims the explicit existing owner once and uses a secure browser cookie',async({page,request})=>{
   const status=await (await request.get('/api/v1/auth/status')).json();expect(status.setupRequired).toBe(true);
   await page.goto('/web/');await expect(page.locator('#auth-mode')).toHaveValue('setup');

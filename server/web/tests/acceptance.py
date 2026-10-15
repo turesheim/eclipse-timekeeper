@@ -25,6 +25,7 @@ def main():
     parser.add_argument('--distribution', type=Path, required=True)
     parser.add_argument('--java', default='java')
     parser.add_argument('--grep', help='Run selected browser tests for diagnosis')
+    parser.add_argument('--browser', choices=('chromium','webkit','firefox'), default='chromium', help='Browser engine for this acceptance run')
     args = parser.parse_args()
     digest = hashlib.sha256(args.distribution.read_bytes()).hexdigest()
     if args.distribution.with_suffix('.zip.sha256').read_text().split()[0] != digest:
@@ -68,9 +69,9 @@ def main():
                     if b'id="login-form"' not in response.read(): raise AssertionError('Missing bundled web client')
                     if "frame-ancestors 'none'" not in response.headers.get('Content-Security-Policy',''): raise AssertionError('Missing web security policy')
                 command = ['npm', 'run', 'test:browser'] + (['--', '--grep', args.grep] if args.grep else [])
-                result = subprocess.run(command, cwd=ROOT / 'server/web', env={**environment, 'TIMEKEEPER_WEB_URL':base, 'TIMEKEEPER_WEB_TOKEN':tokens[0], 'TIMEKEEPER_WEB_READ_TOKEN':tokens[1], 'TIMEKEEPER_WEB_REGISTRY':str(registry), 'TIMEKEEPER_WEB_SETUP_CODE':code, 'TIMEKEEPER_WEB_PASSWORD':password}, timeout=600)
+                result = subprocess.run(command, cwd=ROOT / 'server/web', env={**environment, 'TIMEKEEPER_WEB_URL':base, 'TIMEKEEPER_WEB_TOKEN':tokens[0], 'TIMEKEEPER_WEB_READ_TOKEN':tokens[1], 'TIMEKEEPER_WEB_REGISTRY':str(registry), 'TIMEKEEPER_WEB_SETUP_CODE':code, 'TIMEKEEPER_WEB_PASSWORD':password, 'TIMEKEEPER_WEB_BROWSER':args.browser}, timeout=600)
                 if result.returncode: raise RuntimeError('Browser acceptance failed')
-                (output / 'acceptance.json').write_text(json.dumps({'distributionSha256':digest, 'sourceCommit':manifest['commit'], 'serverPid':process.pid, 'browser':'chromium', 'passed':True}, indent=2) + '\n')
+                (output / 'acceptance.json').write_text(json.dumps({'distributionSha256':digest, 'sourceCommit':manifest['commit'], 'serverPid':process.pid, 'browser':args.browser, 'passed':True}, indent=2) + '\n')
             finally:
                 process.terminate()
                 try: process.wait(timeout=10)

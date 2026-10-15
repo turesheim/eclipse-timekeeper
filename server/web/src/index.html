@@ -19,10 +19,10 @@
         <label>Sign-in method<select id="auth-mode"><option value="login">Username and password</option><option value="setup">First administrator setup</option><option value="recover">Recover account</option><option value="token">Existing API token</option></select></label>
         <label id="username-field">Username<input id="username" autocomplete="username" required maxlength="64"></label>
         <label id="password-field">Password<input id="password" type="password" autocomplete="current-password" required></label>
-        <label id="confirm-field" hidden>Confirm password<input id="password-confirm" type="password" autocomplete="new-password"></label>
-        <label id="code-field" hidden>One-time setup or recovery code<input id="setup-code" type="password" autocomplete="off"></label>
+        <label id="confirm-field" hidden>Confirm password<input id="password-confirm" type="password" autocomplete="new-password" disabled></label>
+        <label id="code-field" hidden>One-time setup or recovery code<input id="setup-code" name="one-time-code" type="text" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" disabled></label>
         <label id="remember-field" class="check"><input id="remember" type="checkbox"> Remember me on this browser</label>
-        <label id="token-field" hidden>Access token<input id="token" type="password" autocomplete="off"></label>
+        <label id="token-field" hidden>Access token<input id="token" type="password" autocomplete="off" disabled></label>
         <p id="auth-hint" class="hint">Use your Timekeeper account. API tokens are managed after signing in.</p>
         <p id="login-error" role="alert"></p><button class="primary" type="submit">Sign in</button>
       </form>
