@@ -34,7 +34,11 @@ def fixture_sql():
         salt=secrets.token_bytes(16)
         encoded=lambda value:base64.urlsafe_b64encode(value).decode().rstrip('=')
         password='pbkdf2-sha256$600000$'+encoded(salt)+'$'+encoded(hashlib.pbkdf2_hmac('sha256',b'migration password fixture',salt,600000))
-        sql+=f"INSERT INTO tk_owner VALUES({quote(owner)},'Europe/Oslo',7,9007199254740993,{quote(secrets.token_hex(32))});\n"
+        # Keep the beyond-JavaScript sequence on a closed interval. The active
+        # owner's sequence needs room for legitimate day-boundary writes when
+        # this historical fixture is started by the real server on later dates.
+        sequence=42 if index==0 else 9007199254740993
+        sql+=f"INSERT INTO tk_owner VALUES({quote(owner)},'Europe/Oslo',7,{sequence},{quote(secrets.token_hex(32))});\n"
         sql+=f"INSERT INTO tk_account VALUES({quote(owner)},'account{index}',{quote(password)},'Private account','ENABLED',{str(index==0)},TRUE,8);\n"
         for kind,identifier in ids.items():
             payload={'ownerId':owner,'id':identifier,'version':9,'summary':'Norwegian æøå and β; tab\tnewline\nquote \' slash\\', 'start':now,'end':None}
@@ -42,15 +46,17 @@ def fixture_sql():
             if kind in ('CLIENT','LABEL'):payload['color']='#2563eb'
             if kind in ('PROJECT','WORK_SESSION'):payload['clientId']=ids['CLIENT']
             if kind=='TASK':payload.update(projectId=ids['PROJECT'],parentTaskId=None,url=None,externalReferences=[{'providerId':'mylyn','repositoryId':'https://example.invalid/repository','externalId':'issue-123','externalUrl':None}])
-            if kind=='ACTIVITY':payload.update(taskId=ids['TASK'],projectId=ids['PROJECT'],workSessionId=ids['WORK_SESSION'],labelIds=[ids['LABEL']],manual=True)
+            if kind=='ACTIVITY':
+                payload.update(taskId=ids['TASK'],projectId=ids['PROJECT'],workSessionId=ids['WORK_SESSION'],labelIds=[ids['LABEL']],manual=True)
+                if index!=0:payload['end']='2026-10-14T13:34:56.123456789Z'
             if kind=='WORK_SESSION':payload['title']='Private work session'
             sql+=f"INSERT INTO tk_resource VALUES({quote(owner)},'{kind}','{identifier}',9,{quote(json.dumps(payload,ensure_ascii=False))});\n"
         for from_type,kind,to_type in (('TASK','project','PROJECT'),('PROJECT','client','CLIENT'),('WORK_SESSION','client','CLIENT'),('ACTIVITY','task','TASK'),('ACTIVITY','workSession','WORK_SESSION'),('ACTIVITY','label','LABEL')):
             sql+=f"INSERT INTO tk_relation VALUES({quote(owner)},'{from_type}','{ids[from_type]}','{kind}','{to_type}','{ids[to_type]}');\n"
         sql+=f"INSERT INTO tk_external_reference VALUES({quote(owner)},'mylyn','https://example.invalid/repository','issue-123','TASK','{ids['TASK']}',{quote(hashlib.sha256(owner.encode()).hexdigest())});\n"
-        sql+=f"INSERT INTO tk_active VALUES({quote(owner)},'ACTIVITY','{ids['ACTIVITY']}');\n"
+        if index==0:sql+=f"INSERT INTO tk_active VALUES({quote(owner)},'ACTIVITY','{ids['ACTIVITY']}');\n"
         sql+=f"INSERT INTO tk_receipt VALUES({quote(owner)},'{uuid.uuid4()}',{'%s'},201,{quote(json.dumps({'id':ids['ACTIVITY'],'start':now}))},'\"9\"','/api/v1/activities/{ids['ACTIVITY']}',{quote(now)});\n" % quote('f'*64)
-        sql+=f"INSERT INTO tk_change VALUES({quote(owner)},9007199254740993,'ACTIVITY','{ids['ACTIVITY']}','CREATED',{quote(now)});\n"
+        sql+=f"INSERT INTO tk_change VALUES({quote(owner)},{sequence},'ACTIVITY','{ids['ACTIVITY']}','CREATED',{quote(now)});\n"
         token=secrets.token_hex(32)
         sql+=f"INSERT INTO tk_api_token VALUES('{token}','{uuid.uuid4()}',{quote(owner)},'Eclipse','READ_WRITE',NULL,FALSE,'MANAGED',{quote(now)},NULL,3,NULL);\n"
         sql+=f"INSERT INTO tk_auth_session VALUES('{secrets.token_hex(32)}',{quote(owner)},'{secrets.token_hex(32)}','READ_WRITE',{quote(now)},'2030-01-01T00:00:00Z',{quote(now)},TRUE,'{token}');\n"
