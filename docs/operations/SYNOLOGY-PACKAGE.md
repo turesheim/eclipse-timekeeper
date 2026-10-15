@@ -7,6 +7,13 @@ SynoCommunity PostgreSQL **17.11-6** on its normal port **5433**. Real DSM accep
 is required before this candidate can be described as supported or published in
 a stable feed. The [generic Compose deployment](DEPLOYMENT.md) remains available.
 
+The current scope of #297 is a downloadable SPK installed through **Package
+Center → Manual Install**, with NAS lifecycle tests and migration/recovery
+instructions. Public repository discovery and release publication are deferred;
+they are not acceptance gates for this implementation. Publication tooling
+described below is prepared for future use. Preview publication remains off by
+default.
+
 ## Installation flow
 
 Install SynoCommunity PostgreSQL and Synology Container Manager first. Native
@@ -246,7 +253,7 @@ Preview SPKs use `1.99.0-<revision>` so the eventual stable `2.0.0` package sort
 higher in DSM. Both identify the actual server build in the web footer. Preloading
 the tested image avoids unpublished PR tags and moving registry aliases.
 
-## Candidate downloads and repository discovery
+## Manual installer downloads
 
 The **Server containers → Synology candidate and PostgreSQL 17** CI job uploads
 `synology-installer` after both PostgreSQL major versions pass. Download
@@ -261,6 +268,8 @@ The installer artifact name describes its contents. Preview status remains in
 the SPK version (`1.99.0-<revision>`), provenance and repository channel. Release
 and Pages tooling also accept the former `synology-preview-candidate` name for
 already-tested builds, without rebuilding their packages.
+
+### Deferred repository discovery
 
 The catalog uses a separate `/synology/preview/r1000/` HTTPS directory and links to
 the immutable versioned SPK beside it. Its install/upgrade flags keep the wizard
@@ -282,7 +291,7 @@ SynoCommunity inclusion remains subject to upstream acceptance.
 The catalog fields follow the [SynoCommunity NAS catalog implementation](https://github.com/SynoCommunity/spkrepo/blob/main/spkrepo/domain/catalog.py)
 and its [repository setup guide](https://docs.synocommunity.com/developer-guide/publishing/package-server/).
 
-## Pages package sources
+## Deferred: Pages package sources
 
 The Pages workflow assembles separate DSM channels alongside the documentation
 and Eclipse update sites. It reacts to both the main build matrix and Server
@@ -322,7 +331,7 @@ Actual source discovery and upgrade must still pass on the NAS. Pages is a
 candidate host for GET clients; if this DSM requires POST, use a repository
 service and keep the static source disabled.
 
-## Promoting a NAS-tested package
+## Deferred: promoting a package for public distribution
 
 Keep the downloaded candidate SPK and its adjacent provenance JSON together. To
 create an acceptance template locally (CI also supplies one):
@@ -419,11 +428,13 @@ fingerprint mismatch rolls back the entire import; used targets are refused.
 These do not emulate DSM Package Center
 or its resource workers.
 
-Still required before stable distribution: real DS923+ installation/start/stop/
-restart/upgrade/reinstall testing, verification of PostgreSQL 18 migration and native backup/restore on the actual
-NAS, and package repository discovery. SynoCommunity catalog inclusion
-requires upstream acceptance. An independent Timekeeper feed will require users
-to configure SynoCommunity separately; one configured source is not promised.
+Manual NAS acceptance still needs the remaining lifecycle/client checks,
+including NAS restart, working-version upgrade, repair, PostgreSQL 18 migration
+and native backup/restore on the actual NAS. Repository discovery and public
+release publication are separate future work. Before a public package feed is
+enabled, its discovery/update behavior must be tested; SynoCommunity catalog
+inclusion also requires upstream acceptance. An independent Timekeeper feed
+would require users to configure SynoCommunity separately.
 
 The packaging follows Synology's [Docker Project worker](https://help.synology.com/developer-guide/resource_acquisition/docker-project.html),
 [permanent appdata layout](https://help.synology.com/developer-guide/integrate_dsm/fhs.html)
