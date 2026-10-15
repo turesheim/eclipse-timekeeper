@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -63,6 +62,10 @@ func install(root, target string, w Wizard, r Release) error {
 			}
 		}
 		// Reinstallation/upgrade never reset credentials or infer ownership from a name.
+		if w.UpdateAccess {
+			retained.Tailscale = w.Settings.Tailscale
+			retained.PublicOrigin = w.Settings.PublicOrigin
+		}
 		retained.Release = r
 		retained.DeployedAt = time.Now().UTC().Format(time.RFC3339Nano)
 		if err = render(root, target, retained); err != nil {
@@ -86,7 +89,7 @@ func install(root, target string, w Wizard, r Release) error {
 	if err = probe(w, nativePSQL, false); err != nil {
 		return err
 	}
-	w.Settings.HTTPPort, err = chooseHTTPPort(w.Settings.HTTPPort, w.Settings.DatabasePort, net.Listen)
+	w.Settings.HTTPPort, err = chooseServerPort(w.Settings)
 	if err != nil {
 		return err
 	}
@@ -215,6 +218,9 @@ func publishConfiguration(root, target string, s Settings) error {
 		return err
 	}
 	if err := atomic(filepath.Join(private, "config/http-port"), []byte(fmt.Sprint(s.HTTPPort)+"\n"), 0644); err != nil {
+		return err
+	}
+	if err := publishTailscaleInstructions(root, private, s); err != nil {
 		return err
 	}
 	return syncMaintenanceMarker(root, target)

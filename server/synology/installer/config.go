@@ -42,12 +42,14 @@ type Settings struct {
 	DeployedAt     string  `json:"deployedAt"`
 	Phase          string  `json:"phase"`
 	Release        Release `json:"release"`
+	Tailscale      bool    `json:"tailscale,omitempty"`
 }
 type Wizard struct {
 	Settings      Settings
 	AdminUser     string
 	AdminPassword string
 	Code          string
+	UpdateAccess  bool
 }
 
 func secret() (string, error) {
@@ -117,6 +119,10 @@ func parseWizard(env func(string) string) (Wizard, error) {
 	}
 	if w.Settings.HTTPPort == w.Settings.DatabasePort {
 		return w, errors.New("The HTTP and database ports must differ")
+	}
+	w.Settings, err = configureAccess(w.Settings, env)
+	if err != nil {
+		return w, err
 	}
 	if err = origin(w.Settings.PublicOrigin); err != nil {
 		return w, err

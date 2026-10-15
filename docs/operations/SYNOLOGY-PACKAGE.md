@@ -21,12 +21,15 @@ PostgreSQL must already have the administrator credentials chosen in its own
 wizard. Use **Package Center → Manual Install** for the candidate `.spk`.
 
 The Timekeeper wizard asks for those database administrator credentials, unused
-dedicated database/role names and the public HTTPS origin from DSM Reverse Proxy
-or [Tailscale Serve](TAILSCALE.md). The local HTTP port is selected automatically:
+dedicated database/role names and either **Tailscale integration** or a manually
+configured public HTTPS origin from DSM Reverse Proxy or
+[Tailscale Serve](TAILSCALE.md). The local HTTP port is selected automatically:
 8080 when available, otherwise a free port assigned by the operating system.
 An optional port override is available under **Advanced settings**. The selected
-port is retained across restarts, repairs and upgrades. Configure HTTPS forwarding
-to that loopback port, as described in the Tailscale guide. The wizard also displays
+port is retained across restarts, repairs and upgrades. With integration enabled,
+Timekeeper detects Tailscale, derives the HTTPS address and supplies the manual
+root command for forwarding to that port. Configure forwarding yourself as
+described below or in the Tailscale guide. The wizard also displays
 a random one-time setup code: copy it before finishing. No database administrator
 password is retained by Timekeeper.
 
@@ -71,6 +74,60 @@ needs neither database credentials nor install-time environment substitution.
 `start` waits for application readiness after the worker starts the container.
 Stopped status uses DSM exit code 3. See Synology's [resource timing](https://help.synology.com/developer-guide/resource_acquisition/timing.html)
 and [script lifecycle](https://help.synology.com/developer-guide/synology_package/scripts.html).
+
+### Optional Tailscale integration
+
+Install Tailscale separately and sign the NAS into your tailnet. Enable MagicDNS
+and HTTPS certificates in the Tailscale admin console. The installation and
+upgrade wizards detect Tailscale and explain missing prerequisites. Select
+**Tailscale integration (manual forwarding as root)** and an unused HTTPS port
+(default **8443**). Timekeeper derives the NAS hostname and configures its own
+public HTTPS origin. No separate Tailscale instance is started.
+
+Timekeeper runs as its unprivileged DSM package user. It reads Tailscale status
+and checks for conflicting forwarding; it never modifies Serve, requests sudo
+permission or installs a root helper. An existing identical private Timekeeper
+rule is accepted. A conflicting service, foreground session or public Funnel
+configuration is refused so it cannot be overwritten by the suggested command.
+
+After installation, create a **Task Scheduler → Triggered Task → User-defined
+script** with user **root** and run it manually once. First inspect existing
+forwarding using `/var/packages/Tailscale/target/bin/tailscale serve status`.
+If the chosen HTTPS port is free or already forwards this Timekeeper instance,
+run the command shown in the wizard:
+
+```sh
+/var/packages/Tailscale/target/bin/tailscale serve --bg --https="$(cat /var/packages/timekeeper/target/private/config/tailscale-https-port)" "http://127.0.0.1:$(cat /var/packages/timekeeper/target/private/config/http-port)"
+```
+
+The files contain the actual selected ports, including an automatically assigned
+HTTP port. The same command works from a root SSH session. From a normal
+administrator SSH session, use `sudo -i` first. Delete the one-time Task Scheduler
+task afterwards. The installer also saves instructions with the concrete ports in
+`/var/packages/timekeeper/var/server/TAILSCALE.txt`.
+
+The `--bg` rule persists across NAS and Tailscale restarts. Upgrades preserve the
+selected address and ports. If you change the HTTPS address or disable integration,
+update or remove forwarding manually; changing Timekeeper's selection does not
+modify Tailscale configuration. HTTPS certificates, tailnet access rules and
+Tailscale sign-in remain administrator responsibilities.
+
+Before uninstalling, inspect Serve and remove the Timekeeper root handler
+manually as root, using the command shown in the uninstall wizard. For port 8443:
+
+```sh
+/var/packages/Tailscale/target/bin/tailscale serve --bg --https=8443 --set-path=/ off
+```
+
+Use the configured HTTPS port if different. Remove the handler only if it still
+forwards Timekeeper; another application may have replaced or shared the
+listener. Do not use `serve reset`, which removes other applications' forwarding.
+Uninstall removes Timekeeper's container/project and retains its database and
+appdata; it does not change Tailscale rules.
+
+See the [Tailscale Serve reference](https://tailscale.com/docs/reference/tailscale-cli/serve)
+for persistence and HTTPS prerequisites. Leaving integration unchecked retains
+the manual DSM reverse-proxy or Tailscale configuration flow.
 
 ## Data and lifecycle
 
@@ -428,10 +485,14 @@ fingerprint mismatch rolls back the entire import; used targets are refused.
 These do not emulate DSM Package Center
 or its resource workers.
 
-Manual NAS acceptance still needs the remaining lifecycle/client checks,
-including NAS restart, working-version upgrade, repair, PostgreSQL 18 migration
-and native backup/restore on the actual NAS. Repository discovery and public
-release publication are separate future work. Before a public package feed is
+Candidate **1.99.0-140** passed installation, 133 → 140 upgrade, start/stop,
+retained-data uninstall/reinstall and automatic startup after a NAS reboot on the
+recorded target. Native migration and restore matched all 14 table fingerprints;
+web and shared Eclipse HTTP client access and user isolation were checked over
+Tailscale HTTPS. Installed Eclipse UI tests passed in CI. The optional managed
+Tailscale integration was added afterwards: its read-only detection, conflict checks and manual setup/cleanup
+instructions have automated tests, with wizard validation tracked in PR #300. These checks do not constitute public-feed acceptance.
+Repository discovery and public release publication are separate future work. Before a public package feed is
 enabled, its discovery/update behavior must be tested; SynoCommunity catalog
 inclusion also requires upstream acceptance. An independent Timekeeper feed
 would require users to configure SynoCommunity separately.

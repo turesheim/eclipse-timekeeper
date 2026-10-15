@@ -6,6 +6,10 @@ provides HTTPS access within your tailnet and forwards requests to the server's
 local HTTP endpoint. Install the server using the [Synology deployment guide](DEPLOYMENT.md)
 or [local Docker guide](LOCAL-DOCKER.md), then configure access here.
 
+The [DSM installer](SYNOLOGY-PACKAGE.md#optional-tailscale-integration) also offers
+optional Tailscale detection and manual root commands for persistent forwarding
+and cleanup before uninstall. The manual instructions below work on all deployment hosts.
+
 ## Prepare the server host
 
 Connect the server host and client device to Tailscale. Enable MagicDNS and HTTPS

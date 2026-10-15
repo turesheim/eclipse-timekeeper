@@ -13,6 +13,13 @@ import (
 
 func validate(root string, w Wizard, r Release) error {
 	if retained, err := loadSettings(root); err == nil {
+		if w.UpdateAccess {
+			retained.Tailscale = w.Settings.Tailscale
+			retained.PublicOrigin = w.Settings.PublicOrigin
+		}
+		if err := localTailscale().validate(retained); err != nil {
+			return err
+		}
 		if retained.Release.Schema != r.Schema {
 			return errors.New("Upgrade requires an explicit schema migration; the existing installation is unchanged")
 		}
@@ -29,11 +36,33 @@ func validate(root string, w Wizard, r Release) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return errors.New("Retained Timekeeper settings are invalid and will not be replaced")
 	}
+	if err := localTailscale().validate(w.Settings); err != nil {
+		return err
+	}
 	if err := probe(w, nativePSQL, false); err != nil {
 		return err
 	}
-	_, err := chooseHTTPPort(w.Settings.HTTPPort, w.Settings.DatabasePort, net.Listen)
+	_, err := chooseServerPort(w.Settings)
 	return err
+}
+
+func chooseServerPort(s Settings) (int, error) {
+	listen := net.Listen
+	if s.Tailscale {
+		port, err := tailscalePort(s)
+		if err != nil {
+			return 0, err
+		}
+		listen = func(network, address string) (net.Listener, error) {
+			listener, err := net.Listen(network, address)
+			if err == nil && listener.Addr().(*net.TCPAddr).Port == port {
+				listener.Close()
+				return nil, errors.New("HTTP and Tailscale HTTPS ports must differ")
+			}
+			return listener, err
+		}
+	}
+	return chooseHTTPPort(s.HTTPPort, s.DatabasePort, listen)
 }
 
 // Prefer the documented default, then let the OS select a free loopback port.
@@ -84,6 +113,9 @@ func ready(root string) error {
 func run(action, root, target, releasePath string, env func(string) string, argument string) error {
 	if action == "wizard" {
 		return wizard(os.Stdout, root)
+	}
+	if action == "uninstall-wizard" {
+		return uninstallWizard(os.Stdout, root)
 	}
 	if env("SYNOPKG_PKGNAME") != packageID {
 		return errors.New("Run this helper through DSM Package Center")
@@ -147,8 +179,14 @@ func run(action, root, target, releasePath string, env func(string) string, argu
 			if err != nil {
 				return err
 			}
+		} else {
+			w.Settings, err = configureAccess(retained, env)
+			if err != nil {
+				return err
+			}
+			w.UpdateAccess = env("wizard_tailscale") != ""
 		}
-		if action == "install" && w.Code == "" && env("wizard_setup_code") != "" {
+		if (action == "install" || action == "upgrade") && w.Code == "" && env("wizard_setup_code") != "" {
 			w.Code = env("wizard_setup_code")
 			if !validInstallationID(w.Code) {
 				return errors.New("Reopen the installer to generate a new one-time code")
