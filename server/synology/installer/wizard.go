@@ -6,7 +6,9 @@ import (
 )
 
 func field(kind, key, label, value string, required bool) map[string]any {
-	return map[string]any{"type": kind, "desc": label, "subitems": []any{map[string]any{"key": key, "desc": label, "defaultValue": value, "validator": map[string]any{"allowBlank": !required}}}}
+	// DSM renders the group description and the individual field label separately.
+	// A single-field group needs only the field label.
+	return map[string]any{"type": kind, "desc": "", "subitems": []any{map[string]any{"key": key, "desc": label, "defaultValue": value, "validator": map[string]any{"allowBlank": !required}}}}
 }
 func wizard(output io.Writer, root string) error {
 	code, err := secret()
