@@ -144,8 +144,12 @@ previous domain model requires a matching pre-upgrade backup.
 
 ## Distribution
 
-The CI `timekeeper-server` artifact contains a complete JVM distribution ZIP,
-checksum and embedded source provenance, separate from the Eclipse p2 repository.
+The Build workflow's `server-standalone` artifact contains the Java 21 server
+distribution `timekeeper-server.zip` and its SHA-256 checksum. The ZIP includes
+the bundled web client and source provenance. It is separate from the Eclipse
+p2 repository and the DSM installer. For Synology, download `synology-installer`
+from the Server containers workflow instead; that artifact contains the `.spk`,
+its checksum and installation metadata.
 CI runs the process suite from the extracted ZIP, verifying its checksum and
 actual runtime layout. Packaging requires the exact clean committed source.
 Package the built source with:
