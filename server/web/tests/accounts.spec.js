@@ -9,9 +9,13 @@ async function call(request,method,path,data,headers={}) {return request.fetch(`
 test('first administrator claims the explicit existing owner once and uses a secure browser cookie',async({page,request})=>{
   const status=await (await request.get('/api/v1/auth/status')).json();expect(status.setupRequired).toBe(true);
   await page.goto('/web/');await expect(page.locator('#auth-mode')).toHaveValue('setup');
+  await page.screenshot({path:'test-results/account-setup.png',fullPage:true});
   await page.getByLabel('One-time setup or recovery code').fill(process.env.TIMEKEEPER_WEB_SETUP_CODE);
-  await page.getByLabel('Username',{exact:true}).fill('browser-admin');await page.getByLabel('Password',{exact:true}).fill(password);await page.getByLabel('Display name',{exact:true}).fill('Browser administrator');await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
-  await expect(page.locator('#owner')).toHaveText('Browser administrator');
+  await expect(page.getByLabel('Display name',{exact:true})).toHaveCount(0);
+  await page.getByLabel('Username',{exact:true}).fill('browser-admin');await page.getByLabel('Password',{exact:true}).fill(password);await page.getByLabel('Confirm password',{exact:true}).fill(password+' different');await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  await expect(page.locator('#login-error')).toHaveText('Passwords do not match.');expect((await (await request.get('/api/v1/auth/status')).json()).setupRequired).toBe(true);
+  await page.getByLabel('Confirm password',{exact:true}).fill(password);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+  await expect(page.locator('#owner')).toHaveText('browser-admin');
   const cookie=(await page.context().cookies()).find(value=>value.name==='__Host-timekeeper-session');expect(cookie.httpOnly).toBe(true);expect(cookie.secure).toBe(true);expect(cookie.sameSite).toBe('Lax');expect(cookie.expires).toBe(-1);
   expect(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length,cookies:document.cookie}))).toEqual({local:0,session:0,cookies:''});
   const account=await (await call(request,'GET','/auth/account')).json();expect(account.ownerId).toBe('web-owner');expect(account.username).toBe('browser-admin');

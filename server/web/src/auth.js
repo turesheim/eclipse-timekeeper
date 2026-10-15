@@ -8,7 +8,7 @@ export function authentication({connect, clear, updateAccount}) {
   const errorText = error => error instanceof ApiError ? error.message : 'Unable to sign in. Use HTTPS and check your account details.';
   function mode() {
     const value = $('auth-mode').value, code = ['setup','recover'].includes(value), token = value === 'token';
-    for (const [field, visible] of [['code',code],['username',!token],['password',!token],['display',code],['remember',value === 'login'],['token',token]]) {
+    for (const [field, visible] of [['code',code],['username',!token],['password',!token],['confirm',code],['remember',value === 'login'],['token',token]]) {
       $(`${field}-field`).hidden = !visible;
       for (const input of $(`${field}-field`).querySelectorAll('input')) input.required = visible && input.type !== 'checkbox';
     }
@@ -39,12 +39,16 @@ export function authentication({connect, clear, updateAccount}) {
     finally { bearer.close(); }
   }
   $('login-form').addEventListener('submit', event => {
-    event.preventDefault(); const current = ++generation, submit = $('login-form').querySelector('button'); submit.disabled = true; $('login-error').textContent = '';
+    event.preventDefault();
     const selected = $('auth-mode').value;
+    if (['setup','recover'].includes(selected) && $('password').value !== $('password-confirm').value) {
+      $('login-error').textContent = 'Passwords do not match.'; $('password-confirm').focus(); return;
+    }
+    const current = ++generation, submit = $('login-form').querySelector('button'); submit.disabled = true; $('login-error').textContent = '';
     const body = {username:$('username').value,password:$('password').value};
-    const token = $('token').value; $('password').value = ''; $('token').value = '';
+    const token = $('token').value; $('password').value = ''; $('password-confirm').value = ''; $('token').value = '';
     if (selected === 'login') body.remember = $('remember').checked;
-    else { body.code = $('setup-code').value; body.displayName = $('display-name').value; $('setup-code').value = ''; }
+    else if (['setup','recover'].includes(selected)) { body.code = $('setup-code').value; body.displayName = body.username; $('setup-code').value = ''; }
     void (async () => {
       try { if(selected === 'token') await exchange(token,current); else await attach(await publicRequest(selected,body),current); }
       catch(error) { if(current === generation) reset(errorText(error)); }
