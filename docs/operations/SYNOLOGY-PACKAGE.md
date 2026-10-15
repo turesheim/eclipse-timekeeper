@@ -44,6 +44,17 @@ blocked; forwarding through Tailscale Serve does not require trusting forwarded
 headers or disabling Host validation. The application runs as UID 10001 with a
 read-only filesystem.
 
+When moving from an earlier preview that generated the container name
+`timekeeper-server-server-1`, uninstall the old Timekeeper package before manually
+installing the new preview. Keep its permanent appdata and PostgreSQL database.
+On the recorded Container Manager version, an in-place 131 → 133 rename created
+the new container but failed resource acquisition with `container
+[timekeeper-server]'s profile should exist!`. Normal uninstall removed the
+project/container, and a retained-data installation created the new name.
+The failed upgrade preserved all 14 table fingerprints, service credentials and
+retained identity/settings. This one-time preview name transition must not be
+counted as successful in-place upgrade acceptance.
+
 The complete Compose project and empty bind directories ship in `package.tgz`:
 DSM acquires the project **before** `postinst`. The installer then copies retained
 configuration into those existing directories under a mode-0700 package-private
