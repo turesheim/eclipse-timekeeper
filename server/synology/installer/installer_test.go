@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -74,6 +75,41 @@ func TestNativeClientDoesNotInheritAdminCredentialsOrArbitraryPgSettings(t *test
 	if passEscape(`a:b\c`) != `a\:b\\c` {
 		t.Fatal("invalid libpq password escaping")
 	}
+}
+
+func TestPostgreSQLFailuresExposeUsefulMessagesWithoutRawDiagnostics(t *testing.T) {
+	for _, item := range []struct{ diagnostic, expected string }{
+		{`psql: error: connection to server failed: FATAL:  password authentication failed for user "private-user"`, "PostgreSQL rejected the username or password"},
+		{`psql: error: connection to server failed: fe_sendauth: no password supplied`, "PostgreSQL rejected the username or password"},
+		{`psql: error: connection to server failed: Connection refused`, "Cannot connect to PostgreSQL"},
+		{`psql: error: connection to server failed: timeout expired`, "Cannot connect to PostgreSQL"},
+		{`ERROR: private-user private-password SQL statement`, "PostgreSQL operation failed"},
+	} {
+		failure := pgFailure(item.diagnostic).Error()
+		if !strings.HasPrefix(failure, item.expected) || strings.Contains(failure, "private-") {
+			t.Fatal("unsafe or unhelpful PostgreSQL diagnostic")
+		}
+	}
+	var diagnostic pgDiagnostic
+	value := bytes.Repeat([]byte("x"), 32768)
+	if length, err := diagnostic.Write(value); err != nil || length != len(value) || len(diagnostic.value) != 16384 {
+		t.Fatal("PostgreSQL diagnostic capture is not bounded")
+	}
+}
+
+func TestInstallerFailureIsWrittenToTheDSMErrorFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dsm-error")
+	failure := errors.New("PostgreSQL rejected the username or password")
+	writeInstallerFailure(path, failure)
+	value, err := os.ReadFile(path)
+	if err != nil || string(value) != failure.Error()+"\n" {
+		t.Fatal("DSM error file did not receive the actionable message")
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.Mode().Perm() != 0600 {
+		t.Fatal("DSM error file is not private")
+	}
+	writeInstallerFailure("", failure) // Command-line maintenance has no DSM file.
 }
 func TestOneTimeWizardCodeIsRandomAndOnlyItsHashIsRetained(t *testing.T) {
 	var first, second bytes.Buffer

@@ -57,6 +57,7 @@ def main():
         env_file.chmod(0o600)
         command('docker','run','-d','--name',name,'--network','none',
                 '-e','POSTGRES_PASSWORD_FILE=/run/secrets/test-admin',
+                '-e','POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256',
                 '-v',str(admin_file)+':/run/secrets/test-admin:ro',args.postgres_image,
                 'postgres','-p','5433','-c','log_statement=all')
         try:
@@ -106,7 +107,29 @@ def main():
             if 'Invalid or incompatible package release identity' not in missing.stderr:
                 raise AssertionError('Missing staged identity did not reproduce the DSM preinst failure')
             command('docker','cp',str(release),name+':/tmp/timekeeper-incoming-payload/scripts/release.json')
-            helper('validate'); helper('install')
+            wrong_password=secrets.token_urlsafe(32)
+            bad_env=folder/'wrong-password.env'
+            bad_env.write_text(''.join(key+'='+(wrong_password if key=='wizard_database_admin_password' else value)+'\n' for key,value in variables.items()))
+            bad_env.chmod(0o600)
+            failure=command('docker','exec','--user','10001:10001','--env-file',str(bad_env),
+                            '-e','SYNOPKG_TEMP_LOGFILE=/tmp/timekeeper-dsm-visible-error',name,
+                            '/var/packages/timekeeper/scripts/timekeeper-dsm','validate',check=False)
+            if failure.returncode==0:
+                raise AssertionError('Wrong PostgreSQL password was accepted')
+            visible=command('docker','exec','--user','10001:10001',name,'cat','/tmp/timekeeper-dsm-visible-error').stdout
+            if 'PostgreSQL rejected the username or password' not in visible:
+                raise AssertionError('Wrong PostgreSQL password did not produce a useful DSM error')
+            if any(secret in failure.stdout+failure.stderr+visible for secret in (wrong_password,master_password,code)):
+                raise AssertionError('Wrong-password diagnostic leaked a credential')
+            helper('validate')
+            # DSM moves the incoming payload to target before postinst. The
+            # staging variable can still point at its now-missing old location.
+            command('docker','exec',name,'sh','-ec',
+                    'mv /tmp/timekeeper-incoming-payload/scripts /var/packages/timekeeper/target/scripts; '
+                    'rmdir /tmp/timekeeper-incoming-payload')
+            helper('install')
+            command('docker','exec',name,'mkdir','-p','/tmp/timekeeper-incoming-payload/scripts')
+            command('docker','cp',str(release),name+':/tmp/timekeeper-incoming-payload/scripts/release.json')
             command('docker','exec',name,'sh','-ec','test ! -e /var/packages/timekeeper/shares; test "$(stat -c %a /var/packages/timekeeper/var/server)" = 700')
             if helper('status',expected=1).returncode!=3:raise AssertionError('Stopped package does not return DSM status 3')
             helper('prestart')

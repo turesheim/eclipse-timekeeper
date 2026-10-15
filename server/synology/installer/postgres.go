@@ -21,6 +21,32 @@ func pgEnvironment(values []string, host string, port int, user, database, passf
 	}
 	return append(out, "PGHOST="+host, "PGPORT="+strconv.Itoa(port), "PGUSER="+user, "PGDATABASE="+database, "PGPASSFILE="+passfile, "PGCONNECT_TIMEOUT=5", "PGSSLMODE=disable")
 }
+
+type pgDiagnostic struct{ value []byte }
+
+func (d *pgDiagnostic) Write(value []byte) (int, error) {
+	length := len(value)
+	if remaining := 16384 - len(d.value); remaining > 0 {
+		if len(value) > remaining {
+			value = value[:remaining]
+		}
+		d.value = append(d.value, value...)
+	}
+	return length, nil
+}
+
+func pgFailure(diagnostic string) error {
+	// Match only known diagnostics and return fixed text: SQL errors and role
+	// names can contain arbitrary input, including secrets supplied to psql.
+	switch {
+	case strings.Contains(diagnostic, "password authentication failed for user"), strings.Contains(diagnostic, "no password supplied"):
+		return errors.New("PostgreSQL rejected the username or password. Verify the credentials for the selected PostgreSQL account")
+	case strings.Contains(diagnostic, "Connection refused"), strings.Contains(diagnostic, "connection to server") && strings.Contains(diagnostic, "timeout expired"):
+		return errors.New("Cannot connect to PostgreSQL. Check that the SynoCommunity PostgreSQL package is running and its port is correct (normally 5433)")
+	default:
+		return errors.New("PostgreSQL operation failed; check the selected package, port and account permissions")
+	}
+}
 func passEscape(value string) string { return strings.NewReplacer(`\`, `\\`, ":", `\:`).Replace(value) }
 func pgRun(binary string, port int, user, password, database string, args []string, input io.Reader, output io.Writer) error {
 	temporary, err := os.MkdirTemp("", "timekeeper-pg-")
@@ -35,11 +61,15 @@ func pgRun(binary string, port int, user, password, database string, args []stri
 	}
 	cmd := exec.Command(binary, args...)
 	cmd.Env = pgEnvironment(os.Environ(), "127.0.0.1", port, user, database, path)
+	// Keep diagnostic classification independent of the DSM language.
+	cmd.Env = append(cmd.Env, "LC_ALL=C")
 	cmd.Stdin = input
 	cmd.Stdout = output
-	// Never relay libpq/SQL diagnostics: provisioning input includes credentials.
+	var diagnostic pgDiagnostic
+	cmd.Stderr = &diagnostic
+	// Never relay raw libpq/SQL diagnostics: provisioning input includes credentials.
 	if err = cmd.Run(); err != nil {
-		return errors.New("PostgreSQL operation failed; check the selected package, port and credentials")
+		return pgFailure(string(diagnostic.value))
 	}
 	return nil
 }

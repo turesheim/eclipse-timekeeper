@@ -103,8 +103,10 @@ func run(action, root, target, releasePath string, env func(string) string, argu
 	case "status":
 		return ready(root)
 	case "validate", "install", "upgrade":
-		// preupgrade may run the installed controller against an incoming SPK.
-		if incoming := env("SYNOPKG_PKGINST_TEMP_DIR"); incoming != "" {
+		// preinst/preupgrade validate the staged payload. DSM moves that payload
+		// before postinst/postupgrade, which must read the installed controller's
+		// own release identity even if the staging variable remains set.
+		if incoming := env("SYNOPKG_PKGINST_TEMP_DIR"); action == "validate" && incoming != "" {
 			releasePath = filepath.Join(incoming, "scripts")
 		}
 		release, err := releaseAt(releasePath)
@@ -150,10 +152,21 @@ func main() {
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		if os.Args[1] == "validate" || os.Args[1] == "install" || os.Args[1] == "upgrade" {
+			writeInstallerFailure(os.Getenv("SYNOPKG_TEMP_LOGFILE"), err)
+		}
 		if os.Args[1] == "status" {
 			os.Exit(3)
 		} // DSM: not running (no PID/lock files).
 		os.Exit(1)
+	}
+}
+
+// Package Center displays this SDK-provided file when an installation script
+// fails. Only our user-facing errors go here, never raw libpq stderr.
+func writeInstallerFailure(path string, failure error) {
+	if path != "" {
+		_ = os.WriteFile(path, []byte(failure.Error()+"\n"), 0600)
 	}
 }
 
