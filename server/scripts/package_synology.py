@@ -98,7 +98,13 @@ def build(output, commit, image, revision, channel):
         for name in ('postgresql-shape.sql','schema-v2-postgresql.shape'):
             shutil.copyfile(ROOT/'server/app/src/main/resources/db'/name,outer/'scripts/migration'/name)
         release = {'commit':commit,'image':image,'serverSchema':2}
-        (outer/'scripts/release.json').write_text(json.dumps(release, indent=2)+'\n')
+        release_json = json.dumps(release, indent=2)+'\n'
+        (outer/'scripts/release.json').write_text(release_json)
+        # SYNOPKG_PKGINST_TEMP_DIR contains the extracted package.tgz payload,
+        # not the SPK control scripts. Preinst/preupgrade read this incoming
+        # identity before the installed package is replaced.
+        (payload/'scripts').mkdir()
+        (payload/'scripts/release.json').write_text(release_json)
         environment = {**os.environ, 'GOOS':'linux', 'GOARCH':'amd64', 'GOAMD64':'v1', 'CGO_ENABLED':'0',
                        'GOCACHE':str(ROOT/'server/target/synology-go-cache')}
         subprocess.run(['go','build','-trimpath','-ldflags=-s -w','-o',str(outer/'scripts/timekeeper-dsm'),'.'],

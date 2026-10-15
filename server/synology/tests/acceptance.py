@@ -46,6 +46,7 @@ def main():
         command('go', '-C', str(ROOT/'server/synology/installer'), 'build', '-trimpath', '-o', str(binary), '.',
                 environment={**os.environ, 'GOOS':'linux', 'GOARCH':architecture, 'CGO_ENABLED':'0', 'GOCACHE':str(folder/'go-cache')})
         variables = {'SYNOPKG_PKGNAME':'timekeeper', 'SYNOPKG_PKGDEST':'/var/packages/timekeeper/target',
+                     'SYNOPKG_PKGINST_TEMP_DIR':'/tmp/timekeeper-incoming-payload',
                      'wizard_database':'timekeeper_fixture', 'wizard_database_role':'timekeeper_fixture_app',
                      'wizard_database_port':'5433', 'wizard_http_port':'8098',
                      'wizard_public_origin':'https://timekeeper.example.invalid', 'wizard_owner':'existing-owner',
@@ -73,6 +74,10 @@ def main():
                     'chown -R 10001:10001 /var/packages/timekeeper')
             command('docker','cp',str(binary),name+':/var/packages/timekeeper/scripts/timekeeper-dsm')
             command('docker','cp',str(release),name+':/var/packages/timekeeper/scripts/release.json')
+            # DSM stages package.tgz separately from its SPK control scripts.
+            # Leave the incoming identity absent first to reproduce the real
+            # NAS preinst failure, then supply the payload copy shipped by SPK.
+            command('docker','exec',name,'mkdir','-p','/tmp/timekeeper-incoming-payload/scripts')
             blueprint=folder/'compose.yaml'
             blueprint.write_text((ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',json.loads(release.read_text())['image']))
             command('docker','exec',name,'mkdir','-p','/var/packages/timekeeper/target/project')
@@ -97,6 +102,10 @@ def main():
             # DSM supplies permanent appdata before postinst. No data-share link
             # exists at this point; its worker would run only at enable/startup.
             command('docker','exec',name,'sh','-ec','test -d /var/packages/timekeeper/var; test ! -e /var/packages/timekeeper/shares')
+            missing = helper('validate', expected=1)
+            if 'Invalid or incompatible package release identity' not in missing.stderr:
+                raise AssertionError('Missing staged identity did not reproduce the DSM preinst failure')
+            command('docker','cp',str(release),name+':/tmp/timekeeper-incoming-payload/scripts/release.json')
             helper('validate'); helper('install')
             command('docker','exec',name,'sh','-ec','test ! -e /var/packages/timekeeper/shares; test "$(stat -c %a /var/packages/timekeeper/var/server)" = 700')
             if helper('status',expected=1).returncode!=3:raise AssertionError('Stopped package does not return DSM status 3')

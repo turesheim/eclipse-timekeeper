@@ -31,12 +31,14 @@ def archive(files, compressed=False, extra=None):
 
 
 class SynologyPackageTest(unittest.TestCase):
-    def candidate(self, *, image_tag=IMAGE, architecture='amd64', missing_launcher=False, empty_project=False, elevated=False, late_share=False, install_type=None, outer_extra=None, checksum=None):
+    def candidate(self, *, image_tag=IMAGE, architecture='amd64', missing_launcher=False, missing_staged_release=False, staged_commit=COMMIT, empty_project=False, elevated=False, late_share=False, install_type=None, outer_extra=None, checksum=None):
         image=archive({'manifest.json':json.dumps([{'RepoTags':[image_tag],'Config':'config.json','Layers':[]}]).encode(),
                        'config.json':json.dumps({'architecture':architecture,'os':'linux'}).encode()},True)
         payload={'image.tar.gz':image,'project/compose.yaml':(ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',IMAGE).encode(),
                  'private':None,'private/config':None,'private/secrets':None,
                  **{name:b'guide' for name in ('README.md','ACCOUNTS.md','TAILSCALE.md')}}
+        if not missing_staged_release:
+            payload['scripts/release.json']=json.dumps({'commit':staged_commit,'image':IMAGE,'serverSchema':2}).encode()
         if not missing_launcher:payload['ui/config']=(ROOT/'server/synology/ui/config').read_bytes()
         if empty_project:payload['project/compose.yaml']=b'{"services":{}}'
         payload=archive(payload,True)
@@ -81,3 +83,8 @@ class SynologyPackageTest(unittest.TestCase):
         for name,kind in (('../outside',tarfile.REGTYPE),('escape',tarfile.SYMTYPE)):
             member=tarfile.TarInfo(name);member.type=kind;member.linkname='/etc/passwd'
             with self.subTest(name=name),self.assertRaises(ValueError):self.check(self.candidate(outer_extra=member))
+
+    def test_preinstall_payload_requires_the_matching_incoming_release_identity(self):
+        for overrides in ({'missing_staged_release':True},{'staged_commit':'b'*40}):
+            with self.subTest(overrides=overrides),self.assertRaises(ValueError):
+                self.check(self.candidate(**overrides))

@@ -91,8 +91,10 @@ def validate(path):
             raise ValueError('DSM payload checksum mismatch')
         with tarfile.open(fileobj=io.BytesIO(payload),mode='r:gz') as inner:
             contents=safe_members(inner)
-            if not {'ui/config','project/compose.yaml','image.tar.gz','README.md','ACCOUNTS.md','TAILSCALE.md','private','private/config','private/secrets'}.issubset(contents):
+            if not {'ui/config','project/compose.yaml','image.tar.gz','README.md','ACCOUNTS.md','TAILSCALE.md','private','private/config','private/secrets','scripts/release.json'}.issubset(contents):
                 raise ValueError('Incomplete payload/Open configuration')
+            if json.load(inner.extractfile('scripts/release.json')) != release:
+                raise ValueError('Incoming DSM payload release identity differs from the control scripts')
             if not contents['private'].isdir() or contents['private'].mode & 0o777 != 0o700:
                 raise ValueError('Package runtime configuration needs a private parent directory')
             project=json.load(inner.extractfile('project/compose.yaml'))
