@@ -12,8 +12,9 @@ never grants access to another account's work records or tokens.
 
 For a fresh Docker installation, `python3 setup.py` prints a one-time code and
 sets `TIMEKEEPER_SERVER_SETUP_FILE` in `.env`. Start the deployment, open `/web/`,
-choose **First administrator setup**, and enter the code, username, display name
-and a password of at least 15 characters. The code expires after 15 minutes.
+choose **First administrator setup**, and enter a username, a password of at least
+15 characters twice, and the one-time code. The username is used as the initial
+display name. The code expires after 15 minutes.
 An optional `setup.py --owner alice` explicitly binds setup to that owner ID;
 omitting it creates a new random owner ID when setup completes.
 
@@ -147,7 +148,8 @@ python3 configure_accounts.py --purpose RECOVERY --owner alice --output /secure/
 ```
 
 Configure the file, restart the replicas, then choose **Recover account** in the
-web client. Set the username, display name and new password using the code.
+web client. Enter the username, the new password twice, and the recovery code.
+The username is also used as the display name.
 Recovery preserves owner IDs and the existing administrator role, can re-enable
 a disabled account, and revokes all its prior sessions/API tokens. For an
 unclaimed legacy owner it establishes a normal user account. It cannot create

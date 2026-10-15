@@ -5,5 +5,5 @@ export default defineConfig({
   reporter: [['list'], ['junit', {outputFile: 'test-results/browser.xml'}]],
   // Traces include authorization headers; never retain them as release evidence.
   use: {baseURL: process.env.TIMEKEEPER_WEB_URL, trace: 'off', video: 'off', screenshot: 'only-on-failure'},
-  projects: [{name:'chromium', use:{browserName:'chromium'}}],
+  projects: [{name:process.env.TIMEKEEPER_WEB_BROWSER ?? 'chromium', use:{browserName:process.env.TIMEKEEPER_WEB_BROWSER ?? 'chromium'}}],
 });
