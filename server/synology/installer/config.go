@@ -192,9 +192,25 @@ func writeJSON(path string, value any, mode os.FileMode) error {
 	return atomic(path, append(content, '\n'), mode)
 }
 
-// DSM creates permanent appdata during installation, before postinst. A
-// data-share resource is acquired only at enable/startup and is too late here.
-func stateRoot() string { return "/var/packages/" + packageID + "/var/server" }
+// DSM can remove /var/packages/<name>/var between preupgrade and preinst.
+// Resolve permanent appdata from SDK paths without relying on that transient
+// link. Never scan other volumes or create state during validation.
+func stateRoot(env func(string) string) (string, error) {
+	alias := "/var/packages/" + packageID + "/var"
+	pkgvar, volume := env("SYNOPKG_PKGVAR"), env("SYNOPKG_PKGDEST_VOL")
+	for _, path := range []string{pkgvar, volume} {
+		if path != "" && (!filepath.IsAbs(path) || filepath.Clean(path) != path || path == "/") {
+			return "", errors.New("Invalid DSM permanent appdata location")
+		}
+	}
+	if pkgvar != "" && pkgvar != alias {
+		return filepath.Join(pkgvar, "server"), nil
+	}
+	if volume != "" {
+		return filepath.Join(volume, "@appdata", packageID, "server"), nil
+	}
+	return filepath.Join(alias, "server"), nil
+}
 func loadSettings(root string) (Settings, error) {
 	var s Settings
 	err := readJSON(filepath.Join(root, "settings.json"), &s)

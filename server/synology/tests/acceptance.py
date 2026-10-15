@@ -46,6 +46,7 @@ def main():
         command('go', '-C', str(ROOT/'server/synology/installer'), 'build', '-trimpath', '-o', str(binary), '.',
                 environment={**os.environ, 'GOOS':'linux', 'GOARCH':architecture, 'CGO_ENABLED':'0', 'GOCACHE':str(folder/'go-cache')})
         variables = {'SYNOPKG_PKGNAME':'timekeeper', 'SYNOPKG_PKGDEST':'/var/packages/timekeeper/target',
+                     'SYNOPKG_PKGDEST_VOL':'/volume1', 'SYNOPKG_PKGVAR':'/var/packages/timekeeper/var',
                      'SYNOPKG_PKGINST_TEMP_DIR':'/tmp/timekeeper-incoming-payload',
                      'wizard_database':'timekeeper_fixture', 'wizard_database_role':'timekeeper_fixture_app',
                      'wizard_database_port':'5433',
@@ -69,10 +70,11 @@ def main():
                 raise RuntimeError('Isolated PostgreSQL did not become ready')
             command('docker','exec',name,'sh','-ec',
                     'mkdir -p /var/packages/timekeeper/scripts /var/packages/timekeeper/target/project '
-                    '/var/packages/timekeeper/var /var/packages/postgresql/target/bin /var/packages/ContainerManager; '
+                    '/volume1/@appdata/timekeeper /var/packages/postgresql/target/bin /var/packages/ContainerManager; '
+                    'ln -s /volume1/@appdata/timekeeper /var/packages/timekeeper/var; '
                     'printf \'version="24.0.2-1432"\n\' > /var/packages/ContainerManager/INFO; '
                     'for tool in psql pg_dump pg_restore; do ln -s /usr/lib/postgresql/17/bin/$tool /var/packages/postgresql/target/bin/$tool; done; '
-                    'chown -R 10001:10001 /var/packages/timekeeper')
+                    'chown -R 10001:10001 /var/packages/timekeeper /volume1/@appdata/timekeeper')
             command('docker','cp',str(binary),name+':/var/packages/timekeeper/scripts/timekeeper-dsm')
             command('docker','cp',str(release),name+':/var/packages/timekeeper/scripts/release.json')
             # DSM stages package.tgz separately from its SPK control scripts.
@@ -97,7 +99,7 @@ def main():
 
             def read(relative):
                 path=folder/('read-'+secrets.token_hex(4))
-                command('docker','cp',name+':/var/packages/timekeeper/var/server/'+relative,str(path))
+                command('docker','cp',name+':/volume1/@appdata/timekeeper/server/'+relative,str(path))
                 return path.read_bytes()
 
             # DSM supplies permanent appdata before postinst. No data-share link
@@ -158,6 +160,40 @@ def main():
                 raise AssertionError('Application role has administrative privileges')
             command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-c',
                     "SET ROLE timekeeper_fixture_app; CREATE TABLE tk_schema(id INTEGER PRIMARY KEY,schema_version INTEGER,state TEXT); INSERT INTO tk_schema VALUES(1,2,'READY'); CREATE TABLE preserved_fixture(value TEXT); INSERT INTO preserved_fixture VALUES('owned private data');")
+            # Real DSM upgrade order removes the old var/target links before
+            # incoming preinst, without supplying fresh-install wizard fields.
+            original_variables=dict(variables)
+            variables={key:value for key,value in variables.items() if not key.startswith('wizard_')}
+            variables['SYNOPKG_PKG_STATUS']='UPGRADE'
+            env_file.write_text(''.join(key+'='+value+'\n' for key,value in variables.items()))
+            command('docker','exec',name,'sh','-ec',
+                    'unlink /var/packages/timekeeper/var; rm -r /var/packages/timekeeper/target')
+            retained_wizard=helper('wizard').stdout
+            if 'wizard_database_admin_password' in retained_wizard or 'Retained Timekeeper installation' not in retained_wizard:
+                raise AssertionError('Upgrade without package links did not find retained configuration')
+            helper('validate')
+            command('docker','exec',name,'test','!','-e','/var/packages/timekeeper/var')
+            variables['SYNOPKG_PKGDEST_VOL']='/volume2'
+            env_file.write_text(''.join(key+'='+value+'\n' for key,value in variables.items()))
+            missing_state=helper('validate',expected=1)
+            if 'Cannot locate retained Timekeeper appdata' not in missing_state.stderr:
+                raise AssertionError('Upgrade without retained state fell back to fresh provisioning')
+            variables['SYNOPKG_PKGDEST_VOL']='/volume1'
+            env_file.write_text(''.join(key+'='+value+'\n' for key,value in variables.items()))
+            command('docker','exec',name,'sh','-ec',
+                    'ln -s /volume1/@appdata/timekeeper /var/packages/timekeeper/var; '
+                    'mkdir -p /var/packages/timekeeper/target/project; '
+                    'chown -R 10001:10001 /var/packages/timekeeper/target')
+            command('docker','cp',str(blueprint),name+':/var/packages/timekeeper/target/project/compose.yaml')
+            helper('install');helper('upgrade');helper('prestart')
+            after_upgrade=json.loads(read('settings.json'))
+            for key in ('installationId','database','role','ownerId','httpPort','publicOrigin'):
+                if after_upgrade[key]!=settings[key]:raise AssertionError('Upgrade changed retained '+key)
+            if read('secrets/database_password').decode().strip()!=application_password:
+                raise AssertionError('Upgrade after link removal replaced the database credential')
+            value=command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-Atc','SELECT value FROM preserved_fixture').stdout.strip()
+            if value!='owned private data':raise AssertionError('Upgrade after link removal changed native data')
+            variables=original_variables
             # First setup can expire before the user reaches the web client. Reinstall
             # renews it and invalidates the earlier pending code without master access.
             command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-c',
@@ -203,6 +239,7 @@ def main():
                 raise AssertionError('PostgreSQL statement log contains a plaintext credential')
             print(json.dumps({'postgresql':args.postgres_image,'architecture':architecture,
                               'unprivilegedInstaller':True,'dedicatedNonSuperuser':True,'permanentAppdataBeforeResourceStartup':True,
+                              'upgradeSurvivesRemovedPackageLinks':True,'missingUpgradeStateRefused':True,
                               'reinstallPreservesCredentials':True,'renewIncompleteSetupWithoutResettingAccounts':True,'interruptedProvisioningPreservesData':True,
                               'nativeBackupRestore':True,'corruptRestoreRefused':True,'noPlaintextCredentialsInStatementLog':True}))
         finally:

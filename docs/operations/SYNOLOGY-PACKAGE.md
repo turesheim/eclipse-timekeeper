@@ -64,6 +64,11 @@ uninstallation. It uses mode 0700 under the package account; it is not an SMB
 shared folder. PostgreSQL data remains with the separate PostgreSQL package.
 Stopping or uninstalling Timekeeper never drops databases, roles or other packages.
 
+DSM removes the old package's `var` link before the incoming `preinst` during
+upgrade. The helper resolves retained data using the SDK's permanent appdata
+location or `${SYNOPKG_PKGDEST_VOL}/@appdata/timekeeper` while that link is absent.
+It never scans other volumes or treats missing upgrade data as a fresh install.
+
 This uses DSM's [permanent appdata directory](https://help.synology.com/developer-guide/integrate_dsm/fhs.html),
 not a Data Share resource: the latter is acquired at enable/startup, after
 `postinst` needs to provision and save configuration. Creating directories under

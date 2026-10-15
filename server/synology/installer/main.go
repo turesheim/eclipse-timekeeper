@@ -135,7 +135,14 @@ func run(action, root, target, releasePath string, env func(string) string, argu
 			return err
 		}
 		var w Wizard
-		if retained, loadErr := loadSettings(root); loadErr != nil || retained.Phase != "READY" {
+		retained, loadErr := loadSettings(root)
+		if loadErr != nil && !errors.Is(loadErr, os.ErrNotExist) {
+			return errors.New("Cannot read the retained Timekeeper configuration; restore access before continuing")
+		}
+		if errors.Is(loadErr, os.ErrNotExist) && env("SYNOPKG_PKG_STATUS") == "UPGRADE" {
+			return errors.New("Cannot locate retained Timekeeper appdata for this upgrade; existing data will not be replaced")
+		}
+		if loadErr != nil || retained.Phase != "READY" {
 			w, err = parseWizard(env)
 			if err != nil {
 				return err
@@ -165,11 +172,15 @@ func main() {
 	}
 	executable, err := os.Executable()
 	if err == nil {
+		var root string
+		root, err = stateRoot(os.Getenv)
 		argument := ""
 		if len(os.Args) == 3 {
 			argument = os.Args[2]
 		}
-		err = run(os.Args[1], stateRoot(), os.Getenv("SYNOPKG_PKGDEST"), filepath.Dir(executable), os.Getenv, argument)
+		if err == nil {
+			err = run(os.Args[1], root, os.Getenv("SYNOPKG_PKGDEST"), filepath.Dir(executable), os.Getenv, argument)
+		}
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

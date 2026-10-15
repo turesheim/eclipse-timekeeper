@@ -30,6 +30,32 @@ func fixtureEnv(w Wizard) func(string) string {
 	values := map[string]string{"wizard_database": w.Settings.Database, "wizard_database_role": w.Settings.Role, "wizard_database_port": "5433", "wizard_http_port": "8098", "wizard_public_origin": w.Settings.PublicOrigin, "wizard_owner": w.Settings.Owner, "wizard_database_admin": w.AdminUser, "wizard_database_admin_password": w.AdminPassword, "wizard_setup_code": w.Code}
 	return func(key string) string { return values[key] }
 }
+func TestStateRootSurvivesMissingPackageLinksDuringUpgrade(t *testing.T) {
+	for _, item := range []struct{ pkgvar, volume, expected string }{
+		{"", "", "/var/packages/timekeeper/var/server"},
+		{"/var/packages/timekeeper/var", "/volume2", "/volume2/@appdata/timekeeper/server"},
+		{"", "/volume3", "/volume3/@appdata/timekeeper/server"},
+		{"/volume4/@appdata/timekeeper", "/volume4", "/volume4/@appdata/timekeeper/server"},
+	} {
+		root, err := stateRoot(func(key string) string {
+			return map[string]string{"SYNOPKG_PKGVAR": item.pkgvar, "SYNOPKG_PKGDEST_VOL": item.volume}[key]
+		})
+		if err != nil || root != item.expected {
+			t.Fatalf("wrong persistent appdata path: %q, %v", root, err)
+		}
+	}
+	for _, invalid := range []string{"relative/path", "/", "/volume1/../volume2"} {
+		if _, err := stateRoot(func(key string) string {
+			if key == "SYNOPKG_PKGDEST_VOL" {
+				return invalid
+			}
+			return ""
+		}); err == nil {
+			t.Fatal("accepted an invalid SDK volume location")
+		}
+	}
+}
+
 func TestWizardRejectsSystemDatabasesRemoteHttpAndInjectedIdentifiers(t *testing.T) {
 	w := fixtureWizard(t)
 	if _, err := parseWizard(fixtureEnv(w)); err != nil {
