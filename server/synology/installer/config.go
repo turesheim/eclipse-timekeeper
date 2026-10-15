@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -22,6 +23,7 @@ const nativePSQL = "/var/packages/postgresql/target/bin/psql"
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
 var commitID = regexp.MustCompile(`^[a-f0-9]{40}$`)
+var dnsLabel = regexp.MustCompile(`^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$`)
 
 type Release struct {
 	Commit string `json:"commit"`
@@ -60,6 +62,25 @@ func origin(value string) error {
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" {
 		return errors.New("Enter the exact public HTTPS origin without a path or trailing slash")
 	}
+	// This hostname also becomes a literal entry in Quarkus's Host allowlist.
+	// Reject wildcards, list separators and property escapes before rendering it.
+	host := u.Hostname()
+	if net.ParseIP(host) == nil {
+		if len(host) > 253 {
+			return errors.New("Enter a valid public HTTPS hostname")
+		}
+		for _, label := range strings.Split(strings.TrimSuffix(host, "."), ".") {
+			if !dnsLabel.MatchString(label) {
+				return errors.New("Enter a valid public HTTPS hostname")
+			}
+		}
+	}
+	if u.Port() != "" {
+		port, err := strconv.Atoi(u.Port())
+		if err != nil || port < 1 || port > 65535 {
+			return errors.New("Enter a valid public HTTPS port")
+		}
+	}
 	return nil
 }
 func validInstallationID(value string) bool {
@@ -89,8 +110,10 @@ func parseWizard(env func(string) string) (Wizard, error) {
 	if w.Settings.DatabasePort == 5432 {
 		return w, errors.New("Use the SynoCommunity PostgreSQL port, normally 5433; DSM's built-in database is not supported")
 	}
-	if w.Settings.HTTPPort, err = number("wizard_http_port"); err != nil {
-		return w, err
+	if strings.TrimSpace(env("wizard_http_port")) != "" {
+		if w.Settings.HTTPPort, err = number("wizard_http_port"); err != nil {
+			return w, err
+		}
 	}
 	if w.Settings.HTTPPort == w.Settings.DatabasePort {
 		return w, errors.New("The HTTP and database ports must differ")

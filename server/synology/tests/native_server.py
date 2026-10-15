@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import shutil
 import time
+from urllib.parse import urlsplit
 
 
 def verify(command,database_container,folder,image):
@@ -54,6 +55,17 @@ def verify(command,database_container,folder,image):
             if command('docker','inspect','--format','{{.State.Health.Status}}',name).stdout.strip()=='healthy':break
             time.sleep(.5)
         else:raise AssertionError('Static Compose healthcheck did not use the selected runtime port')
+        properties=dict(line.split('=',1) for line in (config/'runtime.properties').read_text().splitlines() if '=' in line)
+        public_host=urlsplit(properties['timekeeper.auth.public-origin']).netloc
+        web=command('docker','exec',name,'curl','-fsS','-H','Host: '+public_host,endpoint+'/web/')
+        if '<title>Timekeeper</title>' not in web.stdout:raise AssertionError('Public reverse-proxy Host did not serve the web client')
+        for host in (public_host,public_host.upper(),'localhost:8443','127.0.0.1:8080','[::1]:8080'):
+            response=command('docker','exec',name,'curl','-fsS','-H','Host: '+host,endpoint+'/api/v1/auth/status')
+            if 'setupRequired' not in json.loads(response.stdout):raise AssertionError('Allowed Host did not reach account status')
+        for host in ('unrelated.example','timekeeper.example.invalid.attacker.example'):
+            response=command('docker','exec',name,'curl','-sS','-o','/dev/null','-w','%{http_code}',
+                '-H','Host: '+host,endpoint+'/web/')
+            if response.stdout!='400':raise AssertionError('Unconfigured Host bypassed the allowlist')
         for username,owner in (('account0','owner-a'),('account1','owner-β')):
             response=command('docker','exec','-i',name,'curl','-fsS','-H','Content-Type: application/json',
                 '--data-binary','@-',endpoint+'/api/v1/auth/login',
@@ -62,6 +74,7 @@ def verify(command,database_container,folder,image):
         status=json.loads(command('docker','exec',name,'curl','-fsS',endpoint+'/api/v1/auth/status').stdout)
         if status['setupRequired']:raise AssertionError('Restored server reopened administrator setup')
         return {'projectCreatedBeforeRuntimeConfiguration':True,'renderedNativeServerReady':True,'selectedRuntimePortHealthcheck':True,
-                'migratedPasswordsAuthenticateAsOriginalOwners':True,'actualContainerRefusesPendingMaintenance':True}
+                'migratedPasswordsAuthenticateAsOriginalOwners':True,'actualContainerRefusesPendingMaintenance':True,
+                'publicReverseProxyHostServesWebClient':True,'unconfiguredHostsRejected':True}
     finally:
         command(*compose,'down',check=False)

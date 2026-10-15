@@ -48,7 +48,7 @@ def main():
         variables = {'SYNOPKG_PKGNAME':'timekeeper', 'SYNOPKG_PKGDEST':'/var/packages/timekeeper/target',
                      'SYNOPKG_PKGINST_TEMP_DIR':'/tmp/timekeeper-incoming-payload',
                      'wizard_database':'timekeeper_fixture', 'wizard_database_role':'timekeeper_fixture_app',
-                     'wizard_database_port':'5433', 'wizard_http_port':'8098',
+                     'wizard_database_port':'5433',
                      'wizard_public_origin':'https://timekeeper.example.invalid', 'wizard_owner':'existing-owner',
                      'wizard_database_admin':'postgres', 'wizard_database_admin_password':master_password,
                      'wizard_setup_code':code}
@@ -137,11 +137,18 @@ def main():
             application_password=read('secrets/database_password').decode().strip()
             if settings['phase']!='READY' or settings['ownerId']!='existing-owner':
                 raise AssertionError('Installer lost its explicit owner mapping')
+            selected_port=settings['httpPort']
+            if not 1024<=selected_port<=65535 or selected_port==5433:
+                raise AssertionError('Installer did not select a valid local HTTP port automatically')
+            runtime_port=command('docker','exec','--user','10001:10001',name,'cat','/var/packages/timekeeper/target/private/config/http-port').stdout.strip()
+            if runtime_port!=str(selected_port):raise AssertionError('Health check does not use the automatically selected port')
             challenge=json.loads(read('config/account-setup.json'))
             if challenge['sha256']!=hashlib.sha256(code.encode()).hexdigest() or code in json.dumps(challenge):
                 raise AssertionError('Installer retained an invalid bootstrap challenge')
             snapshot={key:read(key) for key in ('settings.json','secrets/database_password','config/tokens.json','config/account-setup.json')}
             helper('validate'); helper('install')
+            if json.loads(read('settings.json'))['httpPort']!=selected_port:
+                raise AssertionError('Reinstallation changed the automatically selected port')
             for key in ('secrets/database_password','config/tokens.json'):
                 if read(key)!=snapshot[key]:
                     raise AssertionError('Reinstallation replaced retained credentials')

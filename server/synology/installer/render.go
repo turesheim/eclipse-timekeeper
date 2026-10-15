@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,6 +84,10 @@ func install(root, target string, w Wizard, r Release) error {
 		return errors.New("State directory is not empty; existing state will not be overwritten")
 	}
 	if err = probe(w, nativePSQL, false); err != nil {
+		return err
+	}
+	w.Settings.HTTPPort, err = chooseHTTPPort(w.Settings.HTTPPort, w.Settings.DatabasePort, net.Listen)
+	if err != nil {
 		return err
 	}
 	password, err := secret()
@@ -165,6 +171,13 @@ func renewSetup(root string, s Settings, code string) error {
 // The parent is private to the package account while each mounted directory is
 // readable by the server's distinct container UID.
 func publishConfiguration(root, target string, s Settings) error {
+	if err := origin(s.PublicOrigin); err != nil {
+		return err
+	}
+	publicURL, err := url.Parse(s.PublicOrigin)
+	if err != nil {
+		return err
+	}
 	private := filepath.Join(target, "private")
 	if err := os.MkdirAll(private, 0700); err != nil {
 		return err
@@ -190,7 +203,14 @@ func publishConfiguration(root, target string, s Settings) error {
 			return err
 		}
 	}
-	properties := fmt.Sprintf("quarkus.datasource.jdbc.url=jdbc:postgresql://127.0.0.1:%d/%s\nquarkus.datasource.username=%s\nquarkus.http.port=%d\ntimekeeper.auth.public-origin=%s\ntimekeeper.deployed-at=%s\ntimekeeper.schema.allow-upgrade=false\n", s.DatabasePort, s.Database, s.Role, s.HTTPPort, s.PublicOrigin, s.DeployedAt)
+	// Quarkus restricts Host to localhost when bound to loopback. Serve preserves
+	// the public Host, so allow that exact hostname as well as local health checks.
+	// No forwarded headers or arbitrary hostnames need to be trusted.
+	publicHost := strings.ToLower(publicURL.Hostname())
+	if strings.Contains(publicHost, ":") {
+		publicHost = "[" + publicHost + "]"
+	}
+	properties := fmt.Sprintf("quarkus.datasource.jdbc.url=jdbc:postgresql://127.0.0.1:%d/%s\nquarkus.datasource.username=%s\nquarkus.http.port=%d\nquarkus.http.host-validation.allowed-hosts=localhost,127.0.0.1,[::1],%s\ntimekeeper.auth.public-origin=%s\ntimekeeper.deployed-at=%s\ntimekeeper.schema.allow-upgrade=false\n", s.DatabasePort, s.Database, s.Role, s.HTTPPort, publicHost, s.PublicOrigin, s.DeployedAt)
 	if err := atomic(filepath.Join(private, "config/runtime.properties"), []byte(properties), 0644); err != nil {
 		return err
 	}

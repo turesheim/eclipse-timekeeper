@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -41,7 +42,7 @@ func TestWizardRejectsSystemDatabasesRemoteHttpAndInjectedIdentifiers(t *testing
 			t.Fatalf("accepted identifier %q", value)
 		}
 	}
-	for _, value := range []string{"http://nas.local", "https://nas.local/", "https://user:password@nas.local", "https://nas.local/path", "https://nas.local?other=1"} {
+	for _, value := range []string{"http://nas.local", "https://nas.local/", "https://user:password@nas.local", "https://nas.local/path", "https://nas.local?other=1", "https://nas.local,other.example", "https://*.example", "https://nas.local:99999", "https://nas.local\nother=setting"} {
 		changed := w
 		changed.Settings.PublicOrigin = value
 		if _, err := parseWizard(fixtureEnv(changed)); err == nil {
@@ -94,6 +95,42 @@ func TestPostgreSQLFailuresExposeUsefulMessagesWithoutRawDiagnostics(t *testing.
 	value := bytes.Repeat([]byte("x"), 32768)
 	if length, err := diagnostic.Write(value); err != nil || length != len(value) || len(diagnostic.value) != 16384 {
 		t.Fatal("PostgreSQL diagnostic capture is not bounded")
+	}
+}
+
+func TestHTTPPortIsOptionalAndAutomaticSelectionHandlesConflicts(t *testing.T) {
+	env := fixtureEnv(fixtureWizard(t))
+	w, err := parseWizard(func(key string) string {
+		if key == "wizard_http_port" {
+			return ""
+		}
+		return env(key)
+	})
+	if err != nil || w.Settings.HTTPPort != 0 {
+		t.Fatal("wizard requires a manual HTTP port")
+	}
+	var attempted []string
+	port, err := chooseHTTPPort(0, 5433, func(network, address string) (net.Listener, error) {
+		attempted = append(attempted, address)
+		if address == "127.0.0.1:8080" {
+			return nil, errors.New("already in use")
+		}
+		return net.Listen(network, address)
+	})
+	if err != nil || port < 1024 || port > 65535 || strings.Join(attempted, ",") != "127.0.0.1:8080,127.0.0.1:0" {
+		t.Fatal("automatic port selection did not fall back to a free loopback port")
+	}
+	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	if err != nil {
+		t.Fatal("selected port remained reserved by the installer")
+	}
+	defer listener.Close()
+	if _, err = chooseHTTPPort(port, 5433, net.Listen); err == nil {
+		t.Fatal("occupied explicit override was silently changed")
+	}
+	port, err = chooseHTTPPort(0, 8080, net.Listen)
+	if err != nil || port == 8080 {
+		t.Fatal("automatic HTTP port reused the database port")
 	}
 }
 
@@ -249,6 +286,23 @@ func TestProjectUsesPinnedImageNativeDatabasePrivateFilesAndTheSelectedPort(t *t
 	}
 	if !strings.Contains(string(properties), "127.0.0.1:5433/timekeeper") || !strings.Contains(strings.Join(server.Healthcheck.Test, " "), "/config/http-port") {
 		t.Fatal("database or healthcheck uses the wrong port")
+	}
+	for _, item := range []struct{ origin, host string }{
+		{"https://seshat.tailad1f0.ts.net:8443", "seshat.tailad1f0.ts.net"},
+		{"https://NAS.EXAMPLE:443", "nas.example"},
+		{"https://[2001:db8::1]:8443", "[2001:db8::1]"},
+	} {
+		s.PublicOrigin = item.origin
+		if err := publishConfiguration(root, target, s); err != nil {
+			t.Fatal(err)
+		}
+		properties, err := os.ReadFile(filepath.Join(target, "private/config/runtime.properties"))
+		if err != nil || !strings.Contains(string(properties), "quarkus.http.host-validation.allowed-hosts=localhost,127.0.0.1,[::1],"+item.host+"\n") {
+			t.Fatal("public hostname or local health checks missing from Host allowlist")
+		}
+		if strings.Contains(string(properties), "require-localhost=false") || strings.Contains(string(properties), "proxy-address-forwarding=true") {
+			t.Fatal("Host allowlist bypasses validation or trusts forwarded headers")
+		}
 	}
 }
 func TestAtomicConfigurationRefusesSymlinksAndMalformedRetainedState(t *testing.T) {

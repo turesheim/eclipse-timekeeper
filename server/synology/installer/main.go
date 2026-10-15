@@ -32,14 +32,35 @@ func validate(root string, w Wizard, r Release) error {
 	if err := probe(w, nativePSQL, false); err != nil {
 		return err
 	}
-	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", w.Settings.HTTPPort))
-	if listener != nil {
+	_, err := chooseHTTPPort(w.Settings.HTTPPort, w.Settings.DatabasePort, net.Listen)
+	return err
+}
+
+// Prefer the documented default, then let the OS select a free loopback port.
+// The chosen port is persisted during postinst and reused on every later start.
+func chooseHTTPPort(requested, databasePort int, listen func(string, string) (net.Listener, error)) (int, error) {
+	ports := []int{requested}
+	if requested == 0 {
+		ports = []int{8080, 0}
+	}
+	for _, port := range ports {
+		if port == databasePort {
+			continue
+		}
+		listener, err := listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+		if err != nil {
+			continue
+		}
+		chosen := listener.Addr().(*net.TCPAddr).Port
 		listener.Close()
+		if chosen != databasePort {
+			return chosen, nil
+		}
 	}
-	if err != nil {
-		return errors.New("The selected local HTTP port is in use")
+	if requested != 0 {
+		return 0, errors.New("The selected local HTTP port is in use; leave the advanced port override empty to choose automatically")
 	}
-	return nil
+	return 0, errors.New("Could not select a free local HTTP port")
 }
 func ready(root string) error {
 	s, err := loadSettings(root)

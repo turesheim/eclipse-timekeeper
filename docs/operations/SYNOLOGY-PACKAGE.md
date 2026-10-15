@@ -14,10 +14,14 @@ PostgreSQL must already have the administrator credentials chosen in its own
 wizard. Use **Package Center → Manual Install** for the candidate `.spk`.
 
 The Timekeeper wizard asks for those database administrator credentials, unused
-dedicated database/role names, a local HTTP port and the public HTTPS origin from
-DSM Reverse Proxy or [Tailscale Serve](TAILSCALE.md). Configure HTTPS forwarding
-to that loopback port. It also displays a random one-time setup code: copy it
-before finishing. No database administrator password is retained by Timekeeper.
+dedicated database/role names and the public HTTPS origin from DSM Reverse Proxy
+or [Tailscale Serve](TAILSCALE.md). The local HTTP port is selected automatically:
+8080 when available, otherwise a free port assigned by the operating system.
+An optional port override is available under **Advanced settings**. The selected
+port is retained across restarts, repairs and upgrades. Configure HTTPS forwarding
+to that loopback port, as described in the Tailscale guide. The wizard also displays
+a random one-time setup code: copy it before finishing. No database administrator
+password is retained by Timekeeper.
 
 Use **Open**, choose **First administrator setup**, and enter that code to create
 your username and password. Codes expire 15 minutes after installation. New
@@ -34,7 +38,11 @@ its lifecycle; there is no Timekeeper PostgreSQL container or host Java dependen
 The application uses host networking to reach native PostgreSQL on loopback and
 binds its HTTP listener to **127.0.0.1**. HTTPS and the exact public origin are
 required for browser sign-in. The selected HTTP port is also used by the container
-health check. The application runs as UID 10001 with a read-only filesystem.
+health check. The installer allows the public origin's hostname in Quarkus's HTTP
+Host validation, alongside localhost for health checks. Other hostnames remain
+blocked; forwarding through Tailscale Serve does not require trusting forwarded
+headers or disabling Host validation. The application runs as UID 10001 with a
+read-only filesystem.
 
 The complete Compose project and empty bind directories ship in `package.tgz`:
 DSM acquires the project **before** `postinst`. The installer then copies retained
