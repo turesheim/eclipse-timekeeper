@@ -35,8 +35,8 @@ from PostgreSQL's `template0`, avoiding unrelated extensions in SynoCommunity's
 resource worker loads the bundled immutable Java 21 application image and owns
 its lifecycle; there is no Timekeeper PostgreSQL container or host Java dependency.
 
-The application uses host networking to reach native PostgreSQL on loopback and
-binds its HTTP listener to **127.0.0.1**. HTTPS and the exact public origin are
+The DSM container is named `timekeeper-server`. The application uses host
+networking to reach native PostgreSQL on loopback and binds its HTTP listener to **127.0.0.1**. HTTPS and the exact public origin are
 required for browser sign-in. The selected HTTP port is also used by the container
 health check. The installer allows the public origin's hostname in Quarkus's HTTP
 Host validation, alongside localhost for health checks. Other hostnames remain
@@ -88,6 +88,20 @@ retained configuration intact; retain the previous `.spk` for recovery. Real DSM
 checks must verify package repair, reinstallation permissions and failure recovery.
 Do not remove the native PostgreSQL package or the retained appdata as part
 of an application rollback.
+
+The failed early-preview upgrade from 128 to 129 left the previous package-owned
+Container Manager project behind. Later installs reported `name 'timekeeper-server'
+duplicated`; removing those broken replacement installs did not remove the old
+project. Recovery identified the orphan by `is_package: true`, project name
+`timekeeper-server` and working directory `/var/packages/timekeeper/target/project`
+before removing its registration and stopped container as an administrator.
+Native PostgreSQL and retained appdata were preserved.
+
+On the recorded DS923+ target, recovery was followed by a clean 131
+install/start/stop/backup/uninstall cycle. Normal uninstall removed both project
+and container; retained files and all 14 database table fingerprints were
+unchanged. This does not replace the remaining NAS acceptance scenarios required
+for stable publication.
 
 ## Native backup and restore
 

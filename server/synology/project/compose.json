@@ -1,6 +1,7 @@
 {
   "services": {
     "server": {
+      "container_name": "timekeeper-server",
       "image": "@TIMEKEEPER_IMAGE@",
       "network_mode": "host",
       "restart": "unless-stopped",
