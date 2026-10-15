@@ -17,6 +17,8 @@ from p2_release import download_testing_artifact, gh
 
 ACCEPTANCE = 'timekeeper-dsm-acceptance.json'
 EVIDENCE = 'timekeeper-dsm-release.json'
+# Preserve access to already-tested installers from before the artifact rename.
+INSTALLER_ARTIFACT_NAMES = {'synology-installer', 'synology-preview-candidate'}
 MATRIX_JOBS = {'API-contract', 'Server', 'Web', 'Build (ubuntu-latest)',
                'Build (macos-latest)', 'Build (windows-latest)',
                'Installed client tests', 'Packaging and channel tests',
@@ -79,7 +81,7 @@ def candidate_artifact(repo, run_id, branch, commit):
         raise ValueError('Candidate must come from a successful main Server containers push at the release commit')
     require_jobs(repo, run_id, {'verify', 'Synology candidate and PostgreSQL 17'})
     found = [artifact for artifact in pages(repo, f'actions/runs/{run_id}/artifacts?per_page=100', 'artifacts')
-             if artifact['name'] == 'synology-preview-candidate' and not artifact['expired']]
+             if artifact['name'] in INSTALLER_ARTIFACT_NAMES and not artifact['expired']]
     if not found:
         raise CandidateUnavailable('A unique, unexpired Synology candidate artifact is required')
     if len(found) != 1:

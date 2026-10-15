@@ -51,9 +51,10 @@ class SynologyReleaseTest(unittest.TestCase):
                     'head_branch': 'main', 'head_sha': COMMIT,
                     'head_repository': {'full_name': REPO}, 'path': '.github/workflows/server-containers.yml'}
         self.matrix = {**self.run, 'id': 124, 'path': '.github/workflows/build.yml'}
-        self.artifact = {'id': 50, 'name': 'synology-preview-candidate', 'expired': False,
+        self.artifact = {'id': 50, 'name': 'synology-installer', 'expired': False,
                          'digest': digest(self.zip.read_bytes()),
                          'workflow_run': {'id': 123, 'head_sha': COMMIT, 'head_branch': 'main'}}
+        self.artifacts = [self.artifact]
         self.matrix_jobs = set(release.MATRIX_JOBS)
         self.uploads = []
         self.addCleanup(patch.stopall)
@@ -62,10 +63,10 @@ class SynologyReleaseTest(unittest.TestCase):
         patch.object(release.subprocess, 'run', side_effect=self.download).start()
         self.output = self.root / 'ready'
 
-    def write_zip(self, extra=None):
+    def write_zip(self, extra=None, prefix=''):
         with zipfile.ZipFile(self.zip, 'w') as archive:
             for path in (self.package, self.package.with_suffix('.json'), self.package.with_suffix('.spk.sha256')):
-                archive.write(path, 'target/synology/' + path.name)
+                archive.write(path, prefix + path.name)
             # Unrelated reports can share basenames; only the three package files
             # are copied out and each must have a unique identity.
             archive.writestr('reports/a/result.txt', 'a')
@@ -94,7 +95,7 @@ class SynologyReleaseTest(unittest.TestCase):
             '/actions/runs/123': self.run,
             '/actions/runs/123/jobs?per_page=100': {'jobs': self.jobs({'verify', 'Synology candidate and PostgreSQL 17'})},
             '/actions/runs/124/jobs?per_page=100': {'jobs': self.jobs(self.matrix_jobs)},
-            '/actions/runs/123/artifacts?per_page=100': {'artifacts': [self.artifact]},
+            '/actions/runs/123/artifacts?per_page=100': {'artifacts': self.artifacts},
             f'/actions/workflows/build.yml/runs?head_sha={COMMIT}&event=push&status=success&per_page=100': {'workflow_runs': [self.matrix]},
         }
         self.assertIn(path, values, args)
@@ -123,6 +124,22 @@ class SynologyReleaseTest(unittest.TestCase):
         release.publish(REPO, 'v2.0.0', self.output, evidence)
         self.assertEqual(1, len(self.uploads))
         self.assertNotIn('--clobber', self.uploads[0])
+
+    def test_installer_artifact_rename_preserves_old_runs_and_refuses_ambiguity(self):
+        for name, prefix in (('synology-installer', ''), ('synology-preview-candidate', 'server/target/synology/')):
+            self.artifact['name'] = name
+            self.write_zip(prefix=prefix)
+            self.artifact['digest'] = digest(self.zip.read_bytes())
+            with self.subTest(name=name):
+                self.assertEqual(self.artifact, release.candidate_artifact(REPO, 123, 'main', COMMIT))
+                destination = self.root / name
+                destination.mkdir()
+                package, checked = release.unpack_candidate(self.zip, destination)
+                self.assertEqual(self.package.read_bytes(), package.read_bytes())
+                self.assertEqual(COMMIT, checked['sourceCommit'])
+        self.artifacts.append({**self.artifact, 'id': 51, 'name': 'synology-installer'})
+        with self.assertRaisesRegex(ValueError, 'Ambiguous'):
+            release.candidate_artifact(REPO, 123, 'main', COMMIT)
 
     def test_untrusted_or_incomplete_ci_and_wrong_release_are_refused(self):
         original = json.loads(json.dumps(self.run))

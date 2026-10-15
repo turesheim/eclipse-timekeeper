@@ -46,6 +46,22 @@ for the matrix and all acceptance jobs, downloads their same-run p2 artifact,
 and uploads the complete site artifact on main. The separate Pages workflow
 verifies and deploys that artifact after the whole main Build workflow succeeds.
 
+The **Server containers** workflow separates installable distributions from test
+results:
+
+| Artifact | Contents |
+| --- | --- |
+| `server-compose` | Docker Compose deployment files, Linux AMD64 images, checksums and image references |
+| `server-compose-test-results` | Server/database test reports and Compose acceptance results |
+| `synology-installer` | DSM `.spk` installer, checksums, source/image metadata, catalog, icons and manual acceptance template |
+| `synology-test-results` | PostgreSQL 17 test reports and deployment acceptance results |
+
+Distribution artifacts are uploaded after successful validation and packaging.
+Test results are retained even when validation fails. The Synology job downloads
+`server-compose` from the same run and reuses its tested server image. A preview
+installer is still identified by its `1.99.0-<revision>` version and metadata;
+the artifact name stays `synology-installer`.
+
 ## Eclipse import
 
 Import existing Maven projects recursively from the repository root. Open

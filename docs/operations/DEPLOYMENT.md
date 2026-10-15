@@ -100,7 +100,7 @@ If registry access is denied, make the repository-linked GHCR packages public,
 or authenticate the NAS with `docker login ghcr.io` using an account that can
 read those packages. The updater reuses Docker's registry authentication.
 
-PR CI also supplies tested AMD64 image archives in `server-compose-evidence`, so
+PR CI also supplies tested AMD64 image archives in `server-compose`, so
 the DS923+ can run a candidate before registry publication. Download the artifact,
 verify `checksums.sha256`, extract `timekeeper-compose.tar.gz` into `deploy`, and
 import the images through Container Manager or SSH:

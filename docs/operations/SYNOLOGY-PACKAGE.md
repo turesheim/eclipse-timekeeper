@@ -224,12 +224,18 @@ the tested image avoids unpublished PR tags and moving registry aliases.
 ## Candidate downloads and repository discovery
 
 The **Server containers → Synology candidate and PostgreSQL 17** CI job uploads
-`synology-preview-candidate` after both PostgreSQL major versions pass. Download
+`synology-installer` after both PostgreSQL major versions pass. Download
 that artifact from the successful PR/main workflow and verify the adjacent SHA-256
 before a manual NAS installation. It includes the SPK, source/image provenance,
-preview `catalog.json`, icons and automated acceptance evidence.
+preview `catalog.json` and icons. Automated acceptance reports and database test
+results are uploaded separately as `synology-test-results`, including on failures.
 An **incomplete** `dsm-acceptance-template.json` binds the real-NAS test record to
 that exact candidate. Automated CI does not fill in the manual test results.
+
+The installer artifact name describes its contents. Preview status remains in
+the SPK version (`1.99.0-<revision>`), provenance and repository channel. Release
+and Pages tooling also accept the former `synology-preview-candidate` name for
+already-tested builds, without rebuilding their packages.
 
 The catalog uses a separate `/synology/preview/r1000/` HTTPS directory and links to
 the immutable versioned SPK beside it. Its install/upgrade flags keep the wizard
