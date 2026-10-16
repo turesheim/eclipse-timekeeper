@@ -36,7 +36,7 @@ async function show(hash, ask = true) {
   $('account-heading').focus();
   view = {
     root: $('account-content'), session: scope.session, account: scope.account, valid,
-    canWrite: !!scope.account.permissions?.includes('write'), dirty: new Set(), busy: false, uncertain: false,
+    canWrite: !!scope.account.permissions?.includes('write'), dirty: new Set(), busy: false, pending: 0, uncertain: false,
     clean(form) {if (valid()) this.dirty.delete(form);},
     changed(account) {if (!valid()) return; scope.account = {...scope.account, ...account}; this.account = scope.account; scope.updateAccount(account); $('owner').textContent = account.displayName; $('account-identity').textContent = `Signed in as ${account.username || account.displayName}. Your work data is private to your account.`;},
     signOut: message => {if (valid()) scope.signOut(message);},
@@ -45,7 +45,8 @@ async function show(hash, ask = true) {
     async run(work, {submit, feedback = $('account-error'), write = false} = {}) {
       if (!valid() || this.busy || (write && (!this.canWrite || this.uncertain))) return;
       feedback.replaceChildren(); if (submit) submit.disabled = true;
-      this.busy = write; this.root.setAttribute('aria-busy', 'true');
+      if (write) this.busy = true;
+      ++this.pending; this.root.setAttribute('aria-busy', 'true');
       try {await work();}
       catch (error) {
         if (!valid()) return;
@@ -56,7 +57,7 @@ async function show(hash, ask = true) {
           feedback.append(' ', button('Reload current values', () => {if (acceptedHash === '#users/new') this.navigate('#users'); else void show(acceptedHash);}));
         }
       } finally {
-        if (valid()) {this.busy = false; this.root.setAttribute('aria-busy', 'false'); if (submit) submit.disabled = !this.canWrite || this.uncertain;}
+        if (valid()) {if (write) this.busy = false; --this.pending; this.root.setAttribute('aria-busy', String(this.pending > 0)); if (submit) submit.disabled = !this.canWrite || this.uncertain;}
       }
     }
   };

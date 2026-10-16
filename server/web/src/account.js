@@ -51,6 +51,7 @@ async function renderTokens(view, zone) {
   const card = section(view, 'Personal API tokens');
   card.append(node('p', 'Use a separate named token for each Eclipse installation or other client. Token secrets are shown once.'));
   const list = node('div'); card.append(list);
+  let listGeneration = 0;
   async function refreshList(feedback, acknowledgement) {
     try {await tokens();}
     catch (error) {
@@ -61,7 +62,12 @@ async function renderTokens(view, zone) {
     }
   }
   async function tokens() {
-    const {data} = await view.session.request('/auth/tokens'); if (!view.valid()) return;
+    const current = ++listGeneration;
+    let reply;
+    try {reply = await view.session.request('/auth/tokens');}
+    catch (error) {if (view.valid() && current === listGeneration) throw error; return;}
+    if (!view.valid() || current !== listGeneration) return;
+    const {data} = reply;
     list.replaceChildren();
     if (!data.items.length) {list.append(node('p', 'No API tokens yet.', 'hint')); return;}
     const rows = data.items.map(token => {

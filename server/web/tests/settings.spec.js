@@ -175,3 +175,40 @@ test('a lost token-creation reply requires review and never repeats the write', 
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', {name: 'Reload current values', exact: true}).click(); await ready(page);
   await expect(page.locator('#account-content tr').filter({hasText: 'Lost token reply'})).toHaveCount(1); await expect(page.getByLabel('New API token', {exact: true})).toHaveCount(0); expect(writes).toBe(1);
 });
+for (const late of [false, true]) test(late ? 'old token list reads cannot replace a newer acknowledged list' : 'old token list reads cannot unlock a pending token write', async ({page, request}) => {
+  const user = await fresh(request); await login(page, user, '#account/tokens'); await ready(page);
+  let writes = 0, failList = false, holdList = false, releaseRead, releaseWrite, readArrived, writeArrived;
+  const readGate = new Promise(resolve => {releaseRead = resolve;}), writeGate = new Promise(resolve => {releaseWrite = resolve;});
+  const reading = new Promise(resolve => {readArrived = resolve;}), writing = new Promise(resolve => {writeArrived = resolve;});
+  await page.route('**/api/v1/auth/tokens', async route => {
+    if (route.request().method() === 'POST') {
+      const response = await route.fetch(); expect(response.status()).toBe(201); ++writes;
+      if (writes === 1) failList = true;
+      else {writeArrived(); await writeGate;}
+      await route.fulfill({response});
+    } else if (failList) {failList = false; await route.abort('failed');}
+    else if (holdList) {
+      holdList = false; const response = await route.fetch(); readArrived(); await readGate; await route.fulfill({response});
+    } else await route.continue();
+  });
+  try {
+    await page.getByLabel('Token name', {exact: true}).fill('First token'); await page.getByRole('button', {name: 'Create token', exact: true}).click();
+    await expect(page.getByRole('button', {name: 'Refresh token list', exact: true})).toBeVisible();
+    holdList = true; await page.getByRole('button', {name: 'Refresh token list', exact: true}).click(); await reading;
+    await page.getByLabel('Token name', {exact: true}).fill('Second token'); await page.getByRole('button', {name: 'Create token', exact: true}).click(); await writing;
+    const second = page.locator('#account-content tr').filter({hasText: 'Second token'});
+    if (!late) {
+      const reply = page.waitForResponse(response => response.url().endsWith('/auth/tokens') && response.request().method() === 'GET');
+      releaseRead(); await reply;
+      await page.getByRole('link', {name: 'Profile', exact: true}).click();
+      await expect(page.locator('#account-error')).toContainText('Wait for the current change');
+      await expect(page.getByLabel('Token name', {exact: true})).toHaveValue('Second token'); await expect(page.getByRole('button', {name: 'Create token', exact: true})).toBeDisabled();
+    }
+    releaseWrite(); await expect(second).toBeVisible();
+    if (late) {
+      const reply = page.waitForResponse(response => response.url().endsWith('/auth/tokens') && response.request().method() === 'GET');
+      releaseRead(); await reply;
+    }
+    await ready(page); await expect(second).toBeVisible(); expect(writes).toBe(2);
+  } finally {releaseRead(); releaseWrite(); await page.unrouteAll({behavior: 'wait'});}
+});
