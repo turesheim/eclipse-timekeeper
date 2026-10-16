@@ -37,6 +37,7 @@ test('My Account direct links, mobile layouts and Back navigation preserve runni
     await page.setViewportSize({width, height: 900});
     for (const part of ['Password', 'API tokens', 'Profile']) {
       await page.getByRole('link', {name: part, exact: true}).click(); await ready(page);
+      await expect(page.getByRole('link', {name: part, exact: true})).toHaveAttribute('aria-current', 'page');
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
       const result = await new AxeBuilder({page}).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
       expect(result.violations.map(value => value.id)).toEqual([]);
@@ -51,6 +52,7 @@ test('My Account direct links, mobile layouts and Back navigation preserve runni
   expect((await (await page.request.get('/api/v1/me')).json()).zoneId).toBe(deviceZone);
   expect((await (await page.request.get('/api/v1/work-sessions/' + session.id)).json()).start).toBe(session.start);
   await page.getByRole('link', {name: 'Password', exact: true}).click(); await ready(page);
+  await expect(page).toHaveURL(/#account\/password$/); await expect(page.getByLabel('Current password', {exact: true})).toBeVisible();
   await page.goBack(); await expect(page.getByLabel('Account username', {exact: true})).toHaveValue(user.username);
   await page.reload(); await ready(page); await expect(page.locator('#account-heading')).toHaveText('My Account');
   await page.getByRole('link', {name: 'Back to time tracking', exact: true}).click();

@@ -35,7 +35,9 @@ export async function renderAccount(view, part) {
     try {new Intl.DateTimeFormat(undefined, {timeZone: input.value.trim()});} catch {throw new Error('Enter a valid time zone, for example Europe/Oslo.');}
     const reply = await view.session.request('/me', {method: 'PUT', etag: profile.etag, body: {zoneId: input.value.trim()}});
     if (!view.valid()) return; profile.etag = reply.etag; view.clean(preferences.value); preferences.feedback.textContent = 'Time zone saved. Stored activity times are unchanged.';
-    await view.refreshProfile();
+    // The preference write is confirmed. Refreshing hidden tracking reports
+    // must not keep account navigation reserved after the save succeeds.
+    void view.refreshProfile().catch(() => {});
   });
   const input = field(preferences.value, 'Time zone', zone), preview = node('p', '', 'hint'); input.setAttribute('aria-describedby', 'account-zone-preview'); preview.id = 'account-zone-preview';
   const updatePreview = () => {try {preview.textContent = `${input.value}: ${instantText(new Date().toISOString(), input.value.trim())}`;} catch {preview.textContent = 'Enter a valid IANA time zone.';}};
