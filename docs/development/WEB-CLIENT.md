@@ -125,15 +125,20 @@ the authenticated owner and reject live token owner reassignment.
 
 ## Work sessions
 
-The persistent **Work Session** card shows the account's running status and
-lets the user start or stop a session independently of activity timers. History
-selects the session whose start/end, duration, tracked, covered and unallocated
-time are displayed. Counters use the report's server timestamp and elapsed
-browser time; when offline they freeze at the last confirmed report.
+The compact **Work Session** card stays visible on every tracking tab and shows
+the running session's title, client, local start time and live duration. Start/stop
+controls operate independently of activity timers. **Session history and tools**
+is collapsed initially; expand it to select a historical session and see its
+start/end, duration, tracked, covered and unallocated time. Selecting history does
+not change the running session's heading, color or duration. Counters use server
+timestamps and elapsed browser time; when offline they freeze at the last
+confirmed report. The activity breakdown appears in Workweek and Calendar;
+the session card does not duplicate it or show an empty activity list.
 
-The card provides retrospective session creation/editing, associated activity
-editing, taskless activity creation, existing-activity association and removal
-of associations. A session can contain activities from several projects or no
+The expanded tools provide retrospective session creation/editing, taskless
+activity creation and management of existing-activity associations. Edit activities
+in Workweek or Calendar; choose Standalone in the association editor to remove a
+link. A session can contain activities from several projects or no
 project/task at all. Generic activity creation remains standalone; the card's
 **Add activity** defaults explicitly to its selected session. A task timer can
 choose the current session or remain standalone.
