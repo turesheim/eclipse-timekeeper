@@ -1,6 +1,6 @@
 import {test, expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
-import {dateInZone, localDateTime} from '../src/model.js';
+import {dateInZone, localDateTime, durationNanos, nanosText, decimalHoursText} from '../src/model.js';
 const token = process.env.TIMEKEEPER_WEB_TOKEN;
 async function api(request, method, path, data, headers = {}) {
   const response = await request.fetch('/api/v1' + path, {method, data, headers: {Authorization: `Bearer ${token}`, ...headers}});
@@ -23,6 +23,8 @@ async function fixture(request) {
 test('Workweek shows client-colored session rows with local DST/week clipping and independent activity totals', async ({page, request}) => {
   const f = await fixture(request);
   try {
+    const baseline = await (await api(request, 'GET', '/reports/activities?from=2025-10-19T22:00:00Z&to=2025-10-26T23:00:00Z&zoneId=Europe%2FOslo')).json();
+    const activityTotal = durationNanos(baseline.total) + 3600000000000n;
     const session = await f.create('work-sessions', {title: 'Weekend work', clientId: f.client.id, summary: '', start: '2025-10-25T21:30:00Z', end: '2025-10-27T01:30:00Z'});
     const outside = await f.create('work-sessions', {title: 'Earlier week', clientId: f.client.id, summary: '', start: '2025-10-01T08:00:00Z', end: '2025-10-01T09:00:00Z'});
     await f.create('activities', {taskId: null, projectId: null, summary: 'Separate tracked time', labelIds: [], start: '2025-10-26T09:00:00Z', end: '2025-10-26T10:00:00Z'});
@@ -32,8 +34,8 @@ test('Workweek shows client-colored session rows with local DST/week clipping an
     expect(await row.locator('.client-color').evaluate(value => getComputedStyle(value, '::before').backgroundColor)).toBe('rgb(103, 80, 164)');
     await expect(row.locator('td').nth(6)).toHaveText('0h 30m'); await expect(row.locator('td').nth(7)).toHaveText('25h 0m'); await expect(row.locator('td').nth(8)).toHaveText('25h 30m');
     await expect(page.locator(`#week-sessions tr[data-work-session-id="${outside.id}"]`)).toHaveCount(0);
-    await expect(page.locator('#week-total')).toHaveText('1h 0m');
-    await page.getByLabel('Duration format', {exact: true}).selectOption('decimal'); await expect(row.locator('td').nth(8)).toHaveText('25.50h'); await expect(page.locator('#week-total')).toHaveText('1.00h');
+    await expect(page.locator('#week-total')).toHaveText(nanosText(activityTotal));
+    await page.getByLabel('Duration format', {exact: true}).selectOption('decimal'); await expect(row.locator('td').nth(8)).toHaveText('25.50h'); await expect(page.locator('#week-total')).toHaveText(decimalHoursText(activityTotal));
     await page.locator('.day button').filter({hasText: '2025-10-21'}).click(); await expect(page.locator('#week-sessions-section')).not.toBeVisible();
     await page.locator('.day button').filter({hasText: '2025-10-21'}).click(); await expect(page.locator('#week-sessions-section')).toBeVisible();
     await page.screenshot({path: 'test-results/workweek-sessions-desktop.png', fullPage: true});
