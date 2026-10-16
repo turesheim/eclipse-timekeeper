@@ -464,7 +464,7 @@ function renderSession() {
   const active=snapshot.activeWorkSession.data, report=snapshot.workSessionReport, choice=$('work-session-choice');
   $('work-session-state').textContent=active ? 'Running' : 'Stopped';
   $('work-session-state').className = `badge rounded-pill ${active ? 'text-bg-success' : 'text-bg-secondary'}`;
-  $('work-session-title').textContent = report?.session.title || 'Your work session';
+  $('work-session-title').textContent = active?.title || 'Your work session';
   $('work-session').style.setProperty('--session-color', snapshot.clients.find(client => client.id === report?.session.clientId)?.color || 'var(--accent)');
   $('work-session-current').textContent=active ? `${active.title} · ${name(snapshot.clients,active.clientId)} · Started ${instantText(active.start,snapshot.profile.data.zoneId)}` : 'Start a work session to track your day independently of tasks.';
   $('session-start').disabled=!connected || !!active; $('session-stop').hidden=!active;
@@ -473,6 +473,7 @@ function renderSession() {
   choice.value=report?.session.id || '';choice.disabled=!connected || !report;
   $('work-session-details').hidden=!report;
   if(!report) return;
+  $('selected-session-title').textContent=report.session.title;
   $('work-session-started').textContent=`${report.session.title} · ${name(snapshot.clients,report.session.clientId)}${report.session.summary ? ' · '+report.session.summary : ''} · ${instantText(report.session.start,snapshot.profile.data.zoneId)} → ${instantText(report.session.end,snapshot.profile.data.zoneId)}`;
   table('session-activities',['Activity','Task / project','Time','Actions'],report.activities.map(value => row([
     value.summary || 'Activity',value.taskId ? name(snapshot.tasks,value.taskId,'summary') : name(snapshot.projects,value.projectId),

@@ -49,7 +49,9 @@ async function position(page,element,edge=null) {
   await page.locator('.calendar-scroll').evaluate((scroll,{id,edge})=>{
     const card=[...scroll.querySelectorAll('.calendar-session:not(.preview)')].find(value=>value.dataset.sessionId===id);
     scroll.scrollTop=parseFloat(card.style.top)+(edge==='end' ? parseFloat(card.style.height)-300 : -130);
-    window.scrollTo(0,scroll.getBoundingClientRect().top+window.scrollY-80);
+    // Bootstrap enables smooth root scrolling; gesture coordinates require the
+    // fixture's page positioning to have finished before the pointer is placed.
+    window.scrollTo({top:scroll.getBoundingClientRect().top+window.scrollY-80,behavior:'instant'});
   },{id:await element.getAttribute('data-session-id'),edge});
   const rect=await element.boundingBox();expect(rect).toBeTruthy();return rect;
 }
