@@ -98,8 +98,9 @@ async function dragRange(page,from,to) {
 }
 
 test('dragging empty calendar space previews a new session and saves only after review',async({page,request})=>{
-  const f=await fixture(request);let creates=0;
+  const f=await fixture(request);let creates=0,otherClient;
   try {
+    otherClient=await (await api(request,'POST','/clients',{name:f.prefix+' other client',color:'#123456'})).json();
     await page.setViewportSize({width:1440,height:1000});await calendar(page);
     page.on('request',value=>{if(value.method()==='POST' && new URL(value.url()).pathname==='/api/v1/work-sessions') creates++;});
     await dragRange(page,{date:'2025-10-21',clock:'09:00/0'},{date:'2025-10-21',clock:'10:30/0'});
@@ -109,20 +110,25 @@ test('dragging empty calendar space previews a new session and saves only after 
     expect(creates).toBe(0);await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-21T09:00:00');
     await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-21T10:30:00');
     await page.screenshot({path:'test-results/calendar-range-review-desktop.png'});
-    await page.getByLabel('Title',{exact:true}).fill(f.prefix+' dragged');await page.getByLabel('Client',{exact:true}).selectOption(f.client.id);
+    await page.getByLabel('Title',{exact:true}).fill(f.prefix+' dragged');await page.getByLabel('Client',{exact:true}).selectOption(otherClient.id);
     await page.getByLabel('Summary',{exact:true}).fill(f.prefix+' dragged interval');await save(page);expect(creates).toBe(1);
-    const created=(await (await api(request,'GET','/work-sessions?clientId='+f.client.id)).json()).items.find(value=>value.title===f.prefix+' dragged');
+    const created=(await (await api(request,'GET','/work-sessions?clientId='+otherClient.id)).json()).items.find(value=>value.title===f.prefix+' dragged');
     expect(created.start).toBe('2025-10-21T07:00:00Z');expect(created.end).toBe('2025-10-21T08:30:00Z');
     expect((await (await api(request,'GET',`/work-sessions/${created.id}/report`)).json()).activities).toEqual([]);
     await unchangedActivities(request,f);
+    // Selecting an older session must not replace the last client actually used.
+    await bar(page,f.session.id).locator('.calendar-session-select').click();
     await dragRange(page,{date:'2025-10-22',clock:'10:30/0'},{date:'2025-10-22',clock:'09:00/0'});await page.mouse.up();
     await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-22T09:00:00');
     await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-22T10:30:00');
-    await page.locator('#cancel').click();expect(creates).toBe(1);
+    await expect(page.getByLabel('Client',{exact:true})).toHaveValue(otherClient.id);
+    await page.getByLabel('Client',{exact:true}).selectOption(f.client.id);await page.locator('#cancel').click();expect(creates).toBe(1);
+    await dragRange(page,{date:'2025-10-22',clock:'11:00/0'},{date:'2025-10-22',clock:'11:30/0'});await page.mouse.up();
+    await expect(page.getByLabel('Client',{exact:true})).toHaveValue(otherClient.id);await page.locator('#cancel').click();
     await dragRange(page,{date:'2025-10-23',clock:'09:00/0'},{date:'2025-10-23',clock:'10:30/0'});
     await page.keyboard.press('Escape');await page.mouse.up();
     await expect(page.locator('.calendar-create-preview')).toHaveCount(0);await expect(page.locator('#editor')).not.toBeVisible();expect(creates).toBe(1);
-  } finally {await f.close();}
+  } finally {await f.close();if(otherClient) {const current=await api(request,'GET','/clients/'+otherClient.id);await api(request,'DELETE','/clients/'+otherClient.id,undefined,{'If-Match':current.headers().etag});}}
 });
 
 test('drag-created intervals distinguish repeated local times and reject shaded endpoints',async({page,request})=>{
@@ -197,7 +203,10 @@ test('calendar pointer moves and both resize handles preserve nanoseconds and ac
   const f=await fixture(request);
   try {
     const active=await (await api(request,'POST','/activities/start',{taskId:f.task.id,summary:f.prefix+' running timer',labelIds:[],workSessionId:f.session.id,expectedActiveId:null,expectedActiveVersion:null},{'Idempotency-Key':randomUUID()})).json();
-    await calendar(page);await dragSession(page,f.session.id,'2025-10-21',32);
+    await calendar(page);
+    // Count actual openings: checking the final closed state misses a brief flash.
+    await page.evaluate(()=>{window.calendarDialogOpens=0;const show=HTMLDialogElement.prototype.showModal;HTMLDialogElement.prototype.showModal=function(){if(this.id==='editor') window.calendarDialogOpens++;return show.call(this);};});
+    await dragSession(page,f.session.id,'2025-10-21',32);
     await expect.poll(async()=> (await read(request,'work-sessions',f.session.id)).start).toBe('2025-10-21T06:33:00.123456789Z');
     let current=await read(request,'work-sessions',f.session.id);expect(current.end).toBe('2025-10-21T14:33:00.987654321Z');expect(current.version).toBe(f.session.version+1);
     await expect(bar(page,f.session.id)).toHaveAttribute('data-version',String(current.version));
@@ -214,6 +223,7 @@ test('calendar pointer moves and both resize handles preserve nanoseconds and ac
     expect(instantNanos(current.end)-instantNanos(current.start)).toBe(instantNanos(f.session.end)-instantNanos(f.session.start));
     await unchangedActivities(request,f);
     expect(await (await api(request,'GET','/activities/active')).json()).toEqual(active);
+    expect(await page.evaluate(()=>window.calendarDialogOpens)).toBe(0);
     const report=await (await api(request,'GET',`/work-sessions/${f.session.id}/report`)).json();expect(report.time.outsideSession.sort()).toEqual([...f.activities,active].map(value=>value.id).sort());
   } finally {await f.close();}
 });

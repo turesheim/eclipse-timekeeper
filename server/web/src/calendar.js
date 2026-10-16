@@ -35,7 +35,7 @@ export class WeekCalendar {
   }
   reset() {
     this.cancelDrag();this.scope=null;this.data=null;this.calendar=null;this.calendarKey=null;this.scrollWeek=null;this.selectedId=null;
-    this.selection=null;this.clipboard=null;this.busy=false;this.grid.replaceChildren();
+    this.selection=null;this.clipboard=null;this.lastClientId=null;this.busy=false;this.grid.replaceChildren();
     this.root.querySelector('#calendar-unrecorded').replaceChildren();this.message.textContent='';this.setConnected(false);
   }
   update(data,connected,scope) {
@@ -52,6 +52,12 @@ export class WeekCalendar {
     if(value) this.text('Drag empty calendar space to select a time range. Release to review a new work session.');
   }
   selected() {return this.data?.workSessions.find(value=>value.id===this.selectedId);}
+  preferredClient() {
+    const available=id=>this.data?.clients.some(value=>value.id===id);
+    return [this.lastClientId,this.selected()?.clientId,this.data?.activeWorkSession?.data?.clientId,
+      ...[...(this.data?.workSessions || [])].sort((a,b)=>b.start.localeCompare(a.start)).map(value=>value.clientId)].find(available);
+  }
+  rememberClient(id) {if(this.data?.clients.some(value=>value.id===id)) this.lastClientId=id;}
   buttons() {
     const available=this.connected && !this.busy && !this.drag;
     this.controls.copy.disabled=!this.selected() || !available;
@@ -229,7 +235,7 @@ export class WeekCalendar {
   }
   create() {
     if(!this.connected || this.busy || !this.selection) return;
-    try {const start=calendarAnchor(this.calendar,this.selection.date,this.selection.row);this.callbacks.onNew({title:'',clientId:this.selected()?.clientId,summary:'',start:nanosInstant(start),end:nanosInstant(start+3600000000000n)});}
+    try {const start=calendarAnchor(this.calendar,this.selection.date,this.selection.row);this.callbacks.onNew({title:'',clientId:this.preferredClient(),summary:'',start:nanosInstant(start),end:nanosInstant(start+3600000000000n)});}
     catch(error) {this.text(error.message);}
   }
   edit() {const value=this.selected();if(value && this.connected && !this.busy) this.callbacks.onEditSession(value.id);}
@@ -303,7 +309,7 @@ export class WeekCalendar {
     const bar=event.currentTarget,row=Math.floor((event.clientY-bar.getBoundingClientRect().top)/ROW_HEIGHT);
     if(!day.byRow.has(row)) {this.text('This shaded clock time does not occur on this day.');return;}
     event.preventDefault();bar.focus({preventScroll:true});
-    this.drag={scope:this.scope,calendar:this.calendar,anchor:{date:day.date,row},clientId:this.selected()?.clientId,bar,pointer:event.pointerId,
+    this.drag={scope:this.scope,calendar:this.calendar,anchor:{date:day.date,row},clientId:this.preferredClient(),bar,pointer:event.pointerId,
       x:event.clientX,y:event.clientY,lastX:event.clientX,lastY:event.clientY,mode:'create',moved:false,proposal:null};
     this.captureDrag(event);
   }

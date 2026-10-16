@@ -186,7 +186,11 @@ remaining days and hours.
 
 Drag across empty calendar space to preview a new work-session interval, in either
 direction and across days. Release opens the normal editor with the selected times;
-choose a title and client, review the interval, then save. Nothing is written until
+choose a title, review the interval and client, then save. The client from the last
+saved work-session editor is preselected during this sign-in. Before that, the
+selected, running or latest session supplies a valid client. Cancelled edits do
+not change this choice, and signing out or switching accounts clears it.
+Nothing is written until
 that save succeeds. Escape cancels an in-progress range, and cancelling the editor
 also leaves records unchanged. Selection follows the calendar's 15-minute slots;
 a short drag covers at least one slot. Repeated clock times resolve to their
@@ -203,6 +207,9 @@ Strips represent work sessions, using the associated client’s color and the
 session title. Select a strip to see its full interval;
 double-click it or use **Edit selected work session** to edit. Drag the strip
 to move it between times or days, and drag its top or bottom handle to resize.
+Moves and resizes save directly without opening a dialog. A failed or uncertain
+save opens the editor with the proposed times for review; it never silently
+overwrites another client's change.
 With a strip focused, Up/Down moves it by 15 minutes and Left/Right by one local
 day. On a resize handle, arrow keys adjust that endpoint. Moving preserves exact
 elapsed duration and fractional seconds. Sessions spanning midnight retain one
