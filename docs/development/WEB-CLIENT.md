@@ -184,10 +184,32 @@ chosen week and the account's time zone. Use the arrows, **Today**, or the date
 field to navigate. On smaller screens, scroll inside the calendar to see the
 remaining days and hours.
 
+Drag across empty calendar space to preview a new work-session interval, in either
+direction and across days. Release opens the normal editor with the selected times;
+choose a title, review the interval and client, then save. The client from the last
+saved work-session editor is preselected during this sign-in. Before that, the
+selected, running or latest session supplies a valid client. Cancelled edits do
+not change this choice, and signing out or switching accounts clears it.
+Nothing is written until
+that save succeeds. Escape cancels an in-progress range, and cancelling the editor
+also leaves records unchanged. Selection follows the calendar's 15-minute slots;
+a short drag covers at least one slot. Repeated clock times resolve to their
+separate instants, and shaded/nonexistent endpoint times cannot create a session.
+
+On touchscreens, enable **Select time range** before dragging empty space. This
+explicit mode leaves ordinary touch scrolling available when it is off. It turns
+off when the range opens for review, when leaving Calendar, on disconnect and at
+sign-out. Existing work-session move/resize gestures continue to work. Keyboard
+users can select a day/time with the arrow keys and press Enter, or use **Record
+work session**, then enter the desired end time in the editor.
+
 Strips represent work sessions, using the associated client’s color and the
 session title. Select a strip to see its full interval;
 double-click it or use **Edit selected work session** to edit. Drag the strip
 to move it between times or days, and drag its top or bottom handle to resize.
+Moves and resizes save directly without opening a dialog. A failed or uncertain
+save opens the editor with the proposed times for review; it never silently
+overwrites another client's change.
 With a strip focused, Up/Down moves it by 15 minutes and Left/Right by one local
 day. On a resize handle, arrow keys adjust that endpoint. Moving preserves exact
 elapsed duration and fractional seconds. Sessions spanning midnight retain one

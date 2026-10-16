@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import {instantNanos,monday,dateInZone,localDateTime} from '../src/model.js';
+import {calendarWeek} from '../src/calendar-model.js';
 
 const token=process.env.TIMEKEEPER_WEB_TOKEN,readToken=process.env.TIMEKEEPER_WEB_READ_TOKEN;
 async function api(request,method,path,data,headers={}) {
@@ -72,6 +73,104 @@ async function resize(page,id,edge,deltaY) {
 }
 async function unchangedActivities(request,f) {for(const value of f.activities) expect(await read(request,'activities',value.id)).toEqual(value);}
 
+async function rangePoints(page,from,to) {
+  const first=await page.locator('#calendar-date').inputValue(),week=calendarWeek(first,'Europe/Oslo');
+  const row=clock=>week.rows.indexOf(clock);
+  await page.locator('.calendar-scroll').evaluate((scroll,start)=>{
+    scroll.scrollTop=Math.max(0,start*16-130);scroll.scrollLeft=0;
+    window.scrollTo({top:scroll.getBoundingClientRect().top+window.scrollY-80,behavior:'instant'});
+  },row(from.clock));
+  await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
+  await expect(page.locator(`.calendar-day[data-date="${from.date}"]`)).toBeVisible();
+  await expect(page.locator(`.calendar-day[data-date="${to.date}"]`)).toBeVisible();
+  // A live snapshot can replace all day nodes. Read both rectangles atomically
+  // instead of retaining a node handle across separate protocol calls.
+  return page.locator('#calendar-grid').evaluate((grid,{from,to,first,last})=>{
+    const source=grid.querySelector(`.calendar-day[data-date="${from}"]`).getBoundingClientRect();
+    const target=grid.querySelector(`.calendar-day[data-date="${to}"]`).getBoundingClientRect();
+    return {start:{x:source.x+source.width*.6,y:source.y+first*16+1},end:{x:target.x+target.width*.6,y:target.y+last*16+1}};
+  },{from:from.date,to:to.date,first:row(from.clock),last:row(to.clock)});
+}
+async function dragRange(page,from,to) {
+  const points=await rangePoints(page,from,to);
+  await page.mouse.move(points.start.x,points.start.y);await page.mouse.down();
+  await page.mouse.move(points.end.x,points.end.y,{steps:8});
+}
+
+test('dragging empty calendar space previews a new session and saves only after review',async({page,request})=>{
+  const f=await fixture(request);let creates=0,otherClient;
+  try {
+    otherClient=await (await api(request,'POST','/clients',{name:f.prefix+' other client',color:'#123456'})).json();
+    await page.setViewportSize({width:1440,height:1000});await calendar(page);
+    page.on('request',value=>{if(value.method()==='POST' && new URL(value.url()).pathname==='/api/v1/work-sessions') creates++;});
+    await dragRange(page,{date:'2025-10-21',clock:'09:00/0'},{date:'2025-10-21',clock:'10:30/0'});
+    await expect(page.locator('.calendar-create-preview')).toHaveCount(1);expect(creates).toBe(0);
+    await page.screenshot({path:'test-results/calendar-range-preview-desktop.png'});
+    await page.mouse.up();await expect(page.locator('#editor')).toBeVisible();
+    expect(creates).toBe(0);await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-21T09:00:00');
+    await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-21T10:30:00');
+    await page.screenshot({path:'test-results/calendar-range-review-desktop.png'});
+    await page.getByLabel('Title',{exact:true}).fill(f.prefix+' dragged');await page.getByLabel('Client',{exact:true}).selectOption(otherClient.id);
+    await page.getByLabel('Summary',{exact:true}).fill(f.prefix+' dragged interval');await save(page);expect(creates).toBe(1);
+    const created=(await (await api(request,'GET','/work-sessions?clientId='+otherClient.id)).json()).items.find(value=>value.title===f.prefix+' dragged');
+    expect(created.start).toBe('2025-10-21T07:00:00Z');expect(created.end).toBe('2025-10-21T08:30:00Z');
+    expect((await (await api(request,'GET',`/work-sessions/${created.id}/report`)).json()).activities).toEqual([]);
+    await unchangedActivities(request,f);
+    // Selecting an older session must not replace the last client actually used.
+    await bar(page,f.session.id).locator('.calendar-session-select').click();
+    await dragRange(page,{date:'2025-10-22',clock:'10:30/0'},{date:'2025-10-22',clock:'09:00/0'});await page.mouse.up();
+    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-22T09:00:00');
+    await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-22T10:30:00');
+    await expect(page.getByLabel('Client',{exact:true})).toHaveValue(otherClient.id);
+    await page.getByLabel('Client',{exact:true}).selectOption(f.client.id);await page.locator('#cancel').click();expect(creates).toBe(1);
+    await dragRange(page,{date:'2025-10-22',clock:'11:00/0'},{date:'2025-10-22',clock:'11:30/0'});await page.mouse.up();
+    await expect(page.getByLabel('Client',{exact:true})).toHaveValue(otherClient.id);await page.locator('#cancel').click();
+    await dragRange(page,{date:'2025-10-23',clock:'09:00/0'},{date:'2025-10-23',clock:'10:30/0'});
+    await page.keyboard.press('Escape');await page.mouse.up();
+    await expect(page.locator('.calendar-create-preview')).toHaveCount(0);await expect(page.locator('#editor')).not.toBeVisible();expect(creates).toBe(1);
+  } finally {await f.close();if(otherClient) {const current=await api(request,'GET','/clients/'+otherClient.id);await api(request,'DELETE','/clients/'+otherClient.id,undefined,{'If-Match':current.headers().etag});}}
+});
+
+test('drag-created intervals distinguish repeated local times and reject shaded endpoints',async({page,request})=>{
+  const f=await fixture(request);
+  try {
+    await page.setViewportSize({width:1440,height:1000});await calendar(page);
+    await dragRange(page,{date:'2025-10-26',clock:'02:15/0'},{date:'2025-10-26',clock:'02:15/1'});await page.mouse.up();
+    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-26T02:15:00+02:00');
+    await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-26T02:15:00+01:00');
+    await page.getByLabel('Title',{exact:true}).fill(f.prefix+' repeated hour');await page.getByLabel('Client',{exact:true}).selectOption(f.client.id);
+    await page.getByLabel('Summary',{exact:true}).fill(f.prefix+' repeated');await save(page);
+    const created=(await (await api(request,'GET','/work-sessions?clientId='+f.client.id)).json()).items.find(value=>value.title===f.prefix+' repeated hour');
+    expect(instantNanos(created.end)-instantNanos(created.start)).toBe(3600000000000n);
+    await dragRange(page,{date:'2025-10-26',clock:'01:45/0'},{date:'2025-10-20',clock:'02:15/1'});await page.mouse.up();
+    await expect(page.locator('#editor')).not.toBeVisible();await expect(page.locator('#calendar-message')).toContainText('does not occur');
+    await unchangedActivities(request,f);
+  } finally {await f.close();}
+});
+
+test('touch range selection is explicit and leaves normal calendar scrolling available',async({browser,request})=>{
+  const f=await fixture(request),context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+  const page=await context.newPage();
+  try {
+    await calendar(page);const client=await context.newCDPSession(page);
+    const from={date:'2025-10-20',clock:'16:30/0'},to={date:'2025-10-20',clock:'17:00/0'};
+    async function touch(points) {
+      await client.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{...points.start,id:1}]});
+      for(let step=1;step<=6;step++) await client.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:points.start.x+(points.end.x-points.start.x)*step/6,y:points.start.y+(points.end.y-points.start.y)*step/6,id:1}]});
+      await client.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    }
+    await expect(page.locator('#calendar-range')).toHaveAttribute('aria-pressed','false');
+    const points=await rangePoints(page,from,to),before=await page.locator('.calendar-scroll').evaluate(value=>value.scrollTop);
+    await touch(points);await expect(page.locator('#editor')).not.toBeVisible();
+    await expect.poll(()=>page.locator('.calendar-scroll').evaluate(value=>value.scrollTop)).not.toBe(before);
+    await page.getByRole('button',{name:'Select time range',exact:true}).click();await expect(page.locator('#calendar-range')).toHaveAttribute('aria-pressed','true');
+    await touch(await rangePoints(page,from,to));await expect(page.locator('#editor')).toBeVisible();
+    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-20T16:30:00');
+    await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-20T17:00:00');
+    await expect(page.locator('#calendar-range')).toHaveAttribute('aria-pressed','false');await page.locator('#cancel').click();
+  } finally {await context.close();await f.close();}
+});
+
 test('calendar shows seven days, task links and activity lists beside multi-day work sessions',async({page,request})=>{
   const f=await fixture(request);
   try {
@@ -104,7 +203,10 @@ test('calendar pointer moves and both resize handles preserve nanoseconds and ac
   const f=await fixture(request);
   try {
     const active=await (await api(request,'POST','/activities/start',{taskId:f.task.id,summary:f.prefix+' running timer',labelIds:[],workSessionId:f.session.id,expectedActiveId:null,expectedActiveVersion:null},{'Idempotency-Key':randomUUID()})).json();
-    await calendar(page);await dragSession(page,f.session.id,'2025-10-21',32);
+    await calendar(page);
+    // Count actual openings: checking the final closed state misses a brief flash.
+    await page.evaluate(()=>{window.calendarDialogOpens=0;const show=HTMLDialogElement.prototype.showModal;HTMLDialogElement.prototype.showModal=function(){if(this.id==='editor') window.calendarDialogOpens++;return show.call(this);};});
+    await dragSession(page,f.session.id,'2025-10-21',32);
     await expect.poll(async()=> (await read(request,'work-sessions',f.session.id)).start).toBe('2025-10-21T06:33:00.123456789Z');
     let current=await read(request,'work-sessions',f.session.id);expect(current.end).toBe('2025-10-21T14:33:00.987654321Z');expect(current.version).toBe(f.session.version+1);
     await expect(bar(page,f.session.id)).toHaveAttribute('data-version',String(current.version));
@@ -121,6 +223,7 @@ test('calendar pointer moves and both resize handles preserve nanoseconds and ac
     expect(instantNanos(current.end)-instantNanos(current.start)).toBe(instantNanos(f.session.end)-instantNanos(f.session.start));
     await unchangedActivities(request,f);
     expect(await (await api(request,'GET','/activities/active')).json()).toEqual(active);
+    expect(await page.evaluate(()=>window.calendarDialogOpens)).toBe(0);
     const report=await (await api(request,'GET',`/work-sessions/${f.session.id}/report`)).json();expect(report.time.outsideSession.sort()).toEqual([...f.activities,active].map(value=>value.id).sort());
   } finally {await f.close();}
 });
@@ -237,7 +340,7 @@ test('calendar committed-but-lost moves require review and read-only moves leave
     await expect(page.locator('#editor-notice')).toContainText('outcome is unknown');await expect(page.locator('#save')).toBeDisabled();
     let current=await read(request,'work-sessions',f.session.id);expect(current.start).toBe('2025-10-20T06:18:00.123456789Z');expect(current.version).toBe(f.session.version+1);expect(writes).toBe(1);
     await unchangedActivities(request,f);await page.locator('#cancel').click();await page.unroute(`**/api/v1/work-sessions/${f.session.id}`);
-    await page.getByRole('button',{name:'Sign out',exact:true}).click();await calendar(page,readToken);
+    await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();await calendar(page,readToken);
     await bar(page,f.session.id).focus();await bar(page,f.session.id).press('ArrowDown');
     await expect(page.locator('#editor-error')).toContainText('permission');expect(await read(request,'work-sessions',f.session.id)).toEqual(current);await unchangedActivities(request,f);
     await page.locator('#cancel').click();

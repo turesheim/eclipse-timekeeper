@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {calendarWeek,calendarPieces,calendarAnchor,shiftSession,shiftSessionDays,pasteSession,sameSession,calendarTaskBlocks,calendarLanes} from '../src/calendar-model.js';
+import {calendarWeek,calendarPieces,calendarAnchor,calendarRange,shiftSession,shiftSessionDays,pasteSession,sameSession,calendarTaskBlocks,calendarLanes} from '../src/calendar-model.js';
 import {instantNanos,nanosInstant} from '../src/model.js';
 
 test('calendar shows seven local days with distinct repeated slots and noninteractive missing times',()=>{
@@ -56,4 +56,26 @@ test('calendar groups task activities without filling gaps and gives overlaps se
   assert.deepEqual(blocks.map(value=>value.activities.map(activity=>activity.id)),[['a','b'],['c'],['d']]);
   const lanes=calendarLanes([{top:1,bottom:4,id:'a'},{top:2,bottom:3,id:'b'},{top:5,bottom:6,id:'c'}]);
   assert.deepEqual(lanes.map(value=>[value.id,value.lane,value.lanes]),[['a',0,2],['b',1,2],['c',0,1]]);
+});
+
+test('drag-created ranges normalize either direction and resolve real instants across DST',()=>{
+  const week=calendarWeek('2025-10-20','Europe/Oslo');
+  const at=(date,clock)=>({date,row:week.rows.indexOf(clock)});
+  const first=at('2025-10-20','09:00/0'),last=at('2025-10-20','10:30/0');
+  const expected={start:'2025-10-20T07:00:00Z',end:'2025-10-20T08:30:00Z'};
+  assert.deepEqual(calendarRange(week,first,last),expected);
+  assert.deepEqual(calendarRange(week,last,first),expected);
+  assert.deepEqual(calendarRange(week,first,first),{start:'2025-10-20T07:00:00Z',end:'2025-10-20T07:15:00Z'});
+  const overnight=calendarRange(week,at('2025-10-25','23:00/0'),at('2025-10-26','03:00/0'));
+  assert.deepEqual(overnight,{start:'2025-10-25T21:00:00Z',end:'2025-10-26T02:00:00Z'});
+  const repeated=calendarRange(week,at('2025-10-26','02:15/0'),at('2025-10-26','02:15/1'));
+  assert.equal(instantNanos(repeated.end)-instantNanos(repeated.start),3600000000000n);
+  assert.deepEqual(calendarRange(week,at('2025-10-20','23:45/0'),{date:'2025-10-20',row:week.rows.length}),
+    {start:'2025-10-20T21:45:00Z',end:'2025-10-20T22:00:00Z'});
+  assert.throws(()=>calendarRange(week,first,at('2025-10-20','02:15/1')),/does not occur/);
+  const spring=calendarWeek('2026-03-23','Europe/Oslo');
+  assert.throws(()=>calendarRange(spring,{date:'2026-03-29',row:spring.rows.indexOf('01:00/0')},
+    {date:'2026-03-29',row:spring.rows.indexOf('02:30/0')}),/does not occur/);
+  const skipped=calendarWeek('2011-12-26','Pacific/Apia');
+  assert.throws(()=>calendarRange(skipped,{date:'2011-12-29',row:0},{date:'2011-12-30',row:0}),/date does not exist/);
 });

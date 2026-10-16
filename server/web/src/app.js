@@ -69,7 +69,7 @@ function readOnlyWhileDisconnected() {
 }
 function tab(name) {
   for (const item of ['week', 'calendar', 'tasks', 'clients', 'projects', 'labels']) $(`${item}-panel`).hidden = item !== name;
-  $('workspace').dataset.view=name;if(name==='calendar') calendar.show();
+  $('workspace').dataset.view=name;if(name==='calendar') calendar.show();else calendar.hide();
   for (const item of document.querySelectorAll('[data-tab]')) {
     item.classList.toggle('active', item.dataset.tab === name);
     if (item.dataset.tab === name) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
@@ -318,11 +318,11 @@ function refreshClientChoices() {
   input.value=selected;
 }
 function sessionFields(value) {
-  field('Title','title',value.title || '',{required:true,max:1000});clientField(value.clientId);
+  field('Title','title',value.title || '',{required:true,max:1000});clientField(value.clientId || calendar.preferredClient());
   field('Summary','summary',value.summary || '',{max:2000});
 }
 function begin(title, state) {
-  if ($('editor').open) return false;
+  if (editor || $('editor').open) return false;
   editor = {...state, session: api, zone: snapshot.profile.data.zoneId, busy: false, uncertain: false}; $('fields').replaceChildren(); $('editor-error').textContent = ''; $('editor-notice').textContent = '';
   $('save').className = `btn ${state.remove ? 'btn-danger' : 'btn-primary'}`;
   $('editor-title').textContent = title; $('save').textContent = 'Save'; $('save').disabled = false; $('cancel').disabled = false; return true;
@@ -362,9 +362,10 @@ function timeFields(value, ongoing) {
   field(`End (local time, blank while ${ongoing})`, 'end', localDateTime(value.end, editor.zone));
 }
 async function changeCalendarSession(original, proposal, scope) {
-  if(scope!==api || !connected || !begin('Change work session',{collection:'work-sessions',id:original.id,etag:null,loading:true})) return;
+  if(scope!==api || !connected || !begin('Change work session',{collection:'work-sessions',id:original.id,etag:null,loading:true,calendarChange:true})) return;
   const state=editor;
-  sessionFields(proposal);timeFields(proposal,'running');showEditor();freeze(true);$('save').disabled=true;
+  sessionFields(proposal);timeFields(proposal,'running');freeze(true);$('save').disabled=true;
+  setStatus('Saving work-session changes…','working');
   $('editor-notice').textContent='Moving or resizing a work session leaves its activities unchanged.';
   try {
     const loaded=await scope.request(`/work-sessions/${original.id}`);
@@ -372,10 +373,12 @@ async function changeCalendarSession(original, proposal, scope) {
     if(!sameSession(original,loaded.data)) throw new ApiError('STALE_VERSION',412);
     state.etag=loaded.etag;state.loading=false;freeze(false);
     await saveEditor();
+    if(scope===api && editor===state) {setStatus('Work-session change needs review.');showEditor();}
   } catch(error) {
     if(scope!==api || editor!==state) return;
     state.loading=false;state.reviewRequired=true;freeze(false);$('save').disabled=true;
     $('editor-error').textContent=errorText(error);$('editor-notice').textContent='Your proposed times are kept. Cancel and reopen the current session to review it before saving.';
+    setStatus('Work-session change needs review.');showEditor();
   }
 }
 async function openDelete(collection, id) {
@@ -429,6 +432,7 @@ async function saveEditor(event) {
     const method = current.command ? 'POST' : current.remove ? 'DELETE' : current.id !== null ? 'PUT' : 'POST';
     const saved = await current.session.request(path, {method, body, etag: current.etag, key: current.key});
     if (current.session !== api || current !== editor) return;
+    if(!current.calendarChange && !current.remove && (current.collection==='work-sessions' || current.command==='session-start')) calendar.rememberClient(saved.data?.clientId);
     editor = null; $('editor').close(); $('fields').replaceChildren();
     connected = false; readOnlyWhileDisconnected(); setStatus('Refreshing saved changes…', 'working');
     // Acknowledged saves remain successful even if the following read fails.
