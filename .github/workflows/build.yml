@@ -104,6 +104,8 @@ jobs:
         path: server/target/distribution
     - name: Install browser test dependencies
       run: npm ci --ignore-scripts --prefix server/web
+    - name: Verify pinned local design assets
+      run: npm run check:assets --prefix server/web
     - name: Test time-zone, precision and HTTP session boundaries
       run: npm test --prefix server/web
     - name: Install Chromium

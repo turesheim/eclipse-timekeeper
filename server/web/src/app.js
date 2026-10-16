@@ -168,10 +168,10 @@ function table(container, headings, rows) {
     const empty = element('div', undefined, 'empty');
     empty.append(icon('clock'), element('h3', title), element('p', hint)); root.append(empty); return;
   }
-  const node = element('table', undefined, 'table table-hover align-middle mb-0'), thead = element('thead'), header = element('tr'), tbody = element('tbody');
+  const node = element('table', undefined, `table table-hover align-middle mb-0${container === 'activities' ? '' : ' record-table'}`), thead = element('thead'), header = element('tr'), tbody = element('tbody');
   for (const heading of headings) { const th = element('th', heading); th.scope = 'col'; header.append(th); }
   thead.append(header); node.append(thead, tbody);
-  for (const row of rows) tbody.append(row); root.append(node);
+  for (const row of rows) {for (const [index,cell] of [...row.children].entries()) cell.dataset.label = headings[index];tbody.append(row);} root.append(node);
 }
 function row(values, actions = []) {
   const node = element('tr'); for (const value of values) { const cell = element('td'); cell.append(value instanceof Node ? value : document.createTextNode(value)); node.append(cell); }
@@ -179,7 +179,7 @@ function row(values, actions = []) {
 }
 function action(text, operation) {
   const node = button('', () => { void operation().catch(error => setStatus(errorText(error))); });
-  iconButton(node, text === 'Start' ? 'start' : text === 'Delete' ? 'delete' : 'edit', text);
+  iconButton(node, text === 'Start' ? 'start' : text === 'Delete' ? 'delete' : text === 'Remove from session' ? 'unlink' : 'edit', text);
   node.disabled = !connected; return node;
 }
 function name(list, id, field = 'name') { const value = list.find(v => v.id === id); return value && field === 'summary' ? taskPresentation(value).title : value?.[field] ?? 'Unassigned'; }
@@ -202,7 +202,7 @@ function render() {
   table('clients', ['Name', 'Color', 'Actions'], s.clients.map(value => row([value.name, colorSwatch(value.color)], [action('Edit', () => openRecord('clients', value.id)), action('Delete', () => openDelete('clients', value.id))])));
   table('projects', ['Name', 'Client', 'Actions'], s.projects.map(value => row([value.name, name(s.clients, value.clientId)], [action('Edit', () => openRecord('projects', value.id)), action('Delete', () => openDelete('projects', value.id))])));
   table('tasks', ['Task', 'Project', 'Parent', 'Actions'], s.tasks.map(value => row([taskLabel(value), name(s.projects, value.projectId), value.parentTaskId ? name(s.tasks, value.parentTaskId, 'summary') : '—'], [action('Start', () => openStart(value.id)), action('Edit', () => openRecord('tasks', value.id)), action('Delete', () => openDelete('tasks', value.id))])));
-  table('labels', ['Name', 'Color', 'Actions'], s.labels.map(value => row([value.name, value.color || '—'], [action('Edit', () => openRecord('labels', value.id)), action('Delete', () => openDelete('labels', value.id))])));
+  table('labels', ['Name', 'Color', 'Actions'], s.labels.map(value => row([value.name, /^#[0-9a-f]{6}$/i.test(value.color) ? colorSwatch(value.color) : value.color || '—'], [action('Edit', () => openRecord('labels', value.id)), action('Delete', () => openDelete('labels', value.id))])));
   refreshLabelFields(); refreshClientChoices(); refreshSessionChoices(); renderSession();
   $('week-total').textContent = displayDuration(s.report.total); $('days').replaceChildren();
   for (let index = 0; index < 7; index++) {

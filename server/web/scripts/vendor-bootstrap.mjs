@@ -3,10 +3,13 @@ import {readFile, writeFile, mkdir, readdir, rm} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 const source = new URL('../node_modules/bootstrap/', import.meta.url);
 const target = new URL('../src/assets/bootstrap/', import.meta.url);
+const check = process.argv.includes('--check');
 const {version} = JSON.parse(await readFile(new URL('package.json', source)));
 if (version !== '5.3.8') throw new Error('Expected Bootstrap 5.3.8');
-await mkdir(target, {recursive:true});
-for (const name of await readdir(target)) if (name.endsWith('.svg')) await rm(new URL(name,target));
+if (!check) {
+  await mkdir(target, {recursive:true});
+  for (const name of await readdir(target)) if (name.endsWith('.svg')) await rm(new URL(name,target));
+}
 let css = await readFile(new URL('dist/css/bootstrap.min.css', source), 'utf8');
 const images = new Map();
 css = css.replace(/url\("data:image\/svg\+xml,([^"\n]+)"\)/g, (_, data) => {
@@ -16,7 +19,12 @@ css = css.replace(/url\("data:image\/svg\+xml,([^"\n]+)"\)/g, (_, data) => {
   return `url("./${name}")`;
 }).replace(/\/\*# sourceMappingURL=.*?\*\//g, '');
 if (/data:|https?:\/\//.test(css.replace(/\/\*[\s\S]*?\*\//g,''))) throw new Error('Unexpected external or embedded asset');
-await writeFile(new URL('bootstrap.min.css',target),css);
-await writeFile(new URL('LICENSE',target),await readFile(new URL('LICENSE',source)));
-for (const [name,svg] of images) await writeFile(new URL(name,target),svg);
-console.log(`Bundled Bootstrap ${version} CSS and ${images.size} local SVGs; no JavaScript.`);
+const files = new Map([['bootstrap.min.css',css],['LICENSE',await readFile(new URL('LICENSE',source),'utf8')],...images]);
+for (const [name,content] of files) {
+  const path = new URL(name,target);
+  if (check) {
+    if(await readFile(path,'utf8')!==content) throw new Error(`Regenerate bundled asset: ${name}`);
+  } else await writeFile(path,content);
+}
+if(check && (await readdir(target)).some(name=>name.endsWith('.svg') && !images.has(name))) throw new Error('Unexpected bundled SVG');
+console.log(`${check ? 'Verified' : 'Bundled'} Bootstrap ${version} CSS and ${images.size} local SVGs; no JavaScript.`);

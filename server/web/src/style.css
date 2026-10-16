@@ -175,4 +175,13 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
   .report-heading { flex-wrap: wrap; }
   .server-info dl { grid-template-columns: 1fr; gap: .25rem; }
   .server-info dd { margin-bottom: .5rem; }
+  /* Keep record actions visible rather than squeezing time strings into tiny columns. */
+  .record-table, .record-table tbody, .record-table tr, .record-table td { display: block; width: 100%; }
+  .record-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .record-table tbody tr { padding: .75rem; border-bottom: 1px solid var(--line); }
+  .record-table tbody tr:last-child { border-bottom: 0; }
+  .record-table.table td { display: grid; grid-template-columns: 6rem minmax(0,1fr); gap: .5rem; padding: .35rem 0; border: 0; overflow-wrap: anywhere; }
+  .record-table td::before { content: attr(data-label); font-weight: 600; color: var(--muted); }
+  .record-table.table td.actions { display: flex; justify-content: flex-end; padding-top: .75rem; }
+  .record-table td.actions::before { content: none; }
 }

@@ -3,6 +3,7 @@
 CSS and MIT license from the exact `bootstrap` npm dependency in
 `server/web/package-lock.json`. Regenerate with `npm ci --ignore-scripts` and
 `npm run vendor:bootstrap` in `server/web`.
+`npm run check:assets` verifies the committed files without changing them.
 
 The upstream CSS is unchanged except that embedded SVG data URLs become local,
 content-addressed SVG files and the source-map reference is removed. This keeps
