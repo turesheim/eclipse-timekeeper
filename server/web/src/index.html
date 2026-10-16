@@ -35,16 +35,19 @@
       <p id="remember-notice" class="hint" role="status"></p>
       <section id="work-session" class="card work-session" aria-label="Work session">
         <div class="work-session-heading"><div><p class="eyebrow">WORK SESSION</p><div class="session-title"><h2 id="work-session-title">Your work session</h2><span id="work-session-state" class="badge rounded-pill text-bg-secondary">Stopped</span></div><p id="work-session-current" class="hint"></p></div>
+          <p id="work-session-timing" class="session-elapsed" hidden><span>Duration</span><strong id="work-session-elapsed"></strong></p>
           <div class="session-actions" role="group" aria-label="Work session actions"><button class="btn btn-primary" id="session-start">Start work session</button><button class="btn btn-outline-danger" id="session-stop" hidden>Stop work session</button><button class="btn btn-outline-secondary" id="session-new">Record work session</button></div></div>
+        <details id="work-session-history" class="session-history"><summary>Session history and tools</summary>
         <label class="form-label">Session details<select class="form-select" id="work-session-choice" aria-label="Session details"></select></label>
         <div id="work-session-details" hidden><h3 id="selected-session-title"></h3><p id="work-session-started" class="hint"></p>
           <dl class="session-totals"><div><dt>Duration</dt><dd id="ws-duration">—</dd></div><div><dt>Tracked activities</dt><dd id="ws-tracked">—</dd></div><div><dt>Covered time</dt><dd id="ws-covered">—</dd></div><div><dt>Unallocated</dt><dd id="ws-unallocated">—</dd></div></dl>
           <p class="hint">Overlapping activities count once toward covered time. Stopping a work session leaves activity timers running.</p>
           <div class="session-actions"><button class="btn btn-outline-secondary" id="session-edit">Edit work session</button><button class="btn btn-outline-danger" id="session-delete">Delete work session</button><button class="btn btn-outline-secondary" id="session-add">Add activity to session</button><button class="btn btn-outline-secondary" id="session-associate">Associate activity</button></div>
-          <div id="session-activities" class="table-wrap"></div><p id="session-warning" class="hint" role="status"></p>
+          <p id="session-warning" class="hint" role="status"></p>
         </div>
+        </details>
       </section>
-      <section class="card tracking"><div><p class="eyebrow">IN PROGRESS</p><h2 id="active-title">Ready when you are</h2><p id="active-details">Choose a task below to start tracking.</p></div><button class="btn btn-primary" id="stop" hidden>Stop tracking</button></section>
+      <section class="card tracking"><div><p class="eyebrow">IN PROGRESS</p><h2 id="active-title">Ready when you are</h2><p id="active-details" class="hint">Choose a task below to start tracking.</p></div><button class="btn btn-primary" id="stop" hidden>Stop tracking</button></section>
       <nav id="workspace-navigation" class="nav nav-pills workspace-nav" aria-label="Workspace" tabindex="-1"><button class="nav-link" data-tab="week" aria-current="page">Workweek</button><button class="nav-link" data-tab="calendar">Calendar</button><button class="nav-link" data-tab="tasks">Tasks</button><button class="nav-link" data-tab="clients">Clients</button><button class="nav-link" data-tab="projects">Projects</button><button class="nav-link" data-tab="labels">Labels</button></nav>
       <section id="week-panel">
         <div class="toolbar"><div><h2>Your workweek</h2><p id="zone-caption" class="hint"></p></div><label class="form-label">Week containing<input class="form-control" id="week-date" type="date" required></label><label class="form-label">Duration format<select class="form-select" id="duration-format" aria-label="Duration format"><option value="clock">Hours, minutes and seconds</option><option value="decimal">Decimal hours</option></select></label><button class="btn btn-outline-secondary" id="add-activity">Add time</button></div>
@@ -62,7 +65,6 @@
         <p id="calendar-dst" class="hint" hidden>The clocks change this week. Repeated times have an extra row; shaded slots do not occur on that day.</p>
         <p id="calendar-selection" class="hint"></p><p id="calendar-message" class="hint" role="status" aria-live="polite"></p>
         <div class="calendar-scroll card" aria-label="Weekly calendar"><div id="calendar-grid" class="calendar-grid"></div></div>
-        <div id="calendar-unrecorded" class="calendar-unrecorded"></div>
       </section>
       <section id="tasks-panel" hidden><div class="toolbar"><h2>Tasks</h2><button class="btn btn-primary" id="add-task">New task</button></div><div id="tasks" class="card table-wrap"></div></section>
       <section id="clients-panel" hidden><div class="toolbar"><h2>Clients</h2><button class="btn btn-primary" id="add-client">New client</button></div><div id="clients" class="card table-wrap"></div></section>

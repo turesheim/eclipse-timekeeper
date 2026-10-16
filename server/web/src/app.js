@@ -11,7 +11,7 @@ let editor = null, selectedActivity = null, selectedDay = null;
 let watchSession = null;
 let accountName = '';
 let serverInfoRequest = 0;
-let selectedWorkSession = null, snapshotAt = 0, sessionAsOf = 0n;
+let selectedWorkSession = null, snapshotAt = 0, sessionAsOf = 0n, activeAsOf = 0n;
 const collapsed = new Set();
 let decimalHours = false, activitiesCollapsed = false;
 const displayNanos = value => decimalHours ? decimalHoursText(value) : nanosText(value);
@@ -21,7 +21,6 @@ const calendar = new WeekCalendar($('calendar-panel'), {
   onDate: date => {if(!date) return;$('week-date').value=date;selectedDay=null;void refresh().catch(()=>{});},
   onEditActivity: id => void openRecord('activities',id).catch(error=>setStatus(errorText(error))),
   onEditSession: id => void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error))),
-  onStartTask: id => void openStart(id).catch(error=>setStatus(errorText(error))),
   onNew: input => void openRecord('work-sessions',null,null,input).catch(error=>setStatus(errorText(error))),
   onPaste: input => void openRecord('work-sessions',null,null,input,'Paste work session').catch(error=>setStatus(errorText(error))),
   onChange: changeCalendarSession,
@@ -92,8 +91,9 @@ const auth = authentication({
     ++serverInfoRequest; clearServerInfo(); api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null; accountName = '';
     calendar.reset(); collapsed.clear(); selectedWorkSession = null;
     $('editor').close(); $('fields').replaceChildren(); $('editor-error').textContent = ''; $('editor-notice').textContent = '';
-    for(const id of ['clients','projects','tasks','labels','activities','days','session-activities','work-session-choice']) $(id).replaceChildren();
-    for(const id of ['owner','status','active-title','active-details','work-session-current','work-session-state','work-session-started','session-warning','zone-caption','week-total','ws-duration','ws-tracked','ws-covered','ws-unallocated']) $(id).textContent = '';
+    $('work-session-history').open = false;
+    for(const id of ['clients','projects','tasks','labels','activities','days','work-session-choice']) $(id).replaceChildren();
+    for(const id of ['owner','status','active-title','active-details','work-session-current','work-session-state','work-session-started','work-session-elapsed','session-warning','zone-caption','week-total','ws-duration','ws-tracked','ws-covered','ws-unallocated']) $(id).textContent = '';
     $('login').hidden = false; $('workspace').hidden = true; $('session').hidden = true; $('remember-notice').textContent = '';
     tab('week');
   }
@@ -121,7 +121,7 @@ async function refresh() {
       // A save may have queued another read while this older snapshot was in
       // flight. Publish only the final snapshot before enabling dependent forms.
       if (reloadAgain) continue;
-      snapshot = current; snapshotAt = performance.now(); sessionAsOf = current.workSessionReport ? instantNanos(current.workSessionReport.generatedAt) : 0n; connected = true;
+      snapshot = current; snapshotAt = performance.now(); sessionAsOf = current.workSessionReport ? instantNanos(current.workSessionReport.generatedAt) : 0n; activeAsOf = instantNanos(current.report.generatedAt); connected = true;
       render(); setStatus('Up to date', 'ready');
       void refreshServerInfo(session);
     } while (reloadAgain && session === api);
@@ -163,7 +163,6 @@ function table(container, headings, rows) {
       tasks:['No tasks yet', 'Create a task to start tracking your work.'],
       labels:['No labels yet', 'Add labels to categorize your activities.'],
       activities:['No activities this week', 'Choose another week, start a task or add time.'],
-      'session-activities':['No associated activities', 'Add an activity or associate one with this session.'],
     }[container];
     const empty = element('div', undefined, 'empty');
     empty.append(icon('clock'), element('h3', title), element('p', hint)); root.append(empty); return;
@@ -469,26 +468,27 @@ function renderSession() {
   $('work-session-state').textContent=active ? 'Running' : 'Stopped';
   $('work-session-state').className = `badge rounded-pill ${active ? 'text-bg-success' : 'text-bg-secondary'}`;
   $('work-session-title').textContent = active?.title || 'Your work session';
-  $('work-session').style.setProperty('--session-color', snapshot.clients.find(client => client.id === report?.session.clientId)?.color || 'var(--accent)');
-  $('work-session-current').textContent=active ? `${active.title} · ${name(snapshot.clients,active.clientId)} · Started ${instantText(active.start,snapshot.profile.data.zoneId)}` : 'Start a work session to track your day independently of tasks.';
-  $('session-start').disabled=!connected || !!active; $('session-stop').hidden=!active;
+  $('work-session').style.setProperty('--session-color', snapshot.clients.find(client => client.id === (active || report?.session)?.clientId)?.color || 'var(--accent)');
+  $('work-session-current').textContent=active ? `${name(snapshot.clients,active.clientId)} · Started ${instantText(active.start,snapshot.profile.data.zoneId)}` : 'Start a work session to track your day independently of tasks.';
+  $('work-session-timing').hidden=!active;
+  $('session-start').disabled=!connected || !!active; $('session-start').hidden=!!active; $('session-stop').hidden=!active;
   choice.replaceChildren();for(const value of [...snapshot.workSessions].sort((a,b) => b.start.localeCompare(a.start))) {const option=element('option',sessionLabel(value));option.value=value.id;choice.append(option);}
   if(!report) {const option=element('option','No sessions yet');option.value='';choice.append(option);}
   choice.value=report?.session.id || '';choice.disabled=!connected || !report;
   $('work-session-details').hidden=!report;
-  if(!report) return;
+  if(!report) {renderSessionTime();return;}
   $('selected-session-title').textContent=report.session.title;
   $('work-session-started').textContent=`${report.session.title} · ${name(snapshot.clients,report.session.clientId)}${report.session.summary ? ' · '+report.session.summary : ''} · ${instantText(report.session.start,snapshot.profile.data.zoneId)} → ${instantText(report.session.end,snapshot.profile.data.zoneId)}`;
-  table('session-activities',['Activity','Task / project','Time','Actions'],report.activities.map(value => row([
-    value.summary || 'Activity',value.taskId ? name(snapshot.tasks,value.taskId,'summary') : name(snapshot.projects,value.projectId),
-    `${instantText(value.start,snapshot.profile.data.zoneId)} → ${instantText(value.end,snapshot.profile.data.zoneId)}`,
-  ],[action('Edit',()=>openRecord('activities',value.id)),action('Remove from session',()=>openAssociation(value.id,''))])));
   $('session-warning').textContent=report.time.outsideSession.length ? 'Some activities extend outside this session. Only their overlap counts toward covered time.' : '';
   renderSessionTime();
 }
 function renderSessionTime() {
-  if(!snapshot?.workSessionReport) return;const report=snapshot.workSessionReport;
+  if(!snapshot) return;
   const elapsed=connected ? BigInt(Math.max(0,Math.floor(performance.now()-snapshotAt)))*1000000n : 0n;
+  const active=snapshot.activeWorkSession.data;
+  if(connected) activeAsOf=instantNanos(snapshot.report.generatedAt)+elapsed;
+  if(active) $('work-session-elapsed').textContent=displayNanos(sessionTimeNanos(active,[],activeAsOf).duration);
+  if(!snapshot.workSessionReport) return;const report=snapshot.workSessionReport;
   if(connected) sessionAsOf=instantNanos(report.generatedAt)+elapsed;
   const time=sessionTimeNanos(report.session,report.activities,sessionAsOf);
   for(const [id,key] of [['ws-duration','duration'],['ws-tracked','tracked'],['ws-covered','allocated'],['ws-unallocated','unallocated']]) $(id).textContent=displayNanos(time[key]);

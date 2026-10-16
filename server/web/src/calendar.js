@@ -36,7 +36,7 @@ export class WeekCalendar {
   reset() {
     this.cancelDrag();this.scope=null;this.data=null;this.calendar=null;this.calendarKey=null;this.scrollWeek=null;this.selectedId=null;
     this.selection=null;this.clipboard=null;this.lastClientId=null;this.busy=false;this.grid.replaceChildren();
-    this.root.querySelector('#calendar-unrecorded').replaceChildren();this.message.textContent='';this.setConnected(false);
+    this.message.textContent='';this.setConnected(false);
   }
   update(data,connected,scope) {
     if(this.scope!==scope) {this.reset();this.scope=scope;}
@@ -66,7 +66,7 @@ export class WeekCalendar {
     this.controls.new.disabled=!this.selection || !available;
     this.controls.range.disabled=!available;
     for(const value of this.root.querySelectorAll('.calendar-resize,.calendar-session-select')) value.disabled=!available;
-    for(const value of this.root.querySelectorAll('.calendar-task button,.calendar-unrecorded button')) value.disabled=!available;
+    for(const value of this.root.querySelectorAll('.calendar-task button')) value.disabled=!available;
     for(const value of this.root.querySelectorAll('.calendar-session')) value.setAttribute('aria-disabled',String(!available));
   }
   text(value) {this.message.textContent=value;this.message.title=value;}
@@ -138,7 +138,7 @@ export class WeekCalendar {
       const day=calendar.days.find(day=>day.date===today && !day.skipped) || calendar.days.find(day=>!day.skipped);
       this.selection=day ? {date:day.date,row:this.defaultRow(day)} : null;
     }
-    this.renderUnrecorded();this.paintSelection();this.buttons();
+    this.paintSelection();this.buttons();
     if(this.scrollWeek!==key) {
       this.scrollWeek=key;this.scroll.scrollTop=Math.max(0,calendar.rows.indexOf('07:00/0')*ROW_HEIGHT);
     }
@@ -199,17 +199,6 @@ export class WeekCalendar {
       item.append(edit,node('small',`${this.clock(activity.start)} – ${activity.end ? this.clock(activity.end) : 'Running'}`));list.append(item);
     }
     card.append(list);return card;
-  }
-  renderUnrecorded() {
-    const root=this.root.querySelector('#calendar-unrecorded');root.replaceChildren();
-    const recorded=new Set(this.data.activities.map(value=>value.taskId));
-    const tasks=this.data.tasks.filter(value=>!recorded.has(value.id));
-    if(!tasks.length) return;
-    const details=node('details'),summary=node('summary',`Tasks without recorded time this week (${tasks.length})`),list=node('ul');
-    for(const task of tasks) {
-      const item=node('li');item.append(this.callbacks.taskLabel(task));
-      const start=button('',()=>this.callbacks.onStartTask(task.id));iconButton(start,'start',`Start ${task.summary}`);start.disabled=!this.connected;item.append(start);list.append(item);
-    }details.append(summary,list);root.append(details);
   }
   select(date,row) {this.selection={date,row};this.paintSelection();this.buttons();}
   selectSession(session,date,row) {this.selectedId=session.id;this.select(date,row);this.text('Arrow keys move 15 minutes or one day. Drag an edge to resize. Copy and paste create a separate session.');}

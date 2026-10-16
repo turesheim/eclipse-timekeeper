@@ -57,7 +57,9 @@ async function position(page,element,edge=null) {
   // Manual mouse/touch coordinates need the same settled layout that locator
   // actions wait for, including fonts and the positioned scroll containers.
   await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
-  const rect=await element.boundingBox();expect(rect).toBeTruthy();return rect;
+  // A live activity poll can replace the handle between layout settling and
+  // this read. Resolve its locator again until a visible box is available.
+  let rect;await expect.poll(async()=>{rect=await element.boundingBox();return rect;}).not.toBeNull();return rect;
 }
 async function dragSession(page,id,targetDate,deltaY=0) {
   const source=bar(page,id),rect=await position(page,source),target=await page.locator(`.calendar-day[data-date="${targetDate}"]`).boundingBox();
@@ -88,7 +90,9 @@ async function rangePoints(page,from,to) {
   return page.locator('#calendar-grid').evaluate((grid,{from,to,first,last})=>{
     const source=grid.querySelector(`.calendar-day[data-date="${from}"]`).getBoundingClientRect();
     const target=grid.querySelector(`.calendar-day[data-date="${to}"]`).getBoundingClientRect();
-    return {start:{x:source.x+source.width*.6,y:source.y+first*16+1},end:{x:target.x+target.width*.6,y:target.y+last*16+1}};
+    // The anchor uses the slot interior; the endpoint snaps to its nearest
+    // boundary. Keep touch rounding away from the preceding anchor slot.
+    return {start:{x:source.x+source.width*.6,y:source.y+first*16+8},end:{x:target.x+target.width*.6,y:target.y+last*16+1}};
   },{from:from.date,to:to.date,first:row(from.clock),last:row(to.clock)});
 }
 async function dragRange(page,from,to) {
@@ -187,12 +191,14 @@ test('calendar shows seven days, task links and activity lists beside multi-day 
     await expect(page.locator('#calendar-dst')).toBeVisible();
     expect(await page.locator('.calendar-day[data-date="2025-10-26"] .unavailable').count()).toBe(0);
     expect(await page.locator('.calendar-day[data-date="2025-10-20"] .unavailable').count()).toBe(4);
-    await page.locator('#calendar-unrecorded summary').click();await expect(page.locator('#calendar-unrecorded').getByText(f.empty.summary,{exact:true})).toBeVisible();
+    await expect(page.locator('#calendar-panel')).not.toContainText(f.empty.summary);
     await page.screenshot({path:'test-results/calendar-desktop.png',fullPage:true});
     await page.setViewportSize({width:390,height:844});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
     expect(await page.locator('.calendar-scroll').evaluate(value=>value.scrollWidth>value.clientWidth)).toBeTruthy();
     await page.screenshot({path:'test-results/calendar-mobile.png',fullPage:true});
+    await page.locator('[data-tab=tasks]').click();await expect(page.locator('#tasks')).toContainText(f.empty.summary);
+    await page.locator('[data-tab=calendar]').click();
     await page.locator('#calendar-next').click();await expect(page.locator('#calendar-zone')).toContainText('2025-10-27');
     await expect(page.locator(`.calendar-session[data-session-id="${long.id}"]`)).toHaveCount(1);
     expect(await read(request,'work-sessions',long.id)).toEqual(long);

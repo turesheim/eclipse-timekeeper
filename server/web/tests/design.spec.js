@@ -63,6 +63,8 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
       await page.screenshot({path:`test-results/design-sign-in-${name}.png`,fullPage:true});
       await signIn(page); await page.locator('#week-date').fill('2025-10-20');await page.locator('#week-date').blur();
       await expect(page.locator('#zone-caption')).toContainText('2025-10-20');
+      await expect(page.locator('#work-session-history')).not.toHaveAttribute('open','');
+      await page.locator('#work-session-history > summary').click();
       await page.locator('#work-session-choice').selectOption(f.session.id);
       await expect(page.locator('#selected-session-title')).toHaveText('Website planning');
       await expect(page.locator('#ws-duration')).toHaveText('8h 0m');
@@ -70,9 +72,13 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
       await page.mouse.move(0,0);
       await page.screenshot({path:`test-results/design-work-session-${name}.png`,fullPage:true});
       await page.locator('#work-session').screenshot({path:`test-results/design-session-card-${name}.png`});
+      await page.locator('#work-session-history > summary').click();
       for(const tab of ['week','calendar','tasks','clients','projects','labels']) {
         await page.locator(`[data-tab=${tab}]`).click();
         await expect(page.locator(`[data-tab=${tab}]`)).toHaveAttribute('aria-current','page');
+        await expect(page.locator('#work-session')).toBeVisible();
+        await expect(page.locator('#work-session-choice')).not.toBeVisible();
+        await expect(page.locator('#work-session')).not.toContainText('No associated activities');
         expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
         await accessible(page);
         await iconTargets(page);
