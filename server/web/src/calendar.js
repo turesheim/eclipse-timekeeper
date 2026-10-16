@@ -129,7 +129,7 @@ export class WeekCalendar {
     if(focus) {
       const target=[...this.grid.querySelectorAll('[data-session-id],[data-activity-id],.calendar-day')].find(value=>
         focus.session ? value.dataset.sessionId===focus.session && value.dataset.edge===focus.edge && value.dataset.date===focus.day && value.classList.contains('calendar-session-select')===focus.select : focus.activity ? value.dataset.activityId===focus.activity : focus.day && value.classList.contains('calendar-day') && value.dataset.date===focus.day);
-      const fallback=focus.session ? [...this.grid.querySelectorAll('[data-session-id]')].find(value=>value.dataset.sessionId===focus.session && value.dataset.edge===focus.edge) : null;
+      const fallback=focus.session ? [...this.grid.querySelectorAll('[data-session-id]')].find(value=>value.dataset.sessionId===focus.session && value.dataset.edge===focus.edge && value.classList.contains('calendar-session-select')===focus.select) : null;
       (target || fallback)?.focus({preventScroll:true});
     }
   }

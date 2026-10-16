@@ -36,10 +36,6 @@ clients, projects, tasks and labels. Record tables become labelled cards on narr
 screens so actions stay in view; Workweek and Calendar retain their specialized
 scrollable layouts. Calendar geometry is isolated in `calendar.css`.
 
-![Desktop work-session baseline](../images/web-design/work-session-desktop.png)
-
-![Narrow-screen work-session baseline](../images/web-design/work-session-narrow.png)
-
 These screenshots use synthetic records from `tests/design.spec.js` at 1440 and
 390 pixels wide. The design tests also capture all workspace views and account,
 sign-in and validation states under `server/web/test-results/design-*.png`.
