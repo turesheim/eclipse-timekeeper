@@ -55,9 +55,15 @@ def package(output, tag, commit):
               'docs/operations/TAILSCALE.md': 'TAILSCALE.md',
               'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
               'docs/development/WEB-CLIENT.md': 'WEB-CLIENT.md'}
-    destinations = {**guides, 'common/api/openapi.json': 'openapi.json'}
+    illustrations = {
+        'docs/assets/screenshots/bootstrap-work-session-desktop.png': 'images/work-session-desktop.png',
+        'docs/assets/screenshots/bootstrap-work-session-narrow.png': 'images/work-session-narrow.png',
+    }
+    destinations = {**guides, **illustrations, 'common/api/openapi.json': 'openapi.json'}
     files += [(ROOT / source, 'timekeeper-server/' + destination)
               for source, destination in guides.items()]
+    files += [(ROOT / source, 'timekeeper-server/' + destination)
+              for source, destination in illustrations.items()]
     files += [(ROOT / 'common/api/openapi.json', 'timekeeper-server/openapi.json'),
               (ROOT / 'server/scripts/create_token.py', 'timekeeper-server/create_token.py'),
               (ROOT / 'server/scripts/configure_accounts.py', 'timekeeper-server/configure_accounts.py'),

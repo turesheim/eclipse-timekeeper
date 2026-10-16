@@ -42,6 +42,10 @@ sign-in and validation states under `server/web/test-results/design-*.png`.
 Review those images after layout changes; automated accessibility checks cannot
 replace visual review or keyboard testing.
 
+![Desktop work-session baseline](../assets/screenshots/bootstrap-work-session-desktop.png)
+
+![Narrow-screen work-session baseline](../assets/screenshots/bootstrap-work-session-narrow.png)
+
 Bootstrap's exact npm version and integrity are pinned in `package-lock.json`.
 Its compiled CSS and MIT license are committed under `src/assets/bootstrap`,
 alongside the SVGs extracted from its data URLs. No Bootstrap JavaScript is needed:

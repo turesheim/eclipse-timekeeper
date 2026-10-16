@@ -12,6 +12,13 @@ async function accessible(page) {
   const result = await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
   expect(result.violations.map(({id,nodes}) => ({id, targets:nodes.map(node=>node.target)}))).toEqual([]);
 }
+async function iconTargets(page) {
+  for(const button of await page.locator('.icon-button:visible,.tree-toggle:visible').all()) {
+    expect(await button.getAttribute('aria-label')).toBeTruthy();
+    expect(await button.getAttribute('title')).toBeTruthy();
+    const box=await button.boundingBox();expect(box.width).toBeGreaterThanOrEqual(44);expect(box.height).toBeGreaterThanOrEqual(44);
+  }
+}
 async function fixture(request) {
   const records = [], profile = await api(request,'GET','/me'), previous = await profile.json();
   await api(request,'PUT','/me',{zoneId:'Europe/Oslo'},{'If-Match':profile.headers().etag});
@@ -68,6 +75,7 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
         await expect(page.locator(`[data-tab=${tab}]`)).toHaveAttribute('aria-current','page');
         expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
         await accessible(page);
+        await iconTargets(page);
         if(tab!=='week' && tab!=='calendar') {
           for(const action of await page.locator(`#${tab} td.actions button`).all()) {
             const rect=await action.boundingBox();expect(rect.x+rect.width).toBeLessThanOrEqual(width);
@@ -82,11 +90,6 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
       await expect(page.locator('#account-dialog')).not.toBeVisible();
       violations.push(...await page.evaluate(()=>window.designPolicyViolations));
       expect(external).toEqual([]); expect(violations).toEqual([]);
-      for(const button of await page.locator('.icon-button:visible,.tree-toggle:visible').all()) {
-        expect(await button.getAttribute('aria-label')).toBeTruthy();
-        expect(await button.getAttribute('title')).toBeTruthy();
-        const box = await button.boundingBox(); expect(box.width).toBeGreaterThanOrEqual(44); expect(box.height).toBeGreaterThanOrEqual(44);
-      }
     } finally {await f.close();}
   });
 }

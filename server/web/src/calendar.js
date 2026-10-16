@@ -226,9 +226,21 @@ export class WeekCalendar {
   async commit(session,proposal) {
     if(this.busy || !this.connected) {this.text('This change was not saved. Wait for the connection to recover before trying again.');return;}
     if(instantNanos(session.start)===instantNanos(proposal.start) && (session.end===null && proposal.end===null || session.end && proposal.end && instantNanos(session.end)===instantNanos(proposal.end))) return;
+    const active=document.activeElement;
+    const restore=active?.dataset.sessionId===session.id ? {edge:active.dataset.edge,select:active.classList.contains('calendar-session-select')} : null;
     const scope=this.scope;this.busy=true;this.buttons();
     try {await this.callbacks.onChange(structuredClone(session),proposal,scope);}
-    finally {if(scope===this.scope) {this.busy=false;if(!this.root.hidden) this.render();}}
+    finally {if(scope===this.scope) {
+      this.busy=false;if(!this.root.hidden) {
+        this.render();
+        // Disabling a native button during the write blurs it. Restore its
+        // replacement after a successful save, without escaping a review dialog.
+        if(restore && !document.querySelector('#editor').open && (document.activeElement===document.body || this.root.contains(document.activeElement))) {
+          const target=[...this.grid.querySelectorAll('[data-session-id]')].find(value=>value.dataset.sessionId===session.id && value.dataset.edge===restore.edge && value.classList.contains('calendar-session-select')===restore.select);
+          target?.focus({preventScroll:true});target?.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});
+        }
+      }
+    }}
   }
   key(event) {
     if(!this.data || event.target.closest('input,select,textarea,a') || document.querySelector('#editor').open) return;
