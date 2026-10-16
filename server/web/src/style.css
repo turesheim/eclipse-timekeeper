@@ -160,12 +160,29 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .server-info summary { cursor: pointer; min-height: 2.75rem; padding-block: .6rem; }
 .server-info dl { display: grid; grid-template-columns: auto 1fr; gap: .3rem 1rem; margin-block: .5rem; }
 .server-info dd { margin: 0; font-variant-numeric: tabular-nums; }
-#account-dialog { width: min(44rem, calc(100vw - 2rem)); }
-#account-content section { border-bottom: 1px solid var(--line); padding-block: 1.25rem; }
-#account-content form { display: grid; gap: .5rem; }
-#account-content form .btn { justify-self: start; margin-top: .5rem; }
-#account-content details { margin-block: .75rem; border: 1px solid var(--line); border-radius: var(--bs-border-radius); padding: .75rem; }
-#account-content summary { cursor: pointer; min-height: 2.75rem; overflow-wrap: anywhere; }
+#account-page { max-width: 1200px; margin-inline: auto; }
+.account-page-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+.account-layout { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: 1.5rem; }
+#account-navigation { flex-direction: column; align-self: start; gap: .25rem; }
+#account-navigation .nav-link { min-height: 2.75rem; color: var(--accent); font-weight: 600; }
+#account-navigation .nav-link.active { color: white; background: var(--accent); }
+.account-card { padding: 1.5rem; margin-bottom: 1rem; }
+.account-card > .btn { align-self: start; margin-block: .5rem 1rem; }
+.account-card form { max-width: 40rem; }
+.account-field { margin-bottom: .75rem; }
+.account-field.check { justify-content: flex-start; }
+.account-field.check label { margin: 0; }
+.password-reveal { margin-top: .4rem; font-size: .8rem; }
+.form-feedback { overflow-wrap: anywhere; }
+.form-feedback:empty, .new-token:empty { display: none; }
+.new-token { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.new-token .btn, .token-actions .btn { margin: .25rem .25rem .25rem 0; }
+.token-actions { max-width: 22rem; }
+@media(max-width: 760px) {
+  .account-layout { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+  #account-navigation { flex-direction: row; flex-wrap: wrap; }
+  .account-card { padding: 1rem; }
+}
 #account-content input[readonly] { font-family: var(--bs-font-monospace); }
 #account-close { margin-top: 1.25rem; }
 @media(max-width: 767px) {

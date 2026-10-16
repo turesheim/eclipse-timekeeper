@@ -1,9 +1,9 @@
 import {Api, ApiError} from './api.js';
 import {savedToken, forgetToken, isSecureOrigin} from './credentials.js';
-import {openAccount, closeAccount} from './account.js';
+import {connectAccount, closeAccount} from './account-page.js';
 
 const $ = id => document.getElementById(id);
-export function authentication({connect, clear, updateAccount}) {
+export function authentication({connect, clear, updateAccount, refreshProfile}) {
   let active = null, generation = 0;
   const errorText = error => error instanceof ApiError ? error.message : 'Unable to sign in. Use HTTPS and check your account details.';
   function mode() {
@@ -29,6 +29,7 @@ export function authentication({connect, clear, updateAccount}) {
     const session = new Api(null, undefined, data); active = session; forgetToken();
     $('login-form').reset(); mode(); $('login-error').textContent = '';
     await connect(session, data);
+    if (current === generation && active === session) await connectAccount(session, data, reset, updateAccount, refreshProfile);
   }
   function reset(message = '', retry = null) {
     ++generation; active?.close(); active = null; closeAccount(); clear();
@@ -91,7 +92,6 @@ export function authentication({connect, clear, updateAccount}) {
       if(error.status === 401) reset(); else $('status').textContent = 'Sign-out could not be confirmed. Please retry while connected.';
     }).finally(() => {$('sign-out').disabled = false;});
   });
-  $('account').addEventListener('click', () => {if(active) void openAccount(active,reset,updateAccount);});
   return {clear:reset, async initialize() {
     const current = ++generation;
     const submit=$('login-form').querySelector('button');submit.disabled=true;

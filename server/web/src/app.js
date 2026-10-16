@@ -86,6 +86,7 @@ const auth = authentication({
     await refresh(); startWatch(session);
   },
   updateAccount(account) {accountName = account.displayName;},
+  refreshProfile: () => refresh(),
   clear() {
     refreshing = null; reloadAgain = false;
     ++serverInfoRequest; clearServerInfo(); api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null; accountName = '';
