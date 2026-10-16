@@ -76,7 +76,8 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 #active-details { color: var(--muted); font-size: .9rem; }
 #stop { display: inline-flex; align-items: center; gap: .6rem; white-space: nowrap; }
 .workspace-nav { --bs-nav-pills-link-active-bg: #176653; --bs-nav-link-color: #3f554c; --bs-nav-link-hover-color: #104e3f; gap: .25rem; padding-block: 1rem; flex-wrap: wrap; }
-.workspace-nav .nav-link { min-height: 2.75rem; font-weight: 600; }
+/* Switching text and background colors together must not pass through low contrast. */
+.workspace-nav .nav-link { min-height: 2.75rem; font-weight: 600; transition: none; }
 .workspace-nav .nav-link:not(.active):hover { background: #e4ede7; }
 .workspace-nav .nav-link[aria-current] { background: var(--accent); color: #fff; }
 .toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-block: .5rem 1rem; }
