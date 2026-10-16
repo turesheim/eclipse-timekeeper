@@ -53,6 +53,9 @@ async function position(page,element,edge=null) {
     // fixture's page positioning to have finished before the pointer is placed.
     window.scrollTo({top:scroll.getBoundingClientRect().top+window.scrollY-80,behavior:'instant'});
   },{id:await element.getAttribute('data-session-id'),edge});
+  // Manual mouse/touch coordinates need the same settled layout that locator
+  // actions wait for, including fonts and the positioned scroll containers.
+  await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
   const rect=await element.boundingBox();expect(rect).toBeTruthy();return rect;
 }
 async function dragSession(page,id,targetDate,deltaY=0) {
