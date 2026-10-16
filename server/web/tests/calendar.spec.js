@@ -81,9 +81,15 @@ async function rangePoints(page,from,to) {
     window.scrollTo({top:scroll.getBoundingClientRect().top+window.scrollY-80,behavior:'instant'});
   },row(from.clock));
   await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
-  const source=await page.locator(`.calendar-day[data-date="${from.date}"]`).boundingBox();
-  const target=await page.locator(`.calendar-day[data-date="${to.date}"]`).boundingBox();
-  return {start:{x:source.x+source.width*.6,y:source.y+row(from.clock)*16+1},end:{x:target.x+target.width*.6,y:target.y+row(to.clock)*16+1}};
+  await expect(page.locator(`.calendar-day[data-date="${from.date}"]`)).toBeVisible();
+  await expect(page.locator(`.calendar-day[data-date="${to.date}"]`)).toBeVisible();
+  // A live snapshot can replace all day nodes. Read both rectangles atomically
+  // instead of retaining a node handle across separate protocol calls.
+  return page.locator('#calendar-grid').evaluate((grid,{from,to,first,last})=>{
+    const source=grid.querySelector(`.calendar-day[data-date="${from}"]`).getBoundingClientRect();
+    const target=grid.querySelector(`.calendar-day[data-date="${to}"]`).getBoundingClientRect();
+    return {start:{x:source.x+source.width*.6,y:source.y+first*16+1},end:{x:target.x+target.width*.6,y:target.y+last*16+1}};
+  },{from:from.date,to:to.date,first:row(from.clock),last:row(to.clock)});
 }
 async function dragRange(page,from,to) {
   const points=await rangePoints(page,from,to);
