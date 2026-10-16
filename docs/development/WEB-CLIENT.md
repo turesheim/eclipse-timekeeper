@@ -231,8 +231,8 @@ still running. Starts in the future remain invalid.
 
 Task cards use the task's title and issue link and list its activities. Separate
 gaps remain visible. Taskless activity cards and overlapping intervals are also
-shown. Tasks without recorded time this week appear in the expandable list below
-the calendar. Activity times and associations remain unchanged when a work
+shown. Tasks without recorded time remain available in the Tasks tab.
+Activity times and associations remain unchanged when a work
 session is moved, resized or copied. Out-of-bounds activity warnings remain in
 the session details.
 

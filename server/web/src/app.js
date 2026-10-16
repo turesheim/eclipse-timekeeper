@@ -21,7 +21,6 @@ const calendar = new WeekCalendar($('calendar-panel'), {
   onDate: date => {if(!date) return;$('week-date').value=date;selectedDay=null;void refresh().catch(()=>{});},
   onEditActivity: id => void openRecord('activities',id).catch(error=>setStatus(errorText(error))),
   onEditSession: id => void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error))),
-  onStartTask: id => void openStart(id).catch(error=>setStatus(errorText(error))),
   onNew: input => void openRecord('work-sessions',null,null,input).catch(error=>setStatus(errorText(error))),
   onPaste: input => void openRecord('work-sessions',null,null,input,'Paste work session').catch(error=>setStatus(errorText(error))),
   onChange: changeCalendarSession,
