@@ -116,26 +116,47 @@ Use HTTPS outside loopback. For Tailscale Serve or another TLS reverse proxy, se
 The server does not implicitly trust forwarded headers. Direct loopback HTTP is
 supported for development by browsers that accept Secure cookies on loopback.
 
-**Account** lets users rename their login/display name, change their password,
-and create/revoke their own named API tokens. Password changes revoke all that
+**My Account** opens a dedicated page with **Profile**, **Password** and
+**API tokens** sections. Profile includes the username, optional display name
+(blank uses the username), and time zone with a local-time preview and a
+**Use this device's time zone** action. Each form saves independently. Password
+changes require the current password and confirmation of the new password;
+show/hide controls keep the current/new password autocomplete roles distinct.
+Password changes revoke all that
 account's existing sessions and tokens and require signing in again. **Sign out**
 revokes the current browser session, closes requests and clears rendered records,
 editors and the calendar clipboard. Other browser sessions and Eclipse tokens
 remain valid. Expired/revoked sessions and owner changes clear the local account
 view before another account can sign in.
 
-Administrators can create, enable, disable and rename accounts and change the
+The separate **Users** page is available only to administrators with write
+access. It lists independent accounts with their username, role and access
+state. **Add user** and each row's **Edit** action open a full details page;
+**Back to users** returns to the list. Administrators can create, enable,
+disable and rename accounts and change the
 administrator role. New users receive private default labels. Disabling a user or
 changing their role revokes their sessions/tokens; enabling does not resurrect
 old credentials. The last enabled administrator cannot be disabled or demoted.
 Account deletion is not exposed: disabling retains the user's data.
 
+Both settings pages support bookmarks and browser Back under `/web/`:
+`#account/profile`, `#account/password`, `#account/tokens` and `#users`.
+Navigation keeps activity/work-session timers running. Unsaved forms prompt
+before leaving, stale conditional saves retain the draft, and uncertain writes
+require reviewing current records before another submission. Sign-out or an
+account change clears the page, drafts, displayed token secrets and pending
+results. No shared workspace, membership or invitation model is introduced.
+
 ## Eclipse and personal API tokens
 
-Create a separate named token for each installation under **Account**. Choose
+Create a separate named token for each installation under **My Account → API tokens**. Choose
 read-only or read/write access and an optional expiry (entered in local time).
 Copy the token when it is shown; only its hash is stored and it cannot be read
-back. Lists expose the token's name, scope, expiry, revocation and last-use time.
+back. The **Copy token** button copies only the newly issued secret; **Done** or
+navigating away clears it. Lists expose the token's name, scope, expiry,
+revocation and last-use time, displayed in the account's configured time zone.
+Revocation asks for confirmation using the token's name and explains which
+connections lose access.
 Paste it into Eclipse's Timekeeper backend preferences, where Eclipse secure
 storage retains it. No CLIENT or WORK_SESSION UI is required in Eclipse.
 

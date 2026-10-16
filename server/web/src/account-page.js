@@ -10,7 +10,7 @@ function canLeave() {
   return !view?.dirty.size || window.confirm('Discard unsaved account changes?');
 }
 export function closeAccount() {
-  ++generation; context = null; view = null;
+  ++generation; context = null; view = null; acceptedHash = '';
   $('account-page').hidden = true; $('account-content').replaceChildren(); $('account-navigation').replaceChildren();
   $('account-error').replaceChildren(); $('account-heading').textContent = ''; $('account-identity').textContent = ''; $('users-link').hidden = true;
 }
@@ -53,7 +53,7 @@ async function show(hash, ask = true) {
         feedback.textContent = write && error.uncertain ? 'The outcome is unknown. Review current records before making another change.' : [412,409].includes(error.status) ? 'These records changed or conflict with this change. Your draft is kept. Review current values before saving again.' : error.message;
         if ((write && error.uncertain) || [412,409].includes(error.status)) {
           if (error.uncertain) this.uncertain = true;
-          feedback.append(' ', button('Reload current values', () => void show(acceptedHash)));
+          feedback.append(' ', button('Reload current values', () => {if (acceptedHash === '#users/new') this.navigate('#users'); else void show(acceptedHash);}));
         }
       } finally {
         if (valid()) {this.busy = false; this.root.setAttribute('aria-busy', 'false'); if (submit) submit.disabled = !this.canWrite || this.uncertain;}

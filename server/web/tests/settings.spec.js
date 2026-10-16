@@ -131,9 +131,28 @@ test('standard users cannot open Users directly and a late account response cann
   const user = await fresh(request); await login(page, user, '#users'); await ready(page);
   await expect(page.locator('#users-link')).not.toBeVisible(); await expect(page.locator('#account-content')).toContainText('Administrator access is required');
   expect((await page.request.get('/api/v1/auth/users')).status()).toBe(403);
-  let release, arrived; const gate = new Promise(resolve => {release = resolve;}), waiting = new Promise(resolve => {arrived = resolve;});
-  await page.route('**/api/v1/auth/account', async route => {const response = await route.fetch(); arrived(); await gate; await route.fulfill({response});});
-  await page.getByRole('link', {name: 'My Account', exact: true}).click(); await waiting;
+  await page.evaluate(() => {
+    const fetch = window.fetch;
+    window.fetch = async (...args) => {
+      const response = await fetch(...args);
+      if (args[0] === '/api/v1/auth/account') {window.accountReplyCaptured = true; await new Promise(resolve => {window.releaseAccountReply = resolve;});}
+      return response;
+    };
+  });
+  await page.getByRole('link', {name: 'My Account', exact: true}).click(); await expect.poll(() => page.evaluate(() => window.accountReplyCaptured)).toBe(true);
   await page.getByRole('button', {name: 'Sign out', exact: true}).click(); await expect(page.locator('#login')).toBeVisible();
-  release(); await page.unroute('**/api/v1/auth/account'); await expect(page.locator('#account-content')).toBeEmpty(); await expect(page.locator('#account-page')).not.toBeVisible();
+  await page.evaluate(() => window.releaseAccountReply()); await expect(page.locator('#account-content')).toBeEmpty(); await expect(page.locator('#account-page')).not.toBeVisible();
+});
+test('a lost token-creation reply requires review and never repeats the write', async ({page, request}) => {
+  const user = await fresh(request); await login(page, user, '#account/tokens'); await ready(page);
+  let writes = 0;
+  page.on('request', request => {if (request.method() === 'POST' && request.url().endsWith('/auth/tokens')) writes++;});
+  await page.route('**/api/v1/auth/tokens', async route => {
+    if (route.request().method() !== 'POST') {await route.continue(); return;}
+    const response = await route.fetch(); expect(response.status()).toBe(201); await route.abort('failed');
+  });
+  await page.getByLabel('Token name', {exact: true}).fill('Lost token reply'); await page.getByRole('button', {name: 'Create token', exact: true}).click();
+  await expect(page.locator('#account-content')).toContainText('outcome is unknown'); await expect(page.getByRole('button', {name: 'Create token', exact: true})).toBeDisabled(); expect(writes).toBe(1);
+  page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', {name: 'Reload current values', exact: true}).click(); await ready(page);
+  await expect(page.locator('#account-content tr').filter({hasText: 'Lost token reply'})).toHaveCount(1); await expect(page.getByLabel('New API token', {exact: true})).toHaveCount(0); expect(writes).toBe(1);
 });
