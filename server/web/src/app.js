@@ -88,12 +88,12 @@ const auth = authentication({
   },
   updateAccount(account) {accountName = account.displayName;},
   clear() {
+    $('week-sessions').replaceChildren(); $('week-sessions-section').hidden = true;
     refreshing = null; reloadAgain = false;
     ++serverInfoRequest; clearServerInfo(); api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null; accountName = '';
     calendar.reset(); collapsed.clear(); selectedWorkSession = null;
     $('editor').close(); $('fields').replaceChildren(); $('editor-error').textContent = ''; $('editor-notice').textContent = '';
-    $('week-sessions-section').hidden = true;
-    for(const id of ['clients','projects','tasks','labels','activities','days','week-sessions','session-activities','work-session-choice']) $(id).replaceChildren();
+    for(const id of ['clients','projects','tasks','labels','activities','days','session-activities','work-session-choice']) $(id).replaceChildren();
     for(const id of ['owner','status','active-title','active-details','work-session-current','work-session-state','work-session-started','session-warning','zone-caption','week-total','ws-duration','ws-tracked','ws-covered','ws-unallocated']) $(id).textContent = '';
     $('login').hidden = false; $('workspace').hidden = true; $('session').hidden = true; $('remember-notice').textContent = '';
     tab('week');
