@@ -88,7 +88,12 @@ explicit retry of the same frozen payload/key. Acknowledged saves remain
 successful when a subsequent refresh fails.
 
 Reports use the account's IANA time zone and the server's exact daily/weekly
-totals. The default Workweek groups projects, tasks, subtasks and activities,
+totals. At sign-in, an untouched UTC profile (version zero) adopts the browser's
+local IANA time zone. This is saved to the account so work sessions, activities,
+calendar boundaries and other clients use the same zone. An explicitly selected
+zone, including UTC, is retained when signing in from another device. Read-only
+tokens retain the existing account zone. Use **Time zone** to change it explicitly.
+The default Workweek groups projects, tasks, subtasks and activities,
 with seven daily duration columns, a weekly total column and expandable rows
 like the Eclipse view. Task totals include their subtasks. **Hide activities**
 keeps the project/task outline visible; **Show activities** restores its rows.

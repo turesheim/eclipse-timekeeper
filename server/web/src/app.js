@@ -80,7 +80,7 @@ for (const node of document.querySelectorAll('[data-tab]')) node.addEventListene
 const auth = authentication({
   async connect(session, account) {
     api = session; accountName = account.displayName;
-    const {data:profile} = await session.request('/me');
+    const {data:profile} = await session.initializeTimeZone();
     if(session !== api) return;
     $('week-date').value = dateInZone(Date.now(), profile.zoneId);
     $('login').hidden = true; $('workspace').hidden = false; $('session').hidden = false;

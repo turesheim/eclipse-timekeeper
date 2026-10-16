@@ -75,6 +75,20 @@ export class Api {
     } while (cursor !== null);
     return {items, revision};
   }
+  async initializeTimeZone(zone = Intl.DateTimeFormat().resolvedOptions().timeZone) {
+    const profile = await this.request('/me');
+    // Version zero is the untouched server default. An explicitly selected UTC
+    // zone has a newer version and must be kept, just like any other choice.
+    if (profile.data.version !== 0 || profile.data.zoneId !== 'UTC' || !zone || zone === 'UTC' || !profile.etag) return profile;
+    try { new Intl.DateTimeFormat(undefined, {timeZone: zone}); } catch { return profile; }
+    try { return await this.request('/me', {method: 'PUT', body: {zoneId: zone}, etag: profile.etag}); }
+    catch (error) {
+      // A peer's selection wins. Read-only clients can still sign in, and a
+      // lost response is resolved by reading, never by repeating the write.
+      if (error.status !== 403 && error.status !== 412 && error.code !== 'VALIDATION' && !error.uncertain) throw error;
+      return this.request('/me');
+    }
+  }
   async snapshot(range, selectedSession = null) {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
