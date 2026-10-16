@@ -54,7 +54,8 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
         await page.locator('#auth-mode').selectOption(mode); await accessible(page);
       }
       await page.screenshot({path:`test-results/design-sign-in-${name}.png`,fullPage:true});
-      await signIn(page); await page.locator('#week-date').fill('2025-10-20');
+      await signIn(page); await page.locator('#week-date').fill('2025-10-20');await page.locator('#week-date').blur();
+      await expect(page.locator('#zone-caption')).toContainText('2025-10-20');
       await page.locator('#work-session-choice').selectOption(f.session.id);
       await expect(page.locator('#work-session-title')).toHaveText('Website planning');
       await expect(page.locator('#ws-duration')).toHaveText('8h 0m');
@@ -95,6 +96,7 @@ test('narrow-screen editors support keyboard focus, validation and visible error
   await page.locator('#save').click();await expect(page.locator('#editor-error')).toContainText('conflicts');
   await expect(name).not.toHaveValue('');await accessible(page);
   await page.screenshot({path:'test-results/design-validation-narrow.png',fullPage:true});
-  await page.locator('#cancel').focus();expect(await page.locator('#cancel').evaluate(button=>getComputedStyle(button).outlineStyle)).toBe('solid');
+  await page.locator('#save').focus();await page.keyboard.press('Shift+Tab');await expect(page.locator('#cancel')).toBeFocused();
+  expect(await page.locator('#cancel').evaluate(button=>getComputedStyle(button).outlineStyle)).toBe('solid');
   await page.keyboard.press('Enter');await expect(page.locator('#editor')).not.toBeVisible();await expect(create).toBeFocused();
 });

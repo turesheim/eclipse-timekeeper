@@ -10,7 +10,7 @@ export function closeAccount() {++generation;$('account-dialog').close();$('acco
 $('account-close').addEventListener('click',closeAccount);
 $('account-dialog').addEventListener('cancel',event=>{event.preventDefault();closeAccount();});
 export async function openAccount(session,signOut,updateAccount) {
-  const current=++generation, root=$('account-content');root.replaceChildren(node('p','Loading account…'));root.setAttribute('aria-busy','true');$('account-error').textContent='';$('account-dialog').showModal();
+  const current=++generation, root=$('account-content'), loading=node('p','Loading account…');root.replaceChildren(loading);root.setAttribute('aria-busy','true');$('account-error').textContent='';$('account-dialog').showModal();
   const valid=()=>current===generation;
   const run=async work=>{if(!valid()) return;$('account-error').textContent='';try {await work();}catch(error){if(valid()) {if(error.status===401) signOut(error.message);else $('account-error').textContent=error.message;}}};
   function field(form,label,value='',type='text') {
@@ -78,5 +78,5 @@ export async function openAccount(session,signOut,updateAccount) {
       const username=field(create.value,'New user username'),display=field(create.value,'New user display name'),password=field(create.value,'Temporary password','','password'),admin=field(create.value,'New user is administrator',false,'checkbox');create.finish();
     }
   });
-  if(valid()) root.setAttribute('aria-busy','false');
+  if(valid()) {loading.remove();root.setAttribute('aria-busy','false');}
 }

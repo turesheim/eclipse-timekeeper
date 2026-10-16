@@ -19,7 +19,7 @@
 body { background: #f3f6f5; }
 [hidden] { display: none !important; }
 a, button, input, select, summary { touch-action: manipulation; }
-:where(a, button, input, select, summary, [tabindex]):focus-visible {
+:is(a, button, input, select, summary, [tabindex]):focus-visible {
   outline: 3px solid #176653; outline-offset: 3px;
 }
 h1 { font-size: clamp(1.8rem, 3vw, 2.35rem); letter-spacing: -.035em; }
