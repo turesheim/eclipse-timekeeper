@@ -66,9 +66,17 @@ npm run check:assets
 Commit the regenerated CSS, SVGs and license together. CI checks that the bundled
 assets match the pinned dependency, then runs real-server browser tests with axe
 WCAG A/AA checks for all views at desktop and narrow widths. Those tests verify
-that no design asset triggers a third-party request or CSP violation and exercise
+that no design asset triggers a third-party request or is blocked by CSP, and exercise
 keyboard focus, required fields and error recovery. Native browser validation and
 the API's existing concurrency and authorization rules remain in use.
+
+macOS WebKit reports inline-style CSP diagnostics for native select controls even
+on a plain page without application styles/scripts; Playwright screenshots also
+add inline-style diagnostics. The WebKit asset check excludes those inline reports
+while continuing to reject blocked design assets. Chromium checks every CSP event.
+The production security policy is unchanged. The macOS WebKit keyboard check uses
+Option-Shift-Tab to include buttons, matching
+[Safari's native keyboard navigation](https://support.apple.com/guide/safari/cpsh003/mac).
 
 Projects, tasks, labels, activities and work sessions use API v1. Start/stop uses durable
 idempotency keys. Editors/deletion retain the original opaque ETag, including
