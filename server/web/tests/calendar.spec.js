@@ -340,7 +340,7 @@ test('calendar committed-but-lost moves require review and read-only moves leave
     await expect(page.locator('#editor-notice')).toContainText('outcome is unknown');await expect(page.locator('#save')).toBeDisabled();
     let current=await read(request,'work-sessions',f.session.id);expect(current.start).toBe('2025-10-20T06:18:00.123456789Z');expect(current.version).toBe(f.session.version+1);expect(writes).toBe(1);
     await unchangedActivities(request,f);await page.locator('#cancel').click();await page.unroute(`**/api/v1/work-sessions/${f.session.id}`);
-    await page.getByRole('button',{name:'Sign out',exact:true}).click();await calendar(page,readToken);
+    await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();await calendar(page,readToken);
     await bar(page,f.session.id).focus();await bar(page,f.session.id).press('ArrowDown');
     await expect(page.locator('#editor-error')).toContainText('permission');expect(await read(request,'work-sessions',f.session.id)).toEqual(current);await unchangedActivities(request,f);
     await page.locator('#cancel').click();
