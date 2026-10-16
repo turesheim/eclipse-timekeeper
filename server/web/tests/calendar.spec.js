@@ -98,9 +98,11 @@ test('dragging empty calendar space previews a new session and saves only after 
     page.on('request',value=>{if(value.method()==='POST' && new URL(value.url()).pathname==='/api/v1/work-sessions') creates++;});
     await dragRange(page,{date:'2025-10-21',clock:'09:00/0'},{date:'2025-10-21',clock:'10:30/0'});
     await expect(page.locator('.calendar-create-preview')).toHaveCount(1);expect(creates).toBe(0);
+    await page.screenshot({path:'test-results/calendar-range-preview-desktop.png'});
     await page.mouse.up();await expect(page.locator('#editor')).toBeVisible();
     expect(creates).toBe(0);await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-21T09:00:00');
     await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-21T10:30:00');
+    await page.screenshot({path:'test-results/calendar-range-review-desktop.png'});
     await page.getByLabel('Title',{exact:true}).fill(f.prefix+' dragged');await page.getByLabel('Client',{exact:true}).selectOption(f.client.id);
     await page.getByLabel('Summary',{exact:true}).fill(f.prefix+' dragged interval');await save(page);expect(creates).toBe(1);
     const created=(await (await api(request,'GET','/work-sessions?clientId='+f.client.id)).json()).items.find(value=>value.title===f.prefix+' dragged');
