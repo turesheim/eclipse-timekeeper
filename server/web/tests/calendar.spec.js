@@ -80,6 +80,7 @@ async function rangePoints(page,from,to) {
     scroll.scrollTop=Math.max(0,start*16-130);scroll.scrollLeft=0;
     window.scrollTo({top:scroll.getBoundingClientRect().top+window.scrollY-80,behavior:'instant'});
   },row(from.clock));
+  await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
   const source=await page.locator(`.calendar-day[data-date="${from.date}"]`).boundingBox();
   const target=await page.locator(`.calendar-day[data-date="${to.date}"]`).boundingBox();
   return {start:{x:source.x+source.width*.6,y:source.y+row(from.clock)*16+1},end:{x:target.x+target.width*.6,y:target.y+row(to.clock)*16+1}};
