@@ -19,6 +19,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 @Startup @ApplicationScoped @Path("/api/v1/server") @Blocking @Produces("application/json")
 public class ServerInfo {
     @ConfigProperty(name="timekeeper.deployed-at") Optional<String> deployment;
+    @ConfigProperty(name="timekeeper.spk-version") Optional<String> spkVersion;
     private ObjectNode information;
 
     @PostConstruct void initialize() {
@@ -29,6 +30,7 @@ public class ServerInfo {
         } catch(IOException failure) {throw new IllegalStateException("Could not read server build information",failure);}
         information=JsonValues.object();
         information.put("version",build.getProperty("version"));
+        information.put("spkVersion",spkVersion.orElse(null));
         String commit=build.getProperty("commit","");
         if(commit.matches("[0-9a-f]{40}")) information.put("commit",commit);else information.putNull("commit");
         String dirty=build.getProperty("dirty","");
@@ -41,4 +43,5 @@ public class ServerInfo {
     }
 
     @GET public Response get() {return new ApiReplies(200,information.deepCopy(),null,null).response();}
+    String spkVersion() {return spkVersion.orElse(null);}
 }

@@ -73,6 +73,7 @@ def main():
                     '/volume1/@appdata/timekeeper /var/packages/postgresql/target/bin /var/packages/ContainerManager; '
                     'ln -s /volume1/@appdata/timekeeper /var/packages/timekeeper/var; '
                     'printf \'version="24.0.2-1432"\n\' > /var/packages/ContainerManager/INFO; '
+                    'printf \'version="1.99.0-146"\n\' > /var/packages/timekeeper/INFO; '
                     'for tool in psql pg_dump pg_restore; do ln -s /usr/lib/postgresql/17/bin/$tool /var/packages/postgresql/target/bin/$tool; done; '
                     'chown -R 10001:10001 /var/packages/timekeeper /volume1/@appdata/timekeeper')
             command('docker','cp',str(binary),name+':/var/packages/timekeeper/scripts/timekeeper-dsm')
@@ -144,6 +145,8 @@ def main():
                 raise AssertionError('Installer did not select a valid local HTTP port automatically')
             runtime_port=command('docker','exec','--user','10001:10001',name,'cat','/var/packages/timekeeper/target/private/config/http-port').stdout.strip()
             if runtime_port!=str(selected_port):raise AssertionError('Health check does not use the automatically selected port')
+            runtime_properties=command('docker','exec','--user','10001:10001',name,'cat','/var/packages/timekeeper/target/private/config/runtime.properties').stdout
+            if 'timekeeper.spk-version=1.99.0-146\n' not in runtime_properties:raise AssertionError('Installed SPK version was not supplied from canonical DSM INFO')
             challenge=json.loads(read('config/account-setup.json'))
             if challenge['sha256']!=hashlib.sha256(code.encode()).hexdigest() or code in json.dumps(challenge):
                 raise AssertionError('Installer retained an invalid bootstrap challenge')

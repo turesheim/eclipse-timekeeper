@@ -23,11 +23,29 @@ test('setup and recovery keep one-time codes separate from password fields',asyn
   await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#login-error')).toHaveText('Passwords do not match.');
   expect((await (await request.get('/api/v1/auth/status')).json()).setupRequired).toBe(true);
 });
+test('rejected setup stays in setup and sign-in explains that no administrator exists yet',async({page,request})=>{
+  await page.goto('/web/');await expect(page.locator('#auth-mode')).toHaveValue('setup');
+  await expect(page.locator('#login-build')).toHaveText('SPK 1.99.0-146');
+  const code=process.env.TIMEKEEPER_WEB_SETUP_CODE;
+  await page.getByLabel('One-time setup or recovery code').fill((code[0]==='A' ? 'B' : 'A')+code.slice(1));
+  await page.getByLabel('Username',{exact:true}).fill('browser-admin');
+  await page.getByLabel('Password',{exact:true}).fill(password);await page.getByLabel('Confirm password',{exact:true}).fill(password);
+  const rejected=page.waitForResponse(response=>response.url().endsWith('/api/v1/auth/setup') && response.request().method()==='POST');
+  await page.getByRole('button',{name:'Sign in',exact:true}).click();expect((await rejected).status()).toBe(401);
+  await expect(page.locator('#login-error')).toContainText('The setup code was not accepted.');
+  await expect(page.locator('#auth-mode')).toHaveValue('setup');await expect(page.locator('#username')).toHaveValue('browser-admin');
+  for(const id of ['setup-code','password','password-confirm']) await expect(page.locator('#'+id)).toHaveValue('');
+  expect((await (await request.get('/api/v1/auth/status')).json()).setupRequired).toBe(true);
+  await page.locator('#auth-mode').selectOption('login');await page.getByLabel('Password',{exact:true}).fill(password);
+  await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  await expect(page.locator('#login-error')).toContainText('First administrator setup has not completed.');
+  await expect(page.locator('#auth-mode')).toHaveValue('setup');await expect(page.locator('#username')).toHaveValue('browser-admin');
+});
 test('first administrator claims the explicit existing owner once and uses a secure browser cookie',async({page,request})=>{
   const status=await (await request.get('/api/v1/auth/status')).json();expect(status.setupRequired).toBe(true);
   await page.goto('/web/');await expect(page.locator('#auth-mode')).toHaveValue('setup');
   await page.screenshot({path:'test-results/account-setup.png',fullPage:true});
-  await page.getByLabel('One-time setup or recovery code').fill(process.env.TIMEKEEPER_WEB_SETUP_CODE);
+  await page.getByLabel('One-time setup or recovery code').fill(' '+process.env.TIMEKEEPER_WEB_SETUP_CODE+' ');
   await expect(page.getByLabel('Display name',{exact:true})).toHaveCount(0);
   await page.getByLabel('Username',{exact:true}).fill('browser-admin');await page.getByLabel('Password',{exact:true}).fill(password);await page.getByLabel('Confirm password',{exact:true}).fill(password+' different');await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await expect(page.locator('#login-error')).toHaveText('Passwords do not match.');expect((await (await request.get('/api/v1/auth/status')).json()).setupRequired).toBe(true);
@@ -38,7 +56,18 @@ test('first administrator claims the explicit existing owner once and uses a sec
   const account=await (await call(request,'GET','/auth/account')).json();expect(account.ownerId).toBe('web-owner');expect(account.username).toBe('browser-admin');
   expect((await request.post('/api/v1/auth/setup',{data:{code:process.env.TIMEKEEPER_WEB_SETUP_CODE,username:'hijacker',password,displayName:'Other'}})).status()).toBe(401);
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');
+  await expect(page.locator('#server-build')).toContainText('SPK 1.99.0-146');
+  await page.locator('#server-build').click();await expect(page.locator('#server-spk')).toHaveText('1.99.0-146');
   await page.screenshot({path:'test-results/account-signed-in.png',fullPage:true});
+  await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();
+  await login(page);await expect(page.locator('#owner')).toHaveText('browser-admin');
+});
+test('incorrect credentials explain the login failure without reporting an expired session',async({page})=>{
+  await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');
+  await page.getByLabel('Username',{exact:true}).fill('browser-admin');await page.getByLabel('Password',{exact:true}).fill('an incorrect password for this browser test');
+  await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  await expect(page.locator('#login-error')).toHaveText('The username or password was not accepted.');
+  await expect(page.locator('#auth-mode')).toHaveValue('login');await expect(page.locator('#username')).toHaveValue('browser-admin');await expect(page.locator('#password')).toHaveValue('');
 });
 test('account UI creates an isolated user and named Eclipse token shown once',async({page,request,browser})=>{
   const suffix=randomUUID().slice(0,8),username='user-'+suffix,display='Private user '+suffix,otherPassword='private passphrase '+suffix;

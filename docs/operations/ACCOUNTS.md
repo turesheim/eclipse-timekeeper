@@ -38,6 +38,13 @@ with the new file. Completion and consumption are atomic in the shared database.
 Restarts, old files and concurrent replicas cannot reopen completed first setup.
 All replicas must use the same database and operator configuration.
 
+If the setup code is rejected, no account is created and the chosen username and
+password cannot be used for sign-in yet. Stay in **First administrator setup**
+and use the code from the latest installation. Codes from an earlier installation
+can have been replaced as well as expired. For the DSM package, reinstalling with
+retained data renews a pending setup code without resetting completed accounts.
+The sign-in page and server details show the installed SPK version when available.
+
 The container runs as UID 10001. The mounted digest file must be readable by that
 UID; `setup.py` sets mode 0644 within the read-only `/config` mount. For a manually
 generated Docker challenge, place it at `state/config/account-setup.json`, set its

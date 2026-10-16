@@ -214,6 +214,9 @@ func publishConfiguration(root, target string, s Settings) error {
 		publicHost = "[" + publicHost + "]"
 	}
 	properties := fmt.Sprintf("quarkus.datasource.jdbc.url=jdbc:postgresql://127.0.0.1:%d/%s\nquarkus.datasource.username=%s\nquarkus.http.port=%d\nquarkus.http.host-validation.allowed-hosts=localhost,127.0.0.1,[::1],%s\ntimekeeper.auth.public-origin=%s\ntimekeeper.deployed-at=%s\ntimekeeper.schema.allow-upgrade=false\n", s.DatabasePort, s.Database, s.Role, s.HTTPPort, publicHost, s.PublicOrigin, s.DeployedAt)
+	// SYNOPKG_PKGDEST can be /volumeN/@appstore/timekeeper, so its parent is
+	// not the package metadata directory. DSM always keeps INFO at this alias.
+	properties += "timekeeper.spk-version=" + spkVersionAt("/var/packages/"+packageID+"/INFO") + "\n"
 	if err := atomic(filepath.Join(private, "config/runtime.properties"), []byte(properties), 0644); err != nil {
 		return err
 	}

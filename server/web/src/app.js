@@ -42,7 +42,7 @@ function errorText(error) { return error instanceof ApiError ? error.message : '
 function setStatus(text) { $('status').textContent = text; }
 function clearServerInfo() {
   $('server-build').textContent = 'Server build information unavailable';
-  for (const field of ['version', 'commit', 'built', 'deployed', 'started']) $(`server-${field}`).textContent = '—';
+  for (const field of ['version', 'spk', 'commit', 'built', 'deployed', 'started']) $(`server-${field}`).textContent = '—';
 }
 async function refreshServerInfo(session) {
   const request = ++serverInfoRequest;
@@ -51,8 +51,9 @@ async function refreshServerInfo(session) {
     if (session !== api || request !== serverInfoRequest) return;
     const date = value => value ? instantText(value, snapshot.profile.data.zoneId) : 'Not recorded';
     const build = `${data.version}${data.commit ? ` · ${data.commit.slice(0, 8)}` : ' · commit not recorded'}${data.dirty ? ' · modified source' : ''}`;
-    $('server-build').textContent = `Server ${build} · Deployed ${date(data.deployedAt)}`;
+    $('server-build').textContent = `Server ${build}${data.spkVersion ? ` · SPK ${data.spkVersion}` : ''} · Deployed ${date(data.deployedAt)}`;
     $('server-version').textContent = data.version;
+    $('server-spk').textContent = data.spkVersion || 'Not a Synology package';
     $('server-commit').textContent = data.commit ? `${data.commit}${data.dirty ? ' (modified source)' : ''}` : 'Not recorded';
     $('server-built').textContent = date(data.builtAt);
     $('server-deployed').textContent = date(data.deployedAt);

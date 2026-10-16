@@ -15,7 +15,7 @@ import tempfile
 from threading import Event
 import time
 import unittest
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'common/api/tests'))
 import http_acceptance as contract
 from configure_accounts import create_challenge
+from compose_readiness import wait_ready as wait_for_replicas
 
 
 def main():
@@ -74,17 +75,8 @@ def main():
     client = contract.HttpAcceptance('test_authentication_and_read_only_permission')
     client.created = []
 
-    def wait_ready(timeout=120):
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            try:
-                with urlopen(base + '/q/health/ready', timeout=2) as response:
-                    if response.status == 200:
-                        return
-            except (HTTPError, URLError, TimeoutError):
-                pass
-            time.sleep(.5)
-        raise AssertionError('Compose gateway did not recover readiness')
+    def wait_ready(members=('api-1', 'api-2')):
+        wait_for_replicas(compose, base, members)
 
     receipt = {'httpContractCases': 0, 'bundledWeb': False, 'twoReplicas': False, 'singleDatabase': False,
                'databaseRestart': False, 'databaseCrashRecovery': False,
@@ -224,7 +216,7 @@ def main():
         receipt['databaseCrashRecovery'] = True
         print('Single PostgreSQL restart and crash recovery preserved data and command replay: PASS', flush=True)
         compose('stop', 'api-1')
-        wait_ready()
+        wait_ready(('api-2',))
         replay, replay_headers = client.call('POST', '/activities/' + active['id'] + '/stop', headers=stop_key)
         client.assertEqual(stopped, replay)
         client.assertEqual(stopped_headers['ETag'], replay_headers['ETag'])
@@ -232,6 +224,7 @@ def main():
         print('API replica failure preserved exact command replay: PASS', flush=True)
         compose('start', 'api-1')
         compose('up', '-d', '--wait', '--wait-timeout', '120')
+        wait_ready()
         expected, _ = client.call('GET', '/data/export')
         # Back up and restore through a separate client using the actual application role.
         backup_result = subprocess.run(['sh', str(deployment / 'backup.sh')], cwd=deployment,

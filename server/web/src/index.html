@@ -14,7 +14,7 @@
   <main>
     <section id="login" class="card login">
       <p class="eyebrow">YOUR WORK, RECORDED</p><h1>Make time count.</h1>
-      <p>Track work and manage your projects in the browser.</p>
+      <p>Track work and manage your projects in the browser.</p><p id="login-build" class="hint"></p>
       <form id="login-form">
         <label>Sign-in method<select id="auth-mode"><option value="login">Username and password</option><option value="setup">First administrator setup</option><option value="recover">Recover account</option><option value="token">Existing API token</option></select></label>
         <label id="username-field">Username<input id="username" autocomplete="username" required maxlength="64"></label>
@@ -67,7 +67,7 @@
       <section id="labels-panel" hidden><div class="toolbar"><h2>Labels</h2><button id="add-label" class="primary">New label</button></div><div id="labels" class="card table-wrap"></div></section>
       <footer id="server-info" class="server-info" aria-label="Server information">
         <details><summary id="server-build">Server build information unavailable</summary>
-          <dl><dt>Version</dt><dd id="server-version">—</dd><dt>Commit</dt><dd id="server-commit">—</dd><dt>Built</dt><dd id="server-built">—</dd><dt>Deployed</dt><dd id="server-deployed">—</dd><dt>Started</dt><dd id="server-started">—</dd></dl>
+          <dl><dt>Version</dt><dd id="server-version">—</dd><dt>SPK version</dt><dd id="server-spk">—</dd><dt>Commit</dt><dd id="server-commit">—</dd><dt>Built</dt><dd id="server-built">—</dd><dt>Deployed</dt><dd id="server-deployed">—</dd><dt>Started</dt><dd id="server-started">—</dd></dl>
         </details>
       </footer>
     </div>

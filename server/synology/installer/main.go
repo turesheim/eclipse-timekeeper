@@ -198,7 +198,10 @@ func run(action, root, target, releasePath string, env func(string) string, argu
 			}
 			return validate(root, w, release)
 		}
-		return install(root, target, w, release)
+		if err := install(root, target, w, release); err != nil {
+			return err
+		}
+		return clearWizardCode(env)
 	default:
 		return errors.New("Unknown package action")
 	}
