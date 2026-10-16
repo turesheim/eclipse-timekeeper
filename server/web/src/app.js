@@ -6,6 +6,8 @@ import {WeekCalendar} from './calendar.js';
 import {sameSession} from './calendar-model.js';
 
 const $ = id => document.getElementById(id);
+const nameOrder = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
+const sortedNames = values => [...values].sort((a,b) => nameOrder.compare(a.name,b.name) || a.id.localeCompare(b.id));
 let api = null, snapshot = null, connected = false, refreshing = null, reloadAgain = false;
 let editor = null, selectedActivity = null, selectedDay = null;
 let watchSession = null;
@@ -121,7 +123,7 @@ async function refresh() {
       // A save may have queued another read while this older snapshot was in
       // flight. Publish only the final snapshot before enabling dependent forms.
       if (reloadAgain) continue;
-      snapshot = current; snapshotAt = performance.now(); sessionAsOf = current.workSessionReport ? instantNanos(current.workSessionReport.generatedAt) : 0n; connected = true;
+      snapshot = {...current, clients: sortedNames(current.clients), projects: sortedNames(current.projects)}; snapshotAt = performance.now(); sessionAsOf = current.workSessionReport ? instantNanos(current.workSessionReport.generatedAt) : 0n; connected = true;
       render(); setStatus('Up to date', 'ready');
       void refreshServerInfo(session);
     } while (reloadAgain && session === api);

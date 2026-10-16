@@ -6,6 +6,37 @@ async function api(request,method,path,data,headers={}) {
   expect(response.ok(),`${method} ${path}: ${response.status()}`).toBeTruthy();return response;
 }
 async function save(page) {await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');}
+test('client and project lists and choices sort names after create, rename and reload', async({page,request})=>{
+  const prefix='Sort '+randomUUID().slice(0,6), clients=[], projects=[];
+  const names=['Zulu','alpha 10','Beta','alpha 2'];
+  try {
+    for(const suffix of names) clients.push(await (await api(request,'POST','/clients',{name:prefix+' '+suffix,color:'#176653'})).json());
+    for(const suffix of names) projects.push(await (await api(request,'POST','/projects',{name:prefix+' '+suffix,clientId:clients[0].id})).json());
+    await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+    const expected=['alpha 2','alpha 10','Beta','Zulu'].map(value=>prefix+' '+value);
+    for(const [tab,id] of [['Clients','clients'],['Projects','projects']]) {
+      await page.getByRole('button',{name:tab,exact:true}).click();
+      await expect(page.locator(`#${id} tbody tr`).filter({hasText:prefix}).locator('td:first-child')).toHaveText(expected);
+    }
+    await page.getByRole('button',{name:'New project',exact:true}).click();
+    await expect(page.getByLabel('Client',{exact:true}).locator('option').filter({hasText:prefix})).toHaveText(expected);await page.locator('#cancel').click();
+    await page.getByRole('button',{name:'Tasks',exact:true}).click();await page.getByRole('button',{name:'New task',exact:true}).click();
+    await expect(page.getByLabel('Project',{exact:true}).locator('option').filter({hasText:prefix})).toHaveText(expected);await page.locator('#cancel').click();
+    for(const [collection,record] of [['clients',clients[0]],['projects',projects[0]]]) {
+      const loaded=await api(request,'GET',`/${collection}/${record.id}`);
+      await api(request,'PUT',`/${collection}/${record.id}`,{name:prefix+' Aardvark',...(collection==='clients' ? {color:record.color} : {clientId:record.clientId})},{'If-Match':loaded.headers().etag});
+    }
+    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');
+    for(const [tab,id] of [['Clients','clients'],['Projects','projects']]) {
+      await page.getByRole('button',{name:tab,exact:true}).click();
+      await expect(page.locator(`#${id} tbody tr`).filter({hasText:prefix}).locator('td:first-child')).toHaveText(['Aardvark','alpha 2','alpha 10','Beta'].map(value=>prefix+' '+value));
+    }
+  } finally {
+    for(const [collection,records] of [['projects',projects],['clients',clients]]) for(const record of records) {
+      const loaded=await api(request,'GET',`/${collection}/${record.id}`);await api(request,'DELETE',`/${collection}/${record.id}`,undefined,{'If-Match':loaded.headers().etag});
+    }
+  }
+});
 test('clients maintain names and colors, own projects and color titled work sessions after reload',async({page,request})=>{
   const prefix='Client '+randomUUID().slice(0,6);let client,session;const projects=[];
   try {
