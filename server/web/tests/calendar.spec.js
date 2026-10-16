@@ -88,7 +88,9 @@ async function rangePoints(page,from,to) {
   return page.locator('#calendar-grid').evaluate((grid,{from,to,first,last})=>{
     const source=grid.querySelector(`.calendar-day[data-date="${from}"]`).getBoundingClientRect();
     const target=grid.querySelector(`.calendar-day[data-date="${to}"]`).getBoundingClientRect();
-    return {start:{x:source.x+source.width*.6,y:source.y+first*16+1},end:{x:target.x+target.width*.6,y:target.y+last*16+1}};
+    // Aim inside each slot: touch emulation rounds viewport coordinates, so a
+    // point only one pixel from a boundary can land in the preceding quarter.
+    return {start:{x:source.x+source.width*.6,y:source.y+first*16+8},end:{x:target.x+target.width*.6,y:target.y+last*16+8}};
   },{from:from.date,to:to.date,first:row(from.clock),last:row(to.clock)});
 }
 async function dragRange(page,from,to) {

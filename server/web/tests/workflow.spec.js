@@ -421,15 +421,23 @@ test('work session controls start once and stop independently of a task activity
   await expect(page.locator('#work-session-elapsed')).not.toBeEmpty();
   await expect(page.locator('#work-session')).not.toContainText('No associated activities');
   await expect(page.locator('#work-session-choice')).not.toBeVisible();
+  const compactHeight=(await page.locator('#work-session').boundingBox()).height;
+  const sessionTitleSize=await page.locator('#work-session-title').evaluate(node=>getComputedStyle(node).fontSize);
+  const sessionDetailSize=await page.locator('#work-session-current').evaluate(node=>getComputedStyle(node).fontSize);
   for(const tab of ['week','calendar','tasks','clients','projects','labels']) {
     await page.locator(`[data-tab=${tab}]`).click();
     await expect(page.locator('#work-session')).toBeVisible();
     await expect(page.locator('#work-session-state')).toHaveText('Running');
     await expect(page.locator('#active-title')).toHaveText(task.summary);
+    expect((await page.locator('#work-session').boundingBox()).height).toBe(compactHeight);
+    await expect(page.locator('#active-title')).toHaveCSS('font-size',sessionTitleSize);
+    await expect(page.locator('#active-details')).toHaveCSS('font-size',sessionDetailSize);
   }
   const history=await (await api(request,'POST','/work-sessions',{title:'Earlier session',clientId:first.clientId,summary:'History must not replace the live summary',start:'2025-10-20T06:00:00Z',end:'2025-10-20T07:00:00Z'})).json();
+  await page.locator('[data-tab=calendar]').click();
   await page.getByRole('button',{name:'Refresh',exact:true}).click();
   await page.locator('#work-session-history > summary').click();
+  await expect(page.locator('#work-session-details')).toBeVisible();
   await page.locator('#work-session-choice').selectOption(history.id);
   await expect(page.locator('#ws-duration')).toHaveText('1h 0m');
   await expect(page.locator('#work-session-title')).toHaveText(first.title);
