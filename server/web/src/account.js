@@ -65,7 +65,7 @@ async function renderTokens(view, zone) {
     const current = ++listGeneration;
     let reply;
     try {reply = await view.session.request('/auth/tokens');}
-    catch (error) {if (view.valid() && current === listGeneration) throw error; return;}
+    catch (error) {if (view.valid() && (error.status === 401 || current === listGeneration)) throw error; return;}
     if (!view.valid() || current !== listGeneration) return;
     const {data} = reply;
     list.replaceChildren();

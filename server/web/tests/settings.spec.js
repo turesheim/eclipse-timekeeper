@@ -175,7 +175,12 @@ test('a lost token-creation reply requires review and never repeats the write', 
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', {name: 'Reload current values', exact: true}).click(); await ready(page);
   await expect(page.locator('#account-content tr').filter({hasText: 'Lost token reply'})).toHaveCount(1); await expect(page.getByLabel('New API token', {exact: true})).toHaveCount(0); expect(writes).toBe(1);
 });
-for (const late of [false, true]) test(late ? 'old token list reads cannot replace a newer acknowledged list' : 'old token list reads cannot unlock a pending token write', async ({page, request}) => {
+for (const [mode, title] of [
+  ['early', 'old token list reads cannot unlock a pending token write'],
+  ['late', 'old token list reads cannot replace a newer acknowledged list'],
+  ['unauthorized', 'old token list authorization failures still clear the account']
+]) test(title, async ({page, request}) => {
+  const late = mode !== 'early';
   const user = await fresh(request); await login(page, user, '#account/tokens'); await ready(page);
   let writes = 0, failList = false, holdList = false, releaseRead, releaseWrite, readArrived, writeArrived;
   const readGate = new Promise(resolve => {releaseRead = resolve;}), writeGate = new Promise(resolve => {releaseWrite = resolve;});
@@ -188,7 +193,9 @@ for (const late of [false, true]) test(late ? 'old token list reads cannot repla
       await route.fulfill({response});
     } else if (failList) {failList = false; await route.abort('failed');}
     else if (holdList) {
-      holdList = false; const response = await route.fetch(); readArrived(); await readGate; await route.fulfill({response});
+      holdList = false; const response = await route.fetch(); readArrived(); await readGate;
+      if (mode === 'unauthorized') await route.fulfill({status: 401, contentType: 'application/json', body: JSON.stringify({code: 'OWNER_CHANGED'})});
+      else await route.fulfill({response});
     } else await route.continue();
   });
   try {
@@ -209,6 +216,8 @@ for (const late of [false, true]) test(late ? 'old token list reads cannot repla
       const reply = page.waitForResponse(response => response.url().endsWith('/auth/tokens') && response.request().method() === 'GET');
       releaseRead(); await reply;
     }
-    await ready(page); await expect(second).toBeVisible(); expect(writes).toBe(2);
+    if (mode === 'unauthorized') {await expect(page.locator('#login')).toBeVisible(); await expect(page.locator('#account-content')).toBeEmpty();}
+    else {await ready(page); await expect(second).toBeVisible();}
+    expect(writes).toBe(2);
   } finally {releaseRead(); releaseWrite(); await page.unrouteAll({behavior: 'wait'});}
 });
