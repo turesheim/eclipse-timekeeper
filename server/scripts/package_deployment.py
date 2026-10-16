@@ -10,11 +10,12 @@ from documentation import render_document
 
 ROOT = Path(__file__).resolve().parents[2]
 FILES = ('compose.yaml', '.env.example', 'haproxy.cfg', 'setup.py', 'backup.sh',
-         'restore.sh', 'update.sh', 'set-deployment-time.sh', 'postgres/bootstrap.sql')
+         'restore.sh', 'export-synology.py', 'update.sh', 'set-deployment-time.sh', 'postgres/bootstrap.sql')
 GUIDES = {'docs/operations/DEPLOYMENT.md': 'README.md',
           'docs/operations/LOCAL-DOCKER.md': 'LOCAL.md',
           'docs/operations/TAILSCALE.md': 'TAILSCALE.md',
               'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
+          'docs/operations/SYNOLOGY-PACKAGE.md': 'SYNOLOGY-PACKAGE.md',
           'docs/operations/SERVER.md': 'SERVER.md',
           'docs/architecture/API-V1.md': 'API-POLICY.md'}
 
@@ -31,6 +32,8 @@ def package(output, commit, root=ROOT):
                 raise ValueError('Missing or unexpected deployment input: ' + name)
             archive.add(source, arcname=name, recursive=False)
         archive.add(root / 'server/scripts/configure_accounts.py', arcname='configure_accounts.py', recursive=False)
+        for name in ('postgresql-shape.sql','schema-v2-postgresql.shape'):
+            archive.add(root / 'server/app/src/main/resources/db' / name, arcname='migration/'+name,recursive=False)
         for source, destination in GUIDES.items():
             content = render_document(root, source, GUIDES, commit).encode()
             entry = tarfile.TarInfo(destination)

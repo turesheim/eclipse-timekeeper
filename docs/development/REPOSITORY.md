@@ -46,6 +46,27 @@ for the matrix and all acceptance jobs, downloads their same-run p2 artifact,
 and uploads the complete site artifact on main. The separate Pages workflow
 verifies and deploys that artifact after the whole main Build workflow succeeds.
 
+Both build workflows separate installable distributions from test results:
+
+| Workflow | Artifact | Contents |
+| --- | --- | --- |
+| Build | `server-standalone` | Java 21 server ZIP with bundled web client and provenance, plus its SHA-256 checksum |
+| Build | `server-test-results` | Server unit tests and packaged-server acceptance results |
+| Server containers | `server-compose` | Docker Compose deployment files, Linux AMD64 images, checksums and image references |
+| Server containers | `server-compose-test-results` | Server/database test reports and Compose acceptance results |
+| Server containers | `synology-installer` | DSM `.spk` installer, checksums, source/image metadata, catalog, icons and manual acceptance template |
+| Server containers | `synology-test-results` | PostgreSQL 17 test reports and deployment acceptance results |
+
+For a DSM installation, download **synology-installer** from **Server containers**.
+The Build workflow's Java ZIP is an alternative deployment format and contains
+no SPK. Earlier Build runs called this Java artifact `timekeeper-server`.
+
+Distribution artifacts are uploaded after successful validation and packaging.
+Test results are retained even when validation fails. The Synology job downloads
+`server-compose` from the same run and reuses its tested server image. A preview
+installer is still identified by its `1.99.0-<revision>` version and metadata;
+the artifact name stays `synology-installer`.
+
 ## Eclipse import
 
 Import existing Maven projects recursively from the repository root. Open

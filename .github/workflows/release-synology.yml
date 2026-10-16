@@ -1,0 +1,52 @@
+name: Release Synology distribution
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published release with completed timekeeper-dsm-acceptance.json attached
+        required: true
+        type: string
+      candidate_run:
+        description: Successful main Server containers run that produced the exact NAS-tested candidate
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-synology-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      CANDIDATE_RUN: ${{ inputs.candidate_run }}
+    steps:
+      - name: Check out trusted publication tools
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Promote and attach the exact NAS-tested candidate
+        run: |
+          python3 scripts/synology_release.py --repo "$GITHUB_REPOSITORY" \
+            --tag "$RELEASE_TAG" --candidate-run "$CANDIDATE_RUN" \
+            --output "$RUNNER_TEMP/synology-release" --publish
+
+      - name: Retain verified distribution and publication evidence
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: synology-release
+          if-no-files-found: error
+          path: ${{ runner.temp }}/synology-release/

@@ -84,119 +84,46 @@ CONSTRAINT|tk_account|c|CHECK ((((state)::text = 'UNCLAIMED'::text) OR ((state):
 CONSTRAINT|tk_account|c|CHECK ((((username IS NULL) AND (password_hash IS NULL) AND ((state)::text = 'UNCLAIMED'::text)) OR ((username IS NOT NULL) AND (password_hash IS NOT NULL) AND (((state)::text = 'ENABLED'::text) OR ((state)::text = 'DISABLED'::text)))))
 CONSTRAINT|tk_account|c|CHECK ((version >= 0))
 CONSTRAINT|tk_account|f|FOREIGN KEY (owner_id) REFERENCES tk_owner(id)
-CONSTRAINT|tk_account|n|NOT NULL administrator
-CONSTRAINT|tk_account|n|NOT NULL display_name
-CONSTRAINT|tk_account|n|NOT NULL initialized
-CONSTRAINT|tk_account|n|NOT NULL owner_id
-CONSTRAINT|tk_account|n|NOT NULL state
-CONSTRAINT|tk_account|n|NOT NULL version
 CONSTRAINT|tk_account|p|PRIMARY KEY (owner_id)
 CONSTRAINT|tk_account|u|UNIQUE (username)
 CONSTRAINT|tk_active|c|CHECK (((entity_type)::text = 'ACTIVITY'::text))
 CONSTRAINT|tk_active|f|FOREIGN KEY (owner_id, entity_type, activity_id) REFERENCES tk_resource(owner_id, entity_type, id)
-CONSTRAINT|tk_active|n|NOT NULL activity_id
-CONSTRAINT|tk_active|n|NOT NULL entity_type
-CONSTRAINT|tk_active|n|NOT NULL owner_id
 CONSTRAINT|tk_active|p|PRIMARY KEY (owner_id)
 CONSTRAINT|tk_api_token|c|CHECK ((((permissions)::text = 'READ'::text) OR ((permissions)::text = 'READ_WRITE'::text)))
 CONSTRAINT|tk_api_token|c|CHECK ((((source)::text = 'LEGACY'::text) OR ((source)::text = 'MANAGED'::text)))
 CONSTRAINT|tk_api_token|c|CHECK ((version >= 0))
 CONSTRAINT|tk_api_token|f|FOREIGN KEY (owner_id) REFERENCES tk_account(owner_id)
-CONSTRAINT|tk_api_token|n|NOT NULL created_at
-CONSTRAINT|tk_api_token|n|NOT NULL digest
-CONSTRAINT|tk_api_token|n|NOT NULL id
-CONSTRAINT|tk_api_token|n|NOT NULL name
-CONSTRAINT|tk_api_token|n|NOT NULL owner_id
-CONSTRAINT|tk_api_token|n|NOT NULL permissions
-CONSTRAINT|tk_api_token|n|NOT NULL revoked
-CONSTRAINT|tk_api_token|n|NOT NULL source
-CONSTRAINT|tk_api_token|n|NOT NULL version
 CONSTRAINT|tk_api_token|p|PRIMARY KEY (digest)
 CONSTRAINT|tk_api_token|u|UNIQUE (id)
 CONSTRAINT|tk_api_token|u|UNIQUE (owner_id, digest)
 CONSTRAINT|tk_auth_challenge|c|CHECK ((((purpose)::text = 'SETUP'::text) OR ((purpose)::text = 'RECOVERY'::text)))
 CONSTRAINT|tk_auth_challenge|f|FOREIGN KEY (owner_id) REFERENCES tk_owner(id)
-CONSTRAINT|tk_auth_challenge|n|NOT NULL consumed
-CONSTRAINT|tk_auth_challenge|n|NOT NULL digest
-CONSTRAINT|tk_auth_challenge|n|NOT NULL expires_at
-CONSTRAINT|tk_auth_challenge|n|NOT NULL purpose
 CONSTRAINT|tk_auth_challenge|p|PRIMARY KEY (digest)
 CONSTRAINT|tk_auth_control|c|CHECK ((id = 1))
-CONSTRAINT|tk_auth_control|n|NOT NULL bootstrap_completed
-CONSTRAINT|tk_auth_control|n|NOT NULL id
 CONSTRAINT|tk_auth_control|p|PRIMARY KEY (id)
 CONSTRAINT|tk_auth_session|c|CHECK ((((permissions)::text = 'READ'::text) OR ((permissions)::text = 'READ_WRITE'::text)))
 CONSTRAINT|tk_auth_session|f|FOREIGN KEY (owner_id) REFERENCES tk_account(owner_id)
 CONSTRAINT|tk_auth_session|f|FOREIGN KEY (owner_id, parent_digest) REFERENCES tk_api_token(owner_id, digest)
-CONSTRAINT|tk_auth_session|n|NOT NULL created_at
-CONSTRAINT|tk_auth_session|n|NOT NULL csrf
-CONSTRAINT|tk_auth_session|n|NOT NULL digest
-CONSTRAINT|tk_auth_session|n|NOT NULL expires_at
-CONSTRAINT|tk_auth_session|n|NOT NULL last_seen_at
-CONSTRAINT|tk_auth_session|n|NOT NULL owner_id
-CONSTRAINT|tk_auth_session|n|NOT NULL permissions
-CONSTRAINT|tk_auth_session|n|NOT NULL persistent
 CONSTRAINT|tk_auth_session|p|PRIMARY KEY (digest)
 CONSTRAINT|tk_auth_throttle|c|CHECK ((attempts >= 0))
-CONSTRAINT|tk_auth_throttle|n|NOT NULL attempts
-CONSTRAINT|tk_auth_throttle|n|NOT NULL id
-CONSTRAINT|tk_auth_throttle|n|NOT NULL window_start
 CONSTRAINT|tk_auth_throttle|p|PRIMARY KEY (id)
 CONSTRAINT|tk_change|f|FOREIGN KEY (owner_id) REFERENCES tk_owner(id)
-CONSTRAINT|tk_change|n|NOT NULL change_type
-CONSTRAINT|tk_change|n|NOT NULL entity_id
-CONSTRAINT|tk_change|n|NOT NULL entity_type
-CONSTRAINT|tk_change|n|NOT NULL occurred_at
-CONSTRAINT|tk_change|n|NOT NULL owner_id
-CONSTRAINT|tk_change|n|NOT NULL sequence
 CONSTRAINT|tk_change|p|PRIMARY KEY (owner_id, sequence)
 CONSTRAINT|tk_external_reference|c|CHECK (((entity_type)::text = 'TASK'::text))
 CONSTRAINT|tk_external_reference|f|FOREIGN KEY (owner_id, entity_type, task_id) REFERENCES tk_resource(owner_id, entity_type, id)
-CONSTRAINT|tk_external_reference|n|NOT NULL entity_type
-CONSTRAINT|tk_external_reference|n|NOT NULL external_id
-CONSTRAINT|tk_external_reference|n|NOT NULL owner_id
-CONSTRAINT|tk_external_reference|n|NOT NULL provider_id
-CONSTRAINT|tk_external_reference|n|NOT NULL reference_key
-CONSTRAINT|tk_external_reference|n|NOT NULL repository_id
-CONSTRAINT|tk_external_reference|n|NOT NULL task_id
 CONSTRAINT|tk_external_reference|p|PRIMARY KEY (owner_id, reference_key)
 CONSTRAINT|tk_owner|c|CHECK ((revision >= 0))
 CONSTRAINT|tk_owner|c|CHECK ((version >= 0))
-CONSTRAINT|tk_owner|n|NOT NULL cursor_secret
-CONSTRAINT|tk_owner|n|NOT NULL id
-CONSTRAINT|tk_owner|n|NOT NULL revision
-CONSTRAINT|tk_owner|n|NOT NULL version
-CONSTRAINT|tk_owner|n|NOT NULL zone_id
 CONSTRAINT|tk_owner|p|PRIMARY KEY (id)
 CONSTRAINT|tk_receipt|f|FOREIGN KEY (owner_id) REFERENCES tk_owner(id)
-CONSTRAINT|tk_receipt|n|NOT NULL body
-CONSTRAINT|tk_receipt|n|NOT NULL command_id
-CONSTRAINT|tk_receipt|n|NOT NULL created_at
-CONSTRAINT|tk_receipt|n|NOT NULL fingerprint
-CONSTRAINT|tk_receipt|n|NOT NULL owner_id
-CONSTRAINT|tk_receipt|n|NOT NULL status
 CONSTRAINT|tk_receipt|p|PRIMARY KEY (owner_id, command_id)
 CONSTRAINT|tk_relation|f|FOREIGN KEY (owner_id, from_type, from_id) REFERENCES tk_resource(owner_id, entity_type, id)
 CONSTRAINT|tk_relation|f|FOREIGN KEY (owner_id, to_type, to_id) REFERENCES tk_resource(owner_id, entity_type, id)
-CONSTRAINT|tk_relation|n|NOT NULL from_id
-CONSTRAINT|tk_relation|n|NOT NULL from_type
-CONSTRAINT|tk_relation|n|NOT NULL kind
-CONSTRAINT|tk_relation|n|NOT NULL owner_id
-CONSTRAINT|tk_relation|n|NOT NULL to_id
-CONSTRAINT|tk_relation|n|NOT NULL to_type
 CONSTRAINT|tk_relation|p|PRIMARY KEY (owner_id, from_type, from_id, kind, to_type, to_id)
 CONSTRAINT|tk_resource|c|CHECK ((version >= 0))
 CONSTRAINT|tk_resource|f|FOREIGN KEY (owner_id) REFERENCES tk_owner(id)
-CONSTRAINT|tk_resource|n|NOT NULL entity_type
-CONSTRAINT|tk_resource|n|NOT NULL id
-CONSTRAINT|tk_resource|n|NOT NULL owner_id
-CONSTRAINT|tk_resource|n|NOT NULL payload
-CONSTRAINT|tk_resource|n|NOT NULL version
 CONSTRAINT|tk_resource|p|PRIMARY KEY (owner_id, entity_type, id)
 CONSTRAINT|tk_schema|c|CHECK ((id = 1))
-CONSTRAINT|tk_schema|n|NOT NULL id
-CONSTRAINT|tk_schema|n|NOT NULL schema_version
-CONSTRAINT|tk_schema|n|NOT NULL state
 CONSTRAINT|tk_schema|p|PRIMARY KEY (id)
 INDEX|tk_account|CREATE UNIQUE INDEX tk_account_pkey ON public.tk_account USING btree (owner_id)
 INDEX|tk_account|CREATE UNIQUE INDEX tk_account_username_key ON public.tk_account USING btree (username)

@@ -6,6 +6,10 @@ provides HTTPS access within your tailnet and forwards requests to the server's
 local HTTP endpoint. Install the server using the [Synology deployment guide](DEPLOYMENT.md)
 or [local Docker guide](LOCAL-DOCKER.md), then configure access here.
 
+The [DSM installer](SYNOLOGY-PACKAGE.md#optional-tailscale-integration) also offers
+optional Tailscale detection and manual root commands for persistent forwarding
+and cleanup before uninstall. The manual instructions below work on all deployment hosts.
+
 ## Prepare the server host
 
 Connect the server host and client device to Tailscale. Enable MagicDNS and HTTPS
@@ -17,6 +21,22 @@ Run the commands on the host operating system, where `http://127.0.0.1:8080`
 is reachable. Keep `TIMEKEEPER_BIND_ADDRESS=127.0.0.1` in the deployment `.env`.
 Both Compose setups already publish their gateway on this address. If you changed
 `TIMEKEEPER_HTTP_PORT`, replace `8080` in the commands below.
+
+The native **DSM package** automatically selects and remembers its local port.
+Read that non-secret port on the NAS before configuring Serve:
+
+```sh
+timekeeper_port=$(sudo cat /var/packages/timekeeper/target/private/config/http-port)
+case "$timekeeper_port" in ''|*[!0-9]*) exit 1 ;; esac
+sudo /var/packages/Tailscale/target/bin/tailscale serve status
+sudo /var/packages/Tailscale/target/bin/tailscale serve --bg --https=8443 "http://127.0.0.1:$timekeeper_port"
+sudo /var/packages/Tailscale/target/bin/tailscale serve status
+```
+
+Use another HTTPS port if 8443 already serves an application. This is a one-time
+administrator operation; Timekeeper's package account does not need permission
+to manage Tailscale. Installing Timekeeper alone does not enable Serve. The generic
+Compose instructions below use port 8080 unless you configured another one.
 
 On **Synology**, install and sign in to the Tailscale package through Package
 Center, then open an SSH shell on the NAS. If the CLI is unavailable in your
@@ -89,6 +109,19 @@ curl --fail --silent --show-error https://timekeeper.tail1234.ts.net:8443/q/heal
 
 If this fails, check local server readiness first, then Serve status, the
 Tailscale connection, DNS and access rules for the selected HTTPS port.
+If local requests work but HTTPS returns an empty HTTP 400, compare the request
+using the public hostname on the server host:
+
+```sh
+curl --include --header 'Host: timekeeper.tail1234.ts.net:8443' http://127.0.0.1:8080/web/
+```
+
+Use your actual hostname and selected local port. Quarkus 3.40 automatically
+restricts Host headers when bound to loopback. The DSM package adds the hostname
+from the installation's public HTTPS origin to its allowlist, while keeping local
+health checks and rejecting unrelated hosts. Upgrade older package candidates if
+they reject that hostname. See [Quarkus Host validation](https://quarkus.io/version/3.40/guides/http-reference/#http-host-header-validation).
+
 To remove this endpoint, run on the server host:
 
 ```sh

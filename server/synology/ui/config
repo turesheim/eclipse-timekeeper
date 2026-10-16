@@ -1,0 +1,12 @@
+{
+  ".url": {
+    "net.resheim.timekeeper": {
+      "type": "url",
+      "title": "Timekeeper",
+      "desc": "Complete package setup to open the web client",
+      "allUsers": true,
+      "icon": "images/timekeeper_{0}.png",
+      "url": "https://turesheim.github.io/eclipse-timekeeper/"
+    }
+  }
+}

@@ -21,7 +21,7 @@ repositories such as Jira.
 | Eclipse with a shared local database | H2 in your home directory | Use the same records when switching workspaces on this computer. This is the default local storage mode; choose **Database > Shared (in ~/.timekeeper/)**. |
 | Eclipse connected directly to an H2 database | A database selected by its JDBC URL, including an H2 TCP server | Manage the database yourself. Choose **Local database**, then **Database > Specified by JDBC URL**, and enter the URL. This connection does not use the Timekeeper REST server. |
 | Eclipse connected to a Timekeeper server | The server's database, scoped to your token's account | Share records with other Eclipse instances and the browser. Choose **Timekeeper server**, enter its URL and token, and use **Test connection** before applying. |
-| Browser connected to a Timekeeper server | The same server account's records | Open the server's `/web/` page and sign in with a token. Eclipse, Mylyn and task repositories are optional. |
+| Browser connected to a Timekeeper server | The same server account's records | Open the server's `/web/` page and sign in with your account. Eclipse, Mylyn and task repositories are optional. |
 
 For local and direct-H2 storage, configure **Preferences > Timekeeper > Database**.
 The Timekeeper server owns its database and exposes an authenticated HTTP API;
@@ -29,6 +29,8 @@ its database location is configured by the server administrator. Switching
 backends does not copy or merge records. See the [Eclipse connection guide](docs/operations/ECLIPSE-CLIENT.md),
 [database storage and backup guide](docs/operations/DATABASE-RECOVERY.md), and
 [server/Docker setup](docs/operations/LOCAL-DOCKER.md).
+For DSM installation, native PostgreSQL, migration and package-source status,
+see the [Synology package candidate guide](docs/operations/SYNOLOGY-PACKAGE.md).
 
 ## Install the Eclipse plugins
 
