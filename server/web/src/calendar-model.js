@@ -64,6 +64,14 @@ export function calendarAnchor(calendar, date, row) {
   return slot.start;
 }
 
+/** Resolve a dragged range through actual calendar slots, including repeated times. */
+export function calendarRange(calendar, from, to) {
+  const first=calendarAnchor(calendar,from.date,from.row),last=calendarAnchor(calendar,to.date,to.row);
+  const start=first<last ? first : last;
+  const end=first===last ? start+CALENDAR_STEP : first>last ? first : last;
+  return {start:nanosInstant(start),end:nanosInstant(end)};
+}
+
 export function shiftSession(session, delta, mode='move', asOf=null) {
   let start=instantNanos(session.start),end=session.end ? instantNanos(session.end) : null;
   if(mode==='move') {start+=delta;if(end!==null) end+=delta;}
