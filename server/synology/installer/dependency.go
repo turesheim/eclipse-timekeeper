@@ -3,9 +3,29 @@ package main
 import (
 	"errors"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
+
+// Read DSM's installed INFO, rather than substituting the Java version or build
+// revision. Missing INFO is expected in non-DSM fixtures and yields no SPK label.
+func spkVersionAt(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		key, value, ok := strings.Cut(line, "=")
+		if ok && strings.TrimSpace(key) == "version" {
+			version := strings.Trim(strings.TrimSpace(value), `"`)
+			if regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+-[1-9][0-9]*$`).MatchString(version) {
+				return version
+			}
+		}
+	}
+	return ""
+}
 
 func containerManagerAt(path string) error {
 	content, err := os.ReadFile(path)

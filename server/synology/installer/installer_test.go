@@ -221,9 +221,70 @@ func TestOneTimeWizardCodeIsRandomAndOnlyItsHashIsRetained(t *testing.T) {
 		t.Fatal("invalid challenge lifetime")
 	}
 }
+func TestWizardKeepsTheDisplayedCodeUntilInstallationAndThenRemovesItsTemporaryCopy(t *testing.T) {
+	temporary := t.TempDir()
+	env := func(key string) string {
+		if key == "SYNOPKG_PKGTMP" {
+			return temporary
+		}
+		return ""
+	}
+	first, err := wizardCode(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := wizardCode(env)
+	if err != nil || first != second {
+		t.Fatal("DSM wizard regeneration replaced the displayed code")
+	}
+	path, _ := wizardCodePath(env)
+	info, err := os.Stat(path)
+	if err != nil || info.Mode().Perm() != 0600 {
+		t.Fatal("wizard code cache is not private")
+	}
+	if err := clearWizardCode(env); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("plaintext setup code survived installation")
+	}
+	third, err := wizardCode(env)
+	if err != nil || first == third {
+		t.Fatal("new installation reused the previous code")
+	}
+}
+func TestWizardRefusesUnsafeTemporaryCodeCaches(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, ".timekeeper-setup-code")
+	outside := filepath.Join(t.TempDir(), "outside")
+	if err := os.WriteFile(outside, []byte(strings.Repeat("A", 43)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wizardCode(func(string) string { return directory }); err == nil {
+		t.Fatal("followed a wizard cache symlink")
+	}
+	for _, invalid := range []string{"/", "relative", "/tmp/../etc"} {
+		if _, err := wizardCodePath(func(string) string { return invalid }); err == nil {
+			t.Fatal("accepted an invalid SDK temporary path")
+		}
+	}
+}
 func TestProjectUsesPinnedImageNativeDatabasePrivateFilesAndTheSelectedPort(t *testing.T) {
 	w := fixtureWizard(t)
-	root, target := t.TempDir(), t.TempDir()
+	root, packageDirectory := t.TempDir(), t.TempDir()
+	target := filepath.Join(packageDirectory, "target")
+	if err := os.Mkdir(target, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(packageDirectory, "INFO"), []byte("package=\"timekeeper\"\nversion=\"1.99.0-146\"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if spkVersionAt(filepath.Join(packageDirectory, "INFO")) != "1.99.0-146" {
+		t.Fatal("installed INFO version could not be read")
+	}
 	s := w.Settings
 	s.Release = Release{Commit: strings.Repeat("a", 40), Image: "ghcr.io/turesheim/eclipse-timekeeper-server:sha-" + strings.Repeat("a", 40), Schema: 2}
 	s.Phase = "READY"
@@ -259,6 +320,10 @@ func TestProjectUsesPinnedImageNativeDatabasePrivateFilesAndTheSelectedPort(t *t
 	}
 	if err := render(root, target, s); err != nil {
 		t.Fatal(err)
+	}
+	runtime, err := os.ReadFile(filepath.Join(target, "private/config/runtime.properties"))
+	if err != nil || !strings.Contains(string(runtime), "timekeeper.spk-version=") {
+		t.Fatal("SPK version configuration was not supplied to the server")
 	}
 	mountedAfter, err := os.Stat(filepath.Join(target, "private/config"))
 	if err != nil {

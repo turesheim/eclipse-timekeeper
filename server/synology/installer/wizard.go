@@ -2,8 +2,78 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
+	"os"
+	"path/filepath"
 )
+
+// DSM may ask for the same wizard more than once. Keep its displayed code stable
+// for that install attempt, in SDK temporary storage only. Postinst/postupgrade
+// remove the plaintext cache after storing the digest, never in retained appdata.
+func wizardCodePath(env func(string) string) (string, error) {
+	temporary := env("SYNOPKG_PKGTMP")
+	if temporary == "" {
+		return "", nil
+	}
+	if !filepath.IsAbs(temporary) || filepath.Clean(temporary) != temporary || temporary == "/" {
+		return "", errors.New("Invalid DSM wizard temporary directory")
+	}
+	return filepath.Join(temporary, ".timekeeper-setup-code"), nil
+}
+func wizardCode(env func(string) string) (string, error) {
+	path, err := wizardCodePath(env)
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return secret()
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if errors.Is(err, os.ErrExist) {
+		info, err := os.Lstat(path)
+		if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 || info.Size() != 43 {
+			return "", errors.New("Invalid DSM setup-code cache; reopen the installer")
+		}
+		data, err := os.ReadFile(path)
+		if err != nil || !validInstallationID(string(data)) {
+			return "", errors.New("Cannot read the DSM setup-code cache; reopen the installer")
+		}
+		return string(data), nil
+	}
+	if err != nil {
+		return "", err
+	}
+	complete := false
+	defer func() {
+		file.Close()
+		if !complete {
+			_ = os.Remove(path)
+		}
+	}()
+	code, err := secret()
+	if err != nil {
+		return "", err
+	}
+	if _, err = file.WriteString(code); err != nil {
+		return "", err
+	}
+	if err = file.Sync(); err != nil {
+		return "", err
+	}
+	complete = true
+	return code, nil
+}
+func clearWizardCode(env func(string) string) error {
+	path, err := wizardCodePath(env)
+	if err != nil || path == "" {
+		return err
+	}
+	if err = os.Remove(path); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	return err
+}
 
 func field(kind, key, label, value string, required bool) map[string]any {
 	// DSM renders the group description and the individual field label separately.
@@ -11,7 +81,7 @@ func field(kind, key, label, value string, required bool) map[string]any {
 	return map[string]any{"type": kind, "desc": "", "subitems": []any{map[string]any{"key": key, "desc": label, "defaultValue": value, "validator": map[string]any{"allowBlank": !required}}}}
 }
 func wizard(output io.Writer, root string) error {
-	code, err := secret()
+	code, err := wizardCode(os.Getenv)
 	if err != nil {
 		return err
 	}

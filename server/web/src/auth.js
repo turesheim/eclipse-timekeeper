@@ -30,9 +30,11 @@ export function authentication({connect, clear, updateAccount}) {
     $('login-form').reset(); mode(); $('login-error').textContent = '';
     await connect(session, data);
   }
-  function reset(message = '') {
+  function reset(message = '', retry = null) {
     ++generation; active?.close(); active = null; closeAccount(); clear();
-    $('login-form').reset(); mode(); $('login-error').textContent = message;
+    $('login-form').reset();
+    if (retry) { $('auth-mode').value = retry.mode; $('username').value = retry.username; }
+    mode(); $('login-error').textContent = message;
   }
   async function exchange(token, current) {
     if(!isSecureOrigin()) throw new Error();
@@ -51,10 +53,33 @@ export function authentication({connect, clear, updateAccount}) {
     const body = {username:$('username').value,password:$('password').value};
     const token = $('token').value; $('password').value = ''; $('password-confirm').value = ''; $('token').value = '';
     if (selected === 'login') body.remember = $('remember').checked;
-    else if (['setup','recover'].includes(selected)) { body.code = $('setup-code').value; body.displayName = body.username; $('setup-code').value = ''; }
+    else if (['setup','recover'].includes(selected)) { body.code = $('setup-code').value.trim(); body.displayName = body.username; $('setup-code').value = ''; }
     void (async () => {
-      try { if(selected === 'token') await exchange(token,current); else await attach(await publicRequest(selected,body),current); }
-      catch(error) { if(current === generation) reset(errorText(error)); }
+      let issued = false;
+      try {
+        if(selected === 'token') await exchange(token,current);
+        else { const data = await publicRequest(selected,body); issued = true; await attach(data,current); }
+      }
+      catch(error) {
+        if(current !== generation) return;
+        const retry = {mode:issued ? 'login' : selected, username:body.username};
+        let message = errorText(error);
+        if(error.status === 401 && selected !== 'token') {
+          if(issued && selected === 'setup') message = 'Your account was created, but the browser session could not be used. Sign in with your new username and password.';
+          else if(!issued && selected === 'setup') message = 'The setup code was not accepted. Use the code from the latest installation; it may have expired or been replaced. Administrator setup has not completed with this request.';
+          else if(!issued && selected === 'recover') message = 'The recovery code was not accepted. Ask the server operator for a new recovery code.';
+          else if(!issued && selected === 'login') {
+            message = 'The username or password was not accepted.';
+            try {
+              if((await publicRequest('status')).setupRequired) {
+                retry.mode = 'setup';
+                message = 'First administrator setup has not completed. Enter the setup code from the latest installation and choose your username and password.';
+              }
+            } catch { /* Keep the credential error if status is unavailable. */ }
+          }
+        }
+        if(current === generation) reset(message,retry);
+      }
       finally { submit.disabled = false; }
     })();
   });
@@ -75,7 +100,13 @@ export function authentication({connect, clear, updateAccount}) {
       if(current !== generation) return;
       const token = savedToken();
       if(token) {try {await exchange(token,current); return;} catch(failure) {$('login-error').textContent = errorText(failure);}}
-      try {const status = await publicRequest('status'); if(current === generation && status.setupRequired && $('auth-mode').value === 'login') {$('auth-mode').value = 'setup';mode();}} catch { /* The sign-in form remains usable during an outage. */ }
+      try {
+        const status = await publicRequest('status');
+        if(current === generation) {
+          $('login-build').textContent = status.spkVersion ? `SPK ${status.spkVersion}` : '';
+          if(status.setupRequired && $('auth-mode').value === 'login') {$('auth-mode').value = 'setup';mode();}
+        }
+      } catch { /* The sign-in form remains usable during an outage. */ }
     } finally {submit.disabled=false;}
   }};
 }

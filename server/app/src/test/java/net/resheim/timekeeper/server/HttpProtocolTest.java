@@ -20,6 +20,8 @@ class HttpProtocolTest {
             .statusCode(200).header("Cache-Control",equalTo("no-store"))
             .header("X-Timekeeper-Owner",equalTo("YQ"))
             .body("deployedAt",equalTo("2026-10-13T08:30:00Z")).extract().response();
+        assertEquals("1.99.0-146",response.jsonPath().getString("spkVersion"));
+        given().get("/api/v1/auth/status").then().statusCode(200).body("spkVersion",equalTo("1.99.0-146"));
         var information=JsonValues.parse(response.asString());
         var build=new java.util.Properties();
         try(var input=getClass().getResourceAsStream("/timekeeper-build.properties")) {build.load(input);}

@@ -17,6 +17,7 @@ public class AccountResource {
     @Inject ContractInputs inputs;
     @Inject RequestIdentity identity;
     @Inject BrowserOrigins origins;
+    @Inject ServerInfo serverInfo;
     @Context UriInfo uri;
     @Context HttpHeaders headers;
     private static String text(JsonNode input,String field,int limit) {
@@ -31,7 +32,11 @@ public class AccountResource {
         if(issued.persistent()) cookie+="; Max-Age="+Math.max(0,Duration.between(Instant.now(),issued.expires()).toSeconds());
         return Response.ok(value).header("Cache-Control","no-store").header("Set-Cookie",cookie).build();
     }
-    @GET @Path("/status") public JsonNode status() {ContractInputs.queries(uri.getQueryParameters());return accounts.status();}
+    @GET @Path("/status") public JsonNode status() {
+        ContractInputs.queries(uri.getQueryParameters());var result=object();
+        result.put("setupRequired",accounts.status().path("setupRequired").asBoolean());
+        result.put("spkVersion",serverInfo.spkVersion());return result;
+    }
     @POST @Path("/setup") public Response setup(JsonNode body) {return complete(body,false);}
     @POST @Path("/recover") public Response recover(JsonNode body) {return complete(body,true);}
     private Response complete(JsonNode body,boolean recovery) {
