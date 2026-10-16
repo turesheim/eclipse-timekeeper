@@ -123,6 +123,18 @@ user reviews it; saving cannot silently drop that reference.
 Offline reads reconnect with backoff and never replay writes. Sessions bind to
 the authenticated owner and reject live token owner reassignment.
 
+## Work sessions in Workweek
+
+Workweek shows the sessions overlapping the selected week in a separate
+**Work sessions** grid above the task/activity breakdown. Each row shows the
+session title, client name/color, seven local-day durations, a weekly total and
+an Edit action. Running sessions are marked and update with live snapshots.
+Durations are clipped at the week and local-day boundaries, including daylight
+saving changes, and follow the selected clock/decimal display format.
+Day selection filters session rows alongside activity rows. The section is
+hidden when no sessions overlap the selected week/day. Session time is not
+added to the activity report totals; both describe different intervals.
+
 ## Work sessions
 
 The persistent **Work Session** card shows the account's running status and

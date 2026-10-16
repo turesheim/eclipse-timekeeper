@@ -103,6 +103,9 @@ td.actions .btn + .btn { margin-left: .3rem; }
 .workweek-table tr[data-kind=task] { --bs-table-bg: #f6f9f7; font-weight: 600; }
 .workweek-table tr[aria-selected=true] { --bs-table-bg: #dceee3; }
 .workweek-table .active-activity { font-weight: 700; }
+.workweek-session-title { display: grid; gap: .25rem; }
+.workweek-session-title small { margin-left: 1.7rem; color: var(--muted); font-size: .8rem; }
+.workweek-session-title .badge { justify-self: start; margin-left: 1.7rem; }
 .workweek-table th:nth-child(9), .workweek-table td:nth-child(9) { text-align: right; white-space: nowrap; font-weight: 650; font-variant-numeric: tabular-nums; border-left: 1px solid var(--line); }
 .tree-title { display: flex; align-items: center; gap: .35rem; padding-left: calc(var(--level) * 1.15rem); }
 .tree-toggle { flex-shrink: 0; border-color: transparent; }

@@ -92,7 +92,8 @@ const auth = authentication({
     ++serverInfoRequest; clearServerInfo(); api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null; accountName = '';
     calendar.reset(); collapsed.clear(); selectedWorkSession = null;
     $('editor').close(); $('fields').replaceChildren(); $('editor-error').textContent = ''; $('editor-notice').textContent = '';
-    for(const id of ['clients','projects','tasks','labels','activities','days','session-activities','work-session-choice']) $(id).replaceChildren();
+    $('week-sessions-section').hidden = true;
+    for(const id of ['clients','projects','tasks','labels','activities','days','week-sessions','session-activities','work-session-choice']) $(id).replaceChildren();
     for(const id of ['owner','status','active-title','active-details','work-session-current','work-session-state','work-session-started','session-warning','zone-caption','week-total','ws-duration','ws-tracked','ws-covered','ws-unallocated']) $(id).textContent = '';
     $('login').hidden = false; $('workspace').hidden = true; $('session').hidden = true; $('remember-notice').textContent = '';
     tab('week');
@@ -219,12 +220,26 @@ function render() {
 }
 function renderWorkweek(s, zone) {
   const dates = Array.from({length: 7}, (_, index) => addDays(s.dates.first, index));
+  const headings = dates.map(date => new Intl.DateTimeFormat(undefined, {weekday: 'short', day: 'numeric', timeZone: 'UTC'}).format(new Date(`${date}T12:00:00Z`)));
   const visible = value => !selectedDay || (instantNanos(value.start) < instantNanos(dayStart(addDays(selectedDay, 1), zone)) && (!value.end || instantNanos(value.end) > instantNanos(dayStart(selectedDay, zone))));
   const allActivities = node => [...node.activities, ...node.children.flatMap(allActivities)];
   const totals = activities => {
     const daily = dates.map(date => activities.reduce((sum, activity) => sum + activityDayNanos(activity, date, zone, s.report.generatedAt), 0n));
     return [...daily, daily.reduce((sum, value) => sum + value, 0n)].map((value, index) => value || index === 7 ? displayNanos(value) : '—');
   };
+  const sessions = [...s.workSessions].sort((a,b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id)).filter(value => visible(value) && instantNanos(value.start) < instantNanos(s.dates.to) && instantNanos(value.end || s.report.generatedAt) > instantNanos(s.dates.from));
+  $('week-sessions-section').hidden = !sessions.length; $('week-sessions').replaceChildren();
+  if (sessions.length) {
+    const sessionRows = sessions.map(value => {
+      const title = element('span', undefined, 'workweek-session-title'), client = s.clients.find(client => client.id === value.clientId);
+      const caption = element('span', value.title, 'client-color'); if (/^#[0-9a-f]{6}$/i.test(client?.color)) caption.style.setProperty('--client-color', client.color);
+      title.append(caption, element('small', client?.name || 'Client'));
+      if (!value.end) title.append(element('span', 'Running', 'badge rounded-pill text-bg-success'));
+      const item = row([title, ...totals([value])], [action(`Edit session ${value.title}`, () => openRecord('work-sessions', value.id))]); item.dataset.workSessionId = value.id; return item;
+    });
+    table('week-sessions', ['Work session', ...headings, 'Weekly total', 'Actions'], sessionRows);
+    const grid = $('week-sessions').querySelector('table'); grid.classList.remove('record-table'); grid.classList.add('workweek-table');
+  }
   const titleCell = (content, level, key, title) => {
     const node = element('div', undefined, 'tree-title'); node.style.setProperty('--level', level);
     if (key) {
@@ -261,7 +276,6 @@ function renderWorkweek(s, zone) {
     projectRow.dataset.kind = 'project'; rows.push(projectRow);
     if (!collapsed.has(key)) { for (const node of group.tasks) addTask(node, 1); for (const value of (group.activities || []).filter(visible)) addActivity(value, 1); }
   }
-  const headings = dates.map(date => new Intl.DateTimeFormat(undefined, {weekday: 'short', day: 'numeric', timeZone: 'UTC'}).format(new Date(`${date}T12:00:00Z`)));
   table('activities', ['Activity', ...headings, 'Weekly total', 'Labels', 'Actions'], rows);
   $('activities').querySelector('table')?.classList.add('workweek-table');
 }
