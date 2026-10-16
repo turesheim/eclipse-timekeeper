@@ -1,3 +1,5 @@
+const nameOrder = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
+const sortedNames = values => [...values].sort((a,b) => nameOrder.compare(a.name,b.name) || a.id.localeCompare(b.id));
 const messages = {
   UNAUTHENTICATED: 'Your session is no longer authorized. Sign in again with your account.',
   OWNER_CHANGED: 'The account for this session has changed. Sign out before using the intended account.',
@@ -105,7 +107,7 @@ export class Api {
         const report = await this.request(`/reports/activities?${new URLSearchParams({from: dates.from, to: dates.to, zoneId: profile.data.zoneId})}`);
         const confirmed = await this.request('/me'), head = await this.page('/projects');
         if ([clients, tasks, labels, activities, workSessions, head, report.data, ...(workSessionReport ? [workSessionReport] : [])].some(v => v.revision !== projects.revision) || profile.data.version !== confirmed.data.version) throw new ApiError('BUSY');
-        return {profile, dates, clients: clients.items, projects: projects.items, tasks: tasks.items, labels: labels.items, activities: activities.items, active, workSessions: workSessions.items, activeWorkSession, workSessionReport, report: report.data, revision: projects.revision};
+        return {profile, dates, clients: sortedNames(clients.items), projects: sortedNames(projects.items), tasks: tasks.items, labels: labels.items, activities: activities.items, active, workSessions: workSessions.items, activeWorkSession, workSessionReport, report: report.data, revision: projects.revision};
       } catch (error) { if (!['BUSY', 'CURSOR_EXPIRED'].includes(error.code) || attempt === 2) throw error; }
     }
   }
