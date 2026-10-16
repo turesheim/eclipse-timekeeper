@@ -78,6 +78,10 @@ class DistributionDocumentationTest(unittest.TestCase):
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('Packaging fixture')
             with zipfile.ZipFile(root/'server/app/target/quarkus-app/app/fixture.jar','w') as jar:
                 jar.writestr('timekeeper-build.properties', f'commit={COMMIT}\ndirty=false\n')
+            for name in ('bootstrap-work-session-desktop.png','bootstrap-work-session-narrow.png'):
+                image = root/'docs/assets/screenshots'/name
+                image.parent.mkdir(parents=True,exist_ok=True)
+                image.write_bytes((ROOT/'docs/assets/screenshots'/name).read_bytes())
             # Exercise ZIP assembly with synthetic JVM files and the real operational guides.
             with patch.object(package_server,'ROOT',root),patch.object(package_server.subprocess,'check_output',side_effect=[COMMIT,'']), \
                     patch.object(package_server,'render_document',side_effect=lambda _,source,destinations,commit:render_document(ROOT,source,destinations,commit)):
@@ -87,7 +91,12 @@ class DistributionDocumentationTest(unittest.TestCase):
                 guide=archive.read('timekeeper-server/TAILSCALE.md').decode()
                 self.assertIn('[Synology deployment guide](DEPLOYMENT.md)',guide)
                 self.assertIn('[local Docker guide](LOCAL-DOCKER.md)',guide)
-                for name in ('DEPLOYMENT.md','LOCAL-DOCKER.md','TAILSCALE.md'):
+                web = archive.read('timekeeper-server/WEB-CLIENT.md').decode()
+                for size in ('desktop','narrow'):
+                    name = f'images/work-session-{size}.png'
+                    self.assertIn(']('+name+')',web)
+                    self.assertTrue(archive.read('timekeeper-server/'+name).startswith(b'\x89PNG\r\n\x1a\n'))
+                for name in ('DEPLOYMENT.md','LOCAL-DOCKER.md','TAILSCALE.md','WEB-CLIENT.md'):
                     text=archive.read('timekeeper-server/'+name).decode()
                     for url in re.findall(r'\]\(([^\s)]+)\)',text):
                         parts=urlsplit(url)

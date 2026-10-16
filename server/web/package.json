@@ -3,8 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/model.test.js tests/api.test.js tests/credentials.test.js tests/calendar.test.js",
-    "test:browser": "playwright test"
+    "test": "node scripts/vendor-bootstrap.mjs --check && node --test tests/model.test.js tests/api.test.js tests/credentials.test.js tests/calendar.test.js",
+    "test:browser": "playwright test",
+    "vendor:bootstrap": "node scripts/vendor-bootstrap.mjs",
+    "check:assets": "node scripts/vendor-bootstrap.mjs --check"
   },
-  "devDependencies": { "@playwright/test": "1.64.0" }
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.64.0",
+    "bootstrap": "5.3.8"
+  }
 }

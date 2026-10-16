@@ -36,10 +36,10 @@ function element(tag, text, className) {
   if (className) node.className = className; return node;
 }
 function button(text, action) {
-  const node = element('button', text); node.type = 'button'; node.addEventListener('click', action); return node;
+  const node = element('button', text, 'btn btn-outline-secondary'); node.type = 'button'; node.addEventListener('click', action); return node;
 }
 function errorText(error) { return error instanceof ApiError ? error.message : 'Check the entered values, then try again.'; }
-function setStatus(text) { $('status').textContent = text; }
+function setStatus(text, state = 'error') { $('status').textContent = text; $('status').dataset.state = state; }
 function clearServerInfo() {
   $('server-build').textContent = 'Server build information unavailable';
   for (const field of ['version', 'spk', 'commit', 'built', 'deployed', 'started']) $(`server-${field}`).textContent = '—';
@@ -71,6 +71,7 @@ function tab(name) {
   for (const item of ['week', 'calendar', 'tasks', 'clients', 'projects', 'labels']) $(`${item}-panel`).hidden = item !== name;
   $('workspace').dataset.view=name;if(name==='calendar') calendar.show();
   for (const item of document.querySelectorAll('[data-tab]')) {
+    item.classList.toggle('active', item.dataset.tab === name);
     if (item.dataset.tab === name) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
   }
 }
@@ -108,6 +109,9 @@ async function refresh() {
   if (refreshing) { reloadAgain = true; await refreshing; return; }
   const session = api;
   const pending = (async () => {
+    $('workspace').setAttribute('aria-busy', 'true');
+    $('refresh').disabled = true;
+    if (!snapshot || !connected) setStatus('Refreshing…', 'working');
     do {
       reloadAgain = false;
       const date = $('week-date').value, selected = selectedWorkSession;
@@ -118,7 +122,7 @@ async function refresh() {
       // flight. Publish only the final snapshot before enabling dependent forms.
       if (reloadAgain) continue;
       snapshot = current; snapshotAt = performance.now(); sessionAsOf = current.workSessionReport ? instantNanos(current.workSessionReport.generatedAt) : 0n; connected = true;
-      render(); setStatus('Up to date');
+      render(); setStatus('Up to date', 'ready');
       void refreshServerInfo(session);
     } while (reloadAgain && session === api);
   })();
@@ -127,7 +131,7 @@ async function refresh() {
   catch (error) {
     if (session === api) { if(error.status === 401) auth.clear(errorText(error)); else {connected = false; setStatus(errorText(error)); readOnlyWhileDisconnected();} }
     throw error;
-  } finally { if(refreshing === pending) refreshing = null; }
+  } finally { if(refreshing === pending) {refreshing = null; $('refresh').disabled = false; $('workspace').setAttribute('aria-busy', 'false');} }
 }
 async function watch(session) {
   let delay = 1000;
@@ -152,11 +156,22 @@ async function watch(session) {
 }
 function table(container, headings, rows) {
   const root = $(container); root.replaceChildren();
-  if (!rows.length) { root.append(element('p', 'Nothing here yet.', 'empty')); return; }
-  const node = element('table'), thead = element('thead'), header = element('tr'), tbody = element('tbody');
+  if (!rows.length) {
+    const [title, hint] = {
+      clients:['No clients yet', 'Add a client to organize projects and work sessions.'],
+      projects:['No projects yet', 'Create a project and choose its client.'],
+      tasks:['No tasks yet', 'Create a task to start tracking your work.'],
+      labels:['No labels yet', 'Add labels to categorize your activities.'],
+      activities:['No activities this week', 'Choose another week, start a task or add time.'],
+      'session-activities':['No associated activities', 'Add an activity or associate one with this session.'],
+    }[container];
+    const empty = element('div', undefined, 'empty');
+    empty.append(icon('clock'), element('h3', title), element('p', hint)); root.append(empty); return;
+  }
+  const node = element('table', undefined, `table table-hover align-middle mb-0${container === 'activities' ? '' : ' record-table'}`), thead = element('thead'), header = element('tr'), tbody = element('tbody');
   for (const heading of headings) { const th = element('th', heading); th.scope = 'col'; header.append(th); }
   thead.append(header); node.append(thead, tbody);
-  for (const row of rows) tbody.append(row); root.append(node);
+  for (const row of rows) {for (const [index,cell] of [...row.children].entries()) cell.dataset.label = headings[index];tbody.append(row);} root.append(node);
 }
 function row(values, actions = []) {
   const node = element('tr'); for (const value of values) { const cell = element('td'); cell.append(value instanceof Node ? value : document.createTextNode(value)); node.append(cell); }
@@ -164,7 +179,7 @@ function row(values, actions = []) {
 }
 function action(text, operation) {
   const node = button('', () => { void operation().catch(error => setStatus(errorText(error))); });
-  iconButton(node, text === 'Start' ? 'start' : text === 'Delete' ? 'delete' : 'edit', text);
+  iconButton(node, text === 'Start' ? 'start' : text === 'Delete' ? 'delete' : text === 'Remove from session' ? 'unlink' : 'edit', text);
   node.disabled = !connected; return node;
 }
 function name(list, id, field = 'name') { const value = list.find(v => v.id === id); return value && field === 'summary' ? taskPresentation(value).title : value?.[field] ?? 'Unassigned'; }
@@ -187,7 +202,7 @@ function render() {
   table('clients', ['Name', 'Color', 'Actions'], s.clients.map(value => row([value.name, colorSwatch(value.color)], [action('Edit', () => openRecord('clients', value.id)), action('Delete', () => openDelete('clients', value.id))])));
   table('projects', ['Name', 'Client', 'Actions'], s.projects.map(value => row([value.name, name(s.clients, value.clientId)], [action('Edit', () => openRecord('projects', value.id)), action('Delete', () => openDelete('projects', value.id))])));
   table('tasks', ['Task', 'Project', 'Parent', 'Actions'], s.tasks.map(value => row([taskLabel(value), name(s.projects, value.projectId), value.parentTaskId ? name(s.tasks, value.parentTaskId, 'summary') : '—'], [action('Start', () => openStart(value.id)), action('Edit', () => openRecord('tasks', value.id)), action('Delete', () => openDelete('tasks', value.id))])));
-  table('labels', ['Name', 'Color', 'Actions'], s.labels.map(value => row([value.name, value.color || '—'], [action('Edit', () => openRecord('labels', value.id)), action('Delete', () => openDelete('labels', value.id))])));
+  table('labels', ['Name', 'Color', 'Actions'], s.labels.map(value => row([value.name, /^#[0-9a-f]{6}$/i.test(value.color) ? colorSwatch(value.color) : value.color || '—'], [action('Edit', () => openRecord('labels', value.id)), action('Delete', () => openDelete('labels', value.id))])));
   refreshLabelFields(); refreshClientChoices(); refreshSessionChoices(); renderSession();
   $('week-total').textContent = displayDuration(s.report.total); $('days').replaceChildren();
   for (let index = 0; index < 7; index++) {
@@ -215,7 +230,7 @@ function renderWorkweek(s, zone) {
     if (key) {
       const toggle = button('', () => { if (collapsed.has(key)) collapsed.delete(key); else collapsed.add(key); render(); });
       toggle.append(icon(collapsed.has(key) ? 'right' : 'down'));
-      toggle.className = 'tree-toggle'; toggle.setAttribute('aria-label', `${collapsed.has(key) ? 'Expand' : 'Collapse'} ${title}`); toggle.setAttribute('aria-expanded', String(!collapsed.has(key))); node.append(toggle);
+      toggle.className = 'btn btn-outline-secondary tree-toggle'; toggle.setAttribute('aria-label', `${collapsed.has(key) ? 'Expand' : 'Collapse'} ${title}`); toggle.title = toggle.getAttribute('aria-label'); toggle.setAttribute('aria-expanded', String(!collapsed.has(key))); node.append(toggle);
     } else { const marker = element('span', undefined, 'activity-icon'); marker.append(icon('clock')); node.append(marker); }
     node.append(content); return node;
   };
@@ -256,6 +271,7 @@ function field(labelText, key, value = '', options = {}) {
   if (options.choices) for (const [id, text] of options.choices) { const option = element('option', text); option.value = id; input.append(option); }
   else { input.type = options.type || 'text'; if (options.max) input.maxLength = options.max; }
   input.value = value ?? ''; input.required = !!options.required; label.append(input);
+  label.className = 'form-label'; input.className = options.choices ? 'form-select' : `form-control${input.type === 'color' ? ' form-control-color' : ''}`;
   if (options.hint) { const hint = element('p', options.hint, 'hint'); hint.id = `hint-${key}`; label.append(hint); input.setAttribute('aria-describedby', hint.id); }
   $('fields').append(label); return input;
 }
@@ -272,6 +288,7 @@ function refreshLabelFields(ids = []) {
     let input = existing.get(value.id);
     if (!input) {
       input = element('input'); input.type = 'checkbox'; input.name = 'labelIds'; input.value = value.id; input.checked = ids.includes(value.id);
+      input.className = 'form-check-input';
       const label = element('label'); label.append(input, element('span', value.name)); group.append(label);
     } else input.closest('label').querySelector('span').textContent = value.name;
     input.dataset.labelName = value.name;
@@ -307,6 +324,7 @@ function sessionFields(value) {
 function begin(title, state) {
   if ($('editor').open) return false;
   editor = {...state, session: api, zone: snapshot.profile.data.zoneId, busy: false, uncertain: false}; $('fields').replaceChildren(); $('editor-error').textContent = ''; $('editor-notice').textContent = '';
+  $('save').className = `btn ${state.remove ? 'btn-danger' : 'btn-primary'}`;
   $('editor-title').textContent = title; $('save').textContent = 'Save'; $('save').disabled = false; $('cancel').disabled = false; return true;
 }
 function showEditor() { $('editor').showModal(); $('fields').querySelector('input,select')?.focus(); }
@@ -412,10 +430,10 @@ async function saveEditor(event) {
     const saved = await current.session.request(path, {method, body, etag: current.etag, key: current.key});
     if (current.session !== api || current !== editor) return;
     editor = null; $('editor').close(); $('fields').replaceChildren();
-    connected = false; readOnlyWhileDisconnected(); setStatus('Refreshing saved changes…');
+    connected = false; readOnlyWhileDisconnected(); setStatus('Refreshing saved changes…', 'working');
     // Acknowledged saves remain successful even if the following read fails.
     await refresh().catch(() => {});
-    if(saved.data?.outsideSession) setStatus('Saved. This activity extends outside the selected work session.');
+    if(saved.data?.outsideSession) setStatus('Saved. This activity extends outside the selected work session.', 'notice');
   } catch (error) {
     if (current !== editor || current.session !== api) return;
     if(error.status === 401) {auth.clear(errorText(error));return;}
@@ -445,6 +463,9 @@ function refreshSessionChoices() {
 function renderSession() {
   const active=snapshot.activeWorkSession.data, report=snapshot.workSessionReport, choice=$('work-session-choice');
   $('work-session-state').textContent=active ? 'Running' : 'Stopped';
+  $('work-session-state').className = `badge rounded-pill ${active ? 'text-bg-success' : 'text-bg-secondary'}`;
+  $('work-session-title').textContent = active?.title || 'Your work session';
+  $('work-session').style.setProperty('--session-color', snapshot.clients.find(client => client.id === report?.session.clientId)?.color || 'var(--accent)');
   $('work-session-current').textContent=active ? `${active.title} · ${name(snapshot.clients,active.clientId)} · Started ${instantText(active.start,snapshot.profile.data.zoneId)}` : 'Start a work session to track your day independently of tasks.';
   $('session-start').disabled=!connected || !!active; $('session-stop').hidden=!active;
   choice.replaceChildren();for(const value of [...snapshot.workSessions].sort((a,b) => b.start.localeCompare(a.start))) {const option=element('option',sessionLabel(value));option.value=value.id;choice.append(option);}
@@ -452,6 +473,7 @@ function renderSession() {
   choice.value=report?.session.id || '';choice.disabled=!connected || !report;
   $('work-session-details').hidden=!report;
   if(!report) return;
+  $('selected-session-title').textContent=report.session.title;
   $('work-session-started').textContent=`${report.session.title} · ${name(snapshot.clients,report.session.clientId)}${report.session.summary ? ' · '+report.session.summary : ''} · ${instantText(report.session.start,snapshot.profile.data.zoneId)} → ${instantText(report.session.end,snapshot.profile.data.zoneId)}`;
   table('session-activities',['Activity','Task / project','Time','Actions'],report.activities.map(value => row([
     value.summary || 'Activity',value.taskId ? name(snapshot.tasks,value.taskId,'summary') : name(snapshot.projects,value.projectId),

@@ -5,55 +5,58 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Timekeeper</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./assets/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./calendar.css">
   <link rel="preload" href="./assets/fontawesome/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
   <script type="module" src="./app.js"></script>
 </head>
 <body>
-  <header><a class="brand" href="./">Timekeeper <small>2.0</small></a><div id="session" hidden><span id="owner"></span><button id="settings">Time zone</button><button id="account">Account</button><button id="sign-out">Sign out</button></div></header>
-  <main>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <header class="app-header"><a class="brand" href="./">Timekeeper <small>2.0</small></a><div id="session" hidden><span id="owner"></span><button class="btn btn-outline-secondary" id="settings">Time zone</button><button class="btn btn-outline-secondary" id="account">Account</button><button class="btn btn-outline-secondary" id="sign-out">Sign out</button></div></header>
+  <main id="main-content" tabindex="-1">
     <section id="login" class="card login">
       <p class="eyebrow">YOUR WORK, RECORDED</p><h1>Make time count.</h1>
       <p>Track work and manage your projects in the browser.</p><p id="login-build" class="hint"></p>
       <form id="login-form">
-        <label>Sign-in method<select id="auth-mode"><option value="login">Username and password</option><option value="setup">First administrator setup</option><option value="recover">Recover account</option><option value="token">Existing API token</option></select></label>
-        <label id="username-field">Username<input id="username" autocomplete="username" required maxlength="64"></label>
-        <label id="password-field">Password<input id="password" type="password" autocomplete="current-password" required></label>
-        <label id="confirm-field" hidden>Confirm password<input id="password-confirm" type="password" autocomplete="new-password" disabled></label>
-        <label id="code-field" hidden>One-time setup or recovery code<input id="setup-code" name="one-time-code" type="text" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" disabled></label>
-        <label id="remember-field" class="check"><input id="remember" type="checkbox"> Remember me on this browser</label>
-        <label id="token-field" hidden>Access token<input id="token" type="password" autocomplete="off" disabled></label>
+        <label class="form-label">Sign-in method<select class="form-select" id="auth-mode"><option value="login">Username and password</option><option value="setup">First administrator setup</option><option value="recover">Recover account</option><option value="token">Existing API token</option></select></label>
+        <label class="form-label" id="username-field">Username<input class="form-control" id="username" autocomplete="username" required maxlength="64"></label>
+        <label class="form-label" id="password-field">Password<input class="form-control" id="password" type="password" autocomplete="current-password" required></label>
+        <label class="form-label" id="confirm-field" hidden>Confirm password<input class="form-control" id="password-confirm" type="password" autocomplete="new-password" disabled></label>
+        <label class="form-label" id="code-field" hidden>One-time setup or recovery code<input class="form-control" id="setup-code" name="one-time-code" type="text" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" disabled></label>
+        <label class="form-label check" id="remember-field"><input class="form-check-input" id="remember" type="checkbox"> Remember me on this browser</label>
+        <label class="form-label" id="token-field" hidden>Access token<input class="form-control" id="token" type="password" autocomplete="off" disabled></label>
         <p id="auth-hint" class="hint">Use your Timekeeper account. API tokens are managed after signing in.</p>
-        <p id="login-error" role="alert"></p><button class="primary" type="submit">Sign in</button>
+        <p id="login-error" class="alert alert-danger" role="alert" tabindex="-1"></p><button class="btn btn-primary" type="submit">Sign in</button>
       </form>
     </section>
     <div id="workspace" hidden>
-      <div class="status-line"><p id="status" role="status" aria-live="polite"></p><button id="refresh">Refresh</button></div>
+      <div class="status-line"><p id="status" data-state="working" role="status" aria-live="polite"></p><button class="btn btn-outline-secondary" id="refresh">Refresh</button></div>
       <p id="remember-notice" class="hint" role="status"></p>
       <section id="work-session" class="card work-session" aria-label="Work session">
-        <div class="work-session-heading"><div><p class="eyebrow">WORK SESSION</p><h2 id="work-session-state">Stopped</h2><p id="work-session-current" class="hint"></p></div>
-          <div class="session-actions"><button id="session-start">Start work session</button><button id="session-stop" hidden>Stop work session</button><button id="session-new">Record work session</button></div></div>
-        <label>Session details<select id="work-session-choice" aria-label="Session details"></select></label>
-        <div id="work-session-details" hidden><p id="work-session-started" class="hint"></p>
+        <div class="work-session-heading"><div><p class="eyebrow">WORK SESSION</p><div class="session-title"><h2 id="work-session-title">Your work session</h2><span id="work-session-state" class="badge rounded-pill text-bg-secondary">Stopped</span></div><p id="work-session-current" class="hint"></p></div>
+          <div class="session-actions" role="group" aria-label="Work session actions"><button class="btn btn-primary" id="session-start">Start work session</button><button class="btn btn-outline-danger" id="session-stop" hidden>Stop work session</button><button class="btn btn-outline-secondary" id="session-new">Record work session</button></div></div>
+        <label class="form-label">Session details<select class="form-select" id="work-session-choice" aria-label="Session details"></select></label>
+        <div id="work-session-details" hidden><h3 id="selected-session-title"></h3><p id="work-session-started" class="hint"></p>
           <dl class="session-totals"><div><dt>Duration</dt><dd id="ws-duration">—</dd></div><div><dt>Tracked activities</dt><dd id="ws-tracked">—</dd></div><div><dt>Covered time</dt><dd id="ws-covered">—</dd></div><div><dt>Unallocated</dt><dd id="ws-unallocated">—</dd></div></dl>
           <p class="hint">Overlapping activities count once toward covered time. Stopping a work session leaves activity timers running.</p>
-          <div class="session-actions"><button id="session-edit">Edit work session</button><button id="session-delete">Delete work session</button><button id="session-add">Add activity to session</button><button id="session-associate">Associate activity</button></div>
+          <div class="session-actions"><button class="btn btn-outline-secondary" id="session-edit">Edit work session</button><button class="btn btn-outline-danger" id="session-delete">Delete work session</button><button class="btn btn-outline-secondary" id="session-add">Add activity to session</button><button class="btn btn-outline-secondary" id="session-associate">Associate activity</button></div>
           <div id="session-activities" class="table-wrap"></div><p id="session-warning" class="hint" role="status"></p>
         </div>
       </section>
-      <section class="card tracking"><div><p class="eyebrow">IN PROGRESS</p><h1 id="active-title">Ready when you are</h1><p id="active-details">Choose a task below to start tracking.</p></div><button id="stop" class="primary" hidden>Stop tracking</button></section>
-      <nav aria-label="Workspace"><button data-tab="week" aria-current="page">Workweek</button><button data-tab="calendar">Calendar</button><button data-tab="tasks">Tasks</button><button data-tab="clients">Clients</button><button data-tab="projects">Projects</button><button data-tab="labels">Labels</button></nav>
+      <section class="card tracking"><div><p class="eyebrow">IN PROGRESS</p><h2 id="active-title">Ready when you are</h2><p id="active-details">Choose a task below to start tracking.</p></div><button class="btn btn-primary" id="stop" hidden>Stop tracking</button></section>
+      <nav id="workspace-navigation" class="nav nav-pills workspace-nav" aria-label="Workspace" tabindex="-1"><button class="nav-link" data-tab="week" aria-current="page">Workweek</button><button class="nav-link" data-tab="calendar">Calendar</button><button class="nav-link" data-tab="tasks">Tasks</button><button class="nav-link" data-tab="clients">Clients</button><button class="nav-link" data-tab="projects">Projects</button><button class="nav-link" data-tab="labels">Labels</button></nav>
       <section id="week-panel">
-        <div class="toolbar"><div><h2>Your workweek</h2><p id="zone-caption" class="hint"></p></div><label>Week containing<input id="week-date" type="date" required></label><label>Duration format<select id="duration-format" aria-label="Duration format"><option value="clock">Hours, minutes and seconds</option><option value="decimal">Decimal hours</option></select></label><button id="add-activity">Add time</button></div>
-        <div class="outline-actions"><button id="collapse-activities">Hide activities</button><button id="expand-activities">Show activities</button></div>
+        <div class="toolbar"><div><h2>Your workweek</h2><p id="zone-caption" class="hint"></p></div><label class="form-label">Week containing<input class="form-control" id="week-date" type="date" required></label><label class="form-label">Duration format<select class="form-select" id="duration-format" aria-label="Duration format"><option value="clock">Hours, minutes and seconds</option><option value="decimal">Decimal hours</option></select></label><button class="btn btn-outline-secondary" id="add-activity">Add time</button></div>
+        <div class="outline-actions"><button class="btn btn-outline-secondary" id="collapse-activities">Hide activities</button><button class="btn btn-outline-secondary" id="expand-activities">Show activities</button></div>
         <h2 id="activities-heading">Activities</h2><div id="activities" class="card table-wrap"></div>
         <div class="card report"><div class="report-heading"><p>Daily totals</p><span>Week total <strong id="week-total">—</strong></span></div><div id="days" class="days"></div></div>
       </section>
       <section id="calendar-panel" hidden aria-labelledby="calendar-title">
         <div class="toolbar calendar-toolbar"><div><h2 id="calendar-title">Your calendar</h2><p id="calendar-zone" class="hint"></p></div>
-          <div class="calendar-navigation"><button id="calendar-previous">Previous week</button><button id="calendar-today">Today</button><button id="calendar-next">Next week</button></div>
-          <label>Calendar date<input id="calendar-date" type="date" required></label>
-          <div class="calendar-tools"><button id="calendar-new">Record work session at selected time</button><button id="calendar-edit">Edit selected work session</button><button id="calendar-copy">Copy work session</button><button id="calendar-paste">Paste work session</button></div>
+          <div class="calendar-navigation"><button class="btn btn-outline-secondary" id="calendar-previous">Previous week</button><button class="btn btn-outline-secondary" id="calendar-today">Today</button><button class="btn btn-outline-secondary" id="calendar-next">Next week</button></div>
+          <label class="form-label">Calendar date<input class="form-control" id="calendar-date" type="date" required></label>
+          <div class="calendar-tools"><button class="btn btn-outline-secondary" id="calendar-new">Record work session at selected time</button><button class="btn btn-outline-secondary" id="calendar-edit">Edit selected work session</button><button class="btn btn-outline-secondary" id="calendar-copy">Copy work session</button><button class="btn btn-outline-secondary" id="calendar-paste">Paste work session</button></div>
         </div>
         <details class="calendar-help"><summary>Using the calendar</summary><p class="hint">Strips use the client’s color and show the work session title; task cards list recorded activities. Drag a strip to move it, or its top/bottom edge to resize. Moving preserves duration and leaves activities unchanged. With a strip focused, arrow keys move it and Ctrl/Cmd+C copies it. Select a day and use Ctrl/Cmd+V to paste a separate session without its activities.</p></details>
         <p id="calendar-dst" class="hint" hidden>The clocks change this week. Repeated times have an extra row; shaded slots do not occur on that day.</p>
@@ -61,10 +64,10 @@
         <div class="calendar-scroll card" aria-label="Weekly calendar"><div id="calendar-grid" class="calendar-grid"></div></div>
         <div id="calendar-unrecorded" class="calendar-unrecorded"></div>
       </section>
-      <section id="tasks-panel" hidden><div class="toolbar"><h2>Tasks</h2><button id="add-task" class="primary">New task</button></div><div id="tasks" class="card table-wrap"></div></section>
-      <section id="clients-panel" hidden><div class="toolbar"><h2>Clients</h2><button id="add-client" class="primary">New client</button></div><div id="clients" class="card table-wrap"></div></section>
-      <section id="projects-panel" hidden><div class="toolbar"><h2>Projects</h2><button id="add-project" class="primary">New project</button></div><div id="projects" class="card table-wrap"></div></section>
-      <section id="labels-panel" hidden><div class="toolbar"><h2>Labels</h2><button id="add-label" class="primary">New label</button></div><div id="labels" class="card table-wrap"></div></section>
+      <section id="tasks-panel" hidden><div class="toolbar"><h2>Tasks</h2><button class="btn btn-primary" id="add-task">New task</button></div><div id="tasks" class="card table-wrap"></div></section>
+      <section id="clients-panel" hidden><div class="toolbar"><h2>Clients</h2><button class="btn btn-primary" id="add-client">New client</button></div><div id="clients" class="card table-wrap"></div></section>
+      <section id="projects-panel" hidden><div class="toolbar"><h2>Projects</h2><button class="btn btn-primary" id="add-project">New project</button></div><div id="projects" class="card table-wrap"></div></section>
+      <section id="labels-panel" hidden><div class="toolbar"><h2>Labels</h2><button class="btn btn-primary" id="add-label">New label</button></div><div id="labels" class="card table-wrap"></div></section>
       <footer id="server-info" class="server-info" aria-label="Server information">
         <details><summary id="server-build">Server build information unavailable</summary>
           <dl><dt>Version</dt><dd id="server-version">—</dd><dt>SPK version</dt><dd id="server-spk">—</dd><dt>Commit</dt><dd id="server-commit">—</dd><dt>Built</dt><dd id="server-built">—</dd><dt>Deployed</dt><dd id="server-deployed">—</dd><dt>Started</dt><dd id="server-started">—</dd></dl>
@@ -72,7 +75,7 @@
       </footer>
     </div>
   </main>
-  <dialog id="account-dialog" aria-labelledby="account-title"><h2 id="account-title">Account</h2><div id="account-content"></div><p id="account-error" role="alert"></p><button id="account-close" type="button">Close</button></dialog>
-  <dialog id="editor" aria-labelledby="editor-title"><form id="editor-form"><h2 id="editor-title"></h2><div id="fields"></div><p id="editor-error" role="alert"></p><p id="editor-notice" role="status"></p><div class="dialog-actions"><button id="cancel" type="button">Cancel</button><button id="save" class="primary" type="submit">Save</button></div></form></dialog>
+  <dialog class="app-dialog shadow-lg" id="account-dialog" aria-labelledby="account-title"><h2 id="account-title">Account</h2><div id="account-content"></div><p id="account-error" class="alert alert-danger" role="alert" tabindex="-1"></p><button class="btn btn-outline-secondary" id="account-close" type="button">Close</button></dialog>
+  <dialog class="app-dialog shadow-lg" id="editor" aria-labelledby="editor-title"><form id="editor-form"><h2 id="editor-title"></h2><div id="fields"></div><p id="editor-error" class="alert alert-danger" role="alert" tabindex="-1"></p><p id="editor-notice" class="alert alert-info" role="status"></p><div class="dialog-actions"><button class="btn btn-outline-secondary" id="cancel" type="button">Cancel</button><button class="btn btn-primary" id="save" type="submit">Save</button></div></form></dialog>
 </body>
 </html>

@@ -50,7 +50,7 @@ export class WeekCalendar {
     this.controls.edit.disabled=!this.selected() || !available;
     this.controls.paste.disabled=!this.clipboard || !this.selection || !available;
     this.controls.new.disabled=!this.selection || !available;
-    for(const value of this.root.querySelectorAll('.calendar-resize')) value.disabled=!available;
+    for(const value of this.root.querySelectorAll('.calendar-resize,.calendar-session-select')) value.disabled=!available;
     for(const value of this.root.querySelectorAll('.calendar-task button,.calendar-unrecorded button')) value.disabled=!available;
     for(const value of this.root.querySelectorAll('.calendar-session')) value.setAttribute('aria-disabled',String(!available));
   }
@@ -58,7 +58,7 @@ export class WeekCalendar {
   render() {
     const data=this.data,zone=data.profile.data.zoneId,key=`${data.dates.first}/${zone}`;
     const active=document.activeElement;
-    const focus=this.root.contains(active) ? {session:active.dataset.sessionId,edge:active.dataset.edge,day:active.dataset.date,activity:active.dataset.activityId} : null;
+    const focus=this.root.contains(active) ? {session:active.dataset.sessionId,edge:active.dataset.edge,day:active.dataset.date,activity:active.dataset.activityId,select:active.classList.contains('calendar-session-select')} : null;
     if(this.calendarKey!==key) {
       this.calendarKey=key;this.calendar=calendarWeek(data.dates.first,zone);this.selection=null;
     }
@@ -128,8 +128,8 @@ export class WeekCalendar {
     }
     if(focus) {
       const target=[...this.grid.querySelectorAll('[data-session-id],[data-activity-id],.calendar-day')].find(value=>
-        focus.session ? value.dataset.sessionId===focus.session && value.dataset.edge===focus.edge && value.dataset.date===focus.day : focus.activity ? value.dataset.activityId===focus.activity : focus.day && value.classList.contains('calendar-day') && value.dataset.date===focus.day);
-      const fallback=focus.session ? [...this.grid.querySelectorAll('[data-session-id]')].find(value=>value.dataset.sessionId===focus.session && value.dataset.edge===focus.edge) : null;
+        focus.session ? value.dataset.sessionId===focus.session && value.dataset.edge===focus.edge && value.dataset.date===focus.day && value.classList.contains('calendar-session-select')===focus.select : focus.activity ? value.dataset.activityId===focus.activity : focus.day && value.classList.contains('calendar-day') && value.dataset.date===focus.day);
+      const fallback=focus.session ? [...this.grid.querySelectorAll('[data-session-id]')].find(value=>value.dataset.sessionId===focus.session && value.dataset.edge===focus.edge && value.classList.contains('calendar-session-select')===focus.select) : null;
       (target || fallback)?.focus({preventScroll:true});
     }
   }
@@ -147,11 +147,16 @@ export class WeekCalendar {
     const client=this.data.clients.find(client=>client.id===session.clientId),colors=clientColors(client?.color);
     bar.style.backgroundColor=colors.background;bar.style.color=colors.foreground;bar.style.borderColor=colors.foreground;
     const description=`${client?.name || 'Client'} · ${session.title || 'Work session'}${session.summary ? ' · '+session.summary : ''} · ${instantText(session.start,this.calendar.zone)} → ${instantText(session.end,this.calendar.zone)}`;
-    bar.title=description;bar.setAttribute('aria-label',description);bar.setAttribute('role','button');bar.tabIndex=preview ? -1 : 0;
-    bar.setAttribute('aria-pressed',String(this.selectedId===session.id));
-    bar.append(node('span',session.title || 'Work session','calendar-session-title'));
+    bar.title=description;bar.setAttribute('aria-label',description);bar.setAttribute('role','group');bar.tabIndex=-1;
+    bar.dataset.selected=String(this.selectedId===session.id);
+    const title=node('span',session.title || 'Work session','calendar-session-title');
+    if(preview) bar.append(title);
     if(!preview) {
-      bar.addEventListener('focus',()=>this.selectSession(session,piece.date,Math.floor(piece.top)));
+      const select=button('',()=>this.selectSession(session,piece.date,Math.floor(piece.top)),'calendar-session-select');
+      select.dataset.sessionId=session.id;select.dataset.date=piece.date;
+      select.setAttribute('aria-label',description);select.setAttribute('aria-pressed',String(this.selectedId===session.id));
+      select.append(title);bar.append(select);
+      bar.addEventListener('focusin',()=>this.selectSession(session,piece.date,Math.floor(piece.top)));
       bar.addEventListener('click',()=>this.selectSession(session,piece.date,Math.floor(piece.top)));
       bar.addEventListener('dblclick',()=>this.edit());
       bar.addEventListener('pointerdown',event=>this.beginDrag(event,session,piece));
@@ -194,7 +199,10 @@ export class WeekCalendar {
   selectSession(session,date,row) {this.selectedId=session.id;this.select(date,row);this.text('Arrow keys move 15 minutes or one day. Drag an edge to resize. Copy and paste create a separate session.');}
   paintSelection() {
     for(const cursor of this.grid.querySelectorAll('.calendar-cursor')) cursor.remove();
-    for(const bar of this.grid.querySelectorAll('.calendar-session')) bar.setAttribute('aria-pressed',String(bar.dataset.sessionId===this.selectedId));
+    for(const bar of this.grid.querySelectorAll('.calendar-session')) {
+      bar.dataset.selected=String(bar.dataset.sessionId===this.selectedId);
+      bar.querySelector('.calendar-session-select')?.setAttribute('aria-pressed',bar.dataset.selected);
+    }
     if(!this.selection) return;
     const cursor=node('div',undefined,'calendar-cursor');cursor.style.top=`${this.selection.row*ROW_HEIGHT}px`;this.dayNodes.get(this.selection.date)?.append(cursor);
     const selected=this.selected(),zone=this.data.profile.data.zoneId;
@@ -218,9 +226,21 @@ export class WeekCalendar {
   async commit(session,proposal) {
     if(this.busy || !this.connected) {this.text('This change was not saved. Wait for the connection to recover before trying again.');return;}
     if(instantNanos(session.start)===instantNanos(proposal.start) && (session.end===null && proposal.end===null || session.end && proposal.end && instantNanos(session.end)===instantNanos(proposal.end))) return;
+    const active=document.activeElement;
+    const restore=active?.dataset.sessionId===session.id ? {edge:active.dataset.edge,select:active.classList.contains('calendar-session-select')} : null;
     const scope=this.scope;this.busy=true;this.buttons();
     try {await this.callbacks.onChange(structuredClone(session),proposal,scope);}
-    finally {if(scope===this.scope) {this.busy=false;if(!this.root.hidden) this.render();}}
+    finally {if(scope===this.scope) {
+      this.busy=false;if(!this.root.hidden) {
+        this.render();
+        // Disabling a native button during the write blurs it. Restore its
+        // replacement after a successful save, without escaping a review dialog.
+        if(restore && !document.querySelector('#editor').open && (document.activeElement===document.body || this.root.contains(document.activeElement))) {
+          const target=[...this.grid.querySelectorAll('[data-session-id]')].find(value=>value.dataset.sessionId===session.id && value.dataset.edge===restore.edge && value.classList.contains('calendar-session-select')===restore.select);
+          target?.focus({preventScroll:true});target?.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});
+        }
+      }
+    }}
   }
   key(event) {
     if(!this.data || event.target.closest('input,select,textarea,a') || document.querySelector('#editor').open) return;
@@ -260,7 +280,7 @@ export class WeekCalendar {
   beginDrag(event,session,piece) {
     if(event.button!==0 || !this.connected || this.busy || document.querySelector('#editor').open) return;
     event.preventDefault();const bar=event.currentTarget,day=this.dayNodes.get(piece.date);
-    (event.target.closest('[data-edge]') || bar).focus({preventScroll:true});
+    (event.target.closest('[data-edge]') || bar.querySelector('.calendar-session-select') || bar).focus({preventScroll:true});
     this.selectSession(session,piece.date,Math.floor(piece.top));
     const originRow=Math.max(0,Math.min(this.calendar.rows.length-1,Math.floor((event.clientY-day.getBoundingClientRect().top)/ROW_HEIGHT)));
     this.drag={session:structuredClone(session),piece,bar,pointer:event.pointerId,x:event.clientX,y:event.clientY,lastX:event.clientX,lastY:event.clientY,originTop:day.getBoundingClientRect().top,originRow,mode:event.target.closest('[data-edge]')?.dataset.edge || 'move',moved:false,proposal:null};

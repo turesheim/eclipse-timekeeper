@@ -49,8 +49,13 @@ async function position(page,element,edge=null) {
   await page.locator('.calendar-scroll').evaluate((scroll,{id,edge})=>{
     const card=[...scroll.querySelectorAll('.calendar-session:not(.preview)')].find(value=>value.dataset.sessionId===id);
     scroll.scrollTop=parseFloat(card.style.top)+(edge==='end' ? parseFloat(card.style.height)-300 : -130);
-    window.scrollTo(0,scroll.getBoundingClientRect().top+window.scrollY-80);
+    // Bootstrap enables smooth root scrolling; gesture coordinates require the
+    // fixture's page positioning to have finished before the pointer is placed.
+    window.scrollTo({top:scroll.getBoundingClientRect().top+window.scrollY-80,behavior:'instant'});
   },{id:await element.getAttribute('data-session-id'),edge});
+  // Manual mouse/touch coordinates need the same settled layout that locator
+  // actions wait for, including fonts and the positioned scroll containers.
+  await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
   const rect=await element.boundingBox();expect(rect).toBeTruthy();return rect;
 }
 async function dragSession(page,id,targetDate,deltaY=0) {
@@ -109,9 +114,10 @@ test('calendar pointer moves and both resize handles preserve nanoseconds and ac
     await resize(page,f.session.id,'end',16);
     await expect.poll(async()=> (await read(request,'work-sessions',f.session.id)).end).toBe('2025-10-21T14:48:00.987654321Z');
     current=await read(request,'work-sessions',f.session.id);await expect(bar(page,f.session.id)).toHaveAttribute('data-version',String(current.version));
-    await bar(page,f.session.id).focus();await bar(page,f.session.id).press('ArrowRight');
+    await bar(page,f.session.id).locator('.calendar-session-select').focus();await page.keyboard.press('ArrowRight');
     await expect.poll(async()=> (await read(request,'work-sessions',f.session.id)).start).toBe('2025-10-22T06:48:00.123456789Z');
     current=await read(request,'work-sessions',f.session.id);expect(current.end).toBe('2025-10-22T14:48:00.987654321Z');
+    await expect(bar(page,f.session.id).locator('.calendar-session-select')).toBeFocused();
     expect(instantNanos(current.end)-instantNanos(current.start)).toBe(instantNanos(f.session.end)-instantNanos(f.session.start));
     await unchangedActivities(request,f);
     expect(await (await api(request,'GET','/activities/active')).json()).toEqual(active);

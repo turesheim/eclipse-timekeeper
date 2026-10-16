@@ -24,6 +24,60 @@ Font Awesome Free 7.3.1 supplies locally bundled icon fonts for larger tree
 controls and action buttons. Buttons retain accessible names and hover titles;
 fonts and their upstream license are included in the server distribution.
 
+## Design baseline
+
+Bootstrap 5.3.8 supplies the shared buttons, forms, navigation, cards and tables.
+The small application theme in `style.css` defines the green palette, typography,
+spacing and visible keyboard focus. The work-session card establishes the baseline:
+a client-color accent, explicit running/stopped status, four time totals and
+consistently sized icon actions. Client color is always accompanied by text.
+The same controls apply to sign-in/setup/recovery, account management, activities,
+clients, projects, tasks and labels. Record tables become labelled cards on narrow
+screens so actions stay in view; Workweek and Calendar retain their specialized
+scrollable layouts. Calendar geometry is isolated in `calendar.css`.
+
+These screenshots use synthetic records from `tests/design.spec.js` at 1440 and
+390 pixels wide. The design tests also capture all workspace views and account,
+sign-in and validation states under `server/web/test-results/design-*.png`.
+Review those images after layout changes; automated accessibility checks cannot
+replace visual review or keyboard testing.
+
+![Desktop work-session baseline](../assets/screenshots/bootstrap-work-session-desktop.png)
+
+![Narrow-screen work-session baseline](../assets/screenshots/bootstrap-work-session-narrow.png)
+
+Bootstrap's exact npm version and integrity are pinned in `package-lock.json`.
+Its compiled CSS and MIT license are committed under `src/assets/bootstrap`,
+alongside the SVGs extracted from its data URLs. No Bootstrap JavaScript is needed:
+native modal dialogs and the existing application navigation handle interactions.
+The deployed client uses only same-origin files, including icon fonts, and retains
+its `img-src 'self'` security policy. Maven packages these assets directly; it does
+not require npm or an external CDN at runtime or when building the server.
+
+After deliberately updating the pinned dependency, run:
+
+```sh
+cd server/web
+npm ci --ignore-scripts
+npm run vendor:bootstrap
+npm run check:assets
+```
+
+Commit the regenerated CSS, SVGs and license together. CI checks that the bundled
+assets match the pinned dependency, then runs real-server browser tests with axe
+WCAG A/AA checks for all views at desktop and narrow widths. Those tests verify
+that no design asset triggers a third-party request or is blocked by CSP, and exercise
+keyboard focus, required fields and error recovery. Native browser validation and
+the API's existing concurrency and authorization rules remain in use.
+
+macOS WebKit reports inline-style CSP diagnostics for native select controls even
+on a plain page without application styles/scripts; Playwright screenshots also
+add inline-style diagnostics. The WebKit asset check excludes those inline reports
+while continuing to reject blocked design assets. Chromium checks every CSP event.
+The production security policy is unchanged. The macOS WebKit keyboard check uses
+Option-Shift-Tab to include buttons, matching
+[Safari's native keyboard navigation](https://support.apple.com/guide/safari/cpsh003/mac).
+
 Projects, tasks, labels, activities and work sessions use API v1. Start/stop uses durable
 idempotency keys. Editors/deletion retain the original opaque ETag, including
 across full resynchronization, rather than upgrading a stale draft. Validation,

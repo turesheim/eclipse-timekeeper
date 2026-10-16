@@ -5,6 +5,8 @@ export function icon(name) {
   node.setAttribute('aria-hidden', 'true'); node.textContent = glyphs[name]; return node;
 }
 export function iconButton(node, name, label) {
-  node.replaceChildren(icon(name)); node.classList.add('icon-button');
+  node.replaceChildren(icon(name)); node.classList.add('btn', 'icon-button');
+  if (![...node.classList].some(value => /^btn-(primary|danger|outline-)/.test(value))) node.classList.add('btn-outline-secondary');
+  if (name === 'delete') {node.classList.remove('btn-outline-secondary');node.classList.add('btn-outline-danger');}
   node.setAttribute('aria-label', label); node.title = label; return node;
 }

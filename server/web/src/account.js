@@ -2,26 +2,31 @@ import {ownerHeader} from './api.js';
 import {instantText, localDateTimeToInstant} from './model.js';
 const $ = id => document.getElementById(id);
 let generation = 0;
-const node = (tag,text) => {const value=document.createElement(tag);if(text!==undefined) value.textContent=text;return value;};
+const node = (tag,text) => {const value=document.createElement(tag);if(text!==undefined) value.textContent=text;
+  if(tag==='button') value.className='btn btn-outline-secondary';
+  if(tag==='input') value.className='form-control';
+  if(tag==='label') value.className='form-label';return value;};
 export function closeAccount() {++generation;$('account-dialog').close();$('account-content').replaceChildren();$('account-error').textContent='';}
 $('account-close').addEventListener('click',closeAccount);
 $('account-dialog').addEventListener('cancel',event=>{event.preventDefault();closeAccount();});
 export async function openAccount(session,signOut,updateAccount) {
-  const current=++generation, root=$('account-content');root.replaceChildren();$('account-error').textContent='';$('account-dialog').showModal();
+  const current=++generation, root=$('account-content'), loading=node('p','Loading account…');root.replaceChildren(loading);root.setAttribute('aria-busy','true');$('account-error').textContent='';$('account-dialog').showModal();
   const valid=()=>current===generation;
   const run=async work=>{if(!valid()) return;$('account-error').textContent='';try {await work();}catch(error){if(valid()) {if(error.status===401) signOut(error.message);else $('account-error').textContent=error.message;}}};
   function field(form,label,value='',type='text') {
     const wrapper=node('label',label),input=node('input');input.type=type;
-    if(type==='checkbox') {input.checked=!!value;wrapper.className='check';} else {input.value=value;input.required=true;}
+    if(type==='checkbox') {input.checked=!!value;wrapper.className='form-label check';input.className='form-check-input';} else {input.value=value;input.required=true;}
     if(type==='password') {input.autocomplete='new-password';input.minLength=15;}wrapper.append(input);form.append(wrapper);return input;
   }
   function form(title,submit,work) {
     const section=node('section'),heading=node('h3',title),value=node('form'),button=node('button',submit);button.type='submit';section.append(heading,value);root.append(section);
+    button.className='btn btn-primary';
     value.addEventListener('submit',event=>{event.preventDefault();button.disabled=true;void run(work).finally(()=>{button.disabled=false;});});
     return {value,finish:()=>value.append(button)};
   }
   await run(async()=>{
     const [loaded,profile]=await Promise.all([session.request('/auth/account'),session.request('/me')]);if(!valid()) return;
+    root.replaceChildren();root.setAttribute('aria-busy','false');
     const zone=profile.data.zoneId;
     const account=loaded.data;
     root.append(node('p',`Signed in as ${account.displayName}. Your records are private to this account.`));
@@ -73,4 +78,5 @@ export async function openAccount(session,signOut,updateAccount) {
       const username=field(create.value,'New user username'),display=field(create.value,'New user display name'),password=field(create.value,'Temporary password','','password'),admin=field(create.value,'New user is administrator',false,'checkbox');create.finish();
     }
   });
+  if(valid()) {loading.remove();root.setAttribute('aria-busy','false');}
 }
