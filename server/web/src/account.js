@@ -49,6 +49,15 @@ async function renderTokens(view, zone) {
   const card = section(view, 'Personal API tokens');
   card.append(node('p', 'Use a separate named token for each Eclipse installation or other client. Token secrets are shown once.'));
   const list = node('div'); card.append(list);
+  async function refreshList(feedback, acknowledgement) {
+    try {await tokens();}
+    catch (error) {
+      if (error.status === 401) throw error;
+      if (!view.valid()) return;
+      feedback.textContent = `${acknowledgement} Unable to refresh the token list.`;
+      feedback.append(' ', button('Refresh token list', () => void view.run(tokens, {feedback})));
+    }
+  }
   async function tokens() {
     const {data} = await view.session.request('/auth/tokens'); if (!view.valid()) return;
     list.replaceChildren();
@@ -60,7 +69,10 @@ async function renderTokens(view, zone) {
         const revoke = button('Revoke', () => {
           actions.replaceChildren(node('p', `Revoke “${token.name}”? Clients and browser sessions using this token will lose access. Your password sign-in sessions remain valid.`));
           const feedback = node('p', '', 'form-feedback'); feedback.setAttribute('role', 'status');
-          const confirm = button('Revoke token', () => void view.run(async () => {await view.session.request(`/auth/tokens/${token.id}`, {method: 'DELETE'}); if (view.valid()) await tokens();}, {submit: confirm, feedback, write: true}), 'btn btn-danger');
+          const confirm = button('Revoke token', () => void view.run(async () => {
+            await view.session.request(`/auth/tokens/${token.id}`, {method: 'DELETE'}); if (!view.valid()) return;
+            feedback.textContent = 'Token revoked.'; actions.replaceChildren(feedback); await refreshList(feedback, 'Token revoked.');
+          }, {submit: confirm, feedback, write: true}), 'btn btn-danger');
           actions.append(confirm, button('Cancel', () => {actions.replaceChildren(revoke);}), feedback);
         }); revoke.disabled = !view.canWrite; actions.append(revoke);
       }
@@ -81,7 +93,7 @@ async function renderTokens(view, zone) {
       try {await navigator.clipboard.writeText(value.value); if (view.valid()) feedback.textContent = 'Token copied.';}
       catch {if (view.valid()) {value.focus(); value.select(); feedback.textContent = 'Copy the selected token using your browser.';}}
     }), button('Done', () => {value.value = ''; secret.replaceChildren();}), feedback);
-    name.value = ''; expiry.value = ''; view.clean(create.value); create.feedback.textContent = 'Token created.'; await tokens();
+    name.value = ''; expiry.value = ''; view.clean(create.value); create.feedback.textContent = 'Token created.'; await refreshList(create.feedback, 'Token created.');
   });
   create.value.append(node('p', `Expiry times use ${zone}.`, 'hint'));
   const name = field(create.value, 'Token name', '', {maxLength: 200});

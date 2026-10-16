@@ -43,6 +43,13 @@ test('My Account direct links, mobile layouts and Back navigation preserve runni
     }
     await page.screenshot({path: `test-results/my-account-profile-${width}.png`, fullPage: true});
   }
+  await page.getByLabel('Time zone', {exact: true}).fill('Invalid/Zone'); await page.getByRole('button', {name: 'Save time zone', exact: true}).click();
+  await expect(page.locator('#account-content')).toContainText('Enter a valid time zone');
+  const deviceZone = await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
+  await page.getByRole('button', {name: /Use this device's time zone/}).click(); await page.getByRole('button', {name: 'Save time zone', exact: true}).click();
+  await expect(page.locator('#account-content')).toContainText('Time zone saved');
+  expect((await (await page.request.get('/api/v1/me')).json()).zoneId).toBe(deviceZone);
+  expect((await (await page.request.get('/api/v1/work-sessions/' + session.id)).json()).start).toBe(session.start);
   await page.getByRole('link', {name: 'Password', exact: true}).click(); await ready(page);
   await page.goBack(); await expect(page.getByLabel('Account username', {exact: true})).toHaveValue(user.username);
   await page.reload(); await ready(page); await expect(page.locator('#account-heading')).toHaveText('My Account');
@@ -87,6 +94,9 @@ test('Users page protects the last administrator, keeps stale drafts and confirm
   expect((await (await api(request, 'GET', '/auth/users/' + key(user))).json()).user.state).toBe('ENABLED');
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', {name: 'Save user', exact: true}).click();
   await expect(page.locator('#account-content tr').filter({hasText: user.username})).toContainText('Disabled');
+  await page.locator('#account-content tr').filter({hasText: user.username}).getByRole('link', {name: 'Edit', exact: true}).click(); await ready(page);
+  await page.getByLabel('Enabled', {exact: true}).check(); await page.getByRole('button', {name: 'Save user', exact: true}).click();
+  await expect(page.locator('#account-content tr').filter({hasText: user.username})).toContainText('Enabled');
   expect((await (await api(request, 'GET', '/auth/users/' + key(self))).json()).user.administrator).toBe(true);
   await page.screenshot({path: 'test-results/users-desktop.png', fullPage: true});
   await page.setViewportSize({width: 390, height: 844}); await page.screenshot({path: 'test-results/users-mobile.png', fullPage: true});
@@ -95,9 +105,16 @@ test('Users page protects the last administrator, keeps stale drafts and confirm
 });
 test('personal tokens copy once, clear on navigation and require named revocation confirmation', async ({page, request}) => {
   const user = await fresh(request); await login(page, user, '#account/tokens'); await ready(page);
+  let failList = false;
+  page.on('response', response => {if (response.request().method() === 'POST' && response.url().endsWith('/auth/tokens')) failList = true;});
+  await page.route('**/api/v1/auth/tokens', async route => {
+    if (route.request().method() === 'GET' && failList) {failList = false; await route.abort('failed');} else await route.continue();
+  });
   await page.evaluate(() => {Object.defineProperty(navigator, 'clipboard', {value: {writeText: async value => {window.testCopiedToken = value;}}});});
   await page.getByLabel('Token name', {exact: true}).fill('Eclipse laptop'); await page.getByLabel('Token access', {exact: true}).selectOption('read');
   await page.getByRole('button', {name: 'Create token', exact: true}).click(); const secret = await page.getByLabel('New API token', {exact: true}).inputValue(); expect(secret).toMatch(/^tkp_/);
+  await expect(page.locator('#account-content')).toContainText('Token created. Unable to refresh');
+  await page.getByRole('button', {name: 'Refresh token list', exact: true}).click(); await ready(page);
   await page.getByRole('button', {name: 'Copy token', exact: true}).click(); expect(await page.evaluate(() => window.testCopiedToken)).toBe(secret);
   const row = page.locator('#account-content tr').filter({hasText: 'Eclipse laptop'}); await expect(row).toContainText('Read-only'); await expect(row).toContainText('Never used');
   await page.getByRole('link', {name: 'Profile', exact: true}).click(); await ready(page); await expect(page.getByLabel('New API token', {exact: true})).toHaveCount(0);
