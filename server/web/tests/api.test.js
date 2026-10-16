@@ -48,3 +48,44 @@ test('explicit bearer-to-cookie exchange accepts a Set-Cookie response without p
   const api=new Api('existing-token',async(url,options)=>{assert.equal(url,'/api/v1/auth/token-login');assert.equal(options.credentials,'same-origin');assert.equal(options.headers.Authorization,'Bearer existing-token');return reply({ownerId:'owner-a',csrf:'csrf'});});
   await api.request('/auth/token-login',{method:'POST'});
 });
+test('an untouched UTC profile adopts local time conditionally and only once', async () => {
+  let profile={ownerId:'owner-a',zoneId:'UTC',version:0},writes=0;
+  const api=new Api('token',async(url,options)=>{
+    assert.equal(url,'/api/v1/me');
+    if(options.method==='PUT') {
+      writes++;assert.equal(options.headers['If-Match'],'"opaque"');
+      assert.deepEqual(JSON.parse(options.body),{zoneId:'Europe/Oslo'});
+      profile={...profile,zoneId:'Europe/Oslo',version:1};
+    }
+    return reply(profile);
+  });
+  assert.equal((await api.initializeTimeZone('Europe/Oslo')).data.zoneId,'Europe/Oslo');
+  assert.equal((await api.initializeTimeZone('America/Los_Angeles')).data.zoneId,'Europe/Oslo');
+  assert.equal(writes,1);
+});
+test('explicit UTC and other configured zones are preserved on a different device', async () => {
+  for(const profile of [{zoneId:'UTC',version:1},{zoneId:'Europe/Oslo',version:0}]) {
+    const api=new Api('token',async(url,options)=>{assert.equal(options.method,'GET');return reply({ownerId:'owner-a',...profile});});
+    assert.equal((await api.initializeTimeZone('America/Los_Angeles')).data.zoneId,profile.zoneId);
+  }
+});
+test('a concurrent time zone choice wins over browser initialization', async () => {
+  let reads=0,writes=0;
+  const api=new Api('token',async(url,options)=>{
+    if(options.method==='PUT') {writes++;return reply({code:'STALE_VERSION'},undefined,412);}
+    return reply({ownerId:'owner-a',zoneId:reads++ ? 'Asia/Tokyo':'UTC',version:reads===1 ? 0:1});
+  });
+  assert.equal((await api.initializeTimeZone('Europe/Oslo')).data.zoneId,'Asia/Tokyo');assert.equal(writes,1);
+});
+test('read-only time zone initialization cannot prevent signing in', async () => {
+  const api=new Api('token',async(url,options)=>options.method==='PUT' ? reply({code:'FORBIDDEN'},undefined,403):reply({ownerId:'owner-a',zoneId:'UTC',version:0}));
+  assert.equal((await api.initializeTimeZone('Europe/Oslo')).data.zoneId,'UTC');
+});
+test('a lost time zone write reply is read back without repeating the write', async () => {
+  let committed=false,writes=0;
+  const api=new Api('token',async(url,options)=>{
+    if(options.method==='PUT') {committed=true;writes++;throw new Error('connection lost');}
+    return reply({ownerId:'owner-a',zoneId:committed ? 'Europe/Oslo':'UTC',version:committed ? 1:0});
+  });
+  assert.equal((await api.initializeTimeZone('Europe/Oslo')).data.zoneId,'Europe/Oslo');assert.equal(writes,1);
+});
