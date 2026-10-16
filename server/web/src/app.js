@@ -69,7 +69,7 @@ function readOnlyWhileDisconnected() {
 }
 function tab(name) {
   for (const item of ['week', 'calendar', 'tasks', 'clients', 'projects', 'labels']) $(`${item}-panel`).hidden = item !== name;
-  $('workspace').dataset.view=name;if(name==='calendar') calendar.show();
+  $('workspace').dataset.view=name;if(name==='calendar') calendar.show();else calendar.hide();
   for (const item of document.querySelectorAll('[data-tab]')) {
     item.classList.toggle('active', item.dataset.tab === name);
     if (item.dataset.tab === name) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');

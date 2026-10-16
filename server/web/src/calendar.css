@@ -13,3 +13,6 @@
 .calendar-resize{z-index:1}
 /* Keep the grid stationary when live drag/selection feedback appears. */
 #calendar-message{display:block}
+/* Range selection is explicit on touchscreens so normal scrolling stays available. */
+.calendar-range-mode .calendar-day{touch-action:none;cursor:crosshair}
+.calendar-create-preview{left:2px;right:2px;z-index:6;pointer-events:none;background:#17665320;border:2px dashed var(--accent);color:#104e3f;padding:.25rem;font-size:.75rem;font-weight:650}

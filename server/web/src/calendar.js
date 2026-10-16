@@ -1,5 +1,5 @@
 import {addDays,dateInZone,instantNanos,instantText,nanosInstant,localDateTime} from './model.js';
-import {calendarWeek,calendarPieces,calendarAnchor,calendarLanes,calendarTaskBlocks,shiftSession,shiftSessionDays,pasteSession,clientColors,CALENDAR_STEP} from './calendar-model.js';
+import {calendarWeek,calendarPieces,calendarAnchor,calendarRange,calendarLanes,calendarTaskBlocks,shiftSession,shiftSessionDays,pasteSession,clientColors,CALENDAR_STEP} from './calendar-model.js';
 import {iconButton} from './icons.js';
 
 const ROW_HEIGHT=16;
@@ -15,11 +15,11 @@ function button(label,operation,className) {
 export class WeekCalendar {
   constructor(root,callbacks) {
     this.root=root;this.callbacks=callbacks;this.connected=false;this.scope=null;
-    this.selectedId=null;this.selection=null;this.clipboard=null;this.drag=null;this.busy=false;
+    this.selectedId=null;this.selection=null;this.clipboard=null;this.drag=null;this.busy=false;this.rangeMode=false;
     this.scroll=root.querySelector('.calendar-scroll');this.grid=root.querySelector('#calendar-grid');
     this.message=root.querySelector('#calendar-message');
-    this.controls=Object.fromEntries(['previous','next','today','copy','paste','edit','new'].map(key=>[key,root.querySelector(`#calendar-${key}`)]));
-    for(const [key,glyph,label] of [['previous','left','Previous week'],['next','right','Next week'],['copy','copy','Copy work session'],['paste','paste','Paste work session'],['edit','edit','Edit selected work session'],['new','add','Record work session at selected time']])
+    this.controls=Object.fromEntries(['previous','next','today','copy','paste','edit','new','range'].map(key=>[key,root.querySelector(`#calendar-${key}`)]));
+    for(const [key,glyph,label] of [['previous','left','Previous week'],['next','right','Next week'],['copy','copy','Copy work session'],['paste','paste','Paste work session'],['edit','edit','Edit selected work session'],['new','add','Record work session at selected time'],['range','clock','Select time range']])
       iconButton(this.controls[key],glyph,label);
     this.controls.previous.addEventListener('click',()=>callbacks.onDate(addDays(this.calendar.first,-7)));
     this.controls.next.addEventListener('click',()=>callbacks.onDate(addDays(this.calendar.first,7)));
@@ -28,6 +28,8 @@ export class WeekCalendar {
     this.controls.paste.addEventListener('click',()=>this.paste());
     this.controls.edit.addEventListener('click',()=>this.edit());
     this.controls.new.addEventListener('click',()=>this.create());
+    this.controls.range.addEventListener('click',()=>this.setRangeMode(!this.rangeMode));
+    this.setRangeMode(false);
     root.querySelector('#calendar-date').addEventListener('change',event=>callbacks.onDate(event.target.value));
     root.addEventListener('keydown',event=>this.key(event));
   }
@@ -42,7 +44,13 @@ export class WeekCalendar {
     if(!this.root.hidden && !this.drag && !this.busy) this.render();else this.buttons();
   }
   show() {if(this.data && !this.drag && !this.busy) this.render();}
-  setConnected(value) {this.connected=value;this.buttons();}
+  hide() {this.cancelDrag();this.setRangeMode(false);}
+  setConnected(value) {this.connected=value;if(!value) {this.cancelDrag();this.setRangeMode(false);}this.buttons();}
+  setRangeMode(value) {
+    this.rangeMode=value;this.root.classList.toggle('calendar-range-mode',value);
+    this.controls.range.setAttribute('aria-pressed',String(value));this.controls.range.classList.toggle('active',value);
+    if(value) this.text('Drag empty calendar space to select a time range. Release to review a new work session.');
+  }
   selected() {return this.data?.workSessions.find(value=>value.id===this.selectedId);}
   buttons() {
     const available=this.connected && !this.busy && !this.drag;
@@ -50,6 +58,7 @@ export class WeekCalendar {
     this.controls.edit.disabled=!this.selected() || !available;
     this.controls.paste.disabled=!this.clipboard || !this.selection || !available;
     this.controls.new.disabled=!this.selection || !available;
+    this.controls.range.disabled=!available;
     for(const value of this.root.querySelectorAll('.calendar-resize,.calendar-session-select')) value.disabled=!available;
     for(const value of this.root.querySelectorAll('.calendar-task button,.calendar-unrecorded button')) value.disabled=!available;
     for(const value of this.root.querySelectorAll('.calendar-session')) value.setAttribute('aria-disabled',String(!available));
@@ -101,11 +110,12 @@ export class WeekCalendar {
       });
       if(day.skipped) column.append(node('p','Date skipped in this time zone','calendar-skipped'));
       column.addEventListener('click',event=>{
-        if(event.target.closest('.calendar-event,button,a')) return;
+        if(document.querySelector('#editor').open || event.target.closest('.calendar-event,button,a')) return;
         const row=Math.floor((event.clientY-column.getBoundingClientRect().top)/ROW_HEIGHT);
         if(day.byRow.has(row)) this.select(day.date,row);else this.text('This shaded clock time does not occur on this day.');
       });
       column.addEventListener('dblclick',event=>{if(!event.target.closest('.calendar-event,button,a') && this.connected) this.create();});
+      column.addEventListener('pointerdown',event=>this.beginCreation(event,day));
       this.dayNodes.set(day.date,column);this.grid.append(column);
     }
     const sessions=[];
@@ -243,6 +253,7 @@ export class WeekCalendar {
     }}
   }
   key(event) {
+    if(event.key==='Escape' && this.drag) {event.preventDefault();this.cancelDrag();this.setRangeMode(false);this.text('Time selection cancelled.');return;}
     if(!this.data || event.target.closest('input,select,textarea,a') || document.querySelector('#editor').open) return;
     const command=event.ctrlKey || event.metaKey;
     if(command && event.key.toLowerCase()==='c' && !window.getSelection()?.toString() && this.selected()) {event.preventDefault();this.copy();return;}
@@ -283,15 +294,34 @@ export class WeekCalendar {
     (event.target.closest('[data-edge]') || bar.querySelector('.calendar-session-select') || bar).focus({preventScroll:true});
     this.selectSession(session,piece.date,Math.floor(piece.top));
     const originRow=Math.max(0,Math.min(this.calendar.rows.length-1,Math.floor((event.clientY-day.getBoundingClientRect().top)/ROW_HEIGHT)));
-    this.drag={session:structuredClone(session),piece,bar,pointer:event.pointerId,x:event.clientX,y:event.clientY,lastX:event.clientX,lastY:event.clientY,originTop:day.getBoundingClientRect().top,originRow,mode:event.target.closest('[data-edge]')?.dataset.edge || 'move',moved:false,proposal:null};
+    this.drag={scope:this.scope,session:structuredClone(session),piece,bar,pointer:event.pointerId,x:event.clientX,y:event.clientY,lastX:event.clientX,lastY:event.clientY,originTop:day.getBoundingClientRect().top,originRow,mode:event.target.closest('[data-edge]')?.dataset.edge || 'move',moved:false,proposal:null};
+    this.captureDrag(event);
+  }
+  beginCreation(event,day) {
+    if(event.button!==0 || !this.connected || this.busy || this.drag || day.skipped || document.querySelector('#editor').open ||
+       event.target.closest('.calendar-event,button,a') || event.pointerType==='touch' && !this.rangeMode) return;
+    const bar=event.currentTarget,row=Math.floor((event.clientY-bar.getBoundingClientRect().top)/ROW_HEIGHT);
+    if(!day.byRow.has(row)) {this.text('This shaded clock time does not occur on this day.');return;}
+    event.preventDefault();bar.focus({preventScroll:true});
+    this.drag={scope:this.scope,calendar:this.calendar,anchor:{date:day.date,row},clientId:this.selected()?.clientId,bar,pointer:event.pointerId,
+      x:event.clientX,y:event.clientY,lastX:event.clientX,lastY:event.clientY,mode:'create',moved:false,proposal:null};
+    this.captureDrag(event);
+  }
+  captureDrag(event) {
+    const bar=this.drag.bar;
     bar.setPointerCapture(event.pointerId);
     const move=value=>{if(this.drag?.pointer===value.pointerId) {this.drag.lastX=value.clientX;this.drag.lastY=value.clientY;this.moveDrag();}};
     const finish=value=>{
       if(this.drag?.pointer!==value.pointerId) return;
-      const state=this.drag;bar.removeEventListener('pointermove',move);bar.removeEventListener('pointerup',finish);bar.removeEventListener('pointercancel',cancel);
-      this.cancelDrag();if(state.moved && state.proposal) void this.commit(state.session,state.proposal);
+      const state=this.drag;this.cancelDrag();
+      if(state.scope!==this.scope || this.root.hidden || !this.connected || !state.moved || !state.proposal) return;
+      if(state.mode==='create') {
+        this.setRangeMode(false);this.selectedId=null;
+        this.callbacks.onNew({title:'',clientId:state.clientId,summary:'',...state.proposal});
+      } else void this.commit(state.session,state.proposal);
     };
-    const cancel=value=>{if(this.drag?.pointer===value.pointerId) {bar.removeEventListener('pointermove',move);bar.removeEventListener('pointerup',finish);bar.removeEventListener('pointercancel',cancel);this.cancelDrag();this.show();}};
+    const cancel=value=>{if(this.drag?.pointer===value.pointerId) {this.cancelDrag();this.show();}};
+    this.drag.dispose=()=>{bar.removeEventListener('pointermove',move);bar.removeEventListener('pointerup',finish);bar.removeEventListener('pointercancel',cancel);};
     bar.addEventListener('pointermove',move);bar.addEventListener('pointerup',finish);bar.addEventListener('pointercancel',cancel);
     const tick=()=>{
       if(!this.drag) return;
@@ -307,6 +337,7 @@ export class WeekCalendar {
     if(!state.moved && Math.abs(state.lastX-state.x)+Math.abs(state.lastY-state.y)<5) return;state.moved=true;
     const columns=[...this.dayNodes.values()],target=columns.find(value=>state.lastX>=value.getBoundingClientRect().left && state.lastX<value.getBoundingClientRect().right);
     if(!target) return;
+    if(state.mode==='create') {this.moveCreation(target);return;}
     const origin=this.dayNodes.get(state.piece.date),originTop=origin.getBoundingClientRect().top;
     // The original pointer coordinate must follow scroll movement, not the viewport.
     const deltaRows=Math.round((state.lastY-state.y+state.originTop-originTop)/ROW_HEIGHT);
@@ -321,9 +352,27 @@ export class WeekCalendar {
       this.text(`${state.mode==='move' ? 'Move' : 'Resize '+state.mode}: ${instantText(proposal.start,this.calendar.zone)} → ${instantText(proposal.end,this.calendar.zone)}`);
     } catch(error) {state.proposal=null;this.text(error.message);}
   }
+  moveCreation(target) {
+    const state=this.drag;
+    if(state.calendar!==this.calendar || this.data.dates.first!==this.calendar.first || this.data.profile.data.zoneId!==this.calendar.zone) {
+      this.cancelDrag();this.text('The calendar changed. Select the time range again.');return;
+    }
+    const row=Math.max(0,Math.min(this.calendar.rows.length,Math.round((state.lastY-target.getBoundingClientRect().top)/ROW_HEIGHT)));
+    for(const old of this.grid.querySelectorAll('.preview')) old.remove();
+    try {
+      state.proposal=calendarRange(this.calendar,state.anchor,{date:target.dataset.date,row});
+      for(const piece of calendarPieces(state.proposal.start,state.proposal.end,this.calendar)) {
+        const preview=node('div','New work session','calendar-event calendar-create-preview preview');
+        preview.setAttribute('aria-hidden','true');preview.style.top=`${piece.top*ROW_HEIGHT}px`;preview.style.height=`${(piece.bottom-piece.top)*ROW_HEIGHT}px`;
+        this.dayNodes.get(piece.date).append(preview);
+      }
+      this.text(`New work session: ${instantText(state.proposal.start,this.calendar.zone)} → ${instantText(state.proposal.end,this.calendar.zone)}. Release to review.`);
+    } catch(error) {state.proposal=null;this.text(error.message);}
+  }
   cancelDrag() {
     if(this.animation) cancelAnimationFrame(this.animation);
     const state=this.drag;this.drag=null;
+    state?.dispose?.();
     if(state?.bar.hasPointerCapture(state.pointer)) state.bar.releasePointerCapture(state.pointer);
     for(const value of this.grid.querySelectorAll('.preview')) value.remove();
     for(const value of this.grid.querySelectorAll('.drag-source')) value.classList.remove('drag-source');this.buttons();
