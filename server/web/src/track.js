@@ -83,6 +83,10 @@ export class MonthTrack {
     }
     this.root.querySelector('#track-total').textContent=this.format(result.total);
     for(const [client,total] of this.clientTimes)total.textContent=this.format(result.clients.get(client)||0n);
-    for(const day of result.days)for(const entry of day.sessions)this.sessionTimes.get(day.date+'/'+entry.session.id).textContent=this.format(entry.duration);
+    for(const day of result.days)for(const entry of day.sessions) {
+      const duration=this.sessionTimes.get(day.date+'/'+entry.session.id),client=this.snapshot.clients.find(value=>value.id===entry.session.clientId);
+      duration.textContent=this.format(entry.duration);
+      duration.parentElement.setAttribute('aria-label',`${entry.session.title} ${client?.name||'Client'} ${duration.textContent}${entry.session.end ? '':' Running'} · ${day.date}`);
+    }
   }
 }

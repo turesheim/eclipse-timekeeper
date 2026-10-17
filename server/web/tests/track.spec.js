@@ -41,6 +41,7 @@ test('Track is the default month overview with exact client session hours, local
     await page.getByRole('button',{name:'Previous month',exact:true}).click();
     await page.locator('[data-tab=week]').click();await page.locator('[data-tab=track]').click();await expect(page.getByLabel('Month',{exact:true})).toHaveValue('2025-10');
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    const mobile=await new AxeBuilder({page}).include('#workspace').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(mobile.violations).toEqual([]);
     await expect(page.locator('.track-month thead th')).toHaveCount(7);await page.screenshot({path:'test-results/track-mobile.png',fullPage:true});
     await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#track-clients')).toBeEmpty();await expect(page.locator('#track-total')).toBeEmpty();
     await signIn(page,process.env.TIMEKEEPER_WEB_READ_TOKEN);await page.getByLabel('Month',{exact:true}).fill('2025-10');
