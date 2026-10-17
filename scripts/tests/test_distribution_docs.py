@@ -78,7 +78,8 @@ class DistributionDocumentationTest(unittest.TestCase):
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('Packaging fixture')
             with zipfile.ZipFile(root/'server/app/target/quarkus-app/app/fixture.jar','w') as jar:
                 jar.writestr('timekeeper-build.properties', f'commit={COMMIT}\ndirty=false\n')
-            for name in ('bootstrap-work-session-desktop.png','bootstrap-work-session-narrow.png'):
+            for name in ('bootstrap-work-session-desktop.png','bootstrap-work-session-narrow.png',
+                         'track-month-desktop.png','track-month-narrow.png'):
                 image = root/'docs/assets/screenshots'/name
                 image.parent.mkdir(parents=True,exist_ok=True)
                 image.write_bytes((ROOT/'docs/assets/screenshots'/name).read_bytes())
@@ -92,10 +93,11 @@ class DistributionDocumentationTest(unittest.TestCase):
                 self.assertIn('[Synology deployment guide](DEPLOYMENT.md)',guide)
                 self.assertIn('[local Docker guide](LOCAL-DOCKER.md)',guide)
                 web = archive.read('timekeeper-server/WEB-CLIENT.md').decode()
-                for size in ('desktop','narrow'):
-                    name = f'images/work-session-{size}.png'
-                    self.assertIn(']('+name+')',web)
-                    self.assertTrue(archive.read('timekeeper-server/'+name).startswith(b'\x89PNG\r\n\x1a\n'))
+                for view in ('work-session', 'track-month'):
+                    for size in ('desktop','narrow'):
+                        name = f'images/{view}-{size}.png'
+                        self.assertIn(']('+name+')',web)
+                        self.assertTrue(archive.read('timekeeper-server/'+name).startswith(b'\x89PNG\r\n\x1a\n'))
                 for name in ('DEPLOYMENT.md','LOCAL-DOCKER.md','TAILSCALE.md','WEB-CLIENT.md'):
                     text=archive.read('timekeeper-server/'+name).decode()
                     for url in re.findall(r'\]\(([^\s)]+)\)',text):

@@ -58,6 +58,8 @@ def package(output, tag, commit):
     illustrations = {
         'docs/assets/screenshots/bootstrap-work-session-desktop.png': 'images/work-session-desktop.png',
         'docs/assets/screenshots/bootstrap-work-session-narrow.png': 'images/work-session-narrow.png',
+        'docs/assets/screenshots/track-month-desktop.png': 'images/track-month-desktop.png',
+        'docs/assets/screenshots/track-month-narrow.png': 'images/track-month-narrow.png',
     }
     destinations = {**guides, **illustrations, 'common/api/openapi.json': 'openapi.json'}
     files += [(ROOT / source, 'timekeeper-server/' + destination)

@@ -4,6 +4,7 @@ import {authentication} from './auth.js';
 import {icon, iconButton} from './icons.js';
 import {WeekCalendar} from './calendar.js';
 import {sameSession} from './calendar-model.js';
+import {MonthTrack} from './track.js';
 
 const $ = id => document.getElementById(id);
 let api = null, snapshot = null, connected = false, refreshing = null, reloadAgain = false;
@@ -25,6 +26,7 @@ const calendar = new WeekCalendar($('calendar-panel'), {
   onPaste: input => void openRecord('work-sessions',null,null,input,'Paste work session').catch(error=>setStatus(errorText(error))),
   onChange: changeCalendarSession,
 });
+const track = new MonthTrack($('track-panel'),id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error))));
 function startWatch(session) {
   if (watchSession === session) return;
   watchSession = session;
@@ -65,10 +67,11 @@ function readOnlyWhileDisconnected() {
   for (const id of ['add-client', 'add-task', 'add-project', 'add-label', 'add-activity', 'settings', 'stop', 'session-start', 'session-stop', 'session-new', 'session-edit', 'session-delete', 'session-add', 'session-associate']) $(id).disabled = !connected;
   for (const action of document.querySelectorAll('td.actions button')) action.disabled = !connected;
   calendar.setConnected(connected);
+  track.setWritable(connected && canWrite);
   updateSessionActions();
 }
 function tab(name) {
-  for (const item of ['week', 'calendar', 'tasks', 'clients', 'projects', 'labels']) $(`${item}-panel`).hidden = item !== name;
+  for (const item of ['track','week', 'calendar', 'tasks', 'clients', 'projects', 'labels']) $(`${item}-panel`).hidden = item !== name;
   $('workspace').dataset.view=name;if(name==='calendar') calendar.show();else calendar.hide();
   for (const item of document.querySelectorAll('[data-tab]')) {
     item.classList.toggle('active', item.dataset.tab === name);
@@ -92,12 +95,12 @@ const auth = authentication({
     $('week-sessions').replaceChildren(); $('week-sessions-section').hidden = true;
     refreshing = null; reloadAgain = false;
     ++serverInfoRequest; clearServerInfo(); api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null; accountName = '';
-    calendar.reset(); collapsed.clear(); canWrite = false;
+    calendar.reset(); track.reset(); collapsed.clear(); canWrite = false;
     $('editor').close(); $('fields').replaceChildren(); $('editor-error').textContent = ''; $('editor-notice').textContent = '';
     for(const id of ['clients','projects','tasks','labels','activities','days']) $(id).replaceChildren();
     for(const id of ['owner','status','active-title','active-details','work-session-current','work-session-state','work-session-elapsed','zone-caption','week-total']) $(id).textContent = '';
     $('login').hidden = false; $('workspace').hidden = true; $('session').hidden = true; $('remember-notice').textContent = '';
-    tab('week');
+    tab('track');
   }
 });
 $('refresh').addEventListener('click', () => { const session = api; void refresh().then(() => { if (session === api) startWatch(session); }).catch(() => {}); });
@@ -217,6 +220,7 @@ function render() {
   $('activities-heading').textContent = selectedDay ? `Activities — ${selectedDay}` : 'Activities';
   renderWorkweek(s, zone);
   calendar.update(s,connected,api);
+  track.update(s,activeAsOf,displayNanos,connected && canWrite);
 }
 function renderWorkweek(s, zone) {
   const dates = Array.from({length: 7}, (_, index) => addDays(s.dates.first, index));
@@ -506,6 +510,7 @@ function renderSessionTime() {
   const session=displayedSession();
   if(connected) activeAsOf=instantNanos(snapshot.report.generatedAt)+elapsed;
   if(session) $('work-session-elapsed').textContent=displayNanos(sessionTimeNanos(session,[],activeAsOf).duration);
+  track.tick(activeAsOf);
 }
 function addSessionWarning() {
   const warning=element('p','', 'hint');warning.id='activity-session-warning';warning.setAttribute('role','status');$('fields').append(warning);

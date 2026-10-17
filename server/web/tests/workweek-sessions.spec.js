@@ -9,6 +9,7 @@ async function api(request, method, path, data, headers = {}) {
 async function signIn(page, credential = token) {
   await page.goto('/web/'); await page.locator('#auth-mode').selectOption('token'); await page.getByLabel('Access token').fill(credential);
   await page.getByRole('button', {name: 'Sign in', exact: true}).click(); await expect(page.locator('#status')).toHaveText('Up to date');
+  await page.locator('[data-tab=week]').click();
 }
 async function fixture(request) {
   const profile = await api(request, 'GET', '/me'), previous = await profile.json(), records = [];

@@ -56,8 +56,17 @@
           </div></div>
       </section>
       <section class="card tracking"><div><p class="eyebrow">IN PROGRESS</p><h2 id="active-title">Ready when you are</h2><p id="active-details" class="hint">Choose a task below to start tracking.</p></div><button class="btn btn-primary" id="stop" hidden>Stop tracking</button></section>
-      <nav id="workspace-navigation" class="nav nav-pills workspace-nav" aria-label="Workspace" tabindex="-1"><button class="nav-link" data-tab="week" aria-current="page">Workweek</button><button class="nav-link" data-tab="calendar">Calendar</button><button class="nav-link" data-tab="tasks">Tasks</button><button class="nav-link" data-tab="clients">Clients</button><button class="nav-link" data-tab="projects">Projects</button><button class="nav-link" data-tab="labels">Labels</button></nav>
-      <section id="week-panel">
+      <nav id="workspace-navigation" class="nav nav-pills workspace-nav" aria-label="Workspace" tabindex="-1"><button class="nav-link active" data-tab="track" aria-current="page">Track</button><button class="nav-link" data-tab="week">Workweek</button><button class="nav-link" data-tab="calendar">Calendar</button><button class="nav-link" data-tab="tasks">Tasks</button><button class="nav-link" data-tab="clients">Clients</button><button class="nav-link" data-tab="projects">Projects</button><button class="nav-link" data-tab="labels">Labels</button></nav>
+      <section id="track-panel" aria-labelledby="track-title">
+        <div class="toolbar track-toolbar"><div><h2 id="track-title">Your month</h2><p id="track-zone" class="hint"></p></div>
+          <div class="calendar-navigation"><button class="btn btn-outline-secondary" id="track-previous">Previous month</button><button class="btn btn-outline-secondary" id="track-today">Current month</button><button class="btn btn-outline-secondary" id="track-next">Next month</button></div>
+          <label class="form-label">Month<input class="form-control" id="track-month" type="month" placeholder="YYYY-MM" required></label>
+          <p class="track-total">Work sessions <strong id="track-total">0h 0m</strong></p>
+        </div>
+        <div id="track-clients" class="track-clients" aria-label="Client hours this month"></div>
+        <div id="track-calendar" class="card"></div>
+      </section>
+      <section id="week-panel" hidden>
         <div class="toolbar"><div><h2>Your workweek</h2><p id="zone-caption" class="hint"></p></div><label class="form-label">Week containing<input class="form-control" id="week-date" type="date" required></label><label class="form-label">Duration format<select class="form-select" id="duration-format" aria-label="Duration format"><option value="clock">Hours, minutes and seconds</option><option value="decimal">Decimal hours</option></select></label><button class="btn btn-outline-secondary" id="add-activity">Add time</button></div>
         <section id="week-sessions-section" hidden aria-labelledby="week-sessions-heading"><h2 id="week-sessions-heading">Work sessions</h2><div id="week-sessions" class="card table-wrap"></div><p class="hint">Session durations are shown separately from tracked activity totals.</p></section>
         <div class="outline-actions"><button class="btn btn-outline-secondary" id="collapse-activities">Hide activities</button><button class="btn btn-outline-secondary" id="expand-activities">Show activities</button></div>
