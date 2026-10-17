@@ -71,6 +71,29 @@ class WorkSessionServiceTest {
         assertThrows(DomainValidationException.class,()->service.createWorkSession(new CreateWorkSession(owner,now.plusNanos(1),Optional.empty(),"Future")));
         assertEquals(activity,store.activities.get(activity.id()));assertEquals(count,events.size());
     }
+    @Test void temporalContextIncludesUnlinkedRunningActivitiesAndExcludesForeignOrNonoverlappingLinks() {
+        Instant start=now.minusSeconds(10);
+        var session=service.createWorkSession(new CreateWorkSession(owner,start,Optional.empty(),"Independent interval"));
+        var earlier=activity(start.minusSeconds(5),Optional.of(start.plusSeconds(6)));
+        var running=activity(start.plusSeconds(4),Optional.empty());
+        activity(start.minusSeconds(2),Optional.of(start)); // touching the left edge
+        activity(now,Optional.of(now.plusSeconds(1))); // touching the right edge
+        var foreign=new Activity(ActivityId.random(),TaskId.random(),new OwnerId("bob"),start,Optional.of(now),"Private other account",Set.of(),false,0);
+        store.activities.put(foreign.id(),foreign);
+        var old=activity(start.minusSeconds(100),Optional.of(start.minusSeconds(90))).associate(session.id());
+        store.activities.put(old.id(),old);
+        var before=Map.copyOf(store.activities);
+        var report=service.workSessionReport(session.id());
+        assertEquals(List.of(earlier,running),report.activities());
+        assertEquals(Duration.ofSeconds(12),report.time().trackedActivityTime());
+        assertEquals(Duration.ofSeconds(10),report.time().allocatedTime());
+        assertEquals(Duration.ZERO,report.time().unallocatedTime());
+        assertEquals(Set.of(earlier.id()),report.time().outsideSession());
+        service.updateWorkSession(new UpdateWorkSession(session.id(),session.version(),start.plusSeconds(7),Optional.empty(),"Moved interval"));
+        assertEquals(List.of(running),service.workSessionReport(session.id()).activities());
+        assertEquals(Duration.ofSeconds(3),service.workSessionReport(session.id()).time().allocatedTime());
+        assertEquals(before,store.activities,"Deriving temporal context or moving a session changed recorded activities");
+    }
     private static class Store implements WorkSessionRepository, ActivityRepository, TransactionRunner {
         final Map<WorkSessionId,WorkSession> sessions = new HashMap<>();
         final Map<ActivityId,Activity> activities = new HashMap<>();
@@ -84,7 +107,11 @@ class WorkSessionServiceTest {
         public List<Activity> findAllActivities() {return List.copyOf(activities.values());}
         public Optional<Activity> find(ActivityId id) {return Optional.ofNullable(activities.get(id));}
         public Optional<Activity> findOpenByOwner(OwnerId owner) {return activities.values().stream().filter(v->v.ownerId().equals(owner)&&v.end().isEmpty()).findFirst();}
-        public List<Activity> findOverlapping(Instant from,Instant to,Optional<OwnerId> owner,Optional<TaskId> task) {throw new UnsupportedOperationException();}
+        public List<Activity> findOverlapping(Instant from,Instant to,Optional<OwnerId> owner,Optional<TaskId> task) {
+            return activities.values().stream().filter(value -> owner.isEmpty() || owner.get().equals(value.ownerId()))
+                    .filter(value -> task.isEmpty() || task.get().equals(value.taskId()))
+                    .filter(value -> value.start().isBefore(to) && value.end().orElse(to).isAfter(from)).toList();
+        }
         public boolean existsByTask(TaskId task) {return activities.values().stream().anyMatch(v->v.taskId().equals(task));}
         public boolean existsByLabel(LabelId label) {return activities.values().stream().anyMatch(v->v.labelIds().contains(label));}
         public Activity save(Activity activity) {activities.put(activity.id(),activity);return activity;}

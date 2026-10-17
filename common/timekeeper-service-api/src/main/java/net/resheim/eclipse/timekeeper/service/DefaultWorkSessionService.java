@@ -92,8 +92,13 @@ public final class DefaultWorkSessionService implements WorkSessionService {
     }
     @Override public Report workSessionReport(WorkSessionId id) {
         return tx(() -> {
-            var session = required(id);var activities = ports.sessions().findSessionActivities(id);
+            var session = required(id);
             Instant now = ports.timeSource().now();
+            Instant until = session.end().orElse(now);
+            var activities = until.isAfter(session.start())
+                    ? ports.activities().findOverlapping(session.start(),until,Optional.of(session.ownerId()),Optional.empty()).stream()
+                        .sorted(Comparator.comparing(Activity::start).thenComparing(value -> value.id().value())).toList()
+                    : List.<Activity>of();
             return new Report(session,activities,WorkSessionTime.calculate(session,activities,now));
         });
     }
