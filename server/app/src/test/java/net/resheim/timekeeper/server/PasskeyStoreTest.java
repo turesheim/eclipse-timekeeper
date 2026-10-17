@@ -22,6 +22,7 @@ class PasskeyStoreTest {
     private static final String RP="timekeeper.example",ORIGIN="https://timekeeper.example:8443",PASSWORD="An actual fixture password phrase";
     @Inject AccountStore accounts;
     PasskeyStore passkeys;
+    BrowserSignIns signIns;
     record Browser(String owner,String browser,AccountStore.Issued session,TokenRegistry.Principal principal) { }
     @BeforeEach void initialize() {
         accounts.tx(c->{lock(c);
@@ -34,7 +35,8 @@ class PasskeyStoreTest {
         });
         var origin=new RecoveryOrigin();origin.accounts=accounts;origin.configured=ORIGIN;origin.epoch=1;
         var realm=new PasskeyRealm();realm.origin=origin;realm.configuredEnabled=true;realm.configuredRp="AUTO";realm.initialize();
-        passkeys=new PasskeyStore();passkeys.accounts=accounts;passkeys.realm=realm;
+        signIns=new BrowserSignIns();signIns.accounts=accounts;signIns.realm=realm;
+        passkeys=new PasskeyStore();passkeys.accounts=accounts;passkeys.realm=realm;passkeys.browserSignIns=signIns;
     }
     private Browser browser(String owner) {
         String binding=AccountPasswords.secret();var session=accounts.login(owner,PASSWORD,false);
@@ -121,5 +123,69 @@ class PasskeyStoreTest {
         String binding=AccountPasswords.secret();var invalid=object().set("credential",object());((ObjectNode)invalid).put("ceremony",AccountPasswords.secret());
         for(int n=0;n<20;n++) assertEquals(401,assertThrows(ApiFailure.class,()->passkeys.login(binding,null,"fixture",invalid)).status);
         assertEquals(429,assertThrows(ApiFailure.class,()->passkeys.login(binding,null,"fixture",invalid)).status);
+    }
+    @Test void aDelayedPasswordRequestCannotReplaceANewerPasskeySignInAndTheReverseIsAlsoFenced() throws Exception {
+        var alice=browser("pk-alice");var key=new WebAuthnProtocolTest.Authenticator("password/passkey race");register(alice,key,object().put("currentPassword",PASSWORD));
+        var olderPassword=signIns.begin(BrowserSignIns.Method.PASSWORD,alice.browser(),alice.session().secret(),"fixture");
+        var keyOptions=passkeys.loginOptions(alice.browser(),alice.session().secret(),"fixture",true);
+        var newerPasskey=passkeys.login(alice.browser(),alice.session().secret(),"fixture",assertion(keyOptions,key,alice.owner(),false));
+        assertEquals(401,assertThrows(ApiFailure.class,()->accounts.login("pk-bob",PASSWORD,false,signIns.issuer(olderPassword))).status);
+        assertEquals(alice.owner(),accounts.session(newerPasskey.secret()).owner());
+        var olderPasskey=passkeys.loginOptions(alice.browser(),newerPasskey.secret(),"fixture",false);
+        var nextPassword=signIns.begin(BrowserSignIns.Method.PASSWORD,alice.browser(),newerPasskey.secret(),"fixture");
+        var newerPassword=accounts.login("pk-bob",PASSWORD,true,signIns.issuer(nextPassword));
+        assertEquals("pk-bob",accounts.session(newerPassword.secret()).owner());assertTrue(newerPassword.persistent());
+        assertThrows(ApiFailure.class,()->accounts.session(newerPasskey.secret()));
+        assertEquals(401,assertThrows(ApiFailure.class,()->passkeys.login(alice.browser(),newerPasskey.secret(),"fixture",assertion(olderPasskey,key,alice.owner(),false))).status);
+        assertBrowserSession(alice.browser(),newerPassword,1);
+    }
+    private void assertBrowserSession(String browser,AccountStore.Issued issued,long epoch) {
+        accounts.tx(c->{try(var statement=query(c,"SELECT digest,origin_epoch FROM tk_auth_session WHERE browser_digest=?",hash(browser));var rows=statement.executeQuery()) {
+            assertTrue(rows.next());assertEquals(hash(issued.secret()),rows.getString(1));assertEquals(epoch,rows.getLong(2));assertFalse(rows.next());
+        }catch(java.sql.SQLException failure) {throw new AssertionError(failure);}return null;});
+    }
+    @Test void passwordAttemptIsBrowserAndMethodBoundAndCannotBeConvertedIntoPasskeyProof() throws Exception {
+        String binding=AccountPasswords.secret();var attempt=signIns.begin(BrowserSignIns.Method.PASSWORD,binding,null,"fixture");
+        var foreign=new BrowserSignIns.Attempt(attempt.method(),new PasskeyCeremonies.Scope(AccountPasswords.secret(),null,ORIGIN,RP,1),attempt.nonce());
+        assertEquals(401,assertThrows(ApiFailure.class,()->accounts.login("pk-bob",PASSWORD,false,signIns.issuer(foreign))).status);
+        var issued=accounts.login("pk-alice",PASSWORD,false,signIns.issuer(attempt));assertBrowserSession(binding,issued,1);
+        assertEquals(401,assertThrows(ApiFailure.class,()->accounts.login("pk-bob",PASSWORD,false,signIns.issuer(attempt))).status);
+        var next=signIns.begin(BrowserSignIns.Method.PASSWORD,binding,issued.secret(),"fixture");
+        var invalid=object().put("ceremony",next.nonce());invalid.set("credential",object());
+        assertEquals(401,assertThrows(ApiFailure.class,()->passkeys.login(binding,issued.secret(),"fixture",invalid)).status);
+        assertEquals(401,assertThrows(ApiFailure.class,()->accounts.login("pk-bob",PASSWORD,false,signIns.issuer(next))).status,"Wrong ceremony method is consumed before rejecting");
+        assertFalse(next.toString().contains(binding));assertFalse(next.toString().contains(next.nonce()));assertFalse(next.scope().toString().contains(binding));assertFalse(issued.toString().contains(issued.secret()));
+    }
+    @Test void aDelayedRecoveryRollsBackAccountAndKeyChangesAfterTheBrowserSignsIntoAnotherAccount() throws Exception {
+        var alice=browser("pk-alice");var aliceKey=new WebAuthnProtocolTest.Authenticator("account recovery rollback");register(alice,aliceKey,object().put("currentPassword",PASSWORD));
+        var bob=browser("pk-bob");var bobKey=new WebAuthnProtocolTest.Authenticator("new browser account");register(bob,bobKey,object().put("currentPassword",PASSWORD));
+        String code=AccountPasswords.secret();accounts.tx(c->{execute(c,"INSERT INTO tk_auth_challenge VALUES(?,'RECOVERY',?,?,FALSE)",hash(code),alice.owner(),Instant.now().plusSeconds(300).toString());return null;});
+        var delayed=signIns.begin(BrowserSignIns.Method.RECOVERY,alice.browser(),alice.session().secret(),"fixture");
+        var options=passkeys.loginOptions(alice.browser(),alice.session().secret(),"fixture",false);
+        var switched=passkeys.login(alice.browser(),alice.session().secret(),"fixture",assertion(options,bobKey,bob.owner(),false));
+        assertEquals(401,assertThrows(ApiFailure.class,()->accounts.complete(code,alice.owner(),"Recovered fixture password",alice.owner(),true,null,signIns.issuer(delayed))).status);
+        assertTrue(accounts.<Boolean>tx(c->currentPassword(c,alice.owner(),PASSWORD)));
+        accounts.tx(c->{assertFalse(new PasskeyCredentials(c,RP).owned(alice.owner()).isEmpty());try(var statement=query(c,"SELECT consumed FROM tk_auth_challenge WHERE digest=?",hash(code));var rows=statement.executeQuery()) {rows.next();assertFalse(rows.getBoolean(1));}catch(java.sql.SQLException failure) {throw new AssertionError(failure);}return null;});
+        assertEquals(bob.owner(),accounts.session(switched.secret()).owner());
+        var fresh=signIns.begin(BrowserSignIns.Method.RECOVERY,alice.browser(),switched.secret(),"fixture");
+        var recovered=accounts.complete(code,alice.owner(),"Recovered fixture password",alice.owner(),true,null,signIns.issuer(fresh));
+        assertBrowserSession(alice.browser(),recovered,1);assertEquals(alice.owner(),accounts.session(recovered.secret()).owner());
+        assertThrows(ApiFailure.class,()->accounts.session(switched.secret()));assertEquals(bob.owner(),accounts.session(bob.session().secret()).owner());
+        accounts.tx(c->{assertTrue(new PasskeyCredentials(c,RP).owned(alice.owner()).isEmpty());return null;});
+    }
+    @Test void boundTokenExchangeRetainsTokenRestrictionsAndOriginCutoverFencesDelayedNormalSignIns() {
+        var alice=browser("pk-alice");var token=accounts.createToken(alice.principal(),"Bound Eclipse session",Set.of("read","write"),null);var bearer=accounts.managed(hash(token.path("token").asText()));
+        var pending=signIns.begin(BrowserSignIns.Method.TOKEN,alice.browser(),alice.session().secret(),"fixture");
+        var exchanged=accounts.exchange(bearer,signIns.issuer(pending));assertBrowserSession(alice.browser(),exchanged,1);
+        assertEquals(403,assertThrows(ApiFailure.class,()->passkeys.list(accounts.session(exchanged.secret()))).status);
+        var old=signIns.begin(BrowserSignIns.Method.PASSWORD,alice.browser(),exchanged.secret(),"fixture");
+        var origin=new RecoveryOrigin();origin.accounts=accounts;origin.configured="https://timekeeper.example:9443";origin.epoch=2;
+        var realm=new PasskeyRealm();realm.origin=origin;realm.configuredEnabled=false;realm.configuredRp="AUTO";realm.initialize();
+        var moved=new BrowserSignIns();moved.accounts=accounts;moved.realm=realm;
+        assertEquals(503,assertThrows(ApiFailure.class,()->signIns.begin(BrowserSignIns.Method.PASSWORD,alice.browser(),exchanged.secret(),"fixture")).status);
+        assertEquals(401,assertThrows(ApiFailure.class,()->accounts.login(alice.owner(),PASSWORD,false,moved.issuer(old))).status);
+        var replacement=moved.begin(BrowserSignIns.Method.PASSWORD,alice.browser(),exchanged.secret(),"fixture");
+        var issued=accounts.login(alice.owner(),PASSWORD,false,moved.issuer(replacement));assertBrowserSession(alice.browser(),issued,2);
+        assertEquals(alice.owner(),accounts.managed(bearer.digest()).owner(),"Origin moves retain Eclipse token access");
     }
 }

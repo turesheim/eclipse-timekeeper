@@ -21,7 +21,12 @@ public class AccountStore {
     @ConfigProperty(name="timekeeper.auth.setup-file",defaultValue="NONE") String setupFile;
     @ConfigProperty(name="quarkus.datasource.jdbc.url") String jdbcUrl;
     private static final String DUMMY=AccountPasswords.hash("This is a dummy password for constant work");
-    record Issued(String secret,JsonNode account,String csrf,Instant expires,boolean persistent) { }
+    record Issued(String secret,JsonNode account,String csrf,Instant expires,boolean persistent) {
+        @Override public String toString() {return "Browser session";}
+    }
+    @FunctionalInterface interface SessionIssuer {
+        Issued issue(Connection c,String owner,Set<String> permissions,boolean remember,Instant now,String parent);
+    }
     static Set<String> permissions(String value) {return value.equals("READ_WRITE") ? Set.of("read","write") : Set.of("read");}
     static String permissions(Set<String> values) {return values.contains("write") ? "READ_WRITE" : "READ";}
     <T> T tx(Function<Connection,T> work) {
@@ -116,6 +121,9 @@ public class AccountStore {
         return complete(code,login,password,display,recovery,null);
     }
     Issued complete(String code,String login,String password,String display,boolean recovery,String email) {
+        return complete(code,login,password,display,recovery,email,this::issue);
+    }
+    Issued complete(String code,String login,String password,String display,boolean recovery,String email,SessionIssuer issuer) {
         if(!allowed("",true)) throw new ApiFailure(429,"RATE_LIMITED");
         String name=username(login),label=displayName(display),encoded=AccountPasswords.hash(password);
         String pending=email==null ? null : RecoveryEmail.normalize(email);
@@ -134,10 +142,13 @@ public class AccountStore {
             if(!recovery && pending!=null) execute(c,"INSERT INTO tk_recovery_address VALUES(?,'PRIMARY',NULL,?,1)",target,pending);
             execute(c,"UPDATE tk_auth_challenge SET consumed=TRUE WHERE digest=?",digest);
             if(!recovery) execute(c,"UPDATE tk_auth_control SET bootstrap_completed=TRUE WHERE id=1");
-            if(recovery) {PasskeyCredentials.recover(c,target);revokeAll(c,target);}else execute(c,"DELETE FROM tk_auth_session WHERE owner_id=?",target);return issue(c,target,Set.of("read","write"),false,now);
+            if(recovery) {PasskeyCredentials.recover(c,target);revokeAll(c,target);}else execute(c,"DELETE FROM tk_auth_session WHERE owner_id=?",target);return issuer.issue(c,target,Set.of("read","write"),false,now,null);
         });
     }
     Issued login(String login,String password,boolean remember) {
+        return login(login,password,remember,this::issue);
+    }
+    Issued login(String login,String password,boolean remember,SessionIssuer issuer) {
         String name=login==null ? "" : login.strip().toLowerCase(Locale.ROOT);
         if(name.length()>200 || !allowed(name,false)) throw new ApiFailure(429,"RATE_LIMITED");
         record Candidate(String owner,String hash,long version) { }
@@ -151,10 +162,9 @@ public class AccountStore {
         return tx(c->{lock(c);var current=account(c,candidate.owner(),true);
             if(!current.get("state").asText().equals("ENABLED") || current.get("version").asLong()!=candidate.version()) throw ApiFailure.unauthorized(false);
             execute(c,"DELETE FROM tk_auth_throttle WHERE id=?",hash("login:"+name));
-            return issue(c,candidate.owner(),Set.of("read","write"),remember,Instant.now());
+            return issuer.issue(c,candidate.owner(),Set.of("read","write"),remember,Instant.now(),null);
         });
     }
-    private Issued issue(Connection c,String owner,Set<String> permissions,boolean remember,Instant now) {return issue(c,owner,permissions,remember,now,null);}
     Issued issue(Connection c,String owner,Set<String> permissions,boolean remember,Instant now,String parent) {
         String secret=AccountPasswords.secret(),csrf=AccountPasswords.secret();Instant expires=now.plus(remember ? Duration.ofDays(30) : Duration.ofHours(12));
 
@@ -173,7 +183,10 @@ public class AccountStore {
         }catch(SQLException failure) {throw databaseFailure(failure);}
     }
     Issued exchange(TokenRegistry.Principal principal) {
-        return tx(c->{lock(c);guard(c,principal);return issue(c,principal.owner(),principal.permissions(),false,Instant.now(),principal.digest());});
+        return exchange(principal,this::issue);
+    }
+    Issued exchange(TokenRegistry.Principal principal,SessionIssuer issuer) {
+        return tx(c->{lock(c);guard(c,principal);return issuer.issue(c,principal.owner(),principal.permissions(),false,Instant.now(),principal.digest());});
     }
     TokenRegistry.Principal session(String secret) {
         if(secret==null || !secret.matches("[A-Za-z0-9_-]{43}")) throw ApiFailure.unauthorized(false);

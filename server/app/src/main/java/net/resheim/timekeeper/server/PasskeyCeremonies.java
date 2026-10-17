@@ -16,6 +16,7 @@ final class PasskeyCeremonies {
         }
         String browser() {return hash(browserSecret);}
         String session() {return sessionSecret==null ? "" : hash(sessionSecret);}
+        @Override public String toString() {return "Browser ceremony scope";}
     }
     record Pending(String secret,String purpose,String owner,String session,ObjectNode data,Instant expires) { }
     private final Connection connection;

@@ -19,6 +19,7 @@ import jakarta.inject.Inject;
 class PasskeyStore {
     @Inject AccountStore accounts;
     @Inject PasskeyRealm realm;
+    @Inject BrowserSignIns browserSignIns;
     private record Decision<T>(T value,ApiFailure failure) { }
     private static <T> Decision<T> accepted(T value) {return new Decision<>(value,null);}
     private static <T> Decision<T> rejected(int status,String code) {return new Decision<>(null,new ApiFailure(status,code));}
@@ -110,7 +111,7 @@ class PasskeyStore {
             if(!rate(c,"options",scope.browser(),peer,now)) return rejected(429,"RATE_LIMITED");
             try {
                 var options=protocol(scope,new PasskeyCredentials(c,scope.rpId())).assertion(Optional.empty());
-                var data=object().put("request",options.toJson()).put("remember",remember);var pending=new PasskeyCeremonies(c).create("LOGIN",null,scope,data,now);
+                var data=object().put("request",options.toJson()).put("remember",remember).put("method","PASSKEY");var pending=new PasskeyCeremonies(c).create("LOGIN",null,scope,data,now);
                 var reply=object().put("ceremony",pending.secret());reply.set("publicKey",parse(options.toCredentialsGetJson()).path("publicKey"));return accepted(reply);
             }catch(IOException failure) {throw new ApiFailure(503,"UNAVAILABLE");}
         });
@@ -122,14 +123,12 @@ class PasskeyStore {
             ObjectNode data;
             try {data=new PasskeyCeremonies(c).claim(ceremony,"LOGIN",null,scope,now).data();}
             catch(ApiFailure invalid) {if(invalid.status==401) return rejected(401,"PASSKEY_REJECTED");throw invalid;}
+            if(!data.path("method").asText().equals("PASSKEY")) return rejected(401,"PASSKEY_REJECTED");
             var credentials=new PasskeyCredentials(c,scope.rpId());
             try {
                 var assertion=protocol(scope,credentials).authenticate(AssertionRequest.fromJson(data.path("request").asText()),response);
                 var key=credentials.used(assertion,now);
-                new PasskeyCeremonies(c).cancelBrowser(scope);
-                execute(c,"DELETE FROM tk_auth_session WHERE browser_digest=? OR digest=?",scope.browser(),scope.session());
-                var issued=accounts.issue(c,key.owner(),Set.of("read","write"),data.path("remember").asBoolean(),now,null);
-                execute(c,"UPDATE tk_auth_session SET origin_epoch=?,browser_digest=?,passkey_id=? WHERE digest=? AND owner_id=?",scope.epoch(),scope.browser(),key.id(),hash(issued.secret()),key.owner());return accepted(issued);
+                return accepted(browserSignIns.issueBound(c,scope,key.owner(),Set.of("read","write"),data.path("remember").asBoolean(),now,null,key.id()));
             }catch(WebAuthnProtocol.Rejected failure) {return rejected(401,"PASSKEY_REJECTED");}
             catch(IOException failure) {throw new ApiFailure(503,"UNAVAILABLE");}
         });
