@@ -67,7 +67,11 @@ class ImportProvenanceTest {
         store.transaction(owner,()->{
             var origin=ledger.required(ImportLedger.Kind.IMPORT_ORIGIN,ImportLedger.identifier("activity-origin",first.path("activityId").asText()));
             assertEquals(job.path("id").asText(),origin.path("jobId").asText());
-            assertFalse(ledger.required(ImportLedger.Kind.IMPORT_ITEM,ledger.itemId(uuid(next.get("id")),0)).path("created").asBoolean());return null;
+            assertFalse(ledger.required(ImportLedger.Kind.IMPORT_ITEM,ledger.itemId(uuid(next.get("id")),0)).path("created").asBoolean());
+            var references=new ImportReferences(store);assertTrue(references.usedByAnotherImport("ACTIVITY",uuid(first.get("activityId")),uuid(job.get("id"))));
+            var current=ledger.required(ImportLedger.Kind.IMPORT_JOB,uuid(next.get("id")));ledger.beginUndo(uuid(next.get("id")),etag(current));
+            ledger.undoBatch(uuid(next.get("id")),0,object(),state->{state.put("state","UNDONE");return object();});
+            assertFalse(references.usedByAnotherImport("ACTIVITY",uuid(first.get("activityId")),uuid(job.get("id"))));return null;
         });
     }
 }

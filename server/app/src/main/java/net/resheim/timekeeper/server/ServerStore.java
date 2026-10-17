@@ -37,6 +37,7 @@ public class ServerStore {
     private java.util.concurrent.ScheduledExecutorService maintenance;
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="quarkus.datasource.jdbc.url") String jdbcUrl;
     private final ThreadLocal<Context> context = new ThreadLocal<>();
+    private final ThreadLocal<UUID> creationClient = new ThreadLocal<>();
     record Context(String owner, Connection connection, Instant now) { }
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="timekeeper.schema.allow-upgrade",defaultValue="false") boolean allowSchemaUpgrade;
     void start(@Observes StartupEvent event) throws Exception {
@@ -142,6 +143,11 @@ public class ServerStore {
     }
     Context current() { Context value = context.get(); if (value == null) throw new IllegalStateException("No owner transaction"); return value; }
     public String owner() { return current().owner(); }
+    <T> T withCreationClient(UUID client,Supplier<T> work) {
+        find("CLIENT",client).orElseThrow(ApiFailure::notFound);
+        UUID previous=creationClient.get();creationClient.set(client);
+        try {return work.get();} finally {if(previous==null) creationClient.remove();else creationClient.set(previous);}
+    }
     public Instant now() { return current().now(); }
     PreparedStatement statement(String sql, Object... parameters) throws SQLException {
         var statement = current().connection().prepareStatement(sql);
@@ -208,7 +214,8 @@ public class ServerStore {
         var node = snapshot(owner(),value);
         if (type.equals("PROJECT") || type.equals("WORK_SESSION")) {
             var previous=find(type,uuid(node.get("id"))).orElse(null);
-            node.put("clientId",previous!=null && previous.hasNonNull("clientId") ? previous.get("clientId").asText() : defaultClient().get("id").asText());
+            node.put("clientId",previous!=null && previous.hasNonNull("clientId") ? previous.get("clientId").asText()
+                    : creationClient.get()!=null ? creationClient.get().toString() : defaultClient().get("id").asText());
             if(type.equals("WORK_SESSION")) node.put("title",previous!=null && previous.hasNonNull("title") ? previous.get("title").asText() : legacyTitle(node));
         }
         UUID id = uuid(node.get("id")); long version = node.get("version").asLong();

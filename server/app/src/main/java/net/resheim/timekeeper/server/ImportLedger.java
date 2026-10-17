@@ -9,7 +9,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** Private import authority in existing owned storage; never a portable domain collection. */
 final class ImportLedger {
-    enum Kind { IMPORT_JOB, IMPORT_BATCH, IMPORT_ITEM, IMPORT_MAP, IMPORT_KEY, IMPORT_ORIGIN, IMPORT_UNDO }
+    enum Kind { IMPORT_JOB, IMPORT_BATCH, IMPORT_ITEM, IMPORT_MAP, IMPORT_KEY, IMPORT_ORIGIN, IMPORT_UNDO, IMPORT_USE }
     private final ServerStore store;
     ImportLedger(ServerStore store) {this.store=Objects.requireNonNull(store);}
 

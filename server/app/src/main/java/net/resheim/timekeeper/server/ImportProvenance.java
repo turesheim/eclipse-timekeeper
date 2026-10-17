@@ -43,7 +43,10 @@ final class ImportProvenance {
         UUID keyId=ImportLedger.identifier("entry-key",authority);
         var key=object();key.put("authority",authority);key.put("jobId",job.path("id").asText());key.put("itemId",saved.path("id").asText());
         key.put("contentFingerprint",contentFingerprint);ledger.insert(ImportLedger.Kind.IMPORT_KEY,keyId,key);
-        for(var activity:activities) if(created) origin(job,saved,activity,true);
+        for(var activity:activities) {
+            if(created) origin(job,saved,activity,true);
+            new ImportReferences(store).add("ACTIVITY",activity.id().value(),uuid(job.get("id")),uuid(saved.get("id")),created);
+        }
         return saved;
     }
     private void origin(ObjectNode job,ObjectNode item,Activity activity,boolean eligible) {
@@ -73,6 +76,7 @@ final class ImportProvenance {
         if(!eligible) item.put("changedSinceImport",true);
         var updated=ledger.update(ImportLedger.Kind.IMPORT_ITEM,item);
         provenance.origin(job,updated,saved,eligible);
+        new ImportReferences(store).inherit(prior.id().value(),saved.id().value());
         job.put("updatedAt",store.now().toString());ledger.update(ImportLedger.Kind.IMPORT_JOB,job);
     }
 }
