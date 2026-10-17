@@ -14,10 +14,11 @@ class PasskeyRealmTest {
         public Map<String,String> getConfigOverrides() {return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:passkey_realm_tests");}
     }
     @Inject AccountStore accounts;
+    @Inject ServiceSettings settings;
     @BeforeEach void reset() {accounts.tx(c->{lock(c);execute(c,"DELETE FROM tk_passkey_ceremony");execute(c,"DELETE FROM tk_auth_session");execute(c,"UPDATE tk_recovery_control SET origin=NULL,epoch=0");return null;});}
     private PasskeyRealm realm(String address,long epoch) {
-        var origin=new RecoveryOrigin();origin.accounts=accounts;origin.configured=address;origin.epoch=epoch;
-        var realm=new PasskeyRealm();realm.origin=origin;realm.configuredEnabled=true;realm.configuredRp="AUTO";return realm;
+        var origin=new RecoveryOrigin();origin.accounts=accounts;origin.settings=settings;origin.configured=address;origin.epoch=epoch;
+        var realm=new PasskeyRealm();realm.origin=origin;realm.settings=settings;realm.configuredEnabled=true;realm.configuredRp="AUTO";return realm;
     }
     @Test void canonicalRpConfigurationDoesNotTrustNetworkAddressesWildcardsOrUnrelatedDomains() {
         assertEquals(Optional.of("seshat.tailad1f0.ts.net"),PasskeyRealm.rp("https://seshat.tailad1f0.ts.net:8443","AUTO",true));
@@ -44,7 +45,7 @@ class PasskeyRealmTest {
         assertThrows(IllegalStateException.class,old::initialize);
     }
     @Test void newHostnameRequiresNewRpAndAnUnconfiguredReplicaCannotResumeOldBrowserAuthentication() {
-        var unconfigured=realm("NONE",1);unconfigured.initialize();accounts.tx(c->{assertEquals(0,unconfigured.current(c).epoch());return null;});
+        var unconfigured=realm("NONE",0);unconfigured.initialize();accounts.tx(c->{assertEquals(0,unconfigured.current(c).epoch());return null;});
         var vpn=realm("https://seshat.tailad1f0.ts.net:8443",1);vpn.initialize();
         assertThrows(IllegalStateException.class,()->realm("https://public.example",1).initialize());
         var replacement=realm("https://public.example",2);replacement.initialize();assertNotEquals(vpn.rpId(),replacement.rpId());

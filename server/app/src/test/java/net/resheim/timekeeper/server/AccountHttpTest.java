@@ -54,9 +54,9 @@ class AccountHttpTest {
         assertEquals(404,call(admin,"GET","/auth/users",null,false).statusCode(),"The retired route would bypass an admin-prefix proxy policy");
         var reply=call(admin,"GET","/admin/settings",null,false);assertEquals(200,reply.statusCode());assertEquals("no-store",reply.header("Cache-Control"));
         var settings=node(reply.asString());
-        assertEquals(Set.of("configurationManagedBy","databaseType","schemaVersion","publicOrigin","originEpoch","passkeysEnabled","passkeyRpId","emailRecoveryEnabled"),
+        assertEquals(Set.of("configurationManagedBy","databaseType","schemaVersion","publicOrigin","originEpoch","passkeysEnabled","passkeyRpId","emailRecoveryEnabled","version","effectiveVersion","restartRequired","smtpPasswordConfigured","effectiveSmtpPasswordConfigured","saved","effective","canEdit"),
                 JsonValues.MAPPER.convertValue(settings,java.util.Map.class).keySet());
-        assertEquals("deployment",settings.path("configurationManagedBy").asText());assertEquals("h2",settings.path("databaseType").asText());
+        assertEquals("administration",settings.path("configurationManagedBy").asText());assertEquals("h2",settings.path("databaseType").asText());
         assertEquals(ServerSchema.CURRENT,settings.path("schemaVersion").asInt());assertTrue(settings.path("publicOrigin").isNull());assertTrue(settings.path("passkeyRpId").isNull());
         assertEquals(400,call(admin,"GET","/admin/settings?unexpected=1",null,false).statusCode());
         assertEquals(201,call(admin,"POST","/admin/users",node("{\"username\":\"ordinary\",\"password\":\""+PASSWORD+"\",\"displayName\":\"Ordinary user\",\"email\":\"ordinary@example.org\",\"administrator\":false}"),true).statusCode());

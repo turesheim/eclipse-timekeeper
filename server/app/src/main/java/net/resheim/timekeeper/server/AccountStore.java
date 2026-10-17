@@ -101,7 +101,7 @@ public class AccountStore {
         try(var statement=query(c,"SELECT bootstrap_completed FROM tk_auth_control WHERE id=1");var rows=statement.executeQuery()) {if(!rows.next()) throw new SQLException();return rows.getBoolean(1);}
         catch(SQLException failure) {throw databaseFailure(failure);}
     }
-    JsonNode status() {return tx(c->{var node=object();node.put("setupRequired",!bootstrapped(c));return node;});}
+    JsonNode status() {return tx(c->{realm.current(c);var node=object();node.put("setupRequired",!bootstrapped(c));return node;});}
     static boolean attempt(Connection c,String key,int limit,Duration period,Instant now) {
         String id=hash(key);int count=0;Instant window=now;boolean exists=false;
         try(var statement=query(c,"SELECT attempts,window_start FROM tk_auth_throttle WHERE id=?",id);var rows=statement.executeQuery()) {
@@ -170,6 +170,7 @@ public class AccountStore {
         String secret=AccountPasswords.secret(),csrf=AccountPasswords.secret();Instant expires=now.plus(remember ? Duration.ofDays(30) : Duration.ofHours(12));
 
         execute(c,"INSERT INTO tk_auth_session(digest,owner_id,csrf,permissions,created_at,expires_at,last_seen_at,persistent,parent_digest) VALUES(?,?,?,?,?,?,?,?,?)",hash(secret),owner,csrf,permissions(permissions),now.toString(),expires.toString(),now.toString(),remember,parent);
+        execute(c,"UPDATE tk_auth_session SET origin_epoch=? WHERE digest=?",realm.current(c).epoch(),hash(secret));
         return new Issued(secret,account(c,owner,false),csrf,expires,remember);
     }
     static boolean currentPassword(Connection c,String owner,String password) {
@@ -227,6 +228,7 @@ public class AccountStore {
     }
     /** Held until the business transaction commits: disable/revoke waits for already-authorized work. */
     void guard(Connection c,TokenRegistry.Principal principal) {
+        realm.current(c);
         if(!registry.recheck(principal).permissions().containsAll(principal.permissions())) throw new ApiFailure(403,"FORBIDDEN");
         var account=account(c,principal.owner(),true);
         if(account.get("state").asText().equals("DISABLED")) throw ApiFailure.unauthorized(true);
@@ -238,7 +240,7 @@ public class AccountStore {
                 // Plain reads preserve the auth-control -> account/session mutation lock order.
                 var current=realm.current(c);
                 if(current.origin()==null) {
-                    if(rows.getLong(5)!=0 || rows.getString(6)!=null || rows.getObject(7)!=null) throw ApiFailure.unauthorized(false);
+                    if(rows.getLong(5)!=current.epoch() || rows.getString(6)!=null || rows.getObject(7)!=null) throw ApiFailure.unauthorized(false);
                 } else if(rows.getLong(5)!=current.epoch() || rows.getString(6)==null) throw ApiFailure.unauthorized(false);
                 if(rows.getObject(7)!=null) {
                     if(!account.path("state").asText().equals("ENABLED")) throw ApiFailure.unauthorized(false);
@@ -278,7 +280,7 @@ public class AccountStore {
         PasskeyCeremonies.cancelOwner(c,owner);
     }
     private static void requireWrite(TokenRegistry.Principal principal) {if(!principal.permissions().contains("write")) throw new ApiFailure(403,"FORBIDDEN");}
-    private static void requireAdmin(Connection c,TokenRegistry.Principal principal) {
+    static void requireAdmin(Connection c,TokenRegistry.Principal principal) {
         requireWrite(principal);if(!account(c,principal.owner(),false).get("administrator").asBoolean()) throw new ApiFailure(403,"FORBIDDEN");
     }
     JsonNode tokens(TokenRegistry.Principal principal) {

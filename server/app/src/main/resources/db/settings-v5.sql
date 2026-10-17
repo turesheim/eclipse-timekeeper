@@ -1,0 +1,1 @@
+CREATE TABLE tk_service_settings (id INTEGER PRIMARY KEY CHECK(id=1), version BIGINT NOT NULL CHECK(version>=0 AND version<=9007199254740991), active_version BIGINT NOT NULL CHECK(active_version>=0 AND active_version<=version), saved VARCHAR(16384) NOT NULL, effective VARCHAR(16384) NOT NULL, saved_smtp_password VARCHAR(2048), effective_smtp_password VARCHAR(2048));

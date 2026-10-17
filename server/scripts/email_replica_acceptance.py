@@ -91,6 +91,11 @@ def main():
                     'TIMEKEEPER_SERVER_DB_USER':'postgres','TIMEKEEPER_SERVER_DB_PASSWORD':password,
                     'TIMEKEEPER_SERVER_TOKENS_FILE':'/config/tokens.json','TIMEKEEPER_SERVER_SETUP_FILE':'/config/setup.json',
                     'TIMEKEEPER_PUBLIC_ORIGIN':origin,'TIMEKEEPER_AUTH_ORIGIN_EPOCH':str(epoch),'QUARKUS_HTTP_PORT':str(8080+index)}
+                # Exercise the explicit operator recovery path for these
+                # hostname migrations; normal starts load central configuration.
+                control=command('docker','exec',database,'psql','-U','postgres','-X','-A','-t','-c','SELECT epoch FROM tk_recovery_control WHERE id=1',check=False)
+                current=int(control.stdout.strip()) if control.returncode==0 and control.stdout.strip().isdigit() else 0
+                if not ready or epoch>current:environment['TIMEKEEPER_SETTINGS_RECOVERY']='true'
                 env_file=folder/('api-'+str(index)+'.env');env_file.write_text(''.join(key+'='+value+'\n' for key,value in environment.items()));env_file.chmod(0o600)
                 command('docker','run','-d','--name',name,'--network','container:'+database,'--read-only','--tmpfs','/tmp',
                     '--env-file',str(env_file),'-v',str(config)+':/config:ro',args.server_image);names.append(name)

@@ -10,8 +10,9 @@ import org.eclipse.microprofile.health.HealthCheckResponse;
 public class Readiness implements HealthCheck {
     @Inject AgroalDataSource datasource;
     @Inject TokenRegistry tokens;
+    @Inject PasskeyRealm realm;
     @Override public HealthCheckResponse call() {
-        try(var connection=datasource.getConnection()) {tokens.load();ServerSchema.validate(connection);return HealthCheckResponse.up("Timekeeper configuration and schema");}
+        try(var connection=datasource.getConnection()) {tokens.load();ServerSchema.validate(connection);realm.current(connection);return HealthCheckResponse.up("Timekeeper configuration and schema");}
         catch(Exception e) {return HealthCheckResponse.down("Timekeeper configuration and schema");}
     }
 }

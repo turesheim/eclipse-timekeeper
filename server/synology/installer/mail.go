@@ -10,7 +10,7 @@ import (
 // The SMTP password is mounted separately and never enters Compose or properties.
 func ensureMailConfiguration(root string) error {
 	defaults := map[string]string{
-		"config/mail.properties": "# Edit while Timekeeper is stopped, then start it in Package Center.\n" +
+		"config/mail.properties": "# Initial configuration or explicit operator recovery only.\n# After first startup, use Administration; normal restarts preserve central settings.\n" +
 			"timekeeper.mail.enabled=false\ntimekeeper.auth.origin-epoch=1\n" +
 			"quarkus.mailer.host=localhost\nquarkus.mailer.port=587\n" +
 			"quarkus.mailer.from=timekeeper@localhost\nquarkus.mailer.username=\n" +

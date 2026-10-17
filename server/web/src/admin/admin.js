@@ -1,8 +1,9 @@
 import {Api} from '/web/api.js';
 import {accountMenu} from '/web/account-menu.js';
-import {node,link,button,section} from '/web/account-ui.js';
+import {node,link,button} from '/web/account-ui.js';
 import {settingsView} from '/web/settings-view.js';
 import {renderUsers} from '/web/users.js';
+import {renderServiceSettings} from './service-settings.js';
 
 const $=id=>document.getElementById(id);
 let session=null,account=null,view=null,generation=0,acceptedHash='';
@@ -39,19 +40,8 @@ async function show(hash,ask=true) {
     reload:()=>{if(acceptedHash==='#users/new') location.hash='#users';else void show(acceptedHash);}
   });
   const currentView=view;
-  await view.run(()=>users ? renderUsers(currentView,hash.split('/')[1] || '') : renderSettings(currentView));
+  await view.run(()=>users ? renderUsers(currentView,hash.split('/')[1] || '') : renderServiceSettings(currentView));
   if(valid()) $('status').textContent='Administration ready.';
-}
-async function renderSettings(view) {
-  const {data}=await view.session.request('/admin/settings');if(!view.valid()) return;
-  const card=section(view,'General settings');
-  card.append(node('p','These settings are managed by the server deployment. Change its configuration and restart the service to apply changes.','hint'));
-  const values=[['Public HTTPS address',data.publicOrigin || 'Not configured'],['Authentication configuration epoch',String(data.originEpoch)],
-    ['Passkey sign-in',data.passkeysEnabled ? 'Enabled':'Disabled'],['Passkey relying party',data.passkeyRpId || 'Not configured'],
-    ['Email recovery',data.emailRecoveryEnabled ? 'Enabled':'Disabled'],['Database',data.databaseType==='postgresql' ? 'PostgreSQL':'H2'],['Database schema',String(data.schemaVersion)]];
-  const list=node('dl',undefined,'row mb-0');
-  for(const [title,value] of values) {list.append(node('dt',title,'col-sm-5'),node('dd',value,'col-sm-7 text-break'));}
-  card.append(list);
 }
 async function initialize() {
   clear();$('status').textContent='Loading administration…';const current=generation;

@@ -124,7 +124,7 @@ class Replicas:
         self.command('docker','exec','-i',self.database,'psql','-X','-q','-v','ON_ERROR_STOP=1','-U','postgres',input=
             "CREATE ROLE timekeeper LOGIN PASSWORD '"+self.app_password+"'; CREATE DATABASE timekeeper OWNER timekeeper;")
         self.start(1,VPN,1);self.start(2,VPN,1)
-    def start(self,index,origin,epoch,*,stale=False):
+    def start(self,index,origin,epoch,*,stale=False,managed=False):
         old=self.instances.get(index)
         if old:self.command('docker','rm','-f',old);self.names.remove(old)
         self.generation+=1;name=self.network+'-api-'+str(index)+'-'+str(self.generation)
@@ -133,13 +133,18 @@ class Replicas:
             'TIMEKEEPER_SERVER_DB_USER':'timekeeper','TIMEKEEPER_SERVER_DB_PASSWORD':self.app_password,
             'TIMEKEEPER_SERVER_TOKENS_FILE':'/config/tokens.json','TIMEKEEPER_SERVER_SETUP_FILE':'/config/setup.json',
             'TIMEKEEPER_PUBLIC_ORIGIN':origin,'TIMEKEEPER_AUTH_ORIGIN_EPOCH':str(epoch),'QUARKUS_HTTP_PORT':'8080'}
+        # Central settings win over normal deployment defaults. These legacy
+        # migration scenarios explicitly exercise the offline operator override.
+        control=self.command('docker','exec',self.database,'psql','-U','timekeeper','-d','timekeeper','-X','-A','-t','-c','SELECT epoch FROM tk_recovery_control WHERE id=1',check=False)
+        current=int(control.stdout.strip()) if control.returncode==0 and control.stdout.strip().isdigit() else 0
+        if stale or epoch>current and not managed:environment['TIMEKEEPER_SETTINGS_RECOVERY']='true'
         env=self.folder/('api-'+str(self.generation)+'.env');env.write_text(''.join(key+'='+value+'\n' for key,value in environment.items()));env.chmod(0o600)
         self.command('docker','run','-d','--name',name,'--network',self.network,'--ip',self.addresses[index],
             '-p','127.0.0.1::8080','--read-only','--tmpfs','/tmp','--env-file',str(env),'-v',str(self.config)+':/config:ro',self.args.server_image)
         self.names.append(name);self.instances[index]=name;self.origins[index]=origin
         self.bases[index]='http://127.0.0.1:'+self.command('docker','port',name,'8080/tcp').stdout.strip().rsplit(':',1)[1]
         if stale:
-            if self.command('docker','wait',name).stdout.strip()=='0':raise AssertionError('A stale authentication epoch started successfully')
+            if self.command('docker','wait',name).stdout.strip()=='0':raise AssertionError('A stale operator recovery epoch started successfully')
             return
         for _ in range(160):
             try:
@@ -181,6 +186,13 @@ class Replicas:
         browser=self.browser();options=self.login_options(browser,remember=remember)
         expect(self.request(index,browser,'/auth/passkeys/login/finish',key.assertion(options,self.origins[1])),200,'Passkey sign-in on other replica');return browser
     def private_data(self,browser):return expect(self.request(2,browser,'/data/export'),200,'Private owner export')
+    def save_settings(self,browser,changes,password):
+        reply=self.request(1,browser,'/admin/settings');current=expect(reply,200,'Current shared settings')
+        desired={key:value for key,value in current['saved'].items() if key!='originEpoch'}
+        desired.update(changes);desired.update(currentPassword=password,smtpPasswordAction='PRESERVE')
+        saved=expect(self.request(1,browser,'/admin/settings',desired,method='PUT',headers={'If-Match':reply[2]['ETag']}),200,'Save managed origin change')
+        if not saved['restartRequired'] or saved['effective']!=current['effective']:raise AssertionError('Origin change applied before restart')
+        return saved
     def race(self,operations):
         barrier=threading.Barrier(len(operations))
         def run(operation):barrier.wait(timeout=10);return operation()
@@ -296,7 +308,8 @@ def exercise(system):
 
     old_browser=system.browser();old_options=system.login_options(old_browser)
     old_session=system.key_login(replacement)
-    system.start(2,PORT,2)
+    system.save_settings(alice,{'publicOrigin':PORT,'passkeyRpId':'AUTO'},RECOVERED)
+    system.start(2,PORT,2,managed=True)
     expect(system.request(1,old_browser,'/auth/passkeys/login/finish',replacement.assertion(old_options,VPN)),503,'Stale running replica ceremony')
     expect(system.request(2,old_session,'/auth/session'),401,'Port-cutover retired session')
     expect(system.request(2,old_browser,'/auth/passkeys/login/finish',replacement.assertion(old_options,VPN)),401,'Port-cutover retired ceremony')
@@ -308,7 +321,8 @@ def exercise(system):
     passed('same-host port cutover retains compatible keys while retiring sessions, ceremonies and stale replicas')
 
     retired=system.browser();retired_options=system.login_options(retired)
-    system.start(2,PUBLIC,3)
+    system.save_settings(alice,{'publicOrigin':PUBLIC,'passkeyRpId':'AUTO'},RECOVERED)
+    system.start(2,PUBLIC,3,managed=True)
     expect(system.request(1,retired,'/auth/passkeys/login/finish',replacement.assertion(retired_options,PORT)),503,'Retired RP replica')
     expect(system.request(2,port_session,'/auth/session'),401,'Retired hostname session')
     system.start(1,PUBLIC,3)
@@ -333,7 +347,8 @@ def exercise(system):
     passed('normal password change retains passkeys while ending existing sessions')
 
     rollback=system.browser();options=system.login_options(rollback)
-    system.start(2,VPN,4)
+    system.save_settings(final,{'publicOrigin':VPN,'passkeyRpId':'AUTO'},CHANGED)
+    system.start(2,VPN,4,managed=True)
     expect(system.request(2,rollback,'/auth/passkeys/login/finish',public_key.assertion(options,PUBLIC)),401,'Rollback retired public-origin ceremony')
     expect(system.request(1,final,'/auth/session'),401,'Rollback revoked the old public-origin session')
     expect(system.request(1,rollback,'/auth/passkeys/login/options',{'remember':False}),503,'Old public-origin replica cannot start another ceremony')
@@ -348,6 +363,34 @@ def exercise(system):
     if not any(key['rpId']=='public.example.invalid' and not key['usableHere'] for key in keys):raise AssertionError('Rollback relabeled the newer RP credential')
     if system.private_data(alice)!=private[alice.owner]:raise AssertionError('Origin rollback changed private work data')
     passed('returning to an old hostname uses a newer epoch without reviving revoked credentials')
+    # Save through one real HTTP replica, then activate through a restart while
+    # the old JVM is still running. This is distinct from the operator override.
+    alice=system.password_login('alice',CHANGED)
+    reply=system.request(1,alice,'/admin/settings');before=expect(reply,200,'Administration settings snapshot')
+    secret=secrets.token_urlsafe(32);desired={key:value for key,value in before['saved'].items() if key!='originEpoch'}
+    desired.update(currentPassword=CHANGED,smtpHost='relay.example.invalid',smtpPasswordAction='REPLACE',smtpPassword=secret)
+    saved=expect(system.request(2,alice,'/admin/settings',desired,method='PUT',headers={'If-Match':reply[2]['ETag']}),200,'Save shared desired settings')
+    if secret in json.dumps(saved) or not saved['smtpPasswordConfigured'] or not saved['restartRequired'] or saved['effective']!=before['effective']:
+        raise AssertionError('Settings save exposed a secret or changed effective policy before restart')
+    if expect(system.request(1,alice,'/admin/settings'),200,'Other replica sees saved configuration')!=saved:raise AssertionError('Replicas disagree on desired settings')
+    expect(system.request(1,alice,'/admin/settings',desired,method='PUT',headers={'If-Match':reply[2]['ETag']}),412,'Stale settings write cannot repeat')
+    pending=system.browser();options=system.login_options(pending)
+    system.start(1,VPN,4) # Old deployment defaults must not overwrite desired settings.
+    expect(system.request(2,pending,'/auth/passkeys/login/finish',replacement.assertion(options,VPN)),503,'Old running replica is fenced after activation')
+    expect(system.request(1,alice,'/auth/session'),401,'Settings activation revokes retired browser sessions')
+    system.start(2,VPN,4)
+    alice=system.password_login('alice',CHANGED)
+    active=expect(system.request(2,alice,'/admin/settings'),200,'Read activated central settings')
+    if active['restartRequired'] or active['effective']['smtpHost']!='relay.example.invalid' or active['originEpoch']<=before['originEpoch']:
+        raise AssertionError('Restart did not activate the saved shared configuration')
+    if system.private_data(alice)!=private[alice.owner]:raise AssertionError('Settings activation changed private work data')
+    def stored_secret():
+        return system.command('docker','exec',system.database,'psql','-U','timekeeper','-d','timekeeper','-X','-A','-t','-c','SELECT effective_smtp_password FROM tk_service_settings WHERE id=1').stdout.strip()
+    if stored_secret()!=secret:raise AssertionError('Effective SMTP secret was not persisted privately')
+    backup=system.backup();system.restore(backup)
+    alice=system.password_login('alice',CHANGED)
+    if stored_secret()!=secret or system.private_data(alice)!=private[alice.owner]:raise AssertionError('Protected restore lost service settings or private work data')
+    passed('shared editable settings activate on restart, fence stale JVMs and preserve private SMTP credentials through protected restore')
     return checks
 
 

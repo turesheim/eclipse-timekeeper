@@ -18,7 +18,7 @@ func schemaUpgradeSQL(resources string, from, to int) (string, error) {
 		return "", err
 	}
 	for version := from + 1; version <= to; version++ {
-		name := map[int]string{3: "recovery-v3.sql", 4: "passkeys-v4.sql"}[version]
+		name := map[int]string{3: "recovery-v3.sql", 4: "passkeys-v4.sql", 5: "settings-v5.sql"}[version]
 		if name == "" {
 			return "", errors.New("Missing Timekeeper schema transition")
 		}
@@ -44,6 +44,9 @@ func prepareOlderRestoreSQL(resources string, current, incoming int) (string, er
 	sql, err := schemaGuard(resources, current)
 	if err != nil {
 		return "", err
+	}
+	if current >= 5 && incoming < 5 {
+		sql += "DROP TABLE public.tk_service_settings;\n"
 	}
 	if current >= 4 && incoming < 4 {
 		sql += "ALTER TABLE public.tk_auth_session DROP CONSTRAINT tk_auth_session_passkey;\n" +

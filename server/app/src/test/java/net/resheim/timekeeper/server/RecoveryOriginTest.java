@@ -18,6 +18,7 @@ class RecoveryOriginTest {
         public Map<String,String> getConfigOverrides() {return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:recovery_origin_tests");}
     }
     @Inject AccountStore accounts;
+    @Inject ServiceSettings settings;
 
     @BeforeEach void clear() {
         accounts.tx(c->{lock(c);
@@ -29,7 +30,7 @@ class RecoveryOriginTest {
     }
 
     private RecoveryOrigin replica(String origin,long epoch) {
-        var value=new RecoveryOrigin();value.accounts=accounts;value.configured=origin;value.epoch=epoch;return value;
+        var value=new RecoveryOrigin();value.accounts=accounts;value.settings=settings;value.configured=origin;value.epoch=epoch;return value;
     }
     private void pending() {
         accounts.tx(c->{execute(c,"INSERT INTO tk_recovery_link VALUES('link-digest','alice','PRIMARY','alice@example.org','RESET',1,'2026-10-17T00:00:00Z','2026-10-17T00:15:00Z',FALSE)");return null;});

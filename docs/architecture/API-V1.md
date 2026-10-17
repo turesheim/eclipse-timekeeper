@@ -400,3 +400,16 @@ Private jobs, receipts, audit items, mapping plans and lineage use internal owne
 resource types; public domain collections and portable exports omit them.
 Protected database backups retain this authority. No database schema change is
 required. Domain writes and deletions emit the normal owner-scoped change feed.
+
+## Central service configuration
+
+`/api/v1/admin/settings` returns redacted saved/effective configuration and an
+ETag. PUT requires an actual administrator account session, CSRF and current
+password proof; token-derived sessions cannot save. Shared desired settings take
+effect at coordinated startup, with a monotonically newer origin epoch and a
+local-version fence for running replicas. Schema 5 stores the global singleton
+separately from owned work data; SMTP secrets are never part of API reads or
+personal portability archives. HostPolicy applies the exact effective hostname
+and loopback to every HTTP route, including static resources and health checks,
+without forwarded-host trust. The framework localhost default is replaced by
+this dynamic allowlist, rather than pinning the hostname in generated files.

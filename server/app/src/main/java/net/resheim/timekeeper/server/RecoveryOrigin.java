@@ -12,12 +12,14 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 @ApplicationScoped
 class RecoveryOrigin {
     @Inject AccountStore accounts;
+    @Inject ServiceSettings settings;
     @ConfigProperty(name="timekeeper.auth.public-origin",defaultValue="NONE") String configured;
     @ConfigProperty(name="timekeeper.auth.origin-epoch",defaultValue="1") long epoch;
 
     record Current(String origin,long epoch) { }
     String configured() {return configured;}
     long epoch() {return epoch;}
+    void configure(String value,long version) {configured=value;epoch=version;}
 
     static String validate(String value) {
         try {
@@ -35,12 +37,11 @@ class RecoveryOrigin {
 
     void initialize() {
         // Email remains optional. No origin is discovered from an incoming Host header.
-        if("NONE".equals(configured)) return;
-        String origin=validate(configured);
-        if(epoch<1) throw new IllegalArgumentException("Authentication origin epoch must be positive");
+        String origin="NONE".equals(configured) ? null : validate(configured);
+        if(epoch<0 || origin!=null && epoch<1) throw new IllegalArgumentException("Authentication origin epoch must be positive");
         accounts.tx(c->{lock(c);
             var current=read(c);
-            if(epoch<current.epoch() || (epoch==current.epoch() && !origin.equals(current.origin())))
+            if(epoch<current.epoch() || (epoch==current.epoch() && !java.util.Objects.equals(origin,current.origin())))
                 throw new IllegalStateException("Authentication origin changed without a newer epoch; update every replica before cutover");
             if(epoch>current.epoch()) {
                 execute(c,"UPDATE tk_recovery_control SET origin=?,epoch=? WHERE id=1",origin,epoch);
@@ -53,7 +54,7 @@ class RecoveryOrigin {
     }
 
     Current requireCurrent(Connection c) {
-        var current=read(c);
+        settings.requireCurrent(c);var current=read(c);
         if(current.origin()==null || current.epoch()!=epoch || !current.origin().equals(configured))
             throw new ApiFailure(503,"UNAVAILABLE");
         return current;

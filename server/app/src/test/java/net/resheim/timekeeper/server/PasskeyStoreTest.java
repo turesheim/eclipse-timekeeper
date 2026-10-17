@@ -31,6 +31,7 @@ class PasskeyStoreTest {
     }
     private static final String RP="timekeeper.example",ORIGIN="https://timekeeper.example:8443",PASSWORD="An actual fixture password phrase";
     @Inject AccountStore accounts;
+    @Inject ServiceSettings settings;
     PasskeyStore passkeys;
     BrowserSignIns signIns;
     PasskeyRealm originalRealm;
@@ -50,8 +51,8 @@ class PasskeyStoreTest {
                     execute(c,"INSERT INTO tk_account(owner_id,username,password_hash,display_name,state,administrator,version) VALUES(?,?,?,?,'ENABLED',FALSE,0)",owner,owner,password,owner);
             }return null;
         });
-        var origin=new RecoveryOrigin();origin.accounts=accounts;origin.configured=ORIGIN;origin.epoch=1;
-        var realm=new PasskeyRealm();realm.origin=origin;realm.configuredEnabled=true;realm.configuredRp="AUTO";realm.initialize();
+        var origin=new RecoveryOrigin();origin.accounts=accounts;origin.settings=settings;origin.configured=ORIGIN;origin.epoch=1;
+        var realm=new PasskeyRealm();realm.origin=origin;realm.settings=settings;realm.configuredEnabled=true;realm.configuredRp="AUTO";realm.initialize();
         io.quarkus.arc.ClientProxy.unwrap(accounts).realm=realm;
         signIns=new BrowserSignIns();signIns.accounts=accounts;signIns.realm=realm;
         passkeys=new PasskeyStore();passkeys.accounts=accounts;passkeys.realm=realm;passkeys.browserSignIns=signIns;
@@ -199,8 +200,8 @@ class PasskeyStoreTest {
         var exchanged=accounts.exchange(bearer,signIns.issuer(pending));assertBrowserSession(alice.browser(),exchanged,1);
         assertEquals(403,assertThrows(ApiFailure.class,()->passkeys.list(accounts.session(exchanged.secret()))).status);
         var old=signIns.begin(BrowserSignIns.Method.PASSWORD,alice.browser(),exchanged.secret(),"fixture");
-        var origin=new RecoveryOrigin();origin.accounts=accounts;origin.configured="https://timekeeper.example:9443";origin.epoch=2;
-        var realm=new PasskeyRealm();realm.origin=origin;realm.configuredEnabled=false;realm.configuredRp="AUTO";realm.initialize();
+        var origin=new RecoveryOrigin();origin.accounts=accounts;origin.settings=settings;origin.configured="https://timekeeper.example:9443";origin.epoch=2;
+        var realm=new PasskeyRealm();realm.origin=origin;realm.settings=settings;realm.configuredEnabled=false;realm.configuredRp="AUTO";realm.initialize();
         io.quarkus.arc.ClientProxy.unwrap(accounts).realm=realm;
         var moved=new BrowserSignIns();moved.accounts=accounts;moved.realm=realm;
         assertEquals(503,assertThrows(ApiFailure.class,()->signIns.begin(BrowserSignIns.Method.PASSWORD,alice.browser(),exchanged.secret(),"fixture")).status);

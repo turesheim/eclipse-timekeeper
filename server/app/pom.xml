@@ -24,6 +24,7 @@
     <dependency><groupId>${project.groupId}</groupId><artifactId>timekeeper-service</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest-jackson</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-mailer</artifactId></dependency>
+    <dependency><groupId>io.vertx</groupId><artifactId>vertx-mail-client</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-jdbc-h2</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-jdbc-postgresql</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-agroal</artifactId></dependency>

@@ -127,3 +127,9 @@ To remove this endpoint, run on the server host:
 ```sh
 tailscale serve --bg --https=8443 off
 ```
+
+After schema-5 initialization, change the public HTTPS address in
+[Administration](ACCOUNTS.md) and restart Timekeeper. Tailscale forwarding remains
+an operator command; changing the application address does not create a Serve
+rule. The account guide also covers recovery when the previous hostname is no
+longer reachable.

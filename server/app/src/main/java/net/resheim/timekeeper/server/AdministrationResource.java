@@ -16,8 +16,7 @@ public class AdministrationResource {
     @Inject ContractInputs inputs;
     @Inject BrowserOrigins origins;
     @Inject RecoveryMail recoveryMail;
-    @Inject RecoveryOrigin origin;
-    @Inject PasskeyRealm realm;
+    @Inject ServiceSettings settings;
     @ConfigProperty(name="quarkus.datasource.db-kind",defaultValue="h2") String databaseType;
     @Context UriInfo uri;
     @Context HttpHeaders headers;
@@ -27,11 +26,15 @@ public class AdministrationResource {
     private static boolean flag(JsonNode input,String field) {if(!input.get(field).isBoolean()) throw ApiFailure.validation();return input.get(field).asBoolean();}
     private void origin() {origins.check(uri,headers.getRequestHeader("Origin"));}
     @GET @Path("/settings") public Response settings() {
-        ContractInputs.queries(uri.getQueryParameters());accounts.requireAdministration(identity.principal());
-        var value=object().put("configurationManagedBy","deployment").put("databaseType",databaseType).put("schemaVersion",ServerSchema.CURRENT)
-                .put("publicOrigin",origin.configured().equals("NONE") ? null : origin.configured()).put("originEpoch",origin.epoch())
-                .put("passkeysEnabled",realm.enabled()).put("passkeyRpId",realm.rpId().orElse(null)).put("emailRecoveryEnabled",recoveryMail.enabled());
-        return Response.ok(value).header("Cache-Control","no-store").build();
+        ContractInputs.queries(uri.getQueryParameters());return settingsReply(settings.get(identity.principal()));
+    }
+    @PUT @Path("/settings") public Response settings(@HeaderParam("If-Match") String match,JsonNode body) {
+        origin();ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("AdministrationSettingsInput",body);
+        return settingsReply(settings.save(identity.principal(),match,value));
+    }
+    private Response settingsReply(ServiceSettings.Reply reply) {
+        reply.data().put("databaseType",databaseType);
+        return Response.ok(reply.data()).header("ETag",reply.etag()).header("Cache-Control","no-store").build();
     }
     @GET @Path("/users") public JsonNode users() {ContractInputs.queries(uri.getQueryParameters());return accounts.users(identity.principal());}
     @POST @Path("/users") public Response user(JsonNode body) {
