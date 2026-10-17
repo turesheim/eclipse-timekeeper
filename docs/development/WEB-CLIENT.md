@@ -20,6 +20,26 @@ as hashes on the server. New credentials never enter browser storage. Existing
 saved tokens are exchanged for a parent-bound cookie and then removed. Sign out
 revokes the cookie session and clears records, drafts, requests and clipboard.
 
+## Passkey sign-in and account management
+
+The sign-in page offers an explicit **Sign in with a passkey** button when the
+server has a configured HTTPS hostname. Password sign-in remains available;
+canceling a native credential prompt leaves the form usable. **Remember me**
+applies to either method. No credential is requested automatically on page load.
+
+**My Account → Passkeys** lists user-named keys and creation/last-used times in
+the account time zone. Adding or removing a key requires fresh password or
+passkey proof. Removing the key used for the current session signs the user out.
+Keys enrolled for an earlier hostname are marked unavailable at the current RP;
+they remain visible until their owner removes them after testing a replacement.
+Token-derived sessions direct the user to account sign-in before enrollment.
+See [account operations](../operations/ACCOUNTS.md#passkeys) for configuration,
+recovery, hostname changes and protected backup behavior.
+
+![Passkey management on desktop](../assets/screenshots/passkeys-desktop.png)
+
+![Passkey management on a narrow screen](../assets/screenshots/passkeys-mobile.png)
+
 Font Awesome Free 7.3.1 supplies locally bundled icon fonts for larger tree
 controls and action buttons. Buttons retain accessible names and hover titles;
 fonts and their upstream license are included in the server distribution.
