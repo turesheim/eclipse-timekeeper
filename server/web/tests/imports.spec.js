@@ -27,26 +27,6 @@ async function undo(page,index) {
   await page.getByRole('button',{name:'Confirm Undo',exact:true}).click();
   await expect(history).toContainText('Undo complete');
 }
-test('Toggl defaults to work sessions with client totals, repeat detection and whole-job Undo',async({page,request})=>{
-  await login(page);const before=await api(request,'/data/export');
-  await expect(page.getByLabel('Import as',{exact:true})).toHaveValue('WORK_SESSION');await review(page);
-  await expect(page.getByLabel('New project name',{exact:true})).toHaveCount(0);await expect(page.getByLabel('New label name',{exact:true})).toHaveCount(0);
-  await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
-  const imported=await api(request,'/data/export'),sessions=imported.workSessions.filter(value=>!before.workSessions.some(old=>old.id===value.id));expect(sessions).toHaveLength(7);
-  for(const type of ['activities','projects','tasks','labels']) expect(imported[type].length).toBe(before[type].length);
-  expect(sessions.every(value=>value.title===value.summary && value.clientId===sessions[0].clientId)).toBe(true);
-  expect(sessions.reduce((sum,value)=>sum+(+new Date(value.end)-+new Date(value.start)),0)).toBe(151462000);
-  const job=(await api(request,'/imports')).items.find(value=>value.mode==='WORK_SESSION');expect(job.workSessionCount).toBe(7);expect(job.importedNanos).toBe('151462000000000');
-  await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await page.locator('[data-tab=track]').click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
-  await expect(page.locator(`#track-clients [data-track-client="${sessions[0].clientId}"]`)).toContainText('42h 4m');
-  await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();await review(page);
-  await expect(page.locator('#account-content')).toContainText('7 already imported');await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
-  expect((await api(request,'/data/export')).workSessions.length).toBe(imported.workSessions.length);
-  const history=(await api(request,'/imports')).items.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));await undo(page,history.findIndex(value=>value.id!==job.id && value.mode==='WORK_SESSION'));
-  const updated=(await api(request,'/imports')).items.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));await undo(page,updated.findIndex(value=>value.id===job.id));
-  const after=await api(request,'/data/export');expect(after.workSessions.length).toBe(before.workSessions.length);expect(after.clients.length).toBe(before.clients.length);
-});
-
 test('Toggl CSV worker, reviewed mappings, repeat import and whole-job Undo preserve exact time',async({page,request})=>{
   await login(page);await page.getByLabel('Import as',{exact:true}).selectOption('ACTIVITY');const before = await api(request,'/data/export');
   await review(page);await expect(page.locator('#account-content')).toContainText('7 selected entries');
@@ -153,3 +133,24 @@ test('Toggl source selection, rejected-row diagnostics and independent task desc
   expect(sent.join('\n')).not.toContain('Other private entry');expect(sent.join('\n')).not.toContain('other@example.invalid');expect(sent.join('\n')).not.toContain('selected@example.invalid');
   await undo(page,0);
 });
+
+test('Toggl defaults to work sessions with client totals, repeat detection and whole-job Undo',async({page,request})=>{
+  await login(page);const before=await api(request,'/data/export');
+  await expect(page.getByLabel('Import as',{exact:true})).toHaveValue('WORK_SESSION');await review(page);
+  await expect(page.getByLabel('New project name',{exact:true})).toHaveCount(0);await expect(page.getByLabel('New label name',{exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
+  const imported=await api(request,'/data/export'),sessions=imported.workSessions.filter(value=>!before.workSessions.some(old=>old.id===value.id));expect(sessions).toHaveLength(7);
+  for(const type of ['activities','projects','tasks','labels']) expect(imported[type].length).toBe(before[type].length);
+  expect(sessions.every(value=>value.title===value.summary && value.clientId===sessions[0].clientId)).toBe(true);
+  expect(sessions.reduce((sum,value)=>sum+(+new Date(value.end)-+new Date(value.start)),0)).toBe(151462000);
+  const job=(await api(request,'/imports')).items.find(value=>value.mode==='WORK_SESSION');expect(job.workSessionCount).toBe(7);expect(job.importedNanos).toBe('151462000000000');
+  await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await page.locator('[data-tab=track]').click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
+  await expect(page.locator(`#track-clients [data-track-client="${sessions[0].clientId}"]`)).toContainText('42h 4m');
+  await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();await review(page);
+  await expect(page.locator('#account-content')).toContainText('7 already imported');await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
+  expect((await api(request,'/data/export')).workSessions.length).toBe(imported.workSessions.length);
+  const history=(await api(request,'/imports')).items.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));await undo(page,history.findIndex(value=>value.id!==job.id && value.mode==='WORK_SESSION'));
+  const updated=(await api(request,'/imports')).items.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));await undo(page,updated.findIndex(value=>value.id===job.id));
+  const after=await api(request,'/data/export');expect(after.workSessions.length).toBe(before.workSessions.length);expect(after.clients.length).toBe(before.clients.length);
+});
+
