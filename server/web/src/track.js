@@ -45,7 +45,7 @@ export class MonthTrack {
     const result=monthSessions(this.calendar,this.snapshot.workSessions,this.asOf);
     const layout=month+'|'+zone+'|'+today+'|'+result.days.map(day=>day.sessions.map(value=>value.session.id).join(',')).join(';');
     if(force||this.layout!==layout) {
-      const focused=this.root.contains(document.activeElement) ? document.activeElement.dataset.trackSession:null;
+      const focused=this.root.contains(document.activeElement) ? document.activeElement.dataset.trackEntry:null;
       this.layout=layout;this.date=today;this.input.value=month;
       this.root.querySelector('#track-title').textContent=new Intl.DateTimeFormat(undefined,{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(month+'-15T12:00:00Z'));
       this.root.querySelector('#track-zone').textContent=zone;
@@ -68,6 +68,7 @@ export class MonthTrack {
         for(const entry of day.sessions) {
           const session=entry.session,client=this.snapshot.clients.find(value=>value.id===session.clientId);
           const button=node('button',undefined,'track-session');button.type='button';button.disabled=!this.writable;button.dataset.trackSession=session.id;
+          button.dataset.trackEntry=day.date+'/'+session.id;
           button.title=`${session.title} · ${client?.name||'Client'} · ${day.date}`;
           if(/^#[0-9a-f]{6}$/i.test(client?.color))button.style.setProperty('--client-color',client.color);
           const duration=node('span',undefined,'track-session-time'),short=node('span',undefined,'track-session-time-short');this.sessionTimes.set(day.date+'/'+session.id,{duration,short});
@@ -83,7 +84,7 @@ export class MonthTrack {
         card.dataset.trackClient=client.id;card.append(label,total);this.totals.append(card);this.clientTimes.set(client.id,total);
       }
       if(!clients.length)this.totals.append(node('p','No clients yet.','hint'));
-      if(focused)for(const button of this.grid.querySelectorAll('button'))if(button.dataset.trackSession===focused){button.focus({preventScroll:true});break;}
+      if(focused)for(const button of this.grid.querySelectorAll('button'))if(button.dataset.trackEntry===focused){button.focus({preventScroll:true});break;}
     }
     this.root.querySelector('#track-total').textContent=this.format(result.total);
     for(const [client,total] of this.clientTimes)total.textContent=this.format(result.clients.get(client)||0n);

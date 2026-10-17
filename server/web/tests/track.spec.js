@@ -55,3 +55,24 @@ test('Track is the default month overview with exact client session hours, local
     const current=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:original.zoneId},{'If-Match':current.headers().etag});
   }
 });
+test('Track updates running session hours without stealing focus and reconciles peer edits',async({page,request})=> {
+  const client=await (await api(request,'POST','/clients',{name:'Live monthly client',color:'#176653'})).json();let session;
+  try {
+    expect((await api(request,'GET','/work-sessions/active')).status()).toBe(204);
+    session=await (await api(request,'POST','/work-sessions',{title:'Live month overview',clientId:client.id,summary:'',start:new Date(Date.now()-120000).toISOString(),end:null})).json();
+    await signIn(page);await expect(page.locator('[data-tab=track]')).toHaveAttribute('aria-current','page');
+    const card=page.locator(`[data-track-session="${session.id}"]`).last(),duration=card.locator('.track-session-time');
+    const total=page.locator(`[data-track-client="${client.id}"] strong`);
+    await card.focus();const before=await duration.textContent(),monthBefore=await total.textContent();
+    await expect.poll(()=>duration.textContent()).not.toBe(before);await expect(card).toBeFocused();await expect.poll(()=>total.textContent()).not.toBe(monthBefore);
+    const current=await api(request,'GET','/work-sessions/'+session.id);
+    await api(request,'PUT','/work-sessions/'+session.id,{title:'Updated live month',clientId:client.id,summary:'',start:session.start,end:null},{'If-Match':current.headers().etag});
+    await expect(card).toContainText('Updated live month');await expect(card).toBeFocused();
+    const latest=await api(request,'GET','/work-sessions/'+session.id);
+    await api(request,'POST','/work-sessions/'+session.id+'/stop',undefined,{'If-Match':latest.headers().etag,'Idempotency-Key':randomUUID()});
+    await expect(page.locator('#work-session-state')).toHaveText('Stopped');await expect(card).toContainText('Updated live month');
+  } finally {
+    if(session){const current=await api(request,'GET','/work-sessions/'+session.id);await api(request,'DELETE','/work-sessions/'+session.id,undefined,{'If-Match':current.headers().etag});}
+    const current=await api(request,'GET','/clients/'+client.id);await api(request,'DELETE','/clients/'+client.id,undefined,{'If-Match':current.headers().etag});
+  }
+});
