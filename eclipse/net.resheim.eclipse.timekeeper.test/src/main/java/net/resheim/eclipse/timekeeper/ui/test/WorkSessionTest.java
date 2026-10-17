@@ -30,11 +30,14 @@ public class WorkSessionTest {
         waitFor(()->sessions.activeWorkSession(OwnerId.LOCAL).isPresent(),"Work session was not started");
         var first=sessions.activeWorkSession(OwnerId.LOCAL).orElseThrow();
         var ownedSessions=new ArrayList<WorkSessionId>();ownedSessions.add(first.id());
+        ActivityId createdActivity=null;
         try {
             // Other integration scenarios may leave their timer running. Preserve it;
             // session controls must also work independently of an existing activity.
-            var activity=activities.activeActivity(OwnerId.LOCAL).orElseGet(()->activities.startActivity(
-                    new StartActivity(null,OwnerId.LOCAL,"Independent timer",Set.of(),Optional.of(first.id()),Optional.empty())));
+            var existingActivity=activities.activeActivity(OwnerId.LOCAL);
+            var activity=existingActivity.orElseGet(()->activities.startActivity(
+                    new StartActivity(null,OwnerId.LOCAL,"Independent timer",Set.of(),Optional.empty(),Optional.empty())));
+            if(existingActivity.isEmpty()) createdActivity=activity.id();
             waitFor(()->bot.labelWithId("work-session-status").getText().contains("Running") && bot.button("Stop work session").isEnabled(),"Running status missing");
             bot.button("Stop work session").click();
             waitFor(()->sessions.workSession(first.id()).orElseThrow().end().isPresent(),"Session did not stop");
@@ -52,6 +55,11 @@ public class WorkSessionTest {
         } finally {
             for(var id:ownedSessions) {
                 var current=sessions.workSession(id).orElseThrow();sessions.deleteWorkSession(new DeleteWorkSession(current.id(),current.version()));
+            }
+            if(createdActivity!=null) {
+                var current=activities.activity(createdActivity).orElseThrow();
+                if(current.end().isEmpty()) current=activities.stopActivity(new StopActivity(current.id(),current.version()));
+                activities.deleteActivity(new DeleteActivity(current.id(),current.version()));
             }
         }
     }
