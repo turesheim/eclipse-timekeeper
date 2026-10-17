@@ -3,7 +3,7 @@ import {randomUUID} from 'node:crypto';
 const password=process.env.TIMEKEEPER_WEB_PASSWORD;
 const token=process.env.TIMEKEEPER_WEB_TOKEN;
 async function login(page,username='browser-admin',secret=password) {
-  await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');await page.getByLabel('Username',{exact:true}).fill(username);await page.getByLabel('Password',{exact:true}).fill(secret);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+  await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');await page.locator('#login-form').getByLabel('Username',{exact:true}).fill(username);await page.getByLabel('Password',{exact:true}).fill(secret);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
 }
 async function call(request,method,path,data,headers={}) {return request.fetch(`/api/v1${path}`,{method,data,headers:{Authorization:`Bearer ${token}`,...headers}});}
 test('setup and recovery keep one-time codes separate from password fields',async({page,request})=>{
@@ -16,9 +16,9 @@ test('setup and recovery keep one-time codes separate from password fields',asyn
   await page.locator('#auth-mode').selectOption('token');await expect(page.locator('#token')).toBeEnabled();await expect(page.locator('#password')).toBeDisabled();
   await page.locator('#auth-mode').selectOption('recover');await expect(code).toBeEnabled();await expect(page.locator('#token')).toBeDisabled();
   await expect(page.locator('#login-form input[type="password"]:enabled')).toHaveCount(2);
-  await page.locator('#auth-mode').selectOption('setup');await expect(page.locator('#password')).toHaveAttribute('autocomplete','new-password');
+  await page.locator('#auth-mode').selectOption('setup');await page.getByLabel('Recovery email',{exact:true}).fill('browser-admin@example.org');await expect(page.locator('#password')).toHaveAttribute('autocomplete','new-password');
   await code.fill(process.env.TIMEKEEPER_WEB_SETUP_CODE);
-  await page.getByLabel('Username',{exact:true}).fill('browser-admin');await page.getByLabel('Password',{exact:true}).fill(password);await page.getByLabel('Confirm password',{exact:true}).fill(password+' different');
+  await page.locator('#login-form').getByLabel('Username',{exact:true}).fill('browser-admin');await page.getByLabel('Password',{exact:true}).fill(password);await page.getByLabel('Confirm password',{exact:true}).fill(password+' different');
   await expect(code).toHaveValue(process.env.TIMEKEEPER_WEB_SETUP_CODE);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#login-error')).toHaveText('Passwords do not match.');
   expect((await (await request.get('/api/v1/auth/status')).json()).setupRequired).toBe(true);
@@ -28,7 +28,7 @@ test('rejected setup stays in setup and sign-in explains that no administrator e
   await expect(page.locator('#login-build')).toHaveText('SPK 1.99.0-146');
   const code=process.env.TIMEKEEPER_WEB_SETUP_CODE;
   await page.getByLabel('One-time setup or recovery code').fill((code[0]==='A' ? 'B' : 'A')+code.slice(1));
-  await page.getByLabel('Username',{exact:true}).fill('browser-admin');
+  await page.locator('#login-form').getByLabel('Username',{exact:true}).fill('browser-admin');await page.getByLabel('Recovery email',{exact:true}).fill('browser-admin@example.org');
   await page.getByLabel('Password',{exact:true}).fill(password);await page.getByLabel('Confirm password',{exact:true}).fill(password);
   const rejected=page.waitForResponse(response=>response.url().endsWith('/api/v1/auth/setup') && response.request().method()==='POST');
   await page.getByRole('button',{name:'Sign in',exact:true}).click();expect((await rejected).status()).toBe(401);
@@ -47,14 +47,15 @@ test('first administrator claims the explicit existing owner once and uses a sec
   await page.screenshot({path:'test-results/account-setup.png',fullPage:true});
   await page.getByLabel('One-time setup or recovery code').fill(' '+process.env.TIMEKEEPER_WEB_SETUP_CODE+' ');
   await expect(page.getByLabel('Display name',{exact:true})).toHaveCount(0);
-  await page.getByLabel('Username',{exact:true}).fill('browser-admin');await page.getByLabel('Password',{exact:true}).fill(password);await page.getByLabel('Confirm password',{exact:true}).fill(password+' different');await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.getByLabel('Recovery email',{exact:true}).fill('browser-admin@example.org');
+  await page.locator('#login-form').getByLabel('Username',{exact:true}).fill('browser-admin');await page.getByLabel('Password',{exact:true}).fill(password);await page.getByLabel('Confirm password',{exact:true}).fill(password+' different');await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await expect(page.locator('#login-error')).toHaveText('Passwords do not match.');expect((await (await request.get('/api/v1/auth/status')).json()).setupRequired).toBe(true);
   await page.getByLabel('Confirm password',{exact:true}).fill(password);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
   await expect(page.locator('#owner')).toHaveText('browser-admin');
   const cookie=(await page.context().cookies()).find(value=>value.name==='__Host-timekeeper-session');expect(cookie.httpOnly).toBe(true);expect(cookie.secure).toBe(true);expect(cookie.sameSite).toBe('Lax');expect(cookie.expires).toBe(-1);
   expect(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length,cookies:document.cookie}))).toEqual({local:0,session:0,cookies:''});
   const account=await (await call(request,'GET','/auth/account')).json();expect(account.ownerId).toBe('web-owner');expect(account.username).toBe('browser-admin');
-  expect((await request.post('/api/v1/auth/setup',{data:{code:process.env.TIMEKEEPER_WEB_SETUP_CODE,username:'hijacker',password,displayName:'Other'}})).status()).toBe(401);
+  expect((await request.post('/api/v1/auth/setup',{data:{code:process.env.TIMEKEEPER_WEB_SETUP_CODE,username:'hijacker',password,displayName:'Other',email:'other@example.org'}})).status()).toBe(401);
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');
   await expect(page.locator('#server-build')).toContainText('SPK 1.99.0-146');
   await page.locator('#server-build').click();await expect(page.locator('#server-spk')).toHaveText('1.99.0-146');
@@ -64,7 +65,7 @@ test('first administrator claims the explicit existing owner once and uses a sec
 });
 test('incorrect credentials explain the login failure without reporting an expired session',async({page})=>{
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');
-  await page.getByLabel('Username',{exact:true}).fill('browser-admin');await page.getByLabel('Password',{exact:true}).fill('an incorrect password for this browser test');
+  await page.locator('#login-form').getByLabel('Username',{exact:true}).fill('browser-admin');await page.getByLabel('Password',{exact:true}).fill('an incorrect password for this browser test');
   await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await expect(page.locator('#login-error')).toHaveText('The username or password was not accepted.');
   await expect(page.locator('#auth-mode')).toHaveValue('login');await expect(page.locator('#username')).toHaveValue('browser-admin');await expect(page.locator('#password')).toHaveValue('');
@@ -72,7 +73,7 @@ test('incorrect credentials explain the login failure without reporting an expir
 test('account UI creates an isolated user and named Eclipse token shown once',async({page,request,browser})=>{
   const suffix=randomUUID().slice(0,8),username='user-'+suffix,display='Private user '+suffix,otherPassword='private passphrase '+suffix;
   await login(page);await page.locator('#users-link').click();await page.getByRole('link',{name:'Add user',exact:true}).click();
-  await page.getByLabel('New user username',{exact:true}).fill(username);await page.getByLabel('Display name (optional)',{exact:true}).fill(display);await page.getByLabel('Temporary password',{exact:true}).fill(otherPassword);await page.getByLabel('Confirm temporary password',{exact:true}).fill(otherPassword);await page.getByRole('button',{name:'Create user',exact:true}).click();await expect(page.locator('#account-content tr').filter({hasText:display})).toBeVisible();
+  await page.getByLabel('New user username',{exact:true}).fill(username);await page.getByLabel('New user recovery email',{exact:true}).fill(username+'@example.org');await page.getByLabel('Display name (optional)',{exact:true}).fill(display);await page.getByLabel('Temporary password',{exact:true}).fill(otherPassword);await page.getByLabel('Confirm temporary password',{exact:true}).fill(otherPassword);await page.getByRole('button',{name:'Create user',exact:true}).click();await expect(page.locator('#account-content tr').filter({hasText:display})).toBeVisible();
   const peer=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL}),other=await peer.newPage();
   try {
     await login(other,username,otherPassword);await expect(other.locator('#owner')).toHaveText(display);
@@ -90,13 +91,13 @@ test('account UI creates an isolated user and named Eclipse token shown once',as
   await page.screenshot({path:'test-results/account-administration.png',fullPage:true});
 });
 test('remember me persists a cookie while local storage holds no password or bearer token',async({page})=>{
-  await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');await page.getByLabel('Username',{exact:true}).fill('browser-admin');await page.getByLabel('Password',{exact:true}).fill(password);await page.getByLabel('Remember me on this browser').check();await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+  await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');await page.locator('#login-form').getByLabel('Username',{exact:true}).fill('browser-admin');await page.getByLabel('Password',{exact:true}).fill(password);await page.getByLabel('Remember me on this browser').check();await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
   const cookie=(await page.context().cookies()).find(value=>value.name==='__Host-timekeeper-session');expect(cookie.expires).toBeGreaterThan(Date.now()/1000+28*86400);expect(await page.evaluate(()=>localStorage.length)).toBe(0);
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();expect((await page.context().cookies()).some(value=>value.name==='__Host-timekeeper-session')).toBe(false);
 });
 test('another tab changing the cookie clears the old account and rejects a late refresh',async({page,request})=>{
   const username='switched-'+randomUUID().slice(0,8),secret='separate account passphrase';
-  const created=await call(request,'POST','/auth/users',{username,password:secret,displayName:'Other tab user',administrator:false});expect(created.status()).toBe(201);
+  const created=await call(request,'POST','/auth/users',{username,password:secret,displayName:'Other tab user',email:username+'@example.org',administrator:false});expect(created.status()).toBe(201);
   await login(page);
   let captured,release;const arrived=new Promise(resolve=>{captured=resolve;}),gate=new Promise(resolve=>{release=resolve;});
   await page.route('**/api/v1/clients?*',async route=>{const response=await route.fetch();captured();await gate;await route.fulfill({response});});
@@ -128,7 +129,7 @@ test('API token expiry uses the account time zone even when the browser uses ano
 });
 for(const explicitUtc of [false,true]) test(explicitUtc ? 'explicit UTC remains selected when signing in from Oslo':'an untouched account shows running work-session times in local time',async({browser,request})=>{
   const username='zone-'+randomUUID().slice(0,8),secret='local time zone test passphrase';
-  expect((await call(request,'POST','/auth/users',{username,password:secret,displayName:username,administrator:false})).status()).toBe(201);
+  expect((await call(request,'POST','/auth/users',{username,password:secret,displayName:username,email:username+'@example.org',administrator:false})).status()).toBe(201);
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,timezoneId:'Europe/Oslo',locale:'en-GB'}),page=await context.newPage();
   try {
     const login=await context.request.post('/api/v1/auth/login',{data:{username,password:secret,remember:false}});expect(login.status()).toBe(200);

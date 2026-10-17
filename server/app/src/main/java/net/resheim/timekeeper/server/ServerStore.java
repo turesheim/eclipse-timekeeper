@@ -32,6 +32,7 @@ public class ServerStore {
     @Inject TokenRegistry tokens;
     @Inject BackendClock clock;
     @Inject AccountStore accounts;
+    @Inject RecoveryMail recoveryMail;
     private final java.util.concurrent.ConcurrentMap<String,String> partitionDates=new java.util.concurrent.ConcurrentHashMap<>();
     private java.util.concurrent.ScheduledExecutorService maintenance;
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="quarkus.datasource.jdbc.url") String jdbcUrl;
@@ -48,13 +49,20 @@ public class ServerStore {
             }
         }
         accounts.initialize();
+        recoveryMail.initialize();
         initializeConfiguredOwners();
         maintenance=java.util.concurrent.Executors.newSingleThreadScheduledExecutor(work -> {
             var thread=new Thread(work,"Timekeeper day boundaries");thread.setDaemon(true);return thread;
         });
         maintenance.scheduleWithFixedDelay(this::maintainDays,1,1,java.util.concurrent.TimeUnit.SECONDS);
     }
-    @jakarta.annotation.PreDestroy void stopMaintenance() {if(maintenance!=null) maintenance.shutdownNow();}
+    @jakarta.annotation.PreDestroy void stopMaintenance() {
+        if(maintenance==null) return;
+        maintenance.shutdownNow();
+        try {if(!maintenance.awaitTermination(5,java.util.concurrent.TimeUnit.SECONDS))
+            System.getLogger(ServerStore.class.getName()).log(System.Logger.Level.WARNING,"Day-boundary maintenance did not stop within the shutdown deadline");}
+        catch(InterruptedException stopped) {Thread.currentThread().interrupt();}
+    }
     private static String partitionDate(String zone,Instant now) {
         return zone+":"+now.atZone(java.time.ZoneId.of(zone)).toLocalDate();
     }

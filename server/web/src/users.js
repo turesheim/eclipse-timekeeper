@@ -20,7 +20,7 @@ export async function renderUsers(view, key) {
     else if ((user.state === 'ENABLED' && !enabled.checked) || user.administrator !== admin.checked) {
       if (!window.confirm(`Change access for “${user.username}”? This revokes their sessions and API tokens. Their work data will be retained.`)) return;
     }
-    const body = {username: username.value, displayName: display.value.trim() || username.value, administrator: admin.checked, ...(creating ? {password: password.value} : {enabled: enabled.checked})};
+    const body = {username: username.value, displayName: display.value.trim() || username.value, administrator: admin.checked, ...(creating ? {password: password.value, email: email.value} : {enabled: enabled.checked})};
     const reply = await view.session.request(creating ? '/auth/users' : `/auth/users/${encodeURIComponent(key)}`, {method: creating ? 'POST' : 'PUT', etag: loaded?.etag, body});
     if (!view.valid()) return;
     view.clean(edit.value);
@@ -32,8 +32,8 @@ export async function renderUsers(view, key) {
   });
   const username = field(edit.value, creating ? 'New user username' : 'User username', user?.username, {autocomplete: creating ? 'off' : 'username', maxLength: 64});
   const display = field(edit.value, 'Display name (optional)', user?.displayName === user?.username ? '' : user?.displayName, {required: false, maxLength: 200});
-  let password, confirmation, enabled;
-  if (creating) {password = passwordField(edit.value, 'Temporary password'); confirmation = passwordField(edit.value, 'Confirm temporary password');}
+  let password, confirmation, enabled, email;
+  if (creating) {email = field(edit.value, 'New user recovery email', '', {type: 'email', autocomplete: 'off', maxLength: 254}); password = passwordField(edit.value, 'Temporary password'); confirmation = passwordField(edit.value, 'Confirm temporary password');}
   else enabled = field(edit.value, 'Enabled', user.state === 'ENABLED', {type: 'checkbox'});
   const admin = field(edit.value, creating ? 'New user is administrator' : 'Administrator', user?.administrator || false, {type: 'checkbox'});
   if (!creating && user.administrator && user.state === 'ENABLED' && data.users.filter(value => value.administrator && value.state === 'ENABLED').length === 1) {

@@ -131,12 +131,12 @@ def main():
             return (json.loads(payload) if payload.strip() else None), headers
         password = secrets.token_urlsafe(32)
         signed, headers = node_request('api-1','POST','/auth/setup',
-                                      {'code':setup_code,'username':'compose-admin','password':password,'displayName':'Compose administrator'})
+                                      {'code':setup_code,'username':'compose-admin','password':password,'displayName':'Compose administrator','email':'compose-admin@example.org'})
         cookie = next(value for key,value in headers.items() if key.lower()=='set-cookie').split(';',1)[0]
         for member in ('api-1','api-2'):
             context, _ = node_request(member,'GET','/auth/session',cookie=cookie)
             client.assertEqual('owner-a',context['ownerId'])
-        node_request('api-2','POST','/auth/setup',{'code':setup_code,'username':'imposter','password':password,'displayName':'Imposter'},expected_status=401)
+        node_request('api-2','POST','/auth/setup',{'code':setup_code,'username':'imposter','password':password,'displayName':'Imposter','email':'imposter@example.org'},expected_status=401)
         issued, _ = node_request('api-1','POST','/auth/tokens',{'name':'Cross-replica Eclipse','permissions':['read','write'],'expiresAt':None},cookie,signed['csrf'],201)
         raw_token=issued.pop('token')
         for member in ('api-1','api-2'):
@@ -146,7 +146,7 @@ def main():
         node_request('api-1','GET','/me',bearer=raw_token,expected_status=401)
         node_request('api-2','POST','/auth/logout',cookie=cookie,csrf=signed['csrf'],expected_status=204)
         node_request('api-1','GET','/auth/session',cookie=cookie,expected_status=401)
-        node_request('api-2','POST','/auth/setup',{'code':setup_code,'username':'again','password':password,'displayName':'Again'},expected_status=401)
+        node_request('api-2','POST','/auth/setup',{'code':setup_code,'username':'again','password':password,'displayName':'Again','email':'again@example.org'},expected_status=401)
         receipt['sharedAccountSessionsAndRevocation'] = True
         receipt['twoReplicas'] = True
         receipt['bundledWeb'] = True

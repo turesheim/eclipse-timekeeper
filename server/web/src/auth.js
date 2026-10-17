@@ -1,14 +1,15 @@
 import {Api, ApiError} from './api.js';
 import {savedToken, forgetToken, isSecureOrigin} from './credentials.js';
 import {connectAccount, closeAccount} from './account-page.js';
+import {emailRecovery} from './email-recovery.js';
 
 const $ = id => document.getElementById(id);
 export function authentication({connect, clear, updateAccount, refreshProfile}) {
-  let active = null, generation = 0;
+  let active = null, generation = 0, recovery = null;
   const errorText = error => error instanceof ApiError ? error.message : 'Unable to sign in. Use HTTPS and check your account details.';
   function mode() {
     const value = $('auth-mode').value, code = ['setup','recover'].includes(value), token = value === 'token';
-    for (const [field, visible] of [['code',code],['username',!token],['password',!token],['confirm',code],['remember',value === 'login'],['token',token]]) {
+    for (const [field, visible] of [['code',code],['username',!token],['setup-email',value === 'setup'],['password',!token],['confirm',code],['remember',value === 'login'],['token',token]]) {
       $(`${field}-field`).hidden = !visible;
       for (const input of $(`${field}-field`).querySelectorAll('input')) {
         input.disabled = !visible;
@@ -16,13 +17,14 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
       }
     }
     $('password').autocomplete = code ? 'new-password' : 'current-password';
+    $('forgot-password').hidden = value !== 'login';
     $('auth-hint').textContent = code ? 'Get a one-time code from the server operator. New passwords must contain at least 15 characters.' : token ? 'Exchange an existing API token for a browser session. The token is never saved in browser storage.' : 'Use your Timekeeper account. API tokens are managed after signing in.';
   }
   $('auth-mode').addEventListener('change',mode); mode();
   async function publicRequest(path, body) {
     if (!isSecureOrigin()) throw new Error();
     const response = await fetch(`/api/v1/auth/${path}`, {method:body ? 'POST':'GET', credentials:'same-origin', redirect:'error', cache:'no-store', headers:{Accept:'application/json', ...(body ? {'Content-Type':'application/json'} : {})}, ...(body ? {body:JSON.stringify(body)} : {})});
-    const data = await response.json(); if (!response.ok) throw new ApiError(data.code, response.status); return data;
+    const data = response.status === 204 ? null : await response.json(); if (!response.ok) throw new ApiError(data.code, response.status); return data;
   }
   async function attach(data, current) {
     if (current !== generation) return;
@@ -33,6 +35,7 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
   }
   function reset(message = '', retry = null) {
     ++generation; active?.close(); active = null; closeAccount(); clear();
+    recovery?.close();
     $('login-form').reset();
     if (retry) { $('auth-mode').value = retry.mode; $('username').value = retry.username; }
     mode(); $('login-error').textContent = message;
@@ -55,6 +58,7 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
     const token = $('token').value; $('password').value = ''; $('password-confirm').value = ''; $('token').value = '';
     if (selected === 'login') body.remember = $('remember').checked;
     else if (['setup','recover'].includes(selected)) { body.code = $('setup-code').value.trim(); body.displayName = body.username; $('setup-code').value = ''; }
+    if (selected === 'setup') body.email = $('setup-email').value;
     void (async () => {
       let issued = false;
       try {
@@ -92,7 +96,10 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
       if(error.status === 401) reset(); else $('status').textContent = 'Sign-out could not be confirmed. Please retry while connected.';
     }).finally(() => {$('sign-out').disabled = false;});
   });
+  recovery = emailRecovery({request:publicRequest, signIn:reset});
+  window.addEventListener('hashchange', () => {void recovery.initializeFromLocation();});
   return {clear:reset, async initialize() {
+    if (await recovery.initializeFromLocation()) return;
     const current = ++generation;
     const submit=$('login-form').querySelector('button');submit.disabled=true;
     try { const session = new Api(); const {data} = await session.request('/auth/session'); session.close(); forgetToken(); await attach(data,current); }

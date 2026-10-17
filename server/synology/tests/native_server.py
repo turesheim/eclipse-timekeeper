@@ -15,9 +15,10 @@ def verify(command,database_container,folder,image):
     project=folder/'rendered-project.json'
     command('docker','cp',database_container+':/var/packages/timekeeper/target/project/compose.yaml',str(project))
     definition=json.loads(project.read_text());service=definition['services']['server']
-    prepared=folder/'prepared-config';password=folder/'native-password'
+    prepared=folder/'prepared-config';password=folder/'native-password';smtp_password=folder/'native-smtp-password'
     command('docker','cp',database_container+':/var/packages/timekeeper/target/private/config',str(prepared))
     command('docker','cp',database_container+':/var/packages/timekeeper/target/private/secrets/database_password',str(password))
+    command('docker','cp',database_container+':/var/packages/timekeeper/target/private/secrets/smtp_password',str(smtp_password))
     config=folder/'native-config';secrets=folder/'native-secrets'
     config.mkdir(mode=0o755);secrets.mkdir(mode=0o755)
     name=database_container+'-server'
@@ -36,6 +37,7 @@ def verify(command,database_container,folder,image):
         if list(config.iterdir()) or list(secrets.iterdir()):raise AssertionError('Fixture did not create the project with empty runtime directories')
         for path in prepared.iterdir():shutil.copyfile(path,config/path.name);(config/path.name).chmod(0o644)
         shutil.copyfile(password,secrets/'database_password');(secrets/'database_password').chmod(0o444)
+        shutil.copyfile(smtp_password,secrets/'smtp_password');(secrets/'smtp_password').chmod(0o444)
         pending.write_text('{}');pending.chmod(0o644)
         command(*compose,'start')
         if command('docker','wait',name).stdout.strip()!='1':raise AssertionError('Pending maintenance allowed server startup')

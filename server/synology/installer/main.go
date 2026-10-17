@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func validate(root string, w Wizard, r Release) error {
+func validate(root string, w Wizard, r Release, resources string) error {
 	if retained, err := loadSettings(root); err == nil {
 		if w.UpdateAccess {
 			retained.Tailscale = w.Settings.Tailscale
@@ -21,7 +21,11 @@ func validate(root string, w Wizard, r Release) error {
 			return err
 		}
 		if retained.Release.Schema != r.Schema {
-			return errors.New("Upgrade requires an explicit schema migration; the existing installation is unchanged")
+			if retained.Release.Schema != 2 || r.Schema != currentSchema {
+				return errors.New("Unsupported schema upgrade; the existing installation is unchanged")
+			}
+			_, _, _, err := checkSchemaUpgrade(root, resources)
+			return err
 		}
 		if retained.Phase != "READY" {
 			w.Settings = retained
@@ -138,7 +142,7 @@ func run(action, root, target, releasePath string, env func(string) string, argu
 		if !filepath.IsAbs(argument) {
 			return errors.New("Provide the absolute path to a verified native PostgreSQL 17 backup")
 		}
-		return restore(root, argument)
+		return restore(root, argument, filepath.Join(releasePath, "migration"))
 	case "stop", "prestop":
 		return nil // The resource worker stops containers AFTER the stop script.
 	case "prestart":
@@ -196,9 +200,9 @@ func run(action, root, target, releasePath string, env func(string) string, argu
 			if err := containerManagerAt("/var/packages/ContainerManager/INFO"); err != nil {
 				return err
 			}
-			return validate(root, w, release)
+			return validate(root, w, release, filepath.Join(releasePath, "migration"))
 		}
-		if err := install(root, target, w, release); err != nil {
+		if err := install(root, target, w, release, filepath.Join(releasePath, "migration")); err != nil {
 			return err
 		}
 		return clearWizardCode(env)

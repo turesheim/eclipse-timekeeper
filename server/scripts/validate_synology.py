@@ -16,6 +16,7 @@ REQUIRED = {'INFO','LICENSE','PACKAGE_ICON.PNG','PACKAGE_ICON_256.PNG','package.
             'conf/privilege','conf/resource','WIZARD_UIFILES/install_uifile.sh',
             'scripts/timekeeper-dsm','scripts/release.json',
             'scripts/migration/postgresql-shape.sql','scripts/migration/schema-v2-postgresql.shape',
+            'scripts/migration/schema-v3-postgresql.shape','scripts/migration/recovery-v3.sql',
             *('scripts/'+name for name in ('preinst','postinst','preupgrade','postupgrade','preuninst','postuninst','start-stop-status'))}
 
 
@@ -84,7 +85,7 @@ def validate(path):
         if projects['preload-image']!='image.tar.gz' or projects['projects'][0]['path']!='project':
             raise ValueError('Incorrect Container Manager resource')
         release=json.loads(read('scripts/release.json'))
-        if release['serverSchema']!=2 or not re.fullmatch('[a-f0-9]{40}',release['commit']) or release['image']!='ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+release['commit']:
+        if release['serverSchema']!=3 or not re.fullmatch('[a-f0-9]{40}',release['commit']) or release['image']!='ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+release['commit']:
             raise ValueError('Unpinned package image identity')
         payload=read('package.tgz')
         if hashlib.md5(payload,usedforsecurity=False).hexdigest()!=info.get('checksum'):

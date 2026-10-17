@@ -14,6 +14,8 @@ docker compose run --rm --no-deps -T --entrypoint sh maintenance -ec '
 ' > "$backup_dir/database.dump.tmp"
 mv "$backup_dir/database.dump.tmp" "$backup_dir/database.dump"
 cp "$state_dir/config/tokens.json" "$backup_dir/tokens.json"
+cp "$state_dir/config/mail.properties" "$backup_dir/mail.properties"
+cp "$state_dir/secrets/timekeeper_smtp_password" "$backup_dir/smtp_password"
 docker compose images > "$backup_dir/images.txt"
 chmod 600 "$backup_dir"/*
 printf '%s\n' "$backup_dir"

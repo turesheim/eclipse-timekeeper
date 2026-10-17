@@ -60,8 +60,23 @@ class PostgresSchemaIT {
             assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(connection));
             ServerSchema.initializeOrValidate(connection,true);ServerSchema.validate(connection);ServerSchema.initializeOrValidate(connection);
             try(var rows=statement.executeQuery("SELECT id,version,payload FROM tk_resource")) {assertTrue(rows.next());assertEquals(id,rows.getObject(1,UUID.class));assertEquals(8,rows.getLong(2));assertEquals(payload,rows.getString(3));assertFalse(rows.next());}
-            try(var rows=statement.executeQuery("SELECT schema_version,state FROM tk_schema")) {rows.next();assertEquals(2,rows.getInt(1));assertEquals("READY",rows.getString(2));}
+            try(var rows=statement.executeQuery("SELECT schema_version,state FROM tk_schema")) {rows.next();assertEquals(ServerSchema.CURRENT,rows.getInt(1));assertEquals("READY",rows.getString(2));}
             try(var rows=statement.executeQuery("SELECT version,revision FROM tk_owner")) {rows.next();assertEquals(7,rows.getLong(1));assertEquals(19,rows.getLong(2));}
+        }
+    }
+    @Test void upgradesCanonicalV2AndRetainsAccountAndSessionSecrets() throws Exception {
+        try(var connection=connection();var statement=connection.createStatement()) {
+            for(String resource:java.util.List.of("schema-v1-postgresql.sql","auth-v2.sql")) {
+                try(var input=getClass().getResourceAsStream("/db/"+resource)) {statement.execute(new String(input.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));}
+            }
+            statement.executeUpdate("UPDATE tk_schema SET schema_version=2,state='READY'");
+            statement.executeUpdate("INSERT INTO tk_owner VALUES('retained','Europe/Oslo',7,19,'aabb')");
+            statement.executeUpdate("INSERT INTO tk_account(owner_id,username,password_hash,display_name,state,administrator,version) VALUES('retained','retained','password hash','Retained','ENABLED',TRUE,5)");
+            statement.executeUpdate("INSERT INTO tk_auth_session VALUES('session hash','retained','csrf','READ_WRITE','2026-01-01T00:00:00Z','2027-01-01T00:00:00Z','2026-01-01T00:00:00Z',TRUE,NULL)");
+            assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(connection));
+            ServerSchema.initializeOrValidate(connection,true);ServerSchema.initializeOrValidate(connection);ServerSchema.validate(connection);
+            try(var rows=statement.executeQuery("SELECT password_hash,version FROM tk_account WHERE owner_id='retained'")) {assertTrue(rows.next());assertEquals("password hash",rows.getString(1));assertEquals(5,rows.getLong(2));}
+            try(var rows=statement.executeQuery("SELECT digest,csrf FROM tk_auth_session")) {assertTrue(rows.next());assertEquals("session hash",rows.getString(1));assertEquals("csrf",rows.getString(2));}
         }
     }
     @Test void checkConstraintsRemainCanonicalAfterLogicalDumpRestoreDeparsing() throws Exception {

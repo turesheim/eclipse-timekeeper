@@ -141,7 +141,7 @@ sh backup.sh
 ```
 
 The resulting directory contains a PostgreSQL custom-format dump, the token
-registry and the deployed image list. Configure a daily DSM task to run this
+registry, SMTP settings/password and the deployed image list. Configure a daily DSM task to run this
 command, monitor failures, and back up `backups`, `config`, `.env` and `secrets`
 to another host/location using Hyper Backup. Set retention for those backups.
 Copying live PostgreSQL data directories is not a consistent backup.
@@ -184,8 +184,8 @@ If a task was forcibly killed and left `state/update.lock`, verify that no updat
 is running before removing that empty lock directory and rerunning the task.
 
 Automatic API updates require backward-compatible database schemas. Current
-startup upgrades the canonical schema 1 to schema 2. Stop both replicas and
-back up before this first account upgrade; follow the [account migration guide](ACCOUNTS.md).
+startup can upgrade canonical schema 1 or 2 to schema 3 when explicitly enabled.
+Stop both replicas and back up before this upgrade; follow the [account migration guide](ACCOUNTS.md).
 Subsequent incompatible migrations must be coordinated separately with a restore plan;
 rolling back an image alone cannot undo a migration.
 
@@ -195,7 +195,7 @@ replicas. Confirm that both replicas run the accepted Work Session build before
 resuming writes. This first transition must not serve writes through a mixture
 of old and new domain models. The generic SQL layout remains server schema 1;
 its version marker alone does not prove that an older binary understands new
-resource types or activity associations. Once sessions or taskless activities
+resource types or activity associations. Current builds use schema 3. Once sessions or taskless activities
 have been recorded, use only server builds supporting them. Returning to a
 pre-Work-Session build requires stopping client access and restoring a verified
 backup from before those records existed; an image rollback alone is unsupported.

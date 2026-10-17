@@ -11,9 +11,10 @@
       "cap_drop": ["ALL"],
       "security_opt": ["no-new-privileges:true"],
       "environment": {
-        "QUARKUS_CONFIG_LOCATIONS": "file:/config/runtime.properties",
+        "QUARKUS_CONFIG_LOCATIONS": "file:/config/runtime.properties,file:/config/mail.properties",
         "QUARKUS_HTTP_HOST": "127.0.0.1",
         "TIMEKEEPER_SERVER_DB_PASSWORD_FILE": "/run/secrets/database_password",
+        "TIMEKEEPER_SMTP_PASSWORD_FILE": "/run/secrets/smtp_password",
         "TIMEKEEPER_SERVER_TOKENS_FILE": "/config/tokens.json",
         "TIMEKEEPER_SERVER_SETUP_FILE": "/config/account-setup.json",
         "TIMEKEEPER_MAINTENANCE_FILE": "/config/maintenance-pending.json"

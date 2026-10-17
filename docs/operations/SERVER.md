@@ -107,7 +107,7 @@ non-public schemas, user sequences/domains, incomplete initialization and missin
 ownership constraints fail without schema/data repair. H2 DDL commits during
 initialization, so interrupted creation retains `INITIALIZING` and requires an
 operator to select new storage or restore a known valid backup. The canonical
-server schema 1 upgrades to schema 2 as described in the [account guide](ACCOUNTS.md);
+server schema 1 or 2 upgrades to schema 3 as described in the [account guide](ACCOUNTS.md);
 no historical or embedded-schema migration is provided.
 
 After schema validation, the server sets

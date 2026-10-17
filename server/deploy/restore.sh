@@ -6,6 +6,10 @@ if [ "$#" -ne 1 ]; then echo "Usage: $0 /absolute/path/to/backup-directory" >&2;
 backup_dir=$1
 test -s "$backup_dir/database.dump"
 test -s "$backup_dir/tokens.json"
+if [ -e "$backup_dir/mail.properties" ] || [ -e "$backup_dir/smtp_password" ]; then
+  test -f "$backup_dir/mail.properties"
+  test -f "$backup_dir/smtp_password"
+fi
 # shellcheck source=/dev/null
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
 state_dir=${TIMEKEEPER_STATE_DIR:-./state}
@@ -17,6 +21,14 @@ docker compose run --rm --no-deps -T --entrypoint sh maintenance -ec '
 cp "$backup_dir/tokens.json" "$state_dir/config/tokens.json.new"
 chmod 644 "$state_dir/config/tokens.json.new"
 mv "$state_dir/config/tokens.json.new" "$state_dir/config/tokens.json"
+if [ -f "$backup_dir/mail.properties" ]; then
+  cp "$backup_dir/mail.properties" "$state_dir/config/mail.properties.new"
+  chmod 644 "$state_dir/config/mail.properties.new"
+  mv "$state_dir/config/mail.properties.new" "$state_dir/config/mail.properties"
+  cp "$backup_dir/smtp_password" "$state_dir/secrets/timekeeper_smtp_password.new"
+  chmod 444 "$state_dir/secrets/timekeeper_smtp_password.new"
+  mv "$state_dir/secrets/timekeeper_smtp_password.new" "$state_dir/secrets/timekeeper_smtp_password"
+fi
 # Wait for both members before returning; a single ready load-balanced request
 # does not prove that the other restored replica has completed startup.
 docker compose up -d --no-recreate --wait --wait-timeout 180 api-1 api-2

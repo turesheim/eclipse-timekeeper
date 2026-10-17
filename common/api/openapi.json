@@ -1584,7 +1584,7 @@
             "$ref": "#/components/parameters/Csrf"
           }
         ],
-        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
+        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
       }
     },
     "/activities/{id}": {
@@ -1732,7 +1732,7 @@
             }
           }
         },
-        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
+        "description": "Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently."
       },
       "delete": {
         "operationId": "deleteActivity",
@@ -1798,7 +1798,7 @@
     "/activities/active": {
       "get": {
         "operationId": "getActiveActivity",
-        "summary": "Read the authenticated owner’s current interval",
+        "summary": "Read the authenticated owner\u2019s current interval",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -1863,7 +1863,7 @@
     "/activities/start": {
       "post": {
         "operationId": "startActivity",
-        "summary": "Atomically activate or switch the owner’s task",
+        "summary": "Atomically activate or switch the owner\u2019s task",
         "x-required-permission": "write",
         "responses": {
           "201": {
@@ -2044,7 +2044,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Stop an open interval. A newly keyed command for an already stopped interval with its current ETag returns it unchanged. A successful same-key replay returns its original response, even with its original stale ETag. Store separate daily activities at elapsed local midnight boundaries in the owner’s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently.",
+        "description": "Stop an open interval. A newly keyed command for an already stopped interval with its current ETag returns it unchanged. A successful same-key replay returns its original response, even with its original stale ETag. Store separate daily activities at elapsed local midnight boundaries in the owner\u2019s configured zone, preserving exact time, task, summary and labels. The response and ETag identify the last part; earlier parts appear as separate activities and change events and are edited/deleted independently.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
@@ -2114,7 +2114,7 @@
       },
       "put": {
         "operationId": "updateProfile",
-        "summary": "Set the owner’s reporting time zone",
+        "summary": "Set the owner\u2019s reporting time zone",
         "x-required-permission": "write",
         "responses": {
           "200": {
@@ -2244,7 +2244,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Use the owner’s configured zone unless overridden. End is exclusive. Clip intervals to the requested range and local days; open intervals end at one generatedAt instant. Sum durations, including overlaps, using exact nanoseconds. Days are local calendar days, Monday begins a week; DST changes do not assume 24-hour days. No pagination truncates the report totals.",
+        "description": "Use the owner\u2019s configured zone unless overridden. End is exclusive. Clip intervals to the requested range and local days; open intervals end at one generatedAt instant. Sum durations, including overlaps, using exact nanoseconds. Days are local calendar days, Monday begins a week; DST changes do not assume 24-hour days. No pagination truncates the report totals.",
         "parameters": [
           {
             "name": "from",
@@ -2344,7 +2344,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "after is the last processed owner-local sequence. Wait up to waitSeconds if there are no newer events. Retain at least seven days; a cursor older than retained history or ahead of the owner’s head returns 409 RESYNC_REQUIRED. Empty results preserve after. Events are published only after commit; sequence gaps are allowed. Read fresh resources by ID, keeping unsaved local edits until explicitly resolved.",
+        "description": "after is the last processed owner-local sequence. Wait up to waitSeconds if there are no newer events. Retain at least seven days; a cursor older than retained history or ahead of the owner\u2019s head returns 409 RESYNC_REQUIRED. Empty results preserve after. Events are published only after commit; sequence gaps are allowed. Read fresh resources by ID, keeping unsaved local edits until explicitly resolved.",
         "parameters": [
           {
             "name": "after",
@@ -2476,7 +2476,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Validate the complete graph, unique source IDs, parent cycles, reference uniqueness, temporal rules and open-activity limit before commit. Allocate fresh Timekeeper UUIDs for every record and rewrite internal relations; return source-to-new ID mappings. Never overwrite existing data or accept owner identities. Existing external identities conflict with 409; invalid graph returns 422. No record survives a failed import. Maximum 10,000 per type and 20 MiB. Do not change the owner’s configured zone implicitly. Imported multi-day activities are split at elapsed local day boundaries, with source activity IDs mapped to the last part. Accept v1 snapshots without sessions and v2 snapshots containing work sessions and optional task/project/session relations. Remap session IDs, enforce the independent one-running-session limit and preserve associations on all daily activity portions.",
+        "description": "Validate the complete graph, unique source IDs, parent cycles, reference uniqueness, temporal rules and open-activity limit before commit. Allocate fresh Timekeeper UUIDs for every record and rewrite internal relations; return source-to-new ID mappings. Never overwrite existing data or accept owner identities. Existing external identities conflict with 409; invalid graph returns 422. No record survives a failed import. Maximum 10,000 per type and 20 MiB. Do not change the owner\u2019s configured zone implicitly. Imported multi-day activities are split at elapsed local day boundaries, with source activity IDs mapped to the last part. Accept v1 snapshots without sessions and v2 snapshots containing work sessions and optional task/project/session relations. Remap session IDs, enforce the independent one-running-session limit and preserve associations on all daily activity portions.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -3855,7 +3855,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SetupInput"
+                "$ref": "#/components/schemas/EmailSetupInput"
               }
             }
           }
@@ -4889,6 +4889,554 @@
           "$ref": "#/components/parameters/AccountKey"
         }
       ]
+    },
+    "/auth/email/forgot": {
+      "post": {
+        "operationId": "requestEmailRecovery",
+        "summary": "requestEmailRecovery",
+        "tags": [
+          "Accounts"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "202": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailForgotResult"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailForgotInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/email/preview": {
+      "post": {
+        "operationId": "previewEmailLink",
+        "summary": "previewEmailLink",
+        "tags": [
+          "Accounts"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "204": {
+            "description": "Successful operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailLinkInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/email/verify": {
+      "post": {
+        "operationId": "verifyRecoveryEmail",
+        "summary": "verifyRecoveryEmail",
+        "tags": [
+          "Accounts"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "204": {
+            "description": "Successful operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailTokenInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/email/reset": {
+      "post": {
+        "operationId": "resetPasswordByEmail",
+        "summary": "resetPasswordByEmail",
+        "tags": [
+          "Accounts"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "204": {
+            "description": "Successful operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailResetInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/email/addresses/{slot}": {
+      "get": {
+        "operationId": "getRecoveryEmail",
+        "summary": "getRecoveryEmail",
+        "tags": [
+          "Accounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryAddress"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "slot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PRIMARY",
+                "BACKUP"
+              ]
+            }
+          }
+        ],
+        "x-required-permission": "read"
+      },
+      "put": {
+        "operationId": "changeRecoveryEmail",
+        "summary": "changeRecoveryEmail",
+        "tags": [
+          "Accounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryAddress"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "name": "slot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PRIMARY",
+                "BACKUP"
+              ]
+            }
+          }
+        ],
+        "x-required-permission": "write",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryAddressInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/email/addresses/{slot}/resend": {
+      "post": {
+        "operationId": "resendRecoveryEmailVerification",
+        "summary": "resendRecoveryEmailVerification",
+        "tags": [
+          "Accounts"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "202": {
+            "description": "Successful operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "slot",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PRIMARY",
+                "BACKUP"
+              ]
+            }
+          }
+        ],
+        "x-required-permission": "write",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailResendInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6858,7 +7406,8 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "setupRequired"
+          "setupRequired",
+          "emailRecoveryEnabled"
         ],
         "properties": {
           "setupRequired": {
@@ -6871,6 +7420,9 @@
             ],
             "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+-[1-9][0-9]*$",
             "description": "Installed Synology SPK version; null for other deployment types."
+          },
+          "emailRecoveryEnabled": {
+            "type": "boolean"
           }
         }
       },
@@ -7154,7 +7706,8 @@
           "username",
           "password",
           "displayName",
-          "administrator"
+          "administrator",
+          "email"
         ],
         "properties": {
           "username": {
@@ -7175,6 +7728,11 @@
           },
           "administrator": {
             "type": "boolean"
+          },
+          "email": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 320
           }
         }
       },
@@ -7203,6 +7761,185 @@
           },
           "administrator": {
             "type": "boolean"
+          }
+        }
+      },
+      "EmailForgotInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "username"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      },
+      "EmailTokenInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          }
+        }
+      },
+      "EmailLinkInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "token",
+          "purpose"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "VERIFY",
+              "RESET"
+            ]
+          }
+        }
+      },
+      "EmailResetInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "token",
+          "password"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 15,
+            "description": "15 or more Unicode code points; at most 1024 UTF-8 bytes. Never trimmed."
+          }
+        }
+      },
+      "EmailResendInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {}
+      },
+      "RecoveryAddressInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "currentPassword"
+        ],
+        "properties": {
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 320
+          },
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 1024
+          }
+        }
+      },
+      "RecoveryAddress": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slot",
+          "verifiedAddress",
+          "pendingAddress",
+          "version"
+        ],
+        "properties": {
+          "slot": {
+            "type": "string",
+            "enum": [
+              "PRIMARY",
+              "BACKUP"
+            ]
+          },
+          "verifiedAddress": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pendingAddress": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "EmailForgotResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "EmailSetupInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "username",
+          "password",
+          "displayName",
+          "email"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "username": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 15,
+            "description": "15 or more Unicode code points; at most 1024 UTF-8 bytes. Never trimmed."
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "email": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 320
           }
         }
       }
@@ -7507,7 +8244,7 @@
     },
     {
       "name": "Accounts",
-      "description": "User identity, private credentials and administrator account management. Administrator privileges never grant access to another user’s business data."
+      "description": "User identity, private credentials and administrator account management. Administrator privileges never grant access to another user\u2019s business data."
     }
   ]
 }

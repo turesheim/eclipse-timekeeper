@@ -17,7 +17,8 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     @Override public void filter(ContainerRequestContext request) {
         String path=request.getUriInfo().getPath();if(path.startsWith("/")) path=path.substring(1);
         if (!(path.equals("api/v1") || path.startsWith("api/v1/")) || path.equals("api/v1/openapi.json")) return;
-        if(java.util.Set.of("api/v1/auth/status","api/v1/auth/login","api/v1/auth/setup","api/v1/auth/recover").contains(path)) return;
+        if(java.util.Set.of("api/v1/auth/status","api/v1/auth/login","api/v1/auth/setup","api/v1/auth/recover",
+                "api/v1/auth/email/forgot","api/v1/auth/email/preview","api/v1/auth/email/verify","api/v1/auth/email/reset").contains(path)) return;
         var headers=request.getHeaders().get("Authorization");
         String cookie=null;
         for(String header:request.getHeaders().getOrDefault("Cookie",java.util.List.of())) for(String part:header.split(";")) {

@@ -32,7 +32,7 @@ def package(output, commit, root=ROOT):
                 raise ValueError('Missing or unexpected deployment input: ' + name)
             archive.add(source, arcname=name, recursive=False)
         archive.add(root / 'server/scripts/configure_accounts.py', arcname='configure_accounts.py', recursive=False)
-        for name in ('postgresql-shape.sql','schema-v2-postgresql.shape'):
+        for name in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','recovery-v3.sql'):
             archive.add(root / 'server/app/src/main/resources/db' / name, arcname='migration/'+name,recursive=False)
         for source, destination in GUIDES.items():
             content = render_document(root, source, GUIDES, commit).encode()

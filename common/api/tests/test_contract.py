@@ -36,7 +36,8 @@ class ContractTest(unittest.TestCase):
                     continue
                 operation = item[method]
                 ids.append(operation['operationId'])
-                if path in ('/openapi.json', '/auth/status', '/auth/login', '/auth/setup', '/auth/recover'):
+                if path in ('/openapi.json', '/auth/status', '/auth/login', '/auth/setup', '/auth/recover',
+                            '/auth/email/forgot', '/auth/email/preview', '/auth/email/verify', '/auth/email/reset'):
                     self.assertEqual([], operation['security'])
                     continue
                 self.assertNotIn('security', operation)
@@ -186,6 +187,7 @@ class ContractTest(unittest.TestCase):
             'createWorkSession', 'getWorkSession', 'updateWorkSession', 'deleteWorkSession', 'listWorkSessions',
             'getActiveWorkSession', 'startWorkSession', 'stopWorkSession', 'associateWorkSession', 'reportWorkSession',
             'getAuthStatus', 'login', 'setupAccount', 'recoverAccount', 'exchangeApiToken', 'getAuthSession', 'logout', 'getAccount', 'updateAccount', 'changePassword', 'listPersonalTokens', 'createPersonalToken', 'revokePersonalToken', 'listUserAccounts', 'createUserAccount', 'getUserAccount', 'updateUserAccount',
+            'requestEmailRecovery', 'previewEmailLink', 'verifyRecoveryEmail', 'resetPasswordByEmail', 'getRecoveryEmail', 'changeRecoveryEmail', 'resendRecoveryEmailVerification',
             'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()

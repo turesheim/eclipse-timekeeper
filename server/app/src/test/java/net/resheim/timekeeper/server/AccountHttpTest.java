@@ -37,7 +37,7 @@ class AccountHttpTest {
     @BeforeEach void clear() throws Exception {
         var actual=io.quarkus.arc.ClientProxy.unwrap(store);
         try(var c=actual.datasource.getConnection();var s=c.createStatement()) {
-            for(String table:List.of("tk_auth_session","tk_api_token","tk_auth_challenge","tk_account","tk_active","tk_relation","tk_external_reference","tk_receipt","tk_change","tk_resource","tk_owner","tk_auth_throttle")) s.executeUpdate("DELETE FROM "+table);
+            for(String table:List.of("tk_recovery_link","tk_recovery_address","tk_auth_session","tk_api_token","tk_auth_challenge","tk_account","tk_active","tk_relation","tk_external_reference","tk_receipt","tk_change","tk_resource","tk_owner","tk_auth_throttle")) s.executeUpdate("DELETE FROM "+table);
             s.executeUpdate("UPDATE tk_auth_control SET bootstrap_completed=FALSE");
         }
     }
@@ -45,7 +45,7 @@ class AccountHttpTest {
     private Browser setup() throws Exception {
         String code=AccountPasswords.secret();var config=JsonValues.object();config.put("sha256",JsonValues.hash(code));config.put("purpose","SETUP");config.put("expiresAt",Instant.now().plusSeconds(600).toString());
         Path file=temporary.resolve("setup.json");Files.writeString(file,config.toString());io.quarkus.arc.ClientProxy.unwrap(accounts).setupFile=file.toString();accounts.initialize();
-        var body=JsonValues.object();body.put("code",code);body.put("username","admin");body.put("password",PASSWORD);body.put("displayName","Administrator");
+        var body=JsonValues.object();body.put("code",code);body.put("username","admin");body.put("password",PASSWORD);body.put("displayName","Administrator");body.put("email","admin@example.org");
         Browser result=browser(call(null,"POST","/auth/setup",body,false));assertEquals(401,call(null,"POST","/auth/setup",body,false).statusCode());return result;
     }
     @Test void browserSessionsUseCsrfAndAccountBoundDataAndLogoutRevokesOnlyTheCurrentSession() throws Exception {
@@ -75,7 +75,7 @@ class AccountHttpTest {
         assertEquals(401,given().header("Authorization","Bearer "+raw).get("/api/v1/me").statusCode());assertEquals(200,call(second,"GET","/me",null,false).statusCode());
     }
     @Test void administratorCannotReadOtherBusinessDataAndDisableTerminatesOutstandingPolls() throws Exception {
-        var admin=setup();var user=call(admin,"POST","/auth/users",node("{\"username\":\"other\",\"password\":\""+PASSWORD+"\",\"displayName\":\"Other\",\"administrator\":false}"),true);
+        var admin=setup();var user=call(admin,"POST","/auth/users",node("{\"username\":\"other\",\"password\":\""+PASSWORD+"\",\"displayName\":\"Other\",\"email\":\"other@example.org\",\"administrator\":false}"),true);
         assertEquals(201,user.statusCode());String owner=node(user.asString()).get("user").get("ownerId").asText();
         var other=browser(call(null,"POST","/auth/login",node("{\"username\":\"other\",\"password\":\""+PASSWORD+"\",\"remember\":false}"),false));assertEquals(owner,other.owner());
         var created=call(other,"POST","/clients",node("{\"name\":\"Other private client\",\"color\":\"#102030\"}"),true);assertEquals(201,created.statusCode());String id=node(created.asString()).get("id").asText();

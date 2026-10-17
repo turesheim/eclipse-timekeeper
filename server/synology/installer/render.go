@@ -30,14 +30,29 @@ func writeChallenge(root string, w Wizard) error {
 	}
 	return writeJSON(filepath.Join(root, "config", "account-setup.json"), challenge, 0644)
 }
-func install(root, target string, w Wizard, r Release) error {
+func install(root, target string, w Wizard, r Release, resources string) error {
 	if info, err := os.Lstat(root); err == nil && (!info.IsDir() || info.Mode()&os.ModeSymlink != 0) {
 		return errors.New("Refusing an unexpected state directory")
 	}
 	retained, err := loadSettings(root)
 	if err == nil {
+		_, finishingUpgrade, err := pendingSchemaUpgrade(root)
+		if err != nil {
+			return err
+		}
 		if retained.Release.Schema != r.Schema {
-			return errors.New("A schema migration requires a separate tested maintenance procedure")
+			if retained.Release.Schema != 2 || r.Schema != currentSchema {
+				return errors.New("Unsupported Timekeeper schema migration")
+			}
+			finishingUpgrade = true
+		}
+		if finishingUpgrade {
+			if r.Schema != currentSchema {
+				return errors.New("Complete the pending upgrade with the matching package")
+			}
+			if err := prepareSchemaUpgrade(root, resources); err != nil {
+				return err
+			}
 		}
 		if retained.Phase != "READY" {
 			if w.AdminPassword == "" {
@@ -71,7 +86,13 @@ func install(root, target string, w Wizard, r Release) error {
 		if err = render(root, target, retained); err != nil {
 			return err
 		}
-		return writeJSON(filepath.Join(root, "settings.json"), retained, 0600)
+		if err := writeJSON(filepath.Join(root, "settings.json"), retained, 0600); err != nil {
+			return err
+		}
+		if finishingUpgrade {
+			return finishMaintenance(root, retained)
+		}
+		return nil
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return errors.New("Restore the retained Timekeeper configuration before reinstalling")
@@ -177,6 +198,9 @@ func publishConfiguration(root, target string, s Settings) error {
 	if err := origin(s.PublicOrigin); err != nil {
 		return err
 	}
+	if err := ensureMailConfiguration(root); err != nil {
+		return err
+	}
 	publicURL, err := url.Parse(s.PublicOrigin)
 	if err != nil {
 		return err
@@ -193,13 +217,13 @@ func publishConfiguration(root, target string, s Settings) error {
 			return err
 		}
 	}
-	for _, name := range []string{"config/tokens.json", "config/account-setup.json", "secrets/database_password"} {
+	for _, name := range []string{"config/tokens.json", "config/account-setup.json", "config/mail.properties", "secrets/database_password", "secrets/smtp_password"} {
 		content, err := os.ReadFile(filepath.Join(root, name))
 		if err != nil {
 			return err
 		}
 		mode := os.FileMode(0644)
-		if name == "secrets/database_password" {
+		if strings.HasPrefix(name, "secrets/") {
 			mode = 0444
 		}
 		if err = atomic(filepath.Join(private, name), content, mode); err != nil {

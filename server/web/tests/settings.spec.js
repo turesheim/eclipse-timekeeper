@@ -8,12 +8,12 @@ async function api(request, method, path, data, headers = {}) {
 }
 async function fresh(request) {
   const username = 'settings-' + randomUUID().slice(0, 8), password = 'private settings passphrase';
-  const {user} = await (await api(request, 'POST', '/auth/users', {username, password, displayName: username, administrator: false})).json();
+  const {user} = await (await api(request, 'POST', '/auth/users', {username, password, displayName: username, email: username + '@example.org', administrator: false})).json();
   return {...user, password};
 }
 async function login(page, user, hash = '') {
   await page.goto('/web/' + hash); await page.locator('#auth-mode').selectOption('login');
-  await page.getByLabel('Username', {exact: true}).fill(user.username);
+  await page.locator('#login-form').getByLabel('Username', {exact: true}).fill(user.username);
   await page.getByLabel('Password', {exact: true}).fill(user.password);
   await page.getByRole('button', {name: 'Sign in', exact: true}).click();
   await expect(page.locator('#owner')).toHaveText(user.displayName || user.username);
@@ -133,12 +133,12 @@ test('password validation preserves drafts and a successful change revokes only 
   const headers = await ownHeaders(page), tokenReply = await page.request.post('/api/v1/auth/tokens', {headers, data: {name: 'Old password token', permissions: ['read'], expiresAt: null}});
   expect(tokenReply.status()).toBe(201); const secret = (await tokenReply.json()).token;
   await expect(page.getByLabel('Current password', {exact: true})).toHaveAttribute('autocomplete', 'current-password');
-  await expect(page.getByLabel('New password', {exact: true})).toHaveAttribute('autocomplete', 'new-password');
-  await page.getByLabel('Current password', {exact: true}).fill('incorrect current password'); await page.getByLabel('New password', {exact: true}).fill('a replacement private password');
-  await page.getByLabel('Confirm new password', {exact: true}).fill('different replacement password'); await page.getByRole('button', {name: 'Change password and sign out', exact: true}).click();
+  await expect(page.locator('#account-content').getByLabel('New password', {exact: true})).toHaveAttribute('autocomplete', 'new-password');
+  await page.getByLabel('Current password', {exact: true}).fill('incorrect current password'); await page.locator('#account-content').getByLabel('New password', {exact: true}).fill('a replacement private password');
+  await page.locator('#account-content').getByLabel('Confirm new password', {exact: true}).fill('different replacement password'); await page.getByRole('button', {name: 'Change password and sign out', exact: true}).click();
   await expect(page.locator('#account-content')).toContainText('Passwords do not match');
-  await page.getByLabel('Confirm new password', {exact: true}).fill('a replacement private password'); await page.getByRole('button', {name: 'Show new password', exact: true}).click();
-  await expect(page.getByLabel('New password', {exact: true})).toHaveAttribute('type', 'text');
+  await page.locator('#account-content').getByLabel('Confirm new password', {exact: true}).fill('a replacement private password'); await page.getByRole('button', {name: 'Show new password', exact: true}).click();
+  await expect(page.locator('#account-content').getByLabel('New password', {exact: true})).toHaveAttribute('type', 'text');
   await page.getByRole('button', {name: 'Change password and sign out', exact: true}).click(); await expect(page.locator('#account-content')).toContainText('current password was not accepted');
   await page.getByLabel('Current password', {exact: true}).fill(user.password); await page.getByRole('button', {name: 'Change password and sign out', exact: true}).click();
   await expect(page.locator('#login')).toBeVisible(); await expect(page.locator('#account-content')).toBeEmpty(); await expect(page.locator('#login-error')).toContainText('Password changed');

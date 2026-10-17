@@ -1,5 +1,6 @@
 import {instantText, localDateTimeToInstant} from './model.js';
 import {node, button, field, passwordField, validatePassword, section, form, table} from './account-ui.js';
+import {renderRecoveryEmails} from './recovery-emails.js';
 
 export async function renderAccount(view, part) {
   const [loaded, profile] = await Promise.all([view.session.request('/auth/account'), view.session.request('/me')]);
@@ -45,6 +46,7 @@ export async function renderAccount(view, part) {
   const local = Intl.DateTimeFormat().resolvedOptions().timeZone;
   if (local) preferences.value.append(button(`Use this device's time zone (${local})`, () => {input.value = local; view.dirty.add(preferences.value); updatePreview();}));
   preferences.value.append(preview); preferences.finish();
+  if (account.state === 'ENABLED') await renderRecoveryEmails(view);
 }
 
 async function renderTokens(view, zone) {
