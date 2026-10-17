@@ -510,7 +510,7 @@ test('session toolbar targets the displayed session and preserves historical too
   await expect(page.locator('#work-session-title')).toHaveText(active.title);
   await page.getByRole('button',{name:'Delete work session',exact:true}).click();await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();
   await expect(page.locator('#work-session-title')).toHaveText(history.title);
-  expect((await (await own('GET',`/activities/${activity.id}`)).json()).workSessionId).toBeNull();
+  expect(await (await own('GET',`/activities/${activity.id}`)).json()).toEqual(activity);
   const read=await (await own('POST','/auth/tokens',{name:'Toolbar read-only',permissions:['read'],expiresAt:null})).json();
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL});
   try {
