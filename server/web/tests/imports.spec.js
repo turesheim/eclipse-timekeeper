@@ -1,5 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {createHash,randomBytes,randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 
 const fixture = fileURLToPath(new URL('./fixtures/toggl/detailed-member-stop.csv',import.meta.url));
@@ -46,5 +48,57 @@ test('Toggl CSV worker, reviewed mappings, repeat import and whole-job Undo pres
   const after = await api(request,'/data/export');expect(after.activities.length).toBe(before.activities.length);expect(after.clients.length).toBe(before.clients.length);expect(after.projects.length).toBe(before.projects.length);
   expect((await api(request,`/imports/jobs/${originalId}`)).state).toBe('UNDONE');
   await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#account-content')).toBeEmpty();
+  expect(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length}))).toEqual({local:0,session:0});
+});
+
+test('Toggl import resumes committed batches after a lost reply and reload, then reviews edited records during Undo',async({page,request})=>{
+  await login(page);const before = await api(request,'/data/export');
+  const header = 'Description,Duration,Member,Email,Project,Tags,Start date,Start time,Stop date,Stop time';
+  const lines = Array.from({length:201},(_,n)=>{
+    const start = new Date(Date.UTC(2025,9,20,9,0,n)),end = new Date(+start+1000);
+    return [`Bulk row ${n}`,'00:00:01','Bulk member','bulk@example.invalid','Bulk project','','2025-10-20',start.toISOString().slice(11,19),'2025-10-20',end.toISOString().slice(11,19)].join(',');
+  });
+  const file = {name:'bulk.csv',mimeType:'text/csv',buffer:Buffer.from([header,...lines].join('\r\n'))};
+  await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles(file);
+  await page.getByRole('button',{name:'Read CSV',exact:true}).click();await page.getByRole('button',{name:'Review mappings',exact:true}).click();
+  await page.getByLabel('New client name',{exact:true}).fill('Bulk client');await page.getByRole('button',{name:'Review server matches',exact:true}).click();
+  let dropped = false;
+  await page.route('**/api/v1/imports/jobs/*/batches/0',async route=>{
+    await route.fetch();dropped = true;await page.getByRole('button',{name:'Pause after current batch',exact:true}).click();await route.abort('failed');
+  });
+  await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Paused. Resume from Import history.');
+  expect(dropped).toBe(true);await page.unroute('**/api/v1/imports/jobs/*/batches/0');
+  const job = (await api(request,'/imports')).items.find(value=>value.selectedEntries===201);expect(job.nextBatch).toBe(1);expect(job.importedEntries).toBe(100);
+  page.once('dialog',dialog=>dialog.accept());await page.reload();await expect(page.getByRole('heading',{name:'Import history',exact:true})).toBeVisible();
+  await expect(page.getByLabel('Detailed Report CSV',{exact:true})).toHaveValue('');
+  await page.getByRole('button',{name:'Resume',exact:true}).click();await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles(file);
+  await page.getByRole('button',{name:'Read CSV',exact:true}).click();await page.getByRole('button',{name:'Review mappings',exact:true}).click();
+  await expect(page.getByLabel('New client name',{exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Review server matches',exact:true}).click();await page.getByRole('button',{name:'Resume import',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
+  const imported = await api(request,'/data/export');expect(imported.activities.length-before.activities.length).toBe(201);
+  const complete = await api(request,`/imports/jobs/${job.id}`);expect(complete.nextBatch).toBe(3);expect(complete.importedNanos).toBe('201000000000');
+  const activity = imported.activities.find(value=>value.summary==='Bulk row 0');
+  const current = await request.get('/api/v1/activities/'+activity.id,{headers:{Authorization:`Bearer ${token}`}});const body = await current.json();
+  const changed = await request.put('/api/v1/activities/'+activity.id,{headers:{Authorization:`Bearer ${token}`,'If-Match':current.headers().etag},data:{start:body.start,end:body.end,summary:'Edited bulk activity',labelIds:body.labelIds}});expect(changed.status()).toBe(200);
+  const history = page.getByRole('heading',{name:'Import history',exact:true}).locator('..');
+  await history.getByRole('button',{name:'Undo import',exact:true}).click();await page.getByRole('button',{name:'Confirm Undo',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Review records retained or changed since import',exact:true})).toBeVisible();
+  await page.getByLabel('Undo decision',{exact:true}).selectOption('DELETE');await page.getByRole('button',{name:'Apply decisions and continue Undo',exact:true}).click();
+  await expect(history).toContainText('Undo complete');expect((await api(request,'/data/export')).activities.length).toBe(before.activities.length);
+});
+
+test('Toggl worker and previous-account preview are cleared on sign-out and account switch',async({page})=>{
+  await login(page);let release;const blocked = new Promise(resolve=>{release=resolve;});let intercepted=false;
+  await page.route('**/web/toggl-worker.js',async route=>{intercepted=true;await blocked;try{await route.continue();}catch{}});
+  await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles(fixture);await page.getByRole('button',{name:'Read CSV',exact:true}).click();
+  await expect.poll(()=>intercepted).toBe(true);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#account-content')).toBeEmpty();release();
+  const other = randomBytes(32).toString('base64url'),owner = 'import-owner-'+randomUUID();
+  const registryPath = process.env.TIMEKEEPER_WEB_REGISTRY,registry = JSON.parse(readFileSync(registryPath,'utf8'));
+  registry.push({ownerId:owner,sha256:createHash('sha256').update(other).digest('hex'),permissions:['read','write']});writeFileSync(registryPath,JSON.stringify(registry));
+  await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(other);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+  await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();
+  await expect(page.getByLabel('Detailed Report CSV',{exact:true})).toHaveValue('');await expect(page.locator('#account-content')).toContainText('No imports yet.');
+  await expect(page.getByRole('heading',{name:'Review import',exact:true})).not.toBeVisible();
   expect(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length}))).toEqual({local:0,session:0});
 });
