@@ -205,4 +205,43 @@ class TogglImportTest {
         assertEquals(422,assertThrows(ApiFailure.class,()->store.transaction(owner,()->importer.create(source(mappings(),1,"0").put("mode","WORK_SESSION")))).status);
     }
 
+    @Test void workSessionTagsUseReviewedOwnedLabelsAndUndoRemovesOnlyUnusedImportCatalogs() {
+        String owner="toggl-session-labels-"+UUID.randomUUID();var importer=new TogglImport(store);
+        int originalLabels=store.transaction(owner,()->store.list("LABEL").size());
+        var input=sessionSource();((ArrayNode)input.get("mappings")).add(map("tag","LABEL","Session tag",null));
+        var row=sessionRow();row.putArray("tags").add("Session tag");row.putArray("labelKeys").add(hash("tag"));var rows=array().add(row);
+        UUID job=uuid(store.transaction(owner,()->importer.create(input)).get("id"));
+        store.transaction(owner,()->commit(importer,job,rows,0,true));
+        var session=store.transaction(owner,()->store.list("WORK_SESSION").get(0));assertEquals(1,session.path("labelIds").size());
+        UUID label=uuid(session.path("labelIds").get(0));
+        store.transaction(owner,()->{assertTrue(store.related("label","LABEL",label));assertEquals("Session tag",store.find("LABEL",label).orElseThrow().path("name").asText());return null;});
+        UUID repeat=uuid(store.transaction(owner,()->importer.create(input)).get("id"));
+        assertEquals("REUSED",store.transaction(owner,()->importer.preview(repeat,rows)).path("rows").get(0).path("status").asText());
+        store.transaction(owner,()->commit(importer,repeat,rows,0,true));undoAll(repeat,owner);undoAll(job,owner);
+        store.transaction(owner,()->{assertTrue(store.list("WORK_SESSION").isEmpty());assertFalse(store.find("LABEL",label).isPresent());assertEquals(originalLabels,store.list("LABEL").size());return null;});
+    }
+
+    @Test void undoKeepsAnImportLabelUsedByAnIndependentManualWorkSession() {
+        String owner="toggl-session-label-dependency-"+UUID.randomUUID();var importer=new TogglImport(store);
+        var input=sessionSource();((ArrayNode)input.get("mappings")).add(map("tag","LABEL","Retained session tag",null));
+        var row=sessionRow();row.putArray("tags").add("Retained session tag");row.putArray("labelKeys").add(hash("tag"));var rows=array().add(row);
+        UUID job=uuid(store.transaction(owner,()->importer.create(input)).get("id"));store.transaction(owner,()->commit(importer,job,rows,0,true));
+        var manual=store.transaction(owner,()->{
+            var imported=store.list("WORK_SESSION").get(0);
+            var value=store.workSessionService().createWorkSession(new CreateWorkSession(new OwnerId(owner),Instant.parse("2025-10-01T08:00:00Z"),Optional.of(Instant.parse("2025-10-01T09:00:00Z")),"Unrelated manual session"));
+            var details=object();details.set("labelIds",imported.path("labelIds").deepCopy());return store.clientDetails("WORK_SESSION",value.id().value(),details);
+        });
+        store.transaction(owner,()->new ImportUndo(store).start(job,etag(new ImportLedger(store).required(ImportLedger.Kind.IMPORT_JOB,job))));
+        boolean sawDependency=false;
+        for(int step=0;step<10;step++) {
+            int index=step;var preview=store.transaction(owner,()->new ImportUndo(store).preview(job));var choices=object();
+            for(var target:preview.path("targets")) if(target.path("status").asText().equals("DEPENDENCY")) {
+                assertEquals("LABEL",target.path("recordType").asText());sawDependency=true;choices.put(target.path("key").asText(),"KEEP");
+            }
+            var request=object().put("reviewToken",preview.path("reviewToken").asText());request.set("choices",choices);
+            var result=store.transaction(owner,()->new ImportUndo(store).apply(job,index,request));if(result.path("state").asText().startsWith("UNDONE")) break;
+        }
+        assertTrue(sawDependency);store.transaction(owner,()->{assertEquals(List.of(manual),store.list("WORK_SESSION"));assertTrue(store.find("LABEL",uuid(manual.path("labelIds").get(0))).isPresent());return null;});
+    }
+
 }

@@ -2613,6 +2613,14 @@
               "$ref": "#/components/schemas/Id"
             },
             "description": "Only records belonging to this client."
+          },
+          {
+            "name": "labelId",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "Only work sessions assigned this owned label."
           }
         ],
         "tags": [
@@ -7799,6 +7807,15 @@
           },
           "title": {
             "$ref": "#/components/schemas/Name"
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "uniqueItems": true,
+            "maxItems": 1000,
+            "description": "Optional owner-owned labels. Omission preserves labels on edits; an empty array clears them. Older work sessions without this field have no labels."
           }
         },
         "required": [
@@ -7838,6 +7855,15 @@
           },
           "title": {
             "$ref": "#/components/schemas/Name"
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "uniqueItems": true,
+            "maxItems": 1000,
+            "description": "Optional owner-owned labels. Omission preserves labels on edits; an empty array clears them. Older work sessions without this field have no labels."
           }
         },
         "required": [
@@ -7845,7 +7871,7 @@
           "end",
           "summary"
         ],
-        "description": "Web clients supply clientId and title. Legacy interval-only clients may omit them; creation uses General and a title from summary, and edits preserve existing client/title. Null client or blank title is invalid."
+        "description": "Web clients supply clientId and title. Legacy interval-only clients may omit them; creation uses General and a title from summary, and edits preserve existing client/title. Null client or blank title is invalid. Optional labelIds are independent of activity labels and are preserved when omitted."
       },
       "StartWorkSessionInput": {
         "type": "object",
@@ -7859,12 +7885,21 @@
           },
           "title": {
             "$ref": "#/components/schemas/Name"
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "uniqueItems": true,
+            "maxItems": 1000,
+            "description": "Optional owner-owned labels. Omission preserves labels on edits; an empty array clears them. Older work sessions without this field have no labels."
           }
         },
         "required": [
           "summary"
         ],
-        "description": "Web clients supply clientId and title. Legacy interval-only clients may omit them; creation uses General and a title from summary, and edits preserve existing client/title. Null client or blank title is invalid."
+        "description": "Web clients supply clientId and title. Legacy interval-only clients may omit them; creation uses General and a title from summary, and edits preserve existing client/title. Null client or blank title is invalid. Optional labelIds are independent of activity labels and are preserved when omitted."
       },
       "WorkSessionAssociationInput": {
         "type": "object",
@@ -8021,6 +8056,15 @@
           },
           "title": {
             "$ref": "#/components/schemas/Name"
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "uniqueItems": true,
+            "maxItems": 1000,
+            "description": "Optional owner-owned labels. Omission preserves labels on edits; an empty array clears them. Older work sessions without this field have no labels."
           }
         },
         "required": [

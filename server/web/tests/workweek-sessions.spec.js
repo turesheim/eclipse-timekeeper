@@ -1,6 +1,7 @@
 import {openAccountMenu} from './navigation.js';
 import {test, expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
+import AxeBuilder from '@axe-core/playwright';
 import {dateInZone, localDateTime, durationNanos, nanosText, decimalHoursText} from '../src/model.js';
 const token = process.env.TIMEKEEPER_WEB_TOKEN;
 async function api(request, method, path, data, headers = {}) {
@@ -22,6 +23,32 @@ async function fixture(request) {
     const current = await api(request, 'GET', '/me'); await api(request, 'PUT', '/me', {zoneId: previous.zoneId}, {'If-Match': current.headers().etag});
   }};
 }
+test('work-session label choices, compact display and timer edits stay independent of activity labels',async({page,request})=>{
+  const f=await fixture(request);let id;
+  try {
+    const first=await f.create('labels',{name:'Office '+randomUUID().slice(0,6),color:'#176653'});
+    const second=await f.create('labels',{name:'Billable '+randomUUID().slice(0,6),color:'#6750a4'});
+    await signIn(page);await page.getByRole('button',{name:'Start work session',exact:true}).click();
+    await page.getByLabel('Title',{exact:true}).fill('Labelled working day');await page.getByLabel('Client',{exact:true}).selectOption(f.client.id);
+    await page.getByLabel(first.name,{exact:true}).check();await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();
+    const active=await (await api(request,'GET','/work-sessions/active')).json();id=active.id;expect(active.labelIds).toEqual([first.id]);
+    await expect(page.locator('#work-session-labels')).toContainText(first.name);
+    await page.getByRole('button',{name:'Edit work session',exact:true}).click();await expect(page.getByLabel(first.name,{exact:true})).toBeChecked();
+    await page.getByLabel(first.name,{exact:true}).uncheck();await page.getByLabel(second.name,{exact:true}).check();await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();
+    await expect(page.locator('#work-session-labels')).toContainText(second.name);await expect(page.locator('#work-session-labels')).not.toContainText(first.name);
+    expect((await (await api(request,'GET','/work-sessions/'+id)).json()).labelIds).toEqual([second.id]);
+    const audit=await new AxeBuilder({page}).include('#work-session').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
+    await page.locator('#work-session').screenshot({path:'test-results/work-session-labels-desktop.png',timeout:10000});
+    await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.locator('#work-session').screenshot({path:'test-results/work-session-labels-mobile.png',timeout:10000});
+    await page.getByRole('button',{name:'Stop work session',exact:true}).click();await expect(page.locator('#work-session-state')).toHaveText('Stopped');
+    expect((await (await api(request,'GET','/work-sessions/'+id)).json()).labelIds).toEqual([second.id]);
+    await expect(page.locator(`#week-sessions tr[data-work-session-id="${id}"]`)).toContainText(second.name);
+  } finally {
+    if(id) {const current=await api(request,'GET','/work-sessions/'+id);await api(request,'DELETE','/work-sessions/'+id,undefined,{'If-Match':current.headers().etag});}
+    await f.close();
+  }
+});
 test('Workweek shows client-colored session rows with local DST/week clipping and independent activity totals', async ({page, request}) => {
   const f = await fixture(request);
   try {

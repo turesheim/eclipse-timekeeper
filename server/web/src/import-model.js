@@ -6,7 +6,7 @@ export async function importDigest(value) {
 }
 
 /** Stable source keys exclude filenames and chosen destination names/IDs. All defaults are reviewed. */
-export async function importPlan(sourceRows, personKey, {fallbackClient, fallbackProject, mode = 'WORK_SESSION'}) {
+export async function importPlan(sourceRows, personKey, {fallbackClient, fallbackProject, mode = 'WORK_SESSION', mapWorkSessionTags = true}) {
   if(!['WORK_SESSION','ACTIVITY'].includes(mode)) throw new Error('Choose an import type.');
   const sourceKey = await importDigest(personKey), definitions = new Map(), rows = [];
   async function mapping(identity, resourceType, name, parentKey) {
@@ -28,10 +28,10 @@ export async function importPlan(sourceRows, personKey, {fallbackClient, fallbac
     const projectKey = mode === 'ACTIVITY' ? await mapping(['PROJECT', source.client, source.project], 'PROJECT', projectName, clientKey) : null;
     const taskKey = mode === 'ACTIVITY' && source.task ? await mapping(['TASK', source.client, source.project, source.task], 'TASK', source.task, projectKey) : null;
     const labelKeys = [];
-    for (const tag of mode === 'ACTIVITY' ? source.tags : []) labelKeys.push(await mapping(['LABEL', tag], 'LABEL', tag));
+    for (const tag of mode === 'ACTIVITY' || mapWorkSessionTags ? source.tags : []) labelKeys.push(await mapping(['LABEL', tag], 'LABEL', tag));
     rows.push({sourceKey, sourceId: source.sourceId, ...(source.line ? {sourceLine:source.line} : {}), start: source.start, end: source.end,
       durationNanos: source.durationNanos.toString(), client: source.client, project: source.project, task: source.task,
-      summary: source.summary, tags: source.tags, ...(mode === 'WORK_SESSION' ? {clientKey, title:source.summary.trim().slice(0,1000).replace(/[\uD800-\uDBFF]$/, '') || 'Imported work session'} : {projectKey, taskKey, labelKeys}), occurrence: source.occurrence,
+      summary: source.summary, tags: source.tags, ...(mode === 'WORK_SESSION' ? {clientKey, title:source.summary.trim().slice(0,1000).replace(/[\uD800-\uDBFF]$/, '') || 'Imported work session',...(mapWorkSessionTags ? {labelKeys} : {})} : {projectKey, taskKey, labelKeys}), occurrence: source.occurrence,
       duplicateReviewed: !!source.duplicateReviewed, ...(source.duplicateDecision ? {duplicateDecision: source.duplicateDecision} : {})});
     selectedNanos += source.durationNanos;
   }

@@ -41,9 +41,8 @@ rejected.
    and running timers remain intact. In work-session mode, each row becomes one
    completed session with its original start/end, client and description. The
    description supplies the title (first 1,000 characters, or “Imported work
-   session” when blank) and is retained in full as notes. No projects, tasks,
-   activities or labels are created alongside it; source project/task/tag values
-   remain in the audit. In activity mode, descriptions become activity summaries
+   session” when blank) and is retained in full as notes. Source tags become
+   reviewed work-session labels. No projects, tasks or activities are created alongside it; source project/task values remain in the audit. In activity mode, descriptions become activity summaries
    independently of task names; rows without a source Task stay taskless, and
    tags become labels. Unsupported billing/rate columns are reported and omitted.
 
@@ -66,7 +65,10 @@ Cancelling before creating the job writes no import or business records.
 **Import history** records committed progress and exact imported/reused source
 time. Pause after the current batch, or reload and choose **Resume**. Reselect
 the unchanged CSV, original source user, time conversion and row exclusions.
-The original mapping plan is retained. If your account time zone changed, undo
+The original mapping plan is retained. Jobs started before work-session labels
+were supported keep their original tag handling when resumed, and re-importing
+previously imported sessions does not overwrite their labels. If your account
+time zone changed, undo
 the partial job or start a newly reviewed import.
 Changed destination records also require a newly reviewed job; an existing job
 cannot silently adopt a different mapping or a newer destination version.

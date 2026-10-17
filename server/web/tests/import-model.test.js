@@ -4,14 +4,17 @@ import {readFileSync} from 'node:fs';
 import {parseTogglDetailedCsv} from '../src/toggl-csv.js';
 import {importPlan, importBatches, importDayParts} from '../src/import-model.js';
 
-test('work sessions are the default, using reviewed source-project client names without companion records', async () => {
+test('work sessions are the default, using reviewed source-project client names without companion task/activity records', async () => {
   const parsed = parseTogglDetailedCsv(readFileSync(new URL('./fixtures/toggl/detailed-member-stop.csv', import.meta.url), 'utf8'), {zone:'Europe/Oslo'});
   const plan = await importPlan(parsed.rows, parsed.people[0].key, {fallbackClient:'Fallback'});
   assert.equal(plan.mode,'WORK_SESSION');assert.equal(plan.selectedEntries,7);assert.equal(plan.selectedNanos,'151462000000000');
-  assert.deepEqual(plan.mappings.map(value=>value.resourceType),['CLIENT']);assert.equal(plan.mappings[0].name,parsed.rows[0].project);
-  assert.ok(plan.rows.every(row=>row.clientKey===plan.mappings[0].key && row.title===row.summary && !('projectKey' in row) && !('labelKeys' in row)));
+  assert.deepEqual(plan.mappings.map(value=>value.resourceType),['CLIENT','LABEL']);assert.equal(plan.mappings[0].name,parsed.rows[0].project);
+  assert.ok(plan.rows.every(row=>row.clientKey===plan.mappings[0].key && row.title===row.summary && !('projectKey' in row) && row.labelKeys.length===row.tags.length));
   const long = {start:'2000-01-01T00:00:00Z',end:'2025-01-01T00:00:00Z'};
   assert.deepEqual(importBatches(Array.from({length:201},()=>long),'UTC',0,plan.mode).map(batch=>batch.length),[100,100,1]);
+  const legacy=await importPlan(parsed.rows,parsed.people[0].key,{fallbackClient:'Fallback',mapWorkSessionTags:false});
+  assert.deepEqual(legacy.mappings.map(value=>value.resourceType),['CLIENT']);assert.ok(legacy.rows.every(row=>!('labelKeys' in row)));
+  assert.equal(legacy.selectionFingerprint,plan.selectionFingerprint);
   const activityPlan = await importPlan(parsed.rows,parsed.people[0].key,{mode:'ACTIVITY',fallbackClient:'Fallback'});
   assert.notEqual(activityPlan.selectionFingerprint,plan.selectionFingerprint);
 });

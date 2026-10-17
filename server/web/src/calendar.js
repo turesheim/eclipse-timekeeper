@@ -164,7 +164,8 @@ export class WeekCalendar {
     bar.style.backgroundColor=colors.background;bar.style.color=colors.foreground;bar.style.borderColor=colors.foreground;
     const elapsed=instantNanos(session.end || this.data.report.generatedAt)-instantNanos(session.start);
     const duration=nanosText(elapsed>0n ? elapsed : 0n);
-    const description=`${client?.name || 'Client'} · ${session.title || 'Work session'}${session.summary ? ' · '+session.summary : ''} · ${instantText(session.start,this.calendar.zone)} → ${instantText(session.end,this.calendar.zone)} · ${duration}`;
+    const labels=(session.labelIds || []).map(id=>this.data.labels.find(label=>label.id===id)?.name).filter(Boolean).join(', ');
+    const description=`${client?.name || 'Client'} · ${session.title || 'Work session'}${session.summary ? ' · '+session.summary : ''}${labels ? ' · '+labels : ''} · ${instantText(session.start,this.calendar.zone)} → ${instantText(session.end,this.calendar.zone)} · ${duration}`;
     bar.title=description;bar.setAttribute('aria-label',description);bar.setAttribute('role','group');bar.tabIndex=-1;
     bar.dataset.selected=String(this.selectedId===session.id);
     const label=node('span',undefined,'calendar-session-label');
@@ -172,6 +173,7 @@ export class WeekCalendar {
     if(preview) bar.append(label);
     if(!preview) {
       const select=button('',()=>this.selectSession(session,piece.date,Math.floor(piece.top)),'calendar-session-select');
+      select.tabIndex=0;
       select.dataset.sessionId=session.id;select.dataset.date=piece.date;
       select.setAttribute('aria-label',description);select.setAttribute('aria-pressed',String(this.selectedId===session.id));
       select.append(label);bar.append(select);
@@ -184,6 +186,7 @@ export class WeekCalendar {
         const endpoint=edge==='start' ? instantNanos(session.start) : instantNanos(session.end || this.data.report.generatedAt);
         if(edge==='start' ? endpoint!==piece.start : endpoint!==piece.end) continue;
         const handle=button('',()=>{},`calendar-resize ${edge}`);handle.dataset.edge=edge;handle.dataset.sessionId=session.id;handle.dataset.date=piece.date;
+        handle.tabIndex=0;
         handle.setAttribute('aria-label',`Resize ${edge} of ${session.title || 'work session'}`);handle.title=`Resize ${edge}; arrow keys adjust 15 minutes`;
         bar.append(handle);
       }
