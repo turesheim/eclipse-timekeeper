@@ -70,7 +70,7 @@ class ServiceSettingsTest {
         var saved=save(admin,body,previous);var result=success(saved,200);assertTrue(result.path("restartRequired").asBoolean());assertEquals(2525,result.path("saved").path("smtpPort").asInt());assertEquals(587,result.path("effective").path("smtpPort").asInt());
         assertTrue(result.path("smtpPasswordConfigured").asBoolean());assertFalse(result.path("effectiveSmtpPasswordConfigured").asBoolean());assertFalse(saved.asString().contains(secret));assertEquals("no-store",saved.header("Cache-Control"));
         assertEquals(412,save(admin,body,previous).statusCode());assertEquals(result,success(current(admin),200));
-        var preserve=input(saved).put("smtpFrom","timekeeper@example.org");var preserved=save(admin,preserve,saved);assertEquals(200,preserved.statusCode());assertTrue(parse(preserved.asString()).path("smtpPasswordConfigured").asBoolean());
+        var preserve=input(saved).put("smtpFrom","Timekeeper <timekeeper@example.org>");var preserved=save(admin,preserve,saved);assertEquals(200,preserved.statusCode());assertTrue(parse(preserved.asString()).path("smtpPasswordConfigured").asBoolean());
         assertEquals(secret,accounts.tx(c->{try(var q=query(c,"SELECT saved_smtp_password FROM tk_service_settings WHERE id=1");var rows=q.executeQuery()) {assertTrue(rows.next());return rows.getString(1);}catch(java.sql.SQLException e) {throw new AssertionError(e);}}));
         var cleared=save(admin,input(preserved).put("smtpPasswordAction","CLEAR"),preserved);assertFalse(success(cleared,200).path("smtpPasswordConfigured").asBoolean());
         assertEquals(403,call(admin,"PUT","/admin/settings",input(cleared),cleared.header("ETag"),false).statusCode());
@@ -91,7 +91,7 @@ class ServiceSettingsTest {
         var saved=save(admin,body,previous);assertEquals(200,saved.statusCode());assertEquals(412,save(admin,body,previous).statusCode());
         assertEquals(success(saved,200),success(current(admin),200));
     }
-    @ParameterizedTest @ValueSource(strings={"http","path","rp","mail","host","port"})
+    @ParameterizedTest @ValueSource(strings={"http","path","rp","mail","host","port","sender"})
     void invalidConfigurationNeverChangesSavedOrEffectiveValues(String invalid) throws Exception {
         var admin=setup();var previous=current(admin);var body=input(previous);
         switch(invalid) {
@@ -101,6 +101,7 @@ class ServiceSettingsTest {
             case "mail" -> body.put("emailRecoveryEnabled",true);
             case "host" -> body.put("smtpHost","https://mail.example.org");
             case "port" -> body.put("smtpPort",65536);
+            case "sender" -> body.put("smtpFrom","Display <sender@example.org");
             default -> throw new AssertionError(invalid);
         }
         assertTrue(Set.of(400,422).contains(save(admin,body,previous).statusCode()));assertEquals(parse(previous.asString()),success(current(admin),200));

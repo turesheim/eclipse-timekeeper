@@ -61,7 +61,8 @@ class ServiceSettings {
         try {PasskeyRealm.rp(publicOrigin(value),text(value,"passkeyRpId",255),value.path("passkeysEnabled").asBoolean());}catch(IllegalArgumentException invalid) {throw ApiFailure.validation();}
         if(value.path("emailRecoveryEnabled").asBoolean() && publicOrigin(value).equals("NONE")) throw ApiFailure.validation();
         if(!text(value,"smtpHost",255).matches("[A-Za-z0-9._:\\[\\]-]+") || !value.path("smtpPort").isIntegralNumber() || value.path("smtpPort").asInt()<1 || value.path("smtpPort").asInt()>65535) throw ApiFailure.validation();
-        if(!text(value,"smtpFrom",320).matches("[^@\\s<>]+@[^@\\s<>]+")) throw ApiFailure.validation();
+        try {new io.vertx.ext.mail.mailencoder.EmailAddress(text(value,"smtpFrom",320));}
+        catch(IllegalArgumentException invalid) {throw ApiFailure.validation();}
         text(value,"smtpUsername",255);if(!Set.of("DISABLED","OPTIONAL","REQUIRED").contains(text(value,"smtpStartTls",16))) throw ApiFailure.validation();
         if(password!=null && (password.length()>1024 || password.indexOf(0)>=0)) throw ApiFailure.validation();
     }

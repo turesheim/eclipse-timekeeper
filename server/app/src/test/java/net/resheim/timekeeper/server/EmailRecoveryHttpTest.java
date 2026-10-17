@@ -38,7 +38,7 @@ class EmailRecoveryHttpTest {
             try {
                 server=new ServerSocket(0,20,InetAddress.getLoopbackAddress());
                 threads.submit(()->{while(!server.isClosed()) try {var socket=server.accept();sockets.add(socket);threads.submit(()->serve(socket));}catch(IOException stopped) {if(!server.isClosed()) throw new UncheckedIOException(stopped);}});
-                return Map.of("quarkus.mailer.host","localhost","quarkus.mailer.port",Integer.toString(server.getLocalPort()),"quarkus.mailer.start-tls","DISABLED","quarkus.mailer.tls","false","quarkus.mailer.mock","false","quarkus.mailer.from","timekeeper@example.org");
+                return Map.of("quarkus.mailer.host","localhost","quarkus.mailer.port",Integer.toString(server.getLocalPort()),"quarkus.mailer.start-tls","DISABLED","quarkus.mailer.tls","false","quarkus.mailer.mock","false","quarkus.mailer.from","Timekeeper <timekeeper@example.org>");
             }catch(IOException failure) {throw new UncheckedIOException(failure);}
         }
         private void serve(Socket socket) {

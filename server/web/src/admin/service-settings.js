@@ -49,7 +49,7 @@ export async function renderServiceSettings(view) {
   const email=field(editor.value,'Enable recovery email',value.emailRecoveryEnabled,{type:'checkbox'});
   const host=field(editor.value,'SMTP host',value.smtpHost,{maxLength:255});
   const port=field(editor.value,'SMTP port',value.smtpPort,{type:'number'});port.min='1';port.max='65535';port.step='1';
-  const from=field(editor.value,'Sender email address',value.smtpFrom,{type:'email',maxLength:320});
+  const from=field(editor.value,'Sender email address',value.smtpFrom,{maxLength:320});
   const username=field(editor.value,'SMTP username',value.smtpUsername,{required:false,maxLength:255,autocomplete:'section-smtp username'});
   const encryption=field(editor.value,'SMTP encryption',value.smtpTls ? 'TLS':value.smtpStartTls,{choices:[['REQUIRED','STARTTLS required'],['TLS','TLS on connect'],['OPTIONAL','STARTTLS when offered'],['DISABLED','Plain connection']]});
   const secret=node('p',loaded.data.smtpPasswordConfigured ? 'An SMTP password is saved. Leave the password field blank to keep it.':'No SMTP password is saved.','hint');editor.value.append(secret);
