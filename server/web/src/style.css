@@ -144,16 +144,9 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .session-elapsed { display: grid; gap: .2rem; margin: 0; flex-shrink: 0; }
 .session-elapsed span { font-size: .8rem; color: var(--muted); }
 .session-elapsed strong { font-size: 1.4rem; font-variant-numeric: tabular-nums; }
-.session-history { margin-top: .5rem; }
-.session-history > summary { cursor: pointer; min-height: 2.75rem; padding-block: .6rem; color: var(--muted); }
-.session-history[open] > summary { margin-bottom: .75rem; }
-.work-session .form-label { max-width: 100%; }
-.session-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
-.work-session-heading .session-actions { margin: 0; }
-.session-totals { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .75rem; margin-block: 1.25rem; }
-.session-totals > div { padding-left: .75rem; border-left: 2px solid var(--line); }
-.session-totals dt { font-size: .8rem; color: var(--muted); font-weight: 500; }
-.session-totals dd { margin: .3rem 0 0; font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.session-controls { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.session-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.session-tools { border-inline-start: 1px solid var(--line); padding-inline-start: .75rem; }
 .client-color { display: inline-flex; align-items: center; gap: .5rem; }
 .client-color::before { content: ""; width: 1.2rem; height: 1.2rem; border: 1px solid #526257; border-radius: .25rem; background: var(--client-color); flex-shrink: 0; }
 @font-face { font-family: "Font Awesome 7 Free"; font-style: normal; font-weight: 900; font-display: block; src: url("./assets/fontawesome/fa-solid-900.woff2") format("woff2"); }
@@ -196,10 +189,12 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
   .login { padding: 1.5rem; margin: 2vh auto; }
   .tracking { padding: 1rem; align-items: flex-start; flex-direction: column; }
   .work-session { padding: .6rem .8rem; }
-  .work-session-heading { align-items: flex-start; flex-wrap: wrap; }
-  .work-session-heading > :first-child { flex-basis: 100%; }
-  .work-session-heading .session-actions { margin: 0; }
-  .session-totals { grid-template-columns: repeat(2, minmax(0,1fr)); gap: .5rem; }
+  .work-session-heading { display: grid; grid-template-columns: auto 1fr; gap: .5rem; }
+  .work-session-heading > :first-child { grid-column: 1 / -1; }
+  .session-controls { display: contents; }
+  .session-controls > .session-actions:first-child { grid-column: 2; justify-content: flex-end; }
+  #work-session-timing[hidden] + .session-controls > .session-actions:first-child { grid-column: 1 / -1; justify-content: flex-start; }
+  .session-tools { grid-column: 1 / -1; border-inline-start: 0; padding-inline-start: 0; border-top: 1px solid var(--line); padding-top: .5rem; }
   .days { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .toolbar { align-items: flex-start; gap: .75rem; }
   .toolbar label { flex: 1 1 11rem; max-width: 100%; }
