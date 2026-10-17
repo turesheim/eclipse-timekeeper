@@ -39,6 +39,11 @@
       <resource>
         <directory>${project.basedir}/../web/src</directory>
         <targetPath>META-INF/resources/web</targetPath>
+        <excludes><exclude>admin/**</exclude></excludes>
+      </resource>
+      <resource>
+        <directory>${project.basedir}/../web/src/admin</directory>
+        <targetPath>META-INF/resources/admin</targetPath>
       </resource>
       <resource>
         <directory>${project.basedir}/../../common/api</directory>

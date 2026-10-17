@@ -19,7 +19,7 @@ async function login(page, user, hash = '') {
   await page.getByLabel('Password', {exact: true}).fill(user.password);
   await page.getByRole('button', {name: 'Sign in', exact: true}).click();
   await expect(page.locator('#owner')).toHaveText(user.displayName || user.username);
-  await expect(page.locator('#status')).toHaveText('Up to date');
+  await expect(page.locator('#status')).toHaveText(/^(Up to date|Administration ready\.|Administration unavailable\.)$/);
 }
 const key = user => Buffer.from(user.ownerId).toString('base64url');
 async function ready(page) {await expect(page.locator('#account-content')).toHaveAttribute('aria-busy', 'false');}
@@ -152,6 +152,7 @@ test('standard users cannot open Users directly and a late account response cann
   const user = await fresh(request); await login(page, user, '#users'); await ready(page);
   await expect(page.locator('#users-link')).not.toBeVisible(); await expect(page.locator('#account-content')).toContainText('Administrator access is required');
   expect((await browserRequest(page).get('/api/v1/admin/users')).status()).toBe(403);
+  await page.goto('/web/');await expect(page.locator('#status')).toHaveText('Up to date');
   await page.evaluate(() => {
     const fetch = window.fetch;
     window.fetch = async (...args) => {

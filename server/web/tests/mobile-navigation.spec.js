@@ -62,8 +62,8 @@ test('compact account navigation supports touch, keyboard, account settings and 
     const header=await page.locator('.app-header').boundingBox();expect(header.height).toBeLessThanOrEqual(80);
     await toggle.focus();await page.keyboard.press('Enter');await expect(menu).toHaveAttribute('open','');
     await page.keyboard.press('Tab');await expect(page.getByRole('link',{name:'My Account',exact:true})).toBeFocused();
-    if(account.administrator) await expect(page.getByRole('link',{name:'Users',exact:true})).toBeVisible();
-    else await expect(page.getByRole('link',{name:'Users',exact:true})).not.toBeVisible();
+    if(account.administrator) await expect(page.getByRole('link',{name:'Administration',exact:true})).toBeVisible();
+    else await expect(page.getByRole('link',{name:'Administration',exact:true})).not.toBeVisible();
     await page.keyboard.press('Escape');await expect(menu).not.toHaveAttribute('open','');await expect(toggle).toBeFocused();
     await toggle.click();await page.locator('#workspace-navigation').click();await expect(menu).not.toHaveAttribute('open','');
   }

@@ -131,7 +131,8 @@ editors and the calendar clipboard. Other browser sessions and Eclipse tokens
 remain valid. Expired/revoked sessions and owner changes clear the local account
 view before another account can sign in.
 
-The separate **Users** page is available only to administrators with write
+Open **Account menu → Administration** (`/admin/`) for service settings and
+**Users**. This page is available only to administrators with write
 access. It lists independent accounts with their username, role and access
 state. **Add user** and each row's **Edit** action open a full details page;
 **Back to users** returns to the list. Administrators can create, enable,
@@ -148,9 +149,22 @@ prefix; update preview automation to use the new paths.
 `GET /api/v1/admin/settings` returns the deployment's general configuration to
 administrators, without database URLs, passwords, tokens or SMTP credentials.
 These settings remain operator-managed through the deployment configuration.
+The page shows the public origin/epoch, passkey RP and availability, email
+recovery availability, database kind and schema version. It does not edit
+deployment configuration or reveal secrets.
 
-Both settings pages support bookmarks and browser Back under `/web/`:
-`#account/profile`, `#account/password`, `#account/tokens` and `#users`.
+A reverse proxy can apply an additional network/access policy to `/admin` and
+`/admin/` (including descendants) **and** `/api/v1/admin/` (including descendants).
+Protect both namespaces; restricting the HTML alone does not restrict API
+requests. Keep the backend reachable only by trusted infrastructure. Server-side
+administrator/write checks and normal cookie/CSRF rules apply regardless of
+proxy policy. Old `/web/#users` bookmarks redirect to `/admin/#users`; there is
+no legacy user-management API alias.
+
+Personal settings support `/web/#account/profile`, `/web/#account/password`,
+`/web/#account/passkeys`, `/web/#account/tokens` and `/web/#account/import`.
+Administration supports `/admin/#settings`, `/admin/#users` and
+`/admin/#users/new`.
 Navigation keeps activity/work-session timers running. Unsaved forms prompt
 before leaving, stale conditional saves retain the draft, and uncertain writes
 require reviewing current records before another submission. Sign-out or an
