@@ -33,18 +33,20 @@ final class WebAuthnProtocol {
                 .userVerification(UserVerificationRequirement.REQUIRED).timeout(120000).build());
     }
     RegistrationResult register(PublicKeyCredentialCreationOptions request,String response) {
-        if(!rpId.equals(request.getRp().getId())) throw new Rejected();
+        if(!rpId.equals(request.getRp().getId()) || response==null || response.length()>98304) throw new Rejected();
         try {
             var credential=PublicKeyCredential.parseRegistrationResponseJson(response);
+            sameOriginClient(credential.getResponse().getClientDataJSON());
             var result=relyingParty.finishRegistration(FinishRegistrationOptions.builder().request(request).response(credential).build());
             if(!result.isUserVerified() || result.isDiscoverable().equals(Optional.of(false))) throw new Rejected();
             return result;
         } catch(IOException | RegistrationFailedException | IllegalArgumentException failure) {throw new Rejected();}
     }
     Assertion authenticate(AssertionRequest request,String response) {
-        if(!rpId.equals(request.getPublicKeyCredentialRequestOptions().getRpId())) throw new Rejected();
+        if(!rpId.equals(request.getPublicKeyCredentialRequestOptions().getRpId()) || response==null || response.length()>98304) throw new Rejected();
         try {
             var credential=PublicKeyCredential.parseAssertionResponseJson(response);
+            sameOriginClient(credential.getResponse().getClientDataJSON());
             var result=relyingParty.finishAssertion(FinishAssertionOptions.builder().request(request).response(credential).build());
             if(!result.isSuccess() || !result.isUserVerified()) throw new Rejected();
             var stored=result.getCredential();
@@ -55,5 +57,14 @@ final class WebAuthnProtocol {
                     || !result.isBackupEligible() && (previous!=0 || next!=0) && next<=previous) throw new Rejected();
             return new Assertion(result,Math.max(previous,next));
         } catch(IOException | AssertionFailedException | IllegalArgumentException failure) {throw new Rejected();}
+    }
+    private static void sameOriginClient(ByteArray bytes) throws IOException {
+        if(bytes.size()>4096) throw new Rejected();
+        // This application supports top-level, same-origin ceremonies only. The
+        // library verifies the signed client data; its current model omits these
+        // newer embedding fields, so enforce the application's policy explicitly.
+        var value=JsonValues.MAPPER.readTree(bytes.getBytes());
+        if(value==null || !value.isObject() || value.has("topOrigin")
+                || value.has("crossOrigin") && (!value.path("crossOrigin").isBoolean() || value.path("crossOrigin").asBoolean())) throw new Rejected();
     }
 }

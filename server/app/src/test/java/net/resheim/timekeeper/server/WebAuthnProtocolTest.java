@@ -36,8 +36,9 @@ class WebAuthnProtocolTest {
         public Optional<RegisteredCredential> lookup(ByteArray id,ByteArray owner) {return Optional.ofNullable(values.get(id)).filter(value->value.getUserHandle().equals(owner));}
         public Set<RegisteredCredential> lookupAll(ByteArray id) {return values.containsKey(id) ? Set.of(values.get(id)) : Set.of();}
     }
-    private static final class Authenticator {
+    static final class Authenticator {
         final KeyPair key;final ByteArray id,cose;
+        boolean crossOrigin;String topOrigin;
         Authenticator(String label) throws Exception {
             var generator=KeyPairGenerator.getInstance("EC");generator.initialize(new ECGenParameterSpec("secp256r1"));key=generator.generateKeyPair();id=bytes(label);
             var publicKey=(ECPublicKey)key.getPublic();
@@ -51,7 +52,8 @@ class WebAuthnProtocolTest {
             return value.toByteArray();
         }
         private byte[] client(String type,ByteArray challenge,String origin) {
-            return object().put("type",type).put("challenge",challenge.getBase64Url()).put("origin",origin).put("crossOrigin",false).toString().getBytes(StandardCharsets.UTF_8);
+            var value=object().put("type",type).put("challenge",challenge.getBase64Url()).put("origin",origin).put("crossOrigin",crossOrigin);
+            if(topOrigin!=null) value.put("topOrigin",topOrigin);return value.toString().getBytes(StandardCharsets.UTF_8);
         }
         String registration(PublicKeyCredentialCreationOptions request,String rp,String origin,int flags) throws Exception {
             var attestation=CBORObject.NewMap().Add("fmt","none").Add("attStmt",CBORObject.NewMap())
@@ -126,5 +128,17 @@ class WebAuthnProtocolTest {
         for(long count:new long[]{0,3,7}) assertThrows(WebAuthnProtocol.Rejected.class,()->protocol.authenticate(request,key.assertion(request,RP,ORIGIN,0x05,count,repo.handle,false)));
         assertEquals(8,protocol.authenticate(request,key.assertion(request,RP,ORIGIN,0x05,8,repo.handle,false)).nextSignatureCount());
         key.store(repo,false,0);assertEquals(0,protocol.authenticate(request,key.assertion(request,RP,ORIGIN,0x05,0,repo.handle,false)).nextSignatureCount());
+    }
+    @Test void embeddingIsRejectedEvenWithValidSignedSameOriginClientData() throws Exception {
+        var repo=new Repository();var protocol=new WebAuthnProtocol(RP,ORIGIN,repo);var key=new Authenticator("embedded credential");key.store(repo,true,0);
+        var create=protocol.registration(user(repo));var get=protocol.assertion(Optional.empty());
+        key.crossOrigin=true;
+        assertThrows(WebAuthnProtocol.Rejected.class,()->protocol.register(create,key.registration(create,RP,ORIGIN,0x5d)));
+        assertThrows(WebAuthnProtocol.Rejected.class,()->protocol.authenticate(get,key.assertion(get,RP,ORIGIN,0x1d,0,repo.handle,false)));
+        key.crossOrigin=false;key.topOrigin="https://attacker.example";
+        assertThrows(WebAuthnProtocol.Rejected.class,()->protocol.register(create,key.registration(create,RP,ORIGIN,0x5d)));
+        assertThrows(WebAuthnProtocol.Rejected.class,()->protocol.authenticate(get,key.assertion(get,RP,ORIGIN,0x1d,0,repo.handle,false)));
+        key.topOrigin=null;assertEquals(repo.handle,protocol.authenticate(get,key.assertion(get,RP,ORIGIN,0x1d,0,repo.handle,false)).result().getUserHandle());
+        assertThrows(WebAuthnProtocol.Rejected.class,()->protocol.authenticate(get," ".repeat(98305)));
     }
 }
