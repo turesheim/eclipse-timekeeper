@@ -200,6 +200,7 @@ for(const mode of ['WORK_SESSION','ACTIVITY']) test(`Toggl ${mode} maps several 
   expect(await api(request,'/clients/'+destination.id)).toEqual(destination);
   await undo(page,0);const undone=await api(request,'/data/export');expect(undone.clients).toEqual(before.clients);expect(undone[collection]).toEqual(before[collection]);
   expect(await api(request,'/clients/'+destination.id)).toEqual(destination);
+  const current=await request.get('/api/v1/clients/'+destination.id,{headers});expect((await request.delete('/api/v1/clients/'+destination.id,{headers:{...headers,'If-Match':current.headers().etag}})).status()).toBe(204);
 });
 
 test('Toggl review explains missing durations beside the continue action and excludes only reviewed invalid rows',async({page})=>{
