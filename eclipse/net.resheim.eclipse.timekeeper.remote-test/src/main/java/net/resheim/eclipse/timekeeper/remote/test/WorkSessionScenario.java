@@ -26,7 +26,7 @@ final class WorkSessionScenario {
         var completed=api.workSession(running.id()).orElseThrow();api.deleteWorkSession(new DeleteWorkSession(completed.id(),completed.version()));
 
         if(!bot.toggleButton("Session details").isPressed()) bot.toggleButton("Session details").click();
-        var from=LocalDate.now(ZoneOffset.UTC).minusDays(3).atTime(8,0,0,123456789).toInstant(ZoneOffset.UTC);
+        var from=Instant.parse("2007-10-25T08:00:00.123456789Z");
         var until=from.plus(Duration.ofHours(10));var tasks=api.tasks();
         bot.button("Record session").click();var editor=bot.shell("Record work session").bot();
         editor.textWithLabel("Summary").setText("Installed work session");editor.textWithLabel("Start (local time)").setText(net.resheim.eclipse.timekeeper.ui.views.LocalTimeInput.format(from,net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin.getCalendarZone()));
@@ -34,26 +34,21 @@ final class WorkSessionScenario {
         RemoteTestSupport.waitFor(()->api.workSessions(OwnerId.LOCAL).stream().anyMatch(value->value.summary().equals("Installed work session")),"Retrospective session not stored");
         var session=api.workSessions(OwnerId.LOCAL).stream().filter(value->value.summary().equals("Installed work session")).findFirst().orElseThrow();
         RemoteTestSupport.waitFor(()->bot.comboBoxWithId("work-session-history").selection().contains("Installed work session"),"Manual session not selected");
-        bot.button("Add activity").click();editor=bot.shell("New activity").bot();
-        editor.textWithLabel("Summary").setText("Installed session activity");editor.button("Save").click();
-        RemoteTestSupport.waitFor(()->api.workSessionReport(session.id()).activities().size()==1,"Taskless session activity not stored");
-        var linked=api.workSessionReport(session.id()).activities().getFirst();
-        assertTrue(linked.task().isEmpty());assertTrue(linked.projectId().isEmpty());assertEquals(from,linked.start());assertEquals(Optional.of(until),linked.end());
+        var interval=api.createActivity(new CreateActivity(null,OwnerId.LOCAL,from,Optional.of(until),"Installed session activity",Set.of()));
+        RemoteTestSupport.waitFor(()->api.workSessionReport(session.id()).activities().size()==1,"Independent interval missing from temporal context");
+        var contextActivity=api.workSessionReport(session.id()).activities().getFirst();
+        assertTrue(contextActivity.workSessionId().isEmpty());assertTrue(contextActivity.task().isEmpty());assertTrue(contextActivity.projectId().isEmpty());
+        assertEquals(interval,contextActivity);assertEquals(from,contextActivity.start());assertEquals(Optional.of(until),contextActivity.end());
         assertEquals(tasks,api.tasks());assertEquals(Duration.ofHours(10),api.workSessionReport(session.id()).time().allocatedTime());
 
         var independent=api.createActivity(new CreateActivity(null,OwnerId.LOCAL,from.minusSeconds(3600),Optional.of(until),"Installed outside interval",Set.of()));
-        bot.button("Associate activity").click();editor=bot.shell("Associate activity").bot();
-        var choices=editor.comboBoxWithId("session-association-choice");
-        choices.setSelection(Arrays.stream(choices.items()).filter(value->value.startsWith("Installed outside interval")).findFirst().orElseThrow());
-        editor.button("Associate").click();
-        RemoteTestSupport.waitFor(()->api.activity(independent.id()).orElseThrow().workSessionId().equals(Optional.of(session.id())),"Existing interval was not associated");
+        RemoteTestSupport.waitFor(()->api.workSessionReport(session.id()).activities().size()==2,"Concurrent interval missing from temporal context");
+        assertEquals(independent,api.activity(independent.id()).orElseThrow());
         assertTrue(api.workSessionReport(session.id()).time().outsideSession().contains(independent.id()));
         assertEquals(Duration.ofHours(20),api.workSessionReport(session.id()).time().trackedActivityTime());
         assertEquals(Duration.ofHours(10),api.workSessionReport(session.id()).time().allocatedTime());
-        RemoteTestSupport.waitFor(()->bot.tableWithId("work-session-activities").rowCount()==2,"Associated native rows not loaded");
-        bot.tableWithId("work-session-activities").select("Installed outside interval");bot.button("Remove association").click();
-        RemoteTestSupport.waitFor(()->api.activity(independent.id()).orElseThrow().workSessionId().isEmpty(),"Association removal not stored");
-        var detached=api.activity(independent.id()).orElseThrow();api.deleteActivity(new DeleteActivity(detached.id(),detached.version()));
+        RemoteTestSupport.waitFor(()->bot.tableWithId("work-session-activities").rowCount()==2,"Overlapping native rows not loaded");
+        api.deleteActivity(new DeleteActivity(independent.id(),independent.version()));
 
         bot.button("Edit session").click();var shell=bot.shell("Edit work session");editor=shell.bot();
         editor.textWithLabel("Summary").setText("Unreviewed session draft");
@@ -65,7 +60,7 @@ final class WorkSessionScenario {
         assertEquals(peer,api.workSession(session.id()).orElseThrow());editor.button("Cancel").click();
         RemoteTestSupport.waitFor(()->bot.comboBoxWithId("work-session-history").selection().contains("Peer session edit"),"Peer session edit did not reach native history");
         RemoteBootstrap.proof.setProperty("session.id",session.id().value().toString());
-        RemoteBootstrap.proof.setProperty("session.activity.id",linked.id().value().toString());
+        RemoteBootstrap.proof.setProperty("session.activity.id",contextActivity.id().value().toString());
         RemoteBootstrap.proof.setProperty("session.start",from.toString());RemoteBootstrap.proof.setProperty("session.end",until.toString());
         RemoteBootstrap.proof.setProperty("phase.work-session.native","passed");RemoteBootstrap.writeProof();
         bot.toggleButton("Session details").click();
@@ -127,7 +122,7 @@ final class WorkSessionScenario {
         assertEquals(Instant.parse(RemoteBootstrap.proof.getProperty("session.start")),session.start());
         assertEquals(Optional.of(Instant.parse(RemoteBootstrap.proof.getProperty("session.end"))),session.end());
         var activity=api.activity(new ActivityId(UUID.fromString(RemoteBootstrap.proof.getProperty("session.activity.id")))).orElseThrow();
-        assertEquals(Optional.of(id),activity.workSessionId());assertTrue(activity.task().isEmpty());
+        assertTrue(activity.workSessionId().isEmpty());assertTrue(activity.task().isEmpty());
         assertEquals(session.start(),activity.start());assertEquals(session.end(),activity.end());
         assertEquals(Duration.ofHours(10),api.workSessionReport(id).time().allocatedTime());
         for(var phase:List.of("uncertain-start","uncertain-stop")) assertEquals("passed",RemoteBootstrap.proof.getProperty("phase.work-session."+phase));
