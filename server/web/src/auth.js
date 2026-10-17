@@ -7,7 +7,7 @@ import {PasskeyCeremony, passkeysSupported, canceledPasskey} from './webauthn.js
 const $ = id => document.getElementById(id);
 export function authentication({connect, clear, updateAccount, refreshProfile}) {
   let active = null, generation = 0, recovery = null;
-  let passkeysEnabled = false, passkeyBusy = false, passkeyStage = '';
+  let passkeysEnabled = false, passkeyBusy = false, passkeyStage = '', statusRequest = null;
   const errorText = error => error instanceof ApiError ? error.message : 'Unable to sign in. Use HTTPS and check your account details.';
   function mode() {
     const value = $('auth-mode').value, code = ['setup','recover'].includes(value), token = value === 'token';
@@ -34,12 +34,20 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
     const response = await fetch(`/api/v1/auth/${path}`, {method:body ? 'POST':'GET', credentials:'same-origin', redirect:'error', referrerPolicy:'origin', cache:'no-store', headers:{Accept:'application/json', ...(body ? {'Content-Type':'application/json'} : {})}, ...(body ? {body:JSON.stringify(body)} : {})});
     const data = response.status === 204 ? null : await response.json(); if (!response.ok) throw new ApiError(data.code, response.status); return data;
   }
+  function loadStatus() {
+    // One in-flight status request also prevents simultaneous first loads from
+    // racing to install different HttpOnly browser-binding cookies.
+    if(!statusRequest) statusRequest=publicRequest('status').finally(()=>{statusRequest=null;});
+    return statusRequest;
+  }
   const loginPasskey = new PasskeyCeremony(publicRequest);
   function passkeyState(busy,stage = '') {
     passkeyBusy = busy;passkeyStage = stage;$('auth-mode').disabled = busy;
     $('login-form').querySelector('[type="submit"]').disabled = busy;mode();
   }
-  function capabilities(status) {passkeysEnabled = status.passkeysEnabled === true;mode();return status;}
+  function capabilities(status) {
+    passkeysEnabled = status.passkeysEnabled === true;$('login-build').textContent = status.spkVersion ? `SPK ${status.spkVersion}` : '';mode();return status;
+  }
   async function attach(data, current) {
     if (current !== generation) return;
     const session = new Api(null, undefined, data); active = session; forgetToken();
@@ -54,10 +62,11 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
     $('login-form').reset();
     if (retry) { $('auth-mode').value = retry.mode; $('username').value = retry.username; }
     mode(); $('login-error').textContent = message;
+    const current=generation;void loadStatus().then(status=>{if(current===generation) capabilities(status);}).catch(()=>{});
   }
   async function exchange(token, current) {
     if(!isSecureOrigin()) throw new Error();
-    capabilities(await publicRequest('status'));
+    capabilities(await loadStatus());
     if(current !== generation) return;
     const bearer = new Api(token);
     try { const {data} = await bearer.request('/auth/token-login',{method:'POST'}); forgetToken(token); await attach(data,current); }
@@ -81,7 +90,7 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
       let issued = false;
       try {
         if(selected === 'token') await exchange(token,current);
-        else { capabilities(await publicRequest('status')); if(current !== generation) return; const data = await publicRequest(selected,body); issued = true; await attach(data,current); }
+        else { capabilities(await loadStatus()); if(current !== generation) return; const data = await publicRequest(selected,body); issued = true; await attach(data,current); }
       }
       catch(error) {
         if(current !== generation) return;
@@ -94,7 +103,7 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
           else if(!issued && selected === 'login') {
             message = 'The username or password was not accepted.';
             try {
-              if((await publicRequest('status')).setupRequired) {
+              if((await loadStatus()).setupRequired) {
                 retry.mode = 'setup';
                 message = 'First administrator setup has not completed. Enter the setup code from the latest installation and choose your username and password.';
               }
@@ -111,7 +120,8 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
     const current = ++generation;$('password').value = '';$('login-error').textContent = '';passkeyState(true);
     void (async () => {
       try {
-        capabilities(await publicRequest('status'));if(current !== generation) return;
+        capabilities(await loadStatus());if(current !== generation) return;
+        if(!passkeysEnabled) {$('login-error').textContent='Passkey sign-in is unavailable for this server. Use your username and password.';return;}
         const data = await loginPasskey.run('passkeys/login/options','passkeys/login/finish',{remember:$('remember').checked},
           {valid:()=>current === generation,stage:stage=>{if(current === generation) passkeyState(true,stage);}});
         await attach(data,current);
@@ -141,13 +151,13 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
     if (await recovery.initializeFromLocation()) return;
     const current = ++generation;
     const submit=$('login-form').querySelector('button');submit.disabled=true;
-    try { const session = new Api(); const {data} = await session.request('/auth/session'); session.close(); forgetToken(); await attach(data,current); }
+    try { capabilities(await loadStatus());if(current!==generation) return;const session = new Api(); const {data} = await session.request('/auth/session'); session.close(); forgetToken(); await attach(data,current); }
     catch(error) {
       if(current !== generation) return;
       const token = savedToken();
       if(token) {try {await exchange(token,current); return;} catch(failure) {$('login-error').textContent = errorText(failure);}}
       try {
-        const status = capabilities(await publicRequest('status'));
+        const status = capabilities(await loadStatus());
         if(current === generation) {
           $('login-build').textContent = status.spkVersion ? `SPK ${status.spkVersion}` : '';
           if(status.setupRequired && $('auth-mode').value === 'login') {$('auth-mode').value = 'setup';mode();}

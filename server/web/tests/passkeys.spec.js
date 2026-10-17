@@ -44,6 +44,8 @@ test('passkeys: add with password and fresh passkey proof, rename, Remember me a
   },{times:1});
   await add.getByLabel('Passkey name',{exact:true}).fill('Security key');await add.getByLabel('Confirm with',{exact:true}).selectOption('passkey');await add.getByRole('button',{name:'Add passkey',exact:true}).click();
   await expect(page.locator('#account-content tr').filter({hasText:'Security key'})).toHaveCount(1);
+  await page.screenshot({path:'test-results/passkeys-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/passkeys-mobile.png',fullPage:true});await page.setViewportSize({width:1280,height:900});
   await page.getByRole('button',{name:'Rename Laptop key',exact:true}).click();
   const rename=page.getByRole('heading',{name:'Rename “Laptop key”',exact:true}).locator('..');await rename.getByLabel('Passkey name',{exact:true}).fill('Personal passkey');await rename.getByRole('button',{name:'Save name',exact:true}).click();
   await expect(page.locator('#account-content')).toContainText('Passkey renamed.');await expect(page.locator('#account-content tr').filter({hasText:'Personal passkey'})).toHaveCount(1);
@@ -54,7 +56,7 @@ test('passkeys: add with password and fresh passkey proof, rename, Remember me a
   await page.getByRole('button',{name:'Remove Security key',exact:true}).click();const remove=page.getByRole('heading',{name:'Remove “Security key”?',exact:true}).locator('..');
   await remove.getByLabel('Confirm with',{exact:true}).selectOption('passkey');await remove.getByRole('button',{name:'Remove passkey',exact:true}).click();
   await expect(page.locator('#login')).toBeVisible();await expect(page.locator('#login-error')).toContainText('Its sessions were signed out');
-  expect((await page.context().cookies()).some(value=>['__Host-timekeeper-session','__Host-timekeeper-browser'].includes(value.name))).toBe(false);
+  expect((await page.context().cookies()).some(value=>value.name==='__Host-timekeeper-session')).toBe(false);
   await page.getByRole('button',{name:'Sign in with a passkey',exact:true}).click();await expect(page.locator('#owner')).toHaveText(user.username);await account(page);
   await page.getByRole('button',{name:'Remove Personal passkey',exact:true}).click();const last=page.getByRole('heading',{name:'Remove “Personal passkey”?',exact:true}).locator('..');await last.getByLabel('Current password',{exact:true}).fill(password);await last.getByRole('button',{name:'Remove passkey',exact:true}).click();
   await expect(page.locator('#login')).toBeVisible();
@@ -82,13 +84,16 @@ test('passkeys: wrong fresh proof keeps the session, cancellation is normal and 
 test('passkeys: a late assertion cannot replace another account signed in by a second tab',async({page,request})=>{
   const alice=await fresh(request),bob=await fresh(request),key=await virtual(page);await login(page,alice);await account(page);const add=addForm(page);
   await add.getByLabel('Passkey name',{exact:true}).fill('Alice only');await add.getByLabel('Current password',{exact:true}).fill(password);await add.getByRole('button',{name:'Add passkey',exact:true}).click();await expect(add).toContainText('Passkey added.');
-  await signOut(page);await key.presence(false);await page.getByRole('button',{name:'Sign in with a passkey',exact:true}).click();await expect(page.locator('#passkey-cancel')).toBeEnabled();
+  await signOut(page);
+  let arrived,release;const ready=new Promise(resolve=>{arrived=resolve;}),gate=new Promise(resolve=>{release=resolve;});
+  await page.route('**/api/v1/auth/passkeys/login/finish',async route=>{arrived();await gate;await route.continue();});
+  await page.getByRole('button',{name:'Sign in with a passkey',exact:true}).click();await ready;
   const peer=await page.context().newPage();
   try {
-    await login(peer,bob);await key.presence(true);await expect(page.locator('#login-error')).toContainText('could not be verified');
+    await login(peer,bob);release();await expect(page.locator('#login-error')).toContainText('could not be verified');
     await expect(peer.locator('#owner')).toHaveText(bob.username);expect((await (await browserRequest(peer).get('/api/v1/auth/session')).json()).ownerId).toBe(bob.ownerId);
     await page.reload();await expect(page.locator('#owner')).toHaveText(bob.username);await account(page);await expect(page.locator('#account-content')).toContainText('No passkeys added.');
-  } finally {await peer.close();}
+  } finally {release();await page.unroute('**/api/v1/auth/passkeys/login/finish');await peer.close();}
 });
 
 test('passkeys: unsupported browsers keep password fallback and token-derived sessions cannot enroll',async({page,request,browser})=>{
