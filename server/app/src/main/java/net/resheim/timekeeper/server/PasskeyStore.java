@@ -162,13 +162,18 @@ class PasskeyStore {
     }
     ObjectNode list(TokenRegistry.Principal principal) {return tx(c->{manager(c,principal);String rp=realm.rpId().orElse("");var value=object().put("enabled",!rp.isEmpty()).put("rpId",rp);var items=value.putArray("items");new PasskeyCredentials(c,rp).owned(principal.owner()).forEach(key->items.add(key.listed(rp)));return accepted(value);});}
     ObjectNode rename(TokenRegistry.Principal principal,UUID id,String match,String name) {return tx(c->{manager(c,principal);return accepted(new PasskeyCredentials(c,realm.rpId().orElse("")).rename(principal.owner(),id,match,name).management());});}
-    void remove(TokenRegistry.Principal principal,UUID id,String match,String browser,String cookie,String peer,JsonNode input) {
-        tx(c->{var account=manager(c,principal);var scope=scope(c,principal,browser,cookie);var now=Instant.now();
+    boolean remove(TokenRegistry.Principal principal,UUID id,String match,String browser,String cookie,String peer,JsonNode input) {
+        return tx(c->{var account=manager(c,principal);var scope=scope(c,principal,browser,cookie);var now=Instant.now();
             if(!rate(c,"management",scope.browser(),peer,now)) return rejected(429,"RATE_LIMITED");
             var credentials=new PasskeyCredentials(c,scope.rpId());ApiReplies.match(credentials.owned(principal.owner(),id).management(),match);
             var action=object().put("action","REMOVE").put("id",id.toString()).put("etag",match);
             if(!proof(c,principal,account,scope,action,input,object(),now)) return rejected(403,"PASSKEY_PROOF_REQUIRED");
-            credentials.revoke(principal.owner(),id,match);return accepted(null);
+            boolean signedOut;
+            try(var statement=query(c,"SELECT passkey_id FROM tk_auth_session WHERE digest=? AND owner_id=?",principal.digest(),principal.owner());var rows=statement.executeQuery()) {
+                signedOut=rows.next() && id.equals(rows.getObject(1,UUID.class));
+            }catch(java.sql.SQLException failure) {throw databaseFailure(failure);}
+            credentials.revoke(principal.owner(),id,match);
+            if(signedOut) new PasskeyCeremonies(c).cancelBrowser(scope);return accepted(signedOut);
         });
     }
     void cancel(String browser,String cookie) {tx(c->{new PasskeyCeremonies(c).cancelBrowser(realm.scope(c,browser,cookie));return accepted(null);});}

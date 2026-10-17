@@ -6270,6 +6270,839 @@
           }
         }
       }
+    },
+    "/auth/passkeys/login/options": {
+      "post": {
+        "operationId": "passkeyLoginOptions",
+        "summary": "passkeyLoginOptions",
+        "tags": [
+          "Passkeys"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyOptions"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyLoginInput"
+              }
+            }
+          }
+        },
+        "description": "Requires the exact configured HTTPS origin and a host-only HttpOnly browser-binding cookie from GET /auth/status. Credential-management routes additionally require an account browser session; API tokens and token-derived sessions cannot manage passkeys. Completion JSON is limited to 98,304 UTF-8 bytes."
+      }
+    },
+    "/auth/passkeys/login/finish": {
+      "post": {
+        "operationId": "passkeyLogin",
+        "summary": "passkeyLogin",
+        "tags": [
+          "Passkeys"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSession"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyAssertionFinish"
+              }
+            }
+          }
+        },
+        "description": "Requires the exact configured HTTPS origin and a host-only HttpOnly browser-binding cookie from GET /auth/status. Credential-management routes additionally require an account browser session; API tokens and token-derived sessions cannot manage passkeys. Completion JSON is limited to 98,304 UTF-8 bytes."
+      }
+    },
+    "/auth/passkeys/cancel": {
+      "post": {
+        "operationId": "cancelPasskeyCeremonies",
+        "summary": "cancelPasskeyCeremonies",
+        "tags": [
+          "Passkeys"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "204": {
+            "description": "Successful operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyCancelInput"
+              }
+            }
+          }
+        },
+        "description": "Requires the exact configured HTTPS origin and a host-only HttpOnly browser-binding cookie from GET /auth/status. Credential-management routes additionally require an account browser session; API tokens and token-derived sessions cannot manage passkeys. Completion JSON is limited to 98,304 UTF-8 bytes."
+      }
+    },
+    "/auth/passkeys": {
+      "get": {
+        "operationId": "listPasskeys",
+        "summary": "listPasskeys",
+        "tags": [
+          "Passkeys"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyList"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "x-required-permission": "read",
+        "description": "Requires the exact configured HTTPS origin and a host-only HttpOnly browser-binding cookie from GET /auth/status. Credential-management routes additionally require an account browser session; API tokens and token-derived sessions cannot manage passkeys. Completion JSON is limited to 98,304 UTF-8 bytes."
+      }
+    },
+    "/auth/passkeys/register/options": {
+      "post": {
+        "operationId": "passkeyRegistrationOptions",
+        "summary": "passkeyRegistrationOptions",
+        "tags": [
+          "Passkeys"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyOptions"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "x-required-permission": "write",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyRegisterInput"
+              }
+            }
+          }
+        },
+        "description": "Requires the exact configured HTTPS origin and a host-only HttpOnly browser-binding cookie from GET /auth/status. Credential-management routes additionally require an account browser session; API tokens and token-derived sessions cannot manage passkeys. Completion JSON is limited to 98,304 UTF-8 bytes."
+      }
+    },
+    "/auth/passkeys/register/finish": {
+      "post": {
+        "operationId": "registerPasskey",
+        "summary": "registerPasskey",
+        "tags": [
+          "Passkeys"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "201": {
+            "description": "Successful operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyCredential"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "x-required-permission": "write",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyRegistrationFinish"
+              }
+            }
+          }
+        },
+        "description": "Requires the exact configured HTTPS origin and a host-only HttpOnly browser-binding cookie from GET /auth/status. Credential-management routes additionally require an account browser session; API tokens and token-derived sessions cannot manage passkeys. Completion JSON is limited to 98,304 UTF-8 bytes."
+      }
+    },
+    "/auth/passkeys/proof/options": {
+      "post": {
+        "operationId": "passkeyProofOptions",
+        "summary": "passkeyProofOptions",
+        "tags": [
+          "Passkeys"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyOptions"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "x-required-permission": "write",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyActionInput"
+              }
+            }
+          }
+        },
+        "description": "Requires the exact configured HTTPS origin and a host-only HttpOnly browser-binding cookie from GET /auth/status. Credential-management routes additionally require an account browser session; API tokens and token-derived sessions cannot manage passkeys. Completion JSON is limited to 98,304 UTF-8 bytes."
+      }
+    },
+    "/auth/passkeys/proof/finish": {
+      "post": {
+        "operationId": "verifyPasskeyProof",
+        "summary": "verifyPasskeyProof",
+        "tags": [
+          "Passkeys"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyProofIssued"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "x-required-permission": "write",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyAssertionFinish"
+              }
+            }
+          }
+        },
+        "description": "Requires the exact configured HTTPS origin and a host-only HttpOnly browser-binding cookie from GET /auth/status. Credential-management routes additionally require an account browser session; API tokens and token-derived sessions cannot manage passkeys. Completion JSON is limited to 98,304 UTF-8 bytes."
+      }
+    },
+    "/auth/passkeys/{id}": {
+      "put": {
+        "operationId": "renamePasskey",
+        "summary": "renamePasskey",
+        "tags": [
+          "Passkeys"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyCredential"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "x-required-permission": "write",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyNameInput"
+              }
+            }
+          }
+        },
+        "description": "Requires the exact configured HTTPS origin and a host-only HttpOnly browser-binding cookie from GET /auth/status. Credential-management routes additionally require an account browser session; API tokens and token-derived sessions cannot manage passkeys. Completion JSON is limited to 98,304 UTF-8 bytes."
+      },
+      "delete": {
+        "operationId": "removePasskey",
+        "summary": "removePasskey",
+        "tags": [
+          "Passkeys"
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyRemoved"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "x-required-permission": "write",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyProofInput"
+              }
+            }
+          }
+        },
+        "description": "Requires the exact configured HTTPS origin and a host-only HttpOnly browser-binding cookie from GET /auth/status. Credential-management routes additionally require an account browser session; API tokens and token-derived sessions cannot manage passkeys. Completion JSON is limited to 98,304 UTF-8 bytes."
+      }
     }
   },
   "components": {
@@ -6283,7 +7116,7 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "__Host-timekeeper-session",
-        "description": "Opaque HttpOnly; Secure; SameSite=Lax cookie. Unsafe requests also require X-CSRF-Token from /auth/session and a same-origin Origin when present. Data requests must not send Authorization and this cookie together. The explicit /auth/token-login transition uses its bearer credential and replaces any browser cookie."
+        "description": "Opaque HttpOnly; Secure; SameSite=Lax cookie. Configured HTTPS browser requests require the exact canonical Origin, or a matching Referer origin on reads. Unsafe cookie requests also require X-CSRF-Token. A separate host-only HttpOnly browser-binding cookie is issued by same-origin GET /auth/status and refreshed on sign-in. Bearer API/Eclipse requests remain origin-independent; /auth/token-login explicitly exchanges a bearer token for a bound browser session."
       }
     },
     "schemas": {
@@ -9503,6 +10336,514 @@
           "nextOffset"
         ],
         "additionalProperties": false
+      },
+      "PasskeyProofInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "proof": {
+            "type": "string",
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "currentPassword"
+            ]
+          },
+          {
+            "required": [
+              "proof"
+            ]
+          }
+        ]
+      },
+      "PasskeyRegisterInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "proof": {
+            "type": "string",
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "currentPassword"
+            ]
+          },
+          {
+            "required": [
+              "proof"
+            ]
+          }
+        ]
+      },
+      "PasskeyNameInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          }
+        }
+      },
+      "PasskeyLoginInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "remember"
+        ],
+        "properties": {
+          "remember": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PasskeyCancelInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {}
+      },
+      "PasskeyActionInput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "const": "ADD"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "id",
+              "etag"
+            ],
+            "properties": {
+              "action": {
+                "const": "REMOVE"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "etag": {
+                "type": "string",
+                "maxLength": 130
+              }
+            }
+          }
+        ]
+      },
+      "PasskeyRegistrationFinish": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ceremony",
+          "credential"
+        ],
+        "properties": {
+          "ceremony": {
+            "type": "string",
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "credential": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "rawId",
+              "type",
+              "response",
+              "clientExtensionResults"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "maxLength": 4096,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "minLength": 1
+              },
+              "rawId": {
+                "type": "string",
+                "maxLength": 4096,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "minLength": 1
+              },
+              "type": {
+                "const": "public-key"
+              },
+              "response": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "clientDataJSON",
+                  "attestationObject"
+                ],
+                "properties": {
+                  "clientDataJSON": {
+                    "type": "string",
+                    "maxLength": 16384,
+                    "pattern": "^[A-Za-z0-9_-]+$",
+                    "minLength": 1
+                  },
+                  "attestationObject": {
+                    "type": "string",
+                    "maxLength": 65536,
+                    "pattern": "^[A-Za-z0-9_-]+$",
+                    "minLength": 1
+                  },
+                  "transports": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "maxLength": 64
+                    }
+                  },
+                  "authenticatorData": {
+                    "type": "string",
+                    "maxLength": 16384,
+                    "pattern": "^[A-Za-z0-9_-]+$",
+                    "minLength": 1
+                  },
+                  "publicKey": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 16384
+                  },
+                  "publicKeyAlgorithm": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "clientExtensionResults": {
+                "type": "object",
+                "maxProperties": 32
+              },
+              "authenticatorAttachment": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "platform",
+                  "cross-platform",
+                  null
+                ]
+              }
+            }
+          }
+        }
+      },
+      "PasskeyAssertionFinish": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ceremony",
+          "credential"
+        ],
+        "properties": {
+          "ceremony": {
+            "type": "string",
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "credential": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "rawId",
+              "type",
+              "response",
+              "clientExtensionResults"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "maxLength": 4096,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "minLength": 1
+              },
+              "rawId": {
+                "type": "string",
+                "maxLength": 4096,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "minLength": 1
+              },
+              "type": {
+                "const": "public-key"
+              },
+              "response": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "clientDataJSON",
+                  "authenticatorData",
+                  "signature",
+                  "userHandle"
+                ],
+                "properties": {
+                  "clientDataJSON": {
+                    "type": "string",
+                    "maxLength": 16384,
+                    "pattern": "^[A-Za-z0-9_-]+$",
+                    "minLength": 1
+                  },
+                  "authenticatorData": {
+                    "type": "string",
+                    "maxLength": 16384,
+                    "pattern": "^[A-Za-z0-9_-]+$",
+                    "minLength": 1
+                  },
+                  "signature": {
+                    "type": "string",
+                    "maxLength": 4096,
+                    "pattern": "^[A-Za-z0-9_-]+$",
+                    "minLength": 1
+                  },
+                  "userHandle": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 128
+                  }
+                }
+              },
+              "clientExtensionResults": {
+                "type": "object",
+                "maxProperties": 32
+              },
+              "authenticatorAttachment": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "platform",
+                  "cross-platform",
+                  null
+                ]
+              }
+            }
+          }
+        }
+      },
+      "PasskeyOptions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ceremony",
+          "publicKey"
+        ],
+        "properties": {
+          "ceremony": {
+            "type": "string",
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "publicKey": {
+            "type": "object"
+          }
+        }
+      },
+      "PasskeyProofIssued": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "proof",
+          "expiresAt"
+        ],
+        "properties": {
+          "proof": {
+            "type": "string",
+            "maxLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "expiresAt": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        }
+      },
+      "PasskeyCredential": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ownerId",
+          "name",
+          "rpId",
+          "createdAt",
+          "revoked",
+          "version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ownerId": {
+            "type": "string",
+            "maxLength": 400,
+            "minLength": 1
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "rpId": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "revoked": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "PasskeyListedCredential": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ownerId",
+          "name",
+          "rpId",
+          "createdAt",
+          "revoked",
+          "version",
+          "etag",
+          "lastUsedAt",
+          "usableHere",
+          "backedUp"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ownerId": {
+            "type": "string",
+            "maxLength": 400,
+            "minLength": 1
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "rpId": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "revoked": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "etag": {
+            "type": "string",
+            "maxLength": 130
+          },
+          "lastUsedAt": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "usableHere": {
+            "type": "boolean"
+          },
+          "backedUp": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PasskeyList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "rpId",
+          "items"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "rpId": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/PasskeyListedCredential"
+            }
+          }
+        }
+      },
+      "PasskeyRemoved": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "signedOut"
+        ],
+        "properties": {
+          "signedOut": {
+            "type": "boolean"
+          }
+        }
       }
     },
     "parameters": {

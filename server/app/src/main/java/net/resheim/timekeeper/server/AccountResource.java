@@ -19,6 +19,7 @@ public class AccountResource {
     @Inject BrowserOrigins origins;
     @Inject BrowserSignIns signIns;
     @Inject PasskeyRealm realm;
+    @Inject BrowserSessions sessions;
     @Inject ServerInfo serverInfo;
     @Inject RecoveryMail recoveryMail;
     @Context UriInfo uri;
@@ -37,12 +38,7 @@ public class AccountResource {
         return signIns.begin(method,browser,cookies.replacementSession(),peer==null ? "local" : peer.hostAddress());
     }
     private Response issued(AccountStore.Issued issued) {
-        var principal=accounts.session(issued.secret());
-        identity.set(principal);var value=accounts.context(principal);
-        String cookie=AuthenticationFilter.COOKIE+"="+issued.secret()+"; Path=/; HttpOnly; Secure; SameSite=Lax";
-        if(issued.persistent()) cookie+="; Max-Age="+Math.max(0,Duration.between(Instant.now(),issued.expires()).toSeconds());
-        var reply=Response.ok(value).header("Cache-Control","no-store").header("Set-Cookie",cookie);
-        if(origins.configured()) reply.header("Set-Cookie",BrowserCookies.bindingCookie(cookies().requireBrowser()));return reply.build();
+        return sessions.issued(issued,cookies());
     }
     @GET @Path("/status") public Response status() {
         ContractInputs.queries(uri.getQueryParameters());var result=object();
@@ -79,8 +75,7 @@ public class AccountResource {
         origin();ContractInputs.queries(uri.getQueryParameters());var cookies=cookies();
         if(identity.principal().kind().equals("SESSION")) signIns.logout(identity.principal(),origins.configured() ? cookies.requireBrowser() : null,cookies.replacementSession());
         else accounts.logout(identity.principal());
-        var reply=Response.noContent().header("Cache-Control","no-store").header("Set-Cookie",AuthenticationFilter.COOKIE+"=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0");
-        if(origins.configured()) reply.header("Set-Cookie",BrowserCookies.clearBindingCookie());return reply.build();
+        return sessions.clear(Response.noContent().header("Cache-Control","no-store")).build();
     }
     @GET @Path("/account") public Response account() {ContractInputs.queries(uri.getQueryParameters());return ApiReplies.resource(200,accounts.account(identity.principal()),null).response();}
     @PUT @Path("/account") public Response account(@HeaderParam("If-Match") String match,JsonNode body) {
