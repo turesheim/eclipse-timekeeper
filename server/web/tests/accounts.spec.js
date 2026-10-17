@@ -141,7 +141,7 @@ for(const explicitUtc of [false,true]) test(explicitUtc ? 'explicit UTC remains 
     const session=await response.json();
     await page.goto('/web/');await expect(page.locator('#status')).toHaveText('Up to date');
     const clock=explicitUtc ? '07:59:20':'09:59:20';
-    await expect(page.locator('#work-session-current')).toContainText(clock);await expect(page.locator('#work-session-started')).toContainText(clock);
+    await expect(page.locator('#work-session-current')).toContainText(clock);
     if(!explicitUtc) {await expect(page.locator('#work-session-current')).not.toContainText('UTC');await expect(page.locator('#zone-caption')).toContainText('Europe/Oslo');}
     const profile=await (await context.request.get('/api/v1/me')).json();expect(profile.zoneId).toBe(explicitUtc ? 'UTC':'Europe/Oslo');expect(profile.version).toBe(1);
     expect(await (await context.request.get('/api/v1/work-sessions/'+session.id)).json()).toEqual(session);

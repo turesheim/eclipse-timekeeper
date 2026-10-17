@@ -57,7 +57,11 @@ test('running Workweek sessions remain editable without losing exact times and r
     await page.getByLabel('Title', {exact: true}).fill('Updated running session'); await page.locator('#save').click(); await expect(page.locator('#editor')).not.toBeVisible(); await expect(row).toContainText('Updated running session');
     const saved = await (await api(request, 'GET', '/work-sessions/' + session.id)).json(); expect(saved.start).toBe(session.start); expect(saved.end).toBeNull();
     await page.getByRole('button', {name: 'Sign out', exact: true}).click(); await expect(page.locator('#login')).toBeVisible(); await signIn(page, process.env.TIMEKEEPER_WEB_READ_TOKEN);
-    await row.getByRole('button', {name: 'Edit session Updated running session', exact: true}).click(); await page.getByLabel('Title', {exact: true}).fill('Rejected read-only change'); await page.locator('#save').click();
-    await expect(page.locator('#editor-error')).toContainText('permission'); expect((await (await api(request, 'GET', '/work-sessions/' + session.id)).json()).title).toBe('Updated running session'); await page.locator('#cancel').click();
+    await expect(row.getByRole('button', {name: 'Edit session Updated running session', exact: true})).toBeDisabled();
+    await expect(row.getByRole('button', {name: 'Delete session Updated running session', exact: true})).toBeDisabled();
+    const current = await api(request, 'GET', '/work-sessions/' + session.id);
+    const denied = await request.put('/api/v1/work-sessions/' + session.id, {data: {...saved, title: 'Rejected read-only change'}, headers: {Authorization: `Bearer ${process.env.TIMEKEEPER_WEB_READ_TOKEN}`, 'If-Match': current.headers().etag}});
+    expect(denied.status()).toBe(403);
+    expect((await (await api(request, 'GET', '/work-sessions/' + session.id)).json()).title).toBe('Updated running session');
   } finally {await f.close();}
 });
