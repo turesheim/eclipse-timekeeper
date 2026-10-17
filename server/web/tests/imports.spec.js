@@ -103,3 +103,29 @@ test('Toggl worker and previous-account preview are cleared on sign-out and acco
   await expect(page.getByRole('heading',{name:'Review import',exact:true})).not.toBeVisible();
   expect(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length}))).toEqual({local:0,session:0});
 });
+
+test('Toggl source selection, rejected-row diagnostics and independent task descriptions are explicitly reviewed',async({page,request})=>{
+  await login(page);const sent = [];page.on('request',request=>{if(request.url().includes('/api/v1/imports') && request.postData()) sent.push(request.postData());});
+  const csv = 'Description,Duration,Member,Email,Client,Project,Task,Tags,Start date,Start time,Stop date,Stop time,Billable\r\n'
+    +'"=SUM(1,2)",01:00:00,Selected member,selected@example.invalid,Selected client,Selected project,Task name,"Tag one,Tag two",2025-10-20,09:00:00,2025-10-20,10:00:00,Yes\r\n'
+    +'Wrong duration,00:30:00,Selected member,selected@example.invalid,Selected client,Selected project,,,2025-10-20,11:00:00,2025-10-20,12:00:00,No\r\n'
+    +'Other private entry,01:00:00,Other member,other@example.invalid,Other client,Other project,,,2025-10-20,09:00:00,2025-10-20,10:00:00,Yes\r\n';
+  await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles({name:'source-selection.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+  await page.getByRole('button',{name:'Read CSV',exact:true}).click();await page.getByRole('button',{name:'Review mappings',exact:true}).click();
+  await expect(page.locator('#account-content')).toContainText('Choose the source user.');
+  await page.getByLabel('Source user',{exact:true}).selectOption({label:'Selected member · selected@example.invalid'});
+  await page.getByRole('button',{name:'Review mappings',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Review and explicitly exclude invalid rows before continuing.');
+  await expect(page.locator('#account-content')).toContainText('Unsupported metadata: Billable.');
+  await page.getByLabel('Exclude invalid rows after reviewing the diagnostics',{exact:true}).check();
+  const pending = page.waitForEvent('download');await page.getByRole('button',{name:'Download preview diagnostics',exact:true}).click();
+  const download = await pending,diagnostics = JSON.parse(readFileSync(await download.path(),'utf8'));
+  expect(diagnostics.diagnostics).toEqual({sourceRows:3,rejectedRows:1,excludedRows:0,unselectedRows:1,unsupportedFields:['Billable']});
+  expect(diagnostics.rows[1].errors.join(' ')).toContain('duration disagree');
+  await page.getByRole('button',{name:'Review mappings',exact:true}).click();await page.getByRole('button',{name:'Review server matches',exact:true}).click();
+  await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
+  const exported = await api(request,'/data/export'),entry = exported.activities.find(value=>value.summary==='=SUM(1,2)');expect(entry).toBeTruthy();expect(entry.labelIds).toHaveLength(2);
+  expect(exported.tasks.find(value=>value.id===entry.taskId).summary).toBe('Task name');
+  const job = (await api(request,'/imports')).items.find(value=>value.sourceDiagnostics?.sourceRows===3);expect(job.sourceDiagnostics).toEqual(diagnostics.diagnostics);expect(job.importedEntries).toBe(1);
+  expect(sent.join('\n')).not.toContain('Other private entry');expect(sent.join('\n')).not.toContain('other@example.invalid');expect(sent.join('\n')).not.toContain('selected@example.invalid');
+  await undo(page,0);
+});

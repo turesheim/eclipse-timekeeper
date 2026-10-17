@@ -5,7 +5,7 @@ const names = {CLIENT:'Client', PROJECT:'Project', TASK:'Task', LABEL:'Label'};
 const signature = value => JSON.stringify(value);
 
 export async function renderImports(view, zone) {
-  let parsed = null, fingerprint = null, plan = null, batches = [], reviews = [], resume = null;
+  let parsed = null, fingerprint = null, plan = null, batches = [], reviews = [], resume = null, selectedPerson = null;
   let worker = null, cancelWorker = null, pause = false, undoPause = false, historyAfter = null, historyItems = [], createKey = null;
   const api = view.session, catalog = {};
   const upload = form(view, 'Import from Toggl Track', 'Read CSV', read);
@@ -18,11 +18,13 @@ export async function renderImports(view, zone) {
   const work = section(view, 'Review import');work.hidden = true;
   const history = section(view, 'Import history'), historyList = node('div');history.append(historyList);
   const operations = node('div');history.append(operations);
+  const downloadUrls = new Set();
   upload.value.addEventListener('change', () => {cancelWorker?.();parsed = plan = null;work.hidden = true;});
   view.cleanup.add(() => {
     cancelWorker?.();worker?.terminate();worker = null;
     if(parsed) parsed.rows.length = 0;if(plan) plan.rows.length = 0;
     parsed = plan = resume = null;reviews.length = batches.length = historyItems.length = 0;file.value = '';fingerprint = createKey = null;
+    for(const url of downloadUrls) URL.revokeObjectURL(url);downloadUrls.clear();selectedPerson = null;
   });
   await Promise.all(Object.entries({CLIENT:'clients',PROJECT:'projects',TASK:'tasks',LABEL:'labels'}).map(async ([type, path]) => {
     const reply = await api.page(`/${path}`);if(view.valid()) catalog[type] = reply.items;
@@ -71,6 +73,7 @@ export async function renderImports(view, zone) {
     const duplicates = field(work, 'Keep indistinguishable source rows as separate entries', false, {type:'checkbox'});
     const rowList = node('div');work.append(rowList);let page = 0;
     function showRows() {
+      selectedPerson = source.value || null;
       rowList.replaceChildren();const selected = parsed.rows.filter(row => row.personKey === source.value || !row.personKey);
       const errors = selected.filter(row => row.errors.length).length;
       rowList.append(node('p', `${selected.length} source rows · ${errors} invalid. Displayed times use ${zone}.`));
@@ -94,6 +97,7 @@ export async function renderImports(view, zone) {
       if(selected.some(row => row.errors.length) && !invalid.checked) throw new Error('Review and explicitly exclude invalid rows before continuing.');
       if(selected.some(row => row.ambiguousDuplicate && !row.excluded && !row.errors.length) && !duplicates.checked) throw new Error('Review indistinguishable source rows, then keep them separately or exclude them.');
       for(const row of selected) row.duplicateReviewed = duplicates.checked;
+      selectedPerson = source.value;
       const result = await runWorker({operation:'plan',rows:parsed.rows,personKey:source.value,reportZone:resume?.reportZone || zone,
         options:{fallbackClient:fallbackClient.value,fallbackProject:fallbackProject.value}});
       if(!view.valid()) return;plan = result.plan;batches = result.batches;reviews = [];
@@ -105,7 +109,7 @@ export async function renderImports(view, zone) {
       }
       mappingReview();
     }),{submit:next,feedback,write:true}),'btn btn-primary');next.disabled = !view.canWrite;
-    work.append(feedback,next);
+    work.append(feedback,next,button('Download preview diagnostics',downloadPreview));
   }
   function mappingReview() {
     work.replaceChildren(node('h2','Review mappings'),node('p',`${plan.selectedEntries} entries · ${nanosText(BigInt(plan.selectedNanos))} · ${plan.mappings.length} catalog mappings`));
@@ -157,7 +161,7 @@ export async function renderImports(view, zone) {
       }
       matchReview();
     }),{submit:review,feedback,write:true}),'btn btn-primary');review.disabled = !view.canWrite;
-    work.append(feedback,review,button('Back to source rows',()=>{if(!view.busy) sourceReview();}));
+    work.append(feedback,review,button('Back to source rows',()=>{if(!view.busy) sourceReview();}),button('Download preview diagnostics',downloadPreview));
   }
   function matchReview() {
     work.replaceChildren(node('h2','Confirm import'));const flat = reviews.flat();
@@ -198,7 +202,8 @@ export async function renderImports(view, zone) {
     const start = button(resume ? 'Resume import' : 'Import selected entries',()=>void view.run(async()=>{
       if(matches.some(({value,index})=>value.status==='SOURCE_CHANGED' || !plan.rows[index].duplicateDecision || plan.rows[index].duplicateDecision==='REUSE' && plan.rows[index].reuseActivities?.some(item=>!item))) throw new Error('Resolve every matching entry before importing.');
       const initial = {label:resume?.label || 'Toggl Track import',sourceKey:plan.sourceKey,sourceZone:sourceZone.value.trim(),sourceDateFormat:dateFormat.value,
-        fileFingerprint:fingerprint,selectionFingerprint:plan.selectionFingerprint,mappings:plan.mappings,selectedEntries:plan.selectedEntries,selectedNanos:plan.selectedNanos};
+        fileFingerprint:fingerprint,selectionFingerprint:plan.selectionFingerprint,mappings:plan.mappings,selectedEntries:plan.selectedEntries,selectedNanos:plan.selectedNanos,sourceDiagnostics:diagnostics()};
+      stop.hidden = false;
       const enabled = [...work.querySelectorAll('input,select,button')].filter(value=>!value.disabled && value!==stop);
       const sourceControls = [...upload.value.querySelectorAll('input,select,button')].filter(value=>!value.disabled);
       for(const value of [...enabled,...sourceControls]) value.disabled = true;
@@ -206,10 +211,10 @@ export async function renderImports(view, zone) {
         createKey ||= crypto.randomUUID();
         const loaded = resume ? await api.request(`/imports/jobs/${resume.id}`) : await api.request('/imports/toggl/jobs',{method:'POST',key:createKey,body:initial});
         if(!view.valid()) return;resume = loaded.data;pause = false;await importLoop(feedback);
-      } finally {if(view.valid()) for(const value of [...enabled,...sourceControls]) value.disabled = false;}
+      } finally {if(view.valid()) {for(const value of [...enabled,...sourceControls]) value.disabled = false;stop.hidden = true;}}
     },{submit:start,feedback,write:true}),'btn btn-primary');start.disabled = !view.canWrite;
-    const stop = button('Pause after current batch',()=>{pause = true;feedback.textContent = 'Pausing after the current batch…';});
-    work.append(feedback,start,stop,button('Back to mappings',()=>{if(!view.busy) mappingReview();}));
+    const stop = button('Pause after current batch',()=>{pause = true;feedback.textContent = 'Pausing after the current batch…';});stop.hidden = true;
+    work.append(feedback,start,stop,button('Back to mappings',()=>{if(!view.busy) mappingReview();}),button('Download preview diagnostics',downloadPreview));
   }
   async function importLoop(feedback) {
     let committed = resume.importedEntries + resume.skippedEntries, offset = 0;
@@ -237,7 +242,7 @@ export async function renderImports(view, zone) {
     if(!view.valid()) return;
     if(resume.state==='IMPORTED') {
       view.clean(upload.value);feedback.append(' Import complete.');void view.refreshProfile().catch(()=>{});
-      work.replaceChildren(node('h2','Import complete'),feedback,button('Import another file',()=>{
+      work.replaceChildren(node('h2','Import complete'),feedback,button('Download preview diagnostics',downloadPreview),button('Import another file',()=>{
         if(view.busy) return;resume = parsed = plan = null;reviews = [];batches = [];file.value = '';work.hidden = true;upload.feedback.textContent = '';file.focus();
       }));
     }
@@ -308,13 +313,28 @@ export async function renderImports(view, zone) {
     operations.append(feedback,apply,button('Pause Undo',()=>{operations.replaceChildren(node('p','Undo paused. Continue from Import history.'));}));
   }
   async function download(job) {
-    const details = (await api.request(`/imports/jobs/${job.id}`)).data, items = [];let offset = 0;
+    const details = (await api.request(`/imports/jobs/${job.id}`)).data, chunks = [`{"job":${JSON.stringify(details)},"items":[`];let offset = 0,first = true;
     do {
       const reply = await api.request(`/imports/jobs/${job.id}/items?offset=${offset}`);if(!view.valid()) return;
-      items.push(...reply.data.items);offset = reply.data.nextOffset;
+      if(reply.data.items.length) {chunks.push((first ? '' : ',')+JSON.stringify(reply.data.items).slice(1,-1));first = false;}offset = reply.data.nextOffset;
     } while(offset!==null);
     if(!view.valid()) return;
-    const url = URL.createObjectURL(new Blob([JSON.stringify({job:details,items},null,2)],{type:'application/json'}));
-    const link = node('a');link.href = url;link.download = `timekeeper-import-${job.id}.json`;link.click();URL.revokeObjectURL(url);
+    chunks.push(']}');saveJson(chunks,`timekeeper-import-${job.id}.json`);
+  }
+  function diagnostics() {
+    const selected = parsed.rows.filter(row=>row.personKey===selectedPerson || !row.personKey);
+    return {sourceRows:parsed.rows.length,rejectedRows:selected.filter(row=>row.errors.length).length,
+      excludedRows:selected.filter(row=>!row.errors.length && row.excluded).length,unselectedRows:parsed.rows.length-selected.length,unsupportedFields:parsed.unsupported};
+  }
+  function downloadPreview() {
+    if(!view.valid() || !parsed) return;
+    const rows = parsed.rows.map(row=>({line:row.line,selected:row.personKey===selectedPerson || !row.personKey,excluded:!!row.excluded,
+      errors:row.errors,warnings:row.warnings,ambiguousDuplicate:!!row.ambiguousDuplicate}));
+    saveJson([JSON.stringify({sourceZone:sourceZone.value.trim(),sourceDateFormat:dateFormat.value,diagnostics:diagnostics(),rows},null,2)],'timekeeper-import-diagnostics.json');
+  }
+  function saveJson(chunks,filename) {
+    const url = URL.createObjectURL(new Blob(chunks,{type:'application/json'}));downloadUrls.add(url);
+    const link = node('a');link.href = url;link.download = filename;link.hidden = true;document.body.append(link);link.click();link.remove();
+    setTimeout(()=>{URL.revokeObjectURL(url);downloadUrls.delete(url);},1000);
   }
 }

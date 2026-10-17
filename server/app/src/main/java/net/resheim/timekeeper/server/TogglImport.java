@@ -30,6 +30,13 @@ final class TogglImport {
         if(input.has("selectionFingerprint")) {
             String selection=text(input,"selectionFingerprint",64);if(!selection.matches("[0-9a-f]{64}")) throw ApiFailure.validation();job.put("selectionFingerprint",selection);
         }
+        if(input.has("sourceDiagnostics")) {
+            var diagnostics=input.get("sourceDiagnostics");
+            int totalRows=integer(diagnostics,"sourceRows",1,100000),rejected=integer(diagnostics,"rejectedRows",0,100000),
+                    excluded=integer(diagnostics,"excludedRows",0,100000),unselected=integer(diagnostics,"unselectedRows",0,100000);
+            if(totalRows!=count+rejected+excluded+unselected) throw ApiFailure.validation();
+            strings(diagnostics.path("unsupportedFields"),100);job.set("sourceDiagnostics",diagnostics.deepCopy());
+        }
         job.put("sourceDateFormat",dateFormat);job.put("skippedNanos","0");return ledger.update(ImportLedger.Kind.IMPORT_JOB,job);
     }
     ObjectNode preview(JsonNode input) {

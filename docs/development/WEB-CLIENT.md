@@ -151,7 +151,7 @@ the authenticated owner and reject live token owner reassignment.
 
 ## Personal settings and independent user accounts
 
-**My Account** is a dedicated page with Profile, Password and API tokens sections.
+**My Account** is a dedicated page with Profile, Password, API tokens and Import sections.
 It uses a side navigation on desktop and wrapping navigation on narrow screens.
 Profile includes an optional display name and an explicit time-zone preference;
 the device-zone shortcut never overwrites a saved choice without a save action.
@@ -165,7 +165,7 @@ access to another account's work data or introduce workspaces, members or
 invitations. Personal settings remain separate from other-user administration.
 
 Routes are bookmarkable fragments (`#account/profile`, `#account/password`,
-`#account/tokens`, `#users`, `#users/new` and `#users/<encoded-owner>`). Direct
+`#account/tokens`, `#account/import`, `#users`, `#users/new` and `#users/<encoded-owner>`). Direct
 access still requires the authenticated account and server-side permissions.
 Browser Back and explicit return links share the draft guard. Writes reserve
 the page until their result is known; uncertain writes require record review,

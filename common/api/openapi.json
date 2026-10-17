@@ -9059,6 +9059,50 @@
         ],
         "additionalProperties": false
       },
+      "ImportSourceDiagnostics": {
+        "type": "object",
+        "description": "Client-reported CSV diagnostics. Counts reconcile all source rows with selected entries; no unselected source user identity or raw CSV is stored. Server committed counts remain authoritative.",
+        "properties": {
+          "sourceRows": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "rejectedRows": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "excludedRows": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "unselectedRows": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "unsupportedFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "maxItems": 100,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "sourceRows",
+          "rejectedRows",
+          "excludedRows",
+          "unselectedRows",
+          "unsupportedFields"
+        ],
+        "additionalProperties": false
+      },
       "TogglImportJobInput": {
         "type": "object",
         "properties": {
@@ -9072,6 +9116,9 @@
           },
           "selectionFingerprint": {
             "$ref": "#/components/schemas/ImportDigest"
+          },
+          "sourceDiagnostics": {
+            "$ref": "#/components/schemas/ImportSourceDiagnostics"
           },
           "sourceDateFormat": {
             "type": "string",

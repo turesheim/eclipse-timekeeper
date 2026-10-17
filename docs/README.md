@@ -12,6 +12,8 @@ Documentation is grouped by responsibility:
   [Eclipse connection](operations/ECLIPSE-CLIENT.md), [deployment](operations/DEPLOYMENT.md),
   [Synology package candidate](operations/SYNOLOGY-PACKAGE.md)
   and [database recovery](operations/DATABASE-RECOVERY.md).
+- Web account tools: [accounts and recovery](operations/ACCOUNTS.md) and
+  [Toggl Track import and Undo](operations/TOGGL-IMPORT.md).
 - Development: [repository layout](development/REPOSITORY.md),
   [web client](development/WEB-CLIENT.md), [release process](development/RELEASING.md),
   [change history](development/CHANGES.md) and [dated upgrade plan](development/UPGRADE-PLAN.md).
