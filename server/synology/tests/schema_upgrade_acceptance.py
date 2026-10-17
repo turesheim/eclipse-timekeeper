@@ -70,12 +70,15 @@ def main():
                 blueprint=folder/'compose.yaml';blueprint.write_text((ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',image))
                 command('docker','cp',str(binary),container+':/var/packages/timekeeper/scripts/timekeeper-dsm')
                 command('docker','cp',str(release),container+':/var/packages/timekeeper/scripts/release.json')
+                command('docker','exec',container,'mkdir','-p','/tmp/timekeeper-incoming/package/scripts')
+                command('docker','cp',str(release),container+':/tmp/timekeeper-incoming/package/scripts/release.json')
                 command('docker','cp',str(blueprint),container+':/var/packages/timekeeper/target/project/compose.yaml')
                 for name in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','recovery-v3.sql'):
                     command('docker','cp',str(DB/name),container+':/var/packages/timekeeper/scripts/migration/'+name)
                 command('docker','exec',container,'chown','-R','10001:10001','/var/packages/timekeeper')
                 def helper(action,expected=0,argument=None):
                     args=['docker','exec','--user','10001:10001','-e','SYNOPKG_PKGNAME=timekeeper',
+                          '-e','SYNOPKG_PKGINST_TEMP_DIR=/tmp/timekeeper-incoming/package',
                           '-e','SYNOPKG_PKGDEST=/var/packages/timekeeper/target',container,
                           '/var/packages/timekeeper/scripts/timekeeper-dsm',action]
                     if argument is not None:args.append(argument)
@@ -83,6 +86,12 @@ def main():
                     if result.returncode!=expected:raise AssertionError('Unexpected installer result: '+action)
                     if password in result.stdout+result.stderr:raise AssertionError('Installer leaked a fixture password')
                     return result
+                missing=helper('validate',expected=1)
+                assert '/tmp/timekeeper-incoming/package/scripts/migration/postgresql-shape.sql' in missing.stderr
+                assert sql('SELECT schema_version FROM tk_schema')=='2'
+                assert sql(fingerprints)==before
+                assert command('docker','exec',container,'find','/var/packages/timekeeper/var/server/backups','-type','f').stdout.strip()==''
+                command('docker','exec',container,'cp','-R','/var/packages/timekeeper/scripts/migration','/tmp/timekeeper-incoming/package/scripts/migration')
                 helper('validate')
                 assert sql('SELECT schema_version FROM tk_schema')=='2'
                 assert command('docker','exec',container,'find','/var/packages/timekeeper/var/server/backups','-type','f').stdout.strip()==''
