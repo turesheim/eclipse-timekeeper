@@ -19,7 +19,7 @@ class WorkSessionPersistenceTest {
     private WorkSessionService sessions(EntityManager manager) {
         var repository=new JpaServicePorts(()->manager);return new DefaultWorkSessionService(repository.workSessionPorts(event->{}));
     }
-    @Test void sessionsAssociationsLabelsAndExactOverlapsSurviveClosingAndReopeningTheFile() throws Exception {
+    @Test void independentSessionsLabelsAndExactOverlapsSurviveClosingAndReopeningTheFile() throws Exception {
         EntityManager manager=DatabaseStartup.open(url());WorkSessionId id;ActivityId activityId;LabelId labelId;
         var from=Instant.parse("2025-10-25T21:59:59.123456789Z");var end=Instant.parse("2025-10-27T22:00:00.987654321Z");
         WorkSessionTime expected;
@@ -34,13 +34,15 @@ class WorkSessionPersistenceTest {
             var changed=sessions.updateWorkSession(new UpdateWorkSession(id,session.version(),from,Optional.of(end),"Edited"));
             assertEquals(session.version()+1,changed.version());
             assertThrows(ServiceException.class,()->sessions.updateWorkSession(new UpdateWorkSession(id,session.version(),from,Optional.of(end),"Stale")));
-            assertThrows(ServiceException.class,()->sessions.deleteWorkSession(new DeleteWorkSession(id,changed.version())));
         } finally {DatabaseStartup.close(manager);}
         var reopened=DatabaseStartup.open(url()+";IFEXISTS=TRUE");
         try {
             var sessions=sessions(reopened);var report=sessions.workSessionReport(id);assertEquals("Edited",report.session().summary());assertEquals(expected,report.time());
-            for(var activity:report.activities()) {assertTrue(activity.task().isEmpty());assertEquals(Set.of(labelId),activity.labelIds());assertEquals(Optional.of(id),activity.workSessionId());}
+            for(var activity:report.activities()) {assertTrue(activity.task().isEmpty());assertEquals(Set.of(labelId),activity.labelIds());assertTrue(activity.workSessionId().isEmpty());}
             assertTrue(report.activities().stream().anyMatch(value->value.id().equals(activityId)));
+            var before=List.copyOf(report.activities());sessions.deleteWorkSession(new DeleteWorkSession(id,report.session().version()));
+            var repository=new JpaServicePorts(()->reopened);var activities=new DefaultTimekeeperService(repository.ports(event->{}));
+            for(var activity:before) assertEquals(activity,activities.activity(activity.id()).orElseThrow());
         } finally {DatabaseStartup.close(reopened);}
     }
     @Test void databaseGateBlocksASeparateJpaAdapterUntilTheOtherConnectionCommits() throws Exception {

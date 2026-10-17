@@ -2,7 +2,6 @@ package net.resheim.eclipse.timekeeper.ui.test;
 
 import static org.junit.Assert.*;
 import java.time.*;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.BooleanSupplier;
@@ -19,7 +18,6 @@ import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
 /** Exercises actual SWT controls against the embedded database, without mock dialogs. */
 public class WorkSessionTest {
-    private static final DateTimeFormatter MINUTES=DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private final SWTWorkbenchBot bot=new SWTWorkbenchBot();
 
     @Test public void sessionTimersAreIndependentAndPermitMultipleSessionsPerDay() throws Exception {
@@ -63,7 +61,7 @@ public class WorkSessionTest {
         var activities=TimekeeperUiPlugin.getDefault().getTimekeeperService();
         var sessions=TimekeeperUiPlugin.getDefault().getWorkSessionService();
         var tasks=activities.tasks().stream().map(Task::id).collect(java.util.stream.Collectors.toSet());var zone=TimekeeperUiPlugin.getCalendarZone();
-        var from=LocalDate.now(zone).minusDays(2).atTime(8,0).atZone(zone).toInstant().plusNanos(123);
+        var from=LocalDate.of(2007,10,25).atTime(8,0).atZone(zone).toInstant().plusNanos(123);
         var until=from.plus(Duration.ofHours(10));
         if(!bot.toggleButton("Session details").isPressed()) bot.toggleButton("Session details").click();
         waitFor(()->bot.button("Record session").isEnabled(),"Record button unavailable");
@@ -106,7 +104,6 @@ public class WorkSessionTest {
             for(var value:sessions.workSessionReport(session.id()).activities()) {
                 var current=activities.activity(value.id()).orElseThrow();activities.deleteActivity(new DeleteActivity(current.id(),current.version()));
             }
-            var current=activities.activity(independent.id()).orElseThrow();activities.deleteActivity(new DeleteActivity(current.id(),current.version()));
             var currentSession=sessions.workSession(session.id()).orElseThrow();sessions.deleteWorkSession(new DeleteWorkSession(currentSession.id(),currentSession.version()));
             if(bot.toggleButton("Session details").isPressed()) bot.toggleButton("Session details").click();
         }

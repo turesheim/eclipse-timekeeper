@@ -230,7 +230,7 @@ test('calendar pointer moves and both resize handles preserve nanoseconds and ac
     await unchangedActivities(request,f);
     expect(await (await api(request,'GET','/activities/active')).json()).toEqual(active);
     expect(await page.evaluate(()=>window.calendarDialogOpens)).toBe(0);
-    const report=await (await api(request,'GET',`/work-sessions/${f.session.id}/report`)).json();expect(report.time.outsideSession.sort()).toEqual([...f.activities,active].map(value=>value.id).sort());
+    const report=await (await api(request,'GET',`/work-sessions/${f.session.id}/report`)).json();expect(report.activities).toEqual([]);expect(report.time.outsideSession).toEqual([]);
   } finally {await f.close();}
 });
 

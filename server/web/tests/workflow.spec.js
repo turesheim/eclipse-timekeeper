@@ -453,6 +453,7 @@ test('work session controls start once and stop independently of a task activity
   expect((await (await api(request,'GET','/work-sessions/active')).json()).id).toBe(second.id);
   await page.getByRole('button',{name:'Stop work session',exact:true}).click();await expect(page.locator('#work-session-state')).toHaveText('Stopped');
   await removeSessionFixture(request,[first.id,second.id,history.id]);
+  const timer = await api(request,'GET',`/activities/${active.id}`);await api(request,'DELETE',`/activities/${active.id}`,undefined,{'If-Match':timer.headers().etag});
   const read = await api(request,'GET',`/tasks/${task.id}`);await api(request,'DELETE',`/tasks/${task.id}`,undefined,{'If-Match':read.headers().etag});
 });
 test('session toolbar targets the displayed session and preserves historical tools and read-only access', async ({page,request,browser}) => {
@@ -520,11 +521,11 @@ test('independent taskless activities derive overlap context and survive session
   const tasksBefore = (await (await api(request,'GET','/tasks')).json()).items.length;await signIn(page);
   await page.getByRole('button',{name:'Record work session',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill('Recorded work session');await page.getByLabel('Client',{exact:true}).selectOption({index:1});
   await page.getByLabel('Summary',{exact:true}).fill('Browser session '+randomUUID());
-  await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-25T22:00:00.123456789Z');
-  await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2025-10-26T23:00:00.123456789Z');await save(page);
+  await page.getByLabel('Start (local time)',{exact:true}).fill('2007-10-27T22:00:00.123456789Z');
+  await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2007-10-28T23:00:00.123456789Z');await save(page);
   const session = (await (await api(request,'GET','/work-sessions')).json()).items[0];
   const label = (await (await api(request,'GET','/labels')).json()).items[0];
-  for (const [summary,start,end] of [['First overlap','2025-10-26T08:00:00.123456789Z','2025-10-26T12:00:00.123456789Z'],['Second overlap','2025-10-26T10:00:00.123456789Z','2025-10-26T14:00:00.123456789Z']]) {
+  for (const [summary,start,end] of [['First overlap','2007-10-28T08:00:00.123456789Z','2007-10-28T12:00:00.123456789Z'],['Second overlap','2007-10-28T10:00:00.123456789Z','2007-10-28T14:00:00.123456789Z']]) {
     await page.locator('[data-tab=week]').click();await page.getByRole('button',{name:'Add time',exact:true}).click();
     await expect(page.getByLabel('Task',{exact:true})).toHaveValue('');await expect(page.locator('#editor').getByLabel('Work session',{exact:true})).toHaveCount(0);
     await page.getByLabel('Summary',{exact:true}).fill(summary);await page.getByLabel('Start (local time)',{exact:true}).fill(start);
@@ -536,19 +537,19 @@ test('independent taskless activities derive overlap context and survive session
   expect((await (await api(request,'GET','/tasks')).json()).items.length).toBe(tasksBefore);
   await page.getByRole('button',{name:'Edit work session',exact:true}).click();
   await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue(await editorTime(request, session.start));
-  await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2025-10-26T23:00:00.123456790Z');await save(page);
-  expect((await (await api(request,'GET',`/work-sessions/${session.id}`)).json()).end).toBe('2025-10-26T23:00:00.123456790Z');
+  await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2007-10-28T23:00:00.123456790Z');await save(page);
+  expect((await (await api(request,'GET',`/work-sessions/${session.id}`)).json()).end).toBe('2007-10-28T23:00:00.123456790Z');
   await page.locator('[data-tab=week]').click();await page.getByRole('button',{name:'Add time',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill('Outside session');
-  await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-27T00:00:00Z');await page.getByLabel('End (local time, blank while tracking)',{exact:true}).fill('2025-10-27T01:00:00Z');
+  await page.getByLabel('Start (local time)',{exact:true}).fill('2007-10-29T00:00:00Z');await page.getByLabel('End (local time, blank while tracking)',{exact:true}).fill('2007-10-29T01:00:00Z');
   await expect(page.locator('#activity-session-warning')).toHaveCount(0);await save(page);
   expect((await (await api(request,'GET',`/work-sessions/${session.id}/report`)).json()).activities).toHaveLength(2);
-  const before=(await (await api(request,'GET','/activities')).json()).items;
+  const before=(await (await api(request,'GET','/activities?from=2007-10-27T00:00:00Z&to=2007-10-30T00:00:00Z&limit=500')).json()).items;
   await page.getByRole('button',{name:'Edit work session',exact:true}).click();
-  await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-27T00:30:00Z');await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2025-10-27T01:30:00Z');await save(page);
+  await page.getByLabel('Start (local time)',{exact:true}).fill('2007-10-29T00:30:00Z');await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2007-10-29T01:30:00Z');await save(page);
   const moved=await (await api(request,'GET',`/work-sessions/${session.id}/report`)).json();
   expect(moved.activities.map(value=>value.summary)).toEqual(['Outside session']);expect(moved.time.allocatedTime).toBe('PT30M');
   await page.getByRole('button',{name:'Delete work session',exact:true}).click();await save(page);
-  expect((await (await api(request,'GET','/activities')).json()).items).toEqual(before);
+  expect((await (await api(request,'GET','/activities?from=2007-10-27T00:00:00Z&to=2007-10-30T00:00:00Z&limit=500')).json()).items).toEqual(before);
   await page.screenshot({path:'test-results/work-session-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:'test-results/work-session-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
 });

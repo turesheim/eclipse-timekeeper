@@ -256,9 +256,9 @@ and removed as orphans when unlinked.
 
 ### `ACTIVITY`
 
-A recorded work interval. Task, direct project and work-session associations are
-optional. If both a task and a direct project are supplied, their projects must
-agree. Session and activity owners must match.
+A recorded work interval with optional task and direct project assignments. If
+both are supplied, their projects must agree. Work-session context is derived
+from time overlap within the same account; activities require no session link.
 
 | Column | SQL type | Required | Meaning |
 | --- | --- | --- | --- |
@@ -270,7 +270,7 @@ agree. Session and activity owners must match.
 | `OWNER_ID` | `VARCHAR` | yes | Stable user or service identity. The embedded client uses `local`; this is a value, not a foreign key. |
 | `TASK_ID` | `VARCHAR` | no | Optional foreign key to `TASK.ID`. |
 | `ACTIVITY_PROJECT` | `VARCHAR` | no | Optional foreign key to `PROJECT.NAME` for an activity recorded directly against a project. |
-| `WORK_SESSION_ID` | `VARCHAR(36)` | no | Optional foreign key to `WORK_SESSION.ID`. |
+| `WORK_SESSION_ID` | `VARCHAR(36)` | no | Retired nullable foreign key to `WORK_SESSION.ID`, retained for native-file compatibility; ignored by the service and cleared on save/session deletion. |
 
 Activities do not have a physical version column. The adapter calculates their
 service version from the persisted interval, summary, owner, adjusted flag, and
@@ -322,9 +322,8 @@ database constraint is explicitly mentioned:
 - An activity may use only existing labels. A label cannot be deleted while an
   activity uses it.
 - Each owner may have one running work session, independently of their open
-  activity. Sessions can span midnight without stopping; daily activity parts
-  retain their session association. Stopping a session leaves activity timers
-  unchanged. A session cannot be deleted while activities reference it.
+  activity. Sessions can span midnight independently of daily activity parts.
+  Moving, stopping or deleting a session leaves activities and timers unchanged.
 - Session tracked time sums clipped activity intervals. Allocated time is their
   union, and unallocated time is session duration minus that union. Overlapping
   activities therefore do not count twice toward covered time. Intervals outside
@@ -374,14 +373,14 @@ backup, and recovery behavior.
 `VERSION`, `OWNER_ID`, exact UTC `START_TIME`/nullable `END_TIME`, `SUMMARY` and
 `STATE` (`RUNNING` or `COMPLETED`). Its time fields use the same nanosecond-preserving
 text converter as activities. Sessions have no task or project dependency.
-`ACTIVITY.WORK_SESSION_ID` is a nullable foreign key. Activities may also omit
+`ACTIVITY.WORK_SESSION_ID` is a retired nullable foreign key retained for native-file compatibility. The service ignores its value; session deletion clears legacy foreign keys before removing the session. Activities may also omit
 `TASK_ID` and optionally use the existing `ACTIVITY_PROJECT` relation directly.
 
 `TIMEKEEPER_WRITE_LOCK` contains the database row used to serialize local service
 transactions across H2 clients. A single running session is enforced per owner
-inside this lock. Session edits use optimistic versions; association changes
-participate in activity versions. Native CSV exports include `work_session.csv`,
-and import preserves associations, validates owner/open-session invariants and
+inside this lock. Session edits use optimistic versions. Reports derive activity
+context from owner-scoped time overlap without manual association. Native CSV exports include `work_session.csv`,
+and import accepts legacy link metadata, validates owner/open-session invariants and
 advances changed existing session versions instead of reusing stale versions.
 
 ## Server client hierarchy
