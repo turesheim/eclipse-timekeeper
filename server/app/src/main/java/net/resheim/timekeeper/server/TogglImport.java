@@ -26,7 +26,11 @@ final class TogglImport {
         var job=ledger.create(text(input,"label",255),text(input,"sourceKey",64),text(input,"sourceZone",255),
                 text(input,"fileFingerprint",64),hash(canonical(mappings).toString()));
         catalog.register(job,mappings);job.set("mappings",mappings.deepCopy());job.put("selectedEntries",count);job.put("selectedNanos",total.toString());
-        job.put("skippedNanos","0");return ledger.update(ImportLedger.Kind.IMPORT_JOB,job);
+        String dateFormat=input.path("sourceDateFormat").asText("ISO");if(!Set.of("ISO","DMY","MDY").contains(dateFormat)) throw ApiFailure.validation();
+        if(input.has("selectionFingerprint")) {
+            String selection=text(input,"selectionFingerprint",64);if(!selection.matches("[0-9a-f]{64}")) throw ApiFailure.validation();job.put("selectionFingerprint",selection);
+        }
+        job.put("sourceDateFormat",dateFormat);job.put("skippedNanos","0");return ledger.update(ImportLedger.Kind.IMPORT_JOB,job);
     }
     ObjectNode preview(JsonNode input) {
         var job=object().put("sourceKey",text(input,"sourceKey",64)).put("reportZone",store.profile().path("zoneId").asText());

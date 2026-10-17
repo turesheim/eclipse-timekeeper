@@ -9070,6 +9070,14 @@
           "sourceKey": {
             "$ref": "#/components/schemas/ImportDigest"
           },
+          "selectionFingerprint": {
+            "$ref": "#/components/schemas/ImportDigest"
+          },
+          "sourceDateFormat": {
+            "type": "string",
+            "enum": ["ISO", "DMY", "MDY"],
+            "default": "ISO"
+          },
           "sourceZone": {
             "$ref": "#/components/schemas/ZoneId"
           },

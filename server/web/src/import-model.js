@@ -36,7 +36,9 @@ export async function importPlan(sourceRows, personKey, {fallbackClient, fallbac
   }
   if (!rows.length) throw new Error('Select at least one valid source entry.');
   if (definitions.size > 1000) throw new Error('Split this export into files with at most 1,000 catalogue mappings.');
-  return {sourceKey, mappings: [...definitions.values()], rows, selectedEntries: rows.length, selectedNanos: selectedNanos.toString()};
+  const selection = rows.map(({projectKey, taskKey, labelKeys, duplicateReviewed, duplicateDecision, ...source}) => source);
+  const selectionFingerprint = await importDigest(JSON.stringify(selection));
+  return {sourceKey, mappings: [...definitions.values()], rows, selectionFingerprint, selectedEntries: rows.length, selectedNanos: selectedNanos.toString()};
 }
 
 export function importDayParts(row, zone) {
