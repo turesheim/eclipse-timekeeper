@@ -16,10 +16,14 @@ export class MonthTrack {
       button.addEventListener('click',()=>this.select(shiftMonth(this.currentMonth(),offset)));
     }
     iconButton(root.querySelector('#track-today'),'clock','Current month').addEventListener('click',()=>this.select(null));
-    this.input.addEventListener('change',()=> {
-      try {monthCalendar(this.input.value,this.snapshot.profile.data.zoneId);this.input.setCustomValidity('');this.select(this.input.value);}
-      catch {this.input.setCustomValidity('Choose a valid month.');this.input.reportValidity();}
-    });
+    const choose=report=> {
+      try {
+        if(this.input.value===this.currentMonth()){this.input.setCustomValidity('');return;}
+        this.calendar=monthCalendar(this.input.value,this.snapshot.profile.data.zoneId);this.select(this.input.value);
+      } catch {if(report){this.input.setCustomValidity('Choose a valid month.');this.input.reportValidity();}}
+    };
+    this.input.addEventListener('input',()=>choose(false));
+    this.input.addEventListener('change',()=>choose(true));
   }
   currentDate() {return dateInZone(Number(this.asOf/1000000n),this.snapshot.profile.data.zoneId);}
   currentMonth() {return this.month||this.currentDate().slice(0,7);}
