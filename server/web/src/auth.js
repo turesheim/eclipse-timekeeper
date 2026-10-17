@@ -97,6 +97,7 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
     }).finally(() => {$('sign-out').disabled = false;});
   });
   recovery = emailRecovery({request:publicRequest, signIn:reset});
+  window.addEventListener('hashchange', () => {void recovery.initializeFromLocation();});
   return {clear:reset, async initialize() {
     if (await recovery.initializeFromLocation()) return;
     const current = ++generation;
