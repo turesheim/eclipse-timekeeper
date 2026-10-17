@@ -27,11 +27,13 @@ fonts and their upstream license are included in the server distribution.
 ## Track month view
 
 **Track** is the default workspace tab. Its Monday-to-Sunday month grid shows
-client-coloured work sessions, with recorded session hours per client above it.
+one client-coloured summary per client and day, with recorded session hours per
+client above it. Multiple sessions for the same client are combined.
 Month boundaries and daily slices follow the account's time zone, including DST;
 running sessions use the server's report time. Activity/task time is independent
-of these totals. Month navigation does not alter recorded sessions. Open a session
-card to edit it; read-only access keeps the overview available with editing disabled.
+of these totals. Month navigation does not alter recorded sessions. Individual
+sessions are available in Calendar and Workweek. Daily summaries remain readable
+in read-only sessions.
 
 These views use synthetic records from `tests/track.spec.js`; the browser uses
 Los Angeles time while the account uses Oslo time.

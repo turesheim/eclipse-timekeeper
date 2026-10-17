@@ -36,3 +36,21 @@ test('skipped local dates remain empty and do not lose month time',()=> {
   assert.equal(result.total,48n*hour);assert.equal(result.days.find(day=>day.date==='2011-12-30').total,0n);
   assert.equal(result.days.reduce((sum,day)=>sum+day.total,0n),result.total);
 });
+
+test('daily client totals combine all same-client sessions and keep clients and local days separate',()=>{
+  const calendar=monthCalendar('2025-10','Europe/Oslo');
+  const result=monthSessions(calendar,[
+    session('overnight','a','2025-10-25T21:00:00Z','2025-10-25T23:00:00Z'),
+    session('fall','a','2025-10-25T22:00:00Z','2025-10-26T23:00:00Z'),
+    session('extra','a','2025-10-26T12:00:00.000000001Z','2025-10-26T13:00:00Z'),
+    session('other','b','2025-10-26T15:00:00Z','2025-10-26T17:00:00Z'),
+  ],'2025-11-01T00:00:00Z');
+  const day=result.days.find(value=>value.date==='2025-10-26');assert.equal(day.clients.size,2);
+  assert.equal(day.clients.get('a').duration,27n*hour-1n);assert.equal(day.clients.get('b').duration,2n*hour);
+  assert.equal(result.days.find(value=>value.date==='2025-10-25').clients.get('a').duration,hour);
+  assert.equal(day.total,[...day.clients.values()].reduce((sum,value)=>sum+value.duration,0n));
+  assert.equal(result.days.reduce((sum,day)=>sum+day.total,0n),result.total);
+  const running=monthSessions(calendar,[session('running','a','2025-10-25T21:00:00Z',null)],'2025-10-26T12:00:00Z');
+  assert.equal(running.days.find(value=>value.date==='2025-10-25').clients.get('a').running,false);
+  assert.equal(running.days.find(value=>value.date==='2025-10-26').clients.get('a').running,true);
+});
