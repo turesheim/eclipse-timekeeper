@@ -321,10 +321,10 @@ lost, use your password, verified-email recovery, or operator recovery.
 
 ### Configure the origin and RP
 
-Deployed passkeys require HTTPS with a DNS hostname. Set
-`TIMEKEEPER_PUBLIC_ORIGIN` to the exact browser address, without a trailing slash
-or path. `TIMEKEEPER_PASSKEY_RP_ID=AUTO` selects that hostname without its port;
-you can pin it explicitly to the same hostname. Subdomains, unrelated domains,
+Deployed passkeys require HTTPS with a DNS hostname. In **Administration → General
+settings**, set the public address to the exact browser origin, without a trailing
+slash or path. Passkey RP ID `AUTO` selects that hostname without its port; you can
+pin it explicitly to the same hostname. Subdomains, unrelated domains,
 wildcards and forwarded request headers do not select the RP. IP-based addresses
 do not offer passkeys; password sign-in remains available. HTTPS `localhost` is
 supported for isolated development tests.
@@ -334,12 +334,17 @@ For `https://seshat.tailad1f0.ts.net:8443`, use RP
 the container still listens on its private HTTP address. See the
 [Tailscale guide](TAILSCALE.md). Do not create a separate Tailscale instance.
 
-Compose passes `TIMEKEEPER_PASSKEYS_ENABLED` (default `true`) and
-`TIMEKEEPER_PASSKEY_RP_ID` (default `AUTO`) to both replicas. For DSM, stop the
-package and set `timekeeper.auth.passkeys-enabled` or
-`timekeeper.auth.passkey-rp-id` in retained `config/mail.properties`, then start
-it in Package Center. These operator settings survive upgrades and protected
-native backups. Disabling passkeys keeps credential records and password access.
+Save the configuration and restart every server instance to activate it.
+Disabling passkeys keeps credential records and password access. Central settings
+survive upgrades and protected backups.
+
+For initial deployment or explicit operator recovery, Compose passes
+`TIMEKEEPER_PUBLIC_ORIGIN`, `TIMEKEEPER_PASSKEYS_ENABLED` (default `true`) and
+`TIMEKEEPER_PASSKEY_RP_ID` (default `AUTO`) to both replicas. DSM accepts the
+corresponding `timekeeper.auth.public-origin`, `timekeeper.auth.passkeys-enabled`
+and `timekeeper.auth.passkey-rp-id` properties in retained `config/mail.properties`.
+These deployment values do not overwrite existing central settings on a normal
+restart; use the recovery procedure above when the saved address is unreachable.
 
 Changing the network, server IP or proxy while keeping the HTTPS hostname and
 port unchanged preserves passkeys, sessions and pending requests. A port change
