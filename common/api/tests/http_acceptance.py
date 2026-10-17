@@ -388,6 +388,7 @@ class HttpAcceptance(unittest.TestCase):
         self.assertEqual([outside],context['activities'])
         self.assertEqual('PT1H',context['time']['allocatedTime'])
         self.call('DELETE',f'/work-sessions/{session["id"]}',headers={'If-Match':moved_tag['ETag']},status=204)
+        self.created.remove(('a','work-sessions',session['id']))
         for identity,record in before.items():
             retained,_=self.call('GET',f'/activities/{identity}')
             self.assertEqual(record,retained)
