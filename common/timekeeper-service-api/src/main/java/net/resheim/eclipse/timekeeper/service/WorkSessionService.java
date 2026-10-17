@@ -4,7 +4,7 @@ import java.util.*;
 import net.resheim.eclipse.timekeeper.domain.*;
 import net.resheim.eclipse.timekeeper.service.Commands.*;
 
-/** Independent session controls and optional activity associations. */
+/** Independent session controls and owner-scoped activity context derived from time overlap. */
 public interface WorkSessionService {
     record Association(Activity activity, boolean outsideSession) { }
     record Report(WorkSession session, List<Activity> activities, WorkSessionTime time) {
@@ -18,6 +18,8 @@ public interface WorkSessionService {
     Optional<WorkSession> workSession(WorkSessionId id);
     Optional<WorkSession> activeWorkSession(OwnerId ownerId);
     List<WorkSession> workSessions(OwnerId ownerId);
+    /** Legacy detach only; attempts to attach return a conflict. */
+    @Deprecated
     Association associateWorkSession(AssociateWorkSession command);
     Report workSessionReport(WorkSessionId id);
 }

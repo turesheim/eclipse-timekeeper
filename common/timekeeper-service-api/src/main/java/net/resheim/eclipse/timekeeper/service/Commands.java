@@ -73,6 +73,7 @@ public final class Commands {
 
 	public record DeleteLabel(LabelId id, long expectedVersion) { }
 
+	/** workSessionId is retained for source/wire compatibility and ignored. */
 	public record StartActivity(TaskId taskId, OwnerId ownerId, String summary, Set<LabelId> labelIds,
             Optional<WorkSessionId> workSessionId, Optional<ProjectId> projectId) {
         public StartActivity {
@@ -85,6 +86,7 @@ public final class Commands {
 
 	public record StopActivity(ActivityId id, long expectedVersion) { }
 
+	/** workSessionId is retained for source/wire compatibility and ignored. */
 	public record CreateActivity(TaskId taskId, OwnerId ownerId, Instant start, Optional<Instant> end,
 			String summary, Set<LabelId> labelIds, Optional<WorkSessionId> workSessionId, Optional<ProjectId> projectId) {
         public CreateActivity {
@@ -114,6 +116,8 @@ public final class Commands {
         public UpdateWorkSession { end = optional(end); }
     }
     public record DeleteWorkSession(WorkSessionId id, long expectedVersion) { }
+    /** Retired attachment command; only null/detach remains supported. */
+    @Deprecated
     public record AssociateWorkSession(ActivityId activityId, long expectedActivityVersion, Optional<WorkSessionId> workSessionId) {
         public AssociateWorkSession { workSessionId = optional(workSessionId); }
     }

@@ -322,23 +322,25 @@ class HttpAcceptance(unittest.TestCase):
         self.call('POST', '/work-sessions/start', body=body, headers=self.key(), owner='read', status=403, code='FORBIDDEN')
         activity, activity_headers, _ = self.start(self.task)
         self.assertIsNone(activity.get('workSessionId'), 'Existing tracking may remain standalone')
-        association, _ = self.call('PUT', f'/activities/{activity["id"]}/work-session',
-            body={'workSessionId': session['id']}, headers={'If-Match': activity_headers['ETag']})
-        self.assertEqual(session['id'], association['activity']['workSessionId'])
+        self.call('PUT', f'/activities/{activity["id"]}/work-session',
+            body={'workSessionId': session['id']}, headers={'If-Match': activity_headers['ETag']}, status=409, code='CONFLICT')
+        detached, _ = self.call('PUT', f'/activities/{activity["id"]}/work-session',
+            body={'workSessionId': None}, headers={'If-Match': activity_headers['ETag']})
+        self.assertEqual(activity, detached['activity'])
         stop_key = {**self.key(), 'If-Match': session_headers['ETag']}
         stopped, stopped_headers = self.call('POST', f'/work-sessions/{session["id"]}/stop', headers=stop_key)
         repeated, repeated_headers = self.call('POST', f'/work-sessions/{session["id"]}/stop', headers=stop_key)
         self.assertEqual(stopped, repeated)
         self.assertEqual(stopped_headers['ETag'], repeated_headers['ETag'])
         active, _ = self.call('GET', '/activities/active')
-        self.assertEqual(association['activity'], active, 'Stopping the session must not modify its active activity')
+        self.assertEqual(activity, active, 'Stopping the session must not modify its active activity')
         self.assertIsNone(active['end'])
         self.call('GET', '/work-sessions/active', status=204)
         second, _ = self.call('POST', '/work-sessions/start', body=body, headers=self.key(), status=201)
         self.created.append(('a', 'work-sessions', second['id']))
         self.assertNotEqual(session['id'], second['id'])
 
-    def test_work_session_reports_clip_overlap_and_guard_retrospective_associations(self):
+    def test_work_session_reports_follow_overlap_and_deletion_preserves_independent_activities(self):
         interval = {'start': '2025-10-25T22:00:00.123456789Z',
                     'end': '2025-10-26T23:00:00.123456789Z', 'summary': self.prefix}
         session = self.create('work-sessions', interval)
@@ -351,20 +353,19 @@ class HttpAcceptance(unittest.TestCase):
         outside = self.create('activities', {'taskId': None, 'projectId': self.project['id'],
             'start': '2025-10-27T00:00:00Z', 'end': '2025-10-27T01:00:00Z', 'summary': self.prefix, 'labelIds': []})
         _, tag = self.call('GET', f'/activities/{outside["id"]}')
-        assigned, assigned_tag = self.call('PUT', f'/activities/{outside["id"]}/work-session',
-            body={'workSessionId': session['id']}, headers={'If-Match': tag['ETag']})
-        self.assertTrue(assigned['outsideSession'])
-        self.assertEqual(outside['start'], assigned['activity']['start'])
-        self.assertEqual(outside['end'], assigned['activity']['end'])
-        self.assertIsNone(assigned['activity']['taskId'])
+        self.call('PUT', f'/activities/{outside["id"]}/work-session',
+            body={'workSessionId': session['id']}, headers={'If-Match': tag['ETag']}, status=409, code='CONFLICT')
+        detached, _ = self.call('PUT', f'/activities/{outside["id"]}/work-session',
+            body={'workSessionId': None}, headers={'If-Match': tag['ETag']})
+        self.assertEqual(outside, detached['activity'])
         report, _ = self.call('GET', f'/work-sessions/{session["id"]}/report')
         self.assertEqual('PT25H', report['time']['duration'])
         self.assertEqual('PT8H', report['time']['trackedActivityTime'])
         self.assertEqual('PT6H', report['time']['allocatedTime'])
         self.assertEqual('PT19H', report['time']['unallocatedTime'])
-        self.assertEqual([outside['id']], report['time']['outsideSession'])
+        self.assertEqual([], report['time']['outsideSession'])
+        self.assertEqual(2,len(report['activities']))
         _, tag = self.call('GET', f'/work-sessions/{session["id"]}')
-        self.call('DELETE', f'/work-sessions/{session["id"]}', headers={'If-Match': tag['ETag']}, status=409)
         changed, _ = self.call('PUT', f'/work-sessions/{session["id"]}',
             body={**interval, 'summary': self.prefix + ' reviewed'}, headers={'If-Match': tag['ETag']})
         self.call('PUT', f'/work-sessions/{session["id"]}', body=interval,
@@ -376,10 +377,21 @@ class HttpAcceptance(unittest.TestCase):
             'summary': self.prefix, 'labelIds': []}, owner='b')
         _, foreign_tag = self.call('GET', f'/activities/{foreign["id"]}', owner='b')
         self.call('PUT', f'/activities/{foreign["id"]}/work-session', owner='b', body={'workSessionId': session['id']},
+            headers={'If-Match': foreign_tag['ETag']}, status=409, code='CONFLICT')
+        self.call('PUT', f'/activities/{foreign["id"]}/work-session', body={'workSessionId': None},
             headers={'If-Match': foreign_tag['ETag']}, status=404, code='NOT_FOUND')
-        detached, _ = self.call('PUT', f'/activities/{outside["id"]}/work-session',
-            body={'workSessionId': None}, headers={'If-Match': assigned_tag['ETag']})
-        self.assertIsNone(detached['activity'].get('workSessionId'))
+        before={record['id']:record for record in report['activities']+[outside]}
+        _, current_tag=self.call('GET',f'/work-sessions/{session["id"]}')
+        moved, moved_tag=self.call('PUT',f'/work-sessions/{session["id"]}',headers={'If-Match':current_tag['ETag']},
+            body={'start':outside['start'],'end':outside['end'],'summary':self.prefix+' moved'})
+        context,_=self.call('GET',f'/work-sessions/{session["id"]}/report')
+        self.assertEqual([outside],context['activities'])
+        self.assertEqual('PT1H',context['time']['allocatedTime'])
+        self.call('DELETE',f'/work-sessions/{session["id"]}',headers={'If-Match':moved_tag['ETag']},status=204)
+        self.created.remove(('a','work-sessions',session['id']))
+        for identity,record in before.items():
+            retained,_=self.call('GET',f'/activities/{identity}')
+            self.assertEqual(record,retained)
 
     def test_domain_v2_transfer_remaps_taskless_session_graph_atomically(self):
         project, session, activity = [str(uuid4()) for _ in range(3)]
@@ -387,13 +399,13 @@ class HttpAcceptance(unittest.TestCase):
         data = {'format': 'timekeeper-domain-v2', 'zoneId': 'UTC',
             'projects': [{'id': project, 'name': self.prefix + ' imported'}], 'tasks': [], 'labels': [],
             'workSessions': [{'id': session, 'start': start, 'end': end, 'summary': self.prefix}],
-            'activities': [{'id': activity, 'taskId': None, 'projectId': project, 'workSessionId': str(uuid4()),
+            'activities': [{'id': activity, 'taskId': None, 'projectId': str(uuid4()), 'workSessionId': str(uuid4()),
                 'start': start, 'end': end, 'summary': self.prefix, 'labelIds': [], 'manual': True}]}
         before, _ = self.call('GET', '/data/export', owner='b')
         self.call('POST', '/data/import', owner='b', body=data, headers=self.key(), status=422, code='VALIDATION')
         after, _ = self.call('GET', '/data/export', owner='b')
         self.assertEqual(before, after)
-        data['activities'][0]['workSessionId'] = session
+        data['activities'][0]['projectId'] = project
         key = self.key()
         imported, _ = self.call('POST', '/data/import', owner='b', body=data, headers=key, status=201)
         kinds = {'PROJECT': 'projects', 'WORK_SESSION': 'work-sessions', 'ACTIVITY': 'activities'}
@@ -407,7 +419,7 @@ class HttpAcceptance(unittest.TestCase):
         stored, _ = self.call('GET', f'/activities/{ids[activity]}', owner='b')
         self.assertIsNone(stored['taskId'])
         self.assertEqual(ids[project], stored['projectId'])
-        self.assertEqual(ids[session], stored['workSessionId'])
+        self.assertNotIn('workSessionId', stored)
         self.assertEqual((start, end), (stored['start'], stored['end']))
         report, _ = self.call('GET', f'/work-sessions/{ids[session]}/report', owner='b')
         self.assertEqual('PT4H0.864197532S', report['time']['allocatedTime'])

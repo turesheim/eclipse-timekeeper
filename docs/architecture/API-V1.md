@@ -141,12 +141,12 @@ same per-owner lock, including across server replicas.
 
 Portable interchange exports `timekeeper-domain-v3` JSON, including clients, mandatory
 project/session client links, session titles and optional task, direct-project
-and session associations. Import also accepts older `timekeeper-domain-v1` and
+assignments. Import also accepts older `timekeeper-domain-v1` and
 `timekeeper-domain-v2` snapshots, assigning their projects/sessions to General.
 The formats contain no SQL/JPA table names. CSV v3 adds `clients.csv` and client/title
 columns; v2 includes `workSessions.csv`. Every declared
 file must be present. Older CSV clients reject the new format instead of silently
-discarding session associations.
+discarding independent sessions or client metadata.
 Export reads a consistent owned snapshot. Import validates the entire graph,
 then generates fresh UUIDs and rewrites references in one transaction; it never
 updates existing records. Source IDs are correlation keys only. A failure leaves
@@ -223,21 +223,27 @@ midnight and never start or stop activity timers implicitly. The owner lock
 allows only one running session per owner, including across replicas. Several
 completed sessions may belong to the same day.
 
-Activities may omit their task and optionally name a direct project. Creates
-and live starts can include `workSessionId`, assigning every resulting daily
-part in the same transaction. `/activities/{id}/work-session` retrospectively
-assigns or unassigns one activity using its original ETag; its response includes
-an outside-session warning and the activity's ETag. Task and provider references
-retain their existing identities and ownership rules. Deleting a session with
-associated activities is a conflict; detach the activities first.
+Activities may omit their task and optionally name a direct project. They are
+independent of sessions. Moving, resizing, stopping or deleting a session never
+changes activities or task timers; activities may exist outside every session.
 
-`/work-sessions/{id}/report` returns the session, its activities and totals from
-one consistent snapshot. Duration is elapsed session time. Tracked activity
-time sums each interval clipped to the session; allocated time is their union.
-Unallocated time subtracts this union from session duration, preserving
-nanoseconds without counting overlaps twice. The report identifies associated
-activities that extend beyond session boundaries. Transfer remaps session IDs
-alongside the other resources and preserves the independent active-session limit.
+`/work-sessions/{id}/report` derives context from that owner's overlapping
+activities, including running timers, in one consistent snapshot. Tracked time
+sums each interval clipped to the session; allocated time is the union of those
+portions. Unallocated time subtracts that union from session duration, preserving
+nanoseconds without counting overlaps twice. Boundary-crossing activities are
+identified; activities merely touching an endpoint do not overlap.
+
+Compatibility: optional activity `workSessionId` values in create/start and
+v1/v2/v3 imports are accepted but ignored, even when that session is absent.
+Exports and activity responses omit the retired field. The deprecated
+`PUT /activities/{id}/work-session` rejects non-null attachment requests with 409;
+`null` is an authorized, version-checked detach/no-op. It cannot create a link.
+Server startup removes only legacy link metadata under each owner's database
+lock, retaining resource IDs, versions, timestamps, task/project/label references
+and active timers. The canonical SQL schema is unchanged. Reads ignore stale
+link metadata and session deletion tolerates links written by older replicas;
+upgrade all replicas together to obtain consistent temporal-report semantics.
 
 ## Queries, time zones and refresh
 

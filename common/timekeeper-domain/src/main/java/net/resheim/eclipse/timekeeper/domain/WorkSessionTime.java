@@ -4,7 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
-/** Exact session accounting over the supplied associated activity snapshots. */
+/** Exact session accounting over the supplied overlapping activity snapshots. */
 public record WorkSessionTime(Duration duration, Duration trackedActivityTime,
         Duration allocatedTime, Duration unallocatedTime, Set<ActivityId> outsideSession) {
     private record Interval(Instant start, Instant end) { }

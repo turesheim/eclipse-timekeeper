@@ -2415,7 +2415,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Read an owner-neutral timekeeper-domain-v2 snapshot of projects, tasks, labels, activities and work sessions in one consistent transaction. Includes optional session and direct-project associations. Clients must understand v2 before exporting it to CSV; old CSV clients reject the new format. Limits are 10,000 per type and 20 MiB.",
+        "description": "Read an owner-neutral timekeeper-domain-v3 snapshot with clients, projects, tasks, labels, activities and independent work sessions in one transaction. Activities have no workSessionId. Maximum 10,000 per type and 20 MiB.",
         "parameters": [
           {
             "$ref": "#/components/parameters/OwnerBinding"
@@ -2476,7 +2476,7 @@
             "$ref": "#/components/responses/503"
           }
         },
-        "description": "Validate the complete graph, unique source IDs, parent cycles, reference uniqueness, temporal rules and open-activity limit before commit. Allocate fresh Timekeeper UUIDs for every record and rewrite internal relations; return source-to-new ID mappings. Never overwrite existing data or accept owner identities. Existing external identities conflict with 409; invalid graph returns 422. No record survives a failed import. Maximum 10,000 per type and 20 MiB. Do not change the owner\u2019s configured zone implicitly. Imported multi-day activities are split at elapsed local day boundaries, with source activity IDs mapped to the last part. Accept v1 snapshots without sessions and v2 snapshots containing work sessions and optional task/project/session relations. Remap session IDs, enforce the independent one-running-session limit and preserve associations on all daily activity portions.",
+        "description": "Validate and import a complete owner-neutral v1, v2 or v3 snapshot atomically with fresh IDs. Preserve task/project/label references and independent sessions. Legacy activity workSessionId values are accepted but ignored, even if the referenced session is absent. Enforce temporal, ownership, identity and one-running-timer/session rules; split multi-day activities at local day boundaries. Never overwrite records or change the account time zone. Limits: 10,000 per type and 20 MiB.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -2856,7 +2856,7 @@
       },
       "delete": {
         "operationId": "deleteWorkSession",
-        "summary": "Delete a session without associated activities",
+        "summary": "Delete a work session, leaving activities unchanged",
         "x-required-permission": "write",
         "responses": {
           "204": {
@@ -3174,7 +3174,7 @@
     "/activities/{id}/work-session": {
       "put": {
         "operationId": "associateWorkSession",
-        "summary": "Associate or unassign an activity",
+        "summary": "Legacy detach operation",
         "x-required-permission": "write",
         "responses": {
           "200": {
@@ -3261,7 +3261,8 @@
         "tags": [
           "WorkSessions"
         ],
-        "description": "Associate or unassign this activity using its original ETag. Outside intervals are allowed and reported as a warning. The response ETag identifies the activity, allowing a subsequent edit with the returned version."
+        "description": "Manual associations are retired. A non-null workSessionId returns 409 without changing the activity. A null value returns the current activity without a link. Owner authorization and If-Match still apply.",
+        "deprecated": true
       },
       "parameters": [
         {
@@ -3309,7 +3310,7 @@
         "tags": [
           "WorkSessions"
         ],
-        "description": "Read session, associated activities and exact totals in one owner-locked snapshot. Tracked time sums clipped activity durations; allocated time is their union. Unallocated time subtracts this union, so overlaps never count twice. Outside intervals are identified."
+        "description": "Read the session and that owner’s overlapping activities, including running timers, in one owner-locked snapshot. Sum only each activity’s overlap; covered time is the union of those overlaps. Session changes automatically recompute context without altering activities. No explicit association is used."
       },
       "parameters": [
         {
@@ -5684,7 +5685,9 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "deprecated": true,
+            "description": "Retired legacy field. Accepted for compatibility but ignored; work-session context is derived from time overlap."
           }
         },
         "required": [
@@ -5795,7 +5798,9 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "deprecated": true,
+            "description": "Retired legacy field. Accepted for compatibility but ignored; work-session context is derived from time overlap."
           }
         },
         "required": [
@@ -6054,7 +6059,9 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "deprecated": true,
+            "description": "Retired legacy field. Accepted for compatibility but ignored; work-session context is derived from time overlap."
           },
           "projectId": {
             "anyOf": [
@@ -6519,7 +6526,9 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "deprecated": true,
+            "description": "Retired legacy field. Accepted for compatibility but ignored; work-session context is derived from time overlap."
           },
           "projectId": {
             "anyOf": [
@@ -7045,7 +7054,9 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "deprecated": true,
+            "description": "Retired legacy field. Accepted for compatibility but ignored; work-session context is derived from time overlap."
           }
         },
         "required": [

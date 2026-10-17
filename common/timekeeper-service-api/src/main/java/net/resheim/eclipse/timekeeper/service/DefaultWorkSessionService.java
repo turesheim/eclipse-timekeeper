@@ -63,8 +63,6 @@ public final class DefaultWorkSessionService implements WorkSessionService {
     @Override public void deleteWorkSession(DeleteWorkSession command) {
         tx(() -> {
             Objects.requireNonNull(command,"command");var current = required(command.id()); version(current,command.expectedVersion());
-            if (!ports.sessions().findSessionActivities(current.id()).isEmpty())
-                throw ServiceException.conflict("workSession","Remove the activity associations before deleting the work session.");
             ports.sessions().delete(current.id()); event(EntityType.WORK_SESSION,ChangeType.DELETED,current.id().value()); return null;
         });
     }
@@ -80,20 +78,23 @@ public final class DefaultWorkSessionService implements WorkSessionService {
             var activity = ports.activities().find(Objects.requireNonNull(command.activityId())).orElseThrow(
                     () -> ServiceException.notFound("activity",command.activityId()));
             if (activity.version() != command.expectedActivityVersion()) throw ServiceException.conflict("activity","stale activity version");
-            boolean outside = false;
-            if (command.workSessionId().isPresent()) {
-                var session = required(command.workSessionId().get());
-                if (!session.ownerId().equals(activity.ownerId())) throw ServiceException.notFound("workSession",session.id());
-                outside = WorkSessionTime.calculate(session,List.of(activity),ports.timeSource().now()).outsideSession().contains(activity.id());
-            }
-            var saved = ports.activities().save(activity.associate(command.workSessionId().orElse(null)));
-            event(EntityType.ACTIVITY,ChangeType.UPDATED,saved.id().value()); return new Association(saved,outside);
+            if (command.workSessionId().isPresent())
+                throw ServiceException.conflict("workSession","Manual associations have been retired. Work-session context is derived from time overlap.");
+            // Retain the legacy detach operation for older clients, without writing a new link.
+            if (activity.workSessionId().isEmpty()) return new Association(activity,false);
+            var saved = ports.activities().save(activity.associate(null));
+            event(EntityType.ACTIVITY,ChangeType.UPDATED,saved.id().value()); return new Association(saved,false);
         });
     }
     @Override public Report workSessionReport(WorkSessionId id) {
         return tx(() -> {
-            var session = required(id);var activities = ports.sessions().findSessionActivities(id);
+            var session = required(id);
             Instant now = ports.timeSource().now();
+            Instant until = session.end().orElse(now);
+            var activities = until.isAfter(session.start())
+                    ? ports.activities().findOverlapping(session.start(),until,Optional.of(session.ownerId()),Optional.empty()).stream()
+                        .sorted(Comparator.comparing(Activity::start).thenComparing(value -> value.id().value())).toList()
+                    : List.<Activity>of();
             return new Report(session,activities,WorkSessionTime.calculate(session,activities,now));
         });
     }

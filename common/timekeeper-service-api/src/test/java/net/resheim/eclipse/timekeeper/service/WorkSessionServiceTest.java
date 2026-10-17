@@ -38,38 +38,54 @@ class WorkSessionServiceTest {
         assertThrows(ServiceException.class,()->service.updateWorkSession(new UpdateWorkSession(
                 stopped.id(),stopped.version(),stopped.start(),Optional.empty(),"Cannot reopen alongside another session")));
     }
-    @Test void retrospectiveAssociationsWarnAndUnallocatedTimeUsesOverlapCoverage() {
+    @Test void retrospectiveOverlapUsesUnionCoverageAndSessionDeletionLeavesActivitiesUnchanged() {
         var end = now.plusSeconds(10);
         var session = service.createWorkSession(new CreateWorkSession(owner,now,Optional.of(end),"Past work"));
         var a = activity(now.minusSeconds(1),Optional.of(now.plusSeconds(6)));
         var b = activity(now.plusSeconds(4),Optional.of(now.plusSeconds(8)));
-        var associatedA = service.associateWorkSession(new AssociateWorkSession(a.id(),a.version(),Optional.of(session.id())));
-        var associatedB = service.associateWorkSession(new AssociateWorkSession(b.id(),b.version(),Optional.of(session.id())));
-        assertTrue(associatedA.outsideSession());assertFalse(associatedB.outsideSession());
         var report = service.workSessionReport(session.id());
+        assertEquals(Set.of(a.id()),report.time().outsideSession());
         assertEquals(Duration.ofSeconds(10),report.time().trackedActivityTime());
         assertEquals(Duration.ofSeconds(8),report.time().allocatedTime());assertEquals(Duration.ofSeconds(2),report.time().unallocatedTime());
-        assertThrows(ServiceException.class,()->service.deleteWorkSession(new DeleteWorkSession(session.id(),session.version())));
         var edited = service.updateWorkSession(new UpdateWorkSession(session.id(),session.version(),session.start(),Optional.of(end.plusSeconds(2)),"Adjusted"));
         assertEquals(Duration.ofSeconds(4),service.workSessionReport(session.id()).time().unallocatedTime());
         assertThrows(ServiceException.class,()->service.updateWorkSession(new UpdateWorkSession(session.id(),session.version(),session.start(),session.end(),"Stale")));
         assertEquals(edited,service.workSession(session.id()).orElseThrow());
-        for (var association : List.of(associatedA,associatedB)) {
-            var detached = service.associateWorkSession(new AssociateWorkSession(association.activity().id(),association.activity().version(),Optional.empty()));
-            assertTrue(detached.activity().workSessionId().isEmpty());assertEquals(association.activity().start(),detached.activity().start());
-            assertEquals(association.activity().end(),detached.activity().end());
-        }
         service.deleteWorkSession(new DeleteWorkSession(session.id(),edited.version()));assertTrue(service.workSession(session.id()).isEmpty());
-        assertEquals(2,store.activities.size());
+        assertEquals(Map.of(a.id(),a,b.id(),b),store.activities);
     }
-    @Test void staleOrForeignAssociationsAndFutureStartsDoNotChangeAnything() {
+    @Test void retiredAssociationsStaleVersionsAndFutureStartsDoNotChangeAnything() {
         var session = service.startWorkSession(new StartWorkSession(owner,"Work"));
         var foreign = service.startWorkSession(new StartWorkSession(new OwnerId("bob"),"Other"));
         var activity = activity(now,Optional.empty());int count = events.size();
         assertThrows(ServiceException.class,()->service.associateWorkSession(new AssociateWorkSession(activity.id(),1,Optional.of(session.id()))));
         assertThrows(ServiceException.class,()->service.associateWorkSession(new AssociateWorkSession(activity.id(),0,Optional.of(foreign.id()))));
         assertThrows(DomainValidationException.class,()->service.createWorkSession(new CreateWorkSession(owner,now.plusNanos(1),Optional.empty(),"Future")));
+        assertEquals(activity,service.associateWorkSession(new AssociateWorkSession(activity.id(),activity.version(),Optional.empty())).activity());
         assertEquals(activity,store.activities.get(activity.id()));assertEquals(count,events.size());
+    }
+    @Test void temporalContextIncludesUnlinkedRunningActivitiesAndExcludesForeignOrNonoverlappingLinks() {
+        Instant start=now.minusSeconds(10);
+        var session=service.createWorkSession(new CreateWorkSession(owner,start,Optional.empty(),"Independent interval"));
+        var earlier=activity(start.minusSeconds(5),Optional.of(start.plusSeconds(6)));
+        var running=activity(start.plusSeconds(4),Optional.empty());
+        activity(start.minusSeconds(2),Optional.of(start)); // touching the left edge
+        activity(now,Optional.of(now.plusSeconds(1))); // touching the right edge
+        var foreign=new Activity(ActivityId.random(),TaskId.random(),new OwnerId("bob"),start,Optional.of(now),"Private other account",Set.of(),false,0);
+        store.activities.put(foreign.id(),foreign);
+        var old=activity(start.minusSeconds(100),Optional.of(start.minusSeconds(90))).associate(session.id());
+        store.activities.put(old.id(),old);
+        var before=Map.copyOf(store.activities);
+        var report=service.workSessionReport(session.id());
+        assertEquals(List.of(earlier,running),report.activities());
+        assertEquals(Duration.ofSeconds(12),report.time().trackedActivityTime());
+        assertEquals(Duration.ofSeconds(10),report.time().allocatedTime());
+        assertEquals(Duration.ZERO,report.time().unallocatedTime());
+        assertEquals(Set.of(earlier.id()),report.time().outsideSession());
+        service.updateWorkSession(new UpdateWorkSession(session.id(),session.version(),start.plusSeconds(7),Optional.empty(),"Moved interval"));
+        assertEquals(List.of(running),service.workSessionReport(session.id()).activities());
+        assertEquals(Duration.ofSeconds(3),service.workSessionReport(session.id()).time().allocatedTime());
+        assertEquals(before,store.activities,"Deriving temporal context or moving a session changed recorded activities");
     }
     private static class Store implements WorkSessionRepository, ActivityRepository, TransactionRunner {
         final Map<WorkSessionId,WorkSession> sessions = new HashMap<>();
@@ -84,7 +100,11 @@ class WorkSessionServiceTest {
         public List<Activity> findAllActivities() {return List.copyOf(activities.values());}
         public Optional<Activity> find(ActivityId id) {return Optional.ofNullable(activities.get(id));}
         public Optional<Activity> findOpenByOwner(OwnerId owner) {return activities.values().stream().filter(v->v.ownerId().equals(owner)&&v.end().isEmpty()).findFirst();}
-        public List<Activity> findOverlapping(Instant from,Instant to,Optional<OwnerId> owner,Optional<TaskId> task) {throw new UnsupportedOperationException();}
+        public List<Activity> findOverlapping(Instant from,Instant to,Optional<OwnerId> owner,Optional<TaskId> task) {
+            return activities.values().stream().filter(value -> owner.isEmpty() || owner.get().equals(value.ownerId()))
+                    .filter(value -> task.isEmpty() || task.get().equals(value.taskId()))
+                    .filter(value -> value.start().isBefore(to) && value.end().orElse(to).isAfter(from)).toList();
+        }
         public boolean existsByTask(TaskId task) {return activities.values().stream().anyMatch(v->v.taskId().equals(task));}
         public boolean existsByLabel(LabelId label) {return activities.values().stream().anyMatch(v->v.labelIds().contains(label));}
         public Activity save(Activity activity) {activities.put(activity.id(),activity);return activity;}

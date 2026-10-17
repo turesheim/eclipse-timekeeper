@@ -19,7 +19,38 @@ class WorkSessionStoreTest {
     @Inject ServerStore store;
     @Inject MockBackendClock clock;
     @org.junit.jupiter.api.AfterEach void resetClock() {clock.set(null);}
-    @Test void storedSessionsAndAssociationsSurviveAnotherStoreInstanceWithoutModifyingActivityTimers() {
+    @Test void legacyLinkCleanupPreservesOwnedRecordsTimersAndOtherOwners() {
+        clock.set(Instant.parse("2025-10-25T12:00:00Z"));
+        String owner="retired-links-"+UUID.randomUUID(),other="retained-links-"+UUID.randomUUID();
+        var sessions=new HashMap<String,WorkSession>();var records=new HashMap<String,Activity>();
+        for(var account:List.of(owner,other)) store.transaction(account,()->{
+            var identity=new OwnerId(account);
+            var session=store.workSessionService().startWorkSession(new StartWorkSession(identity,"Independent"));
+            var activity=store.service().startActivity(new StartActivity(null,identity,"Timer unchanged",Set.of()));
+            sessions.put(account,session);records.put(account,activity);
+            var payload=JsonValues.snapshot(account,activity);payload.put("workSessionId",session.id().value().toString());
+            store.update("UPDATE tk_resource SET payload=? WHERE owner_id=? AND entity_type='ACTIVITY' AND id=?",payload.toString(),account,activity.id().value());
+            store.update("INSERT INTO tk_relation VALUES(?,'ACTIVITY',?,'workSession','WORK_SESSION',?)",account,activity.id().value(),session.id().value());
+            return null;
+        });
+        store.transaction(owner,()->{
+            store.retireSessionLinks();store.retireSessionLinks();
+            assertEquals(records.get(owner),store.service().activeActivity(new OwnerId(owner)).orElseThrow());
+            try(var query=store.statement("SELECT payload FROM tk_resource WHERE owner_id=? AND entity_type='ACTIVITY'",owner);var rows=query.executeQuery()) {
+                assertTrue(rows.next());assertFalse(JsonValues.parse(rows.getString(1)).has("workSessionId"));
+            } catch(java.sql.SQLException failure) {throw new AssertionError(failure);}
+            var session=sessions.get(owner);store.workSessionService().deleteWorkSession(new DeleteWorkSession(session.id(),session.version()));
+            assertEquals(records.get(owner),store.service().activeActivity(new OwnerId(owner)).orElseThrow());return null;
+        });
+        store.transaction(other,()->{
+            assertEquals(records.get(other),store.service().activeActivity(new OwnerId(other)).orElseThrow());
+            assertTrue(store.related("workSession","WORK_SESSION",sessions.get(other).id().value()),"Cleanup crossed owner boundary");
+            // A stale replica's legacy relation cannot prevent deleting a session.
+            var session=sessions.get(other);store.workSessionService().deleteWorkSession(new DeleteWorkSession(session.id(),session.version()));
+            assertEquals(records.get(other),store.service().activeActivity(new OwnerId(other)).orElseThrow());return null;
+        });
+    }
+    @Test void temporalContextSurvivesAnotherStoreInstanceWithoutModifyingActivityTimers() {
         String owner="session-store-"+UUID.randomUUID();var from=Instant.parse("2025-10-25T21:59:59.123456789Z");
         var end=from.plus(Duration.ofHours(26));var identity=new OwnerId(owner);
         var session=store.transaction(owner,()->store.workSessionService().createWorkSession(new CreateWorkSession(identity,from,Optional.of(end),"Across midnight")));
@@ -27,29 +58,25 @@ class WorkSessionStoreTest {
         var activity=store.transaction(owner,()->store.service().createActivity(new CreateActivity(task.id(),identity,from,Optional.of(end),"Associated",Set.of())));
         var parts=store.transaction(owner,()->store.service().activities(new net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery(
                 from,end.plusSeconds(1),Optional.of(identity),Optional.of(task.id()),Optional.empty(),ZoneId.of("UTC"))).activities());
-        var associated=new ArrayList<Activity>();
-        for(var part:parts) associated.add(store.transaction(owner,()->store.workSessionService().associateWorkSession(
-                new AssociateWorkSession(part.id(),part.version(),Optional.of(session.id())))).activity());
-        var association=associated.stream().filter(value -> value.id().equals(activity.id())).findFirst().orElseThrow();
         var live=store.transaction(owner,()->store.workSessionService().startWorkSession(new StartWorkSession(identity,"Independent running session")));
         var replica=new ServerStore();var actual=io.quarkus.arc.ClientProxy.unwrap(store);replica.datasource=actual.datasource;replica.tokens=actual.tokens;replica.jdbcUrl=actual.jdbcUrl;replica.clock=actual.clock;
         var report=replica.transaction(owner,()->replica.workSessionService().workSessionReport(session.id()));
-        assertEquals(session,report.session());assertEquals(new HashSet<>(associated),new HashSet<>(report.activities()));
+        assertEquals(session,report.session());assertEquals(new HashSet<>(parts),new HashSet<>(report.activities()));
         assertEquals(Duration.ofHours(26),report.time().duration());assertEquals(Duration.ZERO,report.time().unallocatedTime());
         replica.transaction(owner,()->replica.workSessionService().stopWorkSession(new StopWorkSession(live.id(),live.version())));
         var persisted=store.transaction(owner,()->store.service().activity(activity.id()).orElseThrow());
-        assertEquals(association,persisted);assertEquals(Optional.of(session.id()),persisted.workSessionId());
-        assertThrows(ServiceException.class,()->store.transaction(owner,()->{store.workSessionService().deleteWorkSession(new DeleteWorkSession(session.id(),session.version()));return null;}));
+        assertEquals(activity,persisted);assertTrue(persisted.workSessionId().isEmpty());
+        store.transaction(owner,()->{store.workSessionService().deleteWorkSession(new DeleteWorkSession(session.id(),session.version()));return null;});
+        assertEquals(activity,store.transaction(owner,()->store.service().activity(activity.id()).orElseThrow()));
         assertTrue(store.transaction("session-foreign-"+UUID.randomUUID(),()->store.workSessionService().workSession(session.id())).isEmpty());
     }
-    @Test void midnightArchivesKeepSessionAssociationsAndDoNotStopTheSession() throws Exception {
+    @Test void midnightArchivesRemainIndependentAndDoNotStopTheSession() throws Exception {
         String owner="session-midnight-"+UUID.randomUUID();var identity=new OwnerId(owner);
         var from=Instant.parse("2025-10-25T21:59:59.123456789Z");clock.set(from);
         store.transaction(owner,()->store.updateProfile("Europe/Oslo"));
         var task=store.transaction(owner,()->store.service().createTask(new CreateTask(Optional.empty(),"Midnight task",Optional.empty())));
         var session=store.transaction(owner,()->store.workSessionService().startWorkSession(new StartWorkSession(identity,"Independent day")));
         var started=store.transaction(owner,()->store.service().startActivity(new StartActivity(task.id(),identity,"Daily activity",Set.of())));
-        store.transaction(owner,()->store.workSessionService().associateWorkSession(new AssociateWorkSession(started.id(),started.version(),Optional.of(session.id()))));
         clock.set(from.plus(Duration.ofHours(26)));
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);int count=0;
         var actual=io.quarkus.arc.ClientProxy.unwrap(store);
@@ -63,7 +90,7 @@ class WorkSessionStoreTest {
         var report=store.transaction(owner,()->store.workSessionService().workSessionReport(session.id()));
         assertEquals(session,report.session());assertEquals(Duration.ofHours(26),report.time().trackedActivityTime());
         assertEquals(Duration.ZERO,report.time().unallocatedTime());assertEquals(3,report.activities().size());
-        for(var activity:report.activities()) assertEquals(Optional.of(session.id()),activity.workSessionId());
+        for(var activity:report.activities()) assertTrue(activity.workSessionId().isEmpty());
         store.transaction(owner,()->store.workSessionService().stopWorkSession(new StopWorkSession(session.id(),session.version())));
         var active=store.transaction(owner,()->store.service().activeActivity(identity).orElseThrow());assertEquals(started.id(),active.id());
         store.transaction(owner,()->store.service().stopActivity(new StopActivity(active.id(),active.version())));

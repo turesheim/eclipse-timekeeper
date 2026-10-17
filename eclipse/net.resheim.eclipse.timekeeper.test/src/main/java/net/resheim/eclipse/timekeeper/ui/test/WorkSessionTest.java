@@ -2,7 +2,6 @@ package net.resheim.eclipse.timekeeper.ui.test;
 
 import static org.junit.Assert.*;
 import java.time.*;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.BooleanSupplier;
@@ -19,7 +18,6 @@ import net.resheim.eclipse.timekeeper.ui.views.WorkWeekView;
 
 /** Exercises actual SWT controls against the embedded database, without mock dialogs. */
 public class WorkSessionTest {
-    private static final DateTimeFormatter MINUTES=DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private final SWTWorkbenchBot bot=new SWTWorkbenchBot();
 
     @Test public void sessionTimersAreIndependentAndPermitMultipleSessionsPerDay() throws Exception {
@@ -32,11 +30,14 @@ public class WorkSessionTest {
         waitFor(()->sessions.activeWorkSession(OwnerId.LOCAL).isPresent(),"Work session was not started");
         var first=sessions.activeWorkSession(OwnerId.LOCAL).orElseThrow();
         var ownedSessions=new ArrayList<WorkSessionId>();ownedSessions.add(first.id());
+        ActivityId createdActivity=null;
         try {
             // Other integration scenarios may leave their timer running. Preserve it;
             // session controls must also work independently of an existing activity.
-            var activity=activities.activeActivity(OwnerId.LOCAL).orElseGet(()->activities.startActivity(
-                    new StartActivity(null,OwnerId.LOCAL,"Independent timer",Set.of(),Optional.of(first.id()),Optional.empty())));
+            var existingActivity=activities.activeActivity(OwnerId.LOCAL);
+            var activity=existingActivity.orElseGet(()->activities.startActivity(
+                    new StartActivity(null,OwnerId.LOCAL,"Independent timer",Set.of(),Optional.empty(),Optional.empty())));
+            if(existingActivity.isEmpty()) createdActivity=activity.id();
             waitFor(()->bot.labelWithId("work-session-status").getText().contains("Running") && bot.button("Stop work session").isEnabled(),"Running status missing");
             bot.button("Stop work session").click();
             waitFor(()->sessions.workSession(first.id()).orElseThrow().end().isPresent(),"Session did not stop");
@@ -53,22 +54,22 @@ public class WorkSessionTest {
             assertEquals(tasks,activities.tasks().stream().map(Task::id).collect(java.util.stream.Collectors.toSet()));
         } finally {
             for(var id:ownedSessions) {
-                for(var value:sessions.workSessionReport(id).activities()) {
-                    var current=activities.activity(value.id()).orElseThrow();
-                    if(current.end().isEmpty()) current=activities.stopActivity(new StopActivity(current.id(),current.version()));
-                    activities.deleteActivity(new DeleteActivity(current.id(),current.version()));
-                }
                 var current=sessions.workSession(id).orElseThrow();sessions.deleteWorkSession(new DeleteWorkSession(current.id(),current.version()));
+            }
+            if(createdActivity!=null) {
+                var current=activities.activity(createdActivity).orElseThrow();
+                if(current.end().isEmpty()) current=activities.stopActivity(new StopActivity(current.id(),current.version()));
+                activities.deleteActivity(new DeleteActivity(current.id(),current.version()));
             }
         }
     }
 
-    @Test public void retrospectiveSessionSupportsTasklessOverlapAssociationAndStaleEdits() throws Exception {
+    @Test public void retrospectiveSessionDerivesTasklessOverlapAndPreservesStaleEdits() throws Exception {
         open();
         var activities=TimekeeperUiPlugin.getDefault().getTimekeeperService();
         var sessions=TimekeeperUiPlugin.getDefault().getWorkSessionService();
         var tasks=activities.tasks().stream().map(Task::id).collect(java.util.stream.Collectors.toSet());var zone=TimekeeperUiPlugin.getCalendarZone();
-        var from=LocalDate.now(zone).minusDays(2).atTime(8,0).atZone(zone).toInstant().plusNanos(123);
+        var from=LocalDate.of(2007,10,25).atTime(8,0).atZone(zone).toInstant().plusNanos(123);
         var until=from.plus(Duration.ofHours(10));
         if(!bot.toggleButton("Session details").isPressed()) bot.toggleButton("Session details").click();
         waitFor(()->bot.button("Record session").isEnabled(),"Record button unavailable");
@@ -79,38 +80,19 @@ public class WorkSessionTest {
         var session=sessions.workSessions(OwnerId.LOCAL).stream().filter(value->value.summary().equals("Retrospective session")).findFirst().orElseThrow();
         var independent=activities.createActivity(new CreateActivity(null,OwnerId.LOCAL,from.minusSeconds(3600),Optional.of(until.plusSeconds(3600)),"Outside association",Set.of()));
         try {
-            waitFor(()->bot.button("Add activity").isEnabled() && bot.comboBoxWithId("work-session-history").selection().contains("Retrospective session"),"Recorded session was not selected");
-            bot.button("Add activity").click();bot.shell("New activity").activate();
-            bot.textWithLabel("Summary").setText("Exact session interval");bot.button("Save").click();
-            assertTrue("Taskless editor should close after acknowledged save",Arrays.stream(bot.shells()).noneMatch(shell->shell.getText().equals("New activity")));
-            waitFor(()->sessions.workSessionReport(session.id()).activities().size()==1,"Taskless activity missing");
-            var first=sessions.workSessionReport(session.id()).activities().getFirst();
-            assertTrue(first.task().isEmpty());assertTrue(first.projectId().isEmpty());assertEquals(from,first.start());assertEquals(Optional.of(until),first.end());
-            bot.button("Add activity").click();bot.shell("New activity").activate();
-            bot.textWithLabel("Summary").setText("Overlapping interval");
-            bot.textWithLabel("Start (yyyy-MM-dd HH:mm)").setText(MINUTES.format(from.plusSeconds(3600).atZone(zone)));
-            bot.textWithLabel("End (yyyy-MM-dd HH:mm)").setText(MINUTES.format(from.plusSeconds(14400).atZone(zone)));bot.button("Save").click();
-            waitFor(()->sessions.workSessionReport(session.id()).activities().size()==2,"Second activity missing");
+            waitFor(()->bot.comboBoxWithId("work-session-history").selection().contains("Retrospective session"),"Recorded session was not selected");
+            activities.createActivity(new CreateActivity(null,OwnerId.LOCAL,from.plusSeconds(3600),Optional.of(from.plusSeconds(14400)),"Overlapping interval",Set.of()));
+            waitFor(()->sessions.workSessionReport(session.id()).activities().size()==2,"Temporal context missing");
             var metric=sessions.workSessionReport(session.id()).time();
             assertEquals(Duration.ofHours(13),metric.trackedActivityTime());assertEquals(Duration.ofHours(10),metric.allocatedTime());assertEquals(Duration.ZERO,metric.unallocatedTime());
             assertEquals(tasks,activities.tasks().stream().map(Task::id).collect(java.util.stream.Collectors.toSet()));
-            waitFor(()->bot.tableWithId("work-session-activities").rowCount()==2,"Associated rows not displayed");
+            waitFor(()->bot.tableWithId("work-session-activities").rowCount()==2,"Overlapping rows not displayed");
             var screenshots=java.nio.file.Path.of(System.getProperty("java.io.tmpdir"),"timekeeper-work-session-ui");
             java.nio.file.Files.createDirectories(screenshots);
             var capture=new FutureTask<Void>(()->TestUtility.takeScreenshot(screenshots.toFile(),bot.tableWithId("work-session-activities").widget.getParent().getParent(),"work-session-eclipse.png"),null);
             PlatformUI.getWorkbench().getDisplay().syncExec(capture);capture.get(5,TimeUnit.SECONDS);
-            // The association editor changes only the link, and warns without rejecting the interval.
-            bot.button("Associate activity").click();bot.shell("Associate activity").activate();
-            var choices=bot.comboBoxWithId("session-association-choice");
-            choices.setSelection(Arrays.stream(choices.items()).filter(value->value.startsWith("Outside association")).findFirst().orElseThrow());
-            bot.button("Associate").click();
-            waitFor(()->activities.activity(independent.id()).orElseThrow().workSessionId().equals(Optional.of(session.id())),"Association did not save");
-            var associated=activities.activity(independent.id()).orElseThrow();
-            assertEquals(independent.start(),associated.start());assertEquals(independent.end(),associated.end());
+            assertEquals(independent,activities.activity(independent.id()).orElseThrow());
             assertTrue(sessions.workSessionReport(session.id()).time().outsideSession().contains(independent.id()));
-            waitFor(()->bot.tableWithId("work-session-activities").rowCount()==3,"Associated list missing");
-            bot.tableWithId("work-session-activities").select("Outside association");bot.button("Remove association").click();
-            waitFor(()->activities.activity(independent.id()).orElseThrow().workSessionId().isEmpty(),"Association not removed");
             // Another writer must not overwrite a dialog's immutable captured version.
             bot.button("Edit session").click();bot.shell("Edit work session").activate();
             bot.textWithLabel("Summary").setText("Unsaved draft");
@@ -130,7 +112,6 @@ public class WorkSessionTest {
             for(var value:sessions.workSessionReport(session.id()).activities()) {
                 var current=activities.activity(value.id()).orElseThrow();activities.deleteActivity(new DeleteActivity(current.id(),current.version()));
             }
-            var current=activities.activity(independent.id()).orElseThrow();activities.deleteActivity(new DeleteActivity(current.id(),current.version()));
             var currentSession=sessions.workSession(session.id()).orElseThrow();sessions.deleteWorkSession(new DeleteWorkSession(currentSession.id(),currentSession.version()));
             if(bot.toggleButton("Session details").isPressed()) bot.toggleButton("Session details").click();
         }

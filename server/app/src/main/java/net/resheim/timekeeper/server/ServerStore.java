@@ -87,7 +87,7 @@ public class ServerStore {
             while(rows.next()) owners.add(rows.getString(1));
         } catch(SQLException failure) {throw databaseFailure(failure);}
         for (String owner : owners) {
-            transaction(owner,() -> { initializeDefaultLabels(); migrateClientDetails(); return null; });
+            transaction(owner,() -> { initializeDefaultLabels(); migrateClientDetails(); retireSessionLinks(); return null; });
         }
     }
     private void initializeDefaultLabels() {
@@ -189,7 +189,20 @@ public class ServerStore {
         JsonNode value = parse(json);
         if (!owner().equals(value.path("ownerId").asText()) || !id.toString().equals(value.path("id").asText()) || version!=value.path("version").asLong(-1))
             throw new IllegalStateException("Stored resource identity/version mismatch");
+        if (value instanceof com.fasterxml.jackson.databind.node.ObjectNode node) node.remove("workSessionId");
         return value;
+    }
+    /** Retire only obsolete metadata; keep IDs, versions, timers and recorded work untouched. */
+    void retireSessionLinks() {
+        try (var query=statement("SELECT id,payload FROM tk_resource WHERE owner_id=? AND entity_type='ACTIVITY'",owner());var rows=query.executeQuery()) {
+            var changed=new java.util.LinkedHashMap<UUID,String>();
+            while(rows.next()) {
+                var node=(com.fasterxml.jackson.databind.node.ObjectNode)parse(rows.getString(2));
+                if(node.remove("workSessionId")!=null) changed.put(rows.getObject(1,UUID.class),node.toString());
+            }
+            changed.forEach((id,json)->update("UPDATE tk_resource SET payload=? WHERE owner_id=? AND entity_type='ACTIVITY' AND id=?",json,owner(),id));
+        } catch(SQLException failure) {throw databaseFailure(failure);}
+        update("DELETE FROM tk_relation WHERE owner_id=? AND from_type='ACTIVITY' AND kind='workSession' AND to_type='WORK_SESSION'",owner());
     }
     public <T> T save(String type,T value) {
         var node = snapshot(owner(),value);
@@ -219,7 +232,6 @@ public class ServerStore {
             activity.task().ifPresent(task -> relation(type,id,"task","TASK",task.value()));
             activity.projectId().ifPresent(project -> relation(type,id,"project","PROJECT",project.value()));
             activity.labelIds().forEach(label -> relation(type,id,"label","LABEL",label.value()));
-            activity.workSessionId().ifPresent(session -> relation(type,id,"workSession","WORK_SESSION",session.value()));
             if (activity.end().isPresent()) update("DELETE FROM tk_active WHERE owner_id=? AND activity_id=?",owner(),id);
             else if (active().isEmpty()) update("INSERT INTO tk_active(owner_id,entity_type,activity_id) VALUES(?,'ACTIVITY',?)",owner(),id);
             else if (!active().orElseThrow().get("id").asText().equals(id.toString())) throw ApiFailure.conflict();
@@ -279,6 +291,8 @@ public class ServerStore {
         update("INSERT INTO tk_relation(owner_id,from_type,from_id,kind,to_type,to_id) VALUES(?,?,?,?,?,?)",owner(),fromType,fromId,kind,toType,toId);
     }
     public void delete(String type,UUID id) {
+        // Older replicas may have written a legacy link after startup cleanup.
+        if(type.equals("WORK_SESSION")) update("DELETE FROM tk_relation WHERE owner_id=? AND from_type='ACTIVITY' AND kind='workSession' AND to_type='WORK_SESSION' AND to_id=?",owner(),id);
         JsonNode existing = find(type,id).orElseThrow(ApiFailure::notFound);
         update("DELETE FROM tk_relation WHERE owner_id=? AND from_type=? AND from_id=?",owner(),type,id);
         if ("TASK".equals(type)) update("DELETE FROM tk_external_reference WHERE owner_id=? AND entity_type='TASK' AND task_id=?",owner(),id);
