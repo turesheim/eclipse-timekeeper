@@ -26,7 +26,7 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
     $('passkey-support').textContent = passkeyBusy ? 'Complete the request in your browser or password manager.' : !passkeysEnabled
       ? 'Passkey sign-in requires a configured HTTPS hostname. You can use your username and password.' : !passkeysSupported()
         ? 'Passkeys are unavailable in this browser. You can use your username and password.' : '';
-    $('auth-hint').textContent = code ? 'Get a one-time code from the server operator. New passwords must contain at least 15 characters.' : token ? 'Exchange an existing API token for a browser session. The token is never saved in browser storage.' : 'Use your Timekeeper account. API tokens are managed after signing in.';
+    $('auth-hint').textContent = value === 'recover' ? 'Recovery revokes passkeys, sessions and API tokens. Use the operator’s one-time code and choose a new password, then add replacement passkeys in My Account.' : code ? 'Get a one-time code from the server operator. New passwords must contain at least 15 characters.' : token ? 'Exchange an existing API token for a browser session. The token is never saved in browser storage.' : 'Use your Timekeeper account. API tokens are managed after signing in.';
   }
   $('auth-mode').addEventListener('change',mode); mode();
   async function publicRequest(path, body) {

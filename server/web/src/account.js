@@ -22,9 +22,9 @@ export async function renderAccount(view, part) {
         if (error.status === 401) {await view.session.request('/auth/session'); throw new Error('The current password was not accepted. Your draft is kept.');}
         throw error;
       }
-      if (view.valid()) view.signOut('Password changed. Sign in again. Your existing sessions and API tokens have been revoked.');
+      if (view.valid()) view.signOut('Password changed. Sign in again. Your existing sessions and API tokens have been revoked. Registered passkeys remain available.');
     });
-    password.value.append(node('p', 'Use at least 15 characters. Changing your password signs out all of your sessions and revokes all of your API tokens, including Eclipse connections.', 'alert alert-warning'));
+    password.value.append(node('p', 'Use at least 15 characters. Changing your password signs out all of your sessions and revokes all of your API tokens, including Eclipse connections. Registered passkeys remain available.', 'alert alert-warning'));
     const old = passwordField(password.value, 'Current password', true), next = passwordField(password.value, 'New password'), confirm = passwordField(password.value, 'Confirm new password');
     password.finish(); return;
   } else {

@@ -38,7 +38,7 @@ public class EmailRecoveryResource {
     }
     @POST @Path("/reset") public Response reset(JsonNode body) {
         var value=input("EmailResetInput",body);enabled();var result=recovery.reset(value.get("token").asText(),value.get("password").asText());
-        mail.notify(result.notifyAddresses(),"Your Timekeeper password was reset. All browser sessions and API tokens were revoked. Sign in normally; Eclipse connections need new API tokens. If you did not do this, contact your server operator.");return empty(204);
+        mail.notify(result.notifyAddresses(),"Your Timekeeper password was reset. All passkeys, browser sessions and API tokens were revoked. Sign in with your new password and add replacement passkeys in My Account. Eclipse connections need new API tokens. If you did not do this, contact your server operator.");return empty(204);
     }
     @GET @Path("/addresses/{slot}") public Response address(@PathParam("slot") String slot) {
         ContractInputs.queries(uri.getQueryParameters());return ApiReplies.resource(200,recovery.address(identity.principal(),slot),null).response();
