@@ -4,6 +4,7 @@ import {chromium, expect} from '@playwright/test';
 import {createInterface} from 'node:readline';
 import {writeFile} from 'node:fs/promises';
 import {durationText} from '../src/model.js';
+import {setTimeZone} from './navigation.js';
 
 const browser = await chromium.launch();
 const page = await browser.newPage({baseURL: process.env.TIMEKEEPER_WEB_URL});
@@ -29,8 +30,7 @@ async function named(tabName, kind, name) {
   await expect(page.locator(`#${tabName.toLowerCase()} tr`).filter({hasText:name})).toBeVisible();
 }
 async function zone(value) {
-  await page.getByRole('button', {name:'Time zone', exact:true}).click();
-  await page.getByRole('textbox', {name:'Time zone', exact:true}).fill(value); await save();
+  await setTimeZone(page, value);
 }
 async function command(input) {
   switch (input.action) {
