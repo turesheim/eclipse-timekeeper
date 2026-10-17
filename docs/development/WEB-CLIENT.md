@@ -15,7 +15,7 @@ Maven includes `server/web/src` in the server JAR. Users sign in with username a
 password; the [account guide](../operations/ACCOUNTS.md) describes first setup,
 legacy owner migration and recovery. The browser restores an HttpOnly Secure
 cookie after reload. **Remember me** controls persistence across browser restarts.
-API tokens for Eclipse are created under **Account**, shown once, and stored only
+API tokens for Eclipse are created under **My Account → API tokens**, shown once, and stored only
 as hashes on the server. New credentials never enter browser storage. Existing
 saved tokens are exchanged for a parent-bound cookie and then removed. Sign out
 revokes the cookie session and clears records, drafts, requests and clipboard.
@@ -132,6 +132,31 @@ A selected label deleted by another client stays visible as deleted until the
 user reviews it; saving cannot silently drop that reference.
 Offline reads reconnect with backoff and never replay writes. Sessions bind to
 the authenticated owner and reject live token owner reassignment.
+
+## Personal settings and independent user accounts
+
+**My Account** is a dedicated page with Profile, Password and API tokens sections.
+It uses a side navigation on desktop and wrapping navigation on narrow screens.
+Profile includes an optional display name and an explicit time-zone preference;
+the device-zone shortcut never overwrites a saved choice without a save action.
+New passwords require confirmation. Token lists show access, expiry, last use
+and revocation state, with one-time secret copy and named revocation confirmation.
+
+Administrators use the separate **Users** page to list, create and edit account
+identities. Editing opens a full page, with Back to users; the last enabled
+administrator is protected in the UI and by the server. This does not grant
+access to another account's work data or introduce workspaces, members or
+invitations. Personal settings remain separate from other-user administration.
+
+Routes are bookmarkable fragments (`#account/profile`, `#account/password`,
+`#account/tokens`, `#users`, `#users/new` and `#users/<encoded-owner>`). Direct
+access still requires the authenticated account and server-side permissions.
+Browser Back and explicit return links share the draft guard. Writes reserve
+the page until their result is known; uncertain writes require record review,
+and stale edits keep their captured ETag and draft until explicitly reloaded.
+Changing pages never stops timers. Sign-out invalidates pending account-page
+loads and clears forms and token secrets. Passwords and bearer credentials are
+never placed in routes or browser storage.
 
 ## Work sessions
 

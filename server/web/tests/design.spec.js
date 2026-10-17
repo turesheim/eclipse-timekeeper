@@ -89,11 +89,11 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
         }
         await page.screenshot({path:`test-results/design-${tab}-${name}.png`,fullPage:true});
       }
-      await page.getByRole('button',{name:'Account',exact:true}).click();
+      await page.getByRole('link',{name:'My Account',exact:true}).click();
       await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');
       await accessible(page); await page.screenshot({path:`test-results/design-account-${name}.png`,fullPage:true});
-      await page.keyboard.press('Escape');
-      await expect(page.locator('#account-dialog')).not.toBeVisible();
+      await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
+      await expect(page.locator('#account-page')).not.toBeVisible();
       violations.push(...await page.evaluate(()=>window.designPolicyViolations));
       expect(external).toEqual([]);
       // macOS WebKit reports inline styles from its native select controls and

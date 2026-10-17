@@ -86,6 +86,7 @@ const auth = authentication({
     await refresh(); startWatch(session);
   },
   updateAccount(account) {accountName = account.displayName;},
+  refreshProfile: () => refresh(),
   clear() {
     $('week-sessions').replaceChildren(); $('week-sessions-section').hidden = true;
     refreshing = null; reloadAgain = false;

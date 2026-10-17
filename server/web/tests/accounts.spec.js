@@ -71,20 +71,20 @@ test('incorrect credentials explain the login failure without reporting an expir
 });
 test('account UI creates an isolated user and named Eclipse token shown once',async({page,request,browser})=>{
   const suffix=randomUUID().slice(0,8),username='user-'+suffix,display='Private user '+suffix,otherPassword='private passphrase '+suffix;
-  await login(page);await page.getByRole('button',{name:'Account',exact:true}).click();
-  await page.getByLabel('New user username',{exact:true}).fill(username);await page.getByLabel('New user display name',{exact:true}).fill(display);await page.getByLabel('Temporary password',{exact:true}).fill(otherPassword);await page.getByRole('button',{name:'Create user',exact:true}).click();await expect(page.locator('#account-content summary').filter({hasText:display})).toBeVisible();
+  await login(page);await page.locator('#users-link').click();await page.getByRole('link',{name:'Add user',exact:true}).click();
+  await page.getByLabel('New user username',{exact:true}).fill(username);await page.getByLabel('Display name (optional)',{exact:true}).fill(display);await page.getByLabel('Temporary password',{exact:true}).fill(otherPassword);await page.getByLabel('Confirm temporary password',{exact:true}).fill(otherPassword);await page.getByRole('button',{name:'Create user',exact:true}).click();await expect(page.locator('#account-content tr').filter({hasText:display})).toBeVisible();
   const peer=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL}),other=await peer.newPage();
   try {
     await login(other,username,otherPassword);await expect(other.locator('#owner')).toHaveText(display);
     await other.getByRole('button',{name:'Clients',exact:true}).click();await other.getByRole('button',{name:'New client',exact:true}).click();await other.getByLabel('Name',{exact:true}).fill('Private client '+suffix);await other.getByLabel('Color',{exact:true}).fill('#112233');await other.locator('#save').click();await expect(other.locator('#editor')).not.toBeVisible();
-    await other.getByRole('button',{name:'Account',exact:true}).click();await expect(other.getByRole('heading',{name:'User accounts',exact:true})).not.toBeVisible();
+    await other.getByRole('link',{name:'My Account',exact:true}).click();await other.getByRole('link',{name:'API tokens',exact:true}).click();await expect(other.getByRole('heading',{name:'User accounts',exact:true})).not.toBeVisible();
     await other.getByLabel('Token name',{exact:true}).fill('Eclipse '+suffix);await other.getByRole('button',{name:'Create token',exact:true}).click();const raw=await other.getByLabel('New API token',{exact:true}).inputValue();expect(raw).toMatch(/^tkp_/);
     const own=await request.get('/api/v1/clients',{headers:{Authorization:`Bearer ${raw}`}});expect(own.status()).toBe(200);const id=(await own.json()).items.find(value=>value.name==='Private client '+suffix).id;
     expect((await call(request,'GET','/clients/'+id)).status()).toBe(404);
     const exported=await (await call(request,'GET','/data/export')).json();expect(JSON.stringify(exported)).not.toContain('Private client '+suffix);
-    await other.getByRole('button',{name:'Close',exact:true}).click();await other.getByRole('button',{name:'Account',exact:true}).click();await expect(other.getByLabel('New API token',{exact:true})).not.toBeVisible();
-    await other.getByRole('button',{name:'Revoke',exact:true}).click();await expect(other.locator('#account-content')).toContainText('Revoked');expect((await request.get('/api/v1/me',{headers:{Authorization:`Bearer ${raw}`}})).status()).toBe(401);
-    await other.getByRole('button',{name:'Close',exact:true}).click();await other.getByRole('button',{name:'Sign out',exact:true}).click();await expect(other.locator('#login')).toBeVisible();await expect(other.locator('#clients')).toBeEmpty();
+    await other.getByRole('link',{name:'Back to time tracking',exact:true}).click();await other.getByRole('link',{name:'My Account',exact:true}).click();await other.getByRole('link',{name:'API tokens',exact:true}).click();await expect(other.getByLabel('New API token',{exact:true})).not.toBeVisible();
+    await other.getByRole('button',{name:'Revoke',exact:true}).click();await other.getByRole('button',{name:'Revoke token',exact:true}).click();await expect(other.locator('#account-content')).toContainText('Revoked');expect((await request.get('/api/v1/me',{headers:{Authorization:`Bearer ${raw}`}})).status()).toBe(401);
+    await other.getByRole('link',{name:'Back to time tracking',exact:true}).click();await other.getByRole('button',{name:'Sign out',exact:true}).click();await expect(other.locator('#login')).toBeVisible();await expect(other.locator('#clients')).toBeEmpty();
     await login(other);await other.getByRole('button',{name:'Clients',exact:true}).click();await expect(other.locator('#clients')).not.toContainText('Private client '+suffix);
   } finally {await peer.close();}
   await page.screenshot({path:'test-results/account-administration.png',fullPage:true});
@@ -118,11 +118,11 @@ test('API token expiry uses the account time zone even when the browser uses ano
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,timezoneId:'America/Los_Angeles',locale:'en-GB'}),page=await context.newPage();
   try {
     expect((await call(request,'PUT','/me',{zoneId:'Europe/Oslo'},{'If-Match':profile.headers().etag})).status()).toBe(200);
-    await login(page);await page.getByRole('button',{name:'Account',exact:true}).click();
+    await login(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'API tokens',exact:true}).click();
     await expect(page.locator('#account-content')).toContainText('Expiry times use Europe/Oslo');
     await page.getByLabel('Token name',{exact:true}).fill(name);await page.getByLabel('Token expiry (local time, optional)',{exact:true}).fill(wall);await page.getByRole('button',{name:'Create token',exact:true}).click();await expect(page.getByLabel('New API token',{exact:true})).toBeVisible();
     const list=await (await call(request,'GET','/auth/tokens')).json(),token=list.items.find(value=>value.name===name);expect(token.expiresAt).toBe(`${year}-01-15T11:34:00Z`);
-    await expect(page.locator('#account-content p').filter({hasText:name})).toContainText('12:34');
+    await expect(page.locator('#account-content tr').filter({hasText:name})).toContainText('12:34');
     expect((await call(request,'DELETE','/auth/tokens/'+token.id)).status()).toBe(204);
   } finally {const current=await call(request,'GET','/me');await call(request,'PUT','/me',{zoneId:original.zoneId},{'If-Match':current.headers().etag});await context.close();}
 });

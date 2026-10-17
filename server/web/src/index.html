@@ -13,7 +13,7 @@
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
-  <header class="app-header"><a class="brand" href="./">Timekeeper <small>2.0</small></a><div id="session" hidden><span id="owner"></span><button class="btn btn-outline-secondary" id="settings">Time zone</button><button class="btn btn-outline-secondary" id="account">Account</button><button class="btn btn-outline-secondary" id="sign-out">Sign out</button></div></header>
+  <header class="app-header"><a class="brand" href="./">Timekeeper <small>2.0</small></a><div id="session" hidden><span id="owner"></span><button class="btn btn-outline-secondary" id="settings">Time zone</button><a class="btn btn-outline-secondary" id="account" href="#account/profile">My Account</a><a class="btn btn-outline-secondary" id="users-link" href="#users" hidden>Users</a><button class="btn btn-outline-secondary" id="sign-out">Sign out</button></div></header>
   <main id="main-content" tabindex="-1">
     <section id="login" class="card login">
       <p class="eyebrow">YOUR WORK, RECORDED</p><h1>Make time count.</h1>
@@ -29,6 +29,10 @@
         <p id="auth-hint" class="hint">Use your Timekeeper account. API tokens are managed after signing in.</p>
         <p id="login-error" class="alert alert-danger" role="alert" tabindex="-1"></p><button class="btn btn-primary" type="submit">Sign in</button>
       </form>
+    </section>
+    <section id="account-page" hidden aria-labelledby="account-heading">
+      <div class="account-page-heading"><div><p class="eyebrow">ACCOUNT SETTINGS</p><h1 id="account-heading" tabindex="-1"></h1><p id="account-identity" class="hint"></p></div><a class="btn btn-outline-secondary" href="#tracking">Back to time tracking</a></div>
+      <div class="account-layout"><nav id="account-navigation" class="nav nav-pills" aria-label="Account settings"></nav><div><p id="account-error" class="alert alert-danger" role="alert"></p><div id="account-content"></div></div></div>
     </section>
     <div id="workspace" hidden>
       <div class="status-line"><p id="status" data-state="working" role="status" aria-live="polite"></p><button class="btn btn-outline-secondary" id="refresh">Refresh</button></div>
@@ -78,7 +82,6 @@
       </footer>
     </div>
   </main>
-  <dialog class="app-dialog shadow-lg" id="account-dialog" aria-labelledby="account-title"><h2 id="account-title">Account</h2><div id="account-content"></div><p id="account-error" class="alert alert-danger" role="alert" tabindex="-1"></p><button class="btn btn-outline-secondary" id="account-close" type="button">Close</button></dialog>
   <dialog class="app-dialog shadow-lg" id="editor" aria-labelledby="editor-title"><form id="editor-form"><h2 id="editor-title"></h2><div id="fields"></div><p id="editor-error" class="alert alert-danger" role="alert" tabindex="-1"></p><p id="editor-notice" class="alert alert-info" role="status"></p><div class="dialog-actions"><button class="btn btn-outline-secondary" id="cancel" type="button">Cancel</button><button class="btn btn-primary" id="save" type="submit">Save</button></div></form></dialog>
 </body>
 </html>
