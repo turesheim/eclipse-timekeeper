@@ -1,3 +1,4 @@
+import {openAccountMenu} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
 import {readFileSync,writeFileSync} from 'node:fs';
@@ -12,7 +13,7 @@ async function api(request,path) {
 async function login(page) {
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
-  await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();
+  await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();
 }
 async function review(page) {
   await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles(fixture);
@@ -51,7 +52,7 @@ test('Toggl CSV worker, reviewed mappings, repeat import and whole-job Undo pres
   await undo(page,0);
   const after = await api(request,'/data/export');expect(after.activities.length).toBe(before.activities.length);expect(after.clients.length).toBe(before.clients.length);expect(after.projects.length).toBe(before.projects.length);
   expect((await api(request,`/imports/jobs/${originalId}`)).state).toBe('UNDONE');
-  await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#account-content')).toBeEmpty();
+  await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#account-content')).toBeEmpty();
   expect(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length}))).toEqual({local:0,session:0});
 });
 
@@ -98,12 +99,12 @@ test('Toggl worker and previous-account preview are cleared on sign-out and acco
   await login(page);let release;const blocked = new Promise(resolve=>{release=resolve;});let intercepted=false;
   await page.route('**/web/toggl-worker.js',async route=>{intercepted=true;await blocked;try{await route.continue();}catch{}});
   await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles(fixture);await page.getByRole('button',{name:'Read CSV',exact:true}).click();
-  await expect.poll(()=>intercepted).toBe(true);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#account-content')).toBeEmpty();release();
+  await expect.poll(()=>intercepted).toBe(true);await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#account-content')).toBeEmpty();release();
   const other = randomBytes(32).toString('base64url'),owner = 'import-owner-'+randomUUID();
   const registryPath = process.env.TIMEKEEPER_WEB_REGISTRY,registry = JSON.parse(readFileSync(registryPath,'utf8'));
   registry.push({ownerId:owner,sha256:createHash('sha256').update(other).digest('hex'),permissions:['read','write']});writeFileSync(registryPath,JSON.stringify(registry));
   await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(other);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
-  await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();
+  await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();
   await expect(page.getByLabel('Detailed Report CSV',{exact:true})).toHaveValue('');await expect(page.locator('#account-content')).toContainText('No imports yet.');
   await expect(page.getByRole('heading',{name:'Review import',exact:true})).not.toBeVisible();
   expect(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length}))).toEqual({local:0,session:0});
@@ -149,7 +150,7 @@ test('Toggl defaults to work sessions with client totals, repeat detection and w
   const job=(await api(request,'/imports')).items.find(value=>value.mode==='WORK_SESSION' && value.state==='IMPORTED' && value.selectedEntries===7);expect(job.workSessionCount).toBe(7);expect(job.importedNanos).toBe('151462000000000');
   await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await page.locator('[data-tab=track]').click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
   await expect(page.locator(`#track-clients [data-track-client="${sessions[0].clientId}"]`)).toContainText('42h 4m');
-  await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();await review(page);
+  await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();await review(page);
   await expect(page.locator('#account-content')).toContainText('7 already imported');await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
   expect((await api(request,'/data/export')).workSessions.length).toBe(imported.workSessions.length);
   await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/toggl-session-import-history-mobile.png',fullPage:true});

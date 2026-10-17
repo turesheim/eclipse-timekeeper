@@ -1,3 +1,4 @@
+import {openAccountMenu} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -45,7 +46,7 @@ test('Track is the default month overview with exact client session hours, local
     await expect(day.locator('.track-session-time-short')).toHaveText('25h');await expect(day.locator('.track-session-time-short')).toBeVisible();
     const mobile=await new AxeBuilder({page}).include('#workspace').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(mobile.violations).toEqual([]);
     await expect(page.locator('.track-month thead th')).toHaveCount(7);await page.screenshot({path:'test-results/track-mobile.png',fullPage:true});
-    await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#track-clients')).toBeEmpty();await expect(page.locator('#track-total')).toBeEmpty();
+    await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#track-clients')).toBeEmpty();await expect(page.locator('#track-total')).toBeEmpty();
     await signIn(page,process.env.TIMEKEEPER_WEB_READ_TOKEN);await page.getByLabel('Month',{exact:true}).fill('2025-10');
     await expect(page.locator(`[data-track-session="${left.id}"]`)).toBeDisabled();
     await expect(page.locator(`#track-clients [data-track-client="${a.id}"]`)).toContainText('26h 0m');

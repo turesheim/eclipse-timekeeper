@@ -51,7 +51,13 @@ p { margin-block: .5rem; }
 .app-header { background: #fff; border-bottom: 1px solid var(--line); padding: 1rem max(1.5rem, calc((100vw - 1332px) / 2)); display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .brand { font-size: 1.4rem; font-weight: 750; text-decoration: none; color: inherit; white-space: nowrap; }
 .brand small { font-size: .75rem; color: var(--muted); margin-left: .5rem; }
-#session { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+#session { display: flex; align-items: center; justify-content: flex-end; gap: .5rem; min-width: 0; }
+#owner { min-width: 0; max-width: 18rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.account-menu { position: relative; flex-shrink: 0; }
+.account-menu > summary { list-style: none; display: flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; }
+.account-menu > summary::-webkit-details-marker { display: none; }
+.account-menu-items { position: absolute; inset-inline-end: 0; top: calc(100% + .5rem); z-index: 1000; width: 14rem; max-width: calc(100vw - 2rem); padding: .4rem; background: white; border: 1px solid var(--line); border-radius: .5rem; box-shadow: 0 .5rem 1rem rgb(0 0 0 / .12); }
+.account-menu-items > :is(a,button) { display: flex; align-items: center; width: 100%; min-height: 2.75rem; padding: .5rem .75rem; text-align: start; text-decoration: none; }
 #owner { margin-right: .5rem; overflow-wrap: anywhere; }
 main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .skip-link { position: absolute; z-index: 10; left: 1rem; top: -10rem; background: #fff; padding: .75rem; }
@@ -212,9 +218,9 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 #account-close { margin-top: 1.25rem; }
 @media(max-width: 767px) {
   main { padding: 1rem; }
-  .app-header { padding: 1rem; align-items: flex-start; flex-wrap: wrap; }
-  #session { width: 100%; }
-  #owner { width: 100%; font-size: .875rem; }
+  .app-header { padding: .75rem 1rem; gap: .5rem; }
+  #session { flex: 1; }
+  #owner { font-size: .875rem; }
   .login { padding: 1.5rem; margin: 2vh auto; }
   .tracking { padding: 1rem; align-items: flex-start; flex-direction: column; }
   .work-session { padding: .6rem .8rem; }

@@ -1,3 +1,4 @@
+import {openAccountMenu} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 
@@ -37,7 +38,7 @@ test('email recovery verifies independent mailboxes, replaces a primary safely a
   try {
     await verify(action,await delivered(request,primary,'verify-email'));
     await signIn(page,username,password);
-    await page.getByRole('link',{name:'My Account',exact:true}).click();
+    await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();
     await expect(page.locator('#account-content')).toContainText('Verified: '+primary);
     await page.getByLabel('Backup email',{exact:true}).fill(backup);await page.getByLabel('Current password for backup email',{exact:true}).fill(password);
     await page.getByRole('button',{name:'Save backup email',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Awaiting verification: '+backup);
@@ -76,7 +77,7 @@ test('email recovery verifies independent mailboxes, replaces a primary safely a
     expect((await request.get('/api/v1/me',{headers:{Authorization:`Bearer ${oldToken}`}})).status()).toBe(401);
     expect((await request.get('/api/v1/me',{headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`}})).status()).toBe(200);
     expect((await request.post('/api/v1/auth/email/reset',{data:{token:secret,password:replacement}})).status()).toBe(401);
-    await signIn(action,username,replacement);await action.getByRole('link',{name:'My Account',exact:true}).click();
+    await signIn(action,username,replacement);await openAccountMenu(action);await action.getByRole('link',{name:'My Account',exact:true}).click();
     await expect(action.locator('#account-content')).toContainText('Verified: '+next);await expect(action.locator('#account-content')).toContainText('Verified: '+backup);
     await action.getByLabel('Current password for backup email',{exact:true}).fill(replacement);
     await action.getByRole('button',{name:'Remove backup email',exact:true}).click();

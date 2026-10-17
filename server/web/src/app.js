@@ -5,8 +5,10 @@ import {icon, iconButton} from './icons.js';
 import {WeekCalendar} from './calendar.js';
 import {sameSession} from './calendar-model.js';
 import {MonthTrack} from './track.js';
+import {accountMenu} from './account-menu.js';
 
 const $ = id => document.getElementById(id);
+accountMenu($('account-menu'));
 let api = null, snapshot = null, connected = false, refreshing = null, reloadAgain = false;
 let editor = null, selectedActivity = null, selectedDay = null;
 let watchSession = null;
@@ -64,7 +66,7 @@ async function refreshServerInfo(session) {
   }
 }
 function readOnlyWhileDisconnected() {
-  for (const id of ['add-client', 'add-task', 'add-project', 'add-label', 'add-activity', 'settings', 'stop', 'session-start', 'session-stop', 'session-new', 'session-edit', 'session-delete']) $(id).disabled = !connected;
+  for (const id of ['add-client', 'add-task', 'add-project', 'add-label', 'add-activity', 'stop', 'session-start', 'session-stop', 'session-new', 'session-edit', 'session-delete']) $(id).disabled = !connected;
   for (const action of document.querySelectorAll('td.actions button')) action.disabled = !connected;
   calendar.setConnected(connected);
   track.setWritable(connected && canWrite);
@@ -99,7 +101,7 @@ const auth = authentication({
     $('editor').close(); $('fields').replaceChildren(); $('editor-error').textContent = ''; $('editor-notice').textContent = '';
     for(const id of ['clients','projects','tasks','labels','activities','days']) $(id).replaceChildren();
     for(const id of ['owner','status','active-title','active-details','work-session-current','work-session-state','work-session-elapsed','zone-caption','week-total']) $(id).textContent = '';
-    $('login').hidden = false; $('workspace').hidden = true; $('session').hidden = true; $('remember-notice').textContent = '';
+    $('login').hidden = false; $('workspace').hidden = true; $('session').hidden = true; $('account-menu').open = false; $('remember-notice').textContent = '';
     tab('track');
   }
 });
@@ -446,10 +448,6 @@ $('stop').addEventListener('click', () => {
   if (!active.data || !begin('Stop tracking', {command: 'stop', id: active.data.id, etag: active.etag, key: crypto.randomUUID()})) return;
   $('fields').append(element('p', `Stop tracking “${name(snapshot.tasks, active.data.taskId, 'summary')}”?`)); $('save').textContent = 'Stop'; showEditor();
 });
-$('settings').addEventListener('click', () => {
-  if (!begin('Time zone', {collection: 'me', id: '', etag: snapshot.profile.etag})) return;
-  field('Time zone', 'zoneId', snapshot.profile.data.zoneId, {required: true, hint: 'IANA name such as Europe/Oslo. Reports use this zone in every client.'}); showEditor();
-});
 for (const [id, collection] of [['add-client','clients'], ['add-project','projects'], ['add-task','tasks'], ['add-label','labels'], ['add-activity','activities']]) $(id).addEventListener('click', () => { void openRecord(collection).catch(error => setStatus(errorText(error))); });
 function values() {
   const get = key => $('fields').querySelector(`[name="${key}"]`)?.value;
@@ -465,7 +463,6 @@ function values() {
     case 'tasks': return {summary: get('summary'), projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null};
     case 'activities': return {...(editor.id ? {} : {taskId: get('taskId') || null, projectId:get('taskId') ? null : get('projectId') || null}), summary: get('summary'), start: localDateTimeToInstant(get('start'), editor.zone), end: get('end') ? localDateTimeToInstant(get('end'), editor.zone) : null, labelIds: labels()};
     case 'work-sessions': return {title:get('title'),clientId:get('clientId'),summary:get('summary'),start:localDateTimeToInstant(time('start'),editor.zone),end:time('end') ? localDateTimeToInstant(time('end'),editor.zone) : null};
-    case 'me': return {zoneId: get('zoneId')};
   }
 }
 function freeze(state) { for (const input of $('fields').querySelectorAll('input,select')) input.disabled = state || (editor.collection === 'activities' && !!editor.id && input.name === 'taskId'); }
