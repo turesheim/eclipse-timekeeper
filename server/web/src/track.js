@@ -64,10 +64,10 @@ export class MonthTrack {
         for(const entry of day.sessions) {
           const session=entry.session,client=this.snapshot.clients.find(value=>value.id===session.clientId);
           const button=node('button',undefined,'track-session');button.type='button';button.disabled=!this.writable;button.dataset.trackSession=session.id;
-          button.setAttribute('aria-label',`${session.title} · ${client?.name||'Client'} · ${day.date}`);button.title=button.getAttribute('aria-label');
+          button.title=`${session.title} · ${client?.name||'Client'} · ${day.date}`;
           if(/^#[0-9a-f]{6}$/i.test(client?.color))button.style.setProperty('--client-color',client.color);
           const duration=node('span',undefined,'track-session-time');this.sessionTimes.set(day.date+'/'+session.id,duration);
-          button.append(node('strong',session.title),node('span',client?.name||'Client','track-session-client'),duration);
+          button.append(node('strong',session.title),' ',node('span',client?.name||'Client','track-session-client'),' ',duration,node('span',' · '+day.date,'visually-hidden'));
           if(!session.end)button.append(node('span','Running','visually-hidden'));
           button.addEventListener('click',()=>this.onEdit(session.id));cell.append(button);
         }
@@ -84,9 +84,8 @@ export class MonthTrack {
     this.root.querySelector('#track-total').textContent=this.format(result.total);
     for(const [client,total] of this.clientTimes)total.textContent=this.format(result.clients.get(client)||0n);
     for(const day of result.days)for(const entry of day.sessions) {
-      const duration=this.sessionTimes.get(day.date+'/'+entry.session.id),client=this.snapshot.clients.find(value=>value.id===entry.session.clientId);
+      const duration=this.sessionTimes.get(day.date+'/'+entry.session.id);
       duration.textContent=this.format(entry.duration);
-      duration.parentElement.setAttribute('aria-label',`${entry.session.title} ${client?.name||'Client'} ${duration.textContent}${entry.session.end ? '':' Running'} · ${day.date}`);
     }
   }
 }

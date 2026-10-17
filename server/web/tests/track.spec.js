@@ -10,7 +10,8 @@ async function signIn(page,credential=token) {
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(credential);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
 }
-test('Track is the default month overview with exact client session hours, local dates and independent activities',async({page,request})=> {
+test('Track is the default month overview with exact client session hours, local dates and independent activities',async({browser,request})=> {
+  const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,timezoneId:'America/Los_Angeles'}),page=await context.newPage();
   const original=await (await api(request,'GET','/me')).json(),records=[];
   async function create(collection,data){const record=await (await api(request,'POST','/'+collection,data)).json();records.unshift([collection,record.id]);return record;}
   try {
@@ -48,6 +49,7 @@ test('Track is the default month overview with exact client session hours, local
     await expect(page.locator(`[data-track-session="${left.id}"]`)).toBeDisabled();
     await expect(page.locator(`#track-clients [data-track-client="${a.id}"]`)).toContainText('26h 0m');
   } finally {
+    await context.close();
     for(const [collection,id] of records){const current=await api(request,'GET',`/${collection}/${id}`);await api(request,'DELETE',`/${collection}/${id}`,undefined,{'If-Match':current.headers().etag});}
     const current=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:original.zoneId},{'If-Match':current.headers().etag});
   }
