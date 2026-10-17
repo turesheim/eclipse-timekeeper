@@ -7,7 +7,7 @@ const signature = value => JSON.stringify(value);
 export async function renderImports(view, zone) {
   let parsed = null, fingerprint = null, plan = null, batches = [], reviews = [], resume = null, selectedPerson = null;
   let worker = null, cancelWorker = null, pause = false, undoPause = false, historyAfter = null, historyItems = [], createKey = null;
-  const api = view.session, catalog = {};
+  const api = view.session, catalog = {}, clientSourceNames = new Map();
   const upload = form(view, 'Import from Toggl Track', 'Read CSV', read);
   upload.value.append(node('p', 'Detailed Report CSV. Import completed entries as work sessions or activities.'));
   const importMode = field(upload.value, 'Import as', 'WORK_SESSION', {choices:[['WORK_SESSION','Work sessions'],['ACTIVITY','Activities']]});
@@ -23,7 +23,7 @@ export async function renderImports(view, zone) {
   view.cleanup.add(() => {
     cancelWorker?.();worker?.terminate();worker = null;
     if(parsed) parsed.rows.length = 0;if(plan) plan.rows.length = 0;
-    parsed = plan = resume = null;reviews.length = batches.length = historyItems.length = 0;file.value = '';fingerprint = createKey = null;
+    parsed = plan = resume = null;clientSourceNames.clear();reviews.length = batches.length = historyItems.length = 0;file.value = '';fingerprint = createKey = null;
     for(const url of downloadUrls) URL.revokeObjectURL(url);downloadUrls.clear();selectedPerson = null;
   });
   await Promise.all(Object.entries({CLIENT:'clients',PROJECT:'projects',TASK:'tasks',LABEL:'labels'}).map(async ([type, path]) => {
@@ -52,6 +52,7 @@ export async function renderImports(view, zone) {
     try {return await work();} finally {if(view.valid()) for(const value of enabled) value.disabled = false;}
   }
   function workCardControls() {return work.querySelectorAll('input,select,button');}
+  function sourceClientName(definition) {return clientSourceNames.get(definition.key) || 'Entries without a client';}
   async function read() {
     return locked(async()=>{
     if(!file.files[0]) throw new Error('Choose a CSV file.');
@@ -118,24 +119,34 @@ export async function renderImports(view, zone) {
     if(resume) work.append(node('p','The original mapping plan is retained while resuming.','alert alert-info'));
     if(plan.mode==='WORK_SESSION' && plan.rows.some(row=>row.summary.trim().length>1000)) work.append(node('p','Long descriptions use the first 1,000 characters as the title. The full description is retained as notes.','alert alert-info'));
     const list = node('div');work.append(list);const definitions = new Map(plan.mappings.map(value => [value.key,value]));
+    clientSourceNames.clear();
+    for(const row of plan.rows) {
+      const key = row.clientKey || definitions.get(row.projectKey)?.parentKey;
+      if(!clientSourceNames.has(key)) clientSourceNames.set(key,row.client || (plan.mode==='WORK_SESSION' && row.project) || 'Entries without a client');
+    }
     const paths = {CLIENT:'clients',PROJECT:'projects',TASK:'tasks',LABEL:'labels'};
     let mappingRequests = 0;
     function draw() {
       list.replaceChildren();
+      const clients = node('div'), other = node('div');
+      list.append(node('h3','Client mappings'),clients);
+      if(plan.mappings.some(value=>value.resourceType!=='CLIENT')) list.append(node('h3','Other mappings'),other);
       for(const definition of plan.mappings) {
         const parent = definitions.get(definition.parentKey), type = definition.resourceType;
-        const choices = (catalog[type] || []).filter(value => !parent || parent.action === 'REUSE' && value[type === 'PROJECT' ? 'clientId' : 'projectId'] === parent.id);
+        const choices = (catalog[type] || []).filter(value => !parent || parent.action === 'REUSE' && value[type === 'PROJECT' ? 'clientId' : 'projectId'] === parent.id)
+          .sort((a,b)=>(a.name || a.summary).localeCompare(b.name || b.summary));
         if(definition.action === 'REUSE' && !choices.some(value => value.id === definition.id) && !resume) {
           definition.action = 'CREATE';delete definition.id;delete definition.etag;
         }
         const row = node('div',undefined,'import-mapping');
-        const select = field(row,`${names[type]}: ${definition.name}`,definition.action === 'CREATE' ? '' : definition.id,
-          {choices:[['','Create new'],...choices.map(value => [value.id,`Reuse ${value.name || value.summary}`])]});
+        const select = field(row,type==='CLIENT' ? `Timekeeper client for ${sourceClientName(definition)}` : `${names[type]}: ${definition.name}`,definition.action === 'CREATE' ? '' : definition.id,
+          {choices:[['',type==='CLIENT' ? 'Create a new client' : 'Create new'],...choices.map(value => [value.id,`${type==='CLIENT' ? 'Use existing:' : 'Reuse'} ${value.name || value.summary}`])]});
         select.disabled = !!resume;
-        const name = field(row,`New ${names[type].toLowerCase()} name`,definition.name,{maxLength:1000});name.disabled = definition.action !== 'CREATE' || !!resume;
+        const creation = node('div');creation.hidden = definition.action !== 'CREATE';row.append(creation);
+        const name = field(creation,`New ${names[type].toLowerCase()} name`,definition.name,{maxLength:1000});name.disabled = definition.action !== 'CREATE' || !!resume;
         name.addEventListener('input', () => {definition.name = name.value;view.dirty.add(upload.value);});
         if(type === 'CLIENT' || type === 'LABEL') {
-          const color = field(row,`${names[type]} color`,definition.color || '#2563eb',{type:'color'});color.disabled = definition.action !== 'CREATE' || !!resume;
+          const color = field(creation,`${names[type]} color`,definition.color || '#2563eb',{type:'color'});color.disabled = definition.action !== 'CREATE' || !!resume;
           color.addEventListener('input', () => {definition.color = color.value;view.dirty.add(upload.value);});
         }
         select.addEventListener('change', () => void view.run(async () => {
@@ -148,7 +159,7 @@ export async function renderImports(view, zone) {
             if(view.valid()) {view.dirty.add(upload.value);draw();}
           } finally {mappingRequests--;}
         },{feedback}));
-        list.append(row);
+        (type==='CLIENT' ? clients : other).append(row);
       }
     }
     const feedback = node('p','','form-feedback');feedback.setAttribute('role','status');draw();
@@ -168,6 +179,9 @@ export async function renderImports(view, zone) {
   }
   function matchReview() {
     work.replaceChildren(node('h2','Confirm import'));const flat = reviews.flat();
+    work.append(node('h3','Client mappings'),table(['Toggl client','Timekeeper client'],plan.mappings.filter(value=>value.resourceType==='CLIENT').map(value=>[
+      sourceClientName(value),value.action==='REUSE' ? `Use existing: ${catalog.CLIENT.find(client=>client.id===value.id)?.name || value.id}` : `Create new: ${value.name}`
+    ])));
     const matches = flat.map((value,index) => ({value,index})).filter(({value}) => value.status === 'REVIEW_MATCHES' || value.status === 'SOURCE_CHANGED');
     const reused = flat.filter(value => value.status.startsWith('REUSED')).length;
     const edited = flat.map((value,index)=>({value,index})).filter(({value})=>value.status==='REUSED_EDITED');

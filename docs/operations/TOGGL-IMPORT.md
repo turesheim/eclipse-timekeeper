@@ -30,7 +30,12 @@ rejected.
    account; it creates no login accounts, memberships or shared workspaces.
    Review row errors, unsupported columns and excluded rows. Incomplete timers,
    future intervals and mismatched durations require correction or exclusion.
-3. Review create/reuse choices. Work-session imports require only clients: a
+3. Under **Client mappings**, choose an existing Timekeeper client for each
+   Toggl client, or choose **Create a new client** and review its name and color.
+   Several Toggl clients can use the same existing client. Reusing a client
+   preserves its name and color; Undo keeps that client. Review the destinations
+   again on the confirmation screen.
+   Work-session imports require only clients: a
    source Client is used when present; otherwise its Project suggests a client
    name for review, with a fallback for rows missing both. Activity imports map
    clients, projects, tasks and labels and require missing-name fallbacks. Existing projects are available

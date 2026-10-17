@@ -162,3 +162,42 @@ test('Toggl defaults to work sessions with client totals, repeat detection and w
   const after=await api(request,'/data/export');expect(after.workSessions.length).toBe(before.workSessions.length);expect(after.clients.length).toBe(before.clients.length);expect(after.labels.length).toBe(before.labels.length);
 });
 
+
+for(const mode of ['WORK_SESSION','ACTIVITY']) test(`Toggl ${mode} maps several source clients to an existing client and Undo preserves it`,async({page,request})=>{
+  const suffix=randomUUID().slice(0,8),headers={Authorization:`Bearer ${token}`};
+  const created=await request.post('/api/v1/clients',{headers,data:{name:'Existing destination '+suffix,color:'#176653'}});expect(created.status()).toBe(201);
+  const destination=await created.json(),before=await api(request,'/data/export');
+  await login(page);await page.getByLabel('Import as',{exact:true}).selectOption(mode);
+  const csv='Description,Duration,Member,Email,Client,Project,Start date,Start time,Stop date,Stop time\r\n'
+    +[`First ${suffix},01:00:00,Mapping ${suffix},${suffix}@example.invalid,Toggl one,First project,2025-10-20,09:00:00,2025-10-20,10:00:00`,
+      `Second ${suffix},01:00:00,Mapping ${suffix},${suffix}@example.invalid,Toggl two,Second project,2025-10-20,10:00:00,2025-10-20,11:00:00`,
+      `Missing client ${suffix},01:00:00,Mapping ${suffix},${suffix}@example.invalid,,Fallback project,2025-10-20,11:00:00,2025-10-20,12:00:00`].join('\r\n');
+  await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');
+  await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles({name:'client-mapping.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+  await page.getByRole('button',{name:'Read CSV',exact:true}).click();await page.getByRole('button',{name:'Review mappings',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Client mappings',exact:true})).toBeVisible();
+  const sources=['Toggl one','Toggl two',mode==='WORK_SESSION' ? 'Fallback project' : 'Entries without a client'];
+  for(const source of sources) {
+    const select=page.getByLabel('Timekeeper client for '+source,{exact:true});
+    await select.selectOption(destination.id);await expect(select).toHaveValue(destination.id);
+    await expect(select.locator('..').locator('..').getByLabel('New client name',{exact:true})).toBeHidden();
+  }
+  // The choice can be changed back before committing; no destination is edited.
+  const first=page.getByLabel('Timekeeper client for Toggl one',{exact:true});await first.selectOption('');
+  await expect(first.locator('..').locator('..').getByLabel('New client name',{exact:true})).toBeVisible();
+  await first.selectOption(destination.id);await expect(first).toHaveValue(destination.id);
+  await expect(page.getByLabel('New client name',{exact:true}).filter({visible:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Review server matches',exact:true}).click();
+  const mappingTable=page.getByRole('table').filter({has:page.getByRole('columnheader',{name:'Toggl client',exact:true})});
+  for(const source of sources) await expect(mappingTable.getByRole('row').filter({hasText:source})).toContainText('Use existing: '+destination.name);
+  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:`test-results/toggl-existing-client-${mode.toLowerCase()}.png`,fullPage:true});
+  await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
+  const imported=await api(request,'/data/export'),collection=mode==='WORK_SESSION' ? 'workSessions' : 'activities';
+  expect(imported.clients).toEqual(before.clients);const added=imported[collection].filter(value=>!before[collection].some(old=>old.id===value.id));expect(added).toHaveLength(3);
+  if(mode==='WORK_SESSION') expect(added.every(value=>value.clientId===destination.id)).toBe(true);
+  else expect(imported.projects.filter(value=>!before.projects.some(old=>old.id===value.id)).every(value=>value.clientId===destination.id)).toBe(true);
+  expect(await api(request,'/clients/'+destination.id)).toEqual(destination);
+  await undo(page,0);const undone=await api(request,'/data/export');expect(undone.clients).toEqual(before.clients);expect(undone[collection]).toEqual(before[collection]);
+  expect(await api(request,'/clients/'+destination.id)).toEqual(destination);
+});
