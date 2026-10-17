@@ -97,11 +97,12 @@ export async function renderImports(view, zone) {
     }
     source.addEventListener('change', () => {page = 0;invalid.checked = duplicates.checked = false;showRows();});showRows();
     const feedback = node('p','','form-feedback');feedback.setAttribute('role','status');
-    const next = button('Review mappings', () => void view.run(() => locked(async () => {
+    const next = button('Review mappings', () => void view.run(async () => {
       if(!source.value) throw new Error('Choose the source user.');
       const selected = parsed.rows.filter(row => row.personKey === source.value || !row.personKey);
       if(selected.some(row => row.errors.length) && !invalid.checked) {invalid.focus();throw new Error('Review and explicitly exclude invalid rows before continuing.');}
       if(selected.some(row => row.ambiguousDuplicate && !row.excluded && !row.errors.length) && !duplicates.checked) throw new Error('Review indistinguishable source rows, then keep them separately or exclude them.');
+      await locked(async () => {
       for(const row of selected) row.duplicateReviewed = duplicates.checked;
       selectedPerson = source.value;
       const result = await runWorker({operation:'plan',rows:parsed.rows,personKey:source.value,reportZone:resume?.reportZone || zone,
@@ -115,7 +116,8 @@ export async function renderImports(view, zone) {
         plan.mappings = structuredClone(resume.mappings);
       }
       mappingReview();
-    }),{submit:next,feedback,write:true}),'btn btn-primary');next.disabled = !view.canWrite;
+      });
+    },{submit:next,feedback,write:true}),'btn btn-primary');next.disabled = !view.canWrite;
     work.append(decisions,feedback,next,button('Download preview diagnostics',downloadPreview));
   }
   function mappingReview() {
