@@ -28,7 +28,7 @@ const calendar = new WeekCalendar($('calendar-panel'), {
   onPaste: input => void openRecord('work-sessions',null,input,'Paste work session').catch(error=>setStatus(errorText(error))),
   onChange: changeCalendarSession,
 });
-const track = new MonthTrack($('track-panel'),id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error))));
+const track = new MonthTrack($('track-panel'));
 function startWatch(session) {
   if (watchSession === session) return;
   watchSession = session;

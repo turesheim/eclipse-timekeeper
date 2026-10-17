@@ -31,7 +31,7 @@ function overlap(start,end,from,to) {
 /** Sum recorded session durations; task activities never participate in these totals. */
 export function monthSessions(calendar,sessions,asOf) {
   const now=typeof asOf==='bigint' ? asOf:instantNanos(asOf),clients=new Map();let total=0n;
-  const days=calendar.days.map(day=>({...day,total:0n,sessions:[]}));
+  const days=calendar.days.map(day=>({...day,total:0n,clients:new Map()}));
   for(const session of sessions) {
     const start=instantNanos(session.start),end=session.end ? instantNanos(session.end):now;
     const duration=overlap(start,end,calendar.from,calendar.to);
@@ -39,9 +39,13 @@ export function monthSessions(calendar,sessions,asOf) {
     total+=duration;clients.set(session.clientId,(clients.get(session.clientId)||0n)+duration);
     for(const day of days) if(day.inMonth) {
       const duration=overlap(start,end,day.from,day.to);
-      if(duration) {day.total+=duration;day.sessions.push({session,duration});}
+      if(duration) {
+        day.total+=duration;
+        const client=day.clients.get(session.clientId) || {clientId:session.clientId,duration:0n,running:false};
+        client.duration+=duration;client.running ||= !session.end && now>=day.from && now<day.to;
+        day.clients.set(session.clientId,client);
+      }
     }
   }
-  for(const day of days) day.sessions.sort((a,b)=>a.session.start.localeCompare(b.session.start)||a.session.id.localeCompare(b.session.id));
   return {total,clients,days};
 }

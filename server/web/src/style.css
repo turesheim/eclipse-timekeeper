@@ -168,20 +168,17 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .track-outside { background: var(--bs-tertiary-bg); color: var(--muted); }
 .track-date { display: inline-grid; place-items: center; width: 1.75rem; height: 1.75rem; font-size: .85rem; margin-bottom: .25rem; }
 .track-today { background: var(--accent); color: white; border-radius: 50%; font-weight: 700; }
-.track-session { display: flex; flex-direction: column; width: 100%; min-height: 2.75rem; text-align: left; padding: .3rem .4rem; margin-bottom: .3rem; border: 1px solid var(--line); border-inline-start: 4px solid var(--client-color, var(--accent)); border-radius: .3rem; background: var(--bs-body-bg); color: var(--bs-body-color); font-size: .8rem; }
-.track-session > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.track-session-client { color: var(--muted); font-size: .75rem; }
-.track-session-time { font-variant-numeric: tabular-nums; }
-.track-session-time-short { display: none; font-variant-numeric: tabular-nums; }
-.track-session:disabled { opacity: .8; cursor: default; }
+.track-client-day { display: flex; flex-direction: column; width: 100%; min-height: 2.75rem; text-align: left; padding: .3rem .4rem; margin-bottom: .3rem; border: 1px solid var(--line); border-inline-start: 4px solid var(--client-color, var(--accent)); border-radius: .3rem; background: var(--bs-body-bg); color: var(--bs-body-color); font-size: .8rem; }
+.track-client-day > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.track-client-day-time { font-variant-numeric: tabular-nums; }
+.track-client-day-time-short { display: none; font-variant-numeric: tabular-nums; }
 @media(max-width: 767px) {
   .track-day { height: 6rem; padding: .1rem; }
   .track-date { width: 1.5rem; height: 1.5rem; }
-  .track-session { padding: .25rem .15rem; font-size: .75rem; border-inline-start-width: 3px; }
-  .track-session-client { font-size: .7rem; }
+  .track-client-day { padding: .25rem .15rem; font-size: .75rem; border-inline-start-width: 3px; }
   .track-month th { font-size: .75rem; }
-  .track-session-time { display: none; }
-  .track-session-time-short { display: block; }
+  .track-client-day-time { display: none; }
+  .track-client-day-time-short { display: block; }
   .track-client { padding: .65rem; min-width: 0; flex-basis: 9rem; }
 }
 @font-face { font-family: "Font Awesome 7 Free"; font-style: normal; font-weight: 900; font-display: block; src: url("./assets/fontawesome/fa-solid-900.woff2") format("woff2"); }
