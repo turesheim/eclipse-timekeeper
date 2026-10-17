@@ -8,10 +8,10 @@ project/tag/description text and dates while retaining seven intervals totaling
 | Boundary | Verified behavior |
 | --- | --- |
 | CSV and source selection | UTF-8/BOM, CRLF, quoting/newlines, strict headers/durations, incomplete/future/error rows, explicit zone/date format and independent source-user selection. Browser requests exclude other source users and raw email identities. |
-| Time and mapping | Exact nanoseconds across midnight and 25-hour DST days; reviewed fallback clients/projects, distinct equally named projects, independent task descriptions and labels. Skipped civil dates are covered by planner tests. Work sessions are not inferred. |
+| Time and mapping | Exact nanoseconds across midnight and 25-hour DST days; reviewed fallback clients/projects, distinct equally named projects, independent task descriptions and labels. Skipped civil dates are covered by planner tests. Work sessions are explicitly selected (the browser default), preserve each full interval and use only a reviewed client plus description-derived title. Activities remain an alternative; modes have independent duplicate claims. |
 | Atomic authority | Owned domain writes, immutable/version-checked mappings, rollback, simultaneous batch retries, exact count/time reconciliation and persistent per-entry source intervals/outcomes. |
 | Repeat and resume | Same-source repeats reuse the creator's claims without overwriting edits. Ambiguous unclaimed matches require explicit decisions. A dropped batch reply, reload and original-file re-selection resume at committed progress. |
-| Whole-job Undo | Bounded, resumable activity-first/catalog-child-first deletion; edited/running/dependency review; preserved reused data; later-import references; daily-part lineage; original-claim retirement and deliberate re-import. Old Undo receipts cannot remove replacements. |
+| Whole-job Undo | Bounded, resumable session/activity-first/catalog-child-first deletion; edited/running/dependency review; preserved reused data; later-import references; daily-part lineage; original-claim retirement and deliberate re-import. Old Undo receipts cannot remove replacements. |
 | Operational durability | Two actual JVM replicas on PostgreSQL 17.11 and 18.6; database/server restart; protected logical backup/restore of partial jobs, claims and receipts; cross-owner denial. |
 | Browser lifecycle | Module worker and preview disposed on sign-out/account switch; no CSV or credentials in browser storage; safe JSON diagnostics/audit downloads; accessible desktop and 390px layouts. |
 
@@ -21,7 +21,7 @@ project/tag/description text and dates while retaining seven intervals totaling
   passed on `2a6e141`. Subsequent per-entry audit and expanded Undo-step handling
   passed the focused 12-test ledger/API/import/Undo run. The final CI repeats the
   complete server suite at its checked-out source.
-- Web unit tests: 48 passed, including the anonymized real fixture and skipped-date
+- Web unit tests: 49 passed, including the anonymized real fixture and skipped-date
   batch planning.
 - Full packaged Chromium: 65 passed, one SMTP-only test skipped on `2a6e141`.
 - Packaged HTTPS WebKit: six passed on `cb69a7d`, including administrator setup,

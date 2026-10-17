@@ -1,7 +1,7 @@
 import {node, button, field, section, form, table} from './account-ui.js';
 import {instantText, nanosText} from './model.js';
 
-const names = {CLIENT:'Client', PROJECT:'Project', TASK:'Task', LABEL:'Label'};
+const names = {CLIENT:'Client', PROJECT:'Project', TASK:'Task', LABEL:'Label', WORK_SESSION:'Work session'};
 const signature = value => JSON.stringify(value);
 
 export async function renderImports(view, zone) {
@@ -9,7 +9,8 @@ export async function renderImports(view, zone) {
   let worker = null, cancelWorker = null, pause = false, undoPause = false, historyAfter = null, historyItems = [], createKey = null;
   const api = view.session, catalog = {};
   const upload = form(view, 'Import from Toggl Track', 'Read CSV', read);
-  upload.value.append(node('p', 'Detailed Report CSV. Completed entries become activities; work sessions are separate.'));
+  upload.value.append(node('p', 'Detailed Report CSV. Import completed entries as work sessions or activities.'));
+  const importMode = field(upload.value, 'Import as', 'WORK_SESSION', {choices:[['WORK_SESSION','Work sessions'],['ACTIVITY','Activities']]});
   const file = field(upload.value, 'Detailed Report CSV', '', {type:'file'});file.accept = '.csv,text/csv';
   const sourceZone = field(upload.value, 'Source time zone', zone);
   const dateFormat = field(upload.value, 'Source date format', 'ISO', {choices:[['ISO','YYYY-MM-DD'],['DMY','DD/MM/YYYY'],['MDY','MM/DD/YYYY']]});
@@ -68,7 +69,8 @@ export async function renderImports(view, zone) {
     const source = field(work, 'Source user', parsed.people.length === 1 ? parsed.people[0].key : '', {choices:[['','Choose source user'],...parsed.people.map(person => [person.key,[person.name,person.email,person.workspace].filter(Boolean).join(' · ')])]});
     if(parsed.unsupported.length) work.append(node('p', `Unsupported metadata: ${parsed.unsupported.join(', ')}. These columns will not be imported.`, 'alert alert-info'));
     const fallbackClient = field(work, 'Client for entries without a client', 'Imported from Toggl', {maxLength:1000});
-    const fallbackProject = field(work, 'Project for entries without a project', 'Imported time', {maxLength:1000});
+    if(importMode.value==='WORK_SESSION') work.append(node('p','Each entry becomes one work session. Descriptions become titles and are retained in full as notes. Source projects suggest client names when Client is missing; review each client below. Tasks and tags are retained in the import audit only.'));
+    const fallbackProject = importMode.value==='ACTIVITY' ? field(work, 'Project for entries without a project', 'Imported time', {maxLength:1000}) : null;
     const invalid = field(work, 'Exclude invalid rows after reviewing the diagnostics', false, {type:'checkbox'});
     const duplicates = field(work, 'Keep indistinguishable source rows as separate entries', false, {type:'checkbox'});
     const rowList = node('div');work.append(rowList);let page = 0;
@@ -80,9 +82,9 @@ export async function renderImports(view, zone) {
       const rows = selected.slice(page * 100, (page + 1) * 100).map(row => {
         const select = node('input');select.type = 'checkbox';select.className = 'form-check-input';select.checked = !row.excluded && !row.errors.length;select.disabled = !!row.errors.length;
         select.setAttribute('aria-label', `Include source line ${row.line}`);select.addEventListener('change', () => {row.excluded = !select.checked;view.dirty.add(upload.value);});
-        return [select,String(row.line),row.start ? instantText(row.start,zone) : '',row.end ? instantText(row.end,zone) : '',row.durationNanos === undefined ? '' : nanosText(row.durationNanos),row.summary || '',[...row.errors,...row.warnings,...(row.ambiguousDuplicate ? ['Indistinguishable duplicate source row.'] : [])].join(' ')];
+        return [select,String(row.line),row.start ? instantText(row.start,zone) : '',row.end ? instantText(row.end,zone) : '',row.durationNanos === undefined ? '' : nanosText(row.durationNanos),...(importMode.value==='WORK_SESSION' ? [row.summary.trim().slice(0,1000) || 'Imported work session'] : []),row.summary || '',[...row.errors,...row.warnings,...(row.ambiguousDuplicate ? ['Indistinguishable duplicate source row.'] : [])].join(' ')];
       });
-      rowList.append(table(['Include','Line','Start','End','Duration','Description','Diagnostics'],rows));
+      rowList.append(table(['Include','Line','Start','End','Duration',...(importMode.value==='WORK_SESSION' ? ['Work-session title'] : []),'Description','Diagnostics'],rows));
       if(selected.length > 100) {
         const previous = button('Previous rows', () => {page--;showRows();});previous.disabled = page === 0;
         const next = button('Next rows', () => {page++;showRows();});next.disabled = (page + 1) * 100 >= selected.length;
@@ -99,10 +101,10 @@ export async function renderImports(view, zone) {
       for(const row of selected) row.duplicateReviewed = duplicates.checked;
       selectedPerson = source.value;
       const result = await runWorker({operation:'plan',rows:parsed.rows,personKey:source.value,reportZone:resume?.reportZone || zone,
-        options:{fallbackClient:fallbackClient.value,fallbackProject:fallbackProject.value}});
+        options:{mode:importMode.value,fallbackClient:fallbackClient.value,fallbackProject:fallbackProject?.value}});
       if(!view.valid()) return;plan = result.plan;batches = result.batches;reviews = [];
       if(resume) {
-        if(plan.sourceKey !== resume.sourceKey || plan.selectedEntries !== resume.selectedEntries || plan.selectedNanos !== resume.selectedNanos
+        if(plan.mode !== (resume.mode || 'ACTIVITY') || plan.sourceKey !== resume.sourceKey || plan.selectedEntries !== resume.selectedEntries || plan.selectedNanos !== resume.selectedNanos
           || resume.selectionFingerprint && plan.selectionFingerprint !== resume.selectionFingerprint) throw new Error('Choose the original source user and the same row exclusions to resume this import.');
         if(zone !== resume.reportZone) throw new Error('The account time zone changed. Undo this job or start a newly reviewed import.');
         plan.mappings = structuredClone(resume.mappings);
@@ -112,8 +114,9 @@ export async function renderImports(view, zone) {
     work.append(feedback,next,button('Download preview diagnostics',downloadPreview));
   }
   function mappingReview() {
-    work.replaceChildren(node('h2','Review mappings'),node('p',`${plan.selectedEntries} entries · ${nanosText(BigInt(plan.selectedNanos))} · ${plan.mappings.length} catalog mappings`));
+    work.replaceChildren(node('h2','Review mappings'),node('p',`${plan.selectedEntries} ${plan.mode==='WORK_SESSION' ? 'work sessions' : 'activity entries'} · ${nanosText(BigInt(plan.selectedNanos))} · ${plan.mappings.length} catalog mappings`));
     if(resume) work.append(node('p','The original mapping plan is retained while resuming.','alert alert-info'));
+    if(plan.mode==='WORK_SESSION' && plan.rows.some(row=>row.summary.trim().length>1000)) work.append(node('p','Long descriptions use the first 1,000 characters as the title. The full description is retained as notes.','alert alert-info'));
     const list = node('div');work.append(list);const definitions = new Map(plan.mappings.map(value => [value.key,value]));
     const paths = {CLIENT:'clients',PROJECT:'projects',TASK:'tasks',LABEL:'labels'};
     let mappingRequests = 0;
@@ -156,7 +159,7 @@ export async function renderImports(view, zone) {
         if(!view.valid()) return;
         if(resume && offset+count<=resume.importedEntries+resume.skippedEntries) {reviews.push(Array.from({length:count},()=>({status:'COMMITTED'})));offset+=count;continue;}
         const rows = plan.rows.slice(offset,offset+count),reply = resume ? await api.request(`/imports/jobs/${resume.id}/preview`,{method:'POST',body:{rows}})
-          : await api.request('/imports/toggl/preview',{method:'POST',body:{sourceKey:plan.sourceKey,mappings:plan.mappings,rows}});
+          : await api.request('/imports/toggl/preview',{method:'POST',body:{mode:plan.mode,sourceKey:plan.sourceKey,mappings:plan.mappings,rows}});
         if(!view.valid()) return;reviews.push(reply.data.rows);offset += count;feedback.textContent = `Reviewed ${offset} of ${plan.rows.length} entries.`;
       }
       matchReview();
@@ -173,7 +176,7 @@ export async function renderImports(view, zone) {
       const details = node('details');details.append(node('summary',`${edited.length} previously imported entries have edits or missing daily parts. Existing records will be reused without overwriting them.`));
       details.append(table(['Source entry','Source start','Source end','Current daily records'],edited.slice(0,50).map(({value,index})=>[
         plan.rows[index].summary || `Entry ${index+1}`,instantText(plan.rows[index].start,zone),instantText(plan.rows[index].end,zone),
-        value.activities.map(activity=>`${instantText(activity.start,zone)} → ${activity.end ? instantText(activity.end,zone) : 'Running'}`).join('; ')
+        (value.workSessions || value.activities).map(activity=>`${instantText(activity.start,zone)} → ${activity.end ? instantText(activity.end,zone) : 'Running'}`).join('; ')
       ])));
       if(edited.length>50) details.append(node('p','Showing the first 50. Download preview diagnostics for the complete list.'));work.append(details);
     }
@@ -186,15 +189,15 @@ export async function renderImports(view, zone) {
         if(value.status === 'SOURCE_CHANGED') card.append(node('p','The source entry ID has changed. Go back and exclude it or resolve the source change.','alert alert-warning'));
         else {
           const canReuse = value.matches.every(group => group.length > 0);
-          const choice = field(card,'Matching activities',row.duplicateDecision || '',{choices:[['','Choose…'],['CREATE_DISTINCT','Create a distinct entry'],...(canReuse ? [['REUSE','Reuse existing daily activities']] : [])]});
+          const choice = field(card,plan.mode==='WORK_SESSION' ? 'Matching work sessions' : 'Matching activities',row.duplicateDecision || '',{choices:[['','Choose…'],['CREATE_DISTINCT','Create a distinct entry'],...(canReuse ? [['REUSE',plan.mode==='WORK_SESSION' ? 'Reuse existing work session' : 'Reuse existing daily activities']] : [])]});
           const parts = node('div');card.append(parts);
           function showParts() {
-            parts.replaceChildren();row.duplicateDecision = choice.value;delete row.reuseActivities;
+            parts.replaceChildren();row.duplicateDecision = choice.value;delete row.reuseActivities;delete row.reuseWorkSessions;
             if(choice.value === 'REUSE') {
-              row.reuseActivities = [];
+              const reuseField = plan.mode==='WORK_SESSION' ? 'reuseWorkSessions' : 'reuseActivities';row[reuseField] = [];
               value.matches.forEach((group,part) => {
-                const select = field(parts,`Daily activity ${part+1}`,group.length === 1 ? group[0].id : '',{choices:[['','Choose activity'],...group.map(item => [item.id,item.id])]});
-                const update = () => {row.reuseActivities[part] = group.find(item => item.id === select.value) || null;};select.addEventListener('change',update);update();
+                const select = field(parts,plan.mode==='WORK_SESSION' ? 'Work session' : `Daily activity ${part+1}`,group.length === 1 ? group[0].id : '',{choices:[['','Choose record'],...group.map(item => [item.id,item.id])]});
+                const update = () => {row[reuseField][part] = group.find(item => item.id === select.value) || null;};select.addEventListener('change',update);update();
               });
             }
           }
@@ -209,8 +212,8 @@ export async function renderImports(view, zone) {
     }
     draw();const feedback = node('p','','form-feedback');feedback.setAttribute('role','status');
     const start = button(resume ? 'Resume import' : 'Import selected entries',()=>void view.run(async()=>{
-      if(matches.some(({value,index})=>value.status==='SOURCE_CHANGED' || !plan.rows[index].duplicateDecision || plan.rows[index].duplicateDecision==='REUSE' && plan.rows[index].reuseActivities?.some(item=>!item))) throw new Error('Resolve every matching entry before importing.');
-      const initial = {label:resume?.label || 'Toggl Track import',sourceKey:plan.sourceKey,sourceZone:sourceZone.value.trim(),sourceDateFormat:dateFormat.value,
+      if(matches.some(({value,index})=>value.status==='SOURCE_CHANGED' || !plan.rows[index].duplicateDecision || plan.rows[index].duplicateDecision==='REUSE' && (plan.rows[index].reuseWorkSessions || plan.rows[index].reuseActivities)?.some(item=>!item))) throw new Error('Resolve every matching entry before importing.');
+      const initial = {mode:plan.mode,label:resume?.label || 'Toggl Track import',sourceKey:plan.sourceKey,sourceZone:sourceZone.value.trim(),sourceDateFormat:dateFormat.value,
         fileFingerprint:fingerprint,selectionFingerprint:plan.selectionFingerprint,mappings:plan.mappings,selectedEntries:plan.selectedEntries,selectedNanos:plan.selectedNanos,sourceDiagnostics:diagnostics()};
       stop.hidden = false;
       const enabled = [...work.querySelectorAll('input,select,button')].filter(value=>!value.disabled && value!==stop);
@@ -266,21 +269,21 @@ export async function renderImports(view, zone) {
       const actions = node('div',undefined,'token-actions');
       if(job.state==='IMPORTING') actions.append(button('Resume',()=>void view.run(()=>locked(async()=>{
         resume = (await api.request(`/imports/jobs/${job.id}`)).data;if(!view.valid()) return;
-        sourceZone.value = resume.sourceZone;dateFormat.value = resume.sourceDateFormat || 'ISO';parsed = plan = null;work.hidden = true;file.value = '';createKey = null;
+        importMode.value = resume.mode || 'ACTIVITY';sourceZone.value = resume.sourceZone;dateFormat.value = resume.sourceDateFormat || 'ISO';parsed = plan = null;work.hidden = true;file.value = '';createKey = null;
         upload.feedback.textContent = 'Choose the original CSV, source user and row exclusions to resume.';file.focus();
       }),{write:true})));
       if(['IMPORTING','IMPORTED','BLOCKED','UNDOING'].includes(job.state)) {
         const undo = button(job.state==='UNDOING' ? 'Resume Undo' : 'Undo import',()=>void view.run(()=>undoReview(job)));undo.disabled = !view.canWrite;actions.append(undo);
       }
       actions.append(button('Download audit',()=>void view.run(()=>download(job))));
-      return [job.label,instantText(job.createdAt,zone),job.state,`${job.importedEntries} imported · ${job.skippedEntries} reused`,nanosText(BigInt(job.importedNanos)),actions];
+      return [`${job.label} · ${job.mode==='WORK_SESSION' ? 'Work sessions' : 'Activities'}`,instantText(job.createdAt,zone),job.state,`${job.importedEntries} imported · ${job.skippedEntries} reused`,nanosText(BigInt(job.importedNanos)),actions];
     });
     historyList.append(rows.length ? table(['Import','Created','State','Entries','Imported time','Actions'],rows) : node('p','No imports yet.','hint'));
     if(historyAfter) historyList.append(button('Load more imports',()=>void view.run(()=>loadHistory(historyAfter))));
   }
   async function undoReview(job) {
     const loaded = await api.request(`/imports/jobs/${job.id}`);if(!view.valid()) return;
-    const current = loaded.data;operations.replaceChildren(node('h3',`Undo ${current.label}`),node('p',`${current.importedEntries} created entries · ${current.activityCount} daily activities · ${current.catalogCount} catalog records reviewed. Reused records stay. Edited or referenced records require review.`));
+    const current = loaded.data;operations.replaceChildren(node('h3',`Undo ${current.label}`),node('p',`${current.importedEntries} created entries · ${current.mode==='WORK_SESSION' ? `${current.workSessionCount || 0} work sessions` : `${current.activityCount} daily activities`} · ${current.catalogCount} catalog records reviewed. Reused records stay. Edited or referenced records require review.`));
     const feedback = node('p','','form-feedback');feedback.setAttribute('role','status');
     const confirm = button(current.state==='UNDOING' ? 'Continue Undo' : 'Confirm Undo',()=>void view.run(async()=>{
       if(current.state!=='UNDOING') await api.request(`/imports/jobs/${current.id}/undo`,{method:'POST',key:crypto.randomUUID(),etag:loaded.etag});
@@ -306,8 +309,8 @@ export async function renderImports(view, zone) {
     operations.replaceChildren(node('h3','Review records retained or changed since import'));const choices = {};
     for(const target of conflicts) {
       const record = target.current;
-      const title = `${names[target.recordType] || 'Activity'}: ${record?.name || record?.summary || target.recordId}`;
-      const reasons = {REVIEW:'Edited since import.',REFERENCED:'Used by another import. Undo that import first or keep this record.',RUNNING:'This activity is running. Stop it first or keep it.',DEPENDENCY:'Other records still use this catalog record. Keep it or remove those dependencies separately.'};
+      const title = `${names[target.recordType] || 'Activity'}: ${record?.name || record?.title || record?.summary || target.recordId}`;
+      const reasons = {REVIEW:'Edited since import.',REFERENCED:'Used by another import. Undo that import first or keep this record.',RUNNING:'This record is running. Stop it first or keep it.',DEPENDENCY:'Other records still use this catalog record. Keep it or remove those dependencies separately.'};
       const card = node('div',undefined,'card account-card');card.append(node('h4',title),node('p',reasons[target.status] || target.status));
       if(record?.start) card.append(node('p',`${instantText(record.start,zone)} → ${record.end ? instantText(record.end,zone) : 'Running'}`));
       const choice = field(card,'Undo decision','',{choices:[['','Choose…'],['KEEP','Keep this record'],...(target.status==='REVIEW' ? [['DELETE','Delete the reviewed edited record']] : [])]});
@@ -339,7 +342,7 @@ export async function renderImports(view, zone) {
     if(!view.valid() || !parsed) return;
     const rows = parsed.rows.map(row=>({line:row.line,selected:row.personKey===selectedPerson || !row.personKey,excluded:!!row.excluded,
       errors:row.errors,warnings:row.warnings,ambiguousDuplicate:!!row.ambiguousDuplicate}));
-    saveJson([JSON.stringify({sourceZone:sourceZone.value.trim(),sourceDateFormat:dateFormat.value,diagnostics:diagnostics(),rows,
+    saveJson([JSON.stringify({mode:importMode.value,sourceZone:sourceZone.value.trim(),sourceDateFormat:dateFormat.value,diagnostics:diagnostics(),rows,
       serverReview:reviews.flat().map((value,index)=>({entry:index+1,...value}))},null,2)],'timekeeper-import-diagnostics.json');
   }
   function saveJson(chunks,filename) {

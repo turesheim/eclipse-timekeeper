@@ -10,7 +10,7 @@ final class ImportReferences {
     private final ImportLedger ledger;
     ImportReferences(ServerStore store) {this.store=store;this.ledger=new ImportLedger(store);}
     private static UUID id(String type,UUID record) {
-        if(!Set.of("CLIENT","PROJECT","TASK","LABEL","ACTIVITY").contains(type)) throw ApiFailure.validation();
+        if(!Set.of("CLIENT","PROJECT","TASK","LABEL","ACTIVITY","WORK_SESSION").contains(type)) throw ApiFailure.validation();
         return ImportLedger.identifier("import-uses",type,record.toString());
     }
     private Optional<ObjectNode> uses(String type,UUID record) {

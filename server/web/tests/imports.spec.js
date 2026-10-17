@@ -27,8 +27,28 @@ async function undo(page,index) {
   await page.getByRole('button',{name:'Confirm Undo',exact:true}).click();
   await expect(history).toContainText('Undo complete');
 }
+test('Toggl defaults to work sessions with client totals, repeat detection and whole-job Undo',async({page,request})=>{
+  await login(page);const before=await api(request,'/data/export');
+  await expect(page.getByLabel('Import as',{exact:true})).toHaveValue('WORK_SESSION');await review(page);
+  await expect(page.getByLabel('New project name',{exact:true})).toHaveCount(0);await expect(page.getByLabel('New label name',{exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
+  const imported=await api(request,'/data/export'),sessions=imported.workSessions.filter(value=>!before.workSessions.some(old=>old.id===value.id));expect(sessions).toHaveLength(7);
+  for(const type of ['activities','projects','tasks','labels']) expect(imported[type].length).toBe(before[type].length);
+  expect(sessions.every(value=>value.title===value.summary && value.clientId===sessions[0].clientId)).toBe(true);
+  expect(sessions.reduce((sum,value)=>sum+(+new Date(value.end)-+new Date(value.start)),0)).toBe(151462000);
+  const job=(await api(request,'/imports')).items.find(value=>value.mode==='WORK_SESSION');expect(job.workSessionCount).toBe(7);expect(job.importedNanos).toBe('151462000000000');
+  await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await page.locator('[data-tab=track]').click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
+  await expect(page.locator(`#track-clients [data-track-client="${sessions[0].clientId}"]`)).toContainText('42h 4m');
+  await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();await review(page);
+  await expect(page.locator('#account-content')).toContainText('7 already imported');await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
+  expect((await api(request,'/data/export')).workSessions.length).toBe(imported.workSessions.length);
+  const history=(await api(request,'/imports')).items.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));await undo(page,history.findIndex(value=>value.id!==job.id && value.mode==='WORK_SESSION'));
+  const updated=(await api(request,'/imports')).items.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));await undo(page,updated.findIndex(value=>value.id===job.id));
+  const after=await api(request,'/data/export');expect(after.workSessions.length).toBe(before.workSessions.length);expect(after.clients.length).toBe(before.clients.length);
+});
+
 test('Toggl CSV worker, reviewed mappings, repeat import and whole-job Undo preserve exact time',async({page,request})=>{
-  await login(page);const before = await api(request,'/data/export');
+  await login(page);await page.getByLabel('Import as',{exact:true}).selectOption('ACTIVITY');const before = await api(request,'/data/export');
   await review(page);await expect(page.locator('#account-content')).toContainText('7 selected entries');
   const accessibility = await new AxeBuilder({page}).include('#account-page').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(accessibility.violations).toEqual([]);
   await page.screenshot({path:'test-results/toggl-import-review.png',fullPage:true});
@@ -56,7 +76,7 @@ test('Toggl CSV worker, reviewed mappings, repeat import and whole-job Undo pres
 });
 
 test('Toggl import resumes committed batches after a lost reply and reload, then reviews edited records during Undo',async({page,request})=>{
-  await login(page);const before = await api(request,'/data/export');
+  await login(page);await page.getByLabel('Import as',{exact:true}).selectOption('ACTIVITY');const before = await api(request,'/data/export');
   const header = 'Description,Duration,Member,Email,Project,Tags,Start date,Start time,Stop date,Stop time';
   const lines = Array.from({length:201},(_,n)=>{
     const start = new Date(Date.UTC(2025,9,20,9,0,n)),end = new Date(+start+1000);
@@ -109,7 +129,7 @@ test('Toggl worker and previous-account preview are cleared on sign-out and acco
 });
 
 test('Toggl source selection, rejected-row diagnostics and independent task descriptions are explicitly reviewed',async({page,request})=>{
-  await login(page);const sent = [];page.on('request',request=>{if(request.url().includes('/api/v1/imports') && request.postData()) sent.push(request.postData());});
+  await login(page);await page.getByLabel('Import as',{exact:true}).selectOption('ACTIVITY');const sent = [];page.on('request',request=>{if(request.url().includes('/api/v1/imports') && request.postData()) sent.push(request.postData());});
   const csv = 'Description,Duration,Member,Email,Client,Project,Task,Tags,Start date,Start time,Stop date,Stop time,Billable\r\n'
     +'"=SUM(1,2)",01:00:00,Selected member,selected@example.invalid,Selected client,Selected project,Task name,"Tag one,Tag two",2025-10-20,09:00:00,2025-10-20,10:00:00,Yes\r\n'
     +'Wrong duration,00:30:00,Selected member,selected@example.invalid,Selected client,Selected project,,,2025-10-20,11:00:00,2025-10-20,12:00:00,No\r\n'

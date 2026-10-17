@@ -2,6 +2,7 @@ package net.resheim.timekeeper.server;
 
 import static net.resheim.timekeeper.server.JsonValues.*;
 import java.util.*;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.*;
 import net.resheim.eclipse.timekeeper.domain.Activity;
 
@@ -20,11 +21,16 @@ final class ImportProvenance {
     }
     Optional<ObjectNode> active(ObjectNode job,String fingerprint,int occurrence) {
         digest(fingerprint);if(occurrence<0 || occurrence>100000) throw ApiFailure.validation();
-        String authority=hash(job.path("sourceKey").asText()+"\n"+fingerprint+"\n"+occurrence);
+        String authority=authority(job,fingerprint,occurrence);
         UUID key=ImportLedger.identifier("entry-key",authority);
         var found=ledger.find(ImportLedger.Kind.IMPORT_KEY,key);
         if(found.isPresent() && !authority.equals(found.get().path("authority").asText())) throw ApiFailure.conflict();
         return found;
+    }
+    private static String authority(ObjectNode job,String fingerprint,int occurrence) {
+        // Keep legacy activity claims stable; sessions have their own source namespace.
+        return hash(("WORK_SESSION".equals(job.path("mode").asText()) ? "WORK_SESSION\n" : "")
+                +job.path("sourceKey").asText()+"\n"+fingerprint+"\n"+occurrence);
     }
     ObjectNode record(ObjectNode job,String fingerprint,String contentFingerprint,int occurrence,List<Activity> activities,boolean created) {
         return record(job,fingerprint,contentFingerprint,occurrence,activities,created,false);
@@ -34,34 +40,40 @@ final class ImportProvenance {
     }
     /** Retire only this item's claim; a later re-import may already own a replacement. */
     void releaseIfMissing(ObjectNode job,ObjectNode item) {
-        for(var part:item.path("parts")) if(store.find("ACTIVITY",uuid(part.get("id"))).isPresent()) return;
+        for(var part:item.path("parts")) if(store.find(item.path("recordType").asText("ACTIVITY"),uuid(part.get("id"))).isPresent()) return;
         var claim=active(job,item.path("fingerprint").asText(),item.path("occurrence").asInt());
         if(claim.isPresent() && item.path("id").asText().equals(claim.get().path("itemId").asText()))
             ledger.remove(ImportLedger.Kind.IMPORT_KEY,claim.get());
     }
     private ObjectNode record(ObjectNode job,String fingerprint,String contentFingerprint,int occurrence,List<Activity> activities,boolean created,boolean reuseClaim) {
+        if(activities.stream().anyMatch(value->!value.ownerId().value().equals(store.owner()))) throw ApiFailure.validation();
+        return recordSnapshots(job,fingerprint,contentFingerprint,occurrence,activities.stream().map(value->(JsonNode)snapshot(store.owner(),value)).toList(),created,reuseClaim);
+    }
+    ObjectNode recordSnapshots(ObjectNode job,String fingerprint,String contentFingerprint,int occurrence,List<JsonNode> activities,boolean created,boolean reuseClaim) {
         digest(fingerprint);digest(contentFingerprint);
+        String type="WORK_SESSION".equals(job.path("mode").asText()) ? "WORK_SESSION" : "ACTIVITY";
         var claim=active(job,fingerprint,occurrence);
         if(activities.isEmpty() || activities.size()>1000 || (!reuseClaim && claim.isPresent())
                 || (reuseClaim && (claim.isEmpty() || !contentFingerprint.equals(claim.get().path("contentFingerprint").asText())))) throw ApiFailure.conflict();
-        if(activities.stream().anyMatch(value->!value.ownerId().value().equals(store.owner()) || value.end().isEmpty())) throw ApiFailure.validation();
-        if(activities.stream().map(Activity::id).distinct().count()!=activities.size()) throw ApiFailure.validation();
+        if(activities.stream().anyMatch(value->!value.path("ownerId").asText().equals(store.owner()) || !value.hasNonNull("end"))) throw ApiFailure.validation();
+        if(activities.stream().map(value->value.path("id").asText()).distinct().count()!=activities.size()) throw ApiFailure.validation();
         for(var activity:activities) {
-            var current=store.find("ACTIVITY",activity.id().value()).orElseThrow(ApiFailure::notFound);
-            if(!hash(canonical(current).toString()).equals(baseline(store.owner(),activity))) throw new ApiFailure(412,"STALE_VERSION");
+            var current=store.find(type,uuid(activity.get("id"))).orElseThrow(ApiFailure::notFound);
+            if(!hash(canonical(current).toString()).equals(hash(canonical(activity).toString()))) throw new ApiFailure(412,"STALE_VERSION");
         }
-        var item=object();item.put("kind","ENTRY");item.put("created",created);item.put("fingerprint",fingerprint);
+        var item=object();item.put("kind","ENTRY");item.put("recordType",type);item.put("created",created);item.put("fingerprint",fingerprint);
         item.put("contentFingerprint",contentFingerprint);item.put("occurrence",occurrence);item.put("state","PENDING");
         if(reuseClaim) item.put("sharedClaimItemId",claim.orElseThrow().path("itemId").asText());
-        var parts=item.putArray("parts");activities.forEach(value->parts.add(part(store.owner(),value,true)));
+        var parts=item.putArray("parts");activities.forEach(value->parts.add(object().put("id",value.path("id").asText())
+                .put("baselineVersion",value.path("version").asLong()).put("baselineHash",hash(canonical(value).toString())).set("baseline",value.deepCopy())));
         var saved=ledger.appendItem(job,item);
-        String authority=hash(job.path("sourceKey").asText()+"\n"+fingerprint+"\n"+occurrence);
+        String authority=authority(job,fingerprint,occurrence);
         UUID keyId=ImportLedger.identifier("entry-key",authority);
         var key=object();key.put("authority",authority);key.put("jobId",job.path("id").asText());key.put("itemId",saved.path("id").asText());
         key.put("contentFingerprint",contentFingerprint);if(!reuseClaim) ledger.insert(ImportLedger.Kind.IMPORT_KEY,keyId,key);
         for(var activity:activities) {
-            if(created) origin(job,saved,activity,true);
-            new ImportReferences(store).add("ACTIVITY",activity.id().value(),uuid(job.get("id")),uuid(saved.get("id")),created);
+            if(created && type.equals("ACTIVITY")) origin(job,saved,(Activity)decode(type,activity),true);
+            new ImportReferences(store).add(type,uuid(activity.get("id")),uuid(job.get("id")),uuid(saved.get("id")),created);
         }
         return saved;
     }

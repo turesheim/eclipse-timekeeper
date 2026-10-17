@@ -6,7 +6,8 @@ export async function importDigest(value) {
 }
 
 /** Stable source keys exclude filenames and chosen destination names/IDs. All defaults are reviewed. */
-export async function importPlan(sourceRows, personKey, {fallbackClient, fallbackProject}) {
+export async function importPlan(sourceRows, personKey, {fallbackClient, fallbackProject, mode = 'WORK_SESSION'}) {
+  if(!['WORK_SESSION','ACTIVITY'].includes(mode)) throw new Error('Choose an import type.');
   const sourceKey = await importDigest(personKey), definitions = new Map(), rows = [];
   async function mapping(identity, resourceType, name, parentKey) {
     const key = await importDigest(JSON.stringify(identity));
@@ -21,24 +22,24 @@ export async function importPlan(sourceRows, personKey, {fallbackClient, fallbac
   let selectedNanos = 0n;
   for (const source of sourceRows) {
     if (source.personKey !== personKey || source.errors.length || source.excluded) continue;
-    const clientName = source.client || fallbackClient?.trim(), projectName = source.project || fallbackProject?.trim();
-    if (!clientName || !projectName) throw new Error('Choose fallback names for missing clients and projects.');
-    const clientKey = await mapping(['CLIENT', source.client], 'CLIENT', clientName);
-    const projectKey = await mapping(['PROJECT', source.client, source.project], 'PROJECT', projectName, clientKey);
-    const taskKey = source.task ? await mapping(['TASK', source.client, source.project, source.task], 'TASK', source.task, projectKey) : null;
+    const clientName = source.client || (mode === 'WORK_SESSION' ? source.project : '') || fallbackClient?.trim(), projectName = source.project || fallbackProject?.trim();
+    if (!clientName || mode === 'ACTIVITY' && !projectName) throw new Error('Choose fallback names for missing clients and projects.');
+    const clientKey = await mapping(mode === 'WORK_SESSION' ? ['WORK_SESSION_CLIENT', source.client, source.client ? '' : source.project] : ['CLIENT', source.client], 'CLIENT', clientName);
+    const projectKey = mode === 'ACTIVITY' ? await mapping(['PROJECT', source.client, source.project], 'PROJECT', projectName, clientKey) : null;
+    const taskKey = mode === 'ACTIVITY' && source.task ? await mapping(['TASK', source.client, source.project, source.task], 'TASK', source.task, projectKey) : null;
     const labelKeys = [];
-    for (const tag of source.tags) labelKeys.push(await mapping(['LABEL', tag], 'LABEL', tag));
+    for (const tag of mode === 'ACTIVITY' ? source.tags : []) labelKeys.push(await mapping(['LABEL', tag], 'LABEL', tag));
     rows.push({sourceKey, sourceId: source.sourceId, ...(source.line ? {sourceLine:source.line} : {}), start: source.start, end: source.end,
       durationNanos: source.durationNanos.toString(), client: source.client, project: source.project, task: source.task,
-      summary: source.summary, tags: source.tags, projectKey, taskKey, labelKeys, occurrence: source.occurrence,
+      summary: source.summary, tags: source.tags, ...(mode === 'WORK_SESSION' ? {clientKey, title:source.summary.trim().slice(0,1000).replace(/[\uD800-\uDBFF]$/, '') || 'Imported work session'} : {projectKey, taskKey, labelKeys}), occurrence: source.occurrence,
       duplicateReviewed: !!source.duplicateReviewed, ...(source.duplicateDecision ? {duplicateDecision: source.duplicateDecision} : {})});
     selectedNanos += source.durationNanos;
   }
   if (!rows.length) throw new Error('Select at least one valid source entry.');
   if (definitions.size > 1000) throw new Error('Split this export into files with at most 1,000 catalogue mappings.');
-  const selection = rows.map(({projectKey, taskKey, labelKeys, duplicateReviewed, duplicateDecision, sourceLine, ...source}) => source);
+  const selection = rows.map(({clientKey, projectKey, taskKey, labelKeys, duplicateReviewed, duplicateDecision, sourceLine, ...source}) => source);
   const selectionFingerprint = await importDigest(JSON.stringify(selection));
-  return {sourceKey, mappings: [...definitions.values()], rows, selectionFingerprint, selectedEntries: rows.length, selectedNanos: selectedNanos.toString()};
+  return {mode, sourceKey, mappings: [...definitions.values()], rows, selectionFingerprint, selectedEntries: rows.length, selectedNanos: selectedNanos.toString()};
 }
 
 export function importDayParts(row, zone) {
@@ -62,11 +63,11 @@ export function importDayParts(row, zone) {
 }
 
 /** Deterministic layout for restart: count source rows separately from daily records. */
-export function importBatches(rows, zone, offset = 0) {
+export function importBatches(rows, zone, offset = 0, mode = 'ACTIVITY') {
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > rows.length) throw new Error('The import progress is inconsistent.');
   const batches = []; let batch = [], parts = 0;
   for (const row of rows.slice(offset)) {
-    const count = importDayParts(row, zone);
+    const count = mode === 'WORK_SESSION' ? 1 : importDayParts(row, zone);
     if (batch.length === 100 || parts + count > 1000) {batches.push(batch); batch = []; parts = 0;}
     batch.push(row); parts += count;
   }

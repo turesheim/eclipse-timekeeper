@@ -7,7 +7,7 @@ self.onmessage = async ({data}) => {
     const {file, options} = data;
     if(data.operation === 'plan') {
       const plan = await importPlan(data.rows, data.personKey, options);
-      const batches = importBatches(plan.rows, data.reportZone).map(rows => rows.length);
+      const batches = importBatches(plan.rows, data.reportZone, 0, plan.mode).map(rows => rows.length);
       self.postMessage({plan, batches}); return;
     }
     if (!(file instanceof Blob) || file.size > 20 * 1024 * 1024) throw new Error('Choose a UTF-8 CSV file no larger than 20 MiB.');

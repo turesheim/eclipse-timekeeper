@@ -8,7 +8,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.*;
 import io.restassured.response.Response;
 import io.quarkus.test.junit.*;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @QuarkusTest @TestProfile(ImportHttpTest.Profile.class)
 class ImportHttpTest {
@@ -34,25 +35,27 @@ class ImportHttpTest {
                 .put("durationNanos","3600000000000").put("client","Source client").put("project","Source project").put("task","")
                 .put("summary","HTTP interval").put("projectKey",hash("project")).put("occurrence",0);row.putArray("tags");row.putArray("labelKeys");return array().add(row);
     }
-    @Test void completeHttpImportAndUndoArePrivateConditionalAndDurablyIdempotent() {
+    @ParameterizedTest @ValueSource(booleans={false,true}) void completeHttpImportAndUndoArePrivateConditionalAndDurablyIdempotent(boolean sessions) {
+        var source=source();var rows=rows();
+        if(sessions) {source.put("mode","WORK_SESSION");((ArrayNode)source.get("mappings")).remove(1);var row=(ObjectNode)rows.get(0);row.remove(List.of("projectKey","labelKeys"));row.put("clientKey",hash("client")).put("title","HTTP session");}
         assertEquals(401,call(null,"GET","/imports",null,null,null).statusCode());
-        assertEquals(403,call("test-read","POST","/imports/toggl/jobs",source(),UUID.randomUUID().toString(),null).statusCode());
-        var preview=object().put("sourceKey",hash("source"));preview.set("mappings",source().get("mappings"));preview.set("rows",rows());
+        assertEquals(403,call("test-read","POST","/imports/toggl/jobs",source,UUID.randomUUID().toString(),null).statusCode());
+        var preview=object().put("sourceKey",hash("source")).put("mode",sessions ? "WORK_SESSION" : "ACTIVITY");preview.set("mappings",source.get("mappings"));preview.set("rows",rows);
         assertEquals("NEW",json(call("test-a","POST","/imports/toggl/preview",preview,null,null),200).path("rows").get(0).path("status").asText());
-        var invalid=source().put("ownerId","b");assertEquals(400,call("test-a","POST","/imports/toggl/jobs",invalid,UUID.randomUUID().toString(),null).statusCode());
-        String key=UUID.randomUUID().toString();var created=call("test-a","POST","/imports/toggl/jobs",source(),key,null);var job=json(created,201);
-        assertEquals(job,json(call("test-a","POST","/imports/toggl/jobs",source(),key,null),201));
+        var invalid=source.deepCopy().put("ownerId","b");assertEquals(400,call("test-a","POST","/imports/toggl/jobs",invalid,UUID.randomUUID().toString(),null).statusCode());
+        String key=UUID.randomUUID().toString();var created=call("test-a","POST","/imports/toggl/jobs",source,key,null);var job=json(created,201);
+        assertEquals(job,json(call("test-a","POST","/imports/toggl/jobs",source,key,null),201));
         String path="/imports/jobs/"+job.path("id").asText();
         assertEquals(404,call("test-b","GET",path,null,null,null).statusCode());
         assertEquals(404,call("test-b","GET",path+"/items",null,null,null).statusCode());
-        assertEquals(404,call("test-b","POST",path+"/preview",object().set("rows",rows()),null,null).statusCode());
-        var reviewed=json(call("test-a","POST",path+"/preview",object().set("rows",rows()),null,null),200);
-        var batch=object().put("reviewToken",reviewed.path("reviewToken").asText()).put("finished",true);batch.set("rows",rows());
+        assertEquals(404,call("test-b","POST",path+"/preview",object().set("rows",rows),null,null).statusCode());
+        var reviewed=json(call("test-a","POST",path+"/preview",object().set("rows",rows),null,null),200);
+        var batch=object().put("reviewToken",reviewed.path("reviewToken").asText()).put("finished",true);batch.set("rows",rows);
         var receipt=json(call("test-a","POST",path+"/batches/0",batch,null,null),200);assertEquals("IMPORTED",receipt.path("state").asText());
         assertEquals(receipt,json(call("test-a","POST",path+"/batches/0",batch,null,null),200));
         var changed=batch.deepCopy().put("finished",false);assertEquals(409,call("test-a","POST",path+"/batches/0",changed,null,null).statusCode());
         var current=call("test-a","GET",path,null,null,null);assertEquals("IMPORTED",json(current,200).path("state").asText());
-        assertEquals(3,json(call("test-a","GET",path+"/items",null,null,null),200).path("items").size());
+        assertEquals(sessions ? 2 : 3,json(call("test-a","GET",path+"/items",null,null,null),200).path("items").size());
         assertEquals(1,json(call("test-a","GET","/imports?limit=1",null,null,null),200).path("items").size());
         assertEquals(0,json(call("test-b","GET","/imports",null,null,null),200).path("items").size());
         assertEquals(404,call("test-b","GET","/imports?after="+job.path("id").asText(),null,null,null).statusCode());

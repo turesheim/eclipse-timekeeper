@@ -3310,7 +3310,7 @@
         "tags": [
           "WorkSessions"
         ],
-        "description": "Read the session and that owner’s overlapping activities, including running timers, in one owner-locked snapshot. Sum only each activity’s overlap; covered time is the union of those overlaps. Session changes automatically recompute context without altering activities. No explicit association is used."
+        "description": "Read the session and that owner\u2019s overlapping activities, including running timers, in one owner-locked snapshot. Sum only each activity\u2019s overlap; covered time is the union of those overlaps. Session changes automatically recompute context without altering activities. No explicit association is used."
       },
       "parameters": [
         {
@@ -9000,6 +9000,21 @@
               "$ref": "#/components/schemas/ImportReuseRecord"
             },
             "maxItems": 1000
+          },
+          "clientKey": {
+            "$ref": "#/components/schemas/ImportDigest"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "reuseWorkSessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportReuseRecord"
+            },
+            "maxItems": 1
           }
         },
         "required": [
@@ -9012,11 +9027,23 @@
           "task",
           "summary",
           "tags",
-          "projectKey",
-          "labelKeys",
           "occurrence"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "required": [
+              "clientKey",
+              "title"
+            ]
+          },
+          {
+            "required": [
+              "projectKey",
+              "labelKeys"
+            ]
+          }
+        ]
       },
       "TogglImportRowsInput": {
         "type": "object",
@@ -9055,6 +9082,15 @@
             },
             "maxItems": 100,
             "minItems": 1
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "WORK_SESSION",
+              "ACTIVITY"
+            ],
+            "default": "ACTIVITY",
+            "description": "Web import defaults to WORK_SESSION. Omission retains legacy ACTIVITY behavior; the chosen mode is immutable for a job."
           }
         },
         "required": [
@@ -9127,7 +9163,11 @@
           },
           "sourceDateFormat": {
             "type": "string",
-            "enum": ["ISO", "DMY", "MDY"],
+            "enum": [
+              "ISO",
+              "DMY",
+              "MDY"
+            ],
             "default": "ISO"
           },
           "sourceZone": {
@@ -9150,6 +9190,15 @@
           },
           "selectedNanos": {
             "$ref": "#/components/schemas/ImportNanos"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "WORK_SESSION",
+              "ACTIVITY"
+            ],
+            "default": "ACTIVITY",
+            "description": "Web import defaults to WORK_SESSION. Omission retains legacy ACTIVITY behavior; the chosen mode is immutable for a job."
           }
         },
         "required": [
@@ -9274,6 +9323,15 @@
           },
           "selectedNanos": {
             "$ref": "#/components/schemas/ImportNanos"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "WORK_SESSION",
+              "ACTIVITY"
+            ],
+            "default": "ACTIVITY",
+            "description": "Web import defaults to WORK_SESSION. Omission retains legacy ACTIVITY behavior; the chosen mode is immutable for a job."
           }
         },
         "required": [

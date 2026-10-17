@@ -45,7 +45,8 @@ def main():
     evidence = {'twoReplicas': False, 'concurrentBatch': False, 'restartReceipt': False,
                 'exactTime': False, 'ownerIsolation': False, 'laterImportProtection': False,
                 'editedDerivedParts': False, 'boundedUndo': False, 'protectedRestore': False,
-                'deliberateReimport': False, 'oldUndoReplay': False}
+                'deliberateReimport': False, 'oldUndoReplay': False, 'workSessionDurability': False,
+                'workSessionUndo': False, 'workSessionModeIsolation': False}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.unlink(missing_ok=True)
     args.output.with_suffix('.failure.log').unlink(missing_ok=True)
@@ -227,6 +228,19 @@ def main():
             assert get(2, job_path(job))['importedEntries'] == 100
             evidence['concurrentBatch'] = True
 
+            # An explicit session job shares the ledger but has independent source claims.
+            session_rows = [{**{key: value for key, value in row.items() if key not in ('projectKey', 'taskKey', 'labelKeys')},
+                             'clientKey': digest('client'), 'title': row['summary']} for row in rows[:2]]
+            session_input = {**source(session_rows, 'Session history'), 'mode': 'WORK_SESSION', 'mappings': definitions[:1]}
+            session_job = expect(api(2, 'POST', '/imports/toggl/jobs', session_input, key=str(uuid.uuid4())), 201)
+            session_body = batch(session_job, session_rows[:1], 0, False)
+            with ThreadPoolExecutor(2) as workers:
+                session_replies = [expect(future.result()) for future in [workers.submit(api, index, 'POST', job_path(session_job) + '/batches/0', session_body) for index in (1, 2)]]
+            assert session_replies[0] == session_replies[1] and session_replies[0]['workSessionCount'] == 1
+            assert get(1, job_path(session_job))['importedNanos'] == rows[0]['durationNanos']
+            expect(api(1, 'GET', job_path(session_job), owner='b'), 404)
+            evidence['workSessionModeIsolation'] = True
+
             backup = folder / 'database.dump'
             with backup.open('wb') as output:
                 result = subprocess.run(['docker', 'exec', database, 'pg_dump', '-U', 'postgres', '--format=custom', 'postgres'], stdout=output, stderr=subprocess.PIPE, timeout=60)
@@ -242,6 +256,8 @@ def main():
             start(2)
             assert expect(api(2, 'POST', job_path(job) + '/batches/0', first_body)) == replies[0]
             assert get(1, job_path(job))['nextBatch'] == 1
+            assert expect(api(1, 'POST', job_path(session_job) + '/batches/0', session_body)) == session_replies[0]
+            assert get(2, job_path(session_job))['nextBatch'] == 1
             evidence['restartReceipt'] = True
             changed = {**first_body, 'finished': True}
             expect(api(1, 'POST', job_path(job) + '/batches/0', changed), 409)
@@ -306,6 +322,34 @@ def main():
             assert expect(api(1, 'POST', job_path(job) + '/undo/batches/' + str(index), body)) == receipt
             assert len(get(2, '/data/export')['activities']) == 101
             evidence['oldUndoReplay'] = True
+            assert get(2, job_path(session_job))['state'] == 'IMPORTING'
+            assert expect(api(1, 'POST', job_path(session_job) + '/batches/0', session_body)) == session_replies[0]
+            before_sessions = get(2, '/data/export')
+            expect(api(1, 'POST', job_path(session_job) + '/batches/1', batch(session_job, session_rows[1:], 1, True)))
+            completed_sessions = get(2, '/data/export')
+            assert len(completed_sessions['workSessions']) == 2
+            for collection in ('activities', 'projects', 'tasks', 'labels'):
+                assert len(completed_sessions[collection]) == len(before_sessions[collection])
+            assert get(2, job_path(session_job))['workSessionCount'] == 2
+            evidence['workSessionDurability'] = True
+            current_session = completed_sessions['workSessions'][0]
+            session_current = api(2, 'GET', '/work-sessions/' + current_session['id'])
+            expect(api(1, 'PUT', '/work-sessions/' + current_session['id'],
+                       {**{key: current_session[key] for key in ('start', 'end', 'title', 'clientId')}, 'summary': 'Edited attendance'}, etag=session_current[2]['ETag']))
+            repeat_sessions = expect(api(2, 'POST', '/imports/toggl/jobs', session_input, key=str(uuid.uuid4())), 201)
+            assert any(row['status'] == 'REUSED_EDITED' for row in get_preview(repeat_sessions, session_rows)['rows'])
+            expect(api(1, 'POST', job_path(repeat_sessions) + '/batches/0', batch(repeat_sessions, session_rows, 0, True)))
+            assert get(2, job_path(repeat_sessions))['skippedEntries'] == 2
+            begin_undo(session_job)
+            assert all(target['status'] == 'REFERENCED' for target in get(2, job_path(session_job) + '/undo/preview')['targets'])
+            assert undo(repeat_sessions)[0]['state'] == 'UNDONE'
+            assert undo(session_job, review_edits=True)[0]['state'] == 'UNDONE'
+            assert get(2, '/data/export')['workSessions'] == []
+            assert len(get(1, '/data/export')['activities']) == 101
+            new_sessions = expect(api(2, 'POST', '/imports/toggl/jobs', session_input, key=str(uuid.uuid4())), 201)
+            expect(api(1, 'POST', job_path(new_sessions) + '/batches/0', batch(new_sessions, session_rows, 0, True)))
+            assert len(get(2, '/data/export')['workSessions']) == 2
+            evidence['workSessionUndo'] = True
             evidence['sourceCommit'] = get(1, '/server')['commit']
             evidence['postgresImage'] = args.postgres_image
             args.output.write_text(json.dumps(evidence, indent=2) + '\n')

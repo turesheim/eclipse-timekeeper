@@ -35,7 +35,7 @@ final class ImportUndo {
                 var parts=item.path("parts");
                 while(partCursor<parts.size() && targets.size()<MAX_TARGETS) {
                     var part=parts.get(partCursor);
-                    targets.add(target(job,item,"ACTIVITY",uuid(part.get("id")),part,partCursor));partCursor++;
+                    targets.add(target(job,item,item.path("recordType").asText("ACTIVITY"),uuid(part.get("id")),part,partCursor));partCursor++;
                 }
                 if(partCursor<parts.size()) break;
             } else if(phase.equals("CATALOG") && !entry) {
@@ -59,10 +59,10 @@ final class ImportUndo {
         if(!item.path("created").asBoolean()) status="REUSED";
         else if(current.isEmpty()) status="MISSING";
         else if(new ImportReferences(store).usedByAnotherImport(type,id,uuid(job.get("id")))) status="REFERENCED";
-        else if(type.equals("ACTIVITY") && !current.get().hasNonNull("end")) status="RUNNING";
-        else if(!type.equals("ACTIVITY") && dependent(type,id)) status="DEPENDENCY";
+        else if(entryType(type) && !current.get().hasNonNull("end")) status="RUNNING";
+        else if(!entryType(type) && dependent(type,id)) status="DEPENDENCY";
         else {
-            String expected=type.equals("ACTIVITY") ? baseline.path("baselineHash").asText() : hash(canonical(baseline.get("baseline")).toString());
+            String expected=entryType(type) ? baseline.path("baselineHash").asText() : hash(canonical(baseline.get("baseline")).toString());
             status=baseline.path("baselineVersion").asLong(-1)==current.get().path("version").asLong()
                     && expected.equals(hash(canonical(current.get()).toString())) ? "DELETE" : "REVIEW";
         }
@@ -70,6 +70,7 @@ final class ImportUndo {
         current.ifPresent(value->{target.put("etag",etag(value));target.set("current",value);});
         return target;
     }
+    private static boolean entryType(String type) {return type.equals("ACTIVITY") || type.equals("WORK_SESSION");}
     private boolean dependent(String type,UUID id) {
         // Relations are owner-scoped and maintained by the normal domain repositories.
         return switch(type) {
@@ -119,6 +120,7 @@ final class ImportUndo {
         var service=store.service();
         switch(type) {
             case "ACTIVITY" -> service.deleteActivity(new DeleteActivity(new ActivityId(id),version));
+            case "WORK_SESSION" -> store.workSessionService().deleteWorkSession(new DeleteWorkSession(new WorkSessionId(id),version));
             case "TASK" -> service.deleteTask(new DeleteTask(new TaskId(id),version));
             case "PROJECT" -> service.deleteProject(new DeleteProject(new ProjectId(id),version));
             case "LABEL" -> service.deleteLabel(new DeleteLabel(new LabelId(id),version));
