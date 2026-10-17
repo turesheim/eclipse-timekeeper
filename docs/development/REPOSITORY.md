@@ -1,7 +1,10 @@
 # Repository layout and development
 
-Run the commands below from the repository root. Maven requires Java 21 and uses
-the checked-in wrapper; Node is needed only for browser testing.
+Run the commands below from the repository root. Use JDK 21, Python 3.13 and
+Node.js 24 to match CI. The checked-in Maven wrapper selects Maven 3.9.16.
+Python runs contract, packaging and acceptance tooling; Node.js is needed for
+web tests and vendored asset maintenance. The production web client needs no
+Node service.
 
 | Directory | Contents |
 | --- | --- |
@@ -23,6 +26,19 @@ this layout change preserves bundle IDs, package names and Maven coordinates.
 
 ## Build and test
 
+Create a Python virtual environment and install the contract validators before
+running either reactor. The server verification also invokes Python HTTP tests.
+These commands use a sibling directory to keep the environment out of the
+checkout:
+
+```sh
+python3 -m venv ../timekeeper-venv
+. ../timekeeper-venv/bin/activate
+python -m pip install -r common/api/tests/requirements.txt
+```
+
+Then build and run the standalone checks:
+
 ```sh
 ./mvnw -B -ntp clean verify
 ./mvnw -B -ntp -f server/pom.xml clean verify
@@ -31,6 +47,20 @@ python3 -m unittest discover -s scripts/tests -v
 npm ci --ignore-scripts --prefix server/web
 npm test --prefix server/web
 ```
+
+On Windows, activate the environment with
+`..\timekeeper-venv\Scripts\Activate.ps1` in PowerShell and use `mvnw.cmd`
+instead of `./mvnw`. With the environment active, use `python` if `python3` is
+not available.
+
+The root reactor runs Eclipse UI tests and needs a graphical session. On Linux,
+install Xvfb and run its Maven command with
+`xvfb-run --server-args="-screen 0, 1024x768x24" --auto-servernum ./mvnw -B -ntp clean verify`
+when no display is available. Native idle detection additionally requires
+X11/XScreenSaver. The standalone server and Node unit tests need no display.
+The Node commands above run unit/asset checks; browser acceptance additionally
+requires Playwright browser installation and a packaged server, as described
+in the [web acceptance guide](WEB-CLIENT.md#automated-verification).
 
 See [remote Eclipse acceptance](REMOTE-ECLIPSE.md),
 [remote Mylyn acceptance](REMOTE-MYLYN.md),
@@ -77,7 +107,8 @@ the checkout directories.
 
 ## Documentation
 
-Architecture and the normative API policy live in `docs/architecture`.
+The [component overview](../architecture/README.md), data model and normative
+API policy live in `docs/architecture`.
 Operational instructions live in `docs/operations`; development and release
 instructions live here. `docs/verification` preserves dated acceptance evidence,
 including historical commands and source identities. Current commands use this

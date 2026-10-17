@@ -50,14 +50,24 @@ database baseline.
   reports, restart and native idle detection.
 - Added Linux/X11, macOS and Windows CI coverage. Installed-IDE acceptance was
   completed on macOS Apple Silicon.
-
+- Added the Quarkus API server, remote Eclipse backend and bundled browser
+  client, with account-scoped records, authentication, optimistic concurrency
+  and committed change notifications across connected clients.
+- Added browser account setup, sign-in, personal API tokens and email recovery,
+  plus server/web clients grouping projects and work sessions.
+- Added Bootstrap 5.3.8 styling, Track month views and calendar session
+  creation, dragging and resizing. Browser session editors use native date/time
+  pickers in the account's time zone, with explicit choices for repeated DST times.
 - Added independent work sessions in Eclipse and the web client: start/stop,
-  retrospective editing, taskless activities, association of existing intervals,
-  and exact tracked, covered and unallocated time. Sessions can span midnight;
-  stopping a session leaves activity timers running.
-- Added portable domain-v2 JSON/CSV interchange with work-session associations,
-  plus native CSV session storage and guarded schema-2-to-3 upgrades after a
-  verified private backup.
+  retrospective editing, taskless activities and reports of exact tracked,
+  covered and unallocated time derived from owner-scoped interval overlap.
+  Sessions can span midnight; stopping a session leaves activity timers running.
+  Manual activity/session associations are retired.
+- Added portable domain-v3 JSON/CSV interchange with clients, independent work
+  sessions, required project/session client links and session titles. Imports
+  retain v1/v2 compatibility and ignore retired activity/session links.
+  Native CSV includes session storage; known schema-2 databases receive guarded
+  upgrades to schema 3 after a verified private backup.
 
 ### Upgrade notes
 

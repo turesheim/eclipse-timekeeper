@@ -11,10 +11,17 @@ startup allow-list for tables and columns.
 
 A `PROJECT` groups zero or more `TASK` records. A task may point to another task
 in the same project through `PARENT_TASK`, forming the project > task > subtask
-tree. `ACTIVITY` records are time intervals with an optional task, direct project
-and independent `WORK_SESSION`. Activities may have reusable labels, and tasks
-may have identities in one or more external task providers. An activity may
-also have none of these associations; no placeholder task is created.
+tree. `ACTIVITY` records are time intervals with an optional task and direct
+project assignment. Activities may have reusable labels, and tasks may have
+identities in one or more external task providers. An activity may also have no
+task or project; no placeholder task is created.
+
+`WORK_SESSION` records independent work periods. Reports derive activity context
+from time overlap within the same owner scope, without a stored session
+assignment. An activity can overlap more than one session. The legacy
+`ACTIVITY.WORK_SESSION_ID` column is retained for native-file compatibility and
+does not define the current logical relationship. See the
+[component overview](README.md) for the client and storage boundaries.
 
 The schema also contains three association tables created by the older
 unidirectional JPA collections. They duplicate the child-side foreign keys used
@@ -32,6 +39,8 @@ one relationship when inspecting, exporting, or importing data.
 The diagram shows the physical tables. A circle indicates an optional end of a
 relationship. Application rules that are stricter than the SQL cardinality are
 listed under [Domain and service invariants](#domain-and-service-invariants).
+The `WORK_SESSION_ID` relationship is a retired physical foreign key, ignored
+by the service; it does not represent session membership.
 
 ```mermaid
 erDiagram
@@ -133,7 +142,7 @@ erDiagram
     TASK ||--o{ EXTERNAL_TASK_REFERENCE : "TASK_ID"
     TASK o|--o{ ACTIVITY : "TASK_ID"
     PROJECT o|--o{ ACTIVITY : "ACTIVITY_PROJECT"
-    WORK_SESSION o|--o{ ACTIVITY : "WORK_SESSION_ID"
+    WORK_SESSION o|--o{ ACTIVITY : "WORK_SESSION_ID (retired)"
     TASK o|--o| ACTIVITY : "CURRENTACTIVITY_ID"
 
     PROJECT ||--o{ PROJECT_TASK : contains
@@ -352,12 +361,20 @@ deletion preconditions before the JPA adapter mutates the schema. In particular:
   preserving the embedded service UUID.
 
 Direct SQL writers and import tools must preserve both the child-side foreign
-keys and their corresponding association tables. Native CSV export/import includes project types, projects, tasks, activities,
-external references, collection relation tables, labels, activity-label
-assignments and work sessions. Older exports remain supported, but a new export
-with session associations requires its work-session file. The server's portable
-domain-v2 JSON and CSV formats include all five domain entity types and remap
-identifiers when importing into another account.
+keys and their corresponding association tables. Native CSV export/import
+includes project types, projects, tasks, activities, external references,
+collection relation tables, labels, activity-label assignments and work sessions.
+Older exports remain supported; native files carrying legacy session references
+require the corresponding work-session file.
+
+The server's portable domain-v3 JSON and CSV formats include clients, projects,
+tasks, labels, activities and independent work sessions. They preserve mandatory
+project/session client links and session titles, and remap identifiers on import.
+Imports also accept v1/v2 snapshots, assign their projects and sessions to the
+General client, and ignore retired activity/session links. Native table CSV and
+portable server CSV are distinct formats; see the
+[API interchange contract](API-V1.md#resources-and-client-workflows) and
+[HTTP client CSV guide](../development/HTTP-CLIENT.md#server-csv-transfer).
 
 ## Schema compatibility
 
@@ -398,6 +415,9 @@ legacy-client behavior.
 erDiagram
     CLIENT ||--o{ PROJECT : owns
     CLIENT ||--o{ WORK_SESSION : identifies
-    PROJECT ||--o{ TASK : groups
-    WORK_SESSION o|--o{ ACTIVITY : contains
+    PROJECT o|--o{ TASK : groups
 ```
+
+This diagram shows client ownership links. Activities are not children of work
+sessions; session reports find overlapping activities within the same account.
+The time-overlap calculation does not create a persistent association.

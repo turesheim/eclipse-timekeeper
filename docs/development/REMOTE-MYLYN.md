@@ -138,10 +138,11 @@ Mylyn projections. Receipts record `phase.changes.owner-scope`,
 `phase.changes.reconnect`.
 
 `remote-client-tests` includes both native-only and Mylyn modules. CI's
-`Remote-Eclipse` job runs all nine installed phases and uploads reports and
+**Installed client tests** job runs all nine installed phases and uploads reports and
 credential-free receipts/logs. The fixture password, keyring and token registry
-are excluded. The known upstream theme-color/Error Log issue #243 is still a
-separate release gate; these functional tests do not certify a clean Error Log.
+are excluded. The known upstream theme-color/Error Log issue #243 was deferred
+beyond 2.0 and remains an accepted exception; these functional tests do not
+certify a clean Error Log. See the [upgrade-plan decision](UPGRADE-PLAN.md).
 
 Four further JVMs retain the workspace through server A/account B, a second
 server with the same account, embedded storage, server A again and embedded
