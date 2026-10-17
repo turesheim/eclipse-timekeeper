@@ -303,6 +303,27 @@ python3 server/web/tests/acceptance.py --distribution server/target/distribution
 SMTP fixture. Safari's native macOS Password AutoFill UI still needs a manual
 check.
 
+For virtual WebAuthn registration, sign-in and fresh-proof tests, use Chromium
+with the isolated HTTPS `localhost` RP:
+
+```sh
+python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --mail --passkeys
+```
+
+Signed protocol tests also run across two independent server containers sharing
+PostgreSQL. They cover cross-replica completion, one-use races, removal/recovery,
+protected restore and changes to backend addresses, public ports and RP hostnames:
+
+```sh
+python3 server/scripts/passkey_replica_acceptance.py --server-image timekeeper-server:test
+python3 server/scripts/passkey_replica_acceptance.py --server-image timekeeper-server:test --postgres-image postgres:17.11-bookworm --output server/target/passkey-pg17-acceptance.json
+```
+
+These fixtures use synthetic keys; they do not establish Safari/Touch ID,
+security-key or cross-device interoperability. Record those checks separately
+over HTTPS, including a hostname/port cutover. Fixture receipts contain only
+scenario results; private keys and database dumps are temporary and never uploaded.
+
 Packaging requires a clean committed tree. Browser acceptance launches the
 checksum-verified distribution with temporary file storage and synthetic tokens,
 then stops the JVM and removes private fixtures. Reports, screenshots and source

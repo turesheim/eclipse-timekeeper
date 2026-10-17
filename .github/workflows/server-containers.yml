@@ -71,6 +71,8 @@ jobs:
           python server/scripts/compose_acceptance.py
       - name: Verify email recovery across actual replicas and hostname cutover
         run: python server/scripts/email_replica_acceptance.py --server-image timekeeper-server:test
+      - name: Verify signed passkeys across replicas, revocation and origin migration
+        run: python server/scripts/passkey_replica_acceptance.py --server-image timekeeper-server:test --expected-commit "$GITHUB_SHA"
       - name: Verify schema upgrades during protected backup restore
         run: python server/scripts/schema_restore_acceptance.py
       - name: Verify import and Undo across replicas, restart and protected restore
@@ -102,6 +104,7 @@ jobs:
             server/target/compose-acceptance/
             server/target/toggl-replica-acceptance.json
             server/target/toggl-replica-acceptance.failure.log
+            server/target/passkey-replica-acceptance.json
 
   verify-synology:
     name: Synology candidate and PostgreSQL 17
@@ -163,6 +166,8 @@ jobs:
           python server/scripts/compose_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --postgres-image postgres:17.11-bookworm --output server/target/synology-acceptance
       - name: Verify import and Undo with PostgreSQL 17
         run: python server/scripts/toggl_replica_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --postgres-image postgres:17.11-bookworm --output server/target/toggl-pg17-acceptance.json
+      - name: Verify signed passkeys and hostname migration with PostgreSQL 17
+        run: python server/scripts/passkey_replica_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --expected-commit "$GITHUB_SHA" --postgres-image postgres:17.11-bookworm --output server/target/passkey-pg17-acceptance.json
       - name: Build and validate the self-contained preview package
         run: python server/scripts/package_synology.py --commit "$GITHUB_SHA" --image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --revision "$GITHUB_RUN_NUMBER" --output server/target/synology
       - name: Generate preview discovery metadata for NAS acceptance
@@ -188,6 +193,7 @@ jobs:
             server/target/synology-acceptance/
             server/target/toggl-pg17-acceptance.json
             server/target/toggl-pg17-acceptance.failure.log
+            server/target/passkey-pg17-acceptance.json
             server/**/target/surefire-reports/
 
   publish:
