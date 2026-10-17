@@ -55,8 +55,8 @@ test('Toggl CSV worker, reviewed mappings, repeat import and whole-job Undo pres
   expect(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length}))).toEqual({local:0,session:0});
 });
 
-test('Toggl import resumes committed batches after a lost reply and reload, then reviews edited records during Undo',async({page,request})=>{
-  await login(page);await page.getByLabel('Import as',{exact:true}).selectOption('ACTIVITY');const before = await api(request,'/data/export');
+for(const mode of ['ACTIVITY','WORK_SESSION']) test(`Toggl ${mode} import resumes after a lost reply and reload, then reviews edited records during Undo`,async({page,request})=>{
+  await login(page);await page.getByLabel('Import as',{exact:true}).selectOption(mode);const before = await api(request,'/data/export');
   const header = 'Description,Duration,Member,Email,Project,Tags,Start date,Start time,Stop date,Stop time';
   const lines = Array.from({length:201},(_,n)=>{
     const start = new Date(Date.UTC(2025,9,20,9,0,n)),end = new Date(+start+1000);
@@ -81,16 +81,17 @@ test('Toggl import resumes committed batches after a lost reply and reload, then
   await expect(page.getByLabel('New client name',{exact:true})).toBeDisabled();
   await page.getByRole('button',{name:'Review server matches',exact:true}).click();await page.getByRole('button',{name:'Resume import',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
-  const imported = await api(request,'/data/export');expect(imported.activities.length-before.activities.length).toBe(201);
+  const imported = await api(request,'/data/export');expect(imported[mode==='WORK_SESSION' ? 'workSessions' : 'activities'].length-before[mode==='WORK_SESSION' ? 'workSessions' : 'activities'].length).toBe(201);
   const complete = await api(request,`/imports/jobs/${job.id}`);expect(complete.nextBatch).toBe(3);expect(complete.importedNanos).toBe('201000000000');
-  const activity = imported.activities.find(value=>value.summary==='Bulk row 0');
-  const current = await request.get('/api/v1/activities/'+activity.id,{headers:{Authorization:`Bearer ${token}`}});const body = await current.json();
-  const changed = await request.put('/api/v1/activities/'+activity.id,{headers:{Authorization:`Bearer ${token}`,'If-Match':current.headers().etag},data:{start:body.start,end:body.end,summary:'Edited bulk activity',labelIds:body.labelIds}});expect(changed.status()).toBe(200);
+  const collection=mode==='WORK_SESSION' ? 'work-sessions' : 'activities',records=mode==='WORK_SESSION' ? 'workSessions' : 'activities';
+  const activity = imported[records].find(value=>value.summary==='Bulk row 0');
+  const current = await request.get('/api/v1/'+collection+'/'+activity.id,{headers:{Authorization:`Bearer ${token}`}});const body = await current.json();
+  const changed = await request.put('/api/v1/'+collection+'/'+activity.id,{headers:{Authorization:`Bearer ${token}`,'If-Match':current.headers().etag},data:{start:body.start,end:body.end,summary:'Edited bulk entry',...(mode==='WORK_SESSION' ? {title:body.title,clientId:body.clientId} : {labelIds:body.labelIds})}});expect(changed.status()).toBe(200);
   const history = page.getByRole('heading',{name:'Import history',exact:true}).locator('..');
   await history.getByRole('button',{name:'Undo import',exact:true}).click();await page.getByRole('button',{name:'Confirm Undo',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Review records retained or changed since import',exact:true})).toBeVisible();
   await page.getByLabel('Undo decision',{exact:true}).selectOption('DELETE');await page.getByRole('button',{name:'Apply decisions and continue Undo',exact:true}).click();
-  await expect(history).toContainText('Undo complete');expect((await api(request,'/data/export')).activities.length).toBe(before.activities.length);
+  await expect(history).toContainText('Undo complete');expect((await api(request,'/data/export'))[records].length).toBe(before[records].length);
 });
 
 test('Toggl worker and previous-account preview are cleared on sign-out and account switch',async({page})=>{
@@ -143,14 +144,14 @@ test('Toggl defaults to work sessions with client totals, repeat detection and w
   for(const type of ['activities','projects','tasks','labels']) expect(imported[type].length).toBe(before[type].length);
   expect(sessions.every(value=>value.title===value.summary && value.clientId===sessions[0].clientId)).toBe(true);
   expect(sessions.reduce((sum,value)=>sum+(+new Date(value.end)-+new Date(value.start)),0)).toBe(151462000);
-  const job=(await api(request,'/imports')).items.find(value=>value.mode==='WORK_SESSION');expect(job.workSessionCount).toBe(7);expect(job.importedNanos).toBe('151462000000000');
+  const job=(await api(request,'/imports')).items.find(value=>value.mode==='WORK_SESSION' && value.state==='IMPORTED' && value.selectedEntries===7);expect(job.workSessionCount).toBe(7);expect(job.importedNanos).toBe('151462000000000');
   await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await page.locator('[data-tab=track]').click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
   await expect(page.locator(`#track-clients [data-track-client="${sessions[0].clientId}"]`)).toContainText('42h 4m');
   await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();await review(page);
   await expect(page.locator('#account-content')).toContainText('7 already imported');await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
   expect((await api(request,'/data/export')).workSessions.length).toBe(imported.workSessions.length);
   const history=(await api(request,'/imports')).items.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));await undo(page,history.findIndex(value=>value.id!==job.id && value.mode==='WORK_SESSION'));
-  const updated=(await api(request,'/imports')).items.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));await undo(page,updated.findIndex(value=>value.id===job.id));
+  const updated=(await api(request,'/imports')).items.filter(value=>['IMPORTING','IMPORTED','BLOCKED','UNDOING'].includes(value.state)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));await undo(page,updated.findIndex(value=>value.id===job.id));
   const after=await api(request,'/data/export');expect(after.workSessions.length).toBe(before.workSessions.length);expect(after.clients.length).toBe(before.clients.length);
 });
 
