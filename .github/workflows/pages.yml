@@ -11,9 +11,11 @@ on:
 permissions:
   contents: read
 
-# Serialize website assembly and deployment.
+# Serialize assembly and deployment without replacing pending publications when
+# another completion event arrives (even if that event's jobs will be skipped).
 concurrency:
   group: github-pages
+  queue: max
   cancel-in-progress: false
 
 jobs:
