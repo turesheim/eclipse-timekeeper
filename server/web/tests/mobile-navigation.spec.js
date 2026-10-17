@@ -41,7 +41,7 @@ test('saved account zone applies to new editors while hidden reports refresh',as
     await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue(localDateTime(session.start,'Europe/Oslo'));
     await page.locator('#cancel').click();
   } finally {
-    release?.();await page.unroute('**/api/v1/me');
+    release?.();await page.unrouteAll({behavior:'wait'});
     if(session) {const current=await api('GET','/work-sessions/'+session.id);await api('DELETE','/work-sessions/'+session.id,undefined,{'If-Match':current.headers().etag});}
     if(client) {const current=await api('GET','/clients/'+client.id);await api('DELETE','/clients/'+client.id,undefined,{'If-Match':current.headers().etag});}
     const current=await api('GET','/me');await api('PUT','/me',{zoneId:zone},{'If-Match':current.headers().etag});
