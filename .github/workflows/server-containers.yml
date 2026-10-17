@@ -51,6 +51,7 @@ jobs:
           TIMEKEEPER_TEST_RECOVERY_DB_URL: jdbc:postgresql://127.0.0.1:55432/timekeeper_recovery
           TIMEKEEPER_TEST_PASSKEY_DB_URL: jdbc:postgresql://127.0.0.1:55432/timekeeper_passkeys
           TIMEKEEPER_TEST_SETTINGS_DB_URL: jdbc:postgresql://127.0.0.1:55432/timekeeper_settings
+          TIMEKEEPER_TEST_ARCHIVE_DB_URL: jdbc:postgresql://127.0.0.1:55432/timekeeper_archive
           TIMEKEEPER_TEST_PG_USER: postgres
           TIMEKEEPER_TEST_PG_PASSWORD: isolated-ci-test
         run: |
@@ -60,8 +61,8 @@ jobs:
             echo "Waiting for isolated PostgreSQL (attempt $attempt)"
             sleep 1
           done
-          docker exec timekeeper-pg-test psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE timekeeper_recovery' -c 'CREATE DATABASE timekeeper_passkeys' -c 'CREATE DATABASE timekeeper_settings'
-          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest -Dsurefire.failIfNoSpecifiedTests=false
+          docker exec timekeeper-pg-test psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE timekeeper_recovery' -c 'CREATE DATABASE timekeeper_passkeys' -c 'CREATE DATABASE timekeeper_settings' -c 'CREATE DATABASE timekeeper_archive_export' -c 'CREATE DATABASE timekeeper_archive_import' -c 'CREATE DATABASE timekeeper_archive_http' -c 'CREATE DATABASE timekeeper_archive_upload'
+          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest,AccountArchiveTest,AccountArchiveImportTest,AccountArchiveHttpTest,AccountUploadsTest -Dsurefire.failIfNoSpecifiedTests=false
           docker rm -f timekeeper-pg-test
       - name: Build actual deployment images
         run: |
@@ -75,6 +76,8 @@ jobs:
         run: python server/scripts/email_replica_acceptance.py --server-image timekeeper-server:test
       - name: Verify signed passkeys across replicas, revocation and origin migration
         run: python server/scripts/passkey_replica_acceptance.py --server-image timekeeper-server:test --expected-commit "$GITHUB_SHA"
+      - name: Verify private account archives across replicas and protected restore
+        run: python server/scripts/archive_replica_acceptance.py --server-image timekeeper-server:test --expected-commit "$GITHUB_SHA"
       - name: Verify schema upgrades during protected backup restore
         run: python server/scripts/schema_restore_acceptance.py
       - name: Verify import and Undo across replicas, restart and protected restore
@@ -107,6 +110,7 @@ jobs:
             server/target/toggl-replica-acceptance.json
             server/target/toggl-replica-acceptance.failure.log
             server/target/passkey-replica-acceptance.json
+            server/target/archive-replica-acceptance.json
 
   verify-synology:
     name: Synology candidate and PostgreSQL 17
@@ -153,6 +157,7 @@ jobs:
           TIMEKEEPER_TEST_RECOVERY_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_recovery
           TIMEKEEPER_TEST_PASSKEY_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_passkeys
           TIMEKEEPER_TEST_SETTINGS_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_settings
+          TIMEKEEPER_TEST_ARCHIVE_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_archive
           TIMEKEEPER_TEST_PG_USER: postgres
           TIMEKEEPER_TEST_PG_PASSWORD: isolated-ci-test
         run: |
@@ -162,8 +167,8 @@ jobs:
             echo "Waiting for isolated PostgreSQL 17 (attempt $attempt)"
             sleep 1
           done
-          docker exec timekeeper-pg17-test psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE timekeeper_recovery' -c 'CREATE DATABASE timekeeper_passkeys' -c 'CREATE DATABASE timekeeper_settings'
-          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest -Dsurefire.failIfNoSpecifiedTests=false
+          docker exec timekeeper-pg17-test psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE timekeeper_recovery' -c 'CREATE DATABASE timekeeper_passkeys' -c 'CREATE DATABASE timekeeper_settings' -c 'CREATE DATABASE timekeeper_archive_export' -c 'CREATE DATABASE timekeeper_archive_import' -c 'CREATE DATABASE timekeeper_archive_http' -c 'CREATE DATABASE timekeeper_archive_upload'
+          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest,AccountArchiveTest,AccountArchiveImportTest,AccountArchiveHttpTest,AccountUploadsTest -Dsurefire.failIfNoSpecifiedTests=false
           docker rm -f -v timekeeper-pg17-test
       - name: Verify real API, backup, recovery and rolling updates with PostgreSQL 17
         run: |
@@ -173,6 +178,8 @@ jobs:
         run: python server/scripts/toggl_replica_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --postgres-image postgres:17.11-bookworm --output server/target/toggl-pg17-acceptance.json
       - name: Verify signed passkeys and hostname migration with PostgreSQL 17
         run: python server/scripts/passkey_replica_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --expected-commit "$GITHUB_SHA" --postgres-image postgres:17.11-bookworm --output server/target/passkey-pg17-acceptance.json
+      - name: Verify private account archives with PostgreSQL 17
+        run: python server/scripts/archive_replica_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --expected-commit "$GITHUB_SHA" --postgres-image postgres:17.11-bookworm --output server/target/archive-pg17-acceptance.json
       - name: Build and validate the self-contained preview package
         run: python server/scripts/package_synology.py --commit "$GITHUB_SHA" --image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --revision "$GITHUB_RUN_NUMBER" --output server/target/synology
       - name: Generate preview discovery metadata for NAS acceptance
@@ -199,6 +206,7 @@ jobs:
             server/target/toggl-pg17-acceptance.json
             server/target/toggl-pg17-acceptance.failure.log
             server/target/passkey-pg17-acceptance.json
+            server/target/archive-pg17-acceptance.json
             server/**/target/surefire-reports/
 
   publish:

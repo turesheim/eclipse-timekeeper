@@ -80,6 +80,8 @@ class DistributionDocumentationTest(unittest.TestCase):
                 jar.writestr('timekeeper-build.properties', f'commit={COMMIT}\ndirty=false\n')
             for name in ('bootstrap-work-session-desktop.png','bootstrap-work-session-narrow.png',
                          'passkeys-desktop.png','passkeys-mobile.png',
+                         'account-data-review-desktop.png','account-data-review-mobile.png',
+                         'account-menu-mobile.png','work-session-labels-desktop.png','work-session-labels-mobile.png',
                          'track-month-desktop.png','track-month-narrow.png',
                          'toggl-import-review.png','toggl-import-history-narrow.png'):
                 image = root/'docs/assets/screenshots'/name
@@ -95,10 +97,15 @@ class DistributionDocumentationTest(unittest.TestCase):
                 self.assertIn('[Synology deployment guide](DEPLOYMENT.md)',guide)
                 self.assertIn('[local Docker guide](LOCAL-DOCKER.md)',guide)
                 web = archive.read('timekeeper-server/WEB-CLIENT.md').decode()
-                for size in ('desktop','mobile'):
-                    name=f'images/passkeys-{size}.png'
-                    self.assertIn(']('+name+')',web)
-                    self.assertTrue(archive.read('timekeeper-server/'+name).startswith(b'\x89PNG\r\n\x1a\n'))
+                for url in re.findall(r'!\[[^\]]*\]\(([^\s)]+)\)', web):
+                    parts = urlsplit(url)
+                    self.assertFalse(parts.scheme or parts.netloc, url)
+                    self.assertTrue(archive.read('timekeeper-server/'+parts.path).startswith(b'\x89PNG\r\n\x1a\n'), url)
+                for view in ('passkeys','account-data-review'):
+                    for size in ('desktop','mobile'):
+                        name=f'images/{view}-{size}.png'
+                        self.assertIn(']('+name+')',web)
+                        self.assertTrue(archive.read('timekeeper-server/'+name).startswith(b'\x89PNG\r\n\x1a\n'))
                 for view in ('work-session', 'track-month'):
                     for size in ('desktop','narrow'):
                         name = f'images/{view}-{size}.png'
@@ -107,7 +114,7 @@ class DistributionDocumentationTest(unittest.TestCase):
                 for name in ('images/toggl-import-review.png','images/toggl-import-history-narrow.png'):
                     self.assertIn(']('+name+')',web)
                     self.assertTrue(archive.read('timekeeper-server/'+name).startswith(b'\x89PNG\r\n\x1a\n'))
-                for name in ('DEPLOYMENT.md','LOCAL-DOCKER.md','TAILSCALE.md','WEB-CLIENT.md','TOGGL-IMPORT.md'):
+                for name in ('DEPLOYMENT.md','LOCAL-DOCKER.md','TAILSCALE.md','WEB-CLIENT.md','TOGGL-IMPORT.md','ACCOUNT-DATA.md'):
                     text=archive.read('timekeeper-server/'+name).decode()
                     for url in re.findall(r'\]\(([^\s)]+)\)',text):
                         parts=urlsplit(url)

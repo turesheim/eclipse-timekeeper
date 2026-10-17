@@ -181,8 +181,13 @@ administrator/write checks and normal cookie/CSRF rules apply regardless of
 proxy policy. Old `/web/#users` bookmarks redirect to `/admin/#users`; there is
 no legacy user-management API alias.
 
+**My Account → Your data** downloads a complete private JSON/CSV archive and
+reviews a restore into the signed-in account. Work and selected preferences can
+be restored; account identity, roles and credentials remain under the target
+account's control. See [account downloads and restores](ACCOUNT-DATA.md).
+
 Personal settings support `/web/#account/profile`, `/web/#account/password`,
-`/web/#account/passkeys`, `/web/#account/tokens` and `/web/#account/import`.
+`/web/#account/passkeys`, `/web/#account/tokens`, `/web/#account/data` and `/web/#account/import`.
 Administration supports `/admin/#settings`, `/admin/#users` and
 `/admin/#users/new`.
 Navigation keeps activity/work-session timers running. Unsaved forms prompt

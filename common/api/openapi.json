@@ -7271,6 +7271,727 @@
           }
         }
       }
+    },
+    "/data/account/export": {
+      "get": {
+        "operationId": "downloadAccountArchive",
+        "summary": "Download the signed-in account as a complete private JSON/CSV ZIP",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "description": "One consistent owner-scoped snapshot, including when the caller is an administrator. No list-page, 10,000-record or 20 MiB export truncation. Includes work, preferences, account/credential-management metadata and inert import audit. Excludes all credential material and global settings/secrets."
+      }
+    },
+    "/data/account/uploads": {
+      "post": {
+        "operationId": "createAccountArchiveUpload",
+        "summary": "Prepare a private archive upload without changing work records",
+        "x-required-permission": "write",
+        "responses": {
+          "201": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "description": "Opaque version for conditional review/commit.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountArchiveUpload"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountArchiveUploadInput"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listPendingAccountArchives",
+        "summary": "List this account\u2019s resumable archive uploads",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountArchivePendingUploads"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      }
+    },
+    "/data/account/uploads/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "get": {
+        "operationId": "getAccountArchiveUpload",
+        "summary": "Read private archive upload progress",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "description": "Opaque version for conditional review/commit.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountArchiveUpload"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "discardAccountArchiveUpload",
+        "summary": "Discard private staging data",
+        "x-required-permission": "write",
+        "responses": {
+          "204": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ]
+      }
+    },
+    "/data/account/uploads/{id}/chunks/{index}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        },
+        {
+          "name": "index",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        }
+      ],
+      "put": {
+        "operationId": "writeAccountArchiveChunk",
+        "summary": "Upload the exact next chunk or replay identical bytes",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "description": "Opaque version for conditional review/commit.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountArchiveUpload"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountArchiveChunkInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data/account/uploads/{id}/preview": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "post": {
+        "operationId": "previewAccountArchive",
+        "summary": "Validate and review a complete account archive before restoring it",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "description": "Opaque version for conditional review/commit.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountArchivePreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountArchiveReviewInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/data/account/uploads/{id}/import": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "post": {
+        "operationId": "restoreAccountArchive",
+        "summary": "Atomically restore reviewed work and selected preferences into this account",
+        "x-required-permission": "write",
+        "responses": {
+          "201": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountArchiveRestoreResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountArchiveReviewInput"
+              }
+            }
+          }
+        },
+        "description": "Requires the upload ETag from preview and an unchanged target revision/profile. Remaps all work IDs and links; never changes account identity, roles, email or credentials. Old import history is retained only as inert audit. A durable owner-scoped receipt derived from the verified archive ID, with its JSON digest as the replay fingerprint returns the prior result after lost replies/reselection, before stale-version checks. Existing work is retained. Files and uncompressed JSON are bounded to 256 MiB; each request remains below the existing global body limit."
+      }
+    },
+    "/data/account/imports": {
+      "get": {
+        "operationId": "listAccountArchiveRestores",
+        "summary": "List this account\u2019s completed archive restores",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountArchiveHistory"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -11314,6 +12035,1028 @@
           "smtpPasswordAction"
         ],
         "description": "Administrator account session and current password required. Save desired settings using If-Match; coordinated restart activates them centrally and revokes retired authentication state. SMTP password is write-only: preserve, replace or clear explicitly."
+      },
+      "ArchivePreferences": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "zoneId": {
+            "$ref": "#/components/schemas/ZoneId"
+          }
+        },
+        "required": [
+          "zoneId"
+        ]
+      },
+      "ArchiveAccountMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ownerId",
+          "username",
+          "displayName",
+          "state",
+          "administrator",
+          "version",
+          "recoveryAddresses",
+          "apiTokenMetadata",
+          "passkeyMetadata"
+        ],
+        "properties": {
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "state": {
+            "enum": [
+              "UNCLAIMED",
+              "ENABLED",
+              "DISABLED"
+            ]
+          },
+          "administrator": {
+            "type": "boolean"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "recoveryAddresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArchiveRecoveryAddress"
+            },
+            "maxItems": 2
+          },
+          "apiTokenMetadata": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArchiveTokenMetadata"
+            },
+            "maxItems": 250000
+          },
+          "passkeyMetadata": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArchivePasskeyMetadata"
+            },
+            "maxItems": 250000
+          }
+        }
+      },
+      "ArchiveRecoveryAddress": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "slot": {
+            "enum": [
+              "PRIMARY",
+              "BACKUP"
+            ]
+          },
+          "verifiedAddress": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pendingAddress": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "slot",
+          "verifiedAddress",
+          "pendingAddress",
+          "version"
+        ]
+      },
+      "ArchiveTokenMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "permissions": {
+            "enum": [
+              "READ",
+              "READ_WRITE"
+            ]
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revoked": {
+            "type": "boolean"
+          },
+          "source": {
+            "enum": [
+              "LEGACY",
+              "MANAGED"
+            ]
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "lastUsedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "permissions",
+          "expiresAt",
+          "revoked",
+          "source",
+          "createdAt",
+          "lastUsedAt"
+        ]
+      },
+      "ArchivePasskeyMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "rpId": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "lastUsedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revoked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "rpId",
+          "createdAt",
+          "lastUsedAt",
+          "revoked"
+        ]
+      },
+      "ArchiveWorkSnapshot": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "const": "timekeeper-domain-v3"
+          },
+          "zoneId": {
+            "$ref": "#/components/schemas/ZoneId"
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferProject"
+            },
+            "maxItems": 250000
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTask"
+            },
+            "maxItems": 250000
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferLabel"
+            },
+            "maxItems": 250000
+          },
+          "activities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferActivity"
+            },
+            "maxItems": 250000
+          },
+          "workSessions": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/TransferWorkSession"
+            }
+          },
+          "clients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferClient"
+            },
+            "maxItems": 250000
+          }
+        },
+        "required": [
+          "format",
+          "zoneId",
+          "projects",
+          "tasks",
+          "labels",
+          "activities"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "timekeeper-domain-v2"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "workSessions"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "timekeeper-domain-v1"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "workSessions": {
+                  "maxItems": 0
+                },
+                "activities": {
+                  "items": {
+                    "properties": {
+                      "taskId": {
+                        "$ref": "#/components/schemas/Id"
+                      },
+                      "workSessionId": {
+                        "type": "null"
+                      },
+                      "projectId": {
+                        "type": "null"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "timekeeper-domain-v3"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "clients",
+                "workSessions"
+              ],
+              "properties": {
+                "projects": {
+                  "items": {
+                    "required": [
+                      "clientId"
+                    ]
+                  }
+                },
+                "workSessions": {
+                  "items": {
+                    "required": [
+                      "clientId",
+                      "title"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "enum": [
+                    "timekeeper-domain-v1",
+                    "timekeeper-domain-v2"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "clients": {
+                  "maxItems": 0
+                },
+                "projects": {
+                  "items": {
+                    "not": {
+                      "required": [
+                        "clientId"
+                      ]
+                    }
+                  }
+                },
+                "workSessions": {
+                  "items": {
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "clientId"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "title"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "projectId"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ArchiveAuditRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entityType": {
+            "enum": [
+              "IMPORT_JOB",
+              "IMPORT_BATCH",
+              "IMPORT_ITEM",
+              "IMPORT_MAP",
+              "IMPORT_KEY",
+              "IMPORT_ORIGIN",
+              "IMPORT_UNDO",
+              "IMPORT_USE",
+              "ARCHIVE_AUDIT",
+              "ARCHIVE_IMPORT"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "description": "Inert source audit copy. Never restored as import, replay, credential or Undo authority."
+          }
+        },
+        "required": [
+          "entityType",
+          "data"
+        ]
+      },
+      "AccountArchiveSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "timekeeper-account-v1"
+          },
+          "archiveId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "generatedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "account": {
+            "$ref": "#/components/schemas/ArchiveAccountMetadata"
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/ArchivePreferences"
+          },
+          "work": {
+            "$ref": "#/components/schemas/ArchiveWorkSnapshot"
+          },
+          "importHistory": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArchiveAuditRecord"
+            },
+            "maxItems": 1000000
+          }
+        },
+        "required": [
+          "format",
+          "archiveId",
+          "generatedAt",
+          "account",
+          "preferences",
+          "work",
+          "importHistory"
+        ]
+      },
+      "AccountArchiveUploadInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "mediaType": {
+            "enum": [
+              "application/zip",
+              "application/json"
+            ]
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 268435456
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "fileName",
+          "mediaType",
+          "bytes",
+          "sha256"
+        ]
+      },
+      "AccountArchiveChunkInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 1398104,
+            "description": "Canonical padded base64 of the exact next chunk; up to 1 MiB of binary data."
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AccountArchiveReviewInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "restoreTimeZone": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "restoreTimeZone"
+        ]
+      },
+      "AccountArchiveCounts": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "clients": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "projects": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tasks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "labels": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "activities": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "workSessions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "importAuditRecords": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "clients",
+          "projects",
+          "tasks",
+          "labels",
+          "activities",
+          "workSessions",
+          "importAuditRecords"
+        ]
+      },
+      "AccountArchiveRestoreResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "importId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "archiveId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "importedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "alreadyImported": {
+            "type": "boolean"
+          },
+          "restoreTimeZone": {
+            "type": "boolean"
+          },
+          "timeZone": {
+            "$ref": "#/components/schemas/ZoneId"
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/AccountArchiveCounts"
+          }
+        },
+        "required": [
+          "importId",
+          "archiveId",
+          "importedAt",
+          "alreadyImported",
+          "restoreTimeZone",
+          "timeZone",
+          "revision",
+          "counts"
+        ]
+      },
+      "AccountArchiveReview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "archiveId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "generatedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/AccountArchiveCounts"
+          },
+          "sourceAccount": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "username": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "displayName": {
+                "type": "string",
+                "maxLength": 400
+              }
+            },
+            "required": [
+              "username",
+              "displayName"
+            ]
+          },
+          "sourceTimeZone": {
+            "$ref": "#/components/schemas/ZoneId"
+          },
+          "currentTimeZone": {
+            "$ref": "#/components/schemas/ZoneId"
+          },
+          "restoreTimeZone": {
+            "type": "boolean"
+          },
+          "alreadyImported": {
+            "const": false
+          },
+          "runningActivities": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "runningWorkSessions": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10
+          },
+          "canImport": {
+            "type": "boolean"
+          },
+          "relationships": {
+            "$ref": "#/components/schemas/AccountArchiveRelationshipCounts",
+            "description": "Present on new reviews; older retained review summaries may omit this field."
+          }
+        },
+        "required": [
+          "archiveId",
+          "generatedAt",
+          "counts",
+          "sourceAccount",
+          "sourceTimeZone",
+          "currentTimeZone",
+          "restoreTimeZone",
+          "alreadyImported",
+          "runningActivities",
+          "runningWorkSessions",
+          "conflicts",
+          "canImport"
+        ]
+      },
+      "AccountArchiveCompletedReview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "importId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "archiveId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "importedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "alreadyImported": {
+            "const": true
+          },
+          "restoreTimeZone": {
+            "type": "boolean"
+          },
+          "timeZone": {
+            "$ref": "#/components/schemas/ZoneId"
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/AccountArchiveCounts"
+          },
+          "canImport": {
+            "const": false
+          }
+        },
+        "required": [
+          "importId",
+          "archiveId",
+          "importedAt",
+          "alreadyImported",
+          "restoreTimeZone",
+          "timeZone",
+          "revision",
+          "counts",
+          "canImport"
+        ]
+      },
+      "AccountArchivePreview": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AccountArchiveReview"
+          },
+          {
+            "$ref": "#/components/schemas/AccountArchiveCompletedReview"
+          }
+        ]
+      },
+      "AccountArchiveUpload": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "mediaType": {
+            "enum": [
+              "application/zip",
+              "application/json"
+            ]
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 268435456
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "chunkBytes": {
+            "const": 1048576
+          },
+          "chunkCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 256
+          },
+          "nextChunk": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 256
+          },
+          "state": {
+            "enum": [
+              "UPLOADING",
+              "READY",
+              "REVIEWED",
+              "IMPORTED"
+            ]
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "expiresAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "review": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "revision": {
+                "$ref": "#/components/schemas/Version"
+              },
+              "profileVersion": {
+                "$ref": "#/components/schemas/Version"
+              },
+              "restoreTimeZone": {
+                "type": "boolean"
+              },
+              "summary": {
+                "$ref": "#/components/schemas/AccountArchiveReview"
+              }
+            },
+            "required": [
+              "revision",
+              "profileVersion",
+              "restoreTimeZone",
+              "summary"
+            ]
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/AccountArchiveRestoreResult"
+          },
+          "verifiedArchiveId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "verifiedArchiveDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "fileName",
+          "mediaType",
+          "bytes",
+          "sha256",
+          "id",
+          "ownerId",
+          "version",
+          "chunkBytes",
+          "chunkCount",
+          "nextChunk",
+          "state",
+          "createdAt",
+          "expiresAt"
+        ]
+      },
+      "AccountArchiveImportRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "importId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "archiveId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "importedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "alreadyImported": {
+            "type": "boolean"
+          },
+          "restoreTimeZone": {
+            "type": "boolean"
+          },
+          "timeZone": {
+            "$ref": "#/components/schemas/ZoneId"
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/AccountArchiveCounts"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "importId",
+          "archiveId",
+          "importedAt",
+          "alreadyImported",
+          "restoreTimeZone",
+          "timeZone",
+          "revision",
+          "counts",
+          "id",
+          "ownerId",
+          "version"
+        ]
+      },
+      "AccountArchiveHistory": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountArchiveImportRecord"
+            },
+            "maxItems": 100
+          },
+          "nextAfter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextAfter"
+        ]
+      },
+      "AccountArchivePendingUploads": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountArchiveUpload"
+            },
+            "maxItems": 3
+          }
+        }
+      },
+      "AccountArchiveRelationshipCounts": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Counts of validated source references preserved under new record IDs.",
+        "properties": {
+          "projectClients": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "taskProjects": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "parentTasks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "activityTasks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "activityProjects": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "activityLabels": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "workSessionClients": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "workSessionProjects": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "workSessionLabels": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "projectClients",
+          "taskProjects",
+          "parentTasks",
+          "activityTasks",
+          "activityProjects",
+          "activityLabels",
+          "workSessionClients",
+          "workSessionProjects",
+          "workSessionLabels"
+        ]
       }
     },
     "parameters": {
