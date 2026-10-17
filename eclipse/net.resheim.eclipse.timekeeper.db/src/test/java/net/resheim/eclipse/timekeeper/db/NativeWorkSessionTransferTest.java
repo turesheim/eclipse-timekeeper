@@ -14,7 +14,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.*;
 
 class NativeWorkSessionTransferTest {
     @TempDir Path directory;
-    @Test void nativeCsvRestoresDailySessionRelationsAndDoesNotReuseOldVersions() throws Exception {
+    @Test void nativeCsvRestoresIndependentIntervalsAndDoesNotReuseOldVersions() throws Exception {
         var previous=TimekeeperPlugin.getDefault().getEntityManager();
         var source=DatabaseStartup.open("jdbc:h2:mem:native_session_source_"+UUID.randomUUID());
         var target=DatabaseStartup.open("jdbc:h2:mem:native_session_target_"+UUID.randomUUID());
@@ -40,7 +40,8 @@ class NativeWorkSessionTransferTest {
             assertThrows(ServiceException.class,()->copied.updateWorkSession(new UpdateWorkSession(session.id(),session.version(),start,Optional.of(end),"Stale editor")));
             TimekeeperPlugin.getDefault().importFrom(folder);assertEquals(restored,copied.workSession(session.id()).orElseThrow());
             var before=copied.workSessionReport(session.id());Files.delete(folder.resolve("work_session.csv"));
-            assertThrows(java.io.IOException.class,()->TimekeeperPlugin.getDefault().importFrom(folder));assertEquals(before,copied.workSessionReport(session.id()));
+            TimekeeperPlugin.getDefault().importFrom(folder);assertEquals(before,copied.workSessionReport(session.id()));
+            assertTrue(before.activities().stream().allMatch(value->value.workSessionId().isEmpty()));
         } finally {TimekeeperPlugin.setEntityManager(previous);DatabaseStartup.close(source);DatabaseStartup.close(target);}
     }
 }
