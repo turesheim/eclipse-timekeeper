@@ -69,7 +69,9 @@ async function dragSession(page,id,targetDate,deltaY=0) {
 }
 async function resize(page,id,edge,deltaY) {
   const handle=bar(page,id).locator(`[data-edge="${edge}"]`),rect=await position(page,handle,edge);
-  await page.mouse.move(rect.x+rect.width/2,rect.y+rect.height/2);await page.mouse.down();
+  // Resolve the current handle and wait for hover/actionability before pressing:
+  // a live render can replace it between positioning and the pointer gesture.
+  await handle.hover();await expect(handle).toHaveCSS('opacity','1');await page.mouse.down();
   await page.mouse.move(rect.x+rect.width/2,rect.y+rect.height/2+deltaY,{steps:5});await page.mouse.up();
   await expect(page.locator('#editor')).not.toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');
 }
@@ -179,12 +181,25 @@ test('calendar shows seven days, task links and activity lists beside multi-day 
   const f=await fixture(request);
   try {
     const long=await (await api(request,'POST','/work-sessions',{clientId:f.client.id,title:'Overnight work',summary:f.prefix+' overnight',start:'2025-10-25T21:30:00.123456789Z',end:'2025-10-27T00:30:00.987654321Z'})).json();
+    await page.setViewportSize({width:1440,height:1100});
     await calendar(page);
     await expect(page.locator('[data-tab=calendar]')).toHaveAttribute('aria-current','page');
     await expect(bar(page,f.session.id)).toBeAttached();
     await expect(bar(page,f.session.id)).toHaveCSS('background-color','rgb(255, 221, 136)');
     await expect(bar(page,f.session.id)).toHaveCSS('color','rgb(0, 0, 0)');
     await expect(bar(page,f.session.id).locator('.calendar-session-title')).toHaveText(f.session.title);
+    await expect(bar(page,f.session.id).locator('.calendar-session-duration')).toHaveText('8h 0m');
+    await expect(bar(page,f.session.id)).toHaveCSS('border-radius','6px');
+    const handles=bar(page,f.session.id).locator('.calendar-resize');
+    await position(page,bar(page,f.session.id));await page.mouse.move(0,0);
+    await expect(handles.first()).toHaveCSS('opacity','0');
+    await bar(page,f.session.id).hover();await expect(handles.first()).toHaveCSS('opacity','1');
+    await page.screenshot({path:'test-results/calendar-session-hover.png',fullPage:true});
+    await bar(page,f.session.id).locator('.calendar-session-select').click();await page.mouse.move(0,0);
+    await expect(handles.first()).toHaveCSS('opacity','0');
+    await page.keyboard.press('Tab');await expect(handles.first()).toBeFocused();
+    await expect(handles.first()).toHaveCSS('opacity','1');
+    await page.locator('#calendar-today').focus();await expect(handles.first()).toHaveCSS('opacity','0');
     await expect(page.locator('.calendar-task').getByRole('link',{name:`#${f.issue}: ${f.task.summary}`,exact:true})).toHaveAttribute('href',f.url);
     for(const activity of f.activities) await expect(page.locator('.calendar-task').getByRole('button',{name:`Edit activity ${activity.summary}`,exact:true})).toBeAttached();
     await expect(page.locator(`.calendar-session[data-session-id="${long.id}"]`)).toHaveCount(2);
@@ -218,10 +233,12 @@ test('calendar pointer moves and both resize handles preserve nanoseconds and ac
     await expect(bar(page,f.session.id)).toHaveAttribute('data-version',String(current.version));
     await resize(page,f.session.id,'start',16);
     await expect.poll(async()=> (await read(request,'work-sessions',f.session.id)).start).toBe('2025-10-21T06:48:00.123456789Z');
-    current=await read(request,'work-sessions',f.session.id);await expect(bar(page,f.session.id)).toHaveAttribute('data-version',String(current.version));
+    current=await read(request,'work-sessions',f.session.id);expect(current.end).toBe('2025-10-21T14:33:00.987654321Z');
+    await expect(bar(page,f.session.id)).toHaveAttribute('data-version',String(current.version));
     await resize(page,f.session.id,'end',16);
     await expect.poll(async()=> (await read(request,'work-sessions',f.session.id)).end).toBe('2025-10-21T14:48:00.987654321Z');
-    current=await read(request,'work-sessions',f.session.id);await expect(bar(page,f.session.id)).toHaveAttribute('data-version',String(current.version));
+    current=await read(request,'work-sessions',f.session.id);expect(current.start).toBe('2025-10-21T06:48:00.123456789Z');
+    await expect(bar(page,f.session.id)).toHaveAttribute('data-version',String(current.version));
     await bar(page,f.session.id).locator('.calendar-session-select').focus();await page.keyboard.press('ArrowRight');
     await expect.poll(async()=> (await read(request,'work-sessions',f.session.id)).start).toBe('2025-10-22T06:48:00.123456789Z');
     current=await read(request,'work-sessions',f.session.id);expect(current.end).toBe('2025-10-22T14:48:00.987654321Z');

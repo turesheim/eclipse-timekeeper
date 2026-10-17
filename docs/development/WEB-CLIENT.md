@@ -258,8 +258,10 @@ sign-out. Existing work-session move/resize gestures continue to work. Keyboard
 users can select a day/time with the arrow keys and press Enter, or use **Record
 work session**, then enter the desired end time in the editor.
 
-Strips represent work sessions, using the associated client’s color and the
-session title. Select a strip to see its full interval;
+Strips represent work sessions, using the associated client’s color, session
+title and elapsed duration. Small resize grips appear when hovering over a strip
+or focusing its controls with the keyboard; on touchscreens, select the strip to
+reveal them. Select a strip to see its full interval;
 double-click it or use **Edit selected work session** to edit. Drag the strip
 to move it between times or days, and drag its top or bottom handle to resize.
 Moves and resizes save directly without opening a dialog. A failed or uncertain

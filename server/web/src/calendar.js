@@ -1,4 +1,4 @@
-import {addDays,dateInZone,instantNanos,instantText,nanosInstant,localDateTime} from './model.js';
+import {addDays,dateInZone,instantNanos,instantText,nanosInstant,localDateTime,nanosText} from './model.js';
 import {calendarWeek,calendarPieces,calendarAnchor,calendarRange,calendarLanes,calendarTaskBlocks,shiftSession,shiftSessionDays,pasteSession,clientColors,CALENDAR_STEP} from './calendar-model.js';
 import {iconButton} from './icons.js';
 
@@ -162,16 +162,19 @@ export class WeekCalendar {
     bar.dataset.sessionId=session.id;bar.dataset.date=piece.date;bar.dataset.version=String(session.version);this.bounds(bar,piece,'session');
     const client=this.data.clients.find(client=>client.id===session.clientId),colors=clientColors(client?.color);
     bar.style.backgroundColor=colors.background;bar.style.color=colors.foreground;bar.style.borderColor=colors.foreground;
-    const description=`${client?.name || 'Client'} · ${session.title || 'Work session'}${session.summary ? ' · '+session.summary : ''} · ${instantText(session.start,this.calendar.zone)} → ${instantText(session.end,this.calendar.zone)}`;
+    const elapsed=instantNanos(session.end || this.data.report.generatedAt)-instantNanos(session.start);
+    const duration=nanosText(elapsed>0n ? elapsed : 0n);
+    const description=`${client?.name || 'Client'} · ${session.title || 'Work session'}${session.summary ? ' · '+session.summary : ''} · ${instantText(session.start,this.calendar.zone)} → ${instantText(session.end,this.calendar.zone)} · ${duration}`;
     bar.title=description;bar.setAttribute('aria-label',description);bar.setAttribute('role','group');bar.tabIndex=-1;
     bar.dataset.selected=String(this.selectedId===session.id);
-    const title=node('span',session.title || 'Work session','calendar-session-title');
-    if(preview) bar.append(title);
+    const label=node('span',undefined,'calendar-session-label');
+    label.append(node('span',session.title || 'Work session','calendar-session-title'),node('span',`${session.end ? '' : 'Running · '}${duration}`,'calendar-session-duration'));
+    if(preview) bar.append(label);
     if(!preview) {
       const select=button('',()=>this.selectSession(session,piece.date,Math.floor(piece.top)),'calendar-session-select');
       select.dataset.sessionId=session.id;select.dataset.date=piece.date;
       select.setAttribute('aria-label',description);select.setAttribute('aria-pressed',String(this.selectedId===session.id));
-      select.append(title);bar.append(select);
+      select.append(label);bar.append(select);
       bar.addEventListener('focusin',()=>this.selectSession(session,piece.date,Math.floor(piece.top)));
       bar.addEventListener('click',()=>this.selectSession(session,piece.date,Math.floor(piece.top)));
       bar.addEventListener('dblclick',()=>this.edit());
