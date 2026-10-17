@@ -80,7 +80,7 @@ class AccountArchiveTest {
         }
     }
     @Test void spreadsheetProtectionCoversWhitespaceControlsAndQuoting() {
-        for(String value:List.of("=1+1","+cmd","-5","@SUM(A1)","  =A1","\tformula","\rformula","\nformula")) assertTrue(AccountArchive.csvCell(value).startsWith("\"'"));
+        for(String value:List.of("=1+1","+cmd","-5","@SUM(A1)","  =A1","\tformula","\rformula","\nformula","\ufeff=SUM(A1)","\u00a0+cmd")) assertTrue(AccountArchive.csvCell(value).startsWith("\"'"));
         assertEquals("\"ordinary, \"\"quoted\"\"\"",AccountArchive.csvCell("ordinary, \"quoted\""));
     }
 }

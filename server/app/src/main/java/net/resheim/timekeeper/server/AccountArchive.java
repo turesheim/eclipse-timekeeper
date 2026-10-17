@@ -115,8 +115,13 @@ class AccountArchive {
     private static void entry(ZipOutputStream zip,String name) throws IOException {zip.putNextEntry(new ZipEntry(name));}
     private static Set<String> fieldNames(ObjectNode value) {var names=new HashSet<String>();value.fieldNames().forEachRemaining(names::add);return names;}
     static String csvCell(String value) {
-        String stripped=value.stripLeading();
-        if(!stripped.isEmpty() && "=+-@".indexOf(stripped.charAt(0))>=0 || value.startsWith("\t") || value.startsWith("\r") || value.startsWith("\n")) value="'"+value;
+        int offset=0;
+        while(offset<value.length()) {
+            int code=value.codePointAt(offset);
+            if(!Character.isWhitespace(code) && !Character.isSpaceChar(code) && !Character.isISOControl(code) && Character.getType(code)!=Character.FORMAT) break;
+            offset+=Character.charCount(code);
+        }
+        if(offset<value.length() && "=+-@".indexOf(value.charAt(offset))>=0 || !value.isEmpty() && Character.isISOControl(value.codePointAt(0))) value="'"+value;
         return "\""+value.replace("\"","\"\"")+"\"";
     }
     private static void csv(OutputStream stream,List<String> cells) throws IOException {

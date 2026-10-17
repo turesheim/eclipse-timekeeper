@@ -84,7 +84,10 @@ export async function renderAccountData(view,zone) {
       }
     });
   }
-  function countTable(counts) {return table(['Records','Count'],Object.entries(labels).map(([key,label])=>[label,String(counts[key] ?? 0)]));}
+  function countTable(counts) {
+    const value=table(['Records','Count'],Object.entries(labels).map(([key,label])=>[label,String(counts[key] ?? 0)]));
+    const grid=value.querySelector('table');grid.classList.remove('record-table');grid.classList.add('table-sm');return value;
+  }
   function showReview() {
     const value=review.data,captured=review,reviewedUploadId=uploadId;work.hidden=false;work.replaceChildren(node('h2','Review archive'));
     work.append(node('p',`${value.sourceAccount.displayName || value.sourceAccount.username || 'Account archive'} · ${instantText(value.generatedAt,currentZone)}`),countTable(value.counts));
