@@ -51,7 +51,13 @@ test('clients maintain names and colors, own projects and color titled work sess
     projects.push(...(await (await api(request,'GET','/projects?clientId='+client.id)).json()).items);expect(projects).toHaveLength(2);
     for(const project of projects) await expect(page.locator('#projects tr').filter({hasText:project.name})).toContainText(prefix);
     await page.getByRole('button',{name:'Record work session',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill(prefix+' planning');await page.getByLabel('Client',{exact:true}).selectOption(client.id);
-    await page.getByLabel('Summary',{exact:true}).fill('A separate description');await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-20T08:00:00Z');await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2025-10-20T16:00:00Z');await save(page);
+    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveAttribute('type','datetime-local');await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveAttribute('type','datetime-local');
+    await expect(page.getByLabel('Enter exact times',{exact:true})).toHaveCount(0);
+    await page.screenshot({path:'test-results/work-session-date-picker.png',fullPage:true});
+    await page.setViewportSize({width:390,height:844});
+    const pickerBox=await page.getByLabel('Start (local time)',{exact:true}).boundingBox();expect(pickerBox.x).toBeGreaterThanOrEqual(0);expect(pickerBox.x+pickerBox.width).toBeLessThanOrEqual(390);
+    await page.screenshot({path:'test-results/work-session-date-picker-narrow.png',fullPage:true});await page.setViewportSize({width:1280,height:720});
+    await page.getByLabel('Summary',{exact:true}).fill('A separate description');await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-20T08:00');await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2025-10-20T16:00');await save(page);
     session=(await (await api(request,'GET','/work-sessions?clientId='+client.id)).json()).items[0];expect(session.title).toBe(prefix+' planning');
     await page.getByRole('button',{name:'Calendar',exact:true}).click();await page.getByLabel('Calendar date',{exact:true}).fill('2025-10-20');
     const bar=page.locator(`.calendar-session[data-session-id="${session.id}"]`).first();await expect(bar).toHaveCSS('background-color','rgb(255, 238, 0)');await expect(bar).toHaveAttribute('title',new RegExp(prefix));

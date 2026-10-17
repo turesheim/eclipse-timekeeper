@@ -113,8 +113,8 @@ test('dragging empty calendar space previews a new session and saves only after 
     await expect(page.locator('.calendar-create-preview')).toHaveCount(1);expect(creates).toBe(0);
     await page.screenshot({path:'test-results/calendar-range-preview-desktop.png'});
     await page.mouse.up();await expect(page.locator('#editor')).toBeVisible();
-    expect(creates).toBe(0);await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-21T09:00:00');
-    await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-21T10:30:00');
+    expect(creates).toBe(0);await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-21T09:00');
+    await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-21T10:30');
     await page.screenshot({path:'test-results/calendar-range-review-desktop.png'});
     await page.getByLabel('Title',{exact:true}).fill(f.prefix+' dragged');await page.getByLabel('Client',{exact:true}).selectOption(otherClient.id);
     await page.getByLabel('Summary',{exact:true}).fill(f.prefix+' dragged interval');await save(page);expect(creates).toBe(1);
@@ -125,8 +125,8 @@ test('dragging empty calendar space previews a new session and saves only after 
     // Selecting an older session must not replace the last client actually used.
     await bar(page,f.session.id).locator('.calendar-session-select').click();
     await dragRange(page,{date:'2025-10-22',clock:'10:30/0'},{date:'2025-10-22',clock:'09:00/0'});await page.mouse.up();
-    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-22T09:00:00');
-    await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-22T10:30:00');
+    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-22T09:00');
+    await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-22T10:30');
     await expect(page.getByLabel('Client',{exact:true})).toHaveValue(otherClient.id);
     await page.getByLabel('Client',{exact:true}).selectOption(f.client.id);await page.locator('#cancel').click();expect(creates).toBe(1);
     await dragRange(page,{date:'2025-10-22',clock:'11:00/0'},{date:'2025-10-22',clock:'11:30/0'});await page.mouse.up();
@@ -142,8 +142,10 @@ test('drag-created intervals distinguish repeated local times and reject shaded 
   try {
     await page.setViewportSize({width:1440,height:1000});await calendar(page);
     await dragRange(page,{date:'2025-10-26',clock:'02:15/0'},{date:'2025-10-26',clock:'02:15/1'});await page.mouse.up();
-    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-26T02:15:00+02:00');
-    await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-26T02:15:00+01:00');
+    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-26T02:15');
+    await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-26T02:15');
+    await expect(page.getByLabel('Start time occurrence',{exact:true})).toHaveValue('+02:00');
+    await expect(page.getByLabel('End time occurrence',{exact:true})).toHaveValue('+01:00');
     await page.getByLabel('Title',{exact:true}).fill(f.prefix+' repeated hour');await page.getByLabel('Client',{exact:true}).selectOption(f.client.id);
     await page.getByLabel('Summary',{exact:true}).fill(f.prefix+' repeated');await save(page);
     const created=(await (await api(request,'GET','/work-sessions?clientId='+f.client.id)).json()).items.find(value=>value.title===f.prefix+' repeated hour');
@@ -171,8 +173,8 @@ test('touch range selection is explicit and leaves normal calendar scrolling ava
     await expect.poll(()=>page.locator('.calendar-scroll').evaluate(value=>value.scrollTop)).not.toBe(before);
     await page.getByRole('button',{name:'Select time range',exact:true}).click();await expect(page.locator('#calendar-range')).toHaveAttribute('aria-pressed','true');
     await touch(await rangePoints(page,from,to));await expect(page.locator('#editor')).toBeVisible();
-    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-20T16:30:00');
-    await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-20T17:00:00');
+    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-20T16:30');
+    await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-20T17:00');
     await expect(page.locator('#calendar-range')).toHaveAttribute('aria-pressed','false');await page.locator('#cancel').click();
   } finally {await context.close();await f.close();}
 });
@@ -282,7 +284,7 @@ test('calendar copying a running session leaves it running and lets the copy rec
     await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('');
     await page.locator('#save').click();await expect(page.locator('#editor-error')).toContainText('conflicts');
     expect(await (await api(request,'GET','/work-sessions/active')).json()).toEqual(running);
-    await page.getByLabel('End (local time, blank while running)',{exact:true}).fill(localDateTime(new Date().toISOString(),'Europe/Oslo'));await save(page);
+    await page.getByLabel('End (local time, blank while running)',{exact:true}).fill(localDateTime(new Date().toISOString(),'Europe/Oslo').slice(0,19));await save(page);
     expect(await (await api(request,'GET','/work-sessions/active')).json()).toEqual(running);
     const copies=(await (await api(request,'GET','/work-sessions')).json()).items.filter(value=>value.summary===running.summary);expect(copies).toHaveLength(2);
     expect(copies.filter(value=>value.end===null)).toHaveLength(1);await unchangedActivities(request,f);
@@ -313,7 +315,7 @@ test('calendar copy and paste create only a new session and clear the clipboard 
     const targetDay=page.getByRole('button',{name:'Select 2025-10-21',exact:true});
     await targetDay.click();await expect(targetDay).toBeFocused();await page.keyboard.press('ControlOrMeta+v');
     await expect(page.locator('#editor-title')).toHaveText('Paste work session');
-    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-21T08:03:00.123456789');await save(page);
+    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-21T08:03');await save(page);
     let sessions=(await (await api(request,'GET','/work-sessions')).json()).items.filter(value=>value.summary===f.session.summary);expect(sessions).toHaveLength(2);
     const copy=sessions.find(value=>value.id!==f.session.id);expect(copy.clientId).toBe(f.client.id);expect(copy.title).toBe(f.session.title);expect(copy.start).toBe('2025-10-21T06:03:00.123456789Z');expect(copy.end).toBe('2025-10-21T14:03:00.987654321Z');
     expect((await (await api(request,'GET',`/work-sessions/${copy.id}/report`)).json()).activities).toEqual([]);
@@ -337,7 +339,7 @@ test('calendar stale gestures keep the proposal and never adopt a newer snapshot
     });
     await bar(page,f.session.id).focus();await bar(page,f.session.id).press('ArrowDown');
     await expect(page.locator('#editor-error')).toContainText('changed');await expect(page.locator('#save')).toBeDisabled();
-    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-20T08:18:00.123456789');
+    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-20T08:18');
     expect(await read(request,'work-sessions',f.session.id)).toEqual(peer);await unchangedActivities(request,f);
     await page.locator('#cancel').click();await page.unroute(`**/api/v1/work-sessions/${f.session.id}`);
     await page.getByRole('button',{name:'Refresh',exact:true}).click();await expect(bar(page,f.session.id)).toHaveAttribute('title',new RegExp(peer.summary));

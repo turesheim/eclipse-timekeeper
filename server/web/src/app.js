@@ -1,5 +1,5 @@
 import {Api, ApiError} from './api.js';
-import {addDays, dateInZone, dayStart, durationText, durationNanos, instantText, instantNanos, weekRange, taskPresentation, activityDayNanos, nanosText, decimalHoursText, workweekGroups, sessionTimeNanos, localDateTime, localDateTimeToInstant} from './model.js';
+import {addDays, dateInZone, dayStart, durationText, durationNanos, instantText, instantNanos, weekRange, taskPresentation, activityDayNanos, nanosText, decimalHoursText, workweekGroups, sessionTimeNanos, localDateTime, localDateTimeToInstant, localDateTimeOffsets} from './model.js';
 import {authentication} from './auth.js';
 import {icon, iconButton} from './icons.js';
 import {WeekCalendar} from './calendar.js';
@@ -376,9 +376,38 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
   showEditor();
 }
 function timeFields(value, ongoing) {
+  if(editor.collection==='work-sessions') {sessionTimeFields(value,ongoing);return;}
   const hint = `Local date and time in ${editor.zone}, for example 2026-10-13T08:30:00. Fractional seconds are preserved. Repeated clock times include an offset. Start cannot be in the future.`;
   field('Start (local time)', 'start', localDateTime(value.start || new Date().toISOString(), editor.zone), {required: true, hint});
   field(`End (local time, blank while ${ongoing})`, 'end', localDateTime(value.end, editor.zone));
+}
+function sessionTimeFields(value, ongoing) {
+  const defaults={start:value.start || new Date().toISOString().slice(0,16)+':00Z',end:value.end};
+  const fields=['start','end'].map(key=>{
+    const precise=localDateTime(defaults[key],editor.zone);
+    const input=field(key==='start' ? 'Start (local time)' : `End (local time, blank while ${ongoing})`,key,precise.slice(0,19),{type:'datetime-local',required:key==='start',hint:key==='start' ? `Dates and times use ${editor.zone}. Start cannot be in the future.` : undefined});
+    input.step='1';const displayed=input.value;
+    const originalOffset=/([+-]\d{2}:\d{2}(?::\d{2})?)$/.exec(precise)?.[1] || '';
+    const occurrence=field(`${key==='start' ? 'Start' : 'End'} time occurrence`,key+'Offset','',{choices:[['','Choose occurrence']]});
+    const label=occurrence.closest('label');
+    const update=()=>{
+      const offsets=localDateTimeOffsets(input.value,editor.zone), previous=occurrence.value;
+      label.hidden=offsets.length<2;occurrence.required=!label.hidden;occurrence.replaceChildren();
+      for(const [offset,text] of [['','Choose occurrence'],...offsets.map((offset,index)=>[offset,`${index===0 ? 'First' : 'Second'} occurrence (UTC${offset})`])]) {
+        const option=element('option',text);option.value=offset;occurrence.append(option);
+      }
+      occurrence.value=input.value===displayed ? originalOffset : offsets.includes(previous) ? previous : '';
+    };
+    input.addEventListener('input',update);update();
+    return {key,input,precise,displayed,originalOffset,occurrence,label};
+  });
+  // Native pickers show whole seconds. Preserve the original instant, including its
+  // fractional seconds and DST occurrence, until that endpoint is changed.
+  editor.timeValue=key=>{
+    const entry=fields.find(entry=>entry.key===key),offset=entry.label.hidden ? '' : entry.occurrence.value;
+    return entry.input.value===entry.displayed && (entry.label.hidden || offset===entry.originalOffset)
+      ? entry.precise : entry.input.value+(entry.input.value ? offset : '');
+  };
 }
 async function changeCalendarSession(original, proposal, scope) {
   if(scope!==api || !connected || !begin('Change work session',{collection:'work-sessions',id:original.id,etag:null,loading:true,calendarChange:true})) return;
@@ -424,6 +453,7 @@ $('settings').addEventListener('click', () => {
 for (const [id, collection] of [['add-client','clients'], ['add-project','projects'], ['add-task','tasks'], ['add-label','labels'], ['add-activity','activities']]) $(id).addEventListener('click', () => { void openRecord(collection).catch(error => setStatus(errorText(error))); });
 function values() {
   const get = key => $('fields').querySelector(`[name="${key}"]`)?.value;
+  const time = key => editor.timeValue ? editor.timeValue(key) : get(key);
   const labels = () => [...$('fields').querySelectorAll('[name="labelIds"]:checked')].map(node => node.value);
   if (editor.command === 'stop' || editor.command === 'session-stop' || editor.remove) return undefined;
   if (editor.command === 'session-start') return {summary:get('summary'),title:get('title'),clientId:get('clientId')};
@@ -434,7 +464,7 @@ function values() {
     case 'labels': return {name: get('name'), color: get('color') || null};
     case 'tasks': return {summary: get('summary'), projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null};
     case 'activities': return {...(editor.id ? {} : {taskId: get('taskId') || null, projectId:get('taskId') ? null : get('projectId') || null}), summary: get('summary'), start: localDateTimeToInstant(get('start'), editor.zone), end: get('end') ? localDateTimeToInstant(get('end'), editor.zone) : null, labelIds: labels()};
-    case 'work-sessions': return {title:get('title'),clientId:get('clientId'),summary:get('summary'),start:localDateTimeToInstant(get('start'),editor.zone),end:get('end') ? localDateTimeToInstant(get('end'),editor.zone) : null};
+    case 'work-sessions': return {title:get('title'),clientId:get('clientId'),summary:get('summary'),start:localDateTimeToInstant(time('start'),editor.zone),end:time('end') ? localDateTimeToInstant(time('end'),editor.zone) : null};
     case 'me': return {zoneId: get('zoneId')};
   }
 }

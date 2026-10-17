@@ -1,6 +1,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {dayStart, weekRange, durationNanos, durationText, dateInZone, instantNanos, taskPresentation, activityDayNanos, workweekGroups, decimalHoursText, sessionTimeNanos, localDateTime, localDateTimeToInstant, instantText} from '../src/model.js';
+import {dayStart, weekRange, durationNanos, durationText, dateInZone, instantNanos, taskPresentation, activityDayNanos, workweekGroups, decimalHoursText, sessionTimeNanos, localDateTime, localDateTimeToInstant, localDateTimeOffsets, instantText} from '../src/model.js';
+test('local date/time pickers distinguish repeated times and reject missing clock times', () => {
+  assert.deepEqual(localDateTimeOffsets('2026-10-25T02:30','Europe/Oslo'),['+02:00','+01:00']);
+  assert.deepEqual(localDateTimeOffsets('2026-03-29T02:30','Europe/Oslo'),[]);
+  assert.deepEqual(localDateTimeOffsets('2026-01-01T08:30','Asia/Kathmandu'),['+05:45']);
+  assert.deepEqual(localDateTimeOffsets('2026-04-05T01:45','Australia/Lord_Howe'),['+11:00','+10:30']);
+  assert.deepEqual(localDateTimeOffsets('','Europe/Oslo'),[]);
+});
 test('local editor values preserve civil dates and nanoseconds across user time zones', () => {
   for (const [instant, zone, text] of [
     ['2026-07-01T22:30:00.123456789Z','Europe/Oslo','2026-07-02T00:30:00.123456789'],

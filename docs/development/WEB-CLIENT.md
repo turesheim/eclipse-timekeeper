@@ -197,7 +197,10 @@ including running timers. Tracked time sums clipped intervals; covered time is
 their union. Unallocated time subtracts that union from session duration.
 Moving, resizing, stopping or deleting a session leaves activities unchanged.
 Sessions and activities can span midnight independently; activity day parts
-remain independent records. Local editor fields preserve nanoseconds and reject
+remain independent records. Work-session editors use native date/time pickers in
+the account's time zone. Unchanged endpoints retain their exact stored precision;
+choosing a different time uses whole-second precision. Repeated clock times offer a
+first/second occurrence choice. Activity editor fields preserve nanoseconds and reject
 nonexistent or ambiguous local input. Open drafts retain their original time zone;
 stale saves preserve drafts and uncertain commands retry the same durable key.
 
