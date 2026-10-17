@@ -240,3 +240,4 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
   .record-table.table td.actions { display: flex; justify-content: flex-end; padding-top: .75rem; }
   .record-table td.actions::before { content: none; }
 }
+.import-mapping { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 1rem; padding-block: .75rem; border-bottom: 1px solid var(--bs-border-color); }

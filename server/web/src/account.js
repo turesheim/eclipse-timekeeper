@@ -1,11 +1,13 @@
 import {instantText, localDateTimeToInstant} from './model.js';
 import {node, button, field, passwordField, validatePassword, section, form, table} from './account-ui.js';
 import {renderRecoveryEmails} from './recovery-emails.js';
+import {renderImports} from './imports.js';
 
 export async function renderAccount(view, part) {
   const [loaded, profile] = await Promise.all([view.session.request('/auth/account'), view.session.request('/me')]);
   if (!view.valid()) return;
   const account = loaded.data, zone = profile.data.zoneId;
+  if (part === 'import') {await renderImports(view, zone); return;}
   if (part === 'tokens') {await renderTokens(view, zone); return;}
   if (account.state === 'UNCLAIMED') {
     view.root.append(node('p', 'Ask the server operator for an account recovery code to add a username and password to this existing account.', 'alert alert-info'));

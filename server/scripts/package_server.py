@@ -54,12 +54,15 @@ def package(output, tag, commit):
               'docs/operations/LOCAL-DOCKER.md': 'LOCAL-DOCKER.md',
               'docs/operations/TAILSCALE.md': 'TAILSCALE.md',
               'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
+              'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
               'docs/development/WEB-CLIENT.md': 'WEB-CLIENT.md'}
     illustrations = {
         'docs/assets/screenshots/bootstrap-work-session-desktop.png': 'images/work-session-desktop.png',
         'docs/assets/screenshots/bootstrap-work-session-narrow.png': 'images/work-session-narrow.png',
         'docs/assets/screenshots/track-month-desktop.png': 'images/track-month-desktop.png',
         'docs/assets/screenshots/track-month-narrow.png': 'images/track-month-narrow.png',
+        'docs/assets/screenshots/toggl-import-review.png': 'images/toggl-import-review.png',
+        'docs/assets/screenshots/toggl-import-history-narrow.png': 'images/toggl-import-history-narrow.png',
     }
     destinations = {**guides, **illustrations, 'common/api/openapi.json': 'openapi.json'}
     files += [(ROOT / source, 'timekeeper-server/' + destination)

@@ -361,6 +361,8 @@ public class DefaultTimekeeperService implements TimekeeperService {
 	}
 
 	private Activity saveDailyActivities(Activity requested, boolean existing, Instant now) {
+		Activity prior = existing ? requiredActivity(requested.id()) : null;
+		boolean unchangedWork = prior != null && sameRecordedWork(prior,requested);
 		var intervals = ActivityDailySegments.split(requested, ports.timeSource().zone(requested.ownerId()), now);
 		int retainedIndex = intervals.size() - 1;
 		Activity retained = null;
@@ -372,12 +374,19 @@ public class DefaultTimekeeperService implements TimekeeperService {
 					requested.manual(), original ? requested.version() : 0, requested.workSessionId(), requested.projectId());
 			if (!original && ports.activities().find(part.id()).isPresent())
 				throw conflict("activity", "A daily activity already uses this interval. Edit that day's activity separately.");
-			part = ports.activities().save(part);
+			part = ports.activities().saveDailyPart(part,prior,unchangedWork);
 			publish(ACTIVITY, original && existing ? UPDATED : CREATED, part.id().value().toString());
 			if (original) retained = part;
 		}
 		return retained;
 	}
+
+    private static boolean sameRecordedWork(Activity before,Activity after) {
+        return Objects.equals(before.taskId(),after.taskId()) && before.ownerId().equals(after.ownerId())
+                && before.start().equals(after.start()) && before.end().equals(after.end())
+                && before.summary().equals(after.summary()) && before.labelIds().equals(after.labelIds())
+                && before.projectId().equals(after.projectId()) && before.manual()==after.manual();
+    }
 
 	@Override
 	public void deleteActivity(DeleteActivity command) {

@@ -79,7 +79,8 @@ class DistributionDocumentationTest(unittest.TestCase):
             with zipfile.ZipFile(root/'server/app/target/quarkus-app/app/fixture.jar','w') as jar:
                 jar.writestr('timekeeper-build.properties', f'commit={COMMIT}\ndirty=false\n')
             for name in ('bootstrap-work-session-desktop.png','bootstrap-work-session-narrow.png',
-                         'track-month-desktop.png','track-month-narrow.png'):
+                         'track-month-desktop.png','track-month-narrow.png',
+                         'toggl-import-review.png','toggl-import-history-narrow.png'):
                 image = root/'docs/assets/screenshots'/name
                 image.parent.mkdir(parents=True,exist_ok=True)
                 image.write_bytes((ROOT/'docs/assets/screenshots'/name).read_bytes())
@@ -98,7 +99,10 @@ class DistributionDocumentationTest(unittest.TestCase):
                         name = f'images/{view}-{size}.png'
                         self.assertIn(']('+name+')',web)
                         self.assertTrue(archive.read('timekeeper-server/'+name).startswith(b'\x89PNG\r\n\x1a\n'))
-                for name in ('DEPLOYMENT.md','LOCAL-DOCKER.md','TAILSCALE.md','WEB-CLIENT.md'):
+                for name in ('images/toggl-import-review.png','images/toggl-import-history-narrow.png'):
+                    self.assertIn(']('+name+')',web)
+                    self.assertTrue(archive.read('timekeeper-server/'+name).startswith(b'\x89PNG\r\n\x1a\n'))
+                for name in ('DEPLOYMENT.md','LOCAL-DOCKER.md','TAILSCALE.md','WEB-CLIENT.md','TOGGL-IMPORT.md'):
                     text=archive.read('timekeeper-server/'+name).decode()
                     for url in re.findall(r'\]\(([^\s)]+)\)',text):
                         parts=urlsplit(url)

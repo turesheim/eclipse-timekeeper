@@ -3310,7 +3310,7 @@
         "tags": [
           "WorkSessions"
         ],
-        "description": "Read the session and that owner’s overlapping activities, including running timers, in one owner-locked snapshot. Sum only each activity’s overlap; covered time is the union of those overlaps. Session changes automatically recompute context without altering activities. No explicit association is used."
+        "description": "Read the session and that owner\u2019s overlapping activities, including running timers, in one owner-locked snapshot. Sum only each activity\u2019s overlap; covered time is the union of those overlaps. Session changes automatically recompute context without altering activities. No explicit association is used."
       },
       "parameters": [
         {
@@ -5433,6 +5433,830 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/EmailResendInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/imports": {
+      "get": {
+        "operationId": "listImportJobs",
+        "summary": "List private import history",
+        "description": "Owner-scoped stable ID order. Follow nextAfter to retrieve further jobs; clients may sort fetched jobs by createdAt.",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportHistoryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/imports/toggl/preview": {
+      "post": {
+        "operationId": "previewTogglImport",
+        "summary": "Review normalized Track rows without writing data",
+        "description": "",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportReview"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TogglImportPreviewInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/imports/toggl/jobs": {
+      "post": {
+        "operationId": "createTogglImportJob",
+        "summary": "Create an immutable reviewed Track import job",
+        "description": "Creates private job authority and mappings only, with no client/project/task/label/activity creation. Source identity is a hash of the selected source member and workspace, never an account owner override. At most 100,000 selected entries. Work sessions are not inferred.",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJob"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TogglImportJobInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/imports/jobs/{id}": {
+      "get": {
+        "operationId": "getImportJob",
+        "summary": "Get authoritative import progress and immutable mappings",
+        "description": "",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJob"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/imports/jobs/{id}/items": {
+      "get": {
+        "operationId": "listImportItems",
+        "summary": "Read bounded import audit and lineage",
+        "description": "",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100
+            }
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportItemPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/imports/jobs/{id}/preview": {
+      "post": {
+        "operationId": "previewTogglImportBatch",
+        "summary": "Review the next import batch",
+        "description": "",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportReview"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TogglImportRowsInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/imports/jobs/{id}/batches/{index}": {
+      "post": {
+        "operationId": "commitTogglImportBatch",
+        "summary": "Atomically commit a durable import batch",
+        "description": "At most 100 completed source entries and 1,000 resulting daily activities. Source and account zones are distinct; a changed account zone requires new review. A finished batch must reconcile selected entry count and exact imported plus skipped source nanoseconds. Active provenance reuses current records without overwriting edits; ambiguous existing matches require explicit CREATE_DISTINCT or reviewed REUSE choices.",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            }
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportBatchResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TogglImportBatchInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/imports/jobs/{id}/undo": {
+      "post": {
+        "operationId": "beginImportUndo",
+        "summary": "Fence all further writes before whole-job Undo",
+        "description": "Confirm the whole-job operation before starting. Supports partially completed imports. The returned job is UNDOING; repeat previews and bounded commits until complete or retained conflicts are explicitly resolved.",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJob"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/imports/jobs/{id}/undo/preview": {
+      "get": {
+        "operationId": "previewImportUndoBatch",
+        "summary": "Review the next bounded Undo step",
+        "description": "At most 100 records. DELETE is unchanged and removable; REVIEW needs explicit KEEP or DELETE. REFERENCED, RUNNING and DEPENDENCY require KEEP or resolving the blocker outside Undo. REUSED records are preserved and MISSING records are reconciled. Catalog children commit before parent dependency review.",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportReview"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/imports/jobs/{id}/undo/batches/{index}": {
+      "post": {
+        "operationId": "commitImportUndoBatch",
+        "summary": "Commit a reviewed resumable Undo step",
+        "description": "Rechecks the exact preview under the owner lock, including versions and dependencies. Deletes only records created by this job through normal domain notifications. UNDONE_PARTIAL identifies deliberately retained created records. Source claims remain for retained records; removing all created parts releases that original claim for deliberate re-import. Cached replies never repeat deletion.",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483646
+            }
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportBatchResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportUndoBatchInput"
               }
             }
           }
@@ -7953,6 +8777,683 @@
             "maxLength": 320
           }
         }
+      },
+      "ImportDigest": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "ImportNanos": {
+        "type": "string",
+        "pattern": "^[0-9]{1,30}$",
+        "description": "Exact nonnegative nanoseconds, represented as a decimal string."
+      },
+      "ImportReuseRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "etag": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id",
+          "etag"
+        ],
+        "additionalProperties": false
+      },
+      "ImportCatalogMapping": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/ImportDigest"
+          },
+          "resourceType": {
+            "enum": [
+              "CLIENT",
+              "PROJECT",
+              "TASK",
+              "LABEL"
+            ]
+          },
+          "action": {
+            "enum": [
+              "CREATE",
+              "REUSE"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "color": {
+            "$ref": "#/components/schemas/Color"
+          },
+          "parentKey": {
+            "$ref": "#/components/schemas/ImportDigest"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "etag": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "key",
+          "resourceType",
+          "action"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "action": {
+                  "const": "CREATE"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "name"
+              ]
+            },
+            "else": {
+              "required": [
+                "id",
+                "etag"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "resourceType": {
+                  "enum": [
+                    "PROJECT",
+                    "TASK"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "parentKey"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "resourceType": {
+                  "const": "CLIENT"
+                },
+                "action": {
+                  "const": "CREATE"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "color"
+              ]
+            }
+          }
+        ]
+      },
+      "TogglImportRow": {
+        "type": "object",
+        "properties": {
+          "sourceKey": {
+            "$ref": "#/components/schemas/ImportDigest"
+          },
+          "sourceLine": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20971521
+          },
+          "sourceId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 255
+          },
+          "start": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "end": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "durationNanos": {
+            "$ref": "#/components/schemas/ImportNanos"
+          },
+          "client": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "project": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "task": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "summary": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "maxItems": 1000,
+            "uniqueItems": true
+          },
+          "projectKey": {
+            "$ref": "#/components/schemas/ImportDigest"
+          },
+          "taskKey": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImportDigest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "labelKeys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportDigest"
+            },
+            "maxItems": 1000,
+            "uniqueItems": true
+          },
+          "occurrence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "duplicateReviewed": {
+            "type": "boolean"
+          },
+          "duplicateDecision": {
+            "enum": [
+              "CREATE_DISTINCT",
+              "REUSE"
+            ]
+          },
+          "reuseActivities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportReuseRecord"
+            },
+            "maxItems": 1000
+          },
+          "clientKey": {
+            "$ref": "#/components/schemas/ImportDigest"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "reuseWorkSessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportReuseRecord"
+            },
+            "maxItems": 1
+          }
+        },
+        "required": [
+          "sourceKey",
+          "start",
+          "end",
+          "durationNanos",
+          "client",
+          "project",
+          "task",
+          "summary",
+          "tags",
+          "occurrence"
+        ],
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "required": [
+              "clientKey",
+              "title"
+            ]
+          },
+          {
+            "required": [
+              "projectKey",
+              "labelKeys"
+            ]
+          }
+        ]
+      },
+      "TogglImportRowsInput": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TogglImportRow"
+            },
+            "maxItems": 100,
+            "minItems": 1
+          }
+        },
+        "required": [
+          "rows"
+        ],
+        "additionalProperties": false
+      },
+      "TogglImportPreviewInput": {
+        "type": "object",
+        "properties": {
+          "sourceKey": {
+            "$ref": "#/components/schemas/ImportDigest"
+          },
+          "mappings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportCatalogMapping"
+            },
+            "maxItems": 1000
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TogglImportRow"
+            },
+            "maxItems": 100,
+            "minItems": 1
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "WORK_SESSION",
+              "ACTIVITY"
+            ],
+            "default": "ACTIVITY",
+            "description": "Web import defaults to WORK_SESSION. Omission retains legacy ACTIVITY behavior; the chosen mode is immutable for a job."
+          }
+        },
+        "required": [
+          "sourceKey",
+          "mappings",
+          "rows"
+        ],
+        "additionalProperties": false
+      },
+      "ImportSourceDiagnostics": {
+        "type": "object",
+        "description": "Client-reported CSV diagnostics. Counts reconcile all source rows with selected entries; no unselected source user identity or raw CSV is stored. Server committed counts remain authoritative.",
+        "properties": {
+          "sourceRows": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "rejectedRows": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "excludedRows": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "unselectedRows": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "unsupportedFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "maxItems": 100,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "sourceRows",
+          "rejectedRows",
+          "excludedRows",
+          "unselectedRows",
+          "unsupportedFields"
+        ],
+        "additionalProperties": false
+      },
+      "TogglImportJobInput": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "sourceKey": {
+            "$ref": "#/components/schemas/ImportDigest"
+          },
+          "selectionFingerprint": {
+            "$ref": "#/components/schemas/ImportDigest"
+          },
+          "sourceDiagnostics": {
+            "$ref": "#/components/schemas/ImportSourceDiagnostics"
+          },
+          "sourceDateFormat": {
+            "type": "string",
+            "enum": [
+              "ISO",
+              "DMY",
+              "MDY"
+            ],
+            "default": "ISO"
+          },
+          "sourceZone": {
+            "$ref": "#/components/schemas/ZoneId"
+          },
+          "fileFingerprint": {
+            "$ref": "#/components/schemas/ImportDigest"
+          },
+          "mappings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportCatalogMapping"
+            },
+            "maxItems": 1000
+          },
+          "selectedEntries": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "selectedNanos": {
+            "$ref": "#/components/schemas/ImportNanos"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "WORK_SESSION",
+              "ACTIVITY"
+            ],
+            "default": "ACTIVITY",
+            "description": "Web import defaults to WORK_SESSION. Omission retains legacy ACTIVITY behavior; the chosen mode is immutable for a job."
+          }
+        },
+        "required": [
+          "label",
+          "sourceKey",
+          "sourceZone",
+          "fileFingerprint",
+          "mappings",
+          "selectedEntries",
+          "selectedNanos"
+        ],
+        "additionalProperties": false
+      },
+      "TogglImportBatchInput": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TogglImportRow"
+            },
+            "maxItems": 100,
+            "minItems": 1
+          },
+          "reviewToken": {
+            "$ref": "#/components/schemas/ImportDigest"
+          },
+          "finished": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "rows",
+          "reviewToken",
+          "finished"
+        ],
+        "additionalProperties": false
+      },
+      "ImportUndoBatchInput": {
+        "type": "object",
+        "properties": {
+          "reviewToken": {
+            "$ref": "#/components/schemas/ImportDigest"
+          },
+          "choices": {
+            "type": "object",
+            "maxProperties": 100,
+            "propertyNames": {
+              "pattern": "^[0-9]+:-?[0-9]+$"
+            },
+            "additionalProperties": {
+              "enum": [
+                "KEEP",
+                "DELETE"
+              ]
+            }
+          }
+        },
+        "required": [
+          "reviewToken",
+          "choices"
+        ],
+        "additionalProperties": false
+      },
+      "ImportJob": {
+        "type": "object",
+        "description": "Durable private import authority. GET is authoritative after any uncertain batch reply. Mapping plans are immutable; protected database backups retain jobs, receipts and lineage, while portable domain exports omit them.",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "state": {
+            "enum": [
+              "IMPORTING",
+              "IMPORTED",
+              "UNDOING",
+              "UNDONE",
+              "UNDONE_PARTIAL",
+              "BLOCKED"
+            ]
+          },
+          "nextBatch": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "undoNextBatch": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reportZone": {
+            "$ref": "#/components/schemas/ZoneId"
+          },
+          "sourceZone": {
+            "$ref": "#/components/schemas/ZoneId"
+          },
+          "mappings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportCatalogMapping"
+            },
+            "maxItems": 1000
+          },
+          "importedNanos": {
+            "$ref": "#/components/schemas/ImportNanos"
+          },
+          "skippedNanos": {
+            "$ref": "#/components/schemas/ImportNanos"
+          },
+          "selectedEntries": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "selectedNanos": {
+            "$ref": "#/components/schemas/ImportNanos"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "WORK_SESSION",
+              "ACTIVITY"
+            ],
+            "default": "ACTIVITY",
+            "description": "Web import defaults to WORK_SESSION. Omission retains legacy ACTIVITY behavior; the chosen mode is immutable for a job."
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "version",
+          "label",
+          "state",
+          "nextBatch",
+          "undoNextBatch",
+          "reportZone",
+          "sourceZone"
+        ],
+        "additionalProperties": true
+      },
+      "ImportReview": {
+        "type": "object",
+        "description": "Bounded review with a token binding the exact request, current owned records and job version. Changed conditions produce 412. Duplicate decisions are explicit; source changes with a stable ID produce 409. No business data is written by preview.",
+        "properties": {
+          "reviewToken": {
+            "$ref": "#/components/schemas/ImportDigest"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "maxItems": 100
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "reviewToken"
+        ],
+        "additionalProperties": true
+      },
+      "ImportBatchResult": {
+        "type": "object",
+        "description": "Original durable batch outcome. Repeating the same job/index and content returns this result, including after restart; different content at that index produces 409. Historical results may predate Undo: reconcile with GET job.",
+        "properties": {
+          "jobId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "batch": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "jobVersion": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobId",
+          "batch",
+          "jobVersion",
+          "state"
+        ],
+        "additionalProperties": true
+      },
+      "ImportHistoryPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportJob"
+            },
+            "maxItems": 100
+          },
+          "nextAfter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextAfter"
+        ],
+        "additionalProperties": false
+      },
+      "ImportItemPage": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "maxItems": 100
+          },
+          "nextOffset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        },
+        "required": [
+          "jobId",
+          "items",
+          "nextOffset"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {

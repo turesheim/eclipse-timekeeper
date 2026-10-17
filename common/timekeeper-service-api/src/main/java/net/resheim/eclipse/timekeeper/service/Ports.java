@@ -49,6 +49,8 @@ public final class Ports {
 		boolean existsByTask(TaskId taskId);
 		boolean existsByLabel(LabelId labelId);
 		Activity save(Activity activity);
+        /** Optional lineage hook for a saved daily part; older adapters need no extra persistence. */
+        default Activity saveDailyPart(Activity activity, Activity prior, boolean unchangedRecordedWork) { return save(activity); }
 		void delete(ActivityId id);
 	}
 

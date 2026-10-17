@@ -352,3 +352,46 @@ record IDs and exact intervals, increments changed resource versions and emits
 change events. Repeated startup is idempotent. The generic SQL table schema is
 unchanged. Back up the server data before upgrading, and upgrade all replicas
 together to avoid older binaries dropping the new metadata.
+
+## Toggl Track imports and Undo
+
+The `/imports` endpoints accept normalized completed Detailed Report entries,
+with explicit source-zone conversion and reviewed catalog mappings. CSV parsing
+is separate from server authority. Preview writes no import or business records;
+creating a job stores its immutable mappings, file/source fingerprints, account
+report zone and selected count/time. Only authenticated ownership determines the
+destination account. Source member/workspace identity never creates accounts or
+shared workspaces. Work sessions are not inferred.
+
+Commit sequential batches of at most 100 entries and 1,000 resulting local-day
+activities. Each batch atomically commits domain changes, all daily IDs,
+provenance, catalog decisions and its durable outcome. Repeating the same job,
+index and input returns the original outcome; conflicting input is 409. After
+an uncertain reply, GET the job before continuing: a cached historical outcome
+can predate Undo. Completed jobs reconcile exact imported plus skipped source
+nanoseconds and selected entry counts. Changing the account reporting zone
+requires a new review/job; the importer does not change that preference.
+
+Source IDs take priority over fingerprints of exact UTC instants, original
+client/project/task names, descriptions and sorted tags. Filename, header variant
+and chosen destination IDs are excluded. Later exports reuse the original active
+claim, report edits without overwriting them, and retain the original creator.
+Unclaimed exact matches require explicit distinct-create or version-checked
+reuse. Indistinguishable source rows use reviewed occurrence numbers.
+
+Whole-job Undo first fences new import batches, including a partially completed
+job. Subsequent previews and commits each handle at most 100 records. Unchanged
+created activities can be removed; edited records require explicit KEEP or
+DELETE. Running timers, references from another active import and catalog
+dependencies require keeping the record or resolving the blocker first. Reused
+records are preserved. Children commit before their catalog parents are assessed.
+Every commit rechecks its preview token under the owner lock, with durable
+receipts and cursors for restart or lost replies. Automatic daily repartitioning
+tracks all derived IDs; manual edits stay visible for review. Missing records are
+reconciled without deleting anything else, and removing all original parts
+releases only that original source claim, allowing deliberate re-import.
+
+Private jobs, receipts, audit items, mapping plans and lineage use internal owned
+resource types; public domain collections and portable exports omit them.
+Protected database backups retain this authority. No database schema change is
+required. Domain writes and deletions emit the normal owner-scoped change feed.
