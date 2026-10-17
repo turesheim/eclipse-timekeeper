@@ -36,6 +36,10 @@ test('Toggl CSV worker, reviewed mappings, repeat import and whole-job Undo pres
   const first = await api(request,'/data/export');expect(first.activities.length-before.activities.length).toBe(7);expect(first.workSessions.length).toBe(before.workSessions.length);
   const jobs = await api(request,'/imports');expect(jobs.items).toHaveLength(1);expect(jobs.items[0].importedNanos).toBe('151462000000000');expect(jobs.items[0].state).toBe('IMPORTED');
   const originalId = jobs.items[0].id;
+  const pendingAudit = page.waitForEvent('download');await page.getByRole('button',{name:'Download audit',exact:true}).click();
+  const auditDownload = await pendingAudit,audit = JSON.parse(readFileSync(await auditDownload.path(),'utf8'));
+  expect(audit.job.id).toBe(originalId);const entries = audit.items.filter(value=>value.kind==='ENTRY');expect(entries).toHaveLength(7);
+  expect(entries.reduce((sum,value)=>sum+BigInt(value.sourceNanos),0n)).toBe(151462000000000n);expect(entries.every(value=>Number.isInteger(value.sourceLine) && value.outcome==='IMPORTED')).toBe(true);
   await page.getByRole('button',{name:'Import another file',exact:true}).click();await review(page);
   await expect(page.locator('#account-content')).toContainText('7 already imported');await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
   const repeated = await api(request,'/data/export');expect(repeated.activities.length).toBe(first.activities.length);expect(repeated.clients.length).toBe(first.clients.length);expect(repeated.projects.length).toBe(first.projects.length);

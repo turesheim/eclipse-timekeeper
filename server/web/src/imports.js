@@ -167,7 +167,16 @@ export async function renderImports(view, zone) {
     work.replaceChildren(node('h2','Confirm import'));const flat = reviews.flat();
     const matches = flat.map((value,index) => ({value,index})).filter(({value}) => value.status === 'REVIEW_MATCHES' || value.status === 'SOURCE_CHANGED');
     const reused = flat.filter(value => value.status.startsWith('REUSED')).length;
+    const edited = flat.map((value,index)=>({value,index})).filter(({value})=>value.status==='REUSED_EDITED');
     work.append(node('p',`${plan.rows.length} selected entries · ${nanosText(BigInt(plan.selectedNanos))} · ${reused} already imported · ${matches.length} need review.`));
+    if(edited.length) {
+      const details = node('details');details.append(node('summary',`${edited.length} previously imported entries have edits or missing daily parts. Existing records will be reused without overwriting them.`));
+      details.append(table(['Source entry','Source start','Source end','Current daily records'],edited.slice(0,50).map(({value,index})=>[
+        plan.rows[index].summary || `Entry ${index+1}`,instantText(plan.rows[index].start,zone),instantText(plan.rows[index].end,zone),
+        value.activities.map(activity=>`${instantText(activity.start,zone)} → ${activity.end ? instantText(activity.end,zone) : 'Running'}`).join('; ')
+      ])));
+      if(edited.length>50) details.append(node('p','Showing the first 50. Download preview diagnostics for the complete list.'));work.append(details);
+    }
     const list = node('div');work.append(list);let page = 0;
     function draw() {
       list.replaceChildren();
@@ -330,7 +339,8 @@ export async function renderImports(view, zone) {
     if(!view.valid() || !parsed) return;
     const rows = parsed.rows.map(row=>({line:row.line,selected:row.personKey===selectedPerson || !row.personKey,excluded:!!row.excluded,
       errors:row.errors,warnings:row.warnings,ambiguousDuplicate:!!row.ambiguousDuplicate}));
-    saveJson([JSON.stringify({sourceZone:sourceZone.value.trim(),sourceDateFormat:dateFormat.value,diagnostics:diagnostics(),rows},null,2)],'timekeeper-import-diagnostics.json');
+    saveJson([JSON.stringify({sourceZone:sourceZone.value.trim(),sourceDateFormat:dateFormat.value,diagnostics:diagnostics(),rows,
+      serverReview:reviews.flat().map((value,index)=>({entry:index+1,...value}))},null,2)],'timekeeper-import-diagnostics.json');
   }
   function saveJson(chunks,filename) {
     const url = URL.createObjectURL(new Blob(chunks,{type:'application/json'}));downloadUrls.add(url);

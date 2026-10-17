@@ -8913,6 +8913,11 @@
           "sourceKey": {
             "$ref": "#/components/schemas/ImportDigest"
           },
+          "sourceLine": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20971521
+          },
           "sourceId": {
             "type": [
               "string",

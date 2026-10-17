@@ -28,7 +28,7 @@ export async function importPlan(sourceRows, personKey, {fallbackClient, fallbac
     const taskKey = source.task ? await mapping(['TASK', source.client, source.project, source.task], 'TASK', source.task, projectKey) : null;
     const labelKeys = [];
     for (const tag of source.tags) labelKeys.push(await mapping(['LABEL', tag], 'LABEL', tag));
-    rows.push({sourceKey, sourceId: source.sourceId, start: source.start, end: source.end,
+    rows.push({sourceKey, sourceId: source.sourceId, ...(source.line ? {sourceLine:source.line} : {}), start: source.start, end: source.end,
       durationNanos: source.durationNanos.toString(), client: source.client, project: source.project, task: source.task,
       summary: source.summary, tags: source.tags, projectKey, taskKey, labelKeys, occurrence: source.occurrence,
       duplicateReviewed: !!source.duplicateReviewed, ...(source.duplicateDecision ? {duplicateDecision: source.duplicateDecision} : {})});
@@ -36,7 +36,7 @@ export async function importPlan(sourceRows, personKey, {fallbackClient, fallbac
   }
   if (!rows.length) throw new Error('Select at least one valid source entry.');
   if (definitions.size > 1000) throw new Error('Split this export into files with at most 1,000 catalogue mappings.');
-  const selection = rows.map(({projectKey, taskKey, labelKeys, duplicateReviewed, duplicateDecision, ...source}) => source);
+  const selection = rows.map(({projectKey, taskKey, labelKeys, duplicateReviewed, duplicateDecision, sourceLine, ...source}) => source);
   const selectionFingerprint = await importDigest(JSON.stringify(selection));
   return {sourceKey, mappings: [...definitions.values()], rows, selectionFingerprint, selectedEntries: rows.length, selectedNanos: selectedNanos.toString()};
 }

@@ -51,6 +51,11 @@ class TogglImportTest {
         Duration total=Duration.ZERO;
         for(var part:parts) {total=total.plus(Duration.between(Instant.parse(part.path("start").asText()),Instant.parse(part.path("end").asText())));assertEquals("Independent description",part.path("summary").asText());assertTrue(part.hasNonNull("taskId"));assertEquals(1,part.path("labelIds").size());}
         assertEquals(Duration.ofHours(7).plusNanos(2),total);
+        store.transaction(owner,()->{
+            var audit=ledger.required(ImportLedger.Kind.IMPORT_ITEM,ledger.itemId(job,4));
+            assertEquals(row.path("durationNanos").asText(),audit.path("sourceNanos").asText());assertEquals("IMPORTED",audit.path("outcome").asText());
+            assertEquals(row.path("start").asText(),audit.path("sourceStart").asText());return null;
+        });
         store.transaction(owner,()->{var part=parts.get(0);return store.service().updateActivity(new UpdateActivity(new ActivityId(uuid(part.get("id"))),part.path("version").asLong(),Instant.parse(part.path("start").asText()),Optional.of(Instant.parse(part.path("end").asText())),"Edited later",labels(part.get("labelIds"))));});
         UUID repeat=uuid(store.transaction(owner,()->importer.create(source(definitions,1,row.path("durationNanos").asText()).put("fileFingerprint",hash("renamed overlapping file")))).get("id"));
         store.transaction(owner,()->{

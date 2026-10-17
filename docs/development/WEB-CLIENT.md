@@ -164,6 +164,14 @@ administrator is protected in the UI and by the server. This does not grant
 access to another account's work data or introduce workspaces, members or
 invitations. Personal settings remain separate from other-user administration.
 
+**Import** supports reviewed Toggl Track Detailed Report CSV, source-user and
+time-zone selection, explicit catalog mappings, duplicate review, durable
+bounded commits and whole-job Undo. A cancellable module worker handles parsing
+and batch planning. Navigation/sign-out disposes the worker and source preview;
+resuming uses server history and reselecting the unchanged file. No raw CSV or
+credentials are persisted in browser storage. See the
+[import and Undo guide](../operations/TOGGL-IMPORT.md) for limits and conflict handling.
+
 Routes are bookmarkable fragments (`#account/profile`, `#account/password`,
 `#account/tokens`, `#account/import`, `#users`, `#users/new` and `#users/<encoded-owner>`). Direct
 access still requires the authenticated account and server-side permissions.

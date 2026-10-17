@@ -63,6 +63,8 @@ time. Pause after the current batch, or reload and choose **Resume**. Reselect
 the unchanged CSV, original source user, time conversion and row exclusions.
 The original mapping plan is retained. If your account time zone changed, undo
 the partial job or start a newly reviewed import.
+Changed destination records also require a newly reviewed job; an existing job
+cannot silently adopt a different mapping or a newer destination version.
 
 A lost reply does not mean a batch failed: the server's job history is
 authoritative. Retrying the same batch returns its durable outcome. Re-imports
@@ -91,3 +93,6 @@ possible. Retained records keep duplicate protection. **Download audit** provide
 a JSON record of committed outcomes and Undo decisions. Protected server
 database backups preserve this history; portable work-data exports omit its
 private import authority.
+The audit retains each selected entry's original interval, exact source duration,
+source line/ID when available and imported/reused outcome. Reused source time can
+differ from the current duration of a record that was edited after import.

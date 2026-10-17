@@ -86,7 +86,7 @@ final class TogglImport {
                     activities=currentParts(original);
                     if(activities.isEmpty()) provenance.releaseIfMissing(job,original);
                     else {
-                        provenance.reuseActive(job,row.fingerprint(),row.content(),row.occurrence(),activities);
+                        audit(provenance.reuseActive(job,row.fingerprint(),row.content(),row.occurrence(),activities),row,status.equals("REUSED_EDITED") ? status : "REUSED");
                         skipped++;skippedNanos=skippedNanos.add(row.nanos());
                         outcomes.add(outcome(row,status.equals("REUSED_EDITED") ? status : "REUSED",activities,false));continue;
                     }
@@ -104,7 +104,7 @@ final class TogglImport {
                 } else {
                     activities=create(job,row);created=true;imported++;activityCount+=activities.size();importedNanos=importedNanos.add(row.nanos());
                 }
-                provenance.record(job,row.fingerprint(),row.content(),row.occurrence(),activities,created);
+                audit(provenance.record(job,row.fingerprint(),row.content(),row.occurrence(),activities,created),row,created ? "IMPORTED" : "REUSED");
                 outcomes.add(outcome(row,created ? "IMPORTED" : "REUSED",activities,created));
             }
             job.put("importedEntries",job.path("importedEntries").asInt()+imported);job.put("skippedEntries",job.path("skippedEntries").asInt()+skipped);
@@ -238,5 +238,11 @@ final class TogglImport {
     private ObjectNode outcome(Row row,String status,List<Activity> activities,boolean created) {
         var value=object().put("fingerprint",row.fingerprint()).put("occurrence",row.occurrence()).put("status",status).put("created",created).put("sourceNanos",row.nanos().toString());
         var ids=value.putArray("activityIds");activities.forEach(activity->ids.add(activity.id().value().toString()));return value;
+    }
+    private void audit(ObjectNode item,Row row,String status) {
+        item.put("sourceStart",row.start().toString());item.put("sourceEnd",row.end().toString());item.put("sourceNanos",row.nanos().toString());item.put("outcome",status);
+        if(row.input().hasNonNull("sourceId")) item.put("sourceId",row.input().path("sourceId").asText());
+        if(row.input().has("sourceLine")) item.put("sourceLine",integer(row.input(),"sourceLine",1,20971521));
+        ledger.update(ImportLedger.Kind.IMPORT_ITEM,item);
     }
 }
