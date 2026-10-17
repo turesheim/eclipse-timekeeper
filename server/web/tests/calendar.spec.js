@@ -293,7 +293,8 @@ test('calendar copy and paste create only a new session and clear the clipboard 
   try {
     await calendar(page);await bar(page,f.session.id).focus();await bar(page,f.session.id).click();
     await page.keyboard.press('ControlOrMeta+c');
-    await page.getByRole('button',{name:'Select 2025-10-21',exact:true}).click();await page.keyboard.press('ControlOrMeta+v');
+    const targetDay=page.getByRole('button',{name:'Select 2025-10-21',exact:true});
+    await targetDay.click();await expect(targetDay).toBeFocused();await page.keyboard.press('ControlOrMeta+v');
     await expect(page.locator('#editor-title')).toHaveText('Paste work session');
     await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-21T08:03:00.123456789');await save(page);
     let sessions=(await (await api(request,'GET','/work-sessions')).json()).items.filter(value=>value.summary===f.session.summary);expect(sessions).toHaveLength(2);

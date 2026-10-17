@@ -91,6 +91,7 @@ export class WeekCalendar {
       const heading=node('div',undefined,`calendar-heading${day.date===today ? ' today' : ''}`);
       const title=new Intl.DateTimeFormat(undefined,{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(`${day.date}T12:00:00Z`));
       const pick=button(title,()=>{
+        pick.focus({preventScroll:true});
         const source=this.clipboard || this.selected();
         const clock=source ? localDateTime(source.start,zone).slice(11,16) : null;
         const rounded=clock ? clock.slice(0,3)+String(Math.floor(Number(clock.slice(3))/15)*15).padStart(2,'0') : null;
