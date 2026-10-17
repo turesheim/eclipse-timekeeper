@@ -14,6 +14,7 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[3]
+DB = ROOT/'server/app/src/main/resources/db'
 
 
 def command(*args, input=None, check=True, environment=None):
@@ -41,7 +42,7 @@ def main():
         admin_file.chmod(0o444)
         commit = command('git', '-C', str(ROOT), 'rev-parse', 'HEAD').stdout.strip()
         release = folder / 'release.json'
-        release.write_text(json.dumps({'commit':commit, 'image':'ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+commit, 'serverSchema':2}))
+        release.write_text(json.dumps({'commit':commit, 'image':'ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+commit, 'serverSchema':3}))
         binary = folder / 'timekeeper-dsm'
         command('go', '-C', str(ROOT/'server/synology/installer'), 'build', '-trimpath', '-o', str(binary), '.',
                 environment={**os.environ, 'GOOS':'linux', 'GOARCH':architecture, 'CGO_ENABLED':'0', 'GOCACHE':str(folder/'go-cache')})
@@ -63,7 +64,7 @@ def main():
                 'postgres','-p','5433','-c','log_statement=all')
         try:
             for _ in range(100):
-                if command('docker','exec',name,'pg_isready','-U','postgres','-p','5433',check=False).returncode == 0:
+                if command('docker','exec',name,'pg_isready','-h','127.0.0.1','-U','postgres','-p','5433',check=False).returncode == 0:
                     break
                 time.sleep(.1)
             else:
@@ -78,6 +79,9 @@ def main():
                     'chown -R 10001:10001 /var/packages/timekeeper /volume1/@appdata/timekeeper')
             command('docker','cp',str(binary),name+':/var/packages/timekeeper/scripts/timekeeper-dsm')
             command('docker','cp',str(release),name+':/var/packages/timekeeper/scripts/release.json')
+            command('docker','exec',name,'mkdir','-p','/var/packages/timekeeper/scripts/migration')
+            for file in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','recovery-v3.sql'):
+                command('docker','cp',str(DB/file),name+':/var/packages/timekeeper/scripts/migration/'+file)
             # DSM stages package.tgz separately from its SPK control scripts.
             # Leave the incoming identity absent first to reproduce the real
             # NAS preinst failure, then supply the payload copy shipped by SPK.
@@ -161,8 +165,15 @@ def main():
                          "SELECT concat_ws('|',rolsuper,rolcreatedb,rolcreaterole,rolreplication,rolbypassrls) FROM pg_roles WHERE rolname='timekeeper_fixture_app'").stdout.strip()
             if role!='f|f|f|f|f':
                 raise AssertionError('Application role has administrative privileges')
-            command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-c',
-                    "SET ROLE timekeeper_fixture_app; CREATE TABLE tk_schema(id INTEGER PRIMARY KEY,schema_version INTEGER,state TEXT); INSERT INTO tk_schema VALUES(1,2,'READY'); CREATE TABLE preserved_fixture(value TEXT); INSERT INTO preserved_fixture VALUES('owned private data');")
+            # Restore validates the canonical schema, so exercise actual Timekeeper
+            # rows rather than the earlier ad-hoc preserved_fixture table.
+            payload=json.dumps({'ownerId':'existing-owner','id':'11111111-1111-1111-1111-111111111111','version':0,'name':'owned private data','color':'#176653'})
+            schema='SET ROLE timekeeper_fixture_app; '+''.join((DB/file).read_text() for file in ('schema-v1-postgresql.sql','auth-v2.sql','recovery-v3.sql'))
+            schema+="UPDATE tk_schema SET schema_version=3,state='READY'; INSERT INTO tk_owner VALUES('existing-owner','UTC',0,0,'"+'b'*64+"');"
+            schema+="INSERT INTO tk_account VALUES('existing-owner',NULL,NULL,'Existing owner','UNCLAIMED',FALSE,TRUE,0);"
+            schema+="INSERT INTO tk_resource VALUES('existing-owner','LABEL','11111111-1111-1111-1111-111111111111',0,'"+payload+"');"
+            command('docker','exec','-i',name,'psql','-X','-v','ON_ERROR_STOP=1','-U','postgres','-p','5433','-d','timekeeper_fixture',input=schema)
+            owned_data="SELECT payload::jsonb->>'name' FROM tk_resource WHERE owner_id='existing-owner' AND entity_type='LABEL'"
             # Real DSM upgrade order removes the old var/target links before
             # incoming preinst, without supplying fresh-install wizard fields.
             original_variables=dict(variables)
@@ -194,13 +205,13 @@ def main():
                 if after_upgrade[key]!=settings[key]:raise AssertionError('Upgrade changed retained '+key)
             if read('secrets/database_password').decode().strip()!=application_password:
                 raise AssertionError('Upgrade after link removal replaced the database credential')
-            value=command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-Atc','SELECT value FROM preserved_fixture').stdout.strip()
+            value=command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-Atc',owned_data).stdout.strip()
             if value!='owned private data':raise AssertionError('Upgrade after link removal changed native data')
             variables=original_variables
             # First setup can expire before the user reaches the web client. Reinstall
             # renews it and invalidates the earlier pending code without master access.
             command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-c',
-                    "SET ROLE timekeeper_fixture_app; CREATE TABLE tk_auth_control(id INTEGER PRIMARY KEY,bootstrap_completed BOOLEAN); INSERT INTO tk_auth_control VALUES(1,FALSE); CREATE TABLE tk_auth_challenge(digest TEXT,purpose TEXT,consumed BOOLEAN); INSERT INTO tk_auth_challenge VALUES('old-code','SETUP',FALSE);")
+                    "SET ROLE timekeeper_fixture_app; INSERT INTO tk_auth_challenge VALUES('old-code','SETUP',NULL,'2030-01-01T00:00:00Z',FALSE);")
             code=secrets.token_urlsafe(32)
             variables['wizard_setup_code']=code
             variables.pop('wizard_database_admin_password')
@@ -226,13 +237,13 @@ def main():
             helper('validate'); helper('install')
             if read('secrets/database_password').decode().strip()!=application_password:
                 raise AssertionError('Interrupted provisioning replaced the application credential')
-            value=command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-Atc','SELECT value FROM preserved_fixture').stdout.strip()
+            value=command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-Atc',owned_data).stdout.strip()
             if value!='owned private data':
                 raise AssertionError('Repair changed retained data')
             backup_path=helper('backup').stdout.strip()
-            command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-c',"UPDATE preserved_fixture SET value='must disappear after restore'")
+            command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-c',"UPDATE tk_resource SET payload=jsonb_set(payload::jsonb,'{name}','\"must disappear after restore\"')::text WHERE owner_id='existing-owner' AND entity_type='LABEL'")
             helper('restore',backup_path)
-            value=command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-Atc','SELECT value FROM preserved_fixture').stdout.strip()
+            value=command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-Atc',owned_data).stdout.strip()
             if value!='owned private data':raise AssertionError('Native backup restore lost retained data')
             # A separate malformed backup is refused without replacing restored data.
             command('docker','exec',name,'sh','-ec',"printf corrupt > /var/packages/timekeeper/var/server/backups/corrupt.tar; chown 10001:10001 /var/packages/timekeeper/var/server/backups/corrupt.tar")
@@ -240,7 +251,7 @@ def main():
             log=command('docker','logs',name).stdout+command('docker','logs',name).stderr
             if any(secret in log for secret in (master_password,application_password,code)):
                 raise AssertionError('PostgreSQL statement log contains a plaintext credential')
-            print(json.dumps({'postgresql':args.postgres_image,'architecture':architecture,
+            print(json.dumps({'postgresql':args.postgres_image,'architecture':architecture,'serverSchema':3,'canonicalSchemaFixture':True,
                               'unprivilegedInstaller':True,'dedicatedNonSuperuser':True,'permanentAppdataBeforeResourceStartup':True,
                               'upgradeSurvivesRemovedPackageLinks':True,'missingUpgradeStateRefused':True,
                               'reinstallPreservesCredentials':True,'renewIncompleteSetupWithoutResettingAccounts':True,'interruptedProvisioningPreservesData':True,
