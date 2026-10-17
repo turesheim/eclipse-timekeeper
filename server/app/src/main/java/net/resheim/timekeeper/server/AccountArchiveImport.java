@@ -42,6 +42,7 @@ final class AccountArchiveImport {
         }
         var result=object().put("archiveId",archive.path("archiveId").asText()).put("generatedAt",archive.path("generatedAt").asText());
         result.set("counts",AccountArchiveInput.counts(archive));
+        result.set("relationships",AccountArchiveInput.relationships(archive));
         result.set("sourceAccount",object().set("username",archive.path("account").path("username")));
         ((ObjectNode)result.get("sourceAccount")).set("displayName",archive.path("account").path("displayName"));
         result.put("sourceTimeZone",archive.path("preferences").path("zoneId").asText());result.put("currentTimeZone",store.profile().path("zoneId").asText());

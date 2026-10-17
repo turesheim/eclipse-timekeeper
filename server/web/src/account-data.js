@@ -3,6 +3,7 @@ import {instantText} from './model.js';
 
 const MAX_BYTES=256*1024*1024;
 const labels={clients:'Clients',projects:'Projects',tasks:'Tasks',labels:'Labels',activities:'Activities',workSessions:'Work sessions',importAuditRecords:'Import audit records'};
+const relationshipLabels={projectClients:'Project clients',taskProjects:'Task projects',parentTasks:'Parent tasks',activityTasks:'Activity tasks',activityProjects:'Activity projects',activityLabels:'Activity labels',workSessionClients:'Work session clients',workSessionProjects:'Work session projects',workSessionLabels:'Work session labels'};
 const base='/data/account';
 
 export async function renderAccountData(view,zone) {
@@ -91,6 +92,13 @@ export async function renderAccountData(view,zone) {
   function showReview() {
     const value=review.data,captured=review,reviewedUploadId=uploadId;work.hidden=false;work.replaceChildren(node('h2','Review archive'));
     work.append(node('p',`${value.sourceAccount.displayName || value.sourceAccount.username || 'Account archive'} · ${instantText(value.generatedAt,currentZone)}`),countTable(value.counts));
+    if(value.relationships) {
+      work.append(node('h3','Linked records','h6'),node('p','These links are preserved with new record IDs.'));
+      const rows=Object.entries(relationshipLabels).filter(([key])=>value.relationships[key]>0).map(([key,label])=>[label,String(value.relationships[key])]);
+      if(rows.length) {
+        const related=table(['Links','Count'],rows),grid=related.querySelector('table');grid.setAttribute('aria-label','Record links');grid.classList.remove('record-table');grid.classList.add('table-sm');work.append(related);
+      }else work.append(node('p','This archive has no record links.'));
+    }
     work.append(node('p',value.restoreTimeZone ? `Time zone: ${value.currentTimeZone} → ${value.sourceTimeZone}`:`Keep time zone: ${value.currentTimeZone}`));
     if(value.runningActivities || value.runningWorkSessions) work.append(node('p',`${value.runningActivities} running activities · ${value.runningWorkSessions} running work sessions.`));
     for(const conflict of value.conflicts) work.append(node('p',conflict,'alert alert-warning'));

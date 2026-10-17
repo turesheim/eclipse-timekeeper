@@ -12723,6 +12723,10 @@
           },
           "canImport": {
             "type": "boolean"
+          },
+          "relationships": {
+            "$ref": "#/components/schemas/AccountArchiveRelationshipCounts",
+            "description": "Present on new reviews; older retained review summaries may omit this field."
           }
         },
         "required": [
@@ -12999,6 +13003,60 @@
             "maxItems": 3
           }
         }
+      },
+      "AccountArchiveRelationshipCounts": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Counts of validated source references preserved under new record IDs.",
+        "properties": {
+          "projectClients": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "taskProjects": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "parentTasks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "activityTasks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "activityProjects": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "activityLabels": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "workSessionClients": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "workSessionProjects": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "workSessionLabels": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "projectClients",
+          "taskProjects",
+          "parentTasks",
+          "activityTasks",
+          "activityProjects",
+          "activityLabels",
+          "workSessionClients",
+          "workSessionProjects",
+          "workSessionLabels"
+        ]
       }
     },
     "parameters": {

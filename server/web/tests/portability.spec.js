@@ -38,6 +38,7 @@ test('portability: private download, accessible review, stale review and duplica
   await page.reload();await expect(page.getByRole('heading',{name:'Download my data',exact:true})).toBeVisible();
   await page.getByLabel('Timekeeper archive',{exact:true}).setInputFiles(file);await page.getByLabel('Restore the archived time zone',{exact:true}).check();await page.getByRole('button',{name:'Review archive',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Review archive',exact:true})).toBeVisible();await expect(page.getByText('Time zone: UTC → Europe/Oslo',{exact:true})).toBeVisible();
+  const links=page.getByRole('table',{name:'Record links',exact:true});await expect(links.locator('tbody tr')).toHaveCount(3);await expect(links).toContainText('Work session projects');await expect(links.locator('tbody tr').filter({hasText:'Work session projects'})).toContainText('1');
   expect((await snapshot(page)).workSessions).toHaveLength(1);
   for(const width of [1440,390,320]) {
     await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

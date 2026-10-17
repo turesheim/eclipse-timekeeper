@@ -55,6 +55,10 @@ If the result is unknown, use **Check import result**. Timekeeper reconciles the
 recorded result before allowing another attempt. Reloading or selecting the same
 archive again also reconciles a completed restore.
 
+The review lists record counts and the client, project, task, label and session
+links to preserve. It validates these links before importing; linked records
+receive new IDs together.
+
 ## Uploads and limits
 
 Uploads are private to your account and can resume after a lost reply or reload:

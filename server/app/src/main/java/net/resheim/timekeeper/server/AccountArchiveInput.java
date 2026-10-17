@@ -74,6 +74,19 @@ final class AccountArchiveInput {
         }
         result.put("importAuditRecords",archive.path("importHistory").size());return result;
     }
+    static ObjectNode relationships(JsonNode archive) {
+        var result=object();var work=archive.path("work");
+        String[][] links={{"projectClients","projects","clientId"},{"taskProjects","tasks","projectId"},
+                {"parentTasks","tasks","parentTaskId"},{"activityTasks","activities","taskId"},
+                {"activityProjects","activities","projectId"},{"activityLabels","activities","labelIds"},
+                {"workSessionClients","workSessions","clientId"},{"workSessionProjects","workSessions","projectId"},
+                {"workSessionLabels","workSessions","labelIds"}};
+        for(var link:links) {
+            long count=0;for(var record:work.path(link[1])) {var value=record.path(link[2]);count+=value.isArray() ? value.size():value.isTextual() ? 1:0;}
+            result.put(link[0],count);
+        }
+        return result;
+    }
     private static Set<String> names(JsonNode value) {var result=new HashSet<String>();value.fieldNames().forEachRemaining(result::add);return result;}
     private static JsonNode json(InputStream input,long limit) throws IOException {
         var bounded=new FilterInputStream(input) {

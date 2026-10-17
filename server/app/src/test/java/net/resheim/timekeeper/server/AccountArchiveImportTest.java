@@ -90,6 +90,26 @@ class AccountArchiveImportTest {
         var changed=archive.deepCopy();((ObjectNode)changed.path("work").path("projects").get(0)).put("name","Changed after restore");UUID changedId=stage(changed);
         assertEquals(409,assertThrows(ApiFailure.class,()->store.transaction("b",()->importer().preview(changedId,false))).status);assertEquals(saved,work());
     }
+    @Test void previewShowsValidatedLinksAndRestoreKeepsTaskHierarchyAndSessionLabels() throws Exception {
+        var archive=source();var work=(ObjectNode)archive.path("work");var root=work.path("tasks").get(0);
+        var child=((ObjectNode)root).deepCopy().put("id",UUID.randomUUID().toString()).put("parentTaskId",root.path("id").asText()).put("summary","Archive child");
+        ((com.fasterxml.jackson.databind.node.ArrayNode)work.path("tasks")).add(child);
+        ((ObjectNode)work.path("workSessions").get(0)).putArray("labelIds").add(work.path("activities").get(0).path("labelIds").get(0));
+        UUID id=stage(archive);var before=work();var review=store.transaction("b",()->importer().preview(id,false));
+        assertTrue(review.body().path("canImport").asBoolean());inputs.validate("AccountArchiveReview",review.body());
+        assertEquals(object().put("projectClients",1L).put("taskProjects",2L).put("parentTasks",1L)
+                .put("activityTasks",1L).put("activityProjects",1L).put("activityLabels",1L)
+                .put("workSessionClients",1L).put("workSessionProjects",1L).put("workSessionLabels",1L),review.body().path("relationships"));
+        assertEquals(before,work());
+        store.transaction("b",()->importer().apply(id,false,review.etag()));
+        store.transaction("b",()->{
+            var tasks=store.list("TASK");var restoredRoot=tasks.stream().filter(task->task.path("summary").asText().equals("Archive task")).findFirst().orElseThrow();
+            var restoredChild=tasks.stream().filter(task->task.path("summary").asText().equals("Archive child")).findFirst().orElseThrow();
+            assertNotEquals(root.path("id"),restoredRoot.path("id"));assertEquals(restoredRoot.path("id"),restoredChild.path("parentTaskId"));
+            assertEquals(restoredRoot.path("projectId"),restoredChild.path("projectId"));
+            assertEquals(store.list("ACTIVITY").getFirst().path("labelIds"),store.list("WORK_SESSION").getFirst().path("labelIds"));return null;
+        });
+    }
     @Test void staleReviewInvalidGraphsAndSourcePrivilegeFieldsCannotPartlyRestoreData() throws Exception {
         var archive=source();UUID id=stage(archive);var review=store.transaction("b",()->importer().preview(id,false));
         store.transaction("b",()->{store.service().createProject(new CreateProject("Peer edit"));return null;});var peer=work();
