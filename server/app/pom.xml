@@ -9,9 +9,18 @@
     <git.dirty>unknown</git.dirty>
     <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ss'Z'</maven.build.timestamp.format>
   </properties>
+  <dependencyManagement>
+    <dependencies>
+      <!-- Yubico's supported ranges otherwise float, including CBOR 5 prereleases. -->
+      <dependency><groupId>com.upokecenter</groupId><artifactId>cbor</artifactId><version>4.5.6</version></dependency>
+      <dependency><groupId>com.google.guava</groupId><artifactId>guava</artifactId><version>33.6.0-jre</version></dependency>
+      <dependency><groupId>org.apache.httpcomponents.client5</groupId><artifactId>httpclient5</artifactId><version>5.6.4</version></dependency>
+    </dependencies>
+  </dependencyManagement>
   <dependencies>
     <dependency><groupId>${project.groupId}</groupId><artifactId>timekeeper-http-client</artifactId><version>${project.version}</version><scope>test</scope></dependency>
     <dependency><groupId>com.networknt</groupId><artifactId>json-schema-validator</artifactId><version>1.5.9</version></dependency>
+    <dependency><groupId>com.yubico</groupId><artifactId>webauthn-server-core</artifactId><version>2.10.1</version></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>timekeeper-service</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest-jackson</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-mailer</artifactId></dependency>
