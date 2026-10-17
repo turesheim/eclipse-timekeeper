@@ -69,7 +69,9 @@ async function dragSession(page,id,targetDate,deltaY=0) {
 }
 async function resize(page,id,edge,deltaY) {
   const handle=bar(page,id).locator(`[data-edge="${edge}"]`),rect=await position(page,handle,edge);
-  await page.mouse.move(rect.x+rect.width/2,rect.y+rect.height/2);await page.mouse.down();
+  // Resolve the current handle and wait for hover/actionability before pressing:
+  // a live render can replace it between positioning and the pointer gesture.
+  await handle.hover();await expect(handle).toHaveCSS('opacity','1');await page.mouse.down();
   await page.mouse.move(rect.x+rect.width/2,rect.y+rect.height/2+deltaY,{steps:5});await page.mouse.up();
   await expect(page.locator('#editor')).not.toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');
 }
@@ -231,10 +233,12 @@ test('calendar pointer moves and both resize handles preserve nanoseconds and ac
     await expect(bar(page,f.session.id)).toHaveAttribute('data-version',String(current.version));
     await resize(page,f.session.id,'start',16);
     await expect.poll(async()=> (await read(request,'work-sessions',f.session.id)).start).toBe('2025-10-21T06:48:00.123456789Z');
-    current=await read(request,'work-sessions',f.session.id);await expect(bar(page,f.session.id)).toHaveAttribute('data-version',String(current.version));
+    current=await read(request,'work-sessions',f.session.id);expect(current.end).toBe('2025-10-21T14:33:00.987654321Z');
+    await expect(bar(page,f.session.id)).toHaveAttribute('data-version',String(current.version));
     await resize(page,f.session.id,'end',16);
     await expect.poll(async()=> (await read(request,'work-sessions',f.session.id)).end).toBe('2025-10-21T14:48:00.987654321Z');
-    current=await read(request,'work-sessions',f.session.id);await expect(bar(page,f.session.id)).toHaveAttribute('data-version',String(current.version));
+    current=await read(request,'work-sessions',f.session.id);expect(current.start).toBe('2025-10-21T06:48:00.123456789Z');
+    await expect(bar(page,f.session.id)).toHaveAttribute('data-version',String(current.version));
     await bar(page,f.session.id).locator('.calendar-session-select').focus();await page.keyboard.press('ArrowRight');
     await expect.poll(async()=> (await read(request,'work-sessions',f.session.id)).start).toBe('2025-10-22T06:48:00.123456789Z');
     current=await read(request,'work-sessions',f.session.id);expect(current.end).toBe('2025-10-22T14:48:00.987654321Z');
