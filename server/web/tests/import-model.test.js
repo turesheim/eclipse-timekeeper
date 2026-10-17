@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {parseTogglDetailedCsv} from '../src/toggl-csv.js';
 import {importPlan, importBatches, importDayParts} from '../src/import-model.js';
 
-test('work sessions are the default, using reviewed source-project client names without companion records', async () => {
+test('work sessions are the default, using reviewed source-project client names without companion task/activity records', async () => {
   const parsed = parseTogglDetailedCsv(readFileSync(new URL('./fixtures/toggl/detailed-member-stop.csv', import.meta.url), 'utf8'), {zone:'Europe/Oslo'});
   const plan = await importPlan(parsed.rows, parsed.people[0].key, {fallbackClient:'Fallback'});
   assert.equal(plan.mode,'WORK_SESSION');assert.equal(plan.selectedEntries,7);assert.equal(plan.selectedNanos,'151462000000000');

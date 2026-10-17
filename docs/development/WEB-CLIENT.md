@@ -228,6 +228,10 @@ changing any activity labels. JSON and CSV transfers remap labels into the
 destination account. Older sessions and exports may omit `labelIds`; omitted
 labels are preserved on edits, and an empty array explicitly clears them.
 
+![Work-session labels on desktop](../assets/screenshots/work-session-labels-desktop.png)
+
+![Work-session labels on a narrow screen](../assets/screenshots/work-session-labels-mobile.png)
+
 Reports derive context from that account's activities overlapping the session,
 including running timers. Tracked time sums clipped intervals; covered time is
 their union. Unallocated time subtracts that union from session duration.

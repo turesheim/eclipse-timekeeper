@@ -38,10 +38,10 @@ test('work-session label choices, compact display and timer edits stay independe
     await expect(page.locator('#work-session-labels')).toContainText(second.name);await expect(page.locator('#work-session-labels')).not.toContainText(first.name);
     expect((await (await api(request,'GET','/work-sessions/'+id)).json()).labelIds).toEqual([second.id]);
     const audit=await new AxeBuilder({page}).include('#work-session').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
-    await page.locator('#work-session').screenshot({path:'test-results/work-session-labels-desktop.png'});
+    await page.locator('#work-session').screenshot({path:'test-results/work-session-labels-desktop.png',timeout:10000});
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    await page.locator('#work-session').screenshot({path:'test-results/work-session-labels-mobile.png'});
-    await page.getByRole('button',{name:'Stop work session',exact:true}).click();await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();
+    await page.locator('#work-session').screenshot({path:'test-results/work-session-labels-mobile.png',timeout:10000});
+    await page.getByRole('button',{name:'Stop work session',exact:true}).click();await expect(page.locator('#work-session-state')).toHaveText('Stopped');
     expect((await (await api(request,'GET','/work-sessions/'+id)).json()).labelIds).toEqual([second.id]);
     await expect(page.locator(`#week-sessions tr[data-work-session-id="${id}"]`)).toContainText(second.name);
   } finally {

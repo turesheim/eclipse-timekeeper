@@ -20,6 +20,7 @@ async function review(page) {
   await page.getByRole('button',{name:'Read CSV',exact:true}).click();await expect(page.getByRole('heading',{name:'Review import',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Review mappings',exact:true}).click();await expect(page.getByRole('heading',{name:'Review mappings',exact:true})).toBeVisible();
   await page.getByLabel('New client name',{exact:true}).fill('Browser imported client');
+  await expect(page.getByLabel('New label name',{exact:true})).toHaveCount(1);
   await page.getByRole('button',{name:'Review server matches',exact:true}).click();await expect(page.getByRole('heading',{name:'Confirm import',exact:true})).toBeVisible();
 }
 async function undo(page,index) {
@@ -139,7 +140,7 @@ test('Toggl source selection, rejected-row diagnostics and independent task desc
 test('Toggl defaults to work sessions with client totals, repeat detection and whole-job Undo',async({page,request})=>{
   await login(page);const before=await api(request,'/data/export');
   await expect(page.getByLabel(/Source workspace/)).toHaveCount(0);await expect(page.getByLabel('Import as',{exact:true})).toHaveValue('WORK_SESSION');await review(page);
-  await expect(page.getByLabel('New project name',{exact:true})).toHaveCount(0);await expect(page.getByLabel('New label name',{exact:true})).toHaveCount(1);
+  await expect(page.getByLabel('New project name',{exact:true})).toHaveCount(0);await expect(page.getByLabel('New label name',{exact:true})).toHaveCount(0);
   const audit=await new AxeBuilder({page}).include('#account-page').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
   await page.screenshot({path:'test-results/toggl-session-import-review.png',fullPage:true});
   await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
