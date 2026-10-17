@@ -56,13 +56,12 @@ import net.resheim.eclipse.timekeeper.service.TimekeeperEvent.EntityType;
 /** Default application service. Every public operation owns one transaction boundary. */
 public class DefaultTimekeeperService implements TimekeeperService {
 	private final ServicePorts ports;
-    private final WorkSessionService workSessions;
 
 	public DefaultTimekeeperService(ServicePorts ports) {
         this(ports,null);
     }
     public DefaultTimekeeperService(ServicePorts ports,WorkSessionService workSessions) {
-        this.ports = Objects.requireNonNull(ports, "ports");this.workSessions=workSessions;
+        this.ports = Objects.requireNonNull(ports, "ports");
 	}
 
 	@Override
@@ -291,9 +290,9 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			Task task = command.taskId() == null ? null : requiredTask(command.taskId());
 			OwnerId owner = required(command.ownerId(), "ownerId");
 			ensureNoOpenActivity(owner, null);
-            validateLabels(command.labelIds());validateActivityContext(task,owner,command.workSessionId(),command.projectId());
+            validateLabels(command.labelIds());validateActivityContext(task,command.projectId());
             Activity created = ports.activities().save(new Activity(ports.identifiers().newActivityId(), task == null ? null : task.id(),
-					owner, ports.timeSource().now(), Optional.empty(), command.summary(), command.labelIds(), false, 0, command.workSessionId(), command.projectId()));
+					owner, ports.timeSource().now(), Optional.empty(), command.summary(), command.labelIds(), false, 0, Optional.empty(), command.projectId()));
 			publish(ACTIVITY, CREATED, created.id().value().toString());
 			return created;
 		});
@@ -338,10 +337,10 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			Activity.validateStart(command.start(), ports.timeSource().now());
 			Task task = command.taskId() == null ? null : requiredTask(command.taskId());
 			OwnerId owner = required(command.ownerId(), "ownerId");
-            validateLabels(command.labelIds());validateActivityContext(task,owner,command.workSessionId(),command.projectId());
+            validateLabels(command.labelIds());validateActivityContext(task,command.projectId());
             if (command.end().isEmpty()) ensureNoOpenActivity(owner, null);
             return saveDailyActivities(new Activity(ports.identifiers().newActivityId(), task == null ? null : task.id(),
-					owner, command.start(), command.end(), command.summary(), command.labelIds(), true, 0, command.workSessionId(), command.projectId()), false,
+					owner, command.start(), command.end(), command.summary(), command.labelIds(), true, 0, Optional.empty(), command.projectId()), false,
 					ports.timeSource().now());
 		});
 	}
@@ -418,13 +417,9 @@ public class DefaultTimekeeperService implements TimekeeperService {
 		return projectId.isEmpty() || (activity.taskId() == null ? activity.projectId().equals(projectId) : requiredTask(activity.taskId()).projectId().equals(projectId));
 	}
 
-    private void validateActivityContext(Task task,OwnerId owner,Optional<net.resheim.eclipse.timekeeper.domain.WorkSessionId> sessionId,Optional<ProjectId> projectId) {
+    private void validateActivityContext(Task task,Optional<ProjectId> projectId) {
         projectId.ifPresent(this::requiredProject);
         if(task!=null && projectId.isPresent() && !task.projectId().equals(projectId)) throw conflict("projectId","The activity project must match its task's project.");
-        if(sessionId.isPresent()) {
-            var session=workSessions==null ? Optional.<net.resheim.eclipse.timekeeper.domain.WorkSession>empty() : workSessions.workSession(sessionId.get());
-            if(session.isEmpty() || !session.get().ownerId().equals(owner)) throw ServiceException.notFound("workSession",sessionId.get());
-        }
     }
 
 	private void validateLabels(Set<LabelId> labels) {

@@ -69,7 +69,7 @@ public final class JsonValues {
             if (!owner.equals(activity.ownerId().value())) throw new IllegalStateException("Activity owner mismatch");
             var node = base(owner,activity.id().value(),activity.version()); nullable(node,"taskId",activity.task().map(TaskId::value));
             activity.projectId().ifPresent(project -> node.put("projectId",project.value().toString()));
-            node.put("start",activity.start().toString()); nullable(node,"end",activity.end()); node.put("summary",activity.summary()); node.put("manual",activity.manual()); activity.workSessionId().ifPresent(session -> node.put("workSessionId",session.value().toString()));
+            node.put("start",activity.start().toString()); nullable(node,"end",activity.end()); node.put("summary",activity.summary()); node.put("manual",activity.manual());
             var labels = node.putArray("labelIds"); activity.labelIds().stream().map(LabelId::value).sorted().forEach(id -> labels.add(id.toString())); return node;
         }
         throw new IllegalArgumentException("Unsupported resource");
@@ -82,7 +82,7 @@ public final class JsonValues {
             case "TASK" -> new Task(new TaskId(id), optionalText(node.get("projectId")).map(UUID::fromString).map(ProjectId::new),
                     optionalText(node.get("parentTaskId")).map(UUID::fromString).map(TaskId::new), node.get("summary").asText(), optionalText(node.get("url")), references(node.get("externalReferences")), version);
             case "ACTIVITY" -> new Activity(new ActivityId(id), optionalText(node.get("taskId")).map(UUID::fromString).map(TaskId::new).orElse(null), new OwnerId(node.get("ownerId").asText()),
-                    Instant.parse(node.get("start").asText()), optionalText(node.get("end")).map(Instant::parse),node.get("summary").asText(), labels(node.get("labelIds")),node.get("manual").asBoolean(),version,optionalText(node.get("workSessionId")).map(UUID::fromString).map(WorkSessionId::new),optionalText(node.get("projectId")).map(UUID::fromString).map(ProjectId::new));
+                    Instant.parse(node.get("start").asText()), optionalText(node.get("end")).map(Instant::parse),node.get("summary").asText(), labels(node.get("labelIds")),node.get("manual").asBoolean(),version,Optional.empty(),optionalText(node.get("projectId")).map(UUID::fromString).map(ProjectId::new));
             case "WORK_SESSION" -> new WorkSession(new WorkSessionId(id),new OwnerId(node.get("ownerId").asText()),
                     Instant.parse(node.get("start").asText()),optionalText(node.get("end")).map(Instant::parse),node.get("summary").asText(),version);
             default -> throw new IllegalStateException("Unknown stored entity type");

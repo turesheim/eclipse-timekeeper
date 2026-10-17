@@ -21,8 +21,8 @@ const calendar = new WeekCalendar($('calendar-panel'), {
   onDate: date => {if(!date) return;$('week-date').value=date;selectedDay=null;void refresh().catch(()=>{});},
   onEditActivity: id => void openRecord('activities',id).catch(error=>setStatus(errorText(error))),
   onEditSession: id => void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error))),
-  onNew: input => void openRecord('work-sessions',null,null,input).catch(error=>setStatus(errorText(error))),
-  onPaste: input => void openRecord('work-sessions',null,null,input,'Paste work session').catch(error=>setStatus(errorText(error))),
+  onNew: input => void openRecord('work-sessions',null,input).catch(error=>setStatus(errorText(error))),
+  onPaste: input => void openRecord('work-sessions',null,input,'Paste work session').catch(error=>setStatus(errorText(error))),
   onChange: changeCalendarSession,
 });
 function startWatch(session) {
@@ -62,7 +62,7 @@ async function refreshServerInfo(session) {
   }
 }
 function readOnlyWhileDisconnected() {
-  for (const id of ['add-client', 'add-task', 'add-project', 'add-label', 'add-activity', 'settings', 'stop', 'session-start', 'session-stop', 'session-new', 'session-edit', 'session-delete', 'session-add', 'session-associate']) $(id).disabled = !connected;
+  for (const id of ['add-client', 'add-task', 'add-project', 'add-label', 'add-activity', 'settings', 'stop', 'session-start', 'session-stop', 'session-new', 'session-edit', 'session-delete']) $(id).disabled = !connected;
   for (const action of document.querySelectorAll('td.actions button')) action.disabled = !connected;
   calendar.setConnected(connected);
   updateSessionActions();
@@ -204,7 +204,7 @@ function render() {
   table('projects', ['Name', 'Client', 'Actions'], s.projects.map(value => row([value.name, name(s.clients, value.clientId)], [action('Edit', () => openRecord('projects', value.id)), action('Delete', () => openDelete('projects', value.id))])));
   table('tasks', ['Task', 'Project', 'Parent', 'Actions'], s.tasks.map(value => row([taskLabel(value), name(s.projects, value.projectId), value.parentTaskId ? name(s.tasks, value.parentTaskId, 'summary') : '—'], [action('Start', () => openStart(value.id)), action('Edit', () => openRecord('tasks', value.id)), action('Delete', () => openDelete('tasks', value.id))])));
   table('labels', ['Name', 'Color', 'Actions'], s.labels.map(value => row([value.name, /^#[0-9a-f]{6}$/i.test(value.color) ? colorSwatch(value.color) : value.color || '—'], [action('Edit', () => openRecord('labels', value.id)), action('Delete', () => openDelete('labels', value.id))])));
-  refreshLabelFields(); refreshClientChoices(); refreshSessionChoices(); renderSession();
+  refreshLabelFields(); refreshClientChoices(); renderSession();
   $('week-total').textContent = displayDuration(s.report.total); $('days').replaceChildren();
   for (let index = 0; index < 7; index++) {
     const date = addDays(s.dates.first, index), day = s.report.days.find(v => v.date === date);
@@ -344,7 +344,7 @@ function begin(title, state) {
   $('editor-title').textContent = title; $('save').textContent = 'Save'; $('save').disabled = false; $('cancel').disabled = false; return true;
 }
 function showEditor() { $('editor').showModal(); $('fields').querySelector('input,select')?.focus(); }
-async function openRecord(collection, id = null, activitySession = null, initial = {}, caption = null) {
+async function openRecord(collection, id = null, initial = {}, caption = null) {
   const session = api;
   const loaded = id ? await session.request(`/${collection}/${id}`) : {data: initial, etag: null};
   if (session !== api || !connected) return;
@@ -362,14 +362,13 @@ async function openRecord(collection, id = null, activitySession = null, initial
   }
   if (collection === 'activities') {
     const task = field('Task', 'taskId', value.taskId, {choices: [['', 'No task'], ...snapshot.tasks.map(v => [v.id, taskPresentation(v).title])]}); task.disabled = !!id;
-    if (!id) { field('Project (without task)', 'projectId', '', {choices:[['','No project'],...snapshot.projects.map(v => [v.id,v.name])]}); field('Work session', 'workSessionId', activitySession, {choices:sessionChoices()}); }
+    if (!id) { field('Project (without task)', 'projectId', '', {choices:[['','No project'],...snapshot.projects.map(v => [v.id,v.name])]}); }
     field('Summary', 'summary', value.summary, {max: 2000});
     timeFields(value, 'tracking'); labelFields(value.labelIds);
   }
   if (collection === 'work-sessions') {
     sessionFields(value);timeFields(value, 'running');
   }
-  if(collection==='activities' && !id) addSessionWarning();
   showEditor();
 }
 function timeFields(value, ongoing) {
@@ -406,7 +405,7 @@ async function openDelete(collection, id) {
 async function openStart(id) {
   if (!begin('Start tracking', {command: 'start', key: crypto.randomUUID(), expected: snapshot.active.data})) return;
   field('Task', 'taskId', id, {required: true, choices: snapshot.tasks.map(v => [v.id, taskPresentation(v).title])});
-  field('Summary', 'summary', '', {max: 2000}); field('Work session','workSessionId',snapshot.activeWorkSession.data?.id || '',{choices:sessionChoices()}); labelFields(); $('save').textContent = 'Start';
+  field('Summary', 'summary', '', {max: 2000}); labelFields(); $('save').textContent = 'Start';
   if (snapshot.active.data) $('editor-notice').textContent = 'Starting this task stops the current activity.'; showEditor();
 }
 $('stop').addEventListener('click', () => {
@@ -424,14 +423,13 @@ function values() {
   const labels = () => [...$('fields').querySelectorAll('[name="labelIds"]:checked')].map(node => node.value);
   if (editor.command === 'stop' || editor.command === 'session-stop' || editor.remove) return undefined;
   if (editor.command === 'session-start') return {summary:get('summary'),title:get('title'),clientId:get('clientId')};
-  if (editor.association) return {workSessionId:get('workSessionId') || null};
-  if (editor.command === 'start') return {taskId: get('taskId'), workSessionId:get('workSessionId') || null, summary: get('summary'), labelIds: labels(), expectedActiveId: editor.expected?.id ?? null, expectedActiveVersion: editor.expected?.version ?? null};
+  if (editor.command === 'start') return {taskId: get('taskId'), summary: get('summary'), labelIds: labels(), expectedActiveId: editor.expected?.id ?? null, expectedActiveVersion: editor.expected?.version ?? null};
   switch (editor.collection) {
     case 'clients': return {name:get('name'),color:get('color')};
     case 'projects': return {name: get('name'),clientId:get('clientId')};
     case 'labels': return {name: get('name'), color: get('color') || null};
     case 'tasks': return {summary: get('summary'), projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null};
-    case 'activities': return {...(editor.id ? {} : {taskId: get('taskId') || null, projectId:get('taskId') ? null : get('projectId') || null, workSessionId:get('workSessionId') || null}), summary: get('summary'), start: localDateTimeToInstant(get('start'), editor.zone), end: get('end') ? localDateTimeToInstant(get('end'), editor.zone) : null, labelIds: labels()};
+    case 'activities': return {...(editor.id ? {} : {taskId: get('taskId') || null, projectId:get('taskId') ? null : get('projectId') || null}), summary: get('summary'), start: localDateTimeToInstant(get('start'), editor.zone), end: get('end') ? localDateTimeToInstant(get('end'), editor.zone) : null, labelIds: labels()};
     case 'work-sessions': return {title:get('title'),clientId:get('clientId'),summary:get('summary'),start:localDateTimeToInstant(get('start'),editor.zone),end:get('end') ? localDateTimeToInstant(get('end'),editor.zone) : null};
     case 'me': return {zoneId: get('zoneId')};
   }
@@ -444,7 +442,7 @@ async function saveEditor(event) {
   try {
     const body = current.uncertain ? current.payload : values();
     current.payload = body; freeze(true);
-    const path = current.association ? `/activities/${current.id}/work-session` : current.command === 'session-start' ? '/work-sessions/start' : current.command === 'session-stop' ? `/work-sessions/${current.id}/stop` : current.command === 'start' ? '/activities/start' : current.command === 'stop' ? `/activities/${current.id}/stop` : `/${current.collection}${current.id ? '/' + current.id : ''}`;
+    const path = current.command === 'session-start' ? '/work-sessions/start' : current.command === 'session-stop' ? `/work-sessions/${current.id}/stop` : current.command === 'start' ? '/activities/start' : current.command === 'stop' ? `/activities/${current.id}/stop` : `/${current.collection}${current.id ? '/' + current.id : ''}`;
     const method = current.command ? 'POST' : current.remove ? 'DELETE' : current.id !== null ? 'PUT' : 'POST';
     const saved = await current.session.request(path, {method, body, etag: current.etag, key: current.key});
     if (current.session !== api || current !== editor) return;
@@ -453,7 +451,6 @@ async function saveEditor(event) {
     connected = false; readOnlyWhileDisconnected(); setStatus('Refreshing saved changes…', 'working');
     // Acknowledged saves remain successful even if the following read fails.
     await refresh().catch(() => {});
-    if(saved.data?.outsideSession) setStatus('Saved. This activity extends outside the selected work session.', 'notice');
   } catch (error) {
     if (current !== editor || current.session !== api) return;
     if(error.status === 401) {auth.clear(errorText(error));return;}
@@ -470,23 +467,13 @@ async function saveEditor(event) {
 $('editor-form').addEventListener('submit', saveEditor);
 $('cancel').addEventListener('click', () => { if (editor?.busy) return; editor = null; $('editor').close(); $('fields').replaceChildren(); });
 $('editor').addEventListener('cancel', event => { if (editor?.busy) event.preventDefault(); else { editor = null; $('fields').replaceChildren(); } });
-function sessionLabel(value) {
-  return `${instantText(value.start,snapshot.profile.data.zoneId)} · ${value.end ? 'Completed' : 'Running'} · ${value.title} · ${name(snapshot.clients,value.clientId)}`;
-}
-function sessionChoices() {return [['','Standalone'],...snapshot.workSessions.map(value => [value.id,sessionLabel(value)])];}
-function refreshSessionChoices() {
-  const input=$('field-workSessionId');if(!input || editor?.busy || editor?.uncertain) return;const selected=input.value;
-  input.replaceChildren();for(const [id,label] of sessionChoices()) {const option=element('option',label);option.value=id;input.append(option);}
-  if(selected && !snapshot.workSessions.some(value=>value.id===selected)) {const option=element('option','Removed work session');option.value=selected;input.append(option);}
-  input.value=selected;
-}
 function displayedSession() {return snapshot?.activeWorkSession.data || snapshot?.workSessionReport?.session || null;}
 function updateSessionActions() {
   const active=snapshot?.activeWorkSession.data, session=displayedSession(), writable=connected && canWrite;
   $('session-start').disabled=!writable || !!active; $('session-start').hidden=!!active;
   $('session-stop').disabled=!writable || !active; $('session-stop').hidden=!active;
   $('session-new').disabled=!writable;
-  for(const id of ['session-edit','session-delete','session-add','session-associate']) $(id).disabled=!writable || !session;
+  for(const id of ['session-edit','session-delete']) $(id).disabled=!writable || !session;
 }
 function renderSession() {
   const active=snapshot.activeWorkSession.data, session=displayedSession();
@@ -507,37 +494,6 @@ function renderSessionTime() {
   if(connected) activeAsOf=instantNanos(snapshot.report.generatedAt)+elapsed;
   if(session) $('work-session-elapsed').textContent=displayNanos(sessionTimeNanos(session,[],activeAsOf).duration);
 }
-function addSessionWarning() {
-  const warning=element('p','', 'hint');warning.id='activity-session-warning';warning.setAttribute('role','status');$('fields').append(warning);
-  const update=()=> {
-    try {
-      const session=snapshot.workSessions.find(value=>value.id===$('field-workSessionId').value);
-      const from=instantNanos(localDateTimeToInstant($('field-start').value,editor.zone)),end=$('field-end').value ? instantNanos(localDateTimeToInstant($('field-end').value,editor.zone)) : instantNanos(snapshot.report.generatedAt);
-      warning.textContent=session && (from<instantNanos(session.start) || (session.end && end>instantNanos(session.end))) ? 'This activity extends outside the session. Only the overlapping time counts toward covered time.' : '';
-    } catch {warning.textContent='';}
-  };
-  for(const input of $('fields').querySelectorAll('input,select')) input.addEventListener('input',update);update();
-}
-async function openAssociation(id=null, defaultSession=displayedSession()?.id || '') {
-  const session=api, selected=id || snapshot.activities[0]?.id || snapshot.workSessionReport?.activities[0]?.id;
-  if(!selected) {setStatus('Choose a week containing activities, or add an activity first.');return;}
-  const loaded=await session.request(`/activities/${selected}`);
-  if(session!==api || !connected || !begin('Associate activity',{collection:'activities',id:selected,etag:loaded.etag,association:true})) return;
-  const state=editor;
-  const selector=field('Activity','activityId',selected,{choices:[...new Map([...snapshot.activities,...(snapshot.workSessionReport?.activities || [])].map(value=>[value.id,value])).values()].map(value=>[value.id,`${value.summary || 'Activity'} · ${instantText(value.start,snapshot.profile.data.zoneId)}`])});
-  field('Work session','workSessionId',defaultSession,{choices:sessionChoices()});
-  const warning=element('p','', 'hint');warning.setAttribute('role','status');$('fields').append(warning);
-  let record=loaded.data, generation=0;
-  const warn=()=> {const target=snapshot.workSessions.find(value=>value.id===$('field-workSessionId').value);warning.textContent=target && (instantNanos(record.start)<instantNanos(target.start) || (target.end && instantNanos(record.end || snapshot.report.generatedAt)>instantNanos(target.end))) ? 'This activity extends outside the session. Only the overlapping time counts toward covered time.' : '';};
-  $('field-workSessionId').addEventListener('change',warn);warn();
-  selector.addEventListener('change',async()=> {
-    const request=++generation;state.busy=true;$('save').disabled=true;
-    try {const next=await session.request(`/activities/${selector.value}`);if(editor!==state || request!==generation) return;
-      state.id=next.data.id;state.etag=next.etag;record=next.data;warn();}
-    catch(error) {if(editor===state) $('editor-error').textContent=errorText(error);}
-    finally {if(editor===state && request===generation) {state.busy=false;$('save').disabled=state.id!==selector.value;}}
-  });showEditor();
-}
 $('session-start').addEventListener('click',()=> {
   if(!connected || snapshot.activeWorkSession.data || !begin('Start work session',{command:'session-start',key:crypto.randomUUID()})) return;
   sessionFields({});$('save').textContent='Start';showEditor();
@@ -546,8 +502,8 @@ $('session-stop').addEventListener('click',()=> {
   const active=snapshot.activeWorkSession;if(!connected || !active.data || !begin('Stop work session',{command:'session-stop',id:active.data.id,etag:active.etag,key:crypto.randomUUID()})) return;
   $('fields').append(element('p','Stopping your work session. Activity timers remain running.'));showEditor();void saveEditor();
 });
-for(const [id,work] of [['session-new',()=>openRecord('work-sessions')],['session-edit',()=>openRecord('work-sessions',displayedSession().id)],['session-delete',()=>openDelete('work-sessions',displayedSession().id)],['session-add',()=>openRecord('activities',null,displayedSession().id)],['session-associate',()=>openAssociation()]]) $(id).addEventListener('click',()=> {if(connected && canWrite) void work().catch(error=>setStatus(errorText(error)));});
-for(const [id,glyph,label] of [['session-start','start','Start work session'],['session-stop','stop','Stop work session'],['session-new','add','Record work session'],['session-edit','edit','Edit work session'],['session-delete','delete','Delete work session'],['session-add','add','Add activity to session'],['session-associate','link','Associate activity']]) iconButton($(id),glyph,label);
+for(const [id,work] of [['session-new',()=>openRecord('work-sessions')],['session-edit',()=>openRecord('work-sessions',displayedSession().id)],['session-delete',()=>openDelete('work-sessions',displayedSession().id)]]) $(id).addEventListener('click',()=> {if(connected && canWrite) void work().catch(error=>setStatus(errorText(error)));});
+for(const [id,glyph,label] of [['session-start','start','Start work session'],['session-stop','stop','Stop work session'],['session-new','add','Record work session'],['session-edit','edit','Edit work session'],['session-delete','delete','Delete work session']]) iconButton($(id),glyph,label);
 setInterval(renderSessionTime,1000);
 window.addEventListener('pagehide', () => auth.clear());
 window.addEventListener('pageshow', event => {if(event.persisted) void auth.initialize();});

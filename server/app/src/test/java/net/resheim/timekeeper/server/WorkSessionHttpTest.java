@@ -43,19 +43,18 @@ class WorkSessionHttpTest {
                     new ExternalTaskReference("github","https://github.example/repo","1",Optional.empty()))));
             var a=api.createActivity(new CreateActivity(firstTask.id(),OwnerId.LOCAL,Instant.parse("2025-10-26T08:00:00Z"),Optional.of(Instant.parse("2025-10-26T12:00:00Z")),"First",Set.of()));
             var b=api.createActivity(new CreateActivity(secondTask.id(),OwnerId.LOCAL,Instant.parse("2025-10-26T10:00:00Z"),Optional.of(Instant.parse("2025-10-26T14:00:00Z")),"Second",Set.of()));
-            var associatedA=api.associateWorkSession(new AssociateWorkSession(a.id(),a.version(),Optional.of(session.id())));
-            var associatedB=api.associateWorkSession(new AssociateWorkSession(b.id(),b.version(),Optional.of(session.id())));
-            assertFalse(associatedA.outsideSession());assertFalse(associatedB.outsideSession());
+            assertEquals(RemoteFailure.Kind.CONFLICT,assertThrows(RemoteFailure.class,()->api.associateWorkSession(new AssociateWorkSession(a.id(),a.version(),Optional.of(session.id())))).kind());
+            assertEquals(a,api.associateWorkSession(new AssociateWorkSession(a.id(),a.version(),Optional.empty())).activity());
             var report=api.workSessionReport(session.id());
             assertEquals(Duration.ofHours(25),report.time().duration());assertEquals(Duration.ofHours(8),report.time().trackedActivityTime());
             assertEquals(Duration.ofHours(6),report.time().allocatedTime());assertEquals(Duration.ofHours(19),report.time().unallocatedTime());
-            var edited=api.updateActivity(new UpdateActivity(a.id(),associatedA.activity().version(),a.start(),a.end(),"Edited later",a.labelIds()));
-            assertEquals(Optional.of(session.id()),edited.workSessionId());assertEquals(edited,peer.activity(a.id()).orElseThrow());
+            var edited=api.updateActivity(new UpdateActivity(a.id(),a.version(),a.start(),a.end(),"Edited later",a.labelIds()));
+            assertTrue(edited.workSessionId().isEmpty());assertEquals(edited,peer.activity(a.id()).orElseThrow());
             assertEquals(firstTask.externalReferences(),api.task(firstTask.id()).orElseThrow().externalReferences());
             assertEquals(secondTask.externalReferences(),api.task(secondTask.id()).orElseThrow().externalReferences());
             var outside=api.createActivity(new CreateActivity(firstTask.id(),OwnerId.LOCAL,end.plusSeconds(60),Optional.of(end.plusSeconds(120)),"Outside",Set.of()));
-            assertTrue(api.associateWorkSession(new AssociateWorkSession(outside.id(),outside.version(),Optional.of(session.id()))).outsideSession());
-            assertEquals(Set.of(outside.id()),api.workSessionReport(session.id()).time().outsideSession());
+            assertFalse(api.workSessionReport(session.id()).activities().stream().anyMatch(value->value.id().equals(outside.id())));
+            assertTrue(api.workSessionReport(session.id()).time().outsideSession().isEmpty());
             assertEquals(Duration.ofHours(19),api.workSessionReport(session.id()).time().unallocatedTime());
             var changed=peer.updateWorkSession(new UpdateWorkSession(session.id(),session.version(),from,Optional.of(end.plusSeconds(30)),"Adjusted session"));
             assertThrows(RemoteFailure.class,()->api.updateWorkSession(new UpdateWorkSession(session.id(),session.version(),from,Optional.of(end),"Stale")));
@@ -72,17 +71,17 @@ class WorkSessionHttpTest {
             assertEquals(3,api.workSessions(OwnerId.LOCAL).size());
         }
     }
-    @Test void activitiesWithoutTasksCanBeCreatedAtomicallyInSessionsAndReportedAcrossMidnight() {
+    @Test void tasklessActivitiesIgnoreLegacySessionHintsAndReportTemporalContextAcrossMidnight() {
         try(var api=client("test-a")) {
             var from=Instant.parse("2025-10-25T21:59:59.123456789Z");var end=Instant.parse("2025-10-27T22:00:00.987654321Z");
             var session=api.createWorkSession(new CreateWorkSession(OwnerId.LOCAL,from,Optional.of(end),"Unassigned work"));
             var label=api.createLabel(new CreateLabel("Meeting",Optional.of("12,34,56")));
             var retained=api.createActivity(new CreateActivity(null,OwnerId.LOCAL,from,Optional.of(end),"No task",Set.of(label.id()),Optional.of(session.id()),Optional.empty()));
             assertTrue(retained.task().isEmpty());assertTrue(retained.projectId().isEmpty());
-            assertEquals(Optional.of(session.id()),retained.workSessionId());assertTrue(api.tasks().isEmpty());
+            assertTrue(retained.workSessionId().isEmpty());assertTrue(api.tasks().isEmpty());
             var query=new net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery(from,end.plusSeconds(1),Optional.of(OwnerId.LOCAL),Optional.empty(),Optional.empty(),ZoneId.of("UTC"));
             var report=api.activities(query);assertEquals(3,report.activities().size());assertEquals(Duration.between(from,end),report.total());
-            for(var activity:report.activities()) {assertTrue(activity.task().isEmpty());assertEquals(Optional.of(session.id()),activity.workSessionId());assertEquals(Set.of(label.id()),activity.labelIds());}
+            for(var activity:report.activities()) {assertTrue(activity.task().isEmpty());assertTrue(activity.workSessionId().isEmpty());assertEquals(Set.of(label.id()),activity.labelIds());}
             assertEquals(Duration.ZERO,api.workSessionReport(session.id()).time().unallocatedTime());
             var project=api.createProject(new CreateProject("Direct project"));
             var direct=api.createActivity(new CreateActivity(null,OwnerId.LOCAL,from.plusSeconds(1),Optional.of(from.plusSeconds(61)),"Project without task",Set.of(),Optional.empty(),Optional.of(project.id())));
@@ -90,12 +89,11 @@ class WorkSessionHttpTest {
             assertThrows(RemoteFailure.class,()->api.deleteProject(new DeleteProject(project.id(),project.version())));
             var projectQuery=new net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery(from,end.plusSeconds(1),Optional.of(OwnerId.LOCAL),Optional.empty(),Optional.of(project.id()),ZoneId.of("UTC"));
             assertEquals(Duration.ofMinutes(1),api.activities(projectQuery).total());
-            var before=api.activities(query).activities();long revision=api.changes(0,0).get("nextSequence").getAsLong();
-            assertThrows(RemoteFailure.class,()->api.createActivity(new CreateActivity(null,OwnerId.LOCAL,from,Optional.of(end),"Unknown session",Set.of(),Optional.of(WorkSessionId.random()),Optional.empty())));
-            assertEquals(before,api.activities(query).activities());assertEquals(revision,api.changes(0,0).get("nextSequence").getAsLong());
+            var independent=api.createActivity(new CreateActivity(null,OwnerId.LOCAL,from,Optional.of(end),"Unknown legacy session hint",Set.of(),Optional.of(WorkSessionId.random()),Optional.empty()));
+            assertTrue(independent.workSessionId().isEmpty());
             var running=api.startWorkSession(new StartWorkSession(OwnerId.LOCAL,"Live work"));
             var live=api.startActivity(new StartActivity(null,OwnerId.LOCAL,"No task timer",Set.of(label.id()),Optional.of(running.id()),Optional.empty()));
-            assertTrue(live.task().isEmpty());assertEquals(Optional.of(running.id()),live.workSessionId());
+            assertTrue(live.task().isEmpty());assertTrue(live.workSessionId().isEmpty());
             assertEquals(live,api.activeActivity(OwnerId.LOCAL).orElseThrow());
             api.stopWorkSession(new StopWorkSession(running.id(),running.version()));
             assertEquals(live,api.activeActivity(OwnerId.LOCAL).orElseThrow());

@@ -24,7 +24,7 @@ final class WorkSessionPanel {
     private final Label status,totals,details,warning;
     private final Combo history;
     private final Table activities;
-    private final Button start,stop,record,edit,delete,add,associate,detach;
+    private final Button start,stop,record,edit,delete;
     private Snapshot snapshot;
     private WorkSessionId selected;
     private boolean loading,busy;
@@ -75,12 +75,6 @@ final class WorkSessionPanel {
             if(snapshot!=null && snapshot.report()!=null) new WorkSessionDialog(group.getShell(),snapshot.report().session()).open();
         });
         delete=button(body,"Delete session",this::delete);
-        associate=button(body,"Associate activity",this::associate);
-        add=button(body,"Add activity",()->{
-            if(snapshot!=null && snapshot.report()!=null) new ActivityDialog(group.getShell(),ui().getTimekeeperService(),
-                    snapshot.report().session(),LocalDate.now(TimekeeperUiPlugin.getCalendarZone())).open();
-        });
-        detach=button(body,"Remove association",this::detach);
         details=new Label(body,SWT.NONE);
         details.setLayoutData(new GridData(SWT.FILL,SWT.CENTER,true,false,6,1));
         activities=new Table(body,SWT.BORDER|SWT.FULL_SELECTION|SWT.V_SCROLL|SWT.H_SCROLL);
@@ -156,8 +150,8 @@ final class WorkSessionPanel {
         boolean available=ui().isBackendReady() && !busy, has=snapshot!=null && snapshot.report()!=null;
         start.setText(pending==null ? "Start work session" : "Retry session command");
         start.setEnabled(available && (pending!=null || snapshot!=null && snapshot.active().isEmpty()));stop.setEnabled(available && pending==null && snapshot!=null && snapshot.active().isPresent());
-        for(var value:List.of(record,edit,delete,add,associate)) value.setEnabled(available && pending==null && (value==record || has));
-        detach.setEnabled(available && pending==null && selectedActivity()!=null);history.setEnabled(available);
+        for(var value:List.of(record,edit,delete)) value.setEnabled(available && pending==null && (value==record || has));
+        history.setEnabled(available);
     }
     private Activity selectedActivity() {return activities.getSelectionCount()==0 ? null : (Activity)activities.getSelection()[0].getData();}
     private void command(String caption,Supplier<?> operation,boolean durable) {
@@ -191,16 +185,5 @@ final class WorkSessionPanel {
     private void delete() {
         var value=snapshot.report().session();if(!MessageDialog.openConfirm(group.getShell(),"Delete work session","Delete this work session? Detach its activities first.")) return;
         command("Delete work session",()->{RemoteRecordSnapshots.verify(ui().getTimekeeperService(),value);ui().getWorkSessionService().deleteWorkSession(new DeleteWorkSession(value.id(),value.version()));return null;},false);
-    }
-    private void associate() {
-        var session=snapshot.report().session();
-        ui().runBackgroundRead("Load activity choices",()->ui().getSessionActivityCandidates(),values->{
-            if(group.isDisposed()) return;if(values.isEmpty()) {MessageDialog.openInformation(group.getShell(),"Associate activity","No activities are recorded yet.");return;}
-            new WorkSessionAssociationDialog(group.getShell(),session,values).open();
-        },failure->{if(!group.isDisposed()) MessageDialog.openError(group.getShell(),"Could not load activities",failure.getMessage());});
-    }
-    private void detach() {
-        var value=selectedActivity();if(value==null) return;
-        command("Remove session association",()->{RemoteRecordSnapshots.verify(ui().getTimekeeperService(),value);return ui().getWorkSessionService().associateWorkSession(new AssociateWorkSession(value.id(),value.version(),Optional.empty()));},false);
     }
 }

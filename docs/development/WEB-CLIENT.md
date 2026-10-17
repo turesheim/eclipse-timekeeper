@@ -172,26 +172,23 @@ of activity timers. Counters use server timestamps and elapsed browser time;
 when offline they freeze. The card contains no history selector, duplicate totals
 or activity list; those views remain in Workweek and Calendar.
 
-The expanded tools provide retrospective session creation/editing, taskless
-activity creation and management of existing-activity associations. Edit activities
-in Workweek or Calendar; choose Standalone in the association editor to remove a
-link. A session can contain activities from several projects or no
-project/task at all. Generic activity creation remains standalone; the card's
-**Add activity** defaults explicitly to its selected session. A task timer can
-choose the current session or remain standalone.
+A work session is an independent interval for one client. Its tools are **Edit**
+and **Delete**. Create or edit activities in Workweek or Calendar; task timers
+run independently. There are no session selectors or manual activity links.
 
-Tracked time sums clipped intervals; covered time is their union. Unallocated
-time subtracts covered time from session duration, so overlap is not counted
-twice. Out-of-bounds activities are accepted with a warning. Sessions can span
-midnight without stopping, and activity day parts retain their association.
-Deleting a session requires removing its activity associations first. Local editor fields retain nanoseconds. Repeated clock times include an offset;
-nonexistent or ambiguous local input is rejected instead of silently moved.
-An open editor keeps its original time zone if account settings change. Stale versions preserve the user's draft;
-lost start/stop replies offer retry with the same frozen command key and payload.
+Reports derive context from that account's activities overlapping the session,
+including running timers. Tracked time sums clipped intervals; covered time is
+their union. Unallocated time subtracts that union from session duration.
+Moving, resizing, stopping or deleting a session leaves activities unchanged.
+Sessions and activities can span midnight independently; activity day parts
+remain independent records. Local editor fields preserve nanoseconds and reject
+nonexistent or ambiguous local input. Open drafts retain their original time zone;
+stale saves preserve drafts and uncertain commands retry the same durable key.
 
-Portable domain-v2 JSON/CSV export includes work sessions and association IDs.
-Import remaps the complete graph into the destination account; v1 exports
-remain readable. Native Eclipse CSV and portable server CSV are distinct formats.
+Portable domain-v3 JSON/CSV includes clients and independent sessions. Imports
+still accept v1/v2/v3 snapshots, ignoring retired activity `workSessionId` fields,
+including references to sessions absent from an older export. Exports omit those
+links. Native Eclipse CSV and portable server CSV remain distinct formats.
 
 ## Automated verification
 
@@ -269,7 +266,7 @@ still running. Starts in the future remain invalid.
 Task cards use the task's title and issue link and list its activities. Separate
 gaps remain visible. Taskless activity cards and overlapping intervals are also
 shown. Tasks without recorded time remain available in the Tasks tab.
-Activity times and associations remain unchanged when a work
+Activity times and task/project assignments remain unchanged when a work
 session is moved, resized or copied. The activity editor warns when a new
 interval extends beyond its selected session; the API report retains exact
 tracked, covered and unallocated totals.

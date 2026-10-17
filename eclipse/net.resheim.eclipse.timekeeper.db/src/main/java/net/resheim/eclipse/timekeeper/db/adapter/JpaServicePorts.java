@@ -286,10 +286,7 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 		entity.setManual(snapshot.manual());
 		entity.setLabels(snapshot.labelIds().stream().map(labelId -> manager.find(ActivityLabel.class,
 				labelId.value().toString())).toList());
-        var session=snapshot.workSessionId().map(value -> manager.find(net.resheim.eclipse.timekeeper.db.model.WorkSession.class,value.value().toString())).orElse(null);
-        if(snapshot.workSessionId().isPresent() && (session==null || !session.getOwnerId().equals(snapshot.ownerId().value())))
-            throw ServiceException.notFound("workSession",snapshot.workSessionId().get());
-        entity.setWorkSession(session);
+        entity.setWorkSession(null);
         var directProject=snapshot.projectId().map(idValue -> findProject(idValue).orElseThrow(
                 () -> ServiceException.notFound("project",idValue))).orElse(null);
         if(entity.getProject()!=directProject) {
@@ -349,6 +346,9 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
         return workSession(entity);
     }
     @Override public void delete(WorkSessionId id) {
+        for(var activity:manager().createQuery("SELECT a FROM Activity a WHERE a.workSession.id=:id",net.resheim.eclipse.timekeeper.db.model.Activity.class)
+                .setParameter("id",id.value().toString()).getResultList()) activity.setWorkSession(null);
+        manager().flush();
         var entity=manager().find(net.resheim.eclipse.timekeeper.db.model.WorkSession.class,id.value().toString());if(entity!=null) manager().remove(entity);
     }
     private WorkSession workSession(net.resheim.eclipse.timekeeper.db.model.WorkSession entity) {
@@ -515,7 +515,7 @@ public final class JpaServicePorts implements ProjectRepository, TaskRepository,
 		return new Activity(new ActivityId(UUID.fromString(entity.getId())),
 				entity.getTrackedTask()==null ? null : new TaskId(UUID.fromString(entity.getTrackedTask().getId())), new OwnerId(entity.getOwner().value()),
 				entity.getStart(), Optional.ofNullable(entity.getEnd()), entity.getSummary(), labels,
-				entity.isEdited(), activityVersion(entity), Optional.ofNullable(entity.getWorkSession()).map(value -> new WorkSessionId(UUID.fromString(value.getId()))), Optional.ofNullable(entity.getProject()).map(this::project).map(Project::id));
+				entity.isEdited(), activityVersion(entity), Optional.empty(), Optional.ofNullable(entity.getProject()).map(this::project).map(Project::id));
 	}
 
 	private Label label(ActivityLabel entity) {

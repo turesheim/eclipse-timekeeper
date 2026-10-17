@@ -183,7 +183,7 @@ final class ActivityDialog extends AsyncRecordDialog {
             String entered=summary.getText();
             TaskId assigned=taskChoice==null || taskChoice.getSelectionIndex()==0 ? taskId : taskChoices.get(taskChoice.getSelectionIndex()-1).id();
             var project=projectChoice!=null && assigned==null && projectChoice.getSelectionIndex()>0 ? Optional.of(projectChoices.get(projectChoice.getSelectionIndex()-1).id()) : Optional.<net.resheim.eclipse.timekeeper.domain.ProjectId>empty();
-            save("Save Timekeeper activity",()-> original==null ? service.createActivity(new CreateActivity(assigned,OwnerId.LOCAL,from,until,entered,selected,Optional.ofNullable(initialSession).map(net.resheim.eclipse.timekeeper.domain.WorkSession::id),project))
+            save("Save Timekeeper activity",()-> original==null ? service.createActivity(new CreateActivity(assigned,OwnerId.LOCAL,from,until,entered,selected,Optional.empty(),project))
                     : service.updateActivity(new UpdateActivity(original.id(),original.version(),from,until,entered,selected)),value -> {});
 		} catch (RuntimeException failure) {
 			setErrorMessage(failureMessage(failure));

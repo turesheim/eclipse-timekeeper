@@ -69,8 +69,6 @@ public class TransferResource {
             if(task.isPresent() && !sourceTasks.containsKey(task.get())) throw ApiFailure.validation();
             var project=optionalText(item.get("projectId")).map(UUID::fromString);
             if(project.isPresent() && (!sourceProjects.contains(project.get()) || (task.isPresent() && !optionalText(sourceTasks.get(task.get()).get("projectId")).equals(optionalText(item.get("projectId")))))) throw ApiFailure.validation();
-            var session=optionalText(item.get("workSessionId")).map(UUID::fromString);
-            if(session.isPresent() && !sourceSessions.contains(session.get())) throw ApiFailure.validation();
             for(JsonNode label:item.get("labelIds")) if(!sourceLabels.contains(uuid(label))) throw ApiFailure.validation();
             var end=optionalText(item.get("end")).map(Instant::parse);if(end.isPresent() && end.get().isBefore(Instant.parse(item.get("start").asText()))) throw ApiFailure.validation();
         }
@@ -125,7 +123,7 @@ public class TransferResource {
             TaskId task=optionalText(item.get("taskId")).map(UUID::fromString).map(id -> required(tasks,id)).orElse(null);Instant start=Instant.parse(item.get("start").asText());var end=optionalText(item.get("end")).map(Instant::parse);
             // Preserve the transfer's manual flag while reusing domain validation and owned persistence.
             if(end.isEmpty() && store.active().isPresent()) throw ApiFailure.conflict();
-            Activity created=new Activity(new ActivityId(UUID.randomUUID()),task,new OwnerId(store.owner()),start,end,item.get("summary").asText(),assigned,item.get("manual").asBoolean(),0,optionalText(item.get("workSessionId")).map(UUID::fromString).map(id -> required(sessions,id)),optionalText(item.get("projectId")).map(UUID::fromString).map(id -> required(projects,id)));
+            Activity created=new Activity(new ActivityId(UUID.randomUUID()),task,new OwnerId(store.owner()),start,end,item.get("summary").asText(),assigned,item.get("manual").asBoolean(),0,Optional.empty(),optionalText(item.get("projectId")).map(UUID::fromString).map(id -> required(projects,id)));
             store.save("ACTIVITY",created);store.change("ACTIVITY","CREATED",created.id().value().toString());mapping(mappings,"ACTIVITY",item,created.id().value());
         }
         service.rolloverActivities(new OwnerId(store.owner()));

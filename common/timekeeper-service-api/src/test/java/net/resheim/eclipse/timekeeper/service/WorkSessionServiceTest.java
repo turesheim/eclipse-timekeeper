@@ -38,37 +38,30 @@ class WorkSessionServiceTest {
         assertThrows(ServiceException.class,()->service.updateWorkSession(new UpdateWorkSession(
                 stopped.id(),stopped.version(),stopped.start(),Optional.empty(),"Cannot reopen alongside another session")));
     }
-    @Test void retrospectiveAssociationsWarnAndUnallocatedTimeUsesOverlapCoverage() {
+    @Test void retrospectiveOverlapUsesUnionCoverageAndSessionDeletionLeavesActivitiesUnchanged() {
         var end = now.plusSeconds(10);
         var session = service.createWorkSession(new CreateWorkSession(owner,now,Optional.of(end),"Past work"));
         var a = activity(now.minusSeconds(1),Optional.of(now.plusSeconds(6)));
         var b = activity(now.plusSeconds(4),Optional.of(now.plusSeconds(8)));
-        var associatedA = service.associateWorkSession(new AssociateWorkSession(a.id(),a.version(),Optional.of(session.id())));
-        var associatedB = service.associateWorkSession(new AssociateWorkSession(b.id(),b.version(),Optional.of(session.id())));
-        assertTrue(associatedA.outsideSession());assertFalse(associatedB.outsideSession());
         var report = service.workSessionReport(session.id());
+        assertEquals(Set.of(a.id()),report.time().outsideSession());
         assertEquals(Duration.ofSeconds(10),report.time().trackedActivityTime());
         assertEquals(Duration.ofSeconds(8),report.time().allocatedTime());assertEquals(Duration.ofSeconds(2),report.time().unallocatedTime());
-        assertThrows(ServiceException.class,()->service.deleteWorkSession(new DeleteWorkSession(session.id(),session.version())));
         var edited = service.updateWorkSession(new UpdateWorkSession(session.id(),session.version(),session.start(),Optional.of(end.plusSeconds(2)),"Adjusted"));
         assertEquals(Duration.ofSeconds(4),service.workSessionReport(session.id()).time().unallocatedTime());
         assertThrows(ServiceException.class,()->service.updateWorkSession(new UpdateWorkSession(session.id(),session.version(),session.start(),session.end(),"Stale")));
         assertEquals(edited,service.workSession(session.id()).orElseThrow());
-        for (var association : List.of(associatedA,associatedB)) {
-            var detached = service.associateWorkSession(new AssociateWorkSession(association.activity().id(),association.activity().version(),Optional.empty()));
-            assertTrue(detached.activity().workSessionId().isEmpty());assertEquals(association.activity().start(),detached.activity().start());
-            assertEquals(association.activity().end(),detached.activity().end());
-        }
         service.deleteWorkSession(new DeleteWorkSession(session.id(),edited.version()));assertTrue(service.workSession(session.id()).isEmpty());
-        assertEquals(2,store.activities.size());
+        assertEquals(Map.of(a.id(),a,b.id(),b),store.activities);
     }
-    @Test void staleOrForeignAssociationsAndFutureStartsDoNotChangeAnything() {
+    @Test void retiredAssociationsStaleVersionsAndFutureStartsDoNotChangeAnything() {
         var session = service.startWorkSession(new StartWorkSession(owner,"Work"));
         var foreign = service.startWorkSession(new StartWorkSession(new OwnerId("bob"),"Other"));
         var activity = activity(now,Optional.empty());int count = events.size();
         assertThrows(ServiceException.class,()->service.associateWorkSession(new AssociateWorkSession(activity.id(),1,Optional.of(session.id()))));
         assertThrows(ServiceException.class,()->service.associateWorkSession(new AssociateWorkSession(activity.id(),0,Optional.of(foreign.id()))));
         assertThrows(DomainValidationException.class,()->service.createWorkSession(new CreateWorkSession(owner,now.plusNanos(1),Optional.empty(),"Future")));
+        assertEquals(activity,service.associateWorkSession(new AssociateWorkSession(activity.id(),activity.version(),Optional.empty())).activity());
         assertEquals(activity,store.activities.get(activity.id()));assertEquals(count,events.size());
     }
     @Test void temporalContextIncludesUnlinkedRunningActivitiesAndExcludesForeignOrNonoverlappingLinks() {
