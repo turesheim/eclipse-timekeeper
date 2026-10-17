@@ -217,6 +217,7 @@ test('read-only authorization and validation remain visible with the draft intac
   await expect(page.locator('#editor-error')).toContainText('permission'); await expect(page.getByLabel('Name', {exact:true})).toHaveValue('Read-only draft');
   await page.getByRole('button', {name:'Cancel', exact:true}).click(); await openAccountMenu(page);await page.getByRole('button', {name:'Sign out', exact:true}).click(); await signIn(page);
   await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('textbox', {name:'Time zone', exact:true}).fill('Invalid/Zone');await page.getByRole('button',{name:'Save time zone',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Enter a valid time zone'); await expect(page.getByRole('textbox', {name:'Time zone', exact:true})).toHaveValue('Invalid/Zone');
+  page.once('dialog',dialog=>dialog.accept());await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
 });
 test('lost start/stop replies retry the exact durable command only once', async ({page, request}) => {
   const task = await createTask(request); await signIn(page); await page.getByRole('button', {name:'Tasks', exact:true}).click();

@@ -92,7 +92,12 @@ const auth = authentication({
     await refresh(); startWatch(session);
   },
   updateAccount(account) {accountName = account.displayName;},
-  refreshProfile: () => refresh(),
+  refreshProfile: profile => {
+    // The preference write is already committed. New editors must use that
+    // confirmed zone even while hidden reports are still being refreshed.
+    if (profile && snapshot) snapshot.profile = profile;
+    return refresh();
+  },
   clear() {
     $('week-sessions').replaceChildren(); $('week-sessions-section').hidden = true;
     refreshing = null; reloadAgain = false;

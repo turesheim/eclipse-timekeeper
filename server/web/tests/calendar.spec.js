@@ -157,7 +157,8 @@ test('drag-created intervals distinguish repeated local times and reject shaded 
   } finally {await f.close();}
 });
 
-test('touch range selection is explicit and leaves normal calendar scrolling available',async({browser,request})=>{
+test('touch range selection is explicit and leaves normal calendar scrolling available',async({browser,request,browserName})=>{
+  test.skip(browserName!=='chromium','Native touch injection uses Chromium CDP. Other calendar interactions run in every browser.');
   const f=await fixture(request),context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,viewport:{width:390,height:844},isMobile:true,hasTouch:true});
   const page=await context.newPage();
   try {
@@ -295,7 +296,8 @@ test('calendar copying a running session leaves it running and lets the copy rec
   }
 });
 
-test('calendar touch gestures move a work session between days on a narrow screen',async({browser,request})=>{
+test('calendar touch gestures move a work session between days on a narrow screen',async({browser,request,browserName})=>{
+  test.skip(browserName!=='chromium','Native touch injection uses Chromium CDP. Other calendar interactions run in every browser.');
   const f=await fixture(request),context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,viewport:{width:390,height:844},isMobile:true,hasTouch:true});
   const page=await context.newPage();
   try {
