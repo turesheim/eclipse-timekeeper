@@ -10,6 +10,7 @@ export function emailRecovery({request, signIn}) {
 
   function close() {
     ++generation; mode = token = null; form.reset(); form.hidden = true;
+    for (const input of form.querySelectorAll('input')) input.disabled = true;
     $('login-form').hidden = false; $('forgot-password').hidden = false;
     feedback.textContent = ''; submit.disabled = false;
   }

@@ -33,9 +33,9 @@
       <button class="btn btn-link" id="forgot-password" type="button">Forgot password?</button>
       <form id="email-recovery-form" hidden aria-labelledby="email-recovery-title">
         <h2 id="email-recovery-title"></h2><p id="email-recovery-hint" class="hint"></p>
-        <label class="form-label">Username<input class="form-control" id="recovery-username" autocomplete="username" maxlength="64"></label>
-        <label class="form-label">New password<input class="form-control" id="recovery-password" type="password" autocomplete="new-password"></label>
-        <label class="form-label">Confirm new password<input class="form-control" id="recovery-confirm" type="password" autocomplete="new-password"></label>
+        <label class="form-label">Username<input class="form-control" id="recovery-username" autocomplete="username" maxlength="64" disabled></label>
+        <label class="form-label">New password<input class="form-control" id="recovery-password" type="password" autocomplete="new-password" disabled></label>
+        <label class="form-label">Confirm new password<input class="form-control" id="recovery-confirm" type="password" autocomplete="new-password" disabled></label>
         <p id="email-recovery-feedback" role="status" aria-live="polite"></p>
         <div class="dialog-actions"><button class="btn btn-outline-secondary" id="email-recovery-back" type="button">Back to sign in</button><button class="btn btn-primary" type="submit">Request reset link</button></div>
       </form>
