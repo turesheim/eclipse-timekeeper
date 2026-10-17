@@ -93,6 +93,7 @@ final class ImportLedger {
     }
     UUID itemId(UUID job,int index) {return identifier("item",job.toString(),Integer.toString(index));}
     ObjectNode appendItem(ObjectNode job,ObjectNode item) {
+        if(!store.owner().equals(job.path("ownerId").asText())) throw ApiFailure.notFound();
         int index=job.path("itemCount").asInt();var fields=item.deepCopy();fields.put("jobId",job.path("id").asText());fields.put("index",index);
         var saved=insert(Kind.IMPORT_ITEM,itemId(uuid(job.get("id")),index),fields);job.put("itemCount",index+1);return saved;
     }
