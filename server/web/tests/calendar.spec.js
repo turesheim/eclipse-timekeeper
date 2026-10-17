@@ -179,12 +179,25 @@ test('calendar shows seven days, task links and activity lists beside multi-day 
   const f=await fixture(request);
   try {
     const long=await (await api(request,'POST','/work-sessions',{clientId:f.client.id,title:'Overnight work',summary:f.prefix+' overnight',start:'2025-10-25T21:30:00.123456789Z',end:'2025-10-27T00:30:00.987654321Z'})).json();
+    await page.setViewportSize({width:1440,height:1100});
     await calendar(page);
     await expect(page.locator('[data-tab=calendar]')).toHaveAttribute('aria-current','page');
     await expect(bar(page,f.session.id)).toBeAttached();
     await expect(bar(page,f.session.id)).toHaveCSS('background-color','rgb(255, 221, 136)');
     await expect(bar(page,f.session.id)).toHaveCSS('color','rgb(0, 0, 0)');
     await expect(bar(page,f.session.id).locator('.calendar-session-title')).toHaveText(f.session.title);
+    await expect(bar(page,f.session.id).locator('.calendar-session-duration')).toHaveText('8h 0m');
+    await expect(bar(page,f.session.id)).toHaveCSS('border-radius','6px');
+    const handles=bar(page,f.session.id).locator('.calendar-resize');
+    await position(page,bar(page,f.session.id));await page.mouse.move(0,0);
+    await expect(handles.first()).toHaveCSS('opacity','0');
+    await bar(page,f.session.id).hover();await expect(handles.first()).toHaveCSS('opacity','1');
+    await page.screenshot({path:'test-results/calendar-session-hover.png',fullPage:true});
+    await bar(page,f.session.id).locator('.calendar-session-select').click();await page.mouse.move(0,0);
+    await expect(handles.first()).toHaveCSS('opacity','0');
+    await page.keyboard.press('Tab');await expect(handles.first()).toBeFocused();
+    await expect(handles.first()).toHaveCSS('opacity','1');
+    await page.locator('#calendar-today').focus();await expect(handles.first()).toHaveCSS('opacity','0');
     await expect(page.locator('.calendar-task').getByRole('link',{name:`#${f.issue}: ${f.task.summary}`,exact:true})).toHaveAttribute('href',f.url);
     for(const activity of f.activities) await expect(page.locator('.calendar-task').getByRole('button',{name:`Edit activity ${activity.summary}`,exact:true})).toBeAttached();
     await expect(page.locator(`.calendar-session[data-session-id="${long.id}"]`)).toHaveCount(2);
