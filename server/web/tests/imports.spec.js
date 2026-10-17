@@ -145,7 +145,8 @@ test('Toggl defaults to work sessions with client totals, repeat detection and w
   await page.screenshot({path:'test-results/toggl-session-import-review.png',fullPage:true});
   await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
   const imported=await api(request,'/data/export'),sessions=imported.workSessions.filter(value=>!before.workSessions.some(old=>old.id===value.id));expect(sessions).toHaveLength(7);
-  for(const type of ['activities','projects','tasks']) expect(imported[type].length).toBe(before[type].length);
+  for(const type of ['activities','tasks']) expect(imported[type].length).toBe(before[type].length);
+  const importedProjects=imported.projects.filter(value=>!before.projects.some(old=>old.id===value.id));expect(importedProjects).toHaveLength(1);expect(sessions.every(value=>value.projectId===importedProjects[0].id)).toBe(true);
   expect(imported.labels.length).toBe(before.labels.length+1);const importedLabel=imported.labels.find(value=>!before.labels.some(old=>old.id===value.id));
   expect(sessions.every(value=>value.labelIds.includes(importedLabel.id))).toBe(true);
   expect(sessions.every(value=>value.title===value.summary && value.clientId===sessions[0].clientId)).toBe(true);

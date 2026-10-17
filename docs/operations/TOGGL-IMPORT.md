@@ -38,7 +38,7 @@ rejected.
    Several Toggl clients can use the same existing client. Reusing a client
    preserves its name and color; Undo keeps that client. Review the destinations
    again on the confirmation screen.
-   Work-session imports require only clients: a
+   Work-session imports map clients, optional source projects and labels: a
    source Client is used when present; otherwise its Project suggests a client
    name for review, with a fallback for rows missing both. Activity imports map
    clients, projects, tasks and labels and require missing-name fallbacks. Existing projects are available
@@ -50,7 +50,11 @@ rejected.
    completed session with its original start/end, client and description. The
    description supplies the title (first 1,000 characters, or “Imported work
    session” when blank) and is retained in full as notes. Source tags become
-   reviewed work-session labels. No projects, tasks or activities are created alongside it; source project/task values remain in the audit. In activity mode, descriptions become activity summaries
+   reviewed work-session labels. Source projects have reviewed mappings to new or
+   existing Timekeeper projects under the selected client. Entries without a
+   source project remain projectless. No tasks or activities are created alongside
+   work sessions; source task values remain in the audit. In activity mode,
+   descriptions become activity summaries
    independently of task names; rows without a source Task stay taskless, and
    tags become labels. Unsupported billing/rate columns are reported and omitted.
 

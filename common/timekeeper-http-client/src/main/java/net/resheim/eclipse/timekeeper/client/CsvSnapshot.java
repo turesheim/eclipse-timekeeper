@@ -50,7 +50,7 @@ public final class CsvSnapshot {
             if(snapshot.has("clients") && !snapshot.getAsJsonArray("clients").isEmpty()) throw invalid();
             for(var item:snapshot.getAsJsonArray("projects")) if(item.getAsJsonObject().has("clientId")) throw invalid();
             if(snapshot.has("workSessions")) for(var item:snapshot.getAsJsonArray("workSessions"))
-                if(item.getAsJsonObject().has("clientId") || item.getAsJsonObject().has("title") || item.getAsJsonObject().has("labelIds")) throw invalid();
+                if(item.getAsJsonObject().has("clientId") || item.getAsJsonObject().has("title") || item.getAsJsonObject().has("labelIds") || item.getAsJsonObject().has("projectId")) throw invalid();
         }
         if(!sessions) {
             if(snapshot.has("workSessions") && !snapshot.getAsJsonArray("workSessions").isEmpty()) throw invalid();
@@ -67,7 +67,8 @@ public final class CsvSnapshot {
             JsonArray items = snapshot.getAsJsonArray(table.getKey());
             var names=new ArrayList<>(table.getValue());
             if(clients && table.getKey().equals("workSessions"))
-                for(var item:items) if(item.getAsJsonObject().has("labelIds")) {names.add("labelIds");break;}
+                for(String optional:List.of("labelIds","projectId"))
+                    for(var item:items) if(item.getAsJsonObject().has(optional)) {names.add(optional);break;}
             StringBuilder csv = new StringBuilder();row(csv, names);
             for (JsonElement item : items) {
                 List<String> fields = new ArrayList<>();
@@ -103,8 +104,10 @@ public final class CsvSnapshot {
                 checkCancelled();
                 List<List<String>> rows = parse(readFile(folder.resolve(table.getKey() + ".csv"), remaining));
                 if(rows.isEmpty()) throw invalid();
-                var names=rows.removeFirst();var extended=new ArrayList<>(table.getValue());extended.add("labelIds");
-                if ((!names.equals(table.getValue()) && !(clients && table.getKey().equals("workSessions") && names.equals(extended))) || rows.size() > 10000) throw invalid();
+                var names=rows.removeFirst();var expected=new ArrayList<>(table.getValue());
+                if(clients && table.getKey().equals("workSessions"))
+                    for(String optional:List.of("labelIds","projectId")) if(names.contains(optional)) expected.add(optional);
+                if(!names.equals(expected) || rows.size()>10000) throw invalid();
                 JsonArray items = new JsonArray();
                 for (List<String> fields : rows) {
                     checkCancelled();

@@ -202,7 +202,8 @@ class TogglImportTest {
         ((ObjectNode)rows.get(0)).put("duplicateDecision","REUSE").putArray("reuseWorkSessions").add(preview.path("rows").get(0).path("matches").get(0).get(0));
         assertEquals(1,store.transaction(owner,()->commit(importer,job,rows,0,true)).path("skippedEntries").asInt());undoAll(job,owner);
         assertEquals(1,store.transaction(owner,()->store.list("WORK_SESSION").size()));
-        assertEquals(422,assertThrows(ApiFailure.class,()->store.transaction(owner,()->importer.create(source(mappings(),1,"0").put("mode","WORK_SESSION")))).status);
+        var invalidDefinitions=mappings();invalidDefinitions.add(map("unexpected-task","TASK","Unexpected task","project"));
+        assertEquals(422,assertThrows(ApiFailure.class,()->store.transaction(owner,()->importer.create(source(invalidDefinitions,1,"0").put("mode","WORK_SESSION")))).status);
     }
 
     @Test void workSessionTagsUseReviewedOwnedLabelsAndUndoRemovesOnlyUnusedImportCatalogs() {
@@ -242,6 +243,31 @@ class TogglImportTest {
             var result=store.transaction(owner,()->new ImportUndo(store).apply(job,index,request));if(result.path("state").asText().startsWith("UNDONE")) break;
         }
         assertTrue(sawDependency);store.transaction(owner,()->{assertEquals(List.of(manual),store.list("WORK_SESSION"));assertTrue(store.find("LABEL",uuid(manual.path("labelIds").get(0))).isPresent());return null;});
+    }
+
+    @Test void workSessionsMapReviewedProjectsToClientsAndUndoPreservesReusedProjects() {
+        String owner="toggl-session-projects-"+UUID.randomUUID();var importer=new TogglImport(store);
+        var input=sessionSource();((ArrayNode)input.get("mappings")).add(map("session-project","PROJECT","Reviewed project","client"));
+        var row=sessionRow().put("projectKey",hash("session-project"));var rows=array().add(row);
+        UUID job=uuid(store.transaction(owner,()->importer.create(input)).get("id"));store.transaction(owner,()->commit(importer,job,rows,0,true));
+        store.transaction(owner,()->{
+            var session=store.list("WORK_SESSION").get(0);var project=store.list("PROJECT").get(0);
+            assertEquals(project.get("id"),session.get("projectId"));assertEquals(project.get("clientId"),session.get("clientId"));
+            assertTrue(store.list("TASK").isEmpty());assertTrue(store.list("ACTIVITY").isEmpty());return null;
+        });
+        undoAll(job,owner);store.transaction(owner,()->{assertTrue(store.list("WORK_SESSION").isEmpty());assertTrue(store.list("PROJECT").isEmpty());return null;});
+        var reused=store.transaction(owner,()->{
+            var client=store.createClient(object().put("name","Existing").put("color","#123456"));
+            var project=store.withCreationClient(uuid(client.get("id")),()->store.service().createProject(new CreateProject("Existing delivery")));
+            var definitions=array().add(object().put("key",hash("client")).put("resourceType","CLIENT").put("action","REUSE").put("id",client.path("id").asText()).put("etag",etag(client)));
+            var value=store.find("PROJECT",project.id().value()).orElseThrow();
+            definitions.add(object().put("key",hash("session-project")).put("resourceType","PROJECT").put("parentKey",hash("client")).put("action","REUSE").put("id",value.path("id").asText()).put("etag",etag(value)));return definitions;
+        });
+        input.set("mappings",reused);UUID reuseJob=uuid(store.transaction(owner,()->importer.create(input)).get("id"));store.transaction(owner,()->commit(importer,reuseJob,rows,0,true));
+        undoAll(reuseJob,owner);store.transaction(owner,()->{assertTrue(store.list("WORK_SESSION").isEmpty());assertEquals(1,store.list("PROJECT").size());assertEquals(1,store.list("CLIENT").size());return null;});
+        row.put("clientKey",hash("missing-client"));
+        var preview=object().put("sourceKey",row.path("sourceKey").asText()).put("mode","WORK_SESSION");preview.set("mappings",reused);preview.set("rows",rows);
+        assertEquals(422,assertThrows(ApiFailure.class,()->store.transaction(owner,()->importer.preview(preview))).status);
     }
 
 }

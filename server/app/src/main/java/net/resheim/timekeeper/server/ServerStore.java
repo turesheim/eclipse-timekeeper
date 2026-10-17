@@ -222,6 +222,7 @@ public class ServerStore {
                 node.put("title",previous!=null && previous.hasNonNull("title") ? previous.get("title").asText() : legacyTitle(node));
                 // Web-only metadata survives domain timer/interval writes.
                 node.set("labelIds",previous!=null && previous.has("labelIds") ? previous.get("labelIds").deepCopy() : array());
+                if(previous!=null && previous.has("projectId")) node.set("projectId",previous.get("projectId").deepCopy());
             }
         }
         UUID id = uuid(node.get("id")); long version = node.get("version").asLong();
@@ -250,7 +251,10 @@ public class ServerStore {
             else if (!active().orElseThrow().get("id").asText().equals(id.toString())) throw ApiFailure.conflict();
         }
         if (node.hasNonNull("clientId")) relation(type,id,"client","CLIENT",uuid(node.get("clientId")));
-        if(type.equals("WORK_SESSION")) node.path("labelIds").forEach(label -> relation(type,id,"label","LABEL",uuid(label)));
+        if(type.equals("WORK_SESSION")) {
+            node.path("labelIds").forEach(label -> relation(type,id,"label","LABEL",uuid(label)));
+            if(node.hasNonNull("projectId")) relation(type,id,"project","PROJECT",uuid(node.get("projectId")));
+        }
         return value;
     }
     /** Server-only client metadata: common/Eclipse interval and project models stay independent. */
@@ -296,6 +300,22 @@ public class ServerStore {
         if(input.has("clientId")) {
             UUID client=uuid(input.get("clientId"));find("CLIENT",client).orElseThrow(ApiFailure::notFound);node.put("clientId",client.toString());
         }
+        if(type.equals("PROJECT") && input.has("clientId")) {
+            // Reassign sessions explicitly before moving a project to another client.
+            // Historical client totals must never change as a side effect of editing a project.
+            var previous=find(type,id).orElseThrow(ApiFailure::notFound);
+            if(!node.get("clientId").equals(previous.get("clientId")) && sessionUsesProject(id)) throw ApiFailure.conflict();
+        }
+        if(type.equals("WORK_SESSION")) {
+            if(input.has("projectId")) node.set("projectId",input.get("projectId").deepCopy());
+            if(node.hasNonNull("projectId")) {
+                var project=find("PROJECT",uuid(node.get("projectId"))).orElseThrow(ApiFailure::notFound);
+                if(input.has("clientId") && !input.get("clientId").equals(project.get("clientId"))) throw ApiFailure.validation();
+                node.set("clientId",project.get("clientId").deepCopy());
+            }
+            update("DELETE FROM tk_relation WHERE owner_id=? AND from_type='WORK_SESSION' AND from_id=? AND kind='project'",owner(),id);
+            if(node.hasNonNull("projectId")) relation(type,id,"project","PROJECT",uuid(node.get("projectId")));
+        }
         if(type.equals("WORK_SESSION") && input.has("title")) node.put("title",input.get("title").asText().strip());
         if(type.equals("WORK_SESSION") && input.has("labelIds")) {
             var assigned=node.putArray("labelIds");
@@ -308,6 +328,10 @@ public class ServerStore {
         if(update("UPDATE tk_resource SET payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",node.toString(),owner(),type,id,node.get("version").asLong())!=1) throw new ApiFailure(412,"STALE_VERSION");
         update("DELETE FROM tk_relation WHERE owner_id=? AND from_type=? AND from_id=? AND kind='client'",owner(),type,id);
         relation(type,id,"client","CLIENT",uuid(node.get("clientId")));return node;
+    }
+    private boolean sessionUsesProject(UUID project) {
+        try(var query=statement("SELECT 1 FROM tk_relation WHERE owner_id=? AND from_type='WORK_SESSION' AND kind='project' AND to_type='PROJECT' AND to_id=? FETCH FIRST 1 ROW ONLY",owner(),project);var rows=query.executeQuery()) {return rows.next();}
+        catch(SQLException failure) {throw databaseFailure(failure);}
     }
     private void relation(String fromType,UUID fromId,String kind,String toType,UUID toId) {
         update("INSERT INTO tk_relation(owner_id,from_type,from_id,kind,to_type,to_id) VALUES(?,?,?,?,?,?)",owner(),fromType,fromId,kind,toType,toId);
