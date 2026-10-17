@@ -1,6 +1,8 @@
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {openAccountMenu} from './navigation.js';
+import {localDateTime} from '../src/model.js';
+import {randomUUID} from 'node:crypto';
 
 test('iOS home-screen metadata serves the bundled Timekeeper icon without sign-in',async({page})=>{
   await page.goto('/web/');
@@ -10,6 +12,40 @@ test('iOS home-screen metadata serves the bundled Timekeeper icon without sign-i
   const response=await page.request.get(url);expect(response.status()).toBe(200);expect(response.headers()['content-type']).toContain('image/png');
   const bytes=await response.body();expect(bytes.subarray(0,8).toString('hex')).toBe('89504e470d0a1a0a');
   expect([bytes.readUInt32BE(16),bytes.readUInt32BE(20)]).toEqual([256,256]);
+});
+
+test('saved account zone applies to new editors while hidden reports refresh',async({page,request})=>{
+  async function api(method,path,data,extra={}) {
+    const response=await request.fetch('/api/v1'+path,{method,data,headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`,...extra}});
+    expect(response.ok()).toBe(true);return response;
+  }
+  const original=await api('GET','/me'),zone=(await original.json()).zoneId;let client,session,release;
+  try {
+    await api('PUT','/me',{zoneId:'America/New_York'},{'If-Match':original.headers().etag});
+    client=await (await api('POST','/clients',{name:'Zone refresh '+randomUUID(),color:'#176653'})).json();
+    const now=Date.now();session=await (await api('POST','/work-sessions',{title:'Confirmed time zone',clientId:client.id,summary:'',start:new Date(now-7200000).toISOString(),end:new Date(now-3600000).toISOString()})).json();
+    await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_TOKEN);
+    await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+    await page.locator('[data-tab=week]').click();await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();
+    await expect(page.getByLabel('Time zone',{exact:true})).toHaveValue('America/New_York');
+    let written=false,waiting=false;const blocked=new Promise(resolve=>{release=resolve;});
+    await page.route('**/api/v1/me',async route=>{
+      if(route.request().method()==='PUT') written=true;
+      else if(written) {waiting=true;await blocked;}
+      await route.continue();
+    });
+    await page.getByLabel('Time zone',{exact:true}).fill('Europe/Oslo');await page.getByRole('button',{name:'Save time zone',exact:true}).click();
+    await expect(page.locator('#account-content')).toContainText('Time zone saved.');await expect.poll(()=>waiting).toBe(true);
+    await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
+    await page.locator(`#week-sessions tr[data-work-session-id="${session.id}"]`).getByRole('button',{name:/^Edit session /}).click();
+    await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue(localDateTime(session.start,'Europe/Oslo'));
+    await page.locator('#cancel').click();
+  } finally {
+    release?.();await page.unroute('**/api/v1/me');
+    if(session) {const current=await api('GET','/work-sessions/'+session.id);await api('DELETE','/work-sessions/'+session.id,undefined,{'If-Match':current.headers().etag});}
+    if(client) {const current=await api('GET','/clients/'+client.id);await api('DELETE','/clients/'+client.id,undefined,{'If-Match':current.headers().etag});}
+    const current=await api('GET','/me');await api('PUT','/me',{zoneId:zone},{'If-Match':current.headers().etag});
+  }
 });
 
 test('compact account navigation supports touch, keyboard, account settings and sign-out',async({page})=>{
