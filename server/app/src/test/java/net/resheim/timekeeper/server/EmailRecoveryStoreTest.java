@@ -55,13 +55,15 @@ class EmailRecoveryStoreTest {
         // account operation. Quiesce periodic domain writes before resetting it.
         ClientProxy.unwrap(store).stopMaintenance();
         accounts.tx(c->{lock(c);
-            for(String table:List.of("tk_recovery_link","tk_recovery_address","tk_auth_session","tk_api_token","tk_auth_challenge","tk_account","tk_active","tk_relation","tk_external_reference","tk_receipt","tk_change","tk_resource","tk_owner","tk_auth_throttle")) execute(c,"DELETE FROM "+table);
+            for(String table:List.of("tk_recovery_link","tk_recovery_address","tk_passkey_ceremony","tk_auth_session","tk_passkey_credential","tk_passkey_user","tk_api_token","tk_auth_challenge","tk_account","tk_active","tk_relation","tk_external_reference","tk_receipt","tk_change","tk_resource","tk_owner","tk_auth_throttle")) execute(c,"DELETE FROM "+table);
             execute(c,"UPDATE tk_auth_control SET bootstrap_completed=FALSE");
             execute(c,"UPDATE tk_recovery_control SET origin=NULL,epoch=0 WHERE id=1");return null;
         });
+        // Establish the trusted origin before opening sessions: a cutover
+        // deliberately invalidates every session issued at the previous origin.
+        origin=new RecoveryOrigin();origin.accounts=accounts;origin.configured="https://vpn.example.org:8443";origin.epoch=1;origin.initialize();
         aliceSession=accounts.complete(challenge("SETUP",null),"alice",PASSWORD,"Alice",false);alice=accounts.session(aliceSession.secret());
         accounts.createUser(alice,"bob",PASSWORD,"Bob",false);bobSession=accounts.login("bob",PASSWORD,false);bob=accounts.session(bobSession.secret());
-        origin=new RecoveryOrigin();origin.accounts=accounts;origin.configured="https://vpn.example.org:8443";origin.epoch=1;origin.initialize();
         recovery=replica(origin);
     }
     @AfterEach void resetSetupFile() {ClientProxy.unwrap(accounts).setupFile="NONE";}

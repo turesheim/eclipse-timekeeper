@@ -31,7 +31,7 @@ class PasskeyRealm {
             throw new IllegalArgumentException("Passkey RP ID must equal the configured HTTPS hostname; changing it requires a documented origin cutover");
         return Optional.of(host);
     }
-    Optional<String> rpId() {return rp(origin.configured,configuredRp,configuredEnabled);}
+    Optional<String> rpId() {return rp(origin.configured(),configuredRp,configuredEnabled);}
     boolean enabled() {return rpId().isPresent();}
     void initialize() {
         rpId(); // Reject inconsistent configuration before changing shared authority.
@@ -42,8 +42,8 @@ class PasskeyRealm {
         try(var statement=query(connection,"SELECT origin,epoch FROM tk_recovery_control WHERE id=1");var rows=statement.executeQuery()) {
             if(!rows.next()) throw new SQLException("Missing authentication origin control");
             var value=new RecoveryOrigin.Current(rows.getString(1),rows.getLong(2));
-            boolean matches=origin.configured.equals("NONE") ? value.origin()==null && value.epoch()==0
-                    : origin.configured.equals(value.origin()) && origin.epoch==value.epoch();
+            boolean matches=origin.configured().equals("NONE") ? value.origin()==null && value.epoch()==0
+                    : origin.configured().equals(value.origin()) && origin.epoch()==value.epoch();
             if(!matches) throw new ApiFailure(503,"UNAVAILABLE");return value;
         }catch(SQLException failure) {throw databaseFailure(failure);}
     }

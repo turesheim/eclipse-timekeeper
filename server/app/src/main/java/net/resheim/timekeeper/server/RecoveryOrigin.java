@@ -16,6 +16,8 @@ class RecoveryOrigin {
     @ConfigProperty(name="timekeeper.auth.origin-epoch",defaultValue="1") long epoch;
 
     record Current(String origin,long epoch) { }
+    String configured() {return configured;}
+    long epoch() {return epoch;}
 
     static String validate(String value) {
         try {

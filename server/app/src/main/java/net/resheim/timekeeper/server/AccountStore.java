@@ -63,7 +63,7 @@ public class AccountStore {
             if(!rows.next()) execute(c,"INSERT INTO tk_account(owner_id,username,password_hash,display_name,state,administrator,version) VALUES(?,NULL,NULL,?,'UNCLAIMED',FALSE,0)",owner,owner);
         }catch(SQLException failure) {throw databaseFailure(failure);}
     }
-    private static ObjectNode account(Connection c,String owner,boolean locked) {
+    static ObjectNode account(Connection c,String owner,boolean locked) {
         try(var statement=query(c,"SELECT username,display_name,state,administrator,version FROM tk_account WHERE owner_id=?"+(locked ? " FOR UPDATE" : ""),owner);var rows=statement.executeQuery()) {
             if(!rows.next()) throw ApiFailure.notFound();
             var result=object();result.put("ownerId",owner);result.put("username",rows.getString(1));result.put("displayName",rows.getString(2));result.put("state",rows.getString(3));result.put("administrator",rows.getBoolean(4));result.put("version",rows.getLong(5));return result;
@@ -134,7 +134,7 @@ public class AccountStore {
             if(!recovery && pending!=null) execute(c,"INSERT INTO tk_recovery_address VALUES(?,'PRIMARY',NULL,?,1)",target,pending);
             execute(c,"UPDATE tk_auth_challenge SET consumed=TRUE WHERE digest=?",digest);
             if(!recovery) execute(c,"UPDATE tk_auth_control SET bootstrap_completed=TRUE WHERE id=1");
-            if(recovery) revokeAll(c,target);else execute(c,"DELETE FROM tk_auth_session WHERE owner_id=?",target);return issue(c,target,Set.of("read","write"),false,now);
+            if(recovery) {PasskeyCredentials.recover(c,target);revokeAll(c,target);}else execute(c,"DELETE FROM tk_auth_session WHERE owner_id=?",target);return issue(c,target,Set.of("read","write"),false,now);
         });
     }
     Issued login(String login,String password,boolean remember) {
@@ -155,11 +155,22 @@ public class AccountStore {
         });
     }
     private Issued issue(Connection c,String owner,Set<String> permissions,boolean remember,Instant now) {return issue(c,owner,permissions,remember,now,null);}
-    private Issued issue(Connection c,String owner,Set<String> permissions,boolean remember,Instant now,String parent) {
+    Issued issue(Connection c,String owner,Set<String> permissions,boolean remember,Instant now,String parent) {
         String secret=AccountPasswords.secret(),csrf=AccountPasswords.secret();Instant expires=now.plus(remember ? Duration.ofDays(30) : Duration.ofHours(12));
 
         execute(c,"INSERT INTO tk_auth_session(digest,owner_id,csrf,permissions,created_at,expires_at,last_seen_at,persistent,parent_digest) VALUES(?,?,?,?,?,?,?,?,?)",hash(secret),owner,csrf,permissions(permissions),now.toString(),expires.toString(),now.toString(),remember,parent);
         return new Issued(secret,account(c,owner,false),csrf,expires,remember);
+    }
+    static boolean currentPassword(Connection c,String owner,String password) {
+        try(var statement=query(c,"SELECT password_hash FROM tk_account WHERE owner_id=? AND state='ENABLED'",owner);var rows=statement.executeQuery()) {
+            String encoded=rows.next() ? rows.getString(1) : null;boolean valid=AccountPasswords.matches(password,encoded==null ? DUMMY : encoded);return encoded!=null && valid;
+        }catch(SQLException failure) {throw databaseFailure(failure);}
+    }
+    static boolean accountSession(Connection c,TokenRegistry.Principal principal) {
+        if(!principal.kind().equals("SESSION") || !principal.permissions().contains("write")) return false;
+        try(var statement=query(c,"SELECT s.parent_digest,a.state FROM tk_auth_session s JOIN tk_account a ON a.owner_id=s.owner_id WHERE s.digest=? AND s.owner_id=?",principal.digest(),principal.owner());var rows=statement.executeQuery()) {
+            return rows.next() && rows.getString(1)==null && rows.getString(2).equals("ENABLED");
+        }catch(SQLException failure) {throw databaseFailure(failure);}
     }
     Issued exchange(TokenRegistry.Principal principal) {
         return tx(c->{lock(c);guard(c,principal);return issue(c,principal.owner(),principal.permissions(),false,Instant.now(),principal.digest());});
@@ -232,6 +243,7 @@ public class AccountStore {
     static void revokeAll(Connection c,String owner) {
         execute(c,"DELETE FROM tk_auth_session WHERE owner_id=?",owner);execute(c,"UPDATE tk_api_token SET revoked=TRUE,version=version+1 WHERE owner_id=? AND revoked=FALSE",owner);
         execute(c,"UPDATE tk_recovery_link SET consumed=TRUE WHERE owner_id=? AND consumed=FALSE",owner);
+        PasskeyCeremonies.cancelOwner(c,owner);
     }
     private static void requireWrite(TokenRegistry.Principal principal) {if(!principal.permissions().contains("write")) throw new ApiFailure(403,"FORBIDDEN");}
     private static void requireAdmin(Connection c,TokenRegistry.Principal principal) {
