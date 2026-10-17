@@ -22,6 +22,8 @@ test('batches bound both source entries and resulting daily activities across DS
   const row = {start: '2025-10-25T20:00:00.000000001Z', end: '2025-10-26T03:00:00.000000003Z'};
   assert.equal(importDayParts(row, 'Europe/Oslo'), 2);
   assert.equal(importDayParts({...row, end: '2025-10-25T22:00:00Z'}, 'Europe/Oslo'), 1);
+  assert.equal(importDayParts({start:'2011-12-29T22:00:00Z',end:'2011-12-31T00:00:00Z'}, 'Pacific/Apia'), 2);
+  assert.equal(importDayParts({start:'2011-12-29T22:00:00Z',end:'2011-12-30T10:00:00Z'}, 'Pacific/Apia'), 1);
   const rows = Array.from({length: 250}, () => row);
   assert.deepEqual(importBatches(rows, 'Europe/Oslo').map(batch => batch.length), [100, 100, 50]);
   assert.deepEqual(importBatches(rows, 'Europe/Oslo', 100).map(batch => batch.length), [100, 50]);

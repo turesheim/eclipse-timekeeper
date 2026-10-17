@@ -44,8 +44,16 @@ export async function importPlan(sourceRows, personKey, {fallbackClient, fallbac
 export function importDayParts(row, zone) {
   const end = instantNanos(row.end); let cursor = instantNanos(row.start), count = 1;
   let date = dateInZone(row.start, zone);
+  if(date===dateInZone(row.end,zone)) return 1;
   while (true) {
-    date = addDays(date, 1); const boundary = instantNanos(dayStart(date, zone));
+    date = addDays(date, 1);let start;
+    try {start = dayStart(date, zone);}
+    catch(error) {
+      // The server's atStartOfDay skips an absent civil date, such as Apia 2011-12-30.
+      if(error.message==='This date does not exist in the selected time zone.') continue;
+      throw error;
+    }
+    const boundary = instantNanos(start);
     if (boundary >= end) return count;
     // A skipped civil date may have the same boundary as the preceding date.
     if (boundary > cursor) {cursor = boundary; count++;}
