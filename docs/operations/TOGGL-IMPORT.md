@@ -24,9 +24,8 @@ rejected.
 ## Review and import
 
 1. Choose **Work sessions** (the default) or **Activities**, then choose the CSV and its original IANA time zone, for example `Europe/Oslo`.
-   Confirm its date format. If the CSV omits workspace identity and you use
-   several source workspaces, enter a consistent source-workspace name for
-   each workspace across exports.
+   Confirm its date format. Toggl workspace columns are ignored; Timekeeper has
+   no workspaces and imports only into the signed-in user's account.
 2. Select one source user. This selects whose entries to copy into your current
    account; it creates no login accounts, memberships or shared workspaces.
    Review row errors, unsupported columns and excluded rows. Incomplete timers,

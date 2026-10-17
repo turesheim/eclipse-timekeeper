@@ -7,7 +7,7 @@ project/tag/description text and dates while retaining seven intervals totaling
 
 | Boundary | Verified behavior |
 | --- | --- |
-| CSV and source selection | UTF-8/BOM, CRLF, quoting/newlines, strict headers/durations, incomplete/future/error rows, explicit zone/date format and independent source-user selection. Browser requests exclude other source users and raw email identities. |
+| CSV and source selection | UTF-8/BOM, CRLF, quoting/newlines, strict headers/durations, incomplete/future/error rows, explicit zone/date format and independent source-user selection; workspace metadata is ignored and does not alter duplicate identity. Browser requests exclude other source users and raw email identities. |
 | Time and mapping | Exact nanoseconds across midnight and 25-hour DST days; reviewed fallback clients/projects, distinct equally named projects, independent task descriptions and labels. Skipped civil dates are covered by planner tests. Work sessions are explicitly selected (the browser default), preserve each full interval and use only a reviewed client plus description-derived title. Activities remain an alternative; modes have independent duplicate claims. |
 | Atomic authority | Owned domain writes, immutable/version-checked mappings, rollback, simultaneous batch retries, exact count/time reconciliation and persistent per-entry source intervals/outcomes. |
 | Repeat and resume | Same-source repeats reuse the creator's claims without overwriting edits. Ambiguous unclaimed matches require explicit decisions. A dropped batch reply, reload and original-file re-selection resume at committed progress. |
@@ -21,7 +21,7 @@ project/tag/description text and dates while retaining seven intervals totaling
   suites passed after the work-session extension. Focused import/API/provenance/Undo
   checks cover both modes (15 tests), including continuous DST intervals, independent
   source claims, reused sessions, edits, owner denial and deliberate re-import.
-- Web unit tests: 49 passed, including the anonymized real fixture, work-session
+- Web unit tests: 50 passed, including the anonymized real fixture, work-session
   default/client mapping and skipped-date activity batch planning.
 - Packaged Chromium: all six import scenarios passed. Both activity and work-session
   jobs resume a 201-row import after a dropped reply and reload, then review edited

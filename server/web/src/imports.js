@@ -14,7 +14,6 @@ export async function renderImports(view, zone) {
   const file = field(upload.value, 'Detailed Report CSV', '', {type:'file'});file.accept = '.csv,text/csv';
   const sourceZone = field(upload.value, 'Source time zone', zone);
   const dateFormat = field(upload.value, 'Source date format', 'ISO', {choices:[['ISO','YYYY-MM-DD'],['DMY','DD/MM/YYYY'],['MDY','MM/DD/YYYY']]});
-  const workspace = field(upload.value, 'Source workspace (if absent from CSV)', '', {required:false, maxLength:1000});
   const stopParsing = button('Cancel reading', () => cancelWorker?.());stopParsing.hidden = true;upload.value.append(stopParsing);upload.finish();
   const work = section(view, 'Review import');work.hidden = true;
   const history = section(view, 'Import history'), historyList = node('div');history.append(historyList);
@@ -57,7 +56,7 @@ export async function renderImports(view, zone) {
     return locked(async()=>{
     if(!file.files[0]) throw new Error('Choose a CSV file.');
     work.hidden = true;plan = null;reviews = [];batches = [];parsed = null;createKey = null;
-    const result = await runWorker({file:file.files[0],options:{zone:sourceZone.value.trim(),dateFormat:dateFormat.value,workspace:workspace.value}});
+    const result = await runWorker({file:file.files[0],options:{zone:sourceZone.value.trim(),dateFormat:dateFormat.value}});
     if(!view.valid()) return;
     parsed = result.parsed;fingerprint = result.fileFingerprint;
     if(resume && fingerprint !== resume.fileFingerprint) throw new Error('Choose the unchanged CSV used by this import.');
@@ -66,7 +65,7 @@ export async function renderImports(view, zone) {
   }
   function sourceReview() {
     work.replaceChildren(node('h2','Review import'));
-    const source = field(work, 'Source user', parsed.people.length === 1 ? parsed.people[0].key : '', {choices:[['','Choose source user'],...parsed.people.map(person => [person.key,[person.name,person.email,person.workspace].filter(Boolean).join(' · ')])]});
+    const source = field(work, 'Source user', parsed.people.length === 1 ? parsed.people[0].key : '', {choices:[['','Choose source user'],...parsed.people.map(person => [person.key,[person.name,person.email].filter(Boolean).join(' · ')])]});
     if(parsed.unsupported.length) work.append(node('p', `Unsupported metadata: ${parsed.unsupported.join(', ')}. These columns will not be imported.`, 'alert alert-info'));
     const fallbackClient = field(work, 'Client for entries without a client', 'Imported from Toggl', {maxLength:1000});
     if(importMode.value==='WORK_SESSION') work.append(node('p','Each entry becomes one work session. Descriptions become titles and are retained in full as notes. Source projects suggest client names when Client is missing; review each client below. Tasks and tags are retained in the import audit only.'));

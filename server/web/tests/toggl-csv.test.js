@@ -77,6 +77,15 @@ test('source-user selection remains explicit, unsupported fields are visible and
   const stable=parse(header+',Time Entry ID\n'+row+',entry-1\n'+row+',entry-1');
   assert.equal(stable.rejectedRows,2);assert.equal(stable.totalNanos,0n);
   const workspaces=parse(header+',Workspace\n'+row+',Source A\n'+row+',Source B');
-  assert.equal(workspaces.people.length,2);assert.deepEqual(workspaces.rows.map(row=>row.ambiguousDuplicate),[false,false]);
-  assert.deepEqual(workspaces.unsupported,[]);
+  assert.equal(workspaces.people.length,1);assert.deepEqual(workspaces.rows.map(row=>row.ambiguousDuplicate),[true,true]);
+  assert.deepEqual(workspaces.unsupported,['Workspace']);
+});
+
+
+test('Toggl workspace metadata never changes source selection or repeat identity', () => {
+  const original=parse(header+'\n'+row), named=parse(header+',Workspace\n'+row+',Old workspace');
+  const renamed=parse(header+',Workspace\n'+row+',Different workspace');
+  assert.deepEqual(named.people,original.people);assert.deepEqual(renamed.people,original.people);
+  assert.equal(named.rows[0].identity,original.rows[0].identity);assert.equal(renamed.rows[0].identity,original.rows[0].identity);
+  assert.ok(!('workspace' in named.people[0]));
 });
