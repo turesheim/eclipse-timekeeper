@@ -22,7 +22,7 @@ import jakarta.inject.Inject;
 class AccountArchive {
     static final String FORMAT="timekeeper-account-v1";
     static final Map<String,String> WORK=DomainTransfer.TYPES;
-    private static final List<String> HISTORY=List.of("IMPORT_JOB","IMPORT_BATCH","IMPORT_ITEM","IMPORT_MAP","IMPORT_KEY","IMPORT_ORIGIN","IMPORT_UNDO","IMPORT_USE","ARCHIVE_AUDIT");
+    private static final List<String> HISTORY=List.of("IMPORT_JOB","IMPORT_BATCH","IMPORT_ITEM","IMPORT_MAP","IMPORT_KEY","IMPORT_ORIGIN","IMPORT_UNDO","IMPORT_USE","ARCHIVE_AUDIT","ARCHIVE_IMPORT");
     @Inject AgroalDataSource datasource;
     @Inject AccountStore accounts;
     @Inject TokenRegistry tokens;
@@ -48,6 +48,7 @@ class AccountArchive {
                 connection.setAutoCommit(false);
                 try {
                     principal=tokens.recheck(principal);
+                    if(!principal.permissions().contains("read")) throw new ApiFailure(403,"FORBIDDEN");
                     accounts.guard(connection,principal);
                     write(connection,principal.owner(),file);
                     connection.commit();

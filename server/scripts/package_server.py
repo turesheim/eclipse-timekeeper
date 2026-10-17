@@ -54,6 +54,7 @@ def package(output, tag, commit):
               'docs/operations/LOCAL-DOCKER.md': 'LOCAL-DOCKER.md',
               'docs/operations/TAILSCALE.md': 'TAILSCALE.md',
               'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
+              'docs/operations/ACCOUNT-DATA.md': 'ACCOUNT-DATA.md',
               'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
               'docs/development/WEB-CLIENT.md': 'WEB-CLIENT.md'}
     illustrations = {

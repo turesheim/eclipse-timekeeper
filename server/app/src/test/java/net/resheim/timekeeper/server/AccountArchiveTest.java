@@ -21,6 +21,7 @@ class AccountArchiveTest {
     @Inject AccountArchive archives;
     @Inject ServerStore store;
     @Inject TokenRegistry tokens;
+    @Inject ContractInputs inputs;
 
     @Test void administratorDownloadIsPrivateAndManagementMetadataContainsNoCredentials() throws Exception {
         var alice=tokens.authenticate("Bearer test-a");tokens.authenticate("Bearer test-b");
@@ -38,6 +39,8 @@ class AccountArchiveTest {
             path=download.file();assertTrue(download.length()>0);
             try(var zip=new ZipFile(path.toFile())) {
                 String text=new String(zip.getInputStream(zip.getEntry("archive.json")).readAllBytes(),StandardCharsets.UTF_8);var value=parse(text);
+                assertEquals(value,AccountArchiveInput.read(path,"application/zip"));
+                assertDoesNotThrow(()->inputs.validate("AccountArchiveSnapshot",value));
                 assertEquals(AccountArchive.FORMAT,value.path("format").asText());assertEquals("Europe/Oslo",value.path("preferences").path("zoneId").asText());
                 assertTrue(value.path("account").path("administrator").asBoolean());assertEquals("Alice",value.path("account").path("displayName").asText());
                 assertEquals("alice-backup@example.invalid",value.path("account").path("recoveryAddresses").get(0).path("verifiedAddress").asText());

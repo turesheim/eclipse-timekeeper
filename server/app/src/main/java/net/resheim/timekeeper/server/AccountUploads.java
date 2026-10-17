@@ -80,7 +80,7 @@ final class AccountUploads {
             store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",store.owner(),CHUNK,chunkId(id,index));
     }
     private void cleanup() {
-        for(var item:store.list(UPLOAD)) if(!item.path("state").asText().equals("IMPORTED") && !Instant.parse(item.path("expiresAt").asText()).isAfter(store.now())) {
+        for(var item:store.list(UPLOAD)) if(!Instant.parse(item.path("expiresAt").asText()).isAfter(store.now())) {
             deleteChunks((ObjectNode)item);store.update("DELETE FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",store.owner(),UPLOAD,uuid(item.get("id")));
         }
     }

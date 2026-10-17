@@ -108,7 +108,9 @@ class ContractTest(unittest.TestCase):
     def test_versioned_mutations_and_durable_commands(self):
         for path, item in CONTRACT['paths'].items():
             for method in ('put', 'delete'):
-                if method in item and path != '/auth/tokens/{id}':
+                # Chunks are immutable: index plus exact content identifies a
+                # write, and conflicting bytes return 409 instead of overwriting.
+                if method in item and path not in ('/auth/tokens/{id}', '/data/account/uploads/{id}/chunks/{index}'):
                     op = item[method]
                     self.assertIn({'$ref': '#/components/parameters/IfMatch'}, op['parameters'])
                     self.assertIn('412', op['responses'])
@@ -178,6 +180,9 @@ class ContractTest(unittest.TestCase):
 
     def test_every_reference_and_relation_workflow_is_present(self):
         expected = {
+            'downloadAccountArchive', 'createAccountArchiveUpload', 'listPendingAccountArchives',
+            'getAccountArchiveUpload', 'writeAccountArchiveChunk', 'discardAccountArchiveUpload',
+            'previewAccountArchive', 'restoreAccountArchive', 'listAccountArchiveRestores',
             'createClient', 'updateClient', 'deleteClient', 'getClient', 'listClients',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTask', 'updateTask', 'deleteTask', 'getTask', 'listTasks',
