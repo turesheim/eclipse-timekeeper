@@ -24,6 +24,13 @@ Font Awesome Free 7.3.1 supplies locally bundled icon fonts for larger tree
 controls and action buttons. Buttons retain accessible names and hover titles;
 fonts and their upstream license are included in the server distribution.
 
+**Track** is the default workspace tab. Its Monday-to-Sunday month grid shows
+client-coloured work sessions, with recorded session hours per client above it.
+Month boundaries and daily slices follow the account's time zone, including DST;
+running sessions use the server's report time. Activity/task time is independent
+of these totals. Month navigation does not alter recorded sessions. Open a session
+card to edit it; read-only access keeps the overview available with editing disabled.
+
 ## Design baseline
 
 Bootstrap 5.3.8 supplies the shared buttons, forms, navigation, cards and tables.

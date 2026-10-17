@@ -3,6 +3,10 @@ import {monthCalendar,monthSessions,shiftMonth} from './month-model.js';
 import {iconButton} from './icons.js';
 
 const node=(tag,text,className)=> {const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
+function compactTime(value) {
+  const seconds=value/1000000000n,hours=seconds/3600n,minutes=seconds/60n%60n;
+  return hours ? `${hours}h${minutes||''}` : minutes ? `${minutes}m` : seconds ? `${seconds}s` : '<1s';
+}
 export class MonthTrack {
   constructor(root,onEdit) {
     this.root=root;this.onEdit=onEdit;this.input=root.querySelector('#track-month');
@@ -66,8 +70,8 @@ export class MonthTrack {
           const button=node('button',undefined,'track-session');button.type='button';button.disabled=!this.writable;button.dataset.trackSession=session.id;
           button.title=`${session.title} · ${client?.name||'Client'} · ${day.date}`;
           if(/^#[0-9a-f]{6}$/i.test(client?.color))button.style.setProperty('--client-color',client.color);
-          const duration=node('span',undefined,'track-session-time');this.sessionTimes.set(day.date+'/'+session.id,duration);
-          button.append(node('strong',session.title),' ',node('span',client?.name||'Client','track-session-client'),' ',duration,node('span',' · '+day.date,'visually-hidden'));
+          const duration=node('span',undefined,'track-session-time'),short=node('span',undefined,'track-session-time-short');this.sessionTimes.set(day.date+'/'+session.id,{duration,short});
+          button.append(node('strong',session.title),' ',node('span',client?.name||'Client','track-session-client'),' ',duration,short,node('span',' · '+day.date,'visually-hidden'));
           if(!session.end)button.append(node('span','Running','visually-hidden'));
           button.addEventListener('click',()=>this.onEdit(session.id));cell.append(button);
         }
@@ -84,8 +88,9 @@ export class MonthTrack {
     this.root.querySelector('#track-total').textContent=this.format(result.total);
     for(const [client,total] of this.clientTimes)total.textContent=this.format(result.clients.get(client)||0n);
     for(const day of result.days)for(const entry of day.sessions) {
-      const duration=this.sessionTimes.get(day.date+'/'+entry.session.id);
+      const {duration,short}=this.sessionTimes.get(day.date+'/'+entry.session.id);
       duration.textContent=this.format(entry.duration);
+      short.textContent=compactTime(entry.duration);
     }
   }
 }
