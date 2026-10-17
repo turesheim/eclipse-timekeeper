@@ -49,7 +49,6 @@ export class WeekCalendar {
   setRangeMode(value) {
     this.rangeMode=value;this.root.classList.toggle('calendar-range-mode',value);
     this.controls.range.setAttribute('aria-pressed',String(value));this.controls.range.classList.toggle('active',value);
-    if(value) this.text('Drag empty calendar space to select a time range. Release to review a new work session.');
   }
   selected() {return this.data?.workSessions.find(value=>value.id===this.selectedId);}
   preferredClient() {
@@ -201,7 +200,7 @@ export class WeekCalendar {
     card.append(list);return card;
   }
   select(date,row) {this.selection={date,row};this.paintSelection();this.buttons();}
-  selectSession(session,date,row) {this.selectedId=session.id;this.select(date,row);this.text('Arrow keys move 15 minutes or one day. Drag an edge to resize. Copy and paste create a separate session.');}
+  selectSession(session,date,row) {this.selectedId=session.id;this.select(date,row);this.text('');}
   paintSelection() {
     for(const cursor of this.grid.querySelectorAll('.calendar-cursor')) cursor.remove();
     for(const bar of this.grid.querySelectorAll('.calendar-session')) {
@@ -210,12 +209,10 @@ export class WeekCalendar {
     }
     if(!this.selection) return;
     const cursor=node('div',undefined,'calendar-cursor');cursor.style.top=`${this.selection.row*ROW_HEIGHT}px`;this.dayNodes.get(this.selection.date)?.append(cursor);
-    const selected=this.selected(),zone=this.data.profile.data.zoneId;
-    this.root.querySelector('#calendar-selection').textContent=selected ? `${selected.title || 'Work session'} · ${instantText(selected.start,zone)} → ${instantText(selected.end,zone)}` : `${this.selection.date} · ${this.calendar.rows[this.selection.row]?.split('/')[0]} · ${zone}`;
   }
   copy() {
     const value=this.selected();if(!value || !this.connected || this.busy) return;
-    this.clipboard=structuredClone(value);this.text('Work session copied. Select a day and time, then paste. Activities are not copied.');this.buttons();
+    this.clipboard=structuredClone(value);this.text('Work session copied.');this.buttons();
   }
   paste() {
     if(!this.clipboard || !this.connected || this.busy) return;
@@ -361,7 +358,7 @@ export class WeekCalendar {
         preview.setAttribute('aria-hidden','true');preview.style.top=`${piece.top*ROW_HEIGHT}px`;preview.style.height=`${(piece.bottom-piece.top)*ROW_HEIGHT}px`;
         this.dayNodes.get(piece.date).append(preview);
       }
-      this.text(`New work session: ${instantText(state.proposal.start,this.calendar.zone)} → ${instantText(state.proposal.end,this.calendar.zone)}. Release to review.`);
+      this.text(`New work session: ${instantText(state.proposal.start,this.calendar.zone)} → ${instantText(state.proposal.end,this.calendar.zone)}`);
     } catch(error) {state.proposal=null;this.text(error.message);}
   }
   cancelDrag() {
