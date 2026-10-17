@@ -149,6 +149,32 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .session-tools { border-inline-start: 1px solid var(--line); padding-inline-start: .75rem; }
 .client-color { display: inline-flex; align-items: center; gap: .5rem; }
 .client-color::before { content: ""; width: 1.2rem; height: 1.2rem; border: 1px solid #526257; border-radius: .25rem; background: var(--client-color); flex-shrink: 0; }
+.track-toolbar { align-items: center; }
+.track-total { margin: 0; display: grid; gap: .2rem; color: var(--muted); }
+.track-total strong { color: var(--bs-body-color); font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.track-clients { display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1rem; }
+.track-client { padding: .75rem 1rem; min-width: 10rem; flex: 1 1 12rem; gap: .5rem; }
+.track-client strong { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.track-client .client-color { min-width: 0; overflow-wrap: anywhere; }
+.track-month { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.track-month th { text-align: center; padding: .65rem .25rem; color: var(--muted); font-size: .85rem; }
+.track-day { height: 8rem; vertical-align: top; border: 1px solid var(--line); padding: .35rem; }
+.track-outside { background: var(--bs-tertiary-bg); color: var(--muted); }
+.track-date { display: inline-grid; place-items: center; width: 1.75rem; height: 1.75rem; font-size: .85rem; margin-bottom: .25rem; }
+.track-today { background: var(--accent); color: white; border-radius: 50%; font-weight: 700; }
+.track-session { display: flex; flex-direction: column; width: 100%; min-height: 2.75rem; text-align: left; padding: .3rem .4rem; margin-bottom: .3rem; border: 1px solid var(--line); border-inline-start: 4px solid var(--client-color, var(--accent)); border-radius: .3rem; background: var(--bs-body-bg); color: var(--bs-body-color); font-size: .8rem; }
+.track-session > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.track-session-client { color: var(--muted); font-size: .75rem; }
+.track-session-time { font-variant-numeric: tabular-nums; }
+.track-session:disabled { opacity: .8; cursor: default; }
+@media(max-width: 767px) {
+  .track-day { height: 6rem; padding: .1rem; }
+  .track-date { width: 1.5rem; height: 1.5rem; }
+  .track-session { padding: .25rem .15rem; font-size: .75rem; border-inline-start-width: 3px; }
+  .track-session-client { font-size: .7rem; }
+  .track-month th { font-size: .75rem; }
+  .track-client { padding: .65rem; min-width: 0; flex-basis: 9rem; }
+}
 @font-face { font-family: "Font Awesome 7 Free"; font-style: normal; font-weight: 900; font-display: block; src: url("./assets/fontawesome/fa-solid-900.woff2") format("woff2"); }
 .icon { font-family: "Font Awesome 7 Free"; font-style: normal; font-weight: 900; font-size: 1.1rem; line-height: 1; display: inline-block; flex-shrink: 0; text-align: center; width: 1.25rem; -webkit-font-smoothing: antialiased; }
 .icon-button, .tree-toggle { width: 2.75rem; height: 2.75rem; padding: 0; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }

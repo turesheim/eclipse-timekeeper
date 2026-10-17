@@ -8,6 +8,7 @@ test.beforeAll(async({request})=>{const clients=(await (await api(request,'GET',
 async function signIn(page, credential = token) {
   await page.goto('/web/'); await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(credential); await page.getByRole('button', {name:'Sign in', exact:true}).click();
   await expect(page.locator('#status')).toHaveText('Up to date');
+  await page.locator('[data-tab=week]').click();
 }
 async function api(request, method, path, data, headers = {}) {
   const response = await request.fetch(`/api/v1${path}`, {method, data, headers:{Authorization:`Bearer ${token}`, ...headers}});
