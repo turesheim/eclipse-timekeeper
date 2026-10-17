@@ -548,7 +548,7 @@ test('independent taskless activities derive overlap context and survive session
   await page.getByLabel('Start (local time)',{exact:true}).fill('2007-10-29T00:30:00Z');await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2007-10-29T01:30:00Z');await save(page);
   const moved=await (await api(request,'GET',`/work-sessions/${session.id}/report`)).json();
   expect(moved.activities.map(value=>value.summary)).toEqual(['Outside session']);expect(moved.time.allocatedTime).toBe('PT30M');
-  await page.getByRole('button',{name:'Delete work session',exact:true}).click();await save(page);
+  await page.getByRole('button',{name:'Delete work session',exact:true}).click();await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();
   expect((await (await api(request,'GET','/activities?from=2007-10-27T00:00:00Z&to=2007-10-30T00:00:00Z&limit=500')).json()).items).toEqual(before);
   await page.screenshot({path:'test-results/work-session-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:'test-results/work-session-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
