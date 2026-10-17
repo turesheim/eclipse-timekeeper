@@ -22,7 +22,7 @@ final class TogglImport {
 
     ObjectNode create(JsonNode input) {
         var mappings=input.path("mappings");catalog.review(mappings);String mode=mode(input);
-        if(mode.equals("WORK_SESSION")) for(var mapping:mappings) if(!Set.of("CLIENT","LABEL").contains(mapping.path("resourceType").asText())) throw ApiFailure.validation();
+        if(mode.equals("WORK_SESSION")) for(var mapping:mappings) if(!Set.of("CLIENT","PROJECT","LABEL").contains(mapping.path("resourceType").asText())) throw ApiFailure.validation();
         int count=integer(input,"selectedEntries",1,100000);var total=nanos(input.path("selectedNanos"));
         var job=ledger.create(text(input,"label",255),text(input,"sourceKey",64),text(input,"sourceZone",255),
                 text(input,"fileFingerprint",64),hash(canonical(mappings).toString()));
@@ -185,7 +185,13 @@ final class TogglImport {
             var client=catalog.resolve(job,row.input().path("clientKey").asText(),"CLIENT");
             var value=store.withCreationClient(uuid(client.get("id")),()->store.workSessionService().createWorkSession(
                     new CreateWorkSession(new OwnerId(store.owner()),row.start(),Optional.of(row.end()),summary(row.input()))));
-            var details=object().put("title",title(row.input()));var labels=details.putArray("labelIds");
+            var details=object().put("title",title(row.input()));
+            if(row.input().hasNonNull("projectKey")) {
+                var project=catalog.resolve(job,row.input().path("projectKey").asText(),"PROJECT");
+                if(!client.get("id").equals(project.get("clientId"))) throw ApiFailure.validation();
+                details.set("projectId",project.get("id"));
+            }
+            var labels=details.putArray("labelIds");
             for(var key:row.input().path("labelKeys")) labels.add(catalog.resolve(job,key.asText(),"LABEL").path("id").asText());
             return List.of(store.clientDetails("WORK_SESSION",value.id().value(),details));
         }
@@ -215,7 +221,13 @@ final class TogglImport {
             var zone=ContractInputs.zone(job.path("reportZone").asText());
             if(!sessions(job) && ChronoUnit.DAYS.between(start.atZone(zone).toLocalDate(),end.atZone(zone).toLocalDate())>1000) throw new ApiFailure(422,"IMPORT_INTERVAL_TOO_LARGE");
             var parts=sessions(job) ? List.of(new ActivityDailySegments.Interval(start,Optional.of(end))) : ActivityDailySegments.split(start,Optional.of(end),zone,store.now());count+=parts.size();if(count>1000) throw new ApiFailure(422,"IMPORT_BATCH_TOO_LARGE");
-            if(sessions(job)) {mapping(definitions,value.path("clientKey").asText(),"CLIENT");title(value);}
+            if(sessions(job)) {
+                mapping(definitions,value.path("clientKey").asText(),"CLIENT");title(value);
+                if(value.hasNonNull("projectKey")) {
+                    mapping(definitions,value.path("projectKey").asText(),"PROJECT");
+                    if(!definitions.get(value.path("projectKey").asText()).path("parentKey").asText().equals(value.path("clientKey").asText())) throw ApiFailure.validation();
+                }
+            }
             else {mapping(definitions,value.path("projectKey").asText(),"PROJECT");
             if(value.hasNonNull("taskKey")) {
                 mapping(definitions,value.path("taskKey").asText(),"TASK");
@@ -245,7 +257,10 @@ final class TogglImport {
         String value=text(row,"title",1000).strip();if(value.isEmpty()) throw ApiFailure.validation();return value;
     }
     private void resolveCatalog(ObjectNode job,Row row) {
-        if(sessions(job)) catalog.resolve(job,row.input().path("clientKey").asText(),"CLIENT");
+        if(sessions(job)) {
+            catalog.resolve(job,row.input().path("clientKey").asText(),"CLIENT");
+            if(row.input().hasNonNull("projectKey")) catalog.resolve(job,row.input().path("projectKey").asText(),"PROJECT");
+        }
         else {
             catalog.resolve(job,row.input().path("projectKey").asText(),"PROJECT");
             if(row.input().hasNonNull("taskKey")) catalog.resolve(job,row.input().path("taskKey").asText(),"TASK");
@@ -254,13 +269,15 @@ final class TogglImport {
     }
     private ArrayNode sessionMatches(Row row,Map<String,JsonNode> targets) {
         var result=array();var group=result.addArray();var client=targets.get(row.input().path("clientKey").asText());if(client==null) return result;
+        var project=targets.get(row.input().path("projectKey").asText());
+        if(row.input().hasNonNull("projectKey") && project==null) return result;
         var expectedLabels=new TreeSet<String>();
         for(var key:row.input().path("labelKeys")) {var label=targets.get(key.asText());if(label==null) return result;expectedLabels.add(label.path("id").asText());}
         try(var statement=store.statement("SELECT payload FROM tk_resource WHERE owner_id=? AND entity_type='WORK_SESSION' AND payload LIKE ? FETCH FIRST 501 ROWS ONLY",store.owner(),"%\"start\":\""+row.start()+"\"%");var rows=statement.executeQuery()) {
             int count=0;while(rows.next()) {
                 if(++count>500) throw new ApiFailure(409,"IMPORT_TOO_MANY_MATCHES");var value=parse(rows.getString(1));
                 var labels=new TreeSet<String>();value.path("labelIds").forEach(label->labels.add(label.asText()));
-                if(labels.equals(expectedLabels) && value.path("start").asText().equals(row.start().toString()) && value.path("end").asText().equals(row.end().toString())
+                if((project==null ? !value.hasNonNull("projectId") : project.get("id").equals(value.get("projectId"))) && labels.equals(expectedLabels) && value.path("start").asText().equals(row.start().toString()) && value.path("end").asText().equals(row.end().toString())
                         && value.path("clientId").asText().equals(client.path("id").asText()) && value.path("title").asText().equals(title(row.input()))
                         && value.path("summary").asText().equals(summary(row.input()))) group.add(object().put("id",value.path("id").asText()).put("etag",etag(value)));
             }

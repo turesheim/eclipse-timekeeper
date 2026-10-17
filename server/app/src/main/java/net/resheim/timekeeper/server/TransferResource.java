@@ -47,6 +47,8 @@ public class TransferResource {
         var result=object();var mappings=result.putArray("ids");var service=store.service();
         // Validate source identity uniqueness before any record is created.
         TYPES.forEach((name,type) -> {for(JsonNode item:input.path(name)) if(!sourceIds.add(uuid(item.get("id")))) throw ApiFailure.validation();});
+        Map<UUID,JsonNode> sourceProjectRecords=new HashMap<>();
+        input.get("projects").forEach(item -> sourceProjectRecords.put(uuid(item.get("id")),item));
         Set<UUID> sourceProjects=new HashSet<>(),sourceLabels=new HashSet<>(),sourceSessions=new HashSet<>();Map<UUID,JsonNode> sourceTasks=new HashMap<>();
         input.get("projects").forEach(item -> sourceProjects.add(uuid(item.get("id"))));
         input.get("labels").forEach(item -> sourceLabels.add(uuid(item.get("id"))));
@@ -88,6 +90,10 @@ public class TransferResource {
             if(end.filter(value -> value.isBefore(start)).isPresent()) throw ApiFailure.validation();
             if(end.isEmpty()) openSessions++;
             for(var label:item.path("labelIds")) if(!sourceLabels.contains(uuid(label))) throw ApiFailure.validation();
+            if(item.hasNonNull("projectId")) {
+                var project=sourceProjectRecords.get(uuid(item.get("projectId")));
+                if(project==null || !project.path("clientId").equals(item.path("clientId"))) throw ApiFailure.validation();
+            }
         }
         if(openSessions>1) throw ApiFailure.validation();
         if(openSessions==1 && store.workSessionService().activeWorkSession(new OwnerId(store.owner())).isPresent()) throw ApiFailure.conflict();
@@ -95,18 +101,21 @@ public class TransferResource {
         for(JsonNode item:input.get("labels")) {
             var created=service.createLabel(new CreateLabel(item.get("name").asText(),optionalText(item.get("color"))));labels.put(uuid(item.get("id")),created.id());mapping(mappings,"LABEL",item,created.id().value());
         }
+        for(JsonNode item:input.get("projects")) {
+            var created=service.createProject(new CreateProject(item.get("name").asText()));details("PROJECT",created.id().value(),item,clients);projects.put(uuid(item.get("id")),created.id());mapping(mappings,"PROJECT",item,created.id().value());
+        }
         for(JsonNode item:input.path("workSessions")) {
             var created=store.workSessionService().createWorkSession(new CreateWorkSession(new OwnerId(store.owner()),Instant.parse(item.get("start").asText()),
                     optionalText(item.get("end")).map(Instant::parse),item.get("summary").asText()));
             details("WORK_SESSION",created.id().value(),item,clients);
-            if(item.has("labelIds")) {
-                var fields=object();var assigned=fields.putArray("labelIds");item.get("labelIds").forEach(label->assigned.add(required(labels,uuid(label)).value().toString()));
-                store.clientDetails("WORK_SESSION",created.id().value(),fields);
+            var fields=object();
+            if(item.has("labelIds")) {var assigned=fields.putArray("labelIds");item.get("labelIds").forEach(label->assigned.add(required(labels,uuid(label)).value().toString()));}
+            if(item.has("projectId")) {
+                if(item.hasNonNull("projectId")) fields.put("projectId",required(projects,uuid(item.get("projectId"))).value().toString());
+                else fields.putNull("projectId");
             }
+            store.clientDetails("WORK_SESSION",created.id().value(),fields);
             sessions.put(uuid(item.get("id")),created.id());mapping(mappings,"WORK_SESSION",item,created.id().value());
-        }
-        for(JsonNode item:input.get("projects")) {
-            var created=service.createProject(new CreateProject(item.get("name").asText()));details("PROJECT",created.id().value(),item,clients);projects.put(uuid(item.get("id")),created.id());mapping(mappings,"PROJECT",item,created.id().value());
         }
         Map<UUID,JsonNode> pending=new LinkedHashMap<>();input.get("tasks").forEach(item -> pending.put(uuid(item.get("id")),item));
         while(!pending.isEmpty()) {

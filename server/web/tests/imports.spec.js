@@ -145,7 +145,8 @@ test('Toggl defaults to work sessions with client totals, repeat detection and w
   await page.screenshot({path:'test-results/toggl-session-import-review.png',fullPage:true});
   await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
   const imported=await api(request,'/data/export'),sessions=imported.workSessions.filter(value=>!before.workSessions.some(old=>old.id===value.id));expect(sessions).toHaveLength(7);
-  for(const type of ['activities','projects','tasks']) expect(imported[type].length).toBe(before[type].length);
+  for(const type of ['activities','tasks']) expect(imported[type].length).toBe(before[type].length);
+  const importedProjects=imported.projects.filter(value=>!before.projects.some(old=>old.id===value.id));expect(importedProjects).toHaveLength(1);expect(sessions.every(value=>value.projectId===importedProjects[0].id)).toBe(true);
   expect(imported.labels.length).toBe(before.labels.length+1);const importedLabel=imported.labels.find(value=>!before.labels.some(old=>old.id===value.id));
   expect(sessions.every(value=>value.labelIds.includes(importedLabel.id))).toBe(true);
   expect(sessions.every(value=>value.title===value.summary && value.clientId===sessions[0].clientId)).toBe(true);
@@ -166,7 +167,8 @@ test('Toggl defaults to work sessions with client totals, repeat detection and w
 for(const mode of ['WORK_SESSION','ACTIVITY']) test(`Toggl ${mode} maps several source clients to an existing client and Undo preserves it`,async({page,request})=>{
   const suffix=randomUUID().slice(0,8),headers={Authorization:`Bearer ${token}`};
   const created=await request.post('/api/v1/clients',{headers,data:{name:'Existing destination '+suffix,color:'#176653'}});expect(created.status()).toBe(201);
-  const destination=await created.json(),before=await api(request,'/data/export');
+  const destination=await created.json();
+  const projectReply=await request.post('/api/v1/projects',{headers,data:{name:'Existing delivery '+suffix,clientId:destination.id}});expect(projectReply.status()).toBe(201);const destinationProject=await projectReply.json(),before=await api(request,'/data/export');
   await login(page);await page.getByLabel('Import as',{exact:true}).selectOption(mode);
   const csv='Description,Duration,Member,Email,Client,Project,Start date,Start time,Stop date,Stop time\r\n'
     +[`First ${suffix},01:00:00,Mapping ${suffix},${suffix}@example.invalid,Toggl one,First project,2025-10-20,09:00:00,2025-10-20,10:00:00`,
@@ -187,6 +189,7 @@ for(const mode of ['WORK_SESSION','ACTIVITY']) test(`Toggl ${mode} maps several 
   await expect(first.locator('..').locator('..').getByLabel('New client name',{exact:true})).toBeVisible();
   await first.selectOption(destination.id);await expect(first).toHaveValue(destination.id);
   await expect(page.getByLabel('New client name',{exact:true}).filter({visible:true})).toHaveCount(0);
+  await page.getByLabel('Project: First project',{exact:true}).selectOption(destinationProject.id);
   await page.getByRole('button',{name:'Review server matches',exact:true}).click();
   const mappingTable=page.getByRole('table').filter({has:page.getByRole('columnheader',{name:'Toggl client',exact:true})});
   for(const source of sources) await expect(mappingTable.getByRole('row').filter({hasText:source})).toContainText('Use existing: '+destination.name);
@@ -197,9 +200,11 @@ for(const mode of ['WORK_SESSION','ACTIVITY']) test(`Toggl ${mode} maps several 
   expect(imported.clients).toEqual(before.clients);const added=imported[collection].filter(value=>!before[collection].some(old=>old.id===value.id));expect(added).toHaveLength(3);
   if(mode==='WORK_SESSION') expect(added.every(value=>value.clientId===destination.id)).toBe(true);
   else expect(imported.projects.filter(value=>!before.projects.some(old=>old.id===value.id)).every(value=>value.clientId===destination.id)).toBe(true);
+  expect(added.find(value=>value.summary===`First ${suffix}`).projectId).toBe(destinationProject.id);
   expect(await api(request,'/clients/'+destination.id)).toEqual(destination);
   await undo(page,0);const undone=await api(request,'/data/export');expect(undone.clients).toEqual(before.clients);expect(undone[collection]).toEqual(before[collection]);
-  expect(await api(request,'/clients/'+destination.id)).toEqual(destination);
+  expect(await api(request,'/clients/'+destination.id)).toEqual(destination);expect(await api(request,'/projects/'+destinationProject.id)).toEqual(destinationProject);
+  const projectCurrent=await request.get('/api/v1/projects/'+destinationProject.id,{headers});expect((await request.delete('/api/v1/projects/'+destinationProject.id,{headers:{...headers,'If-Match':projectCurrent.headers().etag}})).status()).toBe(204);
   const current=await request.get('/api/v1/clients/'+destination.id,{headers});expect((await request.delete('/api/v1/clients/'+destination.id,{headers:{...headers,'If-Match':current.headers().etag}})).status()).toBe(204);
 });
 

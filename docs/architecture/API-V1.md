@@ -332,6 +332,11 @@ client behavior, unsaved-edit and reconnect acceptance before the parent closes.
 using the same authorization, opaque ETags and change feed as projects. A project
 has exactly one `clientId`, and a client can own many projects. Work sessions
 have exactly one `clientId` and a nonblank `title`, separate from `summary`.
+An optional, owned `projectId` derives the session client from the project.
+A conflicting explicit client is rejected. Omitted projects are preserved on
+edits; explicit null removes the project. Project filters are available on
+`/work-sessions`. A referenced project cannot be deleted or moved to another
+client until its sessions have been reassigned, preserving historical totals.
 `/projects` and `/work-sessions` accept a `clientId` list filter. A referenced
 client must belong to the authenticated owner. Deleting a referenced client is
 409, with the whole transaction rolled back.

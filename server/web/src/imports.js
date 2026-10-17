@@ -107,7 +107,8 @@ export async function renderImports(view, zone) {
       selectedPerson = source.value;
       const result = await runWorker({operation:'plan',rows:parsed.rows,personKey:source.value,reportZone:resume?.reportZone || zone,
         options:{mode:importMode.value,fallbackClient:fallbackClient.value,fallbackProject:fallbackProject?.value,
-          mapWorkSessionTags:!resume || resume.mappings.some(value=>value.resourceType==='LABEL')}});
+          mapWorkSessionTags:!resume || resume.mappings.some(value=>value.resourceType==='LABEL'),
+          mapWorkSessionProjects:!resume || resume.mappings.some(value=>value.resourceType==='PROJECT')}});
       if(!view.valid()) return;plan = result.plan;batches = result.batches;reviews = [];
       if(resume) {
         if(plan.mode !== (resume.mode || 'ACTIVITY') || plan.sourceKey !== resume.sourceKey || plan.selectedEntries !== resume.selectedEntries || plan.selectedNanos !== resume.selectedNanos

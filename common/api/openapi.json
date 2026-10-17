@@ -2615,6 +2615,14 @@
             "description": "Only records belonging to this client."
           },
           {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "Filter by an owned project."
+          },
+          {
             "name": "labelId",
             "in": "query",
             "schema": {
@@ -8399,6 +8407,11 @@
                           "required": [
                             "title"
                           ]
+                        },
+                        {
+                          "required": [
+                            "projectId"
+                          ]
                         }
                       ]
                     }
@@ -8649,6 +8662,17 @@
             "uniqueItems": true,
             "maxItems": 1000,
             "description": "Optional owner-owned labels. Omission preserves labels on edits; an empty array clears them. Older work sessions without this field have no labels."
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional owner-owned project. Its client determines the session client. Omission preserves the project on edits; null clears it. Older sessions without this field have no project."
           }
         },
         "required": [
@@ -8697,6 +8721,17 @@
             "uniqueItems": true,
             "maxItems": 1000,
             "description": "Optional owner-owned labels. Omission preserves labels on edits; an empty array clears them. Older work sessions without this field have no labels."
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional owner-owned project. Its client determines the session client. Omission preserves the project on edits; null clears it. Older sessions without this field have no project."
           }
         },
         "required": [
@@ -8704,7 +8739,7 @@
           "end",
           "summary"
         ],
-        "description": "Web clients supply clientId and title. Legacy interval-only clients may omit them; creation uses General and a title from summary, and edits preserve existing client/title. Null client or blank title is invalid. Optional labelIds are independent of activity labels and are preserved when omitted."
+        "description": "Web clients supply clientId and title. Legacy interval-only clients may omit them; creation uses General and a title from summary, and edits preserve existing client/title. Null client or blank title is invalid. Optional labelIds are independent of activity labels and are preserved when omitted. An optional projectId selects an owned project and derives its client; an explicitly supplied clientId must match. Omitting projectId preserves it on edits; null removes it."
       },
       "StartWorkSessionInput": {
         "type": "object",
@@ -8727,12 +8762,23 @@
             "uniqueItems": true,
             "maxItems": 1000,
             "description": "Optional owner-owned labels. Omission preserves labels on edits; an empty array clears them. Older work sessions without this field have no labels."
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional owner-owned project. Its client determines the session client. Omission preserves the project on edits; null clears it. Older sessions without this field have no project."
           }
         },
         "required": [
           "summary"
         ],
-        "description": "Web clients supply clientId and title. Legacy interval-only clients may omit them; creation uses General and a title from summary, and edits preserve existing client/title. Null client or blank title is invalid. Optional labelIds are independent of activity labels and are preserved when omitted."
+        "description": "Web clients supply clientId and title. Legacy interval-only clients may omit them; creation uses General and a title from summary, and edits preserve existing client/title. Null client or blank title is invalid. Optional labelIds are independent of activity labels and are preserved when omitted. An optional projectId selects an owned project and derives its client; an explicitly supplied clientId must match. Omitting projectId preserves it on edits; null removes it."
       },
       "WorkSessionAssociationInput": {
         "type": "object",
@@ -8898,6 +8944,17 @@
             "uniqueItems": true,
             "maxItems": 1000,
             "description": "Optional owner-owned labels. Omission preserves labels on edits; an empty array clears them. Older work sessions without this field have no labels."
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional owner-owned project. Its client determines the session client. Omission preserves the project on edits; null clears it. Older sessions without this field have no project."
           }
         },
         "required": [

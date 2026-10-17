@@ -178,7 +178,7 @@ public class TimekeeperResource {
         String type=ContractInputs.type(collection);var query=uri.getQueryParameters();
         if(type.equals("ACTIVITY")) ContractInputs.queries(query,"from","to","taskId","projectId","labelId","limit","cursor");
         else if(type.equals("TASK")) ContractInputs.queries(query,"q","projectId","parentTaskId","unassigned","limit","cursor");
-        else if(type.equals("WORK_SESSION")) ContractInputs.queries(query,"q","clientId","labelId","limit","cursor");
+        else if(type.equals("WORK_SESSION")) ContractInputs.queries(query,"q","clientId","projectId","labelId","limit","cursor");
         else if(type.equals("PROJECT")) ContractInputs.queries(query,"q","clientId","limit","cursor");
         else ContractInputs.queries(query,"q","limit","cursor");
         int limit=ContractInputs.number(query.getFirst("limit"),100,1,500);String q=Optional.ofNullable(query.getFirst("q")).orElse("").trim().toLowerCase(Locale.ROOT);if(q.codePointCount(0,q.length())>200) throw ApiFailure.validation();
@@ -189,6 +189,7 @@ public class TimekeeperResource {
                 if(!value.get(type.equals("WORK_SESSION") ? "title" : type.equals("TASK") ? "summary" : "name").asText().toLowerCase(Locale.ROOT).contains(q)) return false;
                 if(query.containsKey("clientId") && !value.path("clientId").asText().equals(ContractInputs.pathId(query.getFirst("clientId")).toString())) return false;
                 if(query.containsKey("labelId") && !labels(value.path("labelIds")).contains(new LabelId(ContractInputs.pathId(query.getFirst("labelId"))))) return false;
+                if(type.equals("WORK_SESSION") && query.containsKey("projectId") && !value.path("projectId").asText().equals(ContractInputs.pathId(query.getFirst("projectId")).toString())) return false;
                 if(type.equals("TASK")) {
                     if(query.containsKey("projectId") && !value.get("projectId").asText().equals(ContractInputs.pathId(query.getFirst("projectId")).toString())) return false;
                     if(query.containsKey("parentTaskId") && !value.get("parentTaskId").asText().equals(ContractInputs.pathId(query.getFirst("parentTaskId")).toString())) return false;

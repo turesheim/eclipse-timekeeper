@@ -4,17 +4,19 @@ import {readFileSync} from 'node:fs';
 import {parseTogglDetailedCsv} from '../src/toggl-csv.js';
 import {importPlan, importBatches, importDayParts} from '../src/import-model.js';
 
-test('work sessions are the default, using reviewed source-project client names without companion task/activity records', async () => {
+test('work sessions are the default, using reviewed clients and projects without companion task/activity records', async () => {
   const parsed = parseTogglDetailedCsv(readFileSync(new URL('./fixtures/toggl/detailed-member-stop.csv', import.meta.url), 'utf8'), {zone:'Europe/Oslo'});
   const plan = await importPlan(parsed.rows, parsed.people[0].key, {fallbackClient:'Fallback'});
   assert.equal(plan.mode,'WORK_SESSION');assert.equal(plan.selectedEntries,7);assert.equal(plan.selectedNanos,'151462000000000');
-  assert.deepEqual(plan.mappings.map(value=>value.resourceType),['CLIENT','LABEL']);assert.equal(plan.mappings[0].name,parsed.rows[0].project);
-  assert.ok(plan.rows.every(row=>row.clientKey===plan.mappings[0].key && row.title===row.summary && !('projectKey' in row) && row.labelKeys.length===row.tags.length));
+  assert.deepEqual(plan.mappings.map(value=>value.resourceType),['CLIENT','PROJECT','LABEL']);assert.equal(plan.mappings[0].name,parsed.rows[0].project);
+  assert.ok(plan.rows.every(row=>row.clientKey===plan.mappings[0].key && row.title===row.summary && row.projectKey===plan.mappings[1].key && row.labelKeys.length===row.tags.length));
   const long = {start:'2000-01-01T00:00:00Z',end:'2025-01-01T00:00:00Z'};
   assert.deepEqual(importBatches(Array.from({length:201},()=>long),'UTC',0,plan.mode).map(batch=>batch.length),[100,100,1]);
-  const legacy=await importPlan(parsed.rows,parsed.people[0].key,{fallbackClient:'Fallback',mapWorkSessionTags:false});
+  const legacy=await importPlan(parsed.rows,parsed.people[0].key,{fallbackClient:'Fallback',mapWorkSessionTags:false,mapWorkSessionProjects:false});
   assert.deepEqual(legacy.mappings.map(value=>value.resourceType),['CLIENT']);assert.ok(legacy.rows.every(row=>!('labelKeys' in row)));
-  assert.equal(legacy.selectionFingerprint,plan.selectionFingerprint);
+  assert.equal(legacy.selectionFingerprint,plan.selectionFingerprint);assert.ok(legacy.rows.every(row=>!('projectKey' in row)));
+  const projectless=await importPlan(parsed.rows.map(row=>({...row,project:''})),parsed.people[0].key,{fallbackClient:'Fallback'});assert.ok(projectless.rows.every(row=>!('projectKey' in row)));assert.ok(!projectless.mappings.some(value=>value.resourceType==='PROJECT'));
+  assert.equal(plan.mappings[1].parentKey,plan.mappings[0].key);
   const activityPlan = await importPlan(parsed.rows,parsed.people[0].key,{mode:'ACTIVITY',fallbackClient:'Fallback'});
   assert.notEqual(activityPlan.selectionFingerprint,plan.selectionFingerprint);
 });

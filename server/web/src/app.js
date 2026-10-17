@@ -345,9 +345,21 @@ function refreshClientChoices() {
   for(const [id,label] of [['','Choose a client'],...snapshot.clients.map(client=>[client.id,client.name])]) {const option=element('option',label);option.value=id;input.append(option);}
   if(selected && !snapshot.clients.some(client=>client.id===selected)) {const option=element('option','Removed client — choose another');option.value=selected;input.append(option);}
   input.value=selected;
+  const project=$('field-projectId');
+  if(project && (editor?.collection==='work-sessions' || editor?.command==='session-start')) {
+    const selectedProject=project.value;project.replaceChildren();
+    for(const [id,label] of sessionProjectChoices()) {const option=element('option',label);option.value=id;project.append(option);}
+    if(selectedProject && !snapshot.projects.some(value=>value.id===selectedProject)) {const option=element('option','Removed project — choose another');option.value=selectedProject;project.append(option);}
+    project.value=selectedProject;
+  }
 }
+function sessionProjectChoices() {return [['','No project'],...snapshot.projects.map(project=>[project.id,`${project.name} · ${name(snapshot.clients,project.clientId)}`])];}
 function sessionFields(value) {
-  field('Title','title',value.title || '',{required:true,max:1000});clientField(value.clientId || calendar.preferredClient());
+  field('Title','title',value.title || '',{required:true,max:1000});
+  const client=clientField(value.clientId || calendar.preferredClient());
+  const project=field('Project (optional)','projectId',value.projectId,{choices:sessionProjectChoices()});
+  project.addEventListener('change',()=>{const selected=snapshot.projects.find(value=>value.id===project.value);if(selected) client.value=selected.clientId;});
+  client.addEventListener('change',()=>{const selected=snapshot.projects.find(value=>value.id===project.value);if(selected && selected.clientId!==client.value) project.value='';});
   field('Summary','summary',value.summary || '',{max:2000});
   labelFields(value.labelIds);
 }
@@ -462,7 +474,7 @@ function values() {
   const time = key => editor.timeValue ? editor.timeValue(key) : get(key);
   const labels = () => [...$('fields').querySelectorAll('[name="labelIds"]:checked')].map(node => node.value);
   if (editor.command === 'stop' || editor.command === 'session-stop' || editor.remove) return undefined;
-  if (editor.command === 'session-start') return {summary:get('summary'),title:get('title'),clientId:get('clientId'),labelIds:labels()};
+  if (editor.command === 'session-start') return {summary:get('summary'),title:get('title'),clientId:get('clientId'),projectId:get('projectId') || null,labelIds:labels()};
   if (editor.command === 'start') return {taskId: get('taskId'), summary: get('summary'), labelIds: labels(), expectedActiveId: editor.expected?.id ?? null, expectedActiveVersion: editor.expected?.version ?? null};
   switch (editor.collection) {
     case 'clients': return {name:get('name'),color:get('color')};
@@ -470,7 +482,7 @@ function values() {
     case 'labels': return {name: get('name'), color: get('color') || null};
     case 'tasks': return {summary: get('summary'), projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null};
     case 'activities': return {...(editor.id ? {} : {taskId: get('taskId') || null, projectId:get('taskId') ? null : get('projectId') || null}), summary: get('summary'), start: localDateTimeToInstant(get('start'), editor.zone), end: get('end') ? localDateTimeToInstant(get('end'), editor.zone) : null, labelIds: labels()};
-    case 'work-sessions': return {title:get('title'),clientId:get('clientId'),summary:get('summary'),labelIds:labels(),start:localDateTimeToInstant(time('start'),editor.zone),end:time('end') ? localDateTimeToInstant(time('end'),editor.zone) : null};
+    case 'work-sessions': return {title:get('title'),clientId:get('clientId'),projectId:get('projectId') || null,summary:get('summary'),labelIds:labels(),start:localDateTimeToInstant(time('start'),editor.zone),end:time('end') ? localDateTimeToInstant(time('end'),editor.zone) : null};
   }
 }
 function freeze(state) { for (const input of $('fields').querySelectorAll('input,select')) input.disabled = state || (editor.collection === 'activities' && !!editor.id && input.name === 'taskId'); }
@@ -521,7 +533,7 @@ function renderSession() {
   $('work-session-title').textContent = session?.title || 'Your work session';
   $('work-session').style.setProperty('--session-color', snapshot.clients.find(client => client.id === session?.clientId)?.color || 'var(--accent)');
   const zone=snapshot.profile.data.zoneId;
-  $('work-session-current').textContent=session ? `${name(snapshot.clients,session.clientId)} · ${active ? 'Started ' : ''}${instantText(session.start,zone)}${session.end ? ' → '+instantText(session.end,zone) : ''}` : '';
+  $('work-session-current').textContent=session ? `${[name(snapshot.clients,session.clientId),session.projectId ? name(snapshot.projects,session.projectId) : null].filter(Boolean).join(' · ')} · ${active ? 'Started ' : ''}${instantText(session.start,zone)}${session.end ? ' → '+instantText(session.end,zone) : ''}` : '';
   const labels=$('work-session-labels');labels.replaceChildren();
   for(const id of session?.labelIds || []) labels.append(element('span',name(snapshot.labels,id),'badge rounded-pill text-bg-secondary'));
   labels.hidden=!labels.childElementCount;

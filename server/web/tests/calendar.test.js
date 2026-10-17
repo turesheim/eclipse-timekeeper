@@ -27,15 +27,15 @@ test('multi-day and running sessions retain one identity and split only their vi
   assert.equal(zero.length,1);
 });
 test('moving, resizing and copying keep exact precision, elapsed duration and independent activity links',()=>{
-  const session={id:'source',version:3,ownerId:'owner',labelIds:['first','second'],summary:'Day',clientId:'client',title:'A day',start:'2026-10-23T06:03:00.123456789Z',end:'2026-10-23T14:03:00.987654321Z',state:'COMPLETED'};
+  const session={id:'source',version:3,ownerId:'owner',labelIds:['first','second'],summary:'Day',clientId:'client',projectId:'project',title:'A day',start:'2026-10-23T06:03:00.123456789Z',end:'2026-10-23T14:03:00.987654321Z',state:'COMPLETED'};
   const moved=shiftSessionDays(session,3,'Europe/Oslo');
   assert.equal(moved.start,'2026-10-26T07:03:00.123456789Z');
   assert.equal(instantNanos(moved.end)-instantNanos(moved.start),instantNanos(session.end)-instantNanos(session.start));
   const resized=shiftSession(session,900000000000n,'start');
   assert.equal(resized.start,'2026-10-23T06:18:00.123456789Z');assert.equal(resized.end,session.end);
   const copy=pasteSession(session,instantNanos('2026-10-26T08:00:00Z'),'Europe/Oslo');
-  assert.deepEqual(copy,{labelIds:['first','second'],summary:'Day',clientId:'client',title:'A day',start:'2026-10-26T08:03:00.123456789Z',end:'2026-10-26T16:03:00.987654321Z'});
-  assert.equal(sameSession(session,{...session,clientId:'other'}),false);
+  assert.deepEqual(copy,{labelIds:['first','second'],summary:'Day',clientId:'client',projectId:'project',title:'A day',start:'2026-10-26T08:03:00.123456789Z',end:'2026-10-26T16:03:00.987654321Z'});
+  assert.equal(sameSession(session,{...session,clientId:'other'}),false);assert.equal(sameSession(session,{...session,projectId:'other'}),false);assert.equal(moved.projectId,session.projectId);assert.equal(resized.projectId,session.projectId);
   assert.equal(sameSession(session,{...session,title:'Peer title'}),false);
   assert.notEqual(copy.labelIds,session.labelIds);assert.deepEqual(moved.labelIds,session.labelIds);
   assert.equal(sameSession(session,{...session,labelIds:['second','first']}),true);
