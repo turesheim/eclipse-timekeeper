@@ -69,11 +69,13 @@ for candidate builds and installing a downloaded p2 archive.
 | [docs](docs/README.md) | Architecture, operations, development and verification evidence |
 | `scripts/` | Repository-wide release and publication tools |
 
-Run builds from the repository root using the Maven wrapper:
+Follow the [developer prerequisites](docs/development/REPOSITORY.md#build-and-test),
+then run builds from the repository root using the Maven wrapper:
 
 ```sh
 ./mvnw -B -ntp clean verify
 ./mvnw -B -ntp -f server/pom.xml clean verify
+npm ci --ignore-scripts --prefix server/web
 npm test --prefix server/web
 ```
 

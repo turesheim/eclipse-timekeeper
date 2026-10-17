@@ -45,8 +45,10 @@ Los Angeles time while the account uses Oslo time.
 Bootstrap 5.3.8 supplies the shared buttons, forms, navigation, cards and tables.
 The small application theme in `style.css` defines the green palette, typography,
 spacing and visible keyboard focus. The work-session card establishes the baseline:
-a client-color accent, explicit running/stopped status, four time totals and
-consistently sized icon actions. Client color is always accompanied by text.
+a client-color accent, title, explicit running/stopped status, local times,
+duration and consistently sized icon actions. Historical records and detailed
+totals are available in Workweek and Calendar. Client color is always accompanied
+by text.
 The same controls apply to sign-in/setup/recovery, account management, activities,
 clients, projects, tasks and labels. Record tables become labelled cards on narrow
 screens so actions stay in view; Workweek and Calendar retain their specialized
@@ -259,6 +261,27 @@ cd server/web && npx playwright install --with-deps chromium && cd ../..
 python3 server/scripts/package_server.py --output server/target/distribution --commit "$(git rev-parse HEAD)"
 python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip
 ```
+
+For WebKit, install its browser and use the existing HTTPS fixture so Secure
+session cookies work. Run from the repository root after packaging the server:
+
+```sh
+cd server/web && npx playwright install --with-deps webkit && cd ../..
+python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --browser webkit --https
+```
+
+The HTTPS fixture requires `openssl` on `PATH` to create a temporary test
+certificate. It uses a loopback reverse proxy and accepts that certificate only
+in the test browser. To reproduce CI's actual email-delivery checks with
+Chromium, run:
+
+```sh
+python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --mail --grep 'first administrator|email recovery'
+```
+
+`--mail` requires `--https` and captures messages through a temporary loopback
+SMTP fixture. Safari's native macOS Password AutoFill UI still needs a manual
+check.
 
 Packaging requires a clean committed tree. Browser acceptance launches the
 checksum-verified distribution with temporary file storage and synthetic tokens,
