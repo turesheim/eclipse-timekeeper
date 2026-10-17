@@ -77,6 +77,12 @@ function offsetText(seconds) {
   const magnitude = Math.abs(seconds), pad = value => String(value).padStart(2, '0');
   return `${seconds < 0 ? '-' : '+'}${pad(Math.floor(magnitude / 3600))}:${pad(Math.floor(magnitude / 60) % 60)}${magnitude % 60 ? ':' + pad(magnitude % 60) : ''}`;
 }
+/** Offsets for a local picker value; two choices indicate a repeated clock time. */
+export function localDateTimeOffsets(value, zone) {
+  if(!value) return [];
+  const civil=value.length===16 ? value+':00' : value.slice(0,19);
+  return localCandidates(civil,zone).map(milliseconds=>offsetText(offsetSeconds(milliseconds,zone)));
+}
 /** Editable wall time; an offset distinguishes the two occurrences of a repeated clock time. */
 export function localDateTime(instant, zone) {
   if (!instant) return '';

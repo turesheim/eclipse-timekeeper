@@ -54,7 +54,7 @@ test('running Workweek sessions remain editable without losing exact times and r
     await signIn(page); await page.getByLabel('Week containing', {exact: true}).fill(dateInZone(Date.now(), 'Europe/Oslo'));
     const row = page.locator(`#week-sessions tr[data-work-session-id="${session.id}"]`); await expect(row).toContainText('Running');
     await row.getByRole('button', {name: 'Edit session Running workweek session', exact: true}).click();
-    await expect(page.getByLabel('Start (local time)', {exact: true})).toHaveValue(localDateTime(session.start, 'Europe/Oslo'));
+    await expect(page.getByLabel('Start (local time)', {exact: true})).toHaveValue(localDateTime(session.start, 'Europe/Oslo').slice(0,19).replace(/:00$/, ''));
     await page.getByLabel('Title', {exact: true}).fill('Updated running session'); await page.locator('#save').click(); await expect(page.locator('#editor')).not.toBeVisible(); await expect(row).toContainText('Updated running session');
     const saved = await (await api(request, 'GET', '/work-sessions/' + session.id)).json(); expect(saved.start).toBe(session.start); expect(saved.end).toBeNull();
     await page.getByRole('button', {name: 'Sign out', exact: true}).click(); await expect(page.locator('#login')).toBeVisible(); await signIn(page, process.env.TIMEKEEPER_WEB_READ_TOKEN);
