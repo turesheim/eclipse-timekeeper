@@ -493,9 +493,9 @@ test('session toolbar targets the displayed session and preserves historical too
   await page.getByRole('button',{name:'Edit work session',exact:true}).click();
   await expect(page.getByLabel('Title',{exact:true})).toHaveValue(active.title);await page.getByRole('button',{name:'Cancel',exact:true}).click();
   await page.getByRole('button',{name:'Add activity to session',exact:true}).click();
-  await expect(page.getByLabel('Work session',{exact:true})).toHaveValue(active.id);await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  await expect(page.locator('#editor').getByLabel('Work session',{exact:true})).toHaveValue(active.id);await page.getByRole('button',{name:'Cancel',exact:true}).click();
   await page.getByRole('button',{name:'Associate activity',exact:true}).click();
-  await expect(page.getByLabel('Work session',{exact:true})).toHaveValue(active.id);await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  await expect(page.locator('#editor').getByLabel('Work session',{exact:true})).toHaveValue(active.id);await page.getByRole('button',{name:'Cancel',exact:true}).click();
   await page.getByRole('button',{name:'Delete work session',exact:true}).click();
   await expect(page.locator('#fields')).toContainText(active.title);await page.getByRole('button',{name:'Cancel',exact:true}).click();
   expect((await (await own('GET','/work-sessions/active')).json()).id).toBe(active.id);
