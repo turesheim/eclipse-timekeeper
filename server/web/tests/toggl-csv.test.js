@@ -76,4 +76,7 @@ test('source-user selection remains explicit, unsupported fields are visible and
   assert.deepEqual(report.rows.map(row=>row.occurrence),[0,1,0]);assert.equal(report.totalNanos,togglDuration('3:00:00'));
   const stable=parse(header+',Time Entry ID\n'+row+',entry-1\n'+row+',entry-1');
   assert.equal(stable.rejectedRows,2);assert.equal(stable.totalNanos,0n);
+  const workspaces=parse(header+',Workspace\n'+row+',Source A\n'+row+',Source B');
+  assert.equal(workspaces.people.length,2);assert.deepEqual(workspaces.rows.map(row=>row.ambiguousDuplicate),[false,false]);
+  assert.deepEqual(workspaces.unsupported,[]);
 });

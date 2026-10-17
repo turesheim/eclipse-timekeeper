@@ -54,7 +54,7 @@ function date(value, format) {
 }
 
 /** Preview only: this module never writes records or infers work sessions. */
-export function parseTogglDetailedCsv(text, {zone, dateFormat = 'ISO', now = new Date().toISOString()} = {}) {
+export function parseTogglDetailedCsv(text, {zone, workspace = '', dateFormat = 'ISO', now = new Date().toISOString()} = {}) {
   if (!zone) throw new Error('Choose the source IANA time zone.');
   new Intl.DateTimeFormat('en', {timeZone:zone});
   const records = csvRecords(text), header = records.shift()?.fields.map(value => value.trim());
@@ -67,15 +67,15 @@ export function parseTogglDetailedCsv(text, {zone, dateFormat = 'ISO', now = new
     throw new Error('Choose a Toggl Track Detailed Report CSV with individual start/end times; summary reports are unsupported.');
   if ((has('Member') && has('User')) || (has('Stop date') && has('End date')))
     throw new Error('The CSV mixes incompatible Detailed Report headers.');
-  const recognized = new Set(['Description','Duration',member,'Email','Client','Project','Task','Tags','Start date','Start time',`${end} date`,`${end} time`,'Time Entry ID']);
+  const recognized = new Set(['Description','Duration',member,'Email','Workspace','Client','Project','Task','Tags','Start date','Start time',`${end} date`,`${end} time`,'Time Entry ID']);
   const unsupported = header.filter(value => !recognized.has(value));
   const people = new Map(), occurrences = new Map(); let totalNanos = 0n;
   const rows = records.map(record => {
     const result = {line:record.line, errors:[], warnings:[]};
     if (record.fields.length !== header.length) return {...result, errors:['The number of fields does not match the header.']};
     const value = Object.fromEntries(header.map((key,index) => [key,record.fields[index]]));
-    const person = {name:value[member].trim(), email:(value.Email || '').trim().toLowerCase()};
-    result.personKey = JSON.stringify(person.email ? ['email',person.email] : ['member',person.name]);
+    const person = {name:value[member].trim(), email:(value.Email || '').trim().toLowerCase(), workspace:(value.Workspace || '').trim() || workspace.trim()};
+    result.personKey = JSON.stringify([person.workspace,...(person.email ? ['email',person.email] : ['member',person.name])]);
     if (!person.name && !person.email) result.errors.push('The source member is missing.');
     else people.set(result.personKey, person);
     result.client = (value.Client || '').trim(); result.project = (value.Project || '').trim();
