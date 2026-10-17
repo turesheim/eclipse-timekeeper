@@ -7,9 +7,16 @@ test('cached modules restore a browser session after reload and opening another 
   const created=await request.post('/api/v1/auth/users',{data:{username,password,displayName:username,email:username+'@example.invalid',administrator:false},headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`}});
   expect(created.status()).toBe(201);
   const diagnostics=[];
+  await page.context().addInitScript(()=>{
+    // Keep errors on their document. Reload normally aborts the outgoing
+    // document's long poll and status requests, especially in WebKit.
+    window.timekeeperStartupErrors=[];
+    window.addEventListener('error',event=>{if(event.message) window.timekeeperStartupErrors.push(event.message);});
+    window.addEventListener('unhandledrejection',event=>window.timekeeperStartupErrors.push(String(event.reason)));
+  });
   function observe(subject) {
     subject.on('pageerror',error=>diagnostics.push({error:error.message}));
-    subject.on('requestfailed',request=>diagnostics.push({path:new URL(request.url()).pathname,error:request.failure()?.errorText}));
+    subject.on('requestfailed',request=>diagnostics.push({path:new URL(request.url()).pathname,type:request.resourceType(),error:request.failure()?.errorText}));
     subject.on('response',response=>{
       if(response.request().resourceType()==='script') diagnostics.push({path:new URL(response.url()).pathname,status:response.status(),type:response.headers()['content-type']});
     });
@@ -21,7 +28,8 @@ test('cached modules restore a browser session after reload and opening another 
     if(iteration===0) await page.goto('/web/');else await page.reload();
     await expect(page.locator('#status'),JSON.stringify({iteration,diagnostics})).toHaveText('Up to date');
     await expect(page.locator('#owner')).toHaveText(username);
-    expect(diagnostics.filter(event=>event.error),JSON.stringify(diagnostics)).toEqual([]);
+    expect(await page.evaluate(()=>window.timekeeperStartupErrors),JSON.stringify(diagnostics)).toEqual([]);
+    expect(diagnostics.filter(event=>event.error && event.type==='script'),JSON.stringify(diagnostics)).toEqual([]);
   }
   const second=await page.context().newPage();observe(second);
   try {
