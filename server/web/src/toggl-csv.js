@@ -36,6 +36,7 @@ export function csvRecords(text) {
 }
 
 export function togglDuration(value) {
+  if (!value.trim() || value.trim() === '-') throw new Error('This row has no recorded duration. Exclude it or correct the CSV before importing.');
   const match = /^(\d{1,8}):([0-5]\d):([0-5]\d)(?:\.(\d{1,9}))?$/.exec(value.trim());
   if (!match) throw new Error('Use an unrounded HH:MM:SS duration, with up to nine fractional digits.');
   return (BigInt(match[1]) * 3600n + BigInt(match[2]) * 60n + BigInt(match[3])) * 1000000000n

@@ -68,6 +68,14 @@ test('incomplete, invalid, rounded and future intervals are row errors, never si
   assert.throws(()=>togglDuration('1.5'),/HH:MM:SS/);assert.throws(()=>togglDuration('0:61:00'),/HH:MM:SS/);
 });
 
+test('missing Toggl durations require explicit exclusion rather than inferred time', () => {
+  for(const duration of ['-','']) {
+    const report=parse(header+'\n'+row.replace('1:00:00',duration));
+    assert.equal(report.rejectedRows,1);assert.equal(report.totalNanos,0n);
+    assert.match(report.rows[0].errors[0],/no recorded duration.*Exclude it/);
+  }
+});
+
 test('source-user selection remains explicit, unsupported fields are visible and duplicate rows are flagged', () => {
   const second = row.replaceAll('Example Member','Other Member').replaceAll('member@example.invalid','other@example.invalid');
   const report=parse(header+',Billable\n'+row+',Yes\n'+row+',Yes\n'+second+',No');
