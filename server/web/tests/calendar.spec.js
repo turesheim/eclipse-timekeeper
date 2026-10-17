@@ -294,7 +294,9 @@ test('calendar copying a running session leaves it running and lets the copy rec
     expect(await (await api(request,'GET','/work-sessions/active')).json()).toEqual(running);
     // Whole-second native input must be after the preserved fractional start.
     await expect.poll(()=>Date.now()-Date.parse(running.start)).toBeGreaterThan(1100);
-    await page.getByLabel('End (local time, blank while running)',{exact:true}).fill(localDateTime(new Date().toISOString(),'Europe/Oslo').slice(0,19));await save(page);
+    // WebKit normalizes zero seconds away; fill expects the canonical native value.
+    const end=localDateTime(new Date().toISOString(),'Europe/Oslo').slice(0,19).replace(/:00$/,'');
+    await page.getByLabel('End (local time, blank while running)',{exact:true}).fill(end);await save(page);
     expect(await (await api(request,'GET','/work-sessions/active')).json()).toEqual(running);
     const copies=(await (await api(request,'GET','/work-sessions')).json()).items.filter(value=>value.summary===running.summary);expect(copies).toHaveLength(2);
     expect(copies.filter(value=>value.end===null)).toHaveLength(1);await unchangedActivities(request,f);
