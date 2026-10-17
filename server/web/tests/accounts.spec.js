@@ -57,7 +57,7 @@ test('first administrator claims the explicit existing owner once and uses a sec
   const cookie=(await page.context().cookies()).find(value=>value.name==='__Host-timekeeper-session');expect(cookie.httpOnly).toBe(true);expect(cookie.secure).toBe(true);expect(cookie.sameSite).toBe('Lax');expect(cookie.expires).toBe(-1);
   expect(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length,cookies:document.cookie}))).toEqual({local:0,session:0,cookies:''});
   const account=await (await call(request,'GET','/auth/account')).json();expect(account.ownerId).toBe('web-owner');expect(account.username).toBe('browser-admin');
-  expect((await request.post('/api/v1/auth/setup',{data:{code:process.env.TIMEKEEPER_WEB_SETUP_CODE,username:'hijacker',password,displayName:'Other',email:'other@example.org'}})).status()).toBe(401);
+  expect((await browserRequest(page).post('/api/v1/auth/setup',{data:{code:process.env.TIMEKEEPER_WEB_SETUP_CODE,username:'hijacker',password,displayName:'Other',email:'other@example.org'}})).status()).toBe(401);
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');
   await expect(page.locator('#server-build')).toContainText('SPK 1.99.0-146');
   await page.locator('#server-build').click();await expect(page.locator('#server-spk')).toHaveText('1.99.0-146');

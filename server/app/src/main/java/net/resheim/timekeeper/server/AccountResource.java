@@ -28,7 +28,8 @@ public class AccountResource {
         var value=input.get(field);if(!value.isTextual() || value.asText().length()>limit) throw ApiFailure.validation();return value.asText();
     }
     private static boolean flag(JsonNode input,String field) {if(!input.get(field).isBoolean()) throw ApiFailure.validation();return input.get(field).asBoolean();}
-    private void origin() {origins.cookie(uri,headers.getRequestHeader("Origin"),headers.getRequestHeader("Referer"),true);}
+    private void origin() {origins.check(uri,headers.getRequestHeader("Origin"));}
+    private void browserOrigin() {origins.cookie(uri,headers.getRequestHeader("Origin"),headers.getRequestHeader("Referer"),true);}
     private BrowserCookies.Values cookies() {return BrowserCookies.read(headers.getRequestHeader("Cookie"));}
     private BrowserSignIns.Attempt begin(BrowserSignIns.Method method) {
         var cookies=cookies();String browser=origins.configured() ? cookies.requireBrowser() : null;
@@ -57,19 +58,19 @@ public class AccountResource {
     @POST @Path("/setup") public Response setup(JsonNode body) {return complete(body,false);}
     @POST @Path("/recover") public Response recover(JsonNode body) {return complete(body,true);}
     private Response complete(JsonNode body,boolean recovery) {
-        origin();ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate(recovery ? "SetupInput" : "EmailSetupInput",body);
+        browserOrigin();ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate(recovery ? "SetupInput" : "EmailSetupInput",body);
         var attempt=begin(recovery ? BrowserSignIns.Method.RECOVERY : BrowserSignIns.Method.SETUP);
         var result=accounts.complete(text(value,"code",100),text(value,"username",200),text(value,"password",1024),text(value,"displayName",400),recovery,recovery ? null : text(value,"email",320),signIns.issuer(attempt));
         if(!recovery) recoveryMail.initialVerification(result.account().path("ownerId").asText());
         return issued(result);
     }
     @POST @Path("/login") public Response login(JsonNode body) {
-        origin();ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("LoginInput",body);
+        browserOrigin();ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("LoginInput",body);
         var attempt=begin(BrowserSignIns.Method.PASSWORD);
         return issued(accounts.login(text(value,"username",200),text(value,"password",1024),flag(value,"remember"),signIns.issuer(attempt)));
     }
     @POST @Path("/token-login") @Consumes("*/*") public Response tokenLogin() {
-        origin();ContractInputs.queries(uri.getQueryParameters());
+        browserOrigin();ContractInputs.queries(uri.getQueryParameters());
         if(identity.principal().kind().equals("SESSION")) throw ApiFailure.badRequest();
         var attempt=begin(BrowserSignIns.Method.TOKEN);return issued(accounts.exchange(identity.principal(),signIns.issuer(attempt)));
     }
