@@ -14,12 +14,12 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
     for (const [field, visible] of [['code',code],['username',!token],['setup-email',value === 'setup'],['password',!token],['confirm',code],['remember',value === 'login'],['token',token]]) {
       $(`${field}-field`).hidden = !visible;
       for (const input of $(`${field}-field`).querySelectorAll('input')) {
-        input.disabled = !visible;
-        input.required = visible && input.type !== 'checkbox';
+        input.disabled = !visible || $('login-form').hidden;
+        input.required = visible && !$('login-form').hidden && input.type !== 'checkbox';
       }
     }
     $('password').autocomplete = code ? 'new-password' : 'current-password';
-    $('forgot-password').hidden = value !== 'login';
+    $('forgot-password').hidden = value !== 'login' || $('login-form').hidden;
     $('passkey-sign-in').hidden = value !== 'login';$('passkey-support').hidden = value !== 'login';
     $('passkey-sign-in').disabled = passkeyBusy || !passkeysEnabled || !passkeysSupported();
     $('passkey-cancel').hidden = !passkeyBusy;$('passkey-cancel').disabled = passkeyStage === 'finish';

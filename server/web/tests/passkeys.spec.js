@@ -7,7 +7,9 @@ test.skip(({browserName})=>browserName!=='chromium' || process.env.TIMEKEEPER_WE
 const password='a private virtual passkey fixture password';
 async function login(page,user) {
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');
+  await expect(page.getByRole('button',{name:'Sign in',exact:true})).toBeEnabled();
   await page.locator('#username').fill(user.username);await page.locator('#password').fill(user.password);
+  expect(await page.locator('#login-form').evaluate(form=>({valid:form.checkValidity(),invalid:[...form.elements].filter(field=>field.willValidate && !field.validity.valid).map(field=>field.id)}))).toEqual({valid:true,invalid:[]});
   await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
 }
 async function account(page) {await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Passkeys',exact:true}).click();await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');}
@@ -99,7 +101,7 @@ test('passkeys: a late assertion cannot replace another account signed in by a s
 test('passkeys: unsupported browsers keep password fallback and token-derived sessions cannot enroll',async({page,request,browser})=>{
   const user=await fresh(request);await page.addInitScript(()=>Object.defineProperty(window,'PublicKeyCredential',{value:undefined,configurable:true}));
   await page.goto('/web/');await expect(page.getByRole('button',{name:'Sign in with a passkey',exact:true})).toBeDisabled();await expect(page.locator('#passkey-support')).toContainText('unavailable in this browser');
-  await login(page,user);await account(page);await expect(addForm(page).getByRole('button',{name:'Add passkey',exact:true})).toBeDisabled();
+  await Promise.race([new Promise((resolve,reject)=>page.once('pageerror',reject)),login(page,user)]);await account(page);await expect(addForm(page).getByRole('button',{name:'Add passkey',exact:true})).toBeDisabled();
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true}),tokenPage=await context.newPage();
   try {
     await tokenPage.goto('/web/');await tokenPage.locator('#auth-mode').selectOption('token');await tokenPage.locator('#token').fill(process.env.TIMEKEEPER_WEB_TOKEN);await tokenPage.getByRole('button',{name:'Sign in',exact:true}).click();await expect(tokenPage.locator('#status')).toHaveText('Up to date');await account(tokenPage);
