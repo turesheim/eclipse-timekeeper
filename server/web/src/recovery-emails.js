@@ -3,6 +3,9 @@ import {node, button, field, passwordField, form} from './account-ui.js';
 export async function renderRecoveryEmails(view) {
   const loaded = await Promise.all(['PRIMARY', 'BACKUP'].map(slot => view.session.request(`/auth/email/addresses/${slot}`)));
   if (!view.valid()) return;
+  if (!loaded[0].data.verifiedAddress && !loaded[0].data.pendingAddress) {
+    view.root.append(node('p', 'Add a primary recovery email so you can reset a forgotten password. Your existing sign-in and recorded work remain available.', 'alert alert-info'));
+  }
   for (let index = 0; index < loaded.length; index++) {
     const slot = index === 0 ? 'PRIMARY' : 'BACKUP', label = index === 0 ? 'Primary' : 'Backup';
     const current = loaded[index];
@@ -25,14 +28,18 @@ export async function renderRecoveryEmails(view) {
     const status = node('p', '', 'hint'); edit.value.append(status);
     const resend = button(`Resend ${label.toLowerCase()} verification`, () => {
       void view.run(async () => {
-        await view.session.request(`/auth/email/addresses/${slot}/resend`, {method: 'POST', body: {}});
+        try {await view.session.request(`/auth/email/addresses/${slot}/resend`, {method: 'POST', body: {}});}
+        catch (error) {if (error.status === 503) throw new Error('Recovery email delivery is unavailable. Ask the server operator to check email configuration.'); throw error;}
         if (view.valid()) edit.feedback.textContent = 'Verification delivery requested. Check your inbox, or contact the operator if delivery is unavailable.';
       }, {submit: resend, feedback: edit.feedback, write: true});
     });
+    const remove = index ? button('Remove backup email', () => {input.value = ''; edit.value.requestSubmit();}, 'btn btn-outline-danger') : null;
     const paint = () => {
       status.textContent = [state.verifiedAddress ? `Verified: ${state.verifiedAddress}.` : 'No verified recovery address.', state.pendingAddress ? `Awaiting verification: ${state.pendingAddress}.` : ''].filter(Boolean).join(' ');
       resend.hidden = !state.pendingAddress; resend.disabled = !view.canWrite;
+      if (remove) {remove.hidden = !state.pendingAddress && !state.verifiedAddress; remove.disabled = !view.canWrite;}
     };
     paint(); edit.value.append(resend, node('p', index ? 'Leave blank to remove the backup. A verified backup can recover your account without access to your primary mailbox.' : 'Verify an address to enable email recovery. Its existing verified address remains usable while a replacement awaits confirmation.', 'hint')); edit.finish();
+    if (remove) edit.value.append(remove);
   }
 }

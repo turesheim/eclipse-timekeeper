@@ -78,6 +78,12 @@ test('email recovery verifies independent mailboxes, replaces a primary safely a
     expect((await request.post('/api/v1/auth/email/reset',{data:{token:secret,password:replacement}})).status()).toBe(401);
     await signIn(action,username,replacement);await action.getByRole('link',{name:'My Account',exact:true}).click();
     await expect(action.locator('#account-content')).toContainText('Verified: '+next);await expect(action.locator('#account-content')).toContainText('Verified: '+backup);
+    await action.getByLabel('Current password for backup email',{exact:true}).fill(replacement);
+    await action.getByRole('button',{name:'Remove backup email',exact:true}).click();
+    await expect(action.locator('#account-content')).toContainText('Backup address removed.');
+    await expect(action.getByRole('button',{name:'Remove backup email',exact:true})).toHaveCount(0);
+    const removed=await (await actionContext.request.get('/api/v1/auth/email/addresses/BACKUP')).json();
+    expect(removed.verifiedAddress).toBeNull();expect(removed.pendingAddress).toBeNull();
     expect(await action.evaluate(()=>({local:localStorage.length,session:sessionStorage.length}))).toEqual({local:0,session:0});
   } finally {await actionContext.close();await context.close();}
 });
