@@ -173,6 +173,7 @@ export class WeekCalendar {
     if(preview) bar.append(label);
     if(!preview) {
       const select=button('',()=>this.selectSession(session,piece.date,Math.floor(piece.top)),'calendar-session-select');
+      select.tabIndex=0;
       select.dataset.sessionId=session.id;select.dataset.date=piece.date;
       select.setAttribute('aria-label',description);select.setAttribute('aria-pressed',String(this.selectedId===session.id));
       select.append(label);bar.append(select);
@@ -185,6 +186,7 @@ export class WeekCalendar {
         const endpoint=edge==='start' ? instantNanos(session.start) : instantNanos(session.end || this.data.report.generatedAt);
         if(edge==='start' ? endpoint!==piece.start : endpoint!==piece.end) continue;
         const handle=button('',()=>{},`calendar-resize ${edge}`);handle.dataset.edge=edge;handle.dataset.sessionId=session.id;handle.dataset.date=piece.date;
+        handle.tabIndex=0;
         handle.setAttribute('aria-label',`Resize ${edge} of ${session.title || 'work session'}`);handle.title=`Resize ${edge}; arrow keys adjust 15 minutes`;
         bar.append(handle);
       }

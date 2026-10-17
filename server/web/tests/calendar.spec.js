@@ -196,13 +196,18 @@ test('calendar shows seven days, task links and activity lists beside multi-day 
     await expect(bar(page,f.session.id).locator('.calendar-session-duration')).toHaveText('8h 0m');
     await expect(bar(page,f.session.id)).toHaveCSS('border-radius','6px');
     const handles=bar(page,f.session.id).locator('.calendar-resize');
-    await position(page,bar(page,f.session.id));await page.mouse.move(0,0);
+    await position(page,bar(page,f.session.id));await page.locator('#calendar-today').hover();
     await expect(handles.first()).toHaveCSS('opacity','0');
     await bar(page,f.session.id).hover();await expect(handles.first()).toHaveCSS('opacity','1');
     await page.screenshot({path:'test-results/calendar-session-hover.png',fullPage:true});
-    await bar(page,f.session.id).locator('.calendar-session-select').click();await page.mouse.move(0,0);
+    const select=bar(page,f.session.id).locator('.calendar-session-select');
+    await select.click();await expect(select).toHaveAttribute('aria-pressed','true');
+    // Browsers differ in whether a pointer click retains :focus-visible after
+    // a native date input. Explicitly leave focus before checking hidden handles,
+    // then enter them through the keyboard rather than relying on that heuristic.
+    await page.locator('#calendar-today').focus();await page.locator('#calendar-today').hover();
     await expect(handles.first()).toHaveCSS('opacity','0');
-    await page.keyboard.press('Tab');await expect(handles.first()).toBeFocused();
+    await select.focus();await page.keyboard.press('Tab');await expect(handles.first()).toBeFocused();
     await expect(handles.first()).toHaveCSS('opacity','1');
     await page.locator('#calendar-today').focus();await expect(handles.first()).toHaveCSS('opacity','0');
     await expect(page.locator('.calendar-task').getByRole('link',{name:`#${f.issue}: ${f.task.summary}`,exact:true})).toHaveAttribute('href',f.url);
@@ -287,6 +292,8 @@ test('calendar copying a running session leaves it running and lets the copy rec
     await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('');
     await page.locator('#save').click();await expect(page.locator('#editor-error')).toContainText('conflicts');
     expect(await (await api(request,'GET','/work-sessions/active')).json()).toEqual(running);
+    // Whole-second native input must be after the preserved fractional start.
+    await expect.poll(()=>Date.now()-Date.parse(running.start)).toBeGreaterThan(1100);
     await page.getByLabel('End (local time, blank while running)',{exact:true}).fill(localDateTime(new Date().toISOString(),'Europe/Oslo').slice(0,19));await save(page);
     expect(await (await api(request,'GET','/work-sessions/active')).json()).toEqual(running);
     const copies=(await (await api(request,'GET','/work-sessions')).json()).items.filter(value=>value.summary===running.summary);expect(copies).toHaveLength(2);
