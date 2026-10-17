@@ -72,7 +72,7 @@ for(const mode of ['ACTIVITY','WORK_SESSION']) test(`Toggl ${mode} import resume
   });
   await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Paused. Resume from Import history.');
   expect(dropped).toBe(true);await page.unroute('**/api/v1/imports/jobs/*/batches/0');
-  const job = (await api(request,'/imports')).items.find(value=>value.selectedEntries===201);expect(job.nextBatch).toBe(1);expect(job.importedEntries).toBe(100);
+  const job = (await api(request,'/imports')).items.find(value=>value.selectedEntries===201 && value.mode===mode && value.state==='IMPORTING');expect(job.nextBatch).toBe(1);expect(job.importedEntries).toBe(100);
   page.once('dialog',dialog=>dialog.accept());await page.reload();await expect(page.getByRole('heading',{name:'Import history',exact:true})).toBeVisible();
   await expect(page.getByLabel('Detailed Report CSV',{exact:true})).toHaveValue('');
   await page.getByRole('button',{name:'Resume',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Choose the original CSV, source user and row exclusions to resume.');
@@ -139,6 +139,8 @@ test('Toggl defaults to work sessions with client totals, repeat detection and w
   await login(page);const before=await api(request,'/data/export');
   await expect(page.getByLabel('Import as',{exact:true})).toHaveValue('WORK_SESSION');await review(page);
   await expect(page.getByLabel('New project name',{exact:true})).toHaveCount(0);await expect(page.getByLabel('New label name',{exact:true})).toHaveCount(0);
+  const audit=await new AxeBuilder({page}).include('#account-page').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
+  await page.screenshot({path:'test-results/toggl-session-import-review.png',fullPage:true});
   await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
   const imported=await api(request,'/data/export'),sessions=imported.workSessions.filter(value=>!before.workSessions.some(old=>old.id===value.id));expect(sessions).toHaveLength(7);
   for(const type of ['activities','projects','tasks','labels']) expect(imported[type].length).toBe(before[type].length);
@@ -150,6 +152,7 @@ test('Toggl defaults to work sessions with client totals, repeat detection and w
   await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();await review(page);
   await expect(page.locator('#account-content')).toContainText('7 already imported');await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
   expect((await api(request,'/data/export')).workSessions.length).toBe(imported.workSessions.length);
+  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/toggl-session-import-history-mobile.png',fullPage:true});
   const history=(await api(request,'/imports')).items.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));await undo(page,history.findIndex(value=>value.id!==job.id && value.mode==='WORK_SESSION'));
   const updated=(await api(request,'/imports')).items.filter(value=>['IMPORTING','IMPORTED','BLOCKED','UNDOING'].includes(value.state)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));await undo(page,updated.findIndex(value=>value.id===job.id));
   const after=await api(request,'/data/export');expect(after.workSessions.length).toBe(before.workSessions.length);expect(after.clients.length).toBe(before.clients.length);
