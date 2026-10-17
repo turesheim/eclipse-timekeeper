@@ -458,3 +458,19 @@ session and the administrator password. SMTP passwords are never prefilled or
 returned, and administrator proof and SMTP credentials use separate browser
 autocomplete sections. Changes activate on a coordinated restart; a stale replica
 leaves readiness and cannot continue using its old policy.
+
+
+## Account data portability
+
+**My Account → Your data** downloads the signed-in account as a private ZIP with
+JSON and CSV. A reviewed restore adds work with remapped relationships and an
+optional time-zone change; it preserves the target account’s identity,
+permissions and credentials. Interrupted uploads resume after file reselection,
+and an uncertain restore can be reconciled without duplicating records.
+
+See the [user guide](../operations/ACCOUNT-DATA.md) for scope and limits, and
+the [acceptance report](../verification/ACCOUNT-DATA.md) for validation.
+
+![Account archive review on desktop](../assets/screenshots/account-data-review-desktop.png)
+
+![Account archive review on a narrow screen](../assets/screenshots/account-data-review-mobile.png)

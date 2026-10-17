@@ -25,14 +25,21 @@ class ArchiveReplicas(Replicas):
         super().__init__(args,folder)
         self.network='timekeeper-archives-'+self.suffix;self.database=self.network+'-db'
     def restart(self,index):
+        before=self.bases[index]
         self.command('docker','restart',self.instances[index])
+        # Docker Desktop can allocate a different ephemeral published port when
+        # restarting the same container. Production deployments use fixed ports.
+        self.bases[index]='http://127.0.0.1:'+self.command('docker','port',self.instances[index],'8080/tcp').stdout.strip().rsplit(':',1)[1]
+        self.restart_port_changed=before!=self.bases[index]
         for _ in range(160):
             try:
                 with urlopen(self.bases[index]+'/q/health/ready',timeout=1) as reply:
                     if reply.status==200:return
             except OSError:pass
             time.sleep(.1)
-        raise RuntimeError('Disposable archive replica did not restart')
+        logs=self.command('docker','logs',self.instances[index],check=False)
+        path=self.args.output.with_suffix('.failure.log');path.parent.mkdir(parents=True,exist_ok=True);path.write_text(logs.stdout[-20000:]+logs.stderr[-20000:]);path.chmod(0o600)
+        raise RuntimeError('Disposable archive replica did not restart; see its private failure log')
 
 
 def download(system,index,browser,*,token=None,owner=None):
@@ -161,7 +168,7 @@ def main():
         try:
             system.initialize();checks=exercise(system);args.output.parent.mkdir(parents=True,exist_ok=True)
             image=system.command('docker','image','inspect','--format','{{.Id}}',args.server_image).stdout.strip()
-            args.output.write_text(json.dumps({'serverImage':args.server_image,'imageId':image,'serverCommit':system.server_commit,'postgresImage':args.postgres_image,'twoActualJVMs':True,'trustedProxyOriginFixture':True,'checks':checks,'passed':True},indent=2)+'\n')
+            args.output.write_text(json.dumps({'serverImage':args.server_image,'imageId':image,'serverCommit':system.server_commit,'postgresImage':args.postgres_image,'twoActualJVMs':True,'trustedProxyOriginFixture':True,'restartPublishedPortChanged':system.restart_port_changed,'checks':checks,'passed':True},indent=2)+'\n')
         finally:system.close()
 
 
