@@ -14,6 +14,13 @@ const messages = {
   NOT_FOUND: 'This record no longer exists. Your draft is kept.',
   UNAVAILABLE: 'The server could not be reached. Reconnecting…',
   BUSY: 'Records are changing too quickly to load a consistent view. Try Refresh.',
+  IMPORT_SOURCE_CHANGED: 'An entry with this source ID changed. Exclude it or resolve the source change before continuing; existing records were kept.',
+  IMPORT_DUPLICATE_REVIEW_REQUIRED: 'Review matching entries and choose whether to reuse them or create distinct activities.',
+  IMPORT_UNDO_REVIEW_REQUIRED: 'Review the edited or referenced records before continuing Undo.',
+  IMPORT_RUNNING_MATCH: 'A previously imported activity is now running. Stop it or exclude that source entry before importing again.',
+  IMPORT_TOO_MANY_MATCHES: 'Too many existing activities match this start time. Resolve these matches before importing this entry.',
+  IMPORT_INTERVAL_TOO_LARGE: 'An entry spans too many days. Split or exclude that source entry.',
+  IMPORT_BATCH_TOO_LARGE: 'This batch produces more than 1,000 daily activities. Use a smaller batch.',
 };
 export class ApiError extends Error {
   constructor(code, status = 0) { super(messages[code] || 'The request was rejected. Review the current records and try again.'); this.code = code; this.status = status; }

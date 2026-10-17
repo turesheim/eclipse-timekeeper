@@ -53,13 +53,12 @@ class ImportCatalogTest {
         var parent=mapping("client","CLIENT","Reviewed client",null);
         var project=object().put("key",hash("project")).put("resourceType","PROJECT").put("action","REUSE")
                 .put("id",other.path("id").asText()).put("etag",etag(other)).put("parentKey",hash("client"));
-        var plan=array().add(parent).add(project);UUID job=uuid(store.transaction(owner,()->job(ledger,catalog,plan)).get("id"));
-        assertEquals(404,assertThrows(ApiFailure.class,()->store.transaction(owner,()->ledger.batch(job,0,object(),false,state->{
-            catalog.resolve(state,hash("project"),"PROJECT");return object();
-        }))).status);
+        var plan=array().add(parent).add(project);
+        assertEquals(404,assertThrows(ApiFailure.class,()->store.transaction(owner,()->catalog.review(plan))).status);
+        assertEquals(404,assertThrows(ApiFailure.class,()->store.transaction(owner,()->job(ledger,catalog,plan))).status);
         store.transaction(owner,()->{
             assertTrue(store.list("CLIENT").isEmpty());assertTrue(store.service().projects().isEmpty());
-            assertFalse(catalog.definition(job,hash("client")).has("targetId"));
+            assertTrue(store.list("IMPORT_JOB").isEmpty());assertTrue(store.list("IMPORT_MAP").isEmpty());
             var client=store.createClient(object().put("name","Existing client").put("color","#6750a4"));
             assertThrows(IllegalStateException.class,()->store.withCreationClient(uuid(client.get("id")),()->{throw new IllegalStateException("Cancelled");}));
             var ordinary=store.service().createProject(new CreateProject("Ordinary project"));

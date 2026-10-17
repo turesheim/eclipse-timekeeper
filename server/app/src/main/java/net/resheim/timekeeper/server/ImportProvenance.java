@@ -32,6 +32,13 @@ final class ImportProvenance {
     ObjectNode reuseActive(ObjectNode job,String fingerprint,String contentFingerprint,int occurrence,List<Activity> activities) {
         return record(job,fingerprint,contentFingerprint,occurrence,activities,false,true);
     }
+    /** Retire only this item's claim; a later re-import may already own a replacement. */
+    void releaseIfMissing(ObjectNode job,ObjectNode item) {
+        for(var part:item.path("parts")) if(store.find("ACTIVITY",uuid(part.get("id"))).isPresent()) return;
+        var claim=active(job,item.path("fingerprint").asText(),item.path("occurrence").asInt());
+        if(claim.isPresent() && item.path("id").asText().equals(claim.get().path("itemId").asText()))
+            ledger.remove(ImportLedger.Kind.IMPORT_KEY,claim.get());
+    }
     private ObjectNode record(ObjectNode job,String fingerprint,String contentFingerprint,int occurrence,List<Activity> activities,boolean created,boolean reuseClaim) {
         digest(fingerprint);digest(contentFingerprint);
         var claim=active(job,fingerprint,occurrence);

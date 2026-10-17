@@ -16,8 +16,18 @@ final class ImportCatalog {
     private static UUID id(UUID job,String key) {return ImportLedger.identifier("catalog-map",job.toString(),key);}
     private static void key(String value) {if(value==null || !value.matches("[0-9a-f]{64}")) throw ApiFailure.validation();}
     void register(ObjectNode job,JsonNode definitions) {
-        if(!definitions.isArray() || definitions.size()>1000) throw ApiFailure.validation();
         if(!hash(canonical(definitions).toString()).equals(job.path("planFingerprint").asText())) throw ApiFailure.validation();
+        review(definitions);
+        for(var definition:definitions) {
+            var value=object();value.put("jobId",job.path("id").asText());value.put("key",definition.path("key").asText());
+            value.set("definition",definition.deepCopy());
+            ledger.insert(ImportLedger.Kind.IMPORT_MAP,id(uuid(job.get("id")),definition.path("key").asText()),value);
+        }
+        job.put("mappingCount",definitions.size());
+    }
+    /** Read-only preview; verifies reuse against the same owner and reviewed hierarchy. */
+    Map<String,JsonNode> review(JsonNode definitions) {
+        if(definitions==null || !definitions.isArray() || definitions.size()>1000) throw ApiFailure.validation();
         var keys=new HashMap<String,JsonNode>();
         for(var definition:definitions) {
             String key=definition.path("key").asText();key(key);
@@ -38,12 +48,18 @@ final class ImportCatalog {
                 if(target==null || !target.path("resourceType").asText().equals(type.equals("PROJECT") ? "CLIENT" : "PROJECT")) throw ApiFailure.validation();
             } else if(!parent.isBlank()) throw ApiFailure.validation();
         }
-        for(var definition:definitions) {
-            var value=object();value.put("jobId",job.path("id").asText());value.put("key",definition.path("key").asText());
-            value.set("definition",definition.deepCopy());
-            ledger.insert(ImportLedger.Kind.IMPORT_MAP,id(uuid(job.get("id")),definition.path("key").asText()),value);
+        var reused=new HashMap<String,JsonNode>();
+        for(String type:List.of("CLIENT","PROJECT","TASK","LABEL")) for(var definition:definitions) {
+            if(!type.equals(definition.path("resourceType").asText()) || !"REUSE".equals(definition.path("action").asText())) continue;
+            var current=store.find(type,ContractInputs.pathId(definition.path("id").asText())).orElseThrow(ApiFailure::notFound);
+            ApiReplies.match(current,definition.path("etag").asText());
+            if(type.equals("PROJECT") || type.equals("TASK")) {
+                var parent=reused.get(definition.path("parentKey").asText());
+                if(parent==null) throw ApiFailure.validation();hierarchy(type,current,parent);
+            }
+            reused.put(definition.path("key").asText(),current);
         }
-        job.put("mappingCount",definitions.size());
+        return Map.copyOf(reused);
     }
     ObjectNode definition(UUID job,String key) {
         key(key);var value=ledger.required(ImportLedger.Kind.IMPORT_MAP,id(job,key));
