@@ -64,7 +64,7 @@ class PostgresSchemaIT {
             try(var rows=statement.executeQuery("SELECT version,revision FROM tk_owner")) {rows.next();assertEquals(7,rows.getLong(1));assertEquals(19,rows.getLong(2));}
         }
     }
-    @Test void upgradesCanonicalV2AndRetainsAccountAndSessionSecrets() throws Exception {
+    @Test void upgradesCanonicalV2RetainsAccountsAndEndsSessionsWithoutOriginProvenance() throws Exception {
         try(var connection=connection();var statement=connection.createStatement()) {
             for(String resource:java.util.List.of("schema-v1-postgresql.sql","auth-v2.sql")) {
                 try(var input=getClass().getResourceAsStream("/db/"+resource)) {statement.execute(new String(input.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));}
@@ -76,7 +76,23 @@ class PostgresSchemaIT {
             assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(connection));
             ServerSchema.initializeOrValidate(connection,true);ServerSchema.initializeOrValidate(connection);ServerSchema.validate(connection);
             try(var rows=statement.executeQuery("SELECT password_hash,version FROM tk_account WHERE owner_id='retained'")) {assertTrue(rows.next());assertEquals("password hash",rows.getString(1));assertEquals(5,rows.getLong(2));}
-            try(var rows=statement.executeQuery("SELECT digest,csrf FROM tk_auth_session")) {assertTrue(rows.next());assertEquals("session hash",rows.getString(1));assertEquals("csrf",rows.getString(2));}
+            try(var rows=statement.executeQuery("SELECT count(*) FROM tk_auth_session")) {assertTrue(rows.next());assertEquals(0,rows.getInt(1));}
+        }
+    }
+    @Test void upgradesCanonicalV3RetainsRecoveryOriginAndAddressesAndRequiresExplicitOptIn() throws Exception {
+        try(var connection=connection();var statement=connection.createStatement()) {
+            for(String resource:java.util.List.of("schema-v1-postgresql.sql","auth-v2.sql","recovery-v3.sql")) {
+                try(var input=getClass().getResourceAsStream("/db/"+resource)) {statement.execute(new String(input.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));}
+            }
+            statement.executeUpdate("UPDATE tk_schema SET schema_version=3,state='READY'");
+            statement.executeUpdate("INSERT INTO tk_owner VALUES('retained','Europe/Oslo',7,19,'aabb')");
+            statement.executeUpdate("INSERT INTO tk_account(owner_id,username,password_hash,display_name,state,administrator,version) VALUES('retained','retained','password hash','Retained','ENABLED',TRUE,5)");
+            statement.executeUpdate("INSERT INTO tk_recovery_address VALUES('retained','BACKUP','retained@example.invalid','pending@example.invalid',9)");
+            statement.executeUpdate("UPDATE tk_recovery_control SET origin='https://retained.example.invalid:8443',epoch=7");
+            assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(connection));
+            ServerSchema.initializeOrValidate(connection,true);ServerSchema.initializeOrValidate(connection);ServerSchema.validate(connection);
+            try(var rows=statement.executeQuery("SELECT verified_address,pending_address,version FROM tk_recovery_address")) {assertTrue(rows.next());assertEquals("retained@example.invalid",rows.getString(1));assertEquals("pending@example.invalid",rows.getString(2));assertEquals(9,rows.getLong(3));}
+            try(var rows=statement.executeQuery("SELECT origin,epoch FROM tk_recovery_control")) {assertTrue(rows.next());assertEquals("https://retained.example.invalid:8443",rows.getString(1));assertEquals(7,rows.getLong(2));}
         }
     }
     @Test void checkConstraintsRemainCanonicalAfterLogicalDumpRestoreDeparsing() throws Exception {

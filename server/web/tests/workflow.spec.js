@@ -1,3 +1,4 @@
+import {browserRequest} from './browser-request.js';
 import {openAccountMenu, setTimeZone} from './navigation.js';
 import {localDateTime} from '../src/model.js';
 import {test, expect} from '@playwright/test';
@@ -473,9 +474,9 @@ test('session toolbar targets the displayed session and preserves historical too
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');
   await page.locator('#login-form').getByLabel('Username',{exact:true}).fill(username);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await expect(page.locator('#status')).toHaveText('Up to date');
-  const account=await (await page.request.get('/api/v1/auth/session')).json();
+  const account=await (await browserRequest(page).get('/api/v1/auth/session')).json();
   const own=async(method,path,data,headers={})=>{
-    const response=await page.request.fetch('/api/v1'+path,{method,data,headers:{'X-CSRF-Token':account.csrf,...headers}});
+    const response=await browserRequest(page).fetch('/api/v1'+path,{method,data,headers:{'X-CSRF-Token':account.csrf,...headers}});
     expect(response.ok(),`${method} ${path}: ${response.status()}`).toBeTruthy();return response;
   };
   const tools=page.getByRole('group',{name:'Work session tools',exact:true});

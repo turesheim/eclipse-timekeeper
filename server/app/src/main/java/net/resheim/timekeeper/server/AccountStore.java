@@ -18,10 +18,16 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 public class AccountStore {
     @Inject AgroalDataSource datasource;
     @Inject TokenRegistry registry;
+    @Inject PasskeyRealm realm;
     @ConfigProperty(name="timekeeper.auth.setup-file",defaultValue="NONE") String setupFile;
     @ConfigProperty(name="quarkus.datasource.jdbc.url") String jdbcUrl;
     private static final String DUMMY=AccountPasswords.hash("This is a dummy password for constant work");
-    record Issued(String secret,JsonNode account,String csrf,Instant expires,boolean persistent) { }
+    record Issued(String secret,JsonNode account,String csrf,Instant expires,boolean persistent) {
+        @Override public String toString() {return "Browser session";}
+    }
+    @FunctionalInterface interface SessionIssuer {
+        Issued issue(Connection c,String owner,Set<String> permissions,boolean remember,Instant now,String parent);
+    }
     static Set<String> permissions(String value) {return value.equals("READ_WRITE") ? Set.of("read","write") : Set.of("read");}
     static String permissions(Set<String> values) {return values.contains("write") ? "READ_WRITE" : "READ";}
     <T> T tx(Function<Connection,T> work) {
@@ -63,7 +69,7 @@ public class AccountStore {
             if(!rows.next()) execute(c,"INSERT INTO tk_account(owner_id,username,password_hash,display_name,state,administrator,version) VALUES(?,NULL,NULL,?,'UNCLAIMED',FALSE,0)",owner,owner);
         }catch(SQLException failure) {throw databaseFailure(failure);}
     }
-    private static ObjectNode account(Connection c,String owner,boolean locked) {
+    static ObjectNode account(Connection c,String owner,boolean locked) {
         try(var statement=query(c,"SELECT username,display_name,state,administrator,version FROM tk_account WHERE owner_id=?"+(locked ? " FOR UPDATE" : ""),owner);var rows=statement.executeQuery()) {
             if(!rows.next()) throw ApiFailure.notFound();
             var result=object();result.put("ownerId",owner);result.put("username",rows.getString(1));result.put("displayName",rows.getString(2));result.put("state",rows.getString(3));result.put("administrator",rows.getBoolean(4));result.put("version",rows.getLong(5));return result;
@@ -116,6 +122,9 @@ public class AccountStore {
         return complete(code,login,password,display,recovery,null);
     }
     Issued complete(String code,String login,String password,String display,boolean recovery,String email) {
+        return complete(code,login,password,display,recovery,email,this::issue);
+    }
+    Issued complete(String code,String login,String password,String display,boolean recovery,String email,SessionIssuer issuer) {
         if(!allowed("",true)) throw new ApiFailure(429,"RATE_LIMITED");
         String name=username(login),label=displayName(display),encoded=AccountPasswords.hash(password);
         String pending=email==null ? null : RecoveryEmail.normalize(email);
@@ -134,10 +143,13 @@ public class AccountStore {
             if(!recovery && pending!=null) execute(c,"INSERT INTO tk_recovery_address VALUES(?,'PRIMARY',NULL,?,1)",target,pending);
             execute(c,"UPDATE tk_auth_challenge SET consumed=TRUE WHERE digest=?",digest);
             if(!recovery) execute(c,"UPDATE tk_auth_control SET bootstrap_completed=TRUE WHERE id=1");
-            if(recovery) revokeAll(c,target);else execute(c,"DELETE FROM tk_auth_session WHERE owner_id=?",target);return issue(c,target,Set.of("read","write"),false,now);
+            if(recovery) {PasskeyCredentials.recover(c,target);revokeAll(c,target);}else execute(c,"DELETE FROM tk_auth_session WHERE owner_id=?",target);return issuer.issue(c,target,Set.of("read","write"),false,now,null);
         });
     }
     Issued login(String login,String password,boolean remember) {
+        return login(login,password,remember,this::issue);
+    }
+    Issued login(String login,String password,boolean remember,SessionIssuer issuer) {
         String name=login==null ? "" : login.strip().toLowerCase(Locale.ROOT);
         if(name.length()>200 || !allowed(name,false)) throw new ApiFailure(429,"RATE_LIMITED");
         record Candidate(String owner,String hash,long version) { }
@@ -151,25 +163,45 @@ public class AccountStore {
         return tx(c->{lock(c);var current=account(c,candidate.owner(),true);
             if(!current.get("state").asText().equals("ENABLED") || current.get("version").asLong()!=candidate.version()) throw ApiFailure.unauthorized(false);
             execute(c,"DELETE FROM tk_auth_throttle WHERE id=?",hash("login:"+name));
-            return issue(c,candidate.owner(),Set.of("read","write"),remember,Instant.now());
+            return issuer.issue(c,candidate.owner(),Set.of("read","write"),remember,Instant.now(),null);
         });
     }
-    private Issued issue(Connection c,String owner,Set<String> permissions,boolean remember,Instant now) {return issue(c,owner,permissions,remember,now,null);}
-    private Issued issue(Connection c,String owner,Set<String> permissions,boolean remember,Instant now,String parent) {
+    Issued issue(Connection c,String owner,Set<String> permissions,boolean remember,Instant now,String parent) {
         String secret=AccountPasswords.secret(),csrf=AccountPasswords.secret();Instant expires=now.plus(remember ? Duration.ofDays(30) : Duration.ofHours(12));
 
         execute(c,"INSERT INTO tk_auth_session(digest,owner_id,csrf,permissions,created_at,expires_at,last_seen_at,persistent,parent_digest) VALUES(?,?,?,?,?,?,?,?,?)",hash(secret),owner,csrf,permissions(permissions),now.toString(),expires.toString(),now.toString(),remember,parent);
         return new Issued(secret,account(c,owner,false),csrf,expires,remember);
     }
+    static boolean currentPassword(Connection c,String owner,String password) {
+        try(var statement=query(c,"SELECT password_hash FROM tk_account WHERE owner_id=? AND state='ENABLED'",owner);var rows=statement.executeQuery()) {
+            String encoded=rows.next() ? rows.getString(1) : null;boolean valid=AccountPasswords.matches(password,encoded==null ? DUMMY : encoded);return encoded!=null && valid;
+        }catch(SQLException failure) {throw databaseFailure(failure);}
+    }
+    static boolean accountSession(Connection c,TokenRegistry.Principal principal) {
+        if(!principal.kind().equals("SESSION") || !principal.permissions().contains("write")) return false;
+        try(var statement=query(c,"SELECT s.parent_digest,a.state FROM tk_auth_session s JOIN tk_account a ON a.owner_id=s.owner_id WHERE s.digest=? AND s.owner_id=?",principal.digest(),principal.owner());var rows=statement.executeQuery()) {
+            return rows.next() && rows.getString(1)==null && rows.getString(2).equals("ENABLED");
+        }catch(SQLException failure) {throw databaseFailure(failure);}
+    }
     Issued exchange(TokenRegistry.Principal principal) {
-        return tx(c->{lock(c);guard(c,principal);return issue(c,principal.owner(),principal.permissions(),false,Instant.now(),principal.digest());});
+        return exchange(principal,this::issue);
+    }
+    Issued exchange(TokenRegistry.Principal principal,SessionIssuer issuer) {
+        return tx(c->{lock(c);guard(c,principal);return issuer.issue(c,principal.owner(),principal.permissions(),false,Instant.now(),principal.digest());});
     }
     TokenRegistry.Principal session(String secret) {
+        return session(secret,null,false);
+    }
+    TokenRegistry.Principal session(String secret,String browser) {
+        return session(secret,browser,true);
+    }
+    private TokenRegistry.Principal session(String secret,String browser,boolean checkBrowser) {
         if(secret==null || !secret.matches("[A-Za-z0-9_-]{43}")) throw ApiFailure.unauthorized(false);
         String digest=hash(secret);
         return tx(c->{
-            try(var statement=query(c,"SELECT s.owner_id,s.permissions,t.permissions,t.legacy_digest FROM tk_auth_session s LEFT JOIN tk_api_token t ON t.owner_id=s.owner_id AND t.digest=s.parent_digest WHERE s.digest=?",digest);var rows=statement.executeQuery()) {
+            try(var statement=query(c,"SELECT s.owner_id,s.permissions,t.permissions,t.legacy_digest,s.browser_digest FROM tk_auth_session s LEFT JOIN tk_api_token t ON t.owner_id=s.owner_id AND t.digest=s.parent_digest WHERE s.digest=?",digest);var rows=statement.executeQuery()) {
                 if(!rows.next()) throw ApiFailure.unauthorized(false);
+                if(checkBrowser && rows.getString(5)!=null && (browser==null || !browser.matches("[A-Za-z0-9_-]{43}") || !rows.getString(5).equals(hash(browser)))) throw ApiFailure.unauthorized(false);
                 var grants=new HashSet<>(permissions(rows.getString(2)));if(rows.getString(3)!=null) grants.retainAll(permissions(rows.getString(3)));
                 var principal=new TokenRegistry.Principal(rows.getString(1),Set.copyOf(grants),"SESSION",digest,rows.getString(4));guard(c,principal);return principal;
             }catch(SQLException failure) {throw databaseFailure(failure);}
@@ -200,9 +232,20 @@ public class AccountStore {
         if(account.get("state").asText().equals("DISABLED")) throw ApiFailure.unauthorized(true);
         if(principal.kind().equals("SESSION")) {
             if(!account.get("state").asText().equals("ENABLED") && !account.get("state").asText().equals("UNCLAIMED")) throw ApiFailure.unauthorized(false);
-            try(var statement=query(c,"SELECT expires_at,last_seen_at,persistent,parent_digest FROM tk_auth_session WHERE digest=? AND owner_id=? FOR UPDATE",principal.digest(),principal.owner());var rows=statement.executeQuery()) {
+            try(var statement=query(c,"SELECT expires_at,last_seen_at,persistent,parent_digest,origin_epoch,browser_digest,passkey_id FROM tk_auth_session WHERE digest=? AND owner_id=? FOR UPDATE",principal.digest(),principal.owner());var rows=statement.executeQuery()) {
                 Instant now=Instant.now();
                 if(!rows.next() || !Instant.parse(rows.getString(1)).isAfter(now) || !Instant.parse(rows.getString(2)).plus(rows.getBoolean(3) ? Duration.ofDays(7) : Duration.ofMinutes(30)).isAfter(now)) throw ApiFailure.unauthorized(false);
+                // Plain reads preserve the auth-control -> account/session mutation lock order.
+                var current=realm.current(c);
+                if(current.origin()==null) {
+                    if(rows.getLong(5)!=0 || rows.getString(6)!=null || rows.getObject(7)!=null) throw ApiFailure.unauthorized(false);
+                } else if(rows.getLong(5)!=current.epoch() || rows.getString(6)==null) throw ApiFailure.unauthorized(false);
+                if(rows.getObject(7)!=null) {
+                    if(!account.path("state").asText().equals("ENABLED")) throw ApiFailure.unauthorized(false);
+                    try(var key=query(c,"SELECT rp_id FROM tk_passkey_credential WHERE id=? AND owner_id=? AND revoked=FALSE",rows.getObject(7),principal.owner());var credentials=key.executeQuery()) {
+                        if(!credentials.next() || !realm.rpId().filter(credentials.getString(1)::equals).isPresent()) throw ApiFailure.unauthorized(false);
+                    }
+                }
                 if(rows.getString(4)!=null) guard(c,new TokenRegistry.Principal(principal.owner(),principal.permissions(),"TOKEN",rows.getString(4)));
                 execute(c,"UPDATE tk_auth_session SET last_seen_at=? WHERE digest=?",now.toString(),principal.digest());
             }catch(SQLException failure) {throw databaseFailure(failure);}
@@ -232,6 +275,7 @@ public class AccountStore {
     static void revokeAll(Connection c,String owner) {
         execute(c,"DELETE FROM tk_auth_session WHERE owner_id=?",owner);execute(c,"UPDATE tk_api_token SET revoked=TRUE,version=version+1 WHERE owner_id=? AND revoked=FALSE",owner);
         execute(c,"UPDATE tk_recovery_link SET consumed=TRUE WHERE owner_id=? AND consumed=FALSE",owner);
+        PasskeyCeremonies.cancelOwner(c,owner);
     }
     private static void requireWrite(TokenRegistry.Principal principal) {if(!principal.permissions().contains("write")) throw new ApiFailure(403,"FORBIDDEN");}
     private static void requireAdmin(Connection c,TokenRegistry.Principal principal) {

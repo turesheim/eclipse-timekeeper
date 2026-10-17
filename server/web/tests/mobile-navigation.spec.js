@@ -1,3 +1,4 @@
+import {browserRequest} from './browser-request.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {openAccountMenu} from './navigation.js';
@@ -9,7 +10,7 @@ test('iOS home-screen metadata serves the bundled Timekeeper icon without sign-i
   const icon=page.locator('link[rel="apple-touch-icon"]');await expect(icon).toHaveCount(1);await expect(icon).toHaveAttribute('sizes','256x256');
   await expect(page.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute('content','Timekeeper');
   const url=await icon.evaluate(node=>node.href);expect(new URL(url).pathname).toBe('/web/apple-touch-icon.png');
-  const response=await page.request.get(url);expect(response.status()).toBe(200);expect(response.headers()['content-type']).toContain('image/png');
+  const response=await browserRequest(page).get(url);expect(response.status()).toBe(200);expect(response.headers()['content-type']).toContain('image/png');
   const bytes=await response.body();expect(bytes.subarray(0,8).toString('hex')).toBe('89504e470d0a1a0a');
   expect([bytes.readUInt32BE(16),bytes.readUInt32BE(20)]).toEqual([256,256]);
 });
@@ -54,7 +55,7 @@ test('compact account navigation supports touch, keyboard, account settings and 
   await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_TOKEN);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
   const toggle=page.getByRole('button',{name:'Account menu',exact:true}),menu=page.locator('#account-menu');
-  const account=(await (await page.request.get('/api/v1/auth/account')).json());
+  const account=(await (await browserRequest(page).get('/api/v1/auth/account')).json());
   for(const width of [320,390,1280]) {
     await page.setViewportSize({width,height:844});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

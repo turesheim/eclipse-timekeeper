@@ -49,6 +49,7 @@ jobs:
         env:
           TIMEKEEPER_TEST_PG_URL: jdbc:postgresql://127.0.0.1:55432/postgres
           TIMEKEEPER_TEST_RECOVERY_DB_URL: jdbc:postgresql://127.0.0.1:55432/postgres
+          TIMEKEEPER_TEST_PASSKEY_DB_URL: jdbc:postgresql://127.0.0.1:55432/postgres
           TIMEKEEPER_TEST_PG_USER: postgres
           TIMEKEEPER_TEST_PG_PASSWORD: isolated-ci-test
         run: |
@@ -58,7 +59,7 @@ jobs:
             echo "Waiting for isolated PostgreSQL (attempt $attempt)"
             sleep 1
           done
-          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest -Dsurefire.failIfNoSpecifiedTests=false
+          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest -Dsurefire.failIfNoSpecifiedTests=false
           docker rm -f timekeeper-pg-test
       - name: Build actual deployment images
         run: |
@@ -70,6 +71,10 @@ jobs:
           python server/scripts/compose_acceptance.py
       - name: Verify email recovery across actual replicas and hostname cutover
         run: python server/scripts/email_replica_acceptance.py --server-image timekeeper-server:test
+      - name: Verify signed passkeys across replicas, revocation and origin migration
+        run: python server/scripts/passkey_replica_acceptance.py --server-image timekeeper-server:test --expected-commit "$GITHUB_SHA"
+      - name: Verify schema upgrades during protected backup restore
+        run: python server/scripts/schema_restore_acceptance.py
       - name: Verify import and Undo across replicas, restart and protected restore
         run: python server/scripts/toggl_replica_acceptance.py --server-image timekeeper-server:test
       - name: Package the Docker Compose deployment
@@ -99,6 +104,7 @@ jobs:
             server/target/compose-acceptance/
             server/target/toggl-replica-acceptance.json
             server/target/toggl-replica-acceptance.failure.log
+            server/target/passkey-replica-acceptance.json
 
   verify-synology:
     name: Synology candidate and PostgreSQL 17
@@ -134,12 +140,15 @@ jobs:
           go vet -C server/synology/installer ./...
           python server/synology/tests/acceptance.py
           python server/synology/tests/schema_upgrade_acceptance.py
+          python server/scripts/schema_restore_acceptance.py --postgres-image postgres:17.11-bookworm
           python server/synology/tests/migration_acceptance.py --source-schema 2
+          python server/synology/tests/migration_acceptance.py --source-schema 3
           python server/synology/tests/migration_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA"
       - name: Verify PostgreSQL 17 schema and concurrent bootstrap
         env:
           TIMEKEEPER_TEST_PG_URL: jdbc:postgresql://127.0.0.1:55433/postgres
           TIMEKEEPER_TEST_RECOVERY_DB_URL: jdbc:postgresql://127.0.0.1:55433/postgres
+          TIMEKEEPER_TEST_PASSKEY_DB_URL: jdbc:postgresql://127.0.0.1:55433/postgres
           TIMEKEEPER_TEST_PG_USER: postgres
           TIMEKEEPER_TEST_PG_PASSWORD: isolated-ci-test
         run: |
@@ -149,7 +158,7 @@ jobs:
             echo "Waiting for isolated PostgreSQL 17 (attempt $attempt)"
             sleep 1
           done
-          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest -Dsurefire.failIfNoSpecifiedTests=false
+          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest -Dsurefire.failIfNoSpecifiedTests=false
           docker rm -f -v timekeeper-pg17-test
       - name: Verify real API, backup, recovery and rolling updates with PostgreSQL 17
         run: |
@@ -157,6 +166,8 @@ jobs:
           python server/scripts/compose_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --postgres-image postgres:17.11-bookworm --output server/target/synology-acceptance
       - name: Verify import and Undo with PostgreSQL 17
         run: python server/scripts/toggl_replica_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --postgres-image postgres:17.11-bookworm --output server/target/toggl-pg17-acceptance.json
+      - name: Verify signed passkeys and hostname migration with PostgreSQL 17
+        run: python server/scripts/passkey_replica_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --expected-commit "$GITHUB_SHA" --postgres-image postgres:17.11-bookworm --output server/target/passkey-pg17-acceptance.json
       - name: Build and validate the self-contained preview package
         run: python server/scripts/package_synology.py --commit "$GITHUB_SHA" --image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --revision "$GITHUB_RUN_NUMBER" --output server/target/synology
       - name: Generate preview discovery metadata for NAS acceptance
@@ -182,6 +193,7 @@ jobs:
             server/target/synology-acceptance/
             server/target/toggl-pg17-acceptance.json
             server/target/toggl-pg17-acceptance.failure.log
+            server/target/passkey-pg17-acceptance.json
             server/**/target/surefire-reports/
 
   publish:

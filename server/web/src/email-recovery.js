@@ -24,7 +24,7 @@ export function emailRecovery({request, signIn}) {
     submit.textContent = selected === 'forgot' ? 'Request reset link' : selected === 'reset' ? 'Reset password' : 'Verify email';
     $('email-recovery-hint').textContent = selected === 'forgot'
       ? 'Enter your username. Recovery requires a verified email address and working email delivery. Otherwise, contact the server operator.'
-      : selected === 'reset' ? 'Use at least 15 characters. Recovery signs out your sessions and revokes your API tokens, including Eclipse connections.'
+      : selected === 'reset' ? 'Use at least 15 characters. Recovery signs out your sessions and revokes your passkeys and API tokens, including Eclipse connections.'
         : 'Confirm that this mailbox should be used to recover your Timekeeper account.';
     (selected === 'forgot' ? $('recovery-username') : selected === 'reset' ? $('recovery-password') : submit).focus();
   }
@@ -45,7 +45,7 @@ export function emailRecovery({request, signIn}) {
       if (current !== generation) return;
       token = null; form.reset();
       feedback.textContent = selected === 'forgot' ? result.message
-        : selected === 'reset' ? 'Password reset. Sign in with your new password. Eclipse connections need new API tokens.'
+        : selected === 'reset' ? 'Password reset. Sign in with your new password. Add replacement passkeys in My Account. Eclipse connections need new API tokens.'
           : 'Recovery email verified. Sign in to review your account.';
       if (selected === 'forgot') submit.disabled = false;
     }).catch(error => {

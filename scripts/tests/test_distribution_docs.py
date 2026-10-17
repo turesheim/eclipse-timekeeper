@@ -79,6 +79,7 @@ class DistributionDocumentationTest(unittest.TestCase):
             with zipfile.ZipFile(root/'server/app/target/quarkus-app/app/fixture.jar','w') as jar:
                 jar.writestr('timekeeper-build.properties', f'commit={COMMIT}\ndirty=false\n')
             for name in ('bootstrap-work-session-desktop.png','bootstrap-work-session-narrow.png',
+                         'passkeys-desktop.png','passkeys-mobile.png',
                          'track-month-desktop.png','track-month-narrow.png',
                          'toggl-import-review.png','toggl-import-history-narrow.png'):
                 image = root/'docs/assets/screenshots'/name
@@ -94,6 +95,10 @@ class DistributionDocumentationTest(unittest.TestCase):
                 self.assertIn('[Synology deployment guide](DEPLOYMENT.md)',guide)
                 self.assertIn('[local Docker guide](LOCAL-DOCKER.md)',guide)
                 web = archive.read('timekeeper-server/WEB-CLIENT.md').decode()
+                for size in ('desktop','mobile'):
+                    name=f'images/passkeys-{size}.png'
+                    self.assertIn(']('+name+')',web)
+                    self.assertTrue(archive.read('timekeeper-server/'+name).startswith(b'\x89PNG\r\n\x1a\n'))
                 for view in ('work-session', 'track-month'):
                     for size in ('desktop','narrow'):
                         name = f'images/{view}-{size}.png'

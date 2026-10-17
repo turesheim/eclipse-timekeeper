@@ -60,10 +60,16 @@ def main():
             if mail_environment is None:raise RuntimeError('Isolated SMTP fixture did not start')
             mail_environment.pop('TIMEKEEPER_WEB_MAIL_FIXTURE')
             bases={index:'http://127.0.0.1:'+command('docker','port',database,str(8080+index)+'/tcp').stdout.strip().rsplit(':',1)[1] for index in (1,2)}
+            origins={}
             def api(index,path,data=None,session=None,*,method=None,headers=None):
-                selected={**(headers or {})}
+                selected={'Origin':origins[index],**(headers or {})}
                 if session:
                     selected.update({'Cookie':session['cookie'],'X-CSRF-Token':session['csrf']})
+                elif path!='/auth/status' and 'Authorization' not in selected:
+                    # A real browser first obtains its HttpOnly binding cookie.
+                    status=api(index,'/auth/status')
+                    if status[0]!=200:raise AssertionError('Browser status did not establish a binding')
+                    selected['Cookie']='; '.join(value.split(';',1)[0] for value in status[2].get_all('Set-Cookie',[]))
                 if data is not None:selected['Content-Type']='application/json'
                 request=Request(bases[index]+'/api/v1'+path,data=None if data is None else json.dumps(data).encode(),headers=selected,method=method or ('GET' if data is None else 'POST'))
                 try:response=urlopen(request,timeout=20)
@@ -76,8 +82,9 @@ def main():
                 return reply
             def session(reply):
                 expect_status(reply,200,'Account sign-in');value=reply[1]
-                return {'cookie':reply[2]['Set-Cookie'].split(';',1)[0],'csrf':value['csrf'],'ownerId':value['ownerId']}
+                return {'cookie':'; '.join(header.split(';',1)[0] for header in reply[2].get_all('Set-Cookie',[])),'csrf':value['csrf'],'ownerId':value['ownerId']}
             def start(index,origin,epoch,ready=True):
+                origins[index]=origin
                 name='timekeeper-email-api-'+str(index)+'-'+suffix
                 if name in names:command('docker','rm','-f',name);names.remove(name)
                 environment={**mail_environment,'TIMEKEEPER_SERVER_DB_URL':'jdbc:postgresql://127.0.0.1:5432/postgres',
@@ -140,6 +147,11 @@ def main():
             expect_status(api(2,'/auth/email/forgot',{'username':'alice'}),202,'Stale generic reset response')
             # A configuration rollback cannot revive the retired epoch.
             start(2,vpn,1,ready=False);start(2,public,2)
+            for owner in (alice,alice_other,bob):
+                expect_status(api(2,'/auth/session',session=owner),401,'Retired-origin browser session')
+            alice=session(api(1,'/auth/login',{'username':'alice','password':account_password,'remember':False}))
+            alice_other=session(api(2,'/auth/login',{'username':'alice','password':account_password,'remember':False}))
+            bob=session(api(2,'/auth/login',{'username':'bob','password':account_password,'remember':False}))
             expect_status(api(2,'/auth/email/addresses/PRIMARY',session=alice),200,'Preserved primary address')
             expect_status(api(2,'/auth/email/forgot',{'username':'alice'}),202,'New-origin reset request')
             primary=links('alice@example.invalid','reset-password',public);backup=links('backup@example.invalid','reset-password',public)
@@ -158,6 +170,7 @@ def main():
             print(json.dumps({'image':args.server_image,'twoActualReplicas':True,'sharedPostgreSQL18':True,'actualSmtpDelivery':True,
                 'independentAccountDataPreserved':True,'linksSurviveRestart':True,'retiredHostnameNotRequired':True,
                 'staleRunningAndRestartedReplicasFenced':True,'newOriginLinksUseVerifiedMailboxes':True,
+                'retiredOriginBrowserSessionsRequireFreshSignIn':True,
                 'concurrentPrimaryBackupResetHasOneWinner':True,'ownerSessionsAndApiTokensRevoked':True}),flush=True)
         finally:
             for name in reversed(names):command('docker','rm','-f','-v',name,check=False)

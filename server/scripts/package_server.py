@@ -46,7 +46,7 @@ def package(output, tag, commit):
     output.mkdir(parents=True, exist_ok=True)
     archive = output / 'timekeeper-server.zip'
     manifest = {'format': 1, 'kind': 'candidate' if tag is None else 'release', 'tag': tag, 'commit': commit, 'java': 21,
-                'quarkus': '3.40.1', 'h2': '2.5.250', 'apiMajor': 1, 'serverSchema': 3}
+                'quarkus': '3.40.1', 'h2': '2.5.250', 'apiMajor': 1, 'serverSchema': 4}
     files = [(p, 'timekeeper-server/' + p.relative_to(app).as_posix()) for p in sorted(app.rglob('*')) if p.is_file()]
     guides = {'docs/operations/SERVER.md': 'README.md',
               'docs/architecture/API-V1.md': 'API-POLICY.md',
@@ -57,6 +57,8 @@ def package(output, tag, commit):
               'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
               'docs/development/WEB-CLIENT.md': 'WEB-CLIENT.md'}
     illustrations = {
+        'docs/assets/screenshots/passkeys-desktop.png': 'images/passkeys-desktop.png',
+        'docs/assets/screenshots/passkeys-mobile.png': 'images/passkeys-mobile.png',
         'docs/assets/screenshots/bootstrap-work-session-desktop.png': 'images/work-session-desktop.png',
         'docs/assets/screenshots/bootstrap-work-session-narrow.png': 'images/work-session-narrow.png',
         'docs/assets/screenshots/track-month-desktop.png': 'images/track-month-desktop.png',

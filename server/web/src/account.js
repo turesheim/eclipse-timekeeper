@@ -2,11 +2,13 @@ import {instantText, localDateTimeToInstant} from './model.js';
 import {node, button, field, passwordField, validatePassword, section, form, table} from './account-ui.js';
 import {renderRecoveryEmails} from './recovery-emails.js';
 import {renderImports} from './imports.js';
+import {renderPasskeys} from './passkeys.js';
 
 export async function renderAccount(view, part) {
   const [loaded, profile] = await Promise.all([view.session.request('/auth/account'), view.session.request('/me')]);
   if (!view.valid()) return;
   const account = loaded.data, zone = profile.data.zoneId;
+  if (part === 'passkeys') {await renderPasskeys(view, zone);return;}
   if (part === 'import') {await renderImports(view, zone); return;}
   if (part === 'tokens') {await renderTokens(view, zone); return;}
   if (account.state === 'UNCLAIMED') {
@@ -20,9 +22,9 @@ export async function renderAccount(view, part) {
         if (error.status === 401) {await view.session.request('/auth/session'); throw new Error('The current password was not accepted. Your draft is kept.');}
         throw error;
       }
-      if (view.valid()) view.signOut('Password changed. Sign in again. Your existing sessions and API tokens have been revoked.');
+      if (view.valid()) view.signOut('Password changed. Sign in again. Your existing sessions and API tokens have been revoked. Registered passkeys remain available.');
     });
-    password.value.append(node('p', 'Use at least 15 characters. Changing your password signs out all of your sessions and revokes all of your API tokens, including Eclipse connections.', 'alert alert-warning'));
+    password.value.append(node('p', 'Use at least 15 characters. Changing your password signs out all of your sessions and revokes all of your API tokens, including Eclipse connections. Registered passkeys remain available.', 'alert alert-warning'));
     const old = passwordField(password.value, 'Current password', true), next = passwordField(password.value, 'New password'), confirm = passwordField(password.value, 'Confirm new password');
     password.finish(); return;
   } else {

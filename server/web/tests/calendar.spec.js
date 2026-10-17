@@ -294,7 +294,9 @@ test('calendar copying a running session leaves it running and lets the copy rec
     expect(await (await api(request,'GET','/work-sessions/active')).json()).toEqual(running);
     // Whole-second native input must be after the preserved fractional start.
     await expect.poll(()=>Date.now()-Date.parse(running.start)).toBeGreaterThan(1100);
-    await page.getByLabel('End (local time, blank while running)',{exact:true}).fill(localDateTime(new Date().toISOString(),'Europe/Oslo').slice(0,19));await save(page);
+    // WebKit normalizes zero seconds away; fill expects the canonical native value.
+    const end=localDateTime(new Date().toISOString(),'Europe/Oslo').slice(0,19).replace(/:00$/,'');
+    await page.getByLabel('End (local time, blank while running)',{exact:true}).fill(end);await save(page);
     expect(await (await api(request,'GET','/work-sessions/active')).json()).toEqual(running);
     const copies=(await (await api(request,'GET','/work-sessions')).json()).items.filter(value=>value.summary===running.summary);expect(copies).toHaveLength(2);
     expect(copies.filter(value=>value.end===null)).toHaveLength(1);await unchangedActivities(request,f);
@@ -321,8 +323,10 @@ test('calendar touch gestures move a work session between days on a narrow scree
 test('calendar copy and paste create only a new session and clear the clipboard on sign-out',async({page,request})=>{
   const f=await fixture(request);
   try {
-    await calendar(page);await bar(page,f.session.id).focus();await bar(page,f.session.id).click();
+    await calendar(page);await bar(page,f.session.id).click();
+    const select=bar(page,f.session.id).locator('.calendar-session-select');await select.focus();await expect(select).toBeFocused();
     await page.keyboard.press('ControlOrMeta+c');
+    await expect(page.locator('#calendar-message')).toHaveText('Work session copied.');
     const targetDay=page.getByRole('button',{name:'Select 2025-10-21',exact:true});
     await targetDay.click();await expect(targetDay).toBeFocused();await page.keyboard.press('ControlOrMeta+v');
     await expect(page.locator('#editor-title')).toHaveText('Paste work session');

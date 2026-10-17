@@ -1,3 +1,4 @@
+import {browserRequest} from './browser-request.js';
 import {openAccountMenu} from './navigation.js';
 import {test, expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -23,7 +24,7 @@ async function login(page, user, hash = '') {
 const key = user => Buffer.from(user.ownerId).toString('base64url');
 async function ready(page) {await expect(page.locator('#account-content')).toHaveAttribute('aria-busy', 'false');}
 async function ownHeaders(page) {
-  const account = await (await page.request.get('/api/v1/auth/session')).json();
+  const account = await (await browserRequest(page).get('/api/v1/auth/session')).json();
   return {'X-CSRF-Token': account.csrf, 'X-Timekeeper-Owner': key(account)};
 }
 test('My Account direct links, mobile layouts and Back navigation preserve running timers', async ({page, request}) => {
@@ -31,8 +32,8 @@ test('My Account direct links, mobile layouts and Back navigation preserve runni
   await expect(page.locator('#account-heading')).toBeFocused();
   await expect(page.locator('#workspace')).not.toBeVisible(); await expect(page.locator('#users-link')).not.toBeVisible();
   const headers = await ownHeaders(page);
-  const client = await (await page.request.post('/api/v1/clients', {headers, data: {name: 'Private timer client', color: '#176653'}})).json();
-  const running = await page.request.post('/api/v1/work-sessions/start', {headers: {...headers, 'Idempotency-Key': randomUUID()}, data: {title: 'Private running session', clientId: client.id, summary: ''}});
+  const client = await (await browserRequest(page).post('/api/v1/clients', {headers, data: {name: 'Private timer client', color: '#176653'}})).json();
+  const running = await browserRequest(page).post('/api/v1/work-sessions/start', {headers: {...headers, 'Idempotency-Key': randomUUID()}, data: {title: 'Private running session', clientId: client.id, summary: ''}});
   expect(running.status()).toBe(201); const session = await running.json();
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({width, height: 900});
@@ -50,17 +51,17 @@ test('My Account direct links, mobile layouts and Back navigation preserve runni
   const deviceZone = await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
   await page.getByRole('button', {name: /Use this device's time zone/}).click(); await page.getByRole('button', {name: 'Save time zone', exact: true}).click();
   await expect(page.locator('#account-content')).toContainText('Time zone saved');
-  expect((await (await page.request.get('/api/v1/me')).json()).zoneId).toBe(deviceZone);
-  expect((await (await page.request.get('/api/v1/work-sessions/' + session.id)).json()).start).toBe(session.start);
+  expect((await (await browserRequest(page).get('/api/v1/me')).json()).zoneId).toBe(deviceZone);
+  expect((await (await browserRequest(page).get('/api/v1/work-sessions/' + session.id)).json()).start).toBe(session.start);
   await page.getByRole('link', {name: 'Password', exact: true}).click(); await ready(page);
   await expect(page).toHaveURL(/#account\/password$/); await expect(page.getByLabel('Current password', {exact: true})).toBeVisible();
   await page.goBack(); await expect(page.getByLabel('Account username', {exact: true})).toHaveValue(user.username);
   await page.reload(); await ready(page); await expect(page.locator('#account-heading')).toHaveText('My Account');
   await page.getByRole('link', {name: 'Back to time tracking', exact: true}).click();
   await expect(page.locator('#workspace')).toBeVisible();
-  const active = await (await page.request.get('/api/v1/work-sessions/active')).json(); expect(active.id).toBe(session.id);
-  const current = await page.request.get('/api/v1/work-sessions/' + session.id);
-  expect((await page.request.post(`/api/v1/work-sessions/${session.id}/stop`, {headers: {...headers, 'If-Match': current.headers().etag, 'Idempotency-Key': randomUUID()}})).ok()).toBeTruthy();
+  const active = await (await browserRequest(page).get('/api/v1/work-sessions/active')).json(); expect(active.id).toBe(session.id);
+  const current = await browserRequest(page).get('/api/v1/work-sessions/' + session.id);
+  expect((await browserRequest(page).post(`/api/v1/work-sessions/${session.id}/stop`, {headers: {...headers, 'If-Match': current.headers().etag, 'Idempotency-Key': randomUUID()}})).ok()).toBeTruthy();
 });
 test('profile drafts survive cancelled navigation and stale saves; blank display name uses username', async ({page, request}) => {
   const user = await fresh(request); await login(page, user, '#account/profile'); await ready(page);
@@ -131,7 +132,7 @@ test('personal tokens copy once, clear on navigation and require named revocatio
 });
 test('password validation preserves drafts and a successful change revokes only this account credentials', async ({page, request}) => {
   const user = await fresh(request); await login(page, user, '#account/password'); await ready(page);
-  const headers = await ownHeaders(page), tokenReply = await page.request.post('/api/v1/auth/tokens', {headers, data: {name: 'Old password token', permissions: ['read'], expiresAt: null}});
+  const headers = await ownHeaders(page), tokenReply = await browserRequest(page).post('/api/v1/auth/tokens', {headers, data: {name: 'Old password token', permissions: ['read'], expiresAt: null}});
   expect(tokenReply.status()).toBe(201); const secret = (await tokenReply.json()).token;
   await expect(page.getByLabel('Current password', {exact: true})).toHaveAttribute('autocomplete', 'current-password');
   await expect(page.locator('#account-content').getByLabel('New password', {exact: true})).toHaveAttribute('autocomplete', 'new-password');
@@ -150,7 +151,7 @@ test('password validation preserves drafts and a successful change revokes only 
 test('standard users cannot open Users directly and a late account response cannot survive sign-out', async ({page, request}) => {
   const user = await fresh(request); await login(page, user, '#users'); await ready(page);
   await expect(page.locator('#users-link')).not.toBeVisible(); await expect(page.locator('#account-content')).toContainText('Administrator access is required');
-  expect((await page.request.get('/api/v1/auth/users')).status()).toBe(403);
+  expect((await browserRequest(page).get('/api/v1/auth/users')).status()).toBe(403);
   await page.evaluate(() => {
     const fetch = window.fetch;
     window.fetch = async (...args) => {

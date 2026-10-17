@@ -44,8 +44,8 @@ async function show(hash, ask = true) {
     signOut: message => {if (valid()) scope.signOut(message);},
     refreshProfile: async profile => {if (valid()) await scope.refreshProfile?.(profile);},
     navigate: next => {if (valid()) location.hash = next;},
-    async run(work, {submit, feedback = $('account-error'), write = false} = {}) {
-      if (!valid() || this.busy || (write && (!this.canWrite || this.uncertain))) return;
+    async run(work, {submit, feedback = $('account-error'), write = false, canSubmit = () => true} = {}) {
+      if (!valid() || this.busy || (write && (!this.canWrite || this.uncertain || !canSubmit()))) return;
       feedback.replaceChildren(); if (submit) submit.disabled = true;
       if (write) this.busy = true;
       ++this.pending; this.root.setAttribute('aria-busy', 'true');
@@ -59,7 +59,7 @@ async function show(hash, ask = true) {
           feedback.append(' ', button('Reload current values', () => {if (acceptedHash === '#users/new') this.navigate('#users'); else void show(acceptedHash);}));
         }
       } finally {
-        if (valid()) {if (write) this.busy = false; --this.pending; this.root.setAttribute('aria-busy', String(this.pending > 0)); if (submit) submit.disabled = !this.canWrite || this.uncertain;}
+        if (valid()) {if (write) this.busy = false; --this.pending; this.root.setAttribute('aria-busy', String(this.pending > 0)); if (submit) submit.disabled = !this.canWrite || this.uncertain || !canSubmit();}
       }
     }
   };
@@ -69,8 +69,8 @@ async function show(hash, ask = true) {
     view.root.append(node('p', 'Administrator access is required to manage independent user accounts.', 'alert alert-warning')); return;
   }
   if (page === 'account') {
-    const part = ['profile', 'password', 'tokens', 'import'].includes(hash.split('/')[1]) ? hash.split('/')[1] : 'profile';
-    for (const [key, title] of [['profile','Profile'],['password','Password'],['tokens','API tokens'],['import','Import']]) {
+    const part = ['profile', 'password', 'passkeys', 'tokens', 'import'].includes(hash.split('/')[1]) ? hash.split('/')[1] : 'profile';
+    for (const [key, title] of [['profile','Profile'],['password','Password'],['passkeys','Passkeys'],['tokens','API tokens'],['import','Import']]) {
       const item = link(title, `#account/${key}`, 'nav-link'); if (key === part) {item.classList.add('active'); item.setAttribute('aria-current', 'page');}
       $('account-navigation').append(item);
     }

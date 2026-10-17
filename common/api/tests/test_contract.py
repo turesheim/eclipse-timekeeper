@@ -37,7 +37,8 @@ class ContractTest(unittest.TestCase):
                 operation = item[method]
                 ids.append(operation['operationId'])
                 if path in ('/openapi.json', '/auth/status', '/auth/login', '/auth/setup', '/auth/recover',
-                            '/auth/email/forgot', '/auth/email/preview', '/auth/email/verify', '/auth/email/reset'):
+                            '/auth/email/forgot', '/auth/email/preview', '/auth/email/verify', '/auth/email/reset',
+                            '/auth/passkeys/login/options', '/auth/passkeys/login/finish', '/auth/passkeys/cancel'):
                     self.assertEqual([], operation['security'])
                     continue
                 self.assertNotIn('security', operation)
@@ -188,6 +189,8 @@ class ContractTest(unittest.TestCase):
             'getActiveWorkSession', 'startWorkSession', 'stopWorkSession', 'associateWorkSession', 'reportWorkSession',
             'getAuthStatus', 'login', 'setupAccount', 'recoverAccount', 'exchangeApiToken', 'getAuthSession', 'logout', 'getAccount', 'updateAccount', 'changePassword', 'listPersonalTokens', 'createPersonalToken', 'revokePersonalToken', 'listUserAccounts', 'createUserAccount', 'getUserAccount', 'updateUserAccount',
             'requestEmailRecovery', 'previewEmailLink', 'verifyRecoveryEmail', 'resetPasswordByEmail', 'getRecoveryEmail', 'changeRecoveryEmail', 'resendRecoveryEmailVerification',
+            'passkeyLoginOptions', 'passkeyLogin', 'cancelPasskeyCeremonies', 'listPasskeys', 'passkeyRegistrationOptions', 'registerPasskey',
+            'passkeyProofOptions', 'verifyPasskeyProof', 'renamePasskey', 'removePasskey',
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
             'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',

@@ -30,7 +30,10 @@
         <label class="form-label check" id="remember-field"><input class="form-check-input" id="remember" type="checkbox"> Remember me on this browser</label>
         <label class="form-label" id="token-field" hidden>Access token<input class="form-control" id="token" type="password" autocomplete="off" disabled></label>
         <p id="auth-hint" class="hint">Use your Timekeeper account. API tokens are managed after signing in.</p>
-        <p id="login-error" class="alert alert-danger" role="alert" tabindex="-1"></p><button class="btn btn-primary" type="submit">Sign in</button>
+        <p id="login-error" class="alert alert-danger" role="alert" tabindex="-1"></p><button class="btn btn-primary" type="submit" disabled>Sign in</button>
+        <button class="btn btn-outline-secondary" id="passkey-sign-in" type="button" tabindex="0" disabled>Sign in with a passkey</button>
+        <button class="btn btn-outline-secondary" id="passkey-cancel" type="button" tabindex="0" hidden>Cancel passkey request</button>
+        <p id="passkey-support" class="hint" role="status"></p>
       </form>
       <button class="btn btn-link" id="forgot-password" type="button">Forgot password?</button>
       <form id="email-recovery-form" hidden aria-labelledby="email-recovery-title">

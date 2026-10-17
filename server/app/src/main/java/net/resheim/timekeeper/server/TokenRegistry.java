@@ -38,6 +38,7 @@ public class TokenRegistry {
         throw ApiFailure.unauthorized(true);
     }
     Principal session(String secret) {return recheck(accounts.session(secret));}
+    Principal session(String secret,String browser) {return recheck(accounts.session(secret,browser));}
     void start(@Observes StartupEvent event) { load(); }
     List<Token> load() {
         if(tokensFile==null || tokensFile.isBlank() || tokensFile.equals("NONE")) return List.of();

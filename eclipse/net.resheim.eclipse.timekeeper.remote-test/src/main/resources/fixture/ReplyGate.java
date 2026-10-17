@@ -51,7 +51,12 @@ public class ReplyGate {
                 }
                 var request=HttpRequest.newBuilder(URI.create(upstream+exchange.getRequestURI().toASCIIString())).timeout(Duration.ofSeconds(30));
                 for(String header:Set.of("Authorization","Accept","Content-Type","If-Match","Idempotency-Key","X-Timekeeper-Owner","Cookie","X-CSRF-Token","Origin")) {
-                    String value=exchange.getRequestHeaders().getFirst(header);if(value!=null) request.header(header,value);
+                    String value=exchange.getRequestHeaders().getFirst(header);
+                    // This HTTP-only loopback fixture has no deployed HTTPS origin.
+                    // Translate only its exact front-end origin for the browser
+                    // peer; foreign origins remain unchanged and are rejected.
+                    if(header.equals("Origin") && ("http://127.0.0.1:"+port).equals(value)) value=upstream.toString();
+                    if(value!=null) request.header(header,value);
                 }
                 byte[] body=exchange.getRequestBody().readAllBytes();
                 request.method(exchange.getRequestMethod(),body.length==0 ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofByteArray(body));

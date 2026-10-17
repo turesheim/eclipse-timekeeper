@@ -146,7 +146,9 @@ public final class RemoteBootstrap implements IApplication {
         builder.environment().put("TIMEKEEPER_SERVER_TOKENS_FILE",folder.resolve("server-tokens.json").toString());builder.environment().put("QUARKUS_HTTP_PORT",String.valueOf(port));
         builder.environment().put("TIMEKEEPER_SERVER_SETUP_FILE","NONE");
         builder.environment().put("TIMEKEEPER_ALLOW_SCHEMA_UPGRADE","false");
-        builder.environment().put("TIMEKEEPER_PUBLIC_ORIGIN",name.equals("main") && upstreamPort>0 ? serverUrl.toString() : "NONE");
+        // This loopback fixture exercises native bearer-token clients, including
+        // the reply gate. It does not provide a canonical HTTPS browser origin.
+        builder.environment().put("TIMEKEEPER_PUBLIC_ORIGIN","NONE");
         builder.redirectErrorStream(true).redirectOutput(folder.resolve("server-"+name+"-"+System.nanoTime()+".log").toFile());
         Process process=builder.start();
         try(var http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build()) {

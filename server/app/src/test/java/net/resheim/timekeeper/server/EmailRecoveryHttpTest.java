@@ -89,7 +89,7 @@ class EmailRecoveryHttpTest {
         throw new AssertionError("Expected recovery message was not delivered to the test mailbox");
     }
     private void verify(String cookie,String csrf,String slot,String email) throws Exception {
-        var record=given().header("Cookie",cookie).get("/api/v1/auth/email/addresses/"+slot).then().statusCode(200).extract().response();
+        var record=given().header("Cookie",cookie).header("Origin",ORIGIN).get("/api/v1/auth/email/addresses/"+slot).then().statusCode(200).extract().response();
         given().header("Cookie",cookie).header("Origin",ORIGIN).header("X-CSRF-Token",csrf).header("If-Match",record.header("ETag")).contentType("application/json")
                 .body(Map.of("email",email,"currentPassword",PASSWORD)).put("/api/v1/auth/email/addresses/"+slot).then().statusCode(200);
         String token=link(email,"verify-email");
@@ -100,8 +100,10 @@ class EmailRecoveryHttpTest {
     @Test void smtpDeliveryRecoveryAndPublicRepliesRemainIndependentOfMailboxFailures() throws Exception {
         String code=AccountPasswords.secret();var challenge=JsonValues.object();challenge.put("sha256",JsonValues.hash(code));challenge.put("purpose","SETUP");challenge.put("expiresAt",Instant.now().plusSeconds(600).toString());
         var file=temporary.resolve("setup.json");Files.writeString(file,challenge.toString());ClientProxy.unwrap(accounts).setupFile=file.toString();accounts.initialize();
-        var setup=given().header("Origin",ORIGIN).contentType("application/json").body(Map.of("username","mail-admin","password",PASSWORD,"displayName","mail-admin","email","initial@example.org","code",code)).post("/api/v1/auth/setup").then().statusCode(200).extract().response();
-        String cookie=AuthenticationFilter.COOKIE+"="+setup.cookie(AuthenticationFilter.COOKIE),csrf=setup.jsonPath().getString("csrf");
+        var status=given().header("Origin",ORIGIN).get("/api/v1/auth/status").then().statusCode(200).extract().response();
+        String binding=BrowserCookies.BROWSER+"="+status.cookie(BrowserCookies.BROWSER);
+        var setup=given().header("Cookie",binding).header("Origin",ORIGIN).contentType("application/json").body(Map.of("username","mail-admin","password",PASSWORD,"displayName","mail-admin","email","initial@example.org","code",code)).post("/api/v1/auth/setup").then().statusCode(200).extract().response();
+        String cookie=AuthenticationFilter.COOKIE+"="+setup.cookie(AuthenticationFilter.COOKIE)+"; "+binding,csrf=setup.jsonPath().getString("csrf");
         try {
             verify(cookie,csrf,"PRIMARY","primary@example.org");verify(cookie,csrf,"BACKUP","backup@example.org");
             var rejected=given().header("Cookie",cookie).header("Origin","https://attacker.example.org").header("X-CSRF-Token",csrf).contentType("application/json").body("{}").post("/api/v1/auth/email/addresses/BACKUP/resend");assertEquals(403,rejected.statusCode());
@@ -112,8 +114,8 @@ class EmailRecoveryHttpTest {
             String reset=link("backup@example.org","reset-password");
             given().header("Origin",ORIGIN).contentType("application/json").body(Map.of("token",reset,"purpose","RESET")).post("/api/v1/auth/email/preview").then().statusCode(204);
             var completed=given().header("Origin",ORIGIN).contentType("application/json").body(Map.of("token",reset,"password",PASSWORD+" changed")).post("/api/v1/auth/email/reset").then().statusCode(204).extract().response();assertNull(completed.header("Set-Cookie"));
-            given().header("Cookie",cookie).get("/api/v1/auth/session").then().statusCode(401);
-            given().header("Origin",ORIGIN).contentType("application/json").body(Map.of("username","mail-admin","password",PASSWORD+" changed","remember",false)).post("/api/v1/auth/login").then().statusCode(200);
+            given().header("Cookie",cookie).header("Origin",ORIGIN).get("/api/v1/auth/session").then().statusCode(401);
+            given().header("Cookie",binding).header("Origin",ORIGIN).contentType("application/json").body(Map.of("username","mail-admin","password",PASSWORD+" changed","remember",false)).post("/api/v1/auth/login").then().statusCode(200);
             given().header("Origin",ORIGIN).contentType("application/json").body(Map.of("token",reset,"password",PASSWORD+" changed again")).post("/api/v1/auth/email/reset").then().statusCode(401);
         }finally {ClientProxy.unwrap(accounts).setupFile="NONE";}
     }

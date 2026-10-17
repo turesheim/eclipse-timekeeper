@@ -16,6 +16,8 @@ class RecoveryOrigin {
     @ConfigProperty(name="timekeeper.auth.origin-epoch",defaultValue="1") long epoch;
 
     record Current(String origin,long epoch) { }
+    String configured() {return configured;}
+    long epoch() {return epoch;}
 
     static String validate(String value) {
         try {
@@ -43,6 +45,8 @@ class RecoveryOrigin {
             if(epoch>current.epoch()) {
                 execute(c,"UPDATE tk_recovery_control SET origin=?,epoch=? WHERE id=1",origin,epoch);
                 execute(c,"UPDATE tk_recovery_link SET consumed=TRUE WHERE consumed=FALSE");
+                execute(c,"UPDATE tk_passkey_ceremony SET consumed=TRUE WHERE consumed=FALSE");
+                execute(c,"DELETE FROM tk_auth_session");
             }
             return null;
         });

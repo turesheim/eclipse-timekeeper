@@ -53,11 +53,13 @@ mode to 0644, set `TIMEKEEPER_SERVER_SETUP_FILE=/config/account-setup.json` in
 
 ## Existing data and accounts
 
-Back up before upgrading. Schema 3 upgrades only the exact canonical server
-schema 1 or 2, preserving owner IDs, UUIDs, timestamps, relations, versions and
+Back up before upgrading. Schema 4 upgrades only the exact canonical server
+schema 1, 2 or 3, preserving owner IDs, UUIDs, timestamps, relations, versions and
 revisions. PostgreSQL upgrades transactionally under a database advisory lock.
 Stop both replicas for the first schema upgrade: an older replica cannot serve
-schema 3. Upgrading is refused by default. After backing up and stopping both
+schema 4. Existing browser sessions are ended because earlier versions did not
+record their origin and browser binding; passwords and Eclipse API tokens remain
+valid. Upgrading is refused by default. After backing up and stopping both
 older replicas, set `TIMEKEEPER_ALLOW_SCHEMA_UPGRADE=true` in `.env` (or the JVM
 environment), select the same new image for both replicas, and start them. Remove
 the flag after successful migration. A fresh database needs no upgrade flag.
@@ -224,18 +226,89 @@ Choose the intended long-term hostname when possible, but migration is supported
    the public origin through the upgrade wizard. The first epoch is 1. Use a
    strictly larger value even when deliberately returning to an earlier hostname.
 3. Start the new configuration consistently. The database records the origin and
-   epoch; a stale/mismatched replica refuses mail recovery. All previous email
-   links are invalidated and pending deliveries recheck the epoch. Ask users to
+   epoch; a stale/mismatched replica refuses browser sign-in and mail recovery.
+   Existing browser sessions, pending passkey requests and previous email links
+   are invalidated; pending deliveries recheck the epoch. Ask users to
    request fresh verification/reset links at the new address. Old hostname cookies
    do not transfer; users sign in again at the new hostname.
 
 Restarting with the same origin/epoch leaves unexpired links usable. Restoring a
 backup or importing from another host retains verified addresses and the stored
-origin; configure a newer epoch before enabling mail at a different origin.
+origin; carry forward that epoch for the same origin, or configure a strictly
+newer epoch before starting at a different origin, even with mail disabled.
 Protect dumps and mail configuration as credentials. Current native and Compose
 backups include mail settings and the SMTP password. Restoring a schema-2 native
-backup upgrades its database to schema 3 and keeps the target's current SMTP
+backup upgrades its database to schema 4 and keeps the target's current SMTP
 configuration, because older backups did not contain those settings.
+
+## Passkeys
+
+Sign in with a password, open **My Account → Passkeys**, and choose **Add
+passkey**. Give it a name and confirm your current password or a registered
+passkey. Your browser handles Touch ID, device PIN, password manager or security
+key selection. You can register several passkeys; a synced passkey can be used
+from several devices. The list shows creation and last-used dates in your account
+time zone. Names can be changed later.
+
+Use **Sign in with a passkey** on the sign-in page. No username is required.
+**Remember me** has the same cookie lifetime as password sign-in. Canceling a
+browser prompt returns to the form; it does not start another prompt. Password
+sign-in remains available. API-token sessions cannot add or remove passkeys;
+sign in with your account first. Administrators cannot enroll keys for other
+users.
+
+Removing a passkey requires fresh password or passkey proof and immediately ends
+sessions established with that key on every replica. Removing the key used for
+the current session signs you out. Removal does not delete it from your password
+manager; remove the saved entry there separately. You may remove the last key
+because your password remains available. Changing your password retains passkeys
+but ends existing sessions and API tokens. Explicit operator or email recovery
+revokes passkeys too; enroll replacements after recovery. If every device is
+lost, use your password, verified-email recovery, or operator recovery.
+
+### Configure the origin and RP
+
+Deployed passkeys require HTTPS with a DNS hostname. Set
+`TIMEKEEPER_PUBLIC_ORIGIN` to the exact browser address, without a trailing slash
+or path. `TIMEKEEPER_PASSKEY_RP_ID=AUTO` selects that hostname without its port;
+you can pin it explicitly to the same hostname. Subdomains, unrelated domains,
+wildcards and forwarded request headers do not select the RP. IP-based addresses
+do not offer passkeys; password sign-in remains available. HTTPS `localhost` is
+supported for isolated development tests.
+
+For `https://seshat.tailad1f0.ts.net:8443`, use RP
+`seshat.tailad1f0.ts.net`. Tailscale Serve or DSM Reverse Proxy terminates HTTPS;
+the container still listens on its private HTTP address. See the
+[Tailscale guide](TAILSCALE.md). Do not create a separate Tailscale instance.
+
+Compose passes `TIMEKEEPER_PASSKEYS_ENABLED` (default `true`) and
+`TIMEKEEPER_PASSKEY_RP_ID` (default `AUTO`) to both replicas. For DSM, stop the
+package and set `timekeeper.auth.passkeys-enabled` or
+`timekeeper.auth.passkey-rp-id` in retained `config/mail.properties`, then start
+it in Package Center. These operator settings survive upgrades and protected
+native backups. Disabling passkeys keeps credential records and password access.
+
+Changing the network, server IP or proxy while keeping the HTTPS hostname and
+port unchanged preserves passkeys, sessions and pending requests. A port change
+keeps the RP, so passkeys remain compatible, but changes the exact origin: follow
+the coordinated epoch cutover above and sign in again. Browser cookies are scoped
+to hosts, not ports; retired ports cannot use the new origin's browser authority.
+
+An unrelated hostname requires new passkeys. Follow the cutover procedure, using
+a strictly newer epoch on every replica, and sign in at the new address with the
+existing password or recovery method. Add and test a replacement key there before
+removing old ones. Old-RP credentials are identified as unavailable at this server;
+their public keys are retained for owner review, not relabeled. This path works
+when the old VPN hostname has already disappeared. Accounts, work records,
+passwords, verified email addresses and Eclipse tokens keep their ownership.
+There is no cross-host redirect carrying authentication secrets.
+
+To roll back an origin configuration, keep the current database and use an epoch
+higher than every previously deployed value, including on the old hostname. Never
+lower the epoch or restore an older authentication backup merely to undo a routing
+change. A schema-3 binary cannot serve schema 4: rolling back that binary requires
+a matching pre-upgrade backup and loses later changes. Perform backup recovery
+offline and account for revoked credentials as described below.
 
 ## Eclipse and personal API tokens
 
@@ -269,13 +342,16 @@ Configure the file, restart the replicas, then choose **Recover account** in the
 web client. Enter the username, the new password twice, and the recovery code.
 The username is also used as the display name.
 Recovery preserves owner IDs and the existing administrator role, can re-enable
-a disabled account, and revokes all its prior sessions/API tokens. For an
+a disabled account, and revokes all its prior passkeys, pending passkey requests,
+sessions and API tokens. For an
 unclaimed legacy owner it establishes a normal user account. It cannot create
 an administrator after bootstrap. Codes expire and are single-use across
 restarts and replicas; do not use recovery to transfer another user's data.
 
 Protect database dumps, deployment secrets and operator configuration as
 administrative credentials. Backups include account/password/token hashes and
-session state. Restoring an older backup can restore credentials revoked after
-that backup: revoke sessions/tokens or use explicit recovery for affected
+session state, passkey public keys, opaque user handles, revocation records and
+short-lived challenges. No private keys or biometric data are stored. Portable
+work-data exports do not contain passkey records. Restoring an older backup can
+restore credentials revoked after that backup: use explicit recovery for affected
 accounts before exposing a restored deployment.

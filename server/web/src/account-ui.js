@@ -39,12 +39,12 @@ export function validatePassword(password, confirmation) {
 export function section(view, title) {
   const value = node('section', undefined, 'card account-card'); value.append(node('h2', title)); view.root.append(value); return value;
 }
-export function form(view, title, action, work) {
+export function form(view, title, action, work, {canSubmit = () => true} = {}) {
   const card = section(view, title), value = node('form'), feedback = node('p', '', 'form-feedback'); feedback.setAttribute('role', 'status');
-  const submit = node('button', action, 'btn btn-primary'); submit.type = 'submit'; submit.disabled = !view.canWrite;
+  const submit = node('button', action, 'btn btn-primary'); submit.type = 'submit'; submit.disabled = !view.canWrite || !canSubmit();
   value.addEventListener('input', () => view.dirty.add(value)); value.addEventListener('change', () => view.dirty.add(value));
   value.addEventListener('submit', event => {
-    event.preventDefault(); void view.run(() => work({value, feedback, submit}), {submit, feedback, write: true});
+    event.preventDefault(); void view.run(() => work({value, feedback, submit}), {submit, feedback, write: true, canSubmit});
   });
   card.append(value);
   return {value, feedback, submit, finish() {value.append(feedback, submit);}};

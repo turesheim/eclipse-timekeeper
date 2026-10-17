@@ -4,6 +4,7 @@ A shared Linux network namespace stands in for DSM host networking. It does not
 emulate Package Center or the Container Manager resource worker.
 """
 import json
+import re
 from pathlib import Path
 import shutil
 import time
@@ -69,7 +70,11 @@ def verify(command,database_container,folder,image):
                 '-H','Host: '+host,endpoint+'/web/')
             if response.stdout!='400':raise AssertionError('Unconfigured Host bypassed the allowlist')
         for username,owner in (('account0','owner-a'),('account1','owner-β')):
-            response=command('docker','exec','-i',name,'curl','-fsS','-H','Content-Type: application/json',
+            origin=properties['timekeeper.auth.public-origin']
+            status=command('docker','exec',name,'curl','-fsS','-D','-','-o','/dev/null','-H','Origin: '+origin,endpoint+'/api/v1/auth/status')
+            binding=re.search(r'(?im)^set-cookie:\s*(__Host-timekeeper-browser=[^;\r\n]+)',status.stdout)
+            if not binding:raise AssertionError('Configured native server did not establish the browser binding')
+            response=command('docker','exec','-i',name,'curl','-fsS','-H','Content-Type: application/json','-H','Origin: '+origin,'-H','Cookie: '+binding.group(1),
                 '--data-binary','@-',endpoint+'/api/v1/auth/login',
                 input=json.dumps({'username':username,'password':'migration password fixture','remember':False}))
             if json.loads(response.stdout)['ownerId']!=owner:raise AssertionError('Migrated login changed data ownership')

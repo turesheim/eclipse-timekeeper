@@ -73,7 +73,7 @@ func maintenanceConnection(root string) (Settings, string, int, error) {
 		return s, "", 0, err
 	}
 	schema := 0
-	for _, version := range []int{2, currentSchema} {
+	for version := 2; version <= currentSchema; version++ {
 		if value == fmt.Sprintf("17\n0\n%d|READY", version) {
 			schema = version
 		}
@@ -299,20 +299,15 @@ func restore(root, path, resources string) error {
 		return err
 	}
 	defer reader.Close()
-	before, after := offlineSchemaSQL, "\nSET search_path=public;\n"
-	if manifest.ServerSchema == 2 && s.Release.Schema == currentSchema {
-		before += "DROP TABLE IF EXISTS public.tk_recovery_link,public.tk_recovery_address,public.tk_recovery_control;\n"
-		migration, err := os.ReadFile(filepath.Join(resources, "recovery-v3.sql"))
-		if err != nil {
-			return err
-		}
-		after += string(migration) + fmt.Sprintf("\nUPDATE tk_schema SET schema_version=%d WHERE id=1;\n", currentSchema)
-	}
-	guard, err := schemaGuard(resources, s.Release.Schema)
+	cleanup, err := prepareOlderRestoreSQL(resources, s.Release.Schema, manifest.ServerSchema)
 	if err != nil {
 		return err
 	}
-	after += guard
+	upgrade, err := schemaUpgradeSQL(resources, manifest.ServerSchema, s.Release.Schema)
+	if err != nil {
+		return err
+	}
+	before, after := offlineSchemaSQL+cleanup, "\nSET search_path=public;\n"+upgrade
 	if err = pgRun(nativePSQL, s.DatabasePort, s.Role, password, s.Database,
 		[]string{"-X", "-q", "-w", "--single-transaction", "--file=-", "-v", "ON_ERROR_STOP=1"},
 		io.MultiReader(strings.NewReader(before), reader, strings.NewReader(after)), io.Discard); err != nil {

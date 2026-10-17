@@ -24,6 +24,8 @@ sys.path.insert(0, str(ROOT / 'common/api/tests'))
 import http_acceptance as contract
 from configure_accounts import create_challenge
 from compose_readiness import wait_ready as wait_for_replicas
+from package_deployment import package as package_deployment
+import tarfile
 
 
 def main():
@@ -37,8 +39,13 @@ def main():
     (output / 'acceptance.json').unlink(missing_ok=True)
     temporary = Path(tempfile.mkdtemp(prefix='timekeeper-compose-'))
     deployment = temporary / 'deploy'
-    shutil.copytree(ROOT / 'server/deploy', deployment, ignore=shutil.ignore_patterns('.env', 'state', '__pycache__'))
-    shutil.copyfile(ROOT / 'server/scripts/configure_accounts.py', deployment / 'configure_accounts.py')
+    # Exercise the actual deployment artifact, including its offline migration
+    # resources, rather than an incomplete copy of the source directory.
+    archive=temporary/'deployment.tar.gz'
+    commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+    package_deployment(archive,commit)
+    with tarfile.open(archive) as packaged:
+        packaged.extractall(deployment,filter='data')
     state = temporary / 'state'
     with socket.socket() as sock:
         sock.bind(('127.0.0.1', 0))

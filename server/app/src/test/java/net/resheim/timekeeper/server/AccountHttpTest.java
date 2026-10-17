@@ -50,6 +50,7 @@ class AccountHttpTest {
     }
     @Test void browserSessionsUseCsrfAndAccountBoundDataAndLogoutRevokesOnlyTheCurrentSession() throws Exception {
         var admin=setup();
+        var passkeys=call(admin,"GET","/auth/passkeys",null,false);assertEquals(200,passkeys.statusCode());assertFalse(node(passkeys.asString()).path("enabled").asBoolean());
         assertEquals(200,call(admin,"GET","/me",null,false).statusCode());
         var labels=call(admin,"GET","/labels",null,false);assertEquals(8,node(labels.asString()).get("items").size(),"New account did not receive owned default labels");
         var input=node("{\"name\":\"Private client\",\"color\":\"#ffee00\"}");

@@ -45,6 +45,8 @@ class EmailRecoveryStoreTest {
     @TempDir Path temporary;
     EmailRecoveryStore recovery;
     RecoveryOrigin origin;
+    PasskeyRealm originalRealm;
+    BrowserSignIns signIns;
     TokenRegistry.Principal alice,bob;
     AccountStore.Issued aliceSession,bobSession;
     static final String PASSWORD="a sufficiently long initial passphrase";
@@ -55,16 +57,27 @@ class EmailRecoveryStoreTest {
         // account operation. Quiesce periodic domain writes before resetting it.
         ClientProxy.unwrap(store).stopMaintenance();
         accounts.tx(c->{lock(c);
-            for(String table:List.of("tk_recovery_link","tk_recovery_address","tk_auth_session","tk_api_token","tk_auth_challenge","tk_account","tk_active","tk_relation","tk_external_reference","tk_receipt","tk_change","tk_resource","tk_owner","tk_auth_throttle")) execute(c,"DELETE FROM "+table);
+            for(String table:List.of("tk_recovery_link","tk_recovery_address","tk_passkey_ceremony","tk_auth_session","tk_passkey_credential","tk_passkey_user","tk_api_token","tk_auth_challenge","tk_account","tk_active","tk_relation","tk_external_reference","tk_receipt","tk_change","tk_resource","tk_owner","tk_auth_throttle")) execute(c,"DELETE FROM "+table);
             execute(c,"UPDATE tk_auth_control SET bootstrap_completed=FALSE");
             execute(c,"UPDATE tk_recovery_control SET origin=NULL,epoch=0 WHERE id=1");return null;
         });
-        aliceSession=accounts.complete(challenge("SETUP",null),"alice",PASSWORD,"Alice",false);alice=accounts.session(aliceSession.secret());
-        accounts.createUser(alice,"bob",PASSWORD,"Bob",false);bobSession=accounts.login("bob",PASSWORD,false);bob=accounts.session(bobSession.secret());
+        // Establish the trusted origin before opening sessions: a cutover
+        // deliberately invalidates every session issued at the previous origin.
         origin=new RecoveryOrigin();origin.accounts=accounts;origin.configured="https://vpn.example.org:8443";origin.epoch=1;origin.initialize();
+        originalRealm=ClientProxy.unwrap(accounts).realm;useOrigin(origin);
+        aliceSession=accounts.complete(challenge("SETUP",null),"alice",PASSWORD,"Alice",false,null,issuer(BrowserSignIns.Method.SETUP));alice=accounts.session(aliceSession.secret());
+        accounts.createUser(alice,"bob",PASSWORD,"Bob",false);bobSession=login("bob",PASSWORD);bob=accounts.session(bobSession.secret());
         recovery=replica(origin);
     }
-    @AfterEach void resetSetupFile() {ClientProxy.unwrap(accounts).setupFile="NONE";}
+    @AfterEach void resetSetupFile() {ClientProxy.unwrap(accounts).setupFile="NONE";ClientProxy.unwrap(accounts).realm=originalRealm;}
+    private void useOrigin(RecoveryOrigin origin) {
+        var realm=new PasskeyRealm();realm.origin=origin;realm.configuredEnabled=true;realm.configuredRp="AUTO";
+        ClientProxy.unwrap(accounts).realm=realm;signIns=new BrowserSignIns();signIns.accounts=accounts;signIns.realm=realm;
+    }
+    private AccountStore.SessionIssuer issuer(BrowserSignIns.Method method) {
+        return signIns.issuer(signIns.begin(method,AccountPasswords.secret(),null,"fixture"));
+    }
+    private AccountStore.Issued login(String username,String password) {return accounts.login(username,password,false,issuer(BrowserSignIns.Method.PASSWORD));}
     private EmailRecoveryStore replica(RecoveryOrigin origin) {
         var result=new EmailRecoveryStore();result.accounts=accounts;result.origins=origin;return result;
     }
@@ -115,7 +128,7 @@ class EmailRecoveryStoreTest {
         assertThrows(ApiFailure.class,()->accounts.session(aliceSession.secret()));
         assertThrows(ApiFailure.class,()->registry.authenticate("Bearer "+token.path("token").asText()));
         assertThrows(ApiFailure.class,()->accounts.login("alice",PASSWORD,false));
-        var resumed=accounts.login("alice",NEXT,false);assertEquals(alice.owner(),resumed.account().path("ownerId").asText());assertTrue(resumed.account().path("administrator").asBoolean());
+        var resumed=login("alice",NEXT);assertEquals(alice.owner(),resumed.account().path("ownerId").asText());assertTrue(resumed.account().path("administrator").asBoolean());
         assertEquals(before,store.transaction(alice.owner(),()->store.list("PROJECT")));
         assertEquals(bob.owner(),accounts.session(bobSession.secret()).owner());
     }
@@ -158,7 +171,7 @@ class EmailRecoveryStoreTest {
             results.add(first.get(20,TimeUnit.SECONDS));results.add(second.get(20,TimeUnit.SECONDS));
         }
         assertEquals(1,results.stream().filter(Boolean::booleanValue).count());
-        assertEquals(alice.owner(),accounts.login("alice",NEXT,false).account().path("ownerId").asText());
+        assertEquals(alice.owner(),login("alice",NEXT).account().path("ownerId").asText());
         assertFalse(another.deliverable(links.getFirst()));
     }
 
@@ -167,7 +180,7 @@ class EmailRecoveryStoreTest {
         var external=new RecoveryOrigin();external.accounts=accounts;external.configured="https://time.example.org";external.epoch=2;external.initialize();var moved=replica(external);
         assertFalse(recovery.deliverable(old));assertThrows(ApiFailure.class,()->moved.preview(old.secret(),"RESET"));
         var fresh=moved.requestReset("alice").getFirst();assertEquals("https://time.example.org",fresh.origin());
-        moved.reset(fresh.secret(),NEXT);assertEquals(alice.owner(),accounts.login("alice",NEXT,false).account().path("ownerId").asText());
+        moved.reset(fresh.secret(),NEXT);useOrigin(external);assertEquals(alice.owner(),login("alice",NEXT).account().path("ownerId").asText());
         assertThrows(IllegalStateException.class,origin::initialize);
     }
 

@@ -29,8 +29,10 @@ def main():
     parser.add_argument('--browser', choices=('chromium','webkit','firefox'), default='chromium', help='Browser engine for this acceptance run')
     parser.add_argument('--https', action='store_true', help='Use a loopback HTTPS reverse proxy with a test-only certificate')
     parser.add_argument('--mail', action='store_true', help='Exercise delivery with a loopback-only SMTP capture fixture (requires --https)')
+    parser.add_argument('--passkeys', action='store_true', help='Use the HTTPS localhost RP for virtual WebAuthn browser tests (requires --https)')
     args = parser.parse_args()
     if args.mail and not args.https:parser.error('--mail requires --https')
+    if args.passkeys and not args.https:parser.error('--passkeys requires --https')
     digest = hashlib.sha256(args.distribution.read_bytes()).hexdigest()
     if args.distribution.with_suffix('.zip.sha256').read_text().split()[0] != digest:
         raise ValueError('Server distribution checksum mismatch')
@@ -52,7 +54,7 @@ def main():
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0)); port = sock.getsockname()[1]
         backend = f'http://127.0.0.1:{port}'
-        fixture = RecoveryFixture(data,port,https=args.https,mail=args.mail)
+        fixture = RecoveryFixture(data,port,https=args.https,mail=args.mail,hostname='localhost' if args.passkeys else '127.0.0.1')
         base = fixture.base
         environment = {**os.environ, 'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:' + str(data / 'database'), 'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry), 'TIMEKEEPER_SERVER_SETUP_FILE':str(data / 'setup.json'),
                        'TIMEKEEPER_PUBLIC_ORIGIN':base if args.https else 'NONE', 'TIMEKEEPER_DEPLOYED_AT':'2026-10-13T08:30:00Z', 'TIMEKEEPER_WEB_BUILD_COMMIT':manifest['commit'], 'TIMEKEEPER_SPK_VERSION':'1.99.0-146', **fixture.environment}
@@ -83,9 +85,9 @@ def main():
                     options+=['--config',str(config)]
                 if args.grep:options+=['--grep',args.grep]
                 command = ['npm', 'run', 'test:browser'] + (['--',*options] if options else [])
-                result = subprocess.run(command, cwd=ROOT / 'server/web', env={**environment, 'TIMEKEEPER_WEB_URL':base, 'TIMEKEEPER_WEB_TOKEN':tokens[0], 'TIMEKEEPER_WEB_READ_TOKEN':tokens[1], 'TIMEKEEPER_WEB_REGISTRY':str(registry), 'TIMEKEEPER_WEB_SETUP_CODE':code, 'TIMEKEEPER_WEB_PASSWORD':password, 'TIMEKEEPER_WEB_BROWSER':args.browser}, timeout=600)
+                result = subprocess.run(command, cwd=ROOT / 'server/web', env={**environment, 'TIMEKEEPER_WEB_URL':base, 'TIMEKEEPER_WEB_TOKEN':tokens[0], 'TIMEKEEPER_WEB_READ_TOKEN':tokens[1], 'TIMEKEEPER_WEB_REGISTRY':str(registry), 'TIMEKEEPER_WEB_SETUP_CODE':code, 'TIMEKEEPER_WEB_PASSWORD':password, 'TIMEKEEPER_WEB_BROWSER':args.browser,'TIMEKEEPER_WEB_PASSKEY_FIXTURE':'true' if args.passkeys else 'false'}, timeout=600)
                 if result.returncode: raise RuntimeError('Browser acceptance failed')
-                (output / 'acceptance.json').write_text(json.dumps({'distributionSha256':digest, 'sourceCommit':manifest['commit'], 'serverPid':process.pid, 'browser':args.browser, 'https':args.https,'loopbackSmtp':args.mail,'passed':True}, indent=2) + '\n')
+                (output / 'acceptance.json').write_text(json.dumps({'distributionSha256':digest, 'sourceCommit':manifest['commit'], 'serverPid':process.pid, 'browser':args.browser, 'https':args.https,'loopbackSmtp':args.mail,'virtualPasskeys':args.passkeys,'passed':True}, indent=2) + '\n')
             finally:
                 (output / 'transport.json').write_text(json.dumps({'authenticationRequests':fixture.events},indent=2)+'\n')
                 fixture.close()

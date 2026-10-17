@@ -14,10 +14,14 @@ import (
 var baseMigrationTables = []string{"tk_schema", "tk_owner", "tk_resource", "tk_relation", "tk_external_reference", "tk_active", "tk_receipt", "tk_change", "tk_account", "tk_auth_control", "tk_auth_challenge", "tk_api_token", "tk_auth_session", "tk_auth_throttle"}
 
 func migrationTablesFor(schema int) []string {
-	if schema == 2 {
-		return append([]string{}, baseMigrationTables...)
+	tables := append([]string{}, baseMigrationTables...)
+	if schema >= 3 {
+		tables = append(tables, "tk_recovery_control", "tk_recovery_address", "tk_recovery_link")
 	}
-	return append(append([]string{}, baseMigrationTables...), "tk_recovery_control", "tk_recovery_address", "tk_recovery_link")
+	if schema >= 4 {
+		tables = append(tables, "tk_passkey_user", "tk_passkey_credential", "tk_passkey_ceremony")
+	}
+	return tables
 }
 
 type migrationManifest struct {
@@ -101,7 +105,10 @@ func unpackMigration(path, stage, resources string) (migrationManifest, error) {
 	return manifest, nil
 }
 func fingerprintQuery(table string) string {
-	return "SELECT count(*)||'|'||COALESCE(md5(string_agg(md5(row_to_json(t)::text),'' ORDER BY md5(row_to_json(t)::text) COLLATE \"C\")),'empty') FROM public." + table + " t"
+	return fingerprintSource("public." + table)
+}
+func fingerprintSource(source string) string {
+	return "SELECT count(*)||'|'||COALESCE(md5(string_agg(md5(row_to_json(t)::text),'' ORDER BY md5(row_to_json(t)::text) COLLATE \"C\")),'empty') FROM " + source + " t"
 }
 func importPostgreSQL18(root, path, resources string) error {
 	s, password, err := maintenance(root)
@@ -159,12 +166,22 @@ func importPostgreSQL18(root, path, resources string) error {
 	before := offlineSchemaSQL + "TRUNCATE " + strings.Join(tables, ",") + ";\n"
 	after := "\nDO $timekeeper$ BEGIN\n"
 	for _, table := range migrationTablesFor(manifest.ServerSchema) {
-		after += "IF (" + fingerprintQuery(table) + ") <> '" + manifest.TableFingerprints[table] + "' THEN RAISE EXCEPTION 'Migration data fingerprint mismatch'; END IF;\n"
+		fingerprint := fingerprintQuery(table)
+		if table == "tk_auth_session" && manifest.ServerSchema < 4 && s.Release.Schema >= 4 {
+			// Verify every original session field before deliberately retiring it.
+			// row_to_json of the target's new columns would change an older hash.
+			fingerprint = fingerprintSource("(SELECT digest,owner_id,csrf,permissions,created_at,expires_at,last_seen_at,persistent,parent_digest FROM public.tk_auth_session)")
+		}
+		after += "IF (" + fingerprint + ") <> '" + manifest.TableFingerprints[table] + "' THEN RAISE EXCEPTION 'Migration data fingerprint mismatch'; END IF;\n"
 	}
 	after += "END $timekeeper$;\n"
-	if manifest.ServerSchema == 2 && s.Release.Schema == currentSchema {
-		after += fmt.Sprintf("INSERT INTO public.tk_recovery_control VALUES(1,NULL,0); UPDATE public.tk_schema SET schema_version=%d WHERE id=1;\n", currentSchema)
+	if manifest.ServerSchema < 3 && s.Release.Schema >= 3 {
+		after += "INSERT INTO public.tk_recovery_control VALUES(1,NULL,0);\n"
 	}
+	if manifest.ServerSchema < 4 && s.Release.Schema >= 4 {
+		after += "DELETE FROM public.tk_auth_session;\n"
+	}
+	after += fmt.Sprintf("UPDATE public.tk_schema SET schema_version=%d WHERE id=1;\n", s.Release.Schema)
 	guard, err := schemaGuard(resources, s.Release.Schema)
 	if err != nil {
 		return err

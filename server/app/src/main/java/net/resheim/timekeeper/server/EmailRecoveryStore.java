@@ -163,7 +163,7 @@ class EmailRecoveryStore {
         String encoded=AccountPasswords.hash(password);
         return accounts.tx(c->{lock(c);var link=valid(c,secret,"RESET");
             execute(c,"UPDATE tk_account SET password_hash=?,version=version+1 WHERE owner_id=?",encoded,link.owner());
-            revokeAll(c,link.owner());return new Reset(link.owner(),verified(c,link.owner()));
+            PasskeyCredentials.recover(c,link.owner());revokeAll(c,link.owner());return new Reset(link.owner(),verified(c,link.owner()));
         });
     }
     boolean deliverable(Delivery delivery) {

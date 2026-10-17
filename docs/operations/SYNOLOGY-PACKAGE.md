@@ -156,9 +156,11 @@ earlier pending codes; it never reopens completed account setup.
 Provisioning records an installation ID on its dedicated role/database so an
 interrupted operation can resume without taking over an unrelated object.
 Same-schema upgrades replace the pinned application image and record deployment
-time. The supported schema-2 → schema-3 upgrade runs while the package is stopped:
+time. Supported schema-2/3 → schema-4 upgrades run while the package is stopped:
 the incoming installer validates the canonical schema, saves a native pre-upgrade
-backup, and adds the recovery tables in one transaction. An interruption keeps
+backup, and adds the required recovery/passkey tables in one transaction. Old
+browser sessions are ended; account passwords, API tokens and private data remain.
+An interruption keeps
 the backup and a maintenance marker; startup stays blocked until retry completes.
 After database commit, retry publishes the new configuration without rerunning
 the migration or replacing the original backup. Other schema changes/downgrades
@@ -241,7 +243,7 @@ databases or the shared PostgreSQL package.
 ## Migrating from containerized PostgreSQL 18
 
 The supported logical transfer is **PostgreSQL 18.6 → 17.11, canonical Timekeeper
-schema 2 or 3** into a schema-3 package. Upgrade an older source using the explicit schema-upgrade procedure in
+schema 2, 3 or 4** into a schema-4 package. Upgrade an older source using the explicit schema-upgrade procedure in
 [account operations](ACCOUNTS.md) and complete its first-administrator setup before
 exporting. Existing owners must be claimed by their explicit IDs. The exporter
 refuses an older/custom schema, unfinished account setup or connected API clients.
@@ -281,11 +283,16 @@ refuses an older/custom schema, unfinished account setup or connected API client
    The current dedicated database service role/password and DSM address/port are
    retained. The importer applies only source data to the canonical PostgreSQL 17
    schema, then compares fingerprints of **all source tables before committing**
-   (14 for schema 2, 17 for schema 3). Schema-2 imports then add empty recovery
-   state and update the schema marker to 3 in that transaction. Schema-3 imports
-   retain verified/pending email addresses and recovery state. No UUID remapping
+   (14 for schema 2, 17 for schema 3, 20 for schema 4). Older imports add empty
+   passkey state, retire browser sessions without origin/browser provenance, and
+   update the schema marker to 4 in that transaction. Schema-2 imports also add
+   empty recovery state. Schema-3/4 imports retain verified/pending email
+   addresses and recovery state; schema 4 retains public credentials, opaque
+   handles and revocation records. No UUID remapping
    or timestamp conversion is performed. Configure SMTP separately for the target;
-   use a newer origin epoch if the address changes before enabling mail.
+   carry forward the source origin epoch for the same address, or configure a
+   strictly newer epoch when changing the address before starting the target,
+   including when mail is disabled. See [passkey migration](ACCOUNTS.md#configure-the-origin-and-rp).
 
 4. Start Timekeeper and sign in with an existing source account. Point clients at
    the target address and check their own data. Existing API tokens remain bound

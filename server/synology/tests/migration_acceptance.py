@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import subprocess
 from pathlib import Path
 import secrets
 import sys
@@ -24,8 +25,8 @@ DB=ROOT/'server/app/src/main/resources/db'
 def quote(value):return "'"+value.replace("'","''")+"'"
 
 
-def fixture_sql(schema=3):
-    if schema not in (2,3):raise ValueError('Unsupported fixture schema')
+def fixture_sql(schema=4):
+    if schema not in (2,3,4):raise ValueError('Unsupported fixture schema')
     sql=(DB/'schema-v1-postgresql.sql').read_text()+(DB/'auth-v2.sql').read_text()
     sql+="UPDATE tk_schema SET schema_version=2,state='READY'; UPDATE tk_auth_control SET bootstrap_completed=TRUE;\n"
     now='2026-10-14T12:34:56.123456789Z'
@@ -63,20 +64,37 @@ def fixture_sql(schema=3):
         sql+=f"INSERT INTO tk_auth_session VALUES('{secrets.token_hex(32)}',{quote(owner)},'{secrets.token_hex(32)}','READ_WRITE',{quote(now)},'2030-01-01T00:00:00Z',{quote(now)},TRUE,'{token}');\n"
         sql+=f"INSERT INTO tk_auth_challenge VALUES('{secrets.token_hex(32)}','RECOVERY',{quote(owner)},'2030-01-01T00:00:00Z',TRUE);\n"
     sql+=f"INSERT INTO tk_auth_throttle VALUES('{secrets.token_hex(32)}',4,{quote(now)});\n"
-    if schema==3:
+    if schema>=3:
         sql+=(DB/'recovery-v3.sql').read_text()
         sql+="UPDATE tk_schema SET schema_version=3; UPDATE tk_recovery_control SET origin='https://timekeeper.example.invalid',epoch=7;\n"
         for index,owner in enumerate(('owner-a','owner-β')):
             sql+=f"INSERT INTO tk_recovery_address VALUES({quote(owner)},'PRIMARY','account{index}@example.invalid','replacement{index}@example.invalid',5);\n"
             sql+=f"INSERT INTO tk_recovery_address VALUES({quote(owner)},'BACKUP','backup{index}@example.invalid',NULL,2);\n"
             sql+=f"INSERT INTO tk_recovery_link VALUES('{secrets.token_hex(32)}',{quote(owner)},'PRIMARY','replacement{index}@example.invalid','VERIFY',7,{quote(now)},'2030-01-01T00:00:00Z',FALSE);\n"
+    if schema>=4:
+        sql+=(DB/'passkeys-v4.sql').read_text()
+        sql+="UPDATE tk_schema SET schema_version=4;\n"
+        for index,owner in enumerate(('owner-a','owner-β')):
+            # Only public COSE material enters the SQL/archive. Private fixture
+            # keys stay in this process and are never printed or committed.
+            private=subprocess.run(['openssl','genpkey','-algorithm','EC','-pkeyopt','ec_paramgen_curve:P-256'],check=True,capture_output=True).stdout
+            public=subprocess.run(['openssl','pkey','-pubout','-outform','DER'],input=private,check=True,capture_output=True).stdout
+            point=public[-65:];assert len(point)==65 and point[0]==4
+            cose=bytes.fromhex('a5010203262001215820')+point[1:33]+bytes.fromhex('225820')+point[33:]
+            credential=secrets.token_urlsafe(32);identifier=str(uuid.uuid4());handle=secrets.token_urlsafe(32)
+            sql+=f"INSERT INTO tk_passkey_user VALUES({quote(owner)},{quote(handle)});\n"
+            sql+=f"INSERT INTO tk_passkey_credential VALUES('{identifier}',{quote(owner)},'{hashlib.sha256(credential.encode()).hexdigest()}',{quote(credential)},'timekeeper.example.invalid',{quote(base64.urlsafe_b64encode(cose).decode().rstrip('='))},0,TRUE,TRUE,'[\"internal\"]','Migration passkey',{quote(now)},NULL,{str(index==1)},5);\n"
+            if index==0:
+                sql+=f"INSERT INTO tk_auth_session(digest,owner_id,csrf,permissions,created_at,expires_at,last_seen_at,persistent,origin_epoch,browser_digest,passkey_id) VALUES('{secrets.token_hex(32)}',{quote(owner)},'{secrets.token_urlsafe(32)}','READ_WRITE',{quote(now)},'2030-01-01T00:00:00Z',{quote(now)},TRUE,7,'{secrets.token_hex(32)}','{identifier}');\n"
+        payload=json.dumps({'origin':'https://timekeeper.example.invalid','rpId':'timekeeper.example.invalid','epoch':7,'expectedSession':'','data':{'method':'PASSKEY','request':'fixture options'}})
+        sql+=f"INSERT INTO tk_passkey_ceremony VALUES('{secrets.token_hex(32)}','{secrets.token_hex(32)}','LOGIN',NULL,NULL,{quote(payload)},'2030-01-01T00:00:00Z',FALSE);\n"
     return sql
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--server-image')
-    parser.add_argument('--source-schema',type=int,choices=(2,3),default=3)
+    parser.add_argument('--source-schema',type=int,choices=(2,3,4),default=4)
     args=parser.parse_args()
     suffix=secrets.token_hex(4);source='timekeeper-migrate18-'+suffix;target='timekeeper-migrate17-'+suffix
     names=[]
@@ -114,13 +132,13 @@ def main():
                 'for tool in psql pg_dump pg_restore; do ln -s /usr/lib/postgresql/17/bin/$tool /var/packages/postgresql/target/bin/$tool; done; '
                 'chown -R 10001:10001 /var/packages/timekeeper')
             command('docker','cp',str(binary),target+':/var/packages/timekeeper/scripts/timekeeper-dsm')
-            release=folder/'release.json';release.write_text(json.dumps({'commit':'a'*40,'image':'ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+'a'*40,'serverSchema':3}))
+            release=folder/'release.json';release.write_text(json.dumps({'commit':'a'*40,'image':'ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+'a'*40,'serverSchema':4}))
             command('docker','cp',str(release),target+':/var/packages/timekeeper/scripts/release.json')
             blueprint=folder/'compose.yaml'
             blueprint.write_text((ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',json.loads(release.read_text())['image']))
             command('docker','exec',target,'mkdir','-p','/var/packages/timekeeper/target/project')
             command('docker','cp',str(blueprint),target+':/var/packages/timekeeper/target/project/compose.yaml')
-            for file in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','recovery-v3.sql'):
+            for file in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','recovery-v3.sql','passkeys-v4.sql'):
                 command('docker','cp',str(DB/file),target+':/var/packages/timekeeper/scripts/migration/'+file)
             env={'SYNOPKG_PKGNAME':'timekeeper','SYNOPKG_PKGDEST':'/var/packages/timekeeper/target','wizard_database':'timekeeper_fixture','wizard_database_role':'timekeeper_fixture_app',
                  'wizard_database_port':'5433','wizard_http_port':'8098','wizard_public_origin':'https://timekeeper.example.invalid','wizard_owner':'',
@@ -131,7 +149,7 @@ def main():
                 if (result.returncode==0)!=(expected==0):raise AssertionError('Native migration action failed: '+action+' '+result.stderr)
                 return result
             helper('install')
-            ddl=(DB/'schema-v1-postgresql.sql').read_text()+(DB/'auth-v2.sql').read_text()+(DB/'recovery-v3.sql').read_text()+"UPDATE tk_schema SET schema_version=3,state='READY';"
+            ddl=''.join((DB/name).read_text() for name in ('schema-v1-postgresql.sql','auth-v2.sql','recovery-v3.sql','passkeys-v4.sql'))+"UPDATE tk_schema SET schema_version=4,state='READY';"
             canonical="SET ROLE timekeeper_fixture_app; "+ddl
             command('docker','exec','-i',target,'psql','-X','-q','-v','ON_ERROR_STOP=1','-U','postgres','-p','5433','-d','timekeeper_fixture',input=canonical)
             archive.chmod(0o644);command('docker','cp',str(archive),target+':/var/packages/timekeeper/var/server/backups/migration.tar')
@@ -153,12 +171,15 @@ def main():
             command('docker','exec',target,'test','-f','/var/packages/timekeeper/var/server/config/maintenance-pending.json')
             helper('cancel-empty-import')
             helper('import-postgresql18',native_archive)
-            compared=[table for table in exporter.tables(args.source_schema) if table!='tk_schema' or args.source_schema==3]
+            compared=[table for table in exporter.tables(args.source_schema) if (table!='tk_schema' or args.source_schema==4) and (table!='tk_auth_session' or args.source_schema>=4)]
             fingerprints=client('psql',['-X','-q','-A','-t'],sql='\n'.join(exporter.fingerprint_sql(table) for table in compared))
             actual=command('docker','exec','-i',target,'psql','-X','-q','-A','-t','-U','postgres','-p','5433','-d','timekeeper_fixture',input='\n'.join(exporter.fingerprint_sql(table) for table in compared)).stdout.strip()
             if actual!=fingerprints:raise AssertionError('Migration changed source data')
             metadata=command('docker','exec',target,'psql','-X','-At','-U','postgres','-p','5433','-d','timekeeper_fixture','-c',"SELECT schema_version||'|'||state FROM tk_schema WHERE id=1").stdout.strip()
-            if metadata!='3|READY':raise AssertionError('Migration did not produce the current ready schema')
+            if metadata!='4|READY':raise AssertionError('Migration did not produce the current ready schema')
+            if args.source_schema<4:
+                sessions=command('docker','exec',target,'psql','-X','-At','-U','postgres','-p','5433','-d','timekeeper_fixture','-c','SELECT count(*) FROM tk_auth_session').stdout.strip()
+                if sessions!='0':raise AssertionError('Migration retained sessions without origin/browser provenance')
             if args.source_schema==2:
                 recovery=command('docker','exec',target,'psql','-X','-At','-U','postgres','-p','5433','-d','timekeeper_fixture','-c',"SELECT epoch FROM tk_recovery_control WHERE id=1 AND origin IS NULL; SELECT count(*) FROM tk_recovery_address; SELECT count(*) FROM tk_recovery_link").stdout.strip()
                 if recovery!='0\n0\n0':raise AssertionError('Legacy migration invented recovery data')
@@ -191,12 +212,19 @@ def main():
             if previous!=fingerprints:raise AssertionError('Recovery changed a database outside its dedicated target')
             native={}
             if args.server_image:
+                # Operators must carry forward the source origin epoch too.
+                # Importing data must never silently lower this shared fence.
+                if args.source_schema>=3:
+                    command('docker','exec','--user','10001:10001',target,'sh','-ec',
+                        "sed -i 's/timekeeper.auth.origin-epoch=1/timekeeper.auth.origin-epoch=7/' /var/packages/timekeeper/var/server/config/mail.properties")
+                    helper('prestart')
                 from native_server import verify
                 native=verify(command,target,folder,args.server_image)
-            print(json.dumps({'source':'postgres:18.6-bookworm' ,'target':'postgres:17.11-bookworm','sourceSchema':args.source_schema,'targetSchema':3,'sourceTablesCompared':len(compared),'backupTablesCompared':len(exporter.TABLES),
+            print(json.dumps({'source':'postgres:18.6-bookworm' ,'target':'postgres:17.11-bookworm','sourceSchema':args.source_schema,'targetSchema':4,'sourceTablesCompared':len(compared),'backupTablesCompared':len(exporter.TABLES),
                 'allTableFingerprintsMatch':True,'twoOwnersWithSharedResourceIds':True,'exactNanosecondTimestampsAndLargeRevisions':True,
-                'schemaMetadataUpgraded':args.source_schema==2,'verifiedAndPendingRecoveryAddressesPreserved':args.source_schema==3,
-                'accountAndTokenSessionHashesPreserved':True,'legacyRegistryPreserved':True,'usedTargetRefused':True,'fingerprintMismatchRollsBackAtomically':True,'emptyFailedImportCanBeCancelled':True,'freshInstallationRestoreWithNewServiceCredential':True,'otherDatabaseUntouched':True,**native}))
+                'schemaMetadataUpgraded':args.source_schema<4,'verifiedAndPendingRecoveryAddressesPreserved':args.source_schema>=3,
+                'passkeyCredentialsAndRevocationTombstonesPreserved':args.source_schema>=4,'legacyBrowserSessionsRevoked':args.source_schema<4,
+                'accountAndTokenHashesPreserved':True,'legacyRegistryPreserved':True,'usedTargetRefused':True,'fingerprintMismatchRollsBackAtomically':True,'emptyFailedImportCanBeCancelled':True,'freshInstallationRestoreWithNewServiceCredential':True,'otherDatabaseUntouched':True,**native}))
         finally:
             for name in names:command('docker','rm','-f','-v',name,check=False)
 
