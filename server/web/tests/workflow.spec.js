@@ -462,9 +462,9 @@ test('work session controls start once and stop independently of a task activity
 });
 test('session toolbar targets the displayed session and preserves historical tools and read-only access', async ({page,request,browser}) => {
   const username='session-tools-'+randomUUID().slice(0,8), password='independent session toolbar passphrase';
-  await api(request,'POST','/auth/users',{username,password,displayName:username,administrator:false});
+  await api(request,'POST','/auth/users',{username,password,displayName:username,email:username+'@example.org',administrator:false});
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');
-  await page.getByLabel('Username',{exact:true}).fill(username);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.locator('#login-form').getByLabel('Username',{exact:true}).fill(username);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await expect(page.locator('#status')).toHaveText('Up to date');
   const account=await (await page.request.get('/api/v1/auth/session')).json();
   const own=async(method,path,data,headers={})=>{
