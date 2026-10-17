@@ -56,7 +56,13 @@ public class ServerStore {
         });
         maintenance.scheduleWithFixedDelay(this::maintainDays,1,1,java.util.concurrent.TimeUnit.SECONDS);
     }
-    @jakarta.annotation.PreDestroy void stopMaintenance() {if(maintenance!=null) maintenance.shutdownNow();}
+    @jakarta.annotation.PreDestroy void stopMaintenance() {
+        if(maintenance==null) return;
+        maintenance.shutdownNow();
+        try {if(!maintenance.awaitTermination(5,java.util.concurrent.TimeUnit.SECONDS))
+            System.getLogger(ServerStore.class.getName()).log(System.Logger.Level.WARNING,"Day-boundary maintenance did not stop within the shutdown deadline");}
+        catch(InterruptedException stopped) {Thread.currentThread().interrupt();}
+    }
     private static String partitionDate(String zone,Instant now) {
         return zone+":"+now.atZone(java.time.ZoneId.of(zone)).toLocalDate();
     }

@@ -32,7 +32,11 @@ class RecoveryFixture:
                         self.send_response(response.status)
                         for key,value in response.getheaders():
                             if key.lower() not in ('connection','content-length','transfer-encoding'):self.send_header(key,value)
-                        self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
+                        # A 304 describes the cached representation; advertising
+                        # its empty response body as length zero corrupts module
+                        # revalidation in browsers. 204/HEAD have no body either.
+                        if response.status not in (204,304) and self.command!='HEAD':self.send_header('Content-Length',str(len(data)))
+                        self.end_headers();self.wfile.write(data)
                     except (BrokenPipeError,ConnectionResetError):pass
                     finally:connection.close()
                 do_GET=do_POST=do_PUT=do_DELETE=do_OPTIONS=do_HEAD=relay

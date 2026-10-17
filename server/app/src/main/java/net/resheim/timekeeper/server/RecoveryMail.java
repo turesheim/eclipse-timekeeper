@@ -28,7 +28,11 @@ class RecoveryMail {
 
     void initialize() {if(enabled) origin.initialize();}
     boolean enabled() {return enabled;}
-    @PreDestroy void close() {workers.shutdownNow();workers.getQueue().clear();}
+    @PreDestroy void close() {
+        workers.shutdownNow();workers.getQueue().clear();
+        try {if(!workers.awaitTermination(5,TimeUnit.SECONDS)) LOG.warn("Recovery mail workers did not stop within the shutdown deadline");}
+        catch(InterruptedException stopped) {Thread.currentThread().interrupt();}
+    }
 
     boolean enqueue(Runnable work) {
         if(!enabled) return false;

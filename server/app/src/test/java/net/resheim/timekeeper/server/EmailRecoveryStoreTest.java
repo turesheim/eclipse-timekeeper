@@ -51,6 +51,9 @@ class EmailRecoveryStoreTest {
     static final String NEXT="another sufficiently long password";
 
     @BeforeEach void setup() throws Exception {
+        // This fixture removes all owners/resources between cases, unlike any
+        // account operation. Quiesce periodic domain writes before resetting it.
+        ClientProxy.unwrap(store).stopMaintenance();
         accounts.tx(c->{lock(c);
             for(String table:List.of("tk_recovery_link","tk_recovery_address","tk_auth_session","tk_api_token","tk_auth_challenge","tk_account","tk_active","tk_relation","tk_external_reference","tk_receipt","tk_change","tk_resource","tk_owner","tk_auth_throttle")) execute(c,"DELETE FROM "+table);
             execute(c,"UPDATE tk_auth_control SET bootstrap_completed=FALSE");
