@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 @QuarkusTest @TestProfile(AccountUploadsTest.Profile.class)
 class AccountUploadsTest {
     public static class Profile implements QuarkusTestProfile {
-        public Map<String,String> getConfigOverrides() {return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:account_upload_tests");}
+        public Map<String,String> getConfigOverrides() {return ArchiveTestDatabase.configuration("upload","jdbc:h2:mem:account_upload_tests");}
     }
     @Inject ServerStore store;
     private static String encoded(byte[] bytes) {return Base64.getEncoder().encodeToString(bytes);}

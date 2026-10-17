@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 @QuarkusTest @TestProfile(AccountArchiveHttpTest.Profile.class)
 class AccountArchiveHttpTest {
     public static class Profile implements QuarkusTestProfile {
-        public Map<String,String> getConfigOverrides() {return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:account_archive_http_tests");}
+        public Map<String,String> getConfigOverrides() {return ArchiveTestDatabase.configuration("http","jdbc:h2:mem:account_archive_http_tests");}
     }
     @Inject ServerStore store;
     private Response call(String token,String method,String path,JsonNode body,String match,String key) {

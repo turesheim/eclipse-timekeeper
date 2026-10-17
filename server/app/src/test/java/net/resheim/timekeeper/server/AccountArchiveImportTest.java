@@ -17,13 +17,14 @@ import net.resheim.eclipse.timekeeper.service.Commands.*;
 @QuarkusTest @TestProfile(AccountArchiveImportTest.Profile.class)
 class AccountArchiveImportTest {
     public static class Profile implements QuarkusTestProfile {
-        public Map<String,String> getConfigOverrides() {return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:account_archive_import_tests");}
+        public Map<String,String> getConfigOverrides() {return ArchiveTestDatabase.configuration("import","jdbc:h2:mem:account_archive_import_tests");}
     }
     @Inject ServerStore store;
     @Inject AccountArchive archives;
     @Inject ContractInputs inputs;
     @Inject CommandReceipts receipts;
     @Inject TokenRegistry tokens;
+    private static final String TARGET_PASSWORD="The target keeps its own passphrase";
     private AccountArchiveImport importer() {return new AccountArchiveImport(store,inputs,receipts);}
     @BeforeEach void reset() throws Exception {
         var actual=io.quarkus.arc.ClientProxy.unwrap(store);actual.stopMaintenance();
@@ -34,6 +35,12 @@ class AccountArchiveImportTest {
             c.commit();
         }
         for(String owner:List.of("a","b")) store.transaction(owner,()->{store.updateProfile("UTC");return null;});
+        String passwordHash=AccountPasswords.hash(TARGET_PASSWORD);
+        store.transaction("b",()->{
+            store.update("UPDATE tk_account SET username='archive-target',display_name='Archive target',password_hash=?,state='ENABLED',administrator=FALSE WHERE owner_id=?",passwordHash,store.owner());
+            store.update("DELETE FROM tk_recovery_address WHERE owner_id=?",store.owner());
+            store.update("INSERT INTO tk_recovery_address VALUES(?,'PRIMARY',?,NULL,1)",store.owner(),"target-private@example.invalid");return null;
+        });
     }
     private ObjectNode source() throws Exception {
         store.transaction("a",()->{
@@ -65,6 +72,10 @@ class AccountArchiveImportTest {
         var imported=store.transaction("b",()->importer().apply(id,true,review.etag()));assertEquals(201,imported.status());
         store.transaction("b",()->{
             assertEquals(identity,AccountStore.account(store.current().connection(),store.owner(),false));assertFalse(identity.path("administrator").asBoolean());
+            try(var query=store.statement("SELECT password_hash FROM tk_account WHERE owner_id=?",store.owner());var rows=query.executeQuery()) {assertTrue(rows.next());assertTrue(AccountPasswords.matches(TARGET_PASSWORD,rows.getString(1)));}
+            catch(java.sql.SQLException failure) {throw new RuntimeException(failure);}
+            try(var query=store.statement("SELECT verified_address FROM tk_recovery_address WHERE owner_id=? AND slot='PRIMARY'",store.owner());var rows=query.executeQuery()) {assertTrue(rows.next());assertEquals("target-private@example.invalid",rows.getString(1));}
+            catch(java.sql.SQLException failure) {throw new RuntimeException(failure);}
             assertEquals("Europe/Oslo",store.profile().path("zoneId").asText());
             var session=store.list("WORK_SESSION").getFirst();var project=store.list("PROJECT").getFirst();var activity=store.list("ACTIVITY").getFirst();var task=store.list("TASK").getFirst();
             assertEquals(project.get("id"),session.get("projectId"));assertEquals(project.get("clientId"),session.get("clientId"));assertEquals(project.get("id"),task.get("projectId"));assertEquals(task.get("id"),activity.get("taskId"));
@@ -74,6 +85,7 @@ class AccountArchiveImportTest {
             assertTrue(store.list("IMPORT_JOB").isEmpty());assertEquals(1,store.list("ARCHIVE_AUDIT").size());assertEquals(1,store.list("ARCHIVE_IMPORT").size());assertTrue(store.list(AccountUploads.CHUNK).isEmpty());return null;
         });
         var saved=work();var replay=store.transaction("b",()->importer().apply(id,true,review.etag()));assertEquals(imported.body().toString(),replay.body().toString());assertEquals(saved,work());
+        assertEquals("b",tokens.authenticate("Bearer test-b").owner());
         UUID reselected=stage(archive);var duplicate=store.transaction("b",()->importer().preview(reselected,false));assertTrue(duplicate.body().path("alreadyImported").asBoolean());assertFalse(duplicate.body().path("canImport").asBoolean());assertEquals(saved,work());
         var changed=archive.deepCopy();((ObjectNode)changed.path("work").path("projects").get(0)).put("name","Changed after restore");UUID changedId=stage(changed);
         assertEquals(409,assertThrows(ApiFailure.class,()->store.transaction("b",()->importer().preview(changedId,false))).status);assertEquals(saved,work());

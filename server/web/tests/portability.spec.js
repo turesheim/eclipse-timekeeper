@@ -18,7 +18,7 @@ async function own(page,method,path,data,extra={}) {
 }
 async function account(page,request) {
   const username='archive-'+randomUUID().slice(0,8),password='Independent archive account passphrase';
-  const created=await request.post('/api/v1/auth/users',{headers:{Authorization:'Bearer '+rootToken},data:{username,password,displayName:'Private archive account',email:username+'@example.invalid',administrator:false}});expect(created.status()).toBe(201);
+  const created=await request.post('/api/v1/admin/users',{headers:{Authorization:'Bearer '+rootToken},data:{username,password,displayName:'Private archive account',email:username+'@example.invalid',administrator:false}});expect(created.status()).toBe(201);
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');await page.locator('#username').fill(username);await page.locator('#password').fill(password);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
   const client=await own(page,'POST','/clients',{name:'Private client',color:'#176653'});expect(client.status()).toBe(201);
   const project=await own(page,'POST','/projects',{name:'Archive project',clientId:(await client.json()).id});expect(project.status()).toBe(201);

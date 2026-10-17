@@ -137,7 +137,7 @@ class Replicas:
         # migration scenarios explicitly exercise the offline operator override.
         control=self.command('docker','exec',self.database,'psql','-U','timekeeper','-d','timekeeper','-X','-A','-t','-c','SELECT epoch FROM tk_recovery_control WHERE id=1',check=False)
         current=int(control.stdout.strip()) if control.returncode==0 and control.stdout.strip().isdigit() else 0
-        if stale or epoch>current and not managed:environment['TIMEKEEPER_SETTINGS_RECOVERY']='true'
+        if stale or current>0 and epoch>current and not managed:environment['TIMEKEEPER_SETTINGS_RECOVERY']='true'
         env=self.folder/('api-'+str(self.generation)+'.env');env.write_text(''.join(key+'='+value+'\n' for key,value in environment.items()));env.chmod(0o600)
         self.command('docker','run','-d','--name',name,'--network',self.network,'--ip',self.addresses[index],
             '-p','127.0.0.1::8080','--read-only','--tmpfs','/tmp','--env-file',str(env),'-v',str(self.config)+':/config:ro',self.args.server_image)

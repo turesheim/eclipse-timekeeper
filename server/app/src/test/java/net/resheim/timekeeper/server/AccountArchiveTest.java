@@ -16,7 +16,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.CreateProject;
 @QuarkusTest @TestProfile(AccountArchiveTest.Profile.class)
 class AccountArchiveTest {
     public static class Profile implements QuarkusTestProfile {
-        public Map<String,String> getConfigOverrides() {return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:account_archive_tests");}
+        public Map<String,String> getConfigOverrides() {return ArchiveTestDatabase.configuration("export","jdbc:h2:mem:account_archive_tests");}
     }
     @Inject AccountArchive archives;
     @Inject ServerStore store;
@@ -33,7 +33,13 @@ class AccountArchiveTest {
             store.update("INSERT INTO tk_passkey_credential VALUES(?,?,?,?,?,?,0,FALSE,FALSE,'[]',?,?,NULL,FALSE,0)",UUID.randomUUID(),store.owner(),"1".repeat(64),"excluded-credential-id","example.invalid","excluded-public-key","Private device","2026-01-01T00:00:00Z");
             new ImportLedger(store).create("Private import audit",hash("source"),"Europe/Oslo",hash("file"),hash("plan"));return null;
         });
-        store.transaction("b",()->{store.service().createProject(new CreateProject("OTHER ACCOUNT MUST STAY PRIVATE"));return null;});
+        store.transaction("b",()->{
+            store.service().createProject(new CreateProject("OTHER ACCOUNT MUST STAY PRIVATE"));
+            store.update("INSERT INTO tk_recovery_address VALUES(?,'PRIMARY',?,NULL,1)",store.owner(),"other-private@example.invalid");return null;
+        });
+        store.transaction("a",()->{
+            store.update("UPDATE tk_service_settings SET saved_smtp_password=?,effective_smtp_password=? WHERE id=1","excluded-global-smtp-secret","excluded-global-smtp-secret");return null;
+        });
         java.nio.file.Path path;
         try(var download=archives.download(alice)) {
             path=download.file();assertTrue(download.length()>0);
@@ -46,7 +52,7 @@ class AccountArchiveTest {
                 assertEquals("alice-backup@example.invalid",value.path("account").path("recoveryAddresses").get(0).path("verifiedAddress").asText());
                 assertEquals("Private device",value.path("account").path("passkeyMetadata").get(0).path("name").asText());
                 assertTrue(value.path("importHistory").size()>0);assertTrue(text.contains("Private import audit"));
-                for(String secret:List.of("OTHER ACCOUNT MUST STAY PRIVATE","excluded-opaque-handle","excluded-credential-id","excluded-public-key","1".repeat(64),alice.digest(),alice.legacyDigest())) assertFalse(text.contains(secret));
+                for(String secret:List.of("OTHER ACCOUNT MUST STAY PRIVATE","other-private@example.invalid","excluded-global-smtp-secret","excluded-opaque-handle","excluded-credential-id","excluded-public-key","1".repeat(64),alice.digest(),alice.legacyDigest())) assertFalse(text.contains(secret));
                 for(String field:List.of("password_hash","public_key","credential_id","user_handle","csrf","smtpPassword","effectiveSmtpPassword","serviceSettings")) assertFalse(text.contains('"'+field+'"'));
                 assertTrue(new String(zip.getInputStream(zip.getEntry("projects.csv")).readAllBytes(),StandardCharsets.UTF_8).contains("'=Private formula name"));
                 assertTrue(text.contains("=Private formula name"));
