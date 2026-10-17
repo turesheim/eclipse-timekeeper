@@ -250,11 +250,11 @@ export async function renderImports(view, zone) {
     historyList.replaceChildren();
     const rows = [...historyItems].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).map(job=>{
       const actions = node('div',undefined,'token-actions');
-      if(job.state==='IMPORTING') actions.append(button('Resume',()=>void view.run(async()=>{
+      if(job.state==='IMPORTING') actions.append(button('Resume',()=>void view.run(()=>locked(async()=>{
         resume = (await api.request(`/imports/jobs/${job.id}`)).data;if(!view.valid()) return;
         sourceZone.value = resume.sourceZone;dateFormat.value = resume.sourceDateFormat || 'ISO';parsed = plan = null;work.hidden = true;file.value = '';createKey = null;
         upload.feedback.textContent = 'Choose the original CSV, source user and row exclusions to resume.';file.focus();
-      })));
+      }),{write:true})));
       if(['IMPORTING','IMPORTED','BLOCKED','UNDOING'].includes(job.state)) {
         const undo = button(job.state==='UNDOING' ? 'Resume Undo' : 'Undo import',()=>void view.run(()=>undoReview(job)));undo.disabled = !view.canWrite;actions.append(undo);
       }

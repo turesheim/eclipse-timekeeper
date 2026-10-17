@@ -71,7 +71,8 @@ test('Toggl import resumes committed batches after a lost reply and reload, then
   const job = (await api(request,'/imports')).items.find(value=>value.selectedEntries===201);expect(job.nextBatch).toBe(1);expect(job.importedEntries).toBe(100);
   page.once('dialog',dialog=>dialog.accept());await page.reload();await expect(page.getByRole('heading',{name:'Import history',exact:true})).toBeVisible();
   await expect(page.getByLabel('Detailed Report CSV',{exact:true})).toHaveValue('');
-  await page.getByRole('button',{name:'Resume',exact:true}).click();await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles(file);
+  await page.getByRole('button',{name:'Resume',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Choose the original CSV, source user and row exclusions to resume.');
+  await expect(page.getByLabel('Detailed Report CSV',{exact:true})).toBeEnabled();await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles(file);
   await page.getByRole('button',{name:'Read CSV',exact:true}).click();await page.getByRole('button',{name:'Review mappings',exact:true}).click();
   await expect(page.getByLabel('New client name',{exact:true})).toBeDisabled();
   await page.getByRole('button',{name:'Review server matches',exact:true}).click();await page.getByRole('button',{name:'Resume import',exact:true}).click();
