@@ -450,5 +450,4 @@ Undo with explicit edited-record decisions. See the
 
 Work sessions support an optional project in start, record and edit dialogs.
 Selecting a project selects its client; changing to a different client clears the
-project. Calendar movement, resizing and copying retain the project. Toggl work-
-session imports review projects under their client without creating task activities.
+project. Calendar movement, resizing and copying retain the project. Toggl work-session imports review projects under their client without creating task activities.

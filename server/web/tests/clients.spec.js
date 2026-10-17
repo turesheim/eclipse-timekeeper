@@ -93,7 +93,9 @@ test('optional work-session projects select their client and survive start, stop
     const direct=await (await api(request,'GET','/work-sessions/'+started.id)).json();expect(direct.projectId).toBeNull();expect(direct.clientId).toBe(clients[1].id);
     await page.getByRole('button',{name:'Record work session',exact:true}).click();await page.getByLabel('Title',{exact:true}).fill(prefix+' manual');
     await page.getByLabel('Project (optional)',{exact:true}).selectOption(project.id);await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-20T08:00');await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2025-10-20T16:00');
-    await page.setViewportSize({width:390,height:844});await page.screenshot({path:'test-results/work-session-project-narrow.png',fullPage:true});await save(page);
+    await page.setViewportSize({width:390,height:844});await page.getByLabel('Project (optional)',{exact:true}).scrollIntoViewIfNeeded();
+    const projectBox=await page.getByLabel('Project (optional)',{exact:true}).boundingBox();expect(projectBox.x).toBeGreaterThanOrEqual(0);expect(projectBox.x+projectBox.width).toBeLessThanOrEqual(390);
+    await page.screenshot({path:'test-results/work-session-project-narrow.png',fullPage:true});await save(page);
     const all=(await (await api(request,'GET','/work-sessions?projectId='+project.id)).json()).items;sessions.push(...all);expect(all).toHaveLength(1);expect(all[0].title).toBe(prefix+' manual');expect(all[0].clientId).toBe(clients[0].id);
   } finally {
     for(const [collection,records] of [['work-sessions',sessions],['projects',project ? [project]:[]],['clients',clients]]) for(const record of records) {
