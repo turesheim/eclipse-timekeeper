@@ -18,6 +18,7 @@ public class AccountResource {
     @Inject RequestIdentity identity;
     @Inject BrowserOrigins origins;
     @Inject ServerInfo serverInfo;
+    @Inject RecoveryMail recoveryMail;
     @Context UriInfo uri;
     @Context HttpHeaders headers;
     private static String text(JsonNode input,String field,int limit) {
@@ -35,13 +36,15 @@ public class AccountResource {
     @GET @Path("/status") public JsonNode status() {
         ContractInputs.queries(uri.getQueryParameters());var result=object();
         result.put("setupRequired",accounts.status().path("setupRequired").asBoolean());
-        result.put("spkVersion",serverInfo.spkVersion());return result;
+        result.put("spkVersion",serverInfo.spkVersion());result.put("emailRecoveryEnabled",recoveryMail.enabled());return result;
     }
     @POST @Path("/setup") public Response setup(JsonNode body) {return complete(body,false);}
     @POST @Path("/recover") public Response recover(JsonNode body) {return complete(body,true);}
     private Response complete(JsonNode body,boolean recovery) {
-        origin();ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("SetupInput",body);
-        return issued(accounts.complete(text(value,"code",100),text(value,"username",200),text(value,"password",1024),text(value,"displayName",400),recovery));
+        origin();ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate(recovery ? "SetupInput" : "EmailSetupInput",body);
+        var result=accounts.complete(text(value,"code",100),text(value,"username",200),text(value,"password",1024),text(value,"displayName",400),recovery,recovery ? null : text(value,"email",320));
+        if(!recovery) recoveryMail.initialVerification(result.account().path("ownerId").asText());
+        return issued(result);
     }
     @POST @Path("/login") public Response login(JsonNode body) {
         origin();ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("LoginInput",body);
@@ -80,7 +83,8 @@ public class AccountResource {
     @GET @Path("/users") public JsonNode users() {ContractInputs.queries(uri.getQueryParameters());return accounts.users(identity.principal());}
     @POST @Path("/users") public Response user(JsonNode body) {
         origin();ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("UserCreateInput",body);
-        var user=accounts.createUser(identity.principal(),text(value,"username",200),text(value,"password",1024),text(value,"displayName",400),flag(value,"administrator"));return userReply(201,user);
+        var user=accounts.createUser(identity.principal(),text(value,"username",200),text(value,"password",1024),text(value,"displayName",400),flag(value,"administrator"),text(value,"email",320));
+        recoveryMail.initialVerification(user.path("ownerId").asText());return userReply(201,user);
     }
     private Response userReply(int status,JsonNode user) {var body=object();body.set("user",user);return new ApiReplies(status,body,etag(user),null).response();}
     @GET @Path("/users/{key}") public Response user(@PathParam("key") String key) {

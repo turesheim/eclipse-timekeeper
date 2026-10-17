@@ -24,24 +24,24 @@ public class AccountStore {
     record Issued(String secret,JsonNode account,String csrf,Instant expires,boolean persistent) { }
     static Set<String> permissions(String value) {return value.equals("READ_WRITE") ? Set.of("read","write") : Set.of("read");}
     static String permissions(Set<String> values) {return values.contains("write") ? "READ_WRITE" : "READ";}
-    private <T> T tx(Function<Connection,T> work) {
+    <T> T tx(Function<Connection,T> work) {
         try(var connection=datasource.getConnection()) {
             connection.setAutoCommit(false);
             try {var result=work.apply(connection);connection.commit();return result;}
             catch(Throwable failure) {try {connection.rollback();}catch(SQLException rollback) {failure.addSuppressed(rollback);}throw failure;}
         } catch(SQLException failure) {throw databaseFailure(failure);}
     }
-    private static RuntimeException databaseFailure(SQLException failure) {
+    static RuntimeException databaseFailure(SQLException failure) {
         if("23505".equals(failure.getSQLState())) return ApiFailure.conflict();
         return new ApiFailure(503,"UNAVAILABLE");
     }
-    private static PreparedStatement query(Connection c,String sql,Object... values) throws SQLException {
+    static PreparedStatement query(Connection c,String sql,Object... values) throws SQLException {
         var statement=c.prepareStatement(sql);for(int i=0;i<values.length;i++) statement.setObject(i+1,values[i]);return statement;
     }
-    private static int execute(Connection c,String sql,Object... values) {
+    static int execute(Connection c,String sql,Object... values) {
         try(var statement=query(c,sql,values)) {return statement.executeUpdate();}catch(SQLException failure) {throw databaseFailure(failure);}
     }
-    private static void lock(Connection c) {
+    static void lock(Connection c) {
         try(var statement=query(c,"SELECT id FROM tk_auth_control WHERE id=1 FOR UPDATE");var rows=statement.executeQuery()) {if(!rows.next()) throw new SQLException("Missing auth control");}
         catch(SQLException failure) {throw databaseFailure(failure);}
     }
@@ -96,7 +96,7 @@ public class AccountStore {
         catch(SQLException failure) {throw databaseFailure(failure);}
     }
     JsonNode status() {return tx(c->{var node=object();node.put("setupRequired",!bootstrapped(c));return node;});}
-    private static boolean attempt(Connection c,String key,int limit,Duration period,Instant now) {
+    static boolean attempt(Connection c,String key,int limit,Duration period,Instant now) {
         String id=hash(key);int count=0;Instant window=now;boolean exists=false;
         try(var statement=query(c,"SELECT attempts,window_start FROM tk_auth_throttle WHERE id=?",id);var rows=statement.executeQuery()) {
             if(rows.next()) {exists=true;count=rows.getInt(1);window=Instant.parse(rows.getString(2));}
@@ -113,8 +113,12 @@ public class AccountStore {
         });
     }
     Issued complete(String code,String login,String password,String display,boolean recovery) {
+        return complete(code,login,password,display,recovery,null);
+    }
+    Issued complete(String code,String login,String password,String display,boolean recovery,String email) {
         if(!allowed("",true)) throw new ApiFailure(429,"RATE_LIMITED");
         String name=username(login),label=displayName(display),encoded=AccountPasswords.hash(password);
+        String pending=email==null ? null : RecoveryEmail.normalize(email);
         if(code==null || !code.matches("[A-Za-z0-9_-]{43}")) throw ApiFailure.unauthorized(false);
         return tx(c->{lock(c);String target=null,expected=recovery ? "RECOVERY" : "SETUP",digest=hash(code);Instant now=Instant.now();
             if(!recovery && bootstrapped(c)) throw ApiFailure.unauthorized(false);
@@ -127,6 +131,7 @@ public class AccountStore {
             if(!recovery && !current.get("state").asText().equals("UNCLAIMED")) throw ApiFailure.conflict();
             boolean admin=!recovery || current.get("administrator").asBoolean();
             execute(c,"UPDATE tk_account SET username=?,password_hash=?,display_name=?,state='ENABLED',administrator=?,version=version+1 WHERE owner_id=?",name,encoded,label,admin,target);
+            if(!recovery && pending!=null) execute(c,"INSERT INTO tk_recovery_address VALUES(?,'PRIMARY',NULL,?,1)",target,pending);
             execute(c,"UPDATE tk_auth_challenge SET consumed=TRUE WHERE digest=?",digest);
             if(!recovery) execute(c,"UPDATE tk_auth_control SET bootstrap_completed=TRUE WHERE id=1");
             if(recovery) revokeAll(c,target);else execute(c,"DELETE FROM tk_auth_session WHERE owner_id=?",target);return issue(c,target,Set.of("read","write"),false,now);
@@ -224,8 +229,9 @@ public class AccountStore {
     void logout(TokenRegistry.Principal principal) {
         if(principal.kind().equals("SESSION")) tx(c->{execute(c,"DELETE FROM tk_auth_session WHERE digest=? AND owner_id=?",principal.digest(),principal.owner());return null;});
     }
-    private static void revokeAll(Connection c,String owner) {
+    static void revokeAll(Connection c,String owner) {
         execute(c,"DELETE FROM tk_auth_session WHERE owner_id=?",owner);execute(c,"UPDATE tk_api_token SET revoked=TRUE,version=version+1 WHERE owner_id=? AND revoked=FALSE",owner);
+        execute(c,"UPDATE tk_recovery_link SET consumed=TRUE WHERE owner_id=? AND consumed=FALSE",owner);
     }
     private static void requireWrite(TokenRegistry.Principal principal) {if(!principal.permissions().contains("write")) throw new ApiFailure(403,"FORBIDDEN");}
     private static void requireAdmin(Connection c,TokenRegistry.Principal principal) {
@@ -256,9 +262,15 @@ public class AccountStore {
     }
     JsonNode user(TokenRegistry.Principal principal,String owner) {return tx(c->{guard(c,principal);requireAdmin(c,principal);return account(c,owner,false);});}
     JsonNode createUser(TokenRegistry.Principal principal,String username,String password,String display,boolean admin) {
+        return createUser(principal,username,password,display,admin,null);
+    }
+    JsonNode createUser(TokenRegistry.Principal principal,String username,String password,String display,boolean admin,String email) {
         String name=username(username),label=displayName(display),encoded=AccountPasswords.hash(password);
+        String pending=email==null ? null : RecoveryEmail.normalize(email);
         return tx(c->{lock(c);guard(c,principal);requireAdmin(c,principal);String id=UUID.randomUUID().toString();owner(c,id);ensureAccount(c,id);
-            execute(c,"UPDATE tk_account SET username=?,password_hash=?,display_name=?,state='ENABLED',administrator=?,version=1 WHERE owner_id=?",name,encoded,label,admin,id);return account(c,id,false);});
+            execute(c,"UPDATE tk_account SET username=?,password_hash=?,display_name=?,state='ENABLED',administrator=?,version=1 WHERE owner_id=?",name,encoded,label,admin,id);
+            if(pending!=null) execute(c,"INSERT INTO tk_recovery_address VALUES(?,'PRIMARY',NULL,?,1)",id,pending);
+            return account(c,id,false);});
     }
     JsonNode updateUser(TokenRegistry.Principal principal,String target,String match,String login,String display,boolean enabled,boolean admin) {
         String name=username(login),label=displayName(display);

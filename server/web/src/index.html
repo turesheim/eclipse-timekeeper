@@ -21,6 +21,7 @@
       <form id="login-form">
         <label class="form-label">Sign-in method<select class="form-select" id="auth-mode"><option value="login">Username and password</option><option value="setup">First administrator setup</option><option value="recover">Recover account</option><option value="token">Existing API token</option></select></label>
         <label class="form-label" id="username-field">Username<input class="form-control" id="username" autocomplete="username" required maxlength="64"></label>
+        <label class="form-label" id="setup-email-field" hidden>Recovery email<input class="form-control" id="setup-email" type="email" autocomplete="email" maxlength="254" disabled></label>
         <label class="form-label" id="password-field">Password<input class="form-control" id="password" type="password" autocomplete="current-password" required></label>
         <label class="form-label" id="confirm-field" hidden>Confirm password<input class="form-control" id="password-confirm" type="password" autocomplete="new-password" disabled></label>
         <label class="form-label" id="code-field" hidden>One-time setup or recovery code<input class="form-control" id="setup-code" name="one-time-code" type="text" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" disabled></label>
@@ -28,6 +29,15 @@
         <label class="form-label" id="token-field" hidden>Access token<input class="form-control" id="token" type="password" autocomplete="off" disabled></label>
         <p id="auth-hint" class="hint">Use your Timekeeper account. API tokens are managed after signing in.</p>
         <p id="login-error" class="alert alert-danger" role="alert" tabindex="-1"></p><button class="btn btn-primary" type="submit">Sign in</button>
+      </form>
+      <button class="btn btn-link" id="forgot-password" type="button">Forgot password?</button>
+      <form id="email-recovery-form" hidden aria-labelledby="email-recovery-title">
+        <h2 id="email-recovery-title"></h2><p id="email-recovery-hint" class="hint"></p>
+        <label class="form-label">Username<input class="form-control" id="recovery-username" autocomplete="username" maxlength="64"></label>
+        <label class="form-label">New password<input class="form-control" id="recovery-password" type="password" autocomplete="new-password"></label>
+        <label class="form-label">Confirm new password<input class="form-control" id="recovery-confirm" type="password" autocomplete="new-password"></label>
+        <p id="email-recovery-feedback" role="status" aria-live="polite"></p>
+        <div class="dialog-actions"><button class="btn btn-outline-secondary" id="email-recovery-back" type="button">Back to sign in</button><button class="btn btn-primary" type="submit">Request reset link</button></div>
       </form>
     </section>
     <section id="account-page" hidden aria-labelledby="account-heading">

@@ -8,7 +8,7 @@ async function api(request, method, path, data, headers = {}) {
 }
 async function fresh(request) {
   const username = 'settings-' + randomUUID().slice(0, 8), password = 'private settings passphrase';
-  const {user} = await (await api(request, 'POST', '/auth/users', {username, password, displayName: username, administrator: false})).json();
+  const {user} = await (await api(request, 'POST', '/auth/users', {username, password, displayName: username, email: username + '@example.org', administrator: false})).json();
   return {...user, password};
 }
 async function login(page, user, hash = '') {

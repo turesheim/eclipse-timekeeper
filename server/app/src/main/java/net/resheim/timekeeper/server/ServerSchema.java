@@ -13,14 +13,21 @@ import org.h2.tools.RunScript;
 public final class ServerSchema {
     private ServerSchema() { }
     private static final Set<String> LEGACY_TABLES=Set.of("TK_SCHEMA","TK_OWNER","TK_RESOURCE","TK_RELATION","TK_EXTERNAL_REFERENCE","TK_ACTIVE","TK_RECEIPT","TK_CHANGE");
-    public static final int CURRENT=2;
+    public static final int CURRENT=3;
+    private static final Set<String> AUTH_TABLES;
     private static final Set<String> TABLES;
-    static {var tables=new HashSet<>(LEGACY_TABLES);tables.addAll(Set.of("TK_ACCOUNT","TK_AUTH_CONTROL","TK_AUTH_CHALLENGE","TK_AUTH_SESSION","TK_API_TOKEN","TK_AUTH_THROTTLE"));TABLES=Set.copyOf(tables);}
+    static {
+        var tables=new HashSet<>(LEGACY_TABLES);
+        tables.addAll(Set.of("TK_ACCOUNT","TK_AUTH_CONTROL","TK_AUTH_CHALLENGE","TK_AUTH_SESSION","TK_API_TOKEN","TK_AUTH_THROTTLE"));
+        AUTH_TABLES=Set.copyOf(tables);
+        tables.addAll(Set.of("TK_RECOVERY_CONTROL","TK_RECOVERY_ADDRESS","TK_RECOVERY_LINK"));
+        TABLES=Set.copyOf(tables);
+    }
     private static class Reference {
         static final List<String> SHAPE=referenceShape();
         private static List<String> referenceShape() {
             try(var connection=DriverManager.getConnection("jdbc:h2:mem:schema_reference_"+UUID.randomUUID())) {
-                create(connection);applyAuth(connection);return shape(connection,TABLES);
+                create(connection);applyAuth(connection);applyRecovery(connection);return shape(connection,TABLES);
             } catch(Exception e) {throw new ExceptionInInitializerError(e);}
         }
     }
@@ -36,8 +43,19 @@ public final class ServerSchema {
             RunScript.execute(connection,new InputStreamReader(input,StandardCharsets.UTF_8));
         }
     }
+    static void applyRecovery(Connection connection) throws Exception {
+        try(var input=ServerSchema.class.getResourceAsStream("/db/recovery-v3.sql")) {
+            if(input==null) throw new SQLException("Missing recovery schema resource");
+            RunScript.execute(connection,new InputStreamReader(input,StandardCharsets.UTF_8));
+        }
+    }
     private static List<String> legacyShape() throws Exception {
         try(var connection=DriverManager.getConnection("jdbc:h2:mem:legacy_reference_"+UUID.randomUUID())) {create(connection);return shape(connection,LEGACY_TABLES);}
+    }
+    private static List<String> authShape() throws Exception {
+        try(var connection=DriverManager.getConnection("jdbc:h2:mem:auth_reference_"+UUID.randomUUID())) {
+            create(connection);applyAuth(connection);return shape(connection,AUTH_TABLES);
+        }
     }
     public static void initializeOrValidate(Connection connection) throws Exception {initializeOrValidate(connection,false);}
     public static void initializeOrValidate(Connection connection,boolean allowUpgrade) throws Exception {
@@ -46,10 +64,10 @@ public final class ServerSchema {
             return;
         }
         if(tables(connection).isEmpty()) {
-            create(connection);applyAuth(connection);
+            create(connection);applyAuth(connection);applyRecovery(connection);
             validateShape(connection);
             // H2 commits DDL. Interrupted initialization remains explicitly INITIALIZING.
-            try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET schema_version=2,state='READY' WHERE id=1");}
+            try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET schema_version="+CURRENT+",state='READY' WHERE id=1");}
         }
         if(tables(connection).equals(LEGACY_TABLES)) {
             if(!allowUpgrade) throw new SQLException("Schema upgrade requires explicit operator authorization after stopping older server replicas");
@@ -59,8 +77,18 @@ public final class ServerSchema {
             }
             // H2 DDL commits: interruption remains MIGRATING and is never accepted as READY.
             try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET state='MIGRATING' WHERE id=1");}
-            applyAuth(connection);validateShape(connection);
-            try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET schema_version=2,state='READY' WHERE id=1");}
+            applyAuth(connection);applyRecovery(connection);validateShape(connection);
+            try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET schema_version="+CURRENT+",state='READY' WHERE id=1");}
+        }
+        if(tables(connection).equals(AUTH_TABLES)) {
+            if(!allowUpgrade) throw new SQLException("Schema upgrade requires explicit operator authorization after stopping older server replicas");
+            if(!shape(connection,AUTH_TABLES).equals(authShape())) throw new SQLException("Unsupported authentication server schema");
+            try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT id,schema_version,state FROM tk_schema")) {
+                if(!rows.next() || rows.getInt(1)!=1 || rows.getInt(2)!=2 || !"READY".equals(rows.getString(3)) || rows.next()) throw new SQLException("Unsupported or incomplete authentication schema");
+            }
+            try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET state='MIGRATING' WHERE id=1");}
+            applyRecovery(connection);validateShape(connection);
+            try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET schema_version="+CURRENT+",state='READY' WHERE id=1");}
         }
         validate(connection);
     }
