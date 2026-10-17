@@ -49,6 +49,7 @@ jobs:
         env:
           TIMEKEEPER_TEST_PG_URL: jdbc:postgresql://127.0.0.1:55432/postgres
           TIMEKEEPER_TEST_RECOVERY_DB_URL: jdbc:postgresql://127.0.0.1:55432/postgres
+          TIMEKEEPER_TEST_PASSKEY_DB_URL: jdbc:postgresql://127.0.0.1:55432/postgres
           TIMEKEEPER_TEST_PG_USER: postgres
           TIMEKEEPER_TEST_PG_PASSWORD: isolated-ci-test
         run: |
@@ -58,7 +59,7 @@ jobs:
             echo "Waiting for isolated PostgreSQL (attempt $attempt)"
             sleep 1
           done
-          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest -Dsurefire.failIfNoSpecifiedTests=false
+          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest -Dsurefire.failIfNoSpecifiedTests=false
           docker rm -f timekeeper-pg-test
       - name: Build actual deployment images
         run: |
@@ -70,6 +71,8 @@ jobs:
           python server/scripts/compose_acceptance.py
       - name: Verify email recovery across actual replicas and hostname cutover
         run: python server/scripts/email_replica_acceptance.py --server-image timekeeper-server:test
+      - name: Verify schema upgrades during protected backup restore
+        run: python server/scripts/schema_restore_acceptance.py
       - name: Verify import and Undo across replicas, restart and protected restore
         run: python server/scripts/toggl_replica_acceptance.py --server-image timekeeper-server:test
       - name: Package the Docker Compose deployment
@@ -134,12 +137,15 @@ jobs:
           go vet -C server/synology/installer ./...
           python server/synology/tests/acceptance.py
           python server/synology/tests/schema_upgrade_acceptance.py
+          python server/scripts/schema_restore_acceptance.py --postgres-image postgres:17.11-bookworm
           python server/synology/tests/migration_acceptance.py --source-schema 2
+          python server/synology/tests/migration_acceptance.py --source-schema 3
           python server/synology/tests/migration_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA"
       - name: Verify PostgreSQL 17 schema and concurrent bootstrap
         env:
           TIMEKEEPER_TEST_PG_URL: jdbc:postgresql://127.0.0.1:55433/postgres
           TIMEKEEPER_TEST_RECOVERY_DB_URL: jdbc:postgresql://127.0.0.1:55433/postgres
+          TIMEKEEPER_TEST_PASSKEY_DB_URL: jdbc:postgresql://127.0.0.1:55433/postgres
           TIMEKEEPER_TEST_PG_USER: postgres
           TIMEKEEPER_TEST_PG_PASSWORD: isolated-ci-test
         run: |
@@ -149,7 +155,7 @@ jobs:
             echo "Waiting for isolated PostgreSQL 17 (attempt $attempt)"
             sleep 1
           done
-          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest -Dsurefire.failIfNoSpecifiedTests=false
+          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest -Dsurefire.failIfNoSpecifiedTests=false
           docker rm -f -v timekeeper-pg17-test
       - name: Verify real API, backup, recovery and rolling updates with PostgreSQL 17
         run: |

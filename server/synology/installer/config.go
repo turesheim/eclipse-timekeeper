@@ -20,9 +20,12 @@ import (
 const packageID = "timekeeper"
 const packageTarget = "/var/packages/timekeeper/target"
 const nativePSQL = "/var/packages/postgresql/target/bin/psql"
-const currentSchema = 3
+const currentSchema = 4
 
-func supportedSchema(version int) bool { return version == 2 || version == currentSchema }
+func supportedSchema(version int) bool { return version >= 2 && version <= currentSchema }
+func supportedUpgrade(from, to int) bool {
+	return supportedSchema(from) && from < to && to == currentSchema
+}
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
 var commitID = regexp.MustCompile(`^[a-f0-9]{40}$`)

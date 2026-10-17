@@ -12,19 +12,20 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class PasskeyCeremoniesTest {
+    @org.junit.jupiter.api.extension.RegisterExtension final PasskeyTestDatabase database=new PasskeyTestDatabase();
     @TempDir Path directory;
     private static final Instant NOW=Instant.parse("2026-10-17T00:00:00Z");
     private PasskeyCeremonies.Scope scope(String browser,String session) {return new PasskeyCeremonies.Scope(browser,session,"https://timekeeper.example:8443","timekeeper.example",7);}
     private String initialized() throws Exception {
         String url="jdbc:h2:"+directory.resolve("ceremonies");
-        try(var c=DriverManager.getConnection(url)) {
+        try(var c=database.connection(url)) {
             ServerSchema.initializeOrValidate(c);execute(c,"INSERT INTO tk_owner VALUES('alice','UTC',0,0,'cursor')");
             execute(c,"INSERT INTO tk_account(owner_id,username,password_hash,display_name,state,administrator,version) VALUES('alice','alice','hash','Alice','ENABLED',FALSE,0)");
         }return url;
     }
     @Test void restartAndConcurrentReplicasConsumeOnlyOnceAndNeverStoreBrowserOrChallengeSecrets() throws Exception {
         String url=initialized();var scope=scope(AccountPasswords.secret(),null);PasskeyCeremonies.Pending pending;
-        try(var c=DriverManager.getConnection(url)) {
+        try(var c=database.connection(url)) {
             c.setAutoCommit(false);lock(c);pending=new PasskeyCeremonies(c).create("LOGIN",null,scope,object().put("request","serialized library request"),NOW);c.commit();
             try(var s=c.createStatement();var rows=s.executeQuery("SELECT digest,browser_digest,payload FROM tk_passkey_ceremony")) {
                 rows.next();assertEquals(hash(pending.secret()),rows.getString(1));assertEquals(hash(scope.browserSecret()),rows.getString(2));
@@ -34,7 +35,7 @@ class PasskeyCeremoniesTest {
         var executor=Executors.newFixedThreadPool(2);
         try {
             var ready=new CyclicBarrier(2);var tasks=new ArrayList<Callable<Boolean>>();
-            for(int n=0;n<2;n++) tasks.add(()->{ready.await(5,TimeUnit.SECONDS);try(var c=DriverManager.getConnection(url)) {
+            for(int n=0;n<2;n++) tasks.add(()->{ready.await(5,TimeUnit.SECONDS);try(var c=database.connection(url)) {
                 c.setAutoCommit(false);lock(c);
                 try {new PasskeyCeremonies(c).claim(pending.secret(),"LOGIN",null,scope,NOW.plusSeconds(1));c.commit();return true;}
                 catch(ApiFailure rejected) {c.rollback();assertEquals(401,rejected.status);return false;}
@@ -44,7 +45,7 @@ class PasskeyCeremoniesTest {
     }
     @Test void browserSessionPurposeOwnerOriginRpEpochAndExpiryAreBoundWithoutConsumingForeignFlows() throws Exception {
         String url=initialized();var scope=scope(AccountPasswords.secret(),AccountPasswords.secret());
-        try(var c=DriverManager.getConnection(url)) {
+        try(var c=database.connection(url)) {
             c.setAutoCommit(false);lock(c);var flows=new PasskeyCeremonies(c);var pending=flows.create("REGISTER","alice",scope,object().put("accountVersion",3),NOW);
             var wrong=List.of(scope(AccountPasswords.secret(),scope.sessionSecret()),scope(scope.browserSecret(),AccountPasswords.secret()),
                     new PasskeyCeremonies.Scope(scope.browserSecret(),scope.sessionSecret(),"https://timekeeper.example:9443","timekeeper.example",7),
@@ -59,7 +60,7 @@ class PasskeyCeremoniesTest {
     }
     @Test void browserCancellationBoundsAndCommittedCryptoRejectionCannotLeaveReusableAuthority() throws Exception {
         String url=initialized();var scope=scope(AccountPasswords.secret(),null);
-        try(var c=DriverManager.getConnection(url)) {
+        try(var c=database.connection(url)) {
             c.setAutoCommit(false);lock(c);var flows=new PasskeyCeremonies(c);var first=flows.create("LOGIN",null,scope,object(),NOW);
             for(int n=1;n<10;n++) flows.create("LOGIN",null,scope,object(),NOW);
             assertEquals(429,assertThrows(ApiFailure.class,()->flows.create("LOGIN",null,scope,object(),NOW)).status);

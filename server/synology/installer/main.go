@@ -21,7 +21,7 @@ func validate(root string, w Wizard, r Release, resources string) error {
 			return err
 		}
 		if retained.Release.Schema != r.Schema {
-			if retained.Release.Schema != 2 || r.Schema != currentSchema {
+			if !supportedUpgrade(retained.Release.Schema, r.Schema) {
 				return errors.New("Unsupported schema upgrade; the existing installation is unchanged")
 			}
 			_, _, _, err := checkSchemaUpgrade(root, resources)

@@ -18,7 +18,16 @@ import org.junit.jupiter.api.Test;
 @QuarkusTest @TestProfile(PasskeyStoreTest.Profile.class)
 class PasskeyStoreTest {
     public static class Profile implements QuarkusTestProfile {
-        public Map<String,String> getConfigOverrides() {return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:passkey_store_tests");}
+        public Map<String,String> getConfigOverrides() {
+            var config=new HashMap<String,String>();String database=System.getenv("TIMEKEEPER_TEST_PASSKEY_DB_URL");
+            config.put("quarkus.datasource.jdbc.url",database==null ? "jdbc:h2:mem:passkey_store_tests" : database);
+            if(database!=null) {
+                config.put("quarkus.datasource.db-kind","postgresql");
+                config.put("quarkus.datasource.username",System.getenv("TIMEKEEPER_TEST_PG_USER"));
+                config.put("quarkus.datasource.password",System.getenv("TIMEKEEPER_TEST_PG_PASSWORD"));
+            }
+            return config;
+        }
     }
     private static final String RP="timekeeper.example",ORIGIN="https://timekeeper.example:8443",PASSWORD="An actual fixture password phrase";
     @Inject AccountStore accounts;

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class PasskeyCredentialsTest {
+    @org.junit.jupiter.api.extension.RegisterExtension final PasskeyTestDatabase database=new PasskeyTestDatabase();
     private static final String RP="timekeeper.example",ORIGIN="https://timekeeper.example:8443";
     @TempDir Path directory;
     private void account(Connection c,String owner) {
@@ -25,7 +26,7 @@ class PasskeyCredentialsTest {
     }
     @Test void signedUseRenameRevocationAndRestartPreserveOpaqueOwnershipAndStableManagementVersions() throws Exception {
         String url="jdbc:h2:"+directory.resolve("passkeys");UUID keyId;ByteArray handle,credentialId;
-        try(var c=DriverManager.getConnection(url)) {
+        try(var c=database.connection(url)) {
             ServerSchema.initializeOrValidate(c);c.setAutoCommit(false);lock(c);account(c,"alice");account(c,"bob");
             var repository=new PasskeyCredentials(c,RP);handle=repository.handle("alice");assertEquals(32,handle.size());assertEquals(handle,repository.handle("alice"));assertNotEquals(handle,repository.handle("bob"));
             var authenticator=new WebAuthnProtocolTest.Authenticator("shared stored passkey");var stored=enroll(repository,"alice",authenticator);keyId=stored.id();credentialId=stored.credentialId();
@@ -39,7 +40,7 @@ class PasskeyCredentialsTest {
             execute(c,"UPDATE tk_account SET username='renamed-alice' WHERE owner_id='alice'");assertEquals("renamed-alice",repository.getUsernameForUserHandle(handle).orElseThrow());
             assertEquals(handle,repository.getUserHandleForUsername("renamed-alice").orElseThrow());c.commit();
         }
-        try(var c=DriverManager.getConnection(url)) {
+        try(var c=database.connection(url)) {
             ServerSchema.validate(c);c.setAutoCommit(false);lock(c);var repository=new PasskeyCredentials(c,RP);var stored=repository.owned("alice",keyId);
             assertEquals(handle,stored.handle());assertEquals(credentialId,stored.credentialId());assertEquals("Laptop and phone",stored.name());
             execute(c,"INSERT INTO tk_auth_session(digest,owner_id,csrf,permissions,created_at,expires_at,last_seen_at,persistent,passkey_id) VALUES('session','alice','csrf','READ_WRITE','2026-10-17T00:00:00Z','2026-10-18T00:00:00Z','2026-10-17T00:00:00Z',FALSE,?)",keyId);
@@ -50,7 +51,7 @@ class PasskeyCredentialsTest {
         }
     }
     @Test void tombstonesPreventCredentialReassignmentAndRecoveryAffectsOnlyItsOwner() throws Exception {
-        try(var c=DriverManager.getConnection("jdbc:h2:mem:passkey_owner_"+UUID.randomUUID())) {
+        try(var c=database.connection("jdbc:h2:mem:passkey_owner_"+UUID.randomUUID())) {
             ServerSchema.initializeOrValidate(c);c.setAutoCommit(false);lock(c);account(c,"alice");account(c,"bob");var repository=new PasskeyCredentials(c,RP);
             var authenticator=new WebAuthnProtocolTest.Authenticator("credential may not transfer");var key=enroll(repository,"alice",authenticator);
             repository.revoke("alice",key.id(),etag(key.management()));

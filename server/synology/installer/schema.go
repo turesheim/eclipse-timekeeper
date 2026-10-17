@@ -103,7 +103,7 @@ func prepareSchemaUpgrade(root, resources string) error {
 	if version == currentSchema {
 		return nil
 	}
-	if version != 2 {
+	if !supportedUpgrade(version, currentSchema) {
 		return errors.New("Unsupported Timekeeper schema upgrade")
 	}
 	_, pending, err := pendingSchemaUpgrade(root)
@@ -119,14 +119,10 @@ func prepareSchemaUpgrade(root, resources string) error {
 			return err
 		}
 	}
-	migration, err := os.ReadFile(filepath.Join(resources, "recovery-v3.sql"))
+	migration, err := schemaUpgradeSQL(resources, version, currentSchema)
 	if err != nil {
 		return err
 	}
-	guard, err := schemaGuard(resources, currentSchema)
-	if err != nil {
-		return err
-	}
-	sql := offlineSchemaSQL + string(migration) + fmt.Sprintf("\nUPDATE tk_schema SET schema_version=%d WHERE id=1;\n", currentSchema) + guard
+	sql := offlineSchemaSQL + migration
 	return pgRun(nativePSQL, s.DatabasePort, s.Role, password, s.Database, []string{"-X", "-q", "-w", "--single-transaction", "--file=-", "-v", "ON_ERROR_STOP=1"}, strings.NewReader(sql), io.Discard)
 }
