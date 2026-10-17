@@ -20,6 +20,9 @@ import (
 const packageID = "timekeeper"
 const packageTarget = "/var/packages/timekeeper/target"
 const nativePSQL = "/var/packages/postgresql/target/bin/psql"
+const currentSchema = 3
+
+func supportedSchema(version int) bool { return version == 2 || version == currentSchema }
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
 var commitID = regexp.MustCompile(`^[a-f0-9]{40}$`)
@@ -161,7 +164,7 @@ func readJSON(path string, target any) error {
 func releaseAt(target string) (Release, error) {
 	var r Release
 	err := readJSON(filepath.Join(target, "release.json"), &r)
-	if err != nil || !commitID.MatchString(r.Commit) || r.Image != "ghcr.io/turesheim/eclipse-timekeeper-server:sha-"+r.Commit || r.Schema != 2 {
+	if err != nil || !commitID.MatchString(r.Commit) || r.Image != "ghcr.io/turesheim/eclipse-timekeeper-server:sha-"+r.Commit || !supportedSchema(r.Schema) {
 		return r, errors.New("Invalid or incompatible package release identity")
 	}
 	return r, nil
@@ -223,7 +226,7 @@ func loadSettings(root string) (Settings, error) {
 	if err != nil {
 		return s, err
 	}
-	if s.Format != 1 || !validIdentity(s.Database) || !validIdentity(s.Role) || !validInstallationID(s.InstallationID) || origin(s.PublicOrigin) != nil || s.Release.Schema != 2 || (s.Phase != "READY" && s.Phase != "PROVISIONING") {
+	if s.Format != 1 || !validIdentity(s.Database) || !validIdentity(s.Role) || !validInstallationID(s.InstallationID) || origin(s.PublicOrigin) != nil || !supportedSchema(s.Release.Schema) || (s.Phase != "READY" && s.Phase != "PROVISIONING") {
 		return s, errors.New("Invalid retained Timekeeper configuration")
 	}
 	return s, nil

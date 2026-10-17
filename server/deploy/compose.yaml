@@ -25,11 +25,14 @@ x-api: &api
     TIMEKEEPER_ALLOW_SCHEMA_UPGRADE: ${TIMEKEEPER_ALLOW_SCHEMA_UPGRADE:-false}
     TIMEKEEPER_SERVER_SETUP_FILE: ${TIMEKEEPER_SERVER_SETUP_FILE:-NONE}
     TIMEKEEPER_PUBLIC_ORIGIN: ${TIMEKEEPER_PUBLIC_ORIGIN:-NONE}
+    TIMEKEEPER_AUTH_ORIGIN_EPOCH: ${TIMEKEEPER_AUTH_ORIGIN_EPOCH:-1}
+    QUARKUS_CONFIG_LOCATIONS: file:/config/mail.properties
+    TIMEKEEPER_SMTP_PASSWORD_FILE: /run/secrets/timekeeper_smtp_password
     QUARKUS_DATASOURCE_JDBC_MAX_SIZE: '16'
     QUARKUS_SHUTDOWN_TIMEOUT: 20s
     JAVA_OPTS: -Xms64m -Xmx384m
     TIMEKEEPER_DEPLOYED_AT: ${TIMEKEEPER_DEPLOYED_AT:-}
-  secrets: [timekeeper_database_password]
+  secrets: [timekeeper_database_password, timekeeper_smtp_password]
   volumes:
     - ${TIMEKEEPER_STATE_DIR:-./state}/config:/config:ro
   depends_on:
@@ -90,3 +93,5 @@ secrets:
     file: ${TIMEKEEPER_STATE_DIR:-./state}/secrets/postgres_admin_password
   timekeeper_database_password:
     file: ${TIMEKEEPER_STATE_DIR:-./state}/secrets/timekeeper_database_password
+  timekeeper_smtp_password:
+    file: ${TIMEKEEPER_STATE_DIR:-./state}/secrets/timekeeper_smtp_password

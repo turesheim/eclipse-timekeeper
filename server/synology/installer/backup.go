@@ -25,35 +25,63 @@ type backupManifest struct {
 
 var backupFiles = []string{"database.dump", "settings.json", "secrets/database_password", "config/tokens.json", "config/account-setup.json"}
 
+func backupFilesFor(schema int) []string {
+	files := append([]string{}, backupFiles...)
+	if schema >= 3 {
+		files = append(files, "config/mail.properties", "secrets/smtp_password")
+	}
+	return files
+}
+
+type maintenancePending struct {
+	Operation     string `json:"operation"`
+	ArchiveSHA256 string `json:"archiveSha256"`
+	ArchivePath   string `json:"archivePath,omitempty"`
+}
+
 // Maintenance operations refuse a running listener or another database client.
 // Package Center must stop Timekeeper first; this helper never kills processes.
 func maintenance(root string) (Settings, string, error) {
+	s, password, schema, err := maintenanceConnection(root)
+	if err == nil && schema != s.Release.Schema {
+		err = errors.New("Complete the pending schema upgrade before maintenance")
+	}
+	return s, password, err
+}
+
+func maintenanceConnection(root string) (Settings, string, int, error) {
 	s, err := loadSettings(root)
 	if err != nil {
-		return s, "", err
+		return s, "", 0, err
 	}
 	if s.Phase != "READY" {
-		return s, "", errors.New("Complete package installation before maintenance")
+		return s, "", 0, errors.New("Complete package installation before maintenance")
 	}
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", s.HTTPPort))
 	if err != nil {
-		return s, "", errors.New("Stop Timekeeper in Package Center before maintenance")
+		return s, "", 0, errors.New("Stop Timekeeper in Package Center before maintenance")
 	}
 	listener.Close()
 	raw, err := os.ReadFile(filepath.Join(root, "secrets/database_password"))
 	if err != nil {
-		return s, "", err
+		return s, "", 0, err
 	}
 	password := strings.TrimSpace(string(raw))
 	query := "SELECT current_setting('server_version_num')::int/10000; SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid(); SELECT schema_version||'|'||state FROM tk_schema WHERE id=1;"
 	value, err := psql(nativePSQL, s.DatabasePort, s.Role, password, s.Database, query)
 	if err != nil {
-		return s, "", err
+		return s, "", 0, err
 	}
-	if value != "17\n0\n2|READY" {
-		return s, "", errors.New("Maintenance requires PostgreSQL 17, a ready schema 2 and all other database clients stopped")
+	schema := 0
+	for _, version := range []int{2, currentSchema} {
+		if value == fmt.Sprintf("17\n0\n%d|READY", version) {
+			schema = version
+		}
 	}
-	return s, password, nil
+	if schema == 0 {
+		return s, "", 0, errors.New("Maintenance requires PostgreSQL 17, a supported ready schema and all other database clients stopped")
+	}
+	return s, password, schema, nil
 }
 func fileDigest(path string) (string, error) {
 	f, err := os.Open(path)
@@ -96,7 +124,7 @@ func backup(root string) (string, error) {
 		return "", closeErr
 	}
 	manifest := backupManifest{Format: 1, ServerSchema: s.Release.Schema, PostgreSQLMajor: 17, CreatedAt: time.Now().UTC().Format(time.RFC3339Nano), Files: map[string]string{}}
-	for _, name := range backupFiles {
+	for _, name := range backupFilesFor(s.Release.Schema) {
 		source := filepath.Join(root, name)
 		if name == "database.dump" {
 			source = filepath.Join(stage, name)
@@ -130,7 +158,7 @@ func backup(root string) (string, error) {
 	if _, err = writer.Write(content); err != nil {
 		return "", err
 	}
-	for _, name := range backupFiles {
+	for _, name := range backupFilesFor(s.Release.Schema) {
 		source := filepath.Join(root, name)
 		if name == "database.dump" {
 			source = filepath.Join(stage, name)
@@ -165,7 +193,7 @@ func backup(root string) (string, error) {
 func unpackBackup(path, stage string) (backupManifest, error) {
 	var manifest backupManifest
 	allowed := map[string]bool{"manifest.json": true}
-	for _, name := range backupFiles {
+	for _, name := range backupFilesFor(currentSchema) {
 		allowed[name] = true
 	}
 	f, err := os.Open(path)
@@ -204,16 +232,17 @@ func unpackBackup(path, stage string) (backupManifest, error) {
 			return manifest, closeErr
 		}
 	}
-	if len(seen) != len(allowed) {
-		return manifest, errors.New("Incomplete Timekeeper backup")
-	}
 	if err = readJSON(filepath.Join(stage, "manifest.json"), &manifest); err != nil {
 		return manifest, err
 	}
-	if manifest.Format != 1 || manifest.ServerSchema != 2 || manifest.PostgreSQLMajor != 17 || len(manifest.Files) != len(backupFiles) {
+	files := backupFilesFor(manifest.ServerSchema)
+	if manifest.Format != 1 || !supportedSchema(manifest.ServerSchema) || manifest.PostgreSQLMajor != 17 || len(manifest.Files) != len(files) {
 		return manifest, errors.New("Unsupported Timekeeper backup version")
 	}
-	for _, name := range backupFiles {
+	if len(seen) != len(files)+1 {
+		return manifest, errors.New("Incomplete Timekeeper backup")
+	}
+	for _, name := range files {
 		digest, err := fileDigest(filepath.Join(stage, name))
 		if err != nil {
 			return manifest, err
@@ -224,7 +253,7 @@ func unpackBackup(path, stage string) (backupManifest, error) {
 	}
 	return manifest, nil
 }
-func restore(root, path string) error {
+func restore(root, path, resources string) error {
 	s, password, err := maintenance(root)
 	if err != nil {
 		return err
@@ -234,8 +263,12 @@ func restore(root, path string) error {
 		return err
 	}
 	defer os.RemoveAll(stage)
-	if _, err = unpackBackup(path, stage); err != nil {
+	manifest, err := unpackBackup(path, stage)
+	if err != nil {
 		return err
+	}
+	if manifest.ServerSchema > s.Release.Schema {
+		return errors.New("Install a package compatible with this newer backup before restoring")
 	}
 	if err = beginMaintenance(root, path, "native-restore"); err != nil {
 		return err
@@ -245,18 +278,60 @@ func restore(root, path string) error {
 		return err
 	}
 	defer dump.Close()
-	// The existing role owns restored objects; source cluster roles and passwords
-	// are never changed. pg_restore rolls the database back on any error.
-	if err = pgRun(filepath.Join(filepath.Dir(nativePSQL), "pg_restore"), s.DatabasePort, s.Role, password, s.Database,
-		[]string{"--no-password", "--dbname=" + s.Database, "--clean", "--if-exists", "--no-owner", "--no-privileges", "--exit-on-error", "--single-transaction"}, dump, io.Discard); err != nil {
+	// Render into a private temporary file, then restore and any supported upgrade
+	// in ONE psql transaction. An older dump does not know which new tables to drop.
+	// Neither SQL data nor credential hashes are written to routine logs.
+	sqlPath := filepath.Join(stage, "restore.sql")
+	sqlFile, err := os.OpenFile(sqlPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
 		return err
 	}
-	for _, name := range []string{"config/tokens.json", "config/account-setup.json"} {
+	if err = pgRun(filepath.Join(filepath.Dir(nativePSQL), "pg_restore"), s.DatabasePort, s.Role, password, s.Database,
+		[]string{"--no-password", "--clean", "--if-exists", "--no-owner", "--no-privileges", "--exit-on-error", "--file=-"}, dump, sqlFile); err != nil {
+		sqlFile.Close()
+		return err
+	}
+	if err = sqlFile.Close(); err != nil {
+		return err
+	}
+	reader, err := os.Open(sqlPath)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+	before, after := offlineSchemaSQL, "\nSET search_path=public;\n"
+	if manifest.ServerSchema == 2 && s.Release.Schema == currentSchema {
+		before += "DROP TABLE IF EXISTS public.tk_recovery_link,public.tk_recovery_address,public.tk_recovery_control;\n"
+		migration, err := os.ReadFile(filepath.Join(resources, "recovery-v3.sql"))
+		if err != nil {
+			return err
+		}
+		after += string(migration) + fmt.Sprintf("\nUPDATE tk_schema SET schema_version=%d WHERE id=1;\n", currentSchema)
+	}
+	guard, err := schemaGuard(resources, s.Release.Schema)
+	if err != nil {
+		return err
+	}
+	after += guard
+	if err = pgRun(nativePSQL, s.DatabasePort, s.Role, password, s.Database,
+		[]string{"-X", "-q", "-w", "--single-transaction", "--file=-", "-v", "ON_ERROR_STOP=1"},
+		io.MultiReader(strings.NewReader(before), reader, strings.NewReader(after)), io.Discard); err != nil {
+		return err
+	}
+	configuration := []string{"config/tokens.json", "config/account-setup.json"}
+	if manifest.ServerSchema >= 3 {
+		configuration = append(configuration, "config/mail.properties", "secrets/smtp_password")
+	}
+	for _, name := range configuration {
 		content, err := os.ReadFile(filepath.Join(stage, name))
 		if err != nil {
 			return err
 		}
-		if err = atomic(filepath.Join(root, name), content, 0644); err != nil {
+		mode := os.FileMode(0644)
+		if strings.HasPrefix(name, "secrets/") {
+			mode = 0444
+		}
+		if err = atomic(filepath.Join(root, name), content, mode); err != nil {
 			return err
 		}
 	}
@@ -269,15 +344,11 @@ func beginMaintenance(root, path, operation string) error {
 		return err
 	}
 	journal := filepath.Join(root, "config/maintenance-pending.json")
-	type pending struct {
-		Operation     string `json:"operation"`
-		ArchiveSHA256 string `json:"archiveSha256"`
-	}
-	var retained pending
+	var retained maintenancePending
 	err = readJSON(journal, &retained)
 	if err == nil {
 		if retained.Operation == operation && operation == "native-restore" {
-			if err = writeJSON(journal, pending{operation, digest}, 0644); err != nil {
+			if err = writeJSON(journal, maintenancePending{operation, digest, path}, 0644); err != nil {
 				return err
 			}
 			return syncMaintenanceMarker(root, packageTarget)
@@ -290,7 +361,7 @@ func beginMaintenance(root, path, operation string) error {
 	if !errors.Is(err, os.ErrNotExist) {
 		return errors.New("Restore the original maintenance journal before proceeding")
 	}
-	if err = writeJSON(journal, pending{operation, digest}, 0644); err != nil {
+	if err = writeJSON(journal, maintenancePending{operation, digest, path}, 0644); err != nil {
 		return err
 	}
 	return syncMaintenanceMarker(root, packageTarget)

@@ -111,6 +111,8 @@ jobs:
       run: npx playwright install --with-deps chromium
     - name: Verify bundled web client against the packaged server
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip
+    - name: Verify email recovery through HTTPS and actual SMTP delivery
+      run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --mail --grep 'first administrator|email recovery'
     - name: Upload browser acceptance evidence
       if: always()
       uses: actions/upload-artifact@v7.0.1

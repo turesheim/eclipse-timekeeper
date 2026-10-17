@@ -3,6 +3,7 @@ package main
 import (
 	"archive/tar"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,7 +11,14 @@ import (
 	"strings"
 )
 
-var migrationTables = []string{"tk_schema", "tk_owner", "tk_resource", "tk_relation", "tk_external_reference", "tk_active", "tk_receipt", "tk_change", "tk_account", "tk_auth_control", "tk_auth_challenge", "tk_api_token", "tk_auth_session", "tk_auth_throttle"}
+var baseMigrationTables = []string{"tk_schema", "tk_owner", "tk_resource", "tk_relation", "tk_external_reference", "tk_active", "tk_receipt", "tk_change", "tk_account", "tk_auth_control", "tk_auth_challenge", "tk_api_token", "tk_auth_session", "tk_auth_throttle"}
+
+func migrationTablesFor(schema int) []string {
+	if schema == 2 {
+		return append([]string{}, baseMigrationTables...)
+	}
+	return append(append([]string{}, baseMigrationTables...), "tk_recovery_control", "tk_recovery_address", "tk_recovery_link")
+}
 
 type migrationManifest struct {
 	Format                int               `json:"format"`
@@ -64,15 +72,19 @@ func unpackMigration(path, stage, resources string) (migrationManifest, error) {
 	if err = readJSON(filepath.Join(stage, "manifest.json"), &manifest); err != nil {
 		return manifest, err
 	}
-	expected, err := fileDigest(filepath.Join(resources, "schema-v2-postgresql.shape"))
+	if !supportedSchema(manifest.ServerSchema) {
+		return manifest, errors.New("Unsupported source schema")
+	}
+	expected, err := fileDigest(filepath.Join(resources, fmt.Sprintf("schema-v%d-postgresql.shape", manifest.ServerSchema)))
 	if err != nil {
 		return manifest, err
 	}
-	if manifest.Format != 1 || manifest.Kind != "timekeeper-postgresql18-to17" || manifest.ServerSchema != 2 || manifest.SourcePostgreSQLMajor != 18 || manifest.TargetPostgreSQLMajor != 17 || manifest.SchemaShapeSHA256 != expected || len(manifest.Files) != 2 || len(manifest.TableFingerprints) != len(migrationTables) {
+	tables := migrationTablesFor(manifest.ServerSchema)
+	if manifest.Format != 1 || manifest.Kind != "timekeeper-postgresql18-to17" || manifest.SourcePostgreSQLMajor != 18 || manifest.TargetPostgreSQLMajor != 17 || manifest.SchemaShapeSHA256 != expected || len(manifest.Files) != 2 || len(manifest.TableFingerprints) != len(tables) {
 		return manifest, errors.New("Unsupported PostgreSQL migration identity")
 	}
 	pattern := regexp.MustCompile(`^[0-9]+\|([a-f0-9]{32}|empty)$`)
-	for _, table := range migrationTables {
+	for _, table := range tables {
 		if !pattern.MatchString(manifest.TableFingerprints[table]) {
 			return manifest, errors.New("Invalid migration table fingerprint")
 		}
@@ -105,6 +117,9 @@ func importPostgreSQL18(root, path, resources string) error {
 	if err != nil {
 		return err
 	}
+	if manifest.ServerSchema > s.Release.Schema {
+		return errors.New("Install a package compatible with the source schema before importing")
+	}
 	query := func(sql string) (string, error) {
 		return psql(nativePSQL, s.DatabasePort, s.Role, password, s.Database, sql)
 	}
@@ -112,7 +127,7 @@ func importPostgreSQL18(root, path, resources string) error {
 	if err != nil {
 		return err
 	}
-	expected, err := os.ReadFile(filepath.Join(resources, "schema-v2-postgresql.shape"))
+	expected, err := os.ReadFile(filepath.Join(resources, fmt.Sprintf("schema-v%d-postgresql.shape", s.Release.Schema)))
 	if err != nil {
 		return err
 	}
@@ -121,7 +136,7 @@ func importPostgreSQL18(root, path, resources string) error {
 		return err
 	}
 	if actual != strings.TrimSpace(string(expected)) {
-		return errors.New("Migration requires the exact canonical target schema 2")
+		return errors.New("Migration requires the exact canonical target schema")
 	}
 	_, pendingErr := os.Stat(filepath.Join(root, "config/maintenance-pending.json"))
 	if errors.Is(pendingErr, os.ErrNotExist) {
@@ -136,16 +151,25 @@ func importPostgreSQL18(root, path, resources string) error {
 	if err = beginMaintenance(root, path, "postgresql18-import"); err != nil {
 		return err
 	}
-	tables := make([]string, len(migrationTables))
-	for i, table := range migrationTables {
+	targetTables := migrationTablesFor(s.Release.Schema)
+	tables := make([]string, len(targetTables))
+	for i, table := range targetTables {
 		tables[i] = "public." + table
 	}
-	before := "TRUNCATE " + strings.Join(tables, ",") + ";\n"
+	before := offlineSchemaSQL + "TRUNCATE " + strings.Join(tables, ",") + ";\n"
 	after := "\nDO $timekeeper$ BEGIN\n"
-	for _, table := range migrationTables {
+	for _, table := range migrationTablesFor(manifest.ServerSchema) {
 		after += "IF (" + fingerprintQuery(table) + ") <> '" + manifest.TableFingerprints[table] + "' THEN RAISE EXCEPTION 'Migration data fingerprint mismatch'; END IF;\n"
 	}
 	after += "END $timekeeper$;\n"
+	if manifest.ServerSchema == 2 && s.Release.Schema == currentSchema {
+		after += fmt.Sprintf("INSERT INTO public.tk_recovery_control VALUES(1,NULL,0); UPDATE public.tk_schema SET schema_version=%d WHERE id=1;\n", currentSchema)
+	}
+	guard, err := schemaGuard(resources, s.Release.Schema)
+	if err != nil {
+		return err
+	}
+	after += guard
 	data, err := os.Open(filepath.Join(stage, "data.sql"))
 	if err != nil {
 		return err
@@ -177,10 +201,7 @@ func cancelEmptyImport(root string) error {
 		return err
 	}
 	path := filepath.Join(root, "config/maintenance-pending.json")
-	var pending struct {
-		Operation     string `json:"operation"`
-		ArchiveSHA256 string `json:"archiveSha256"`
-	}
+	var pending maintenancePending
 	if err = readJSON(path, &pending); err != nil {
 		return err
 	}

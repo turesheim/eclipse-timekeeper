@@ -16,6 +16,7 @@ export function emailRecovery({request, signIn}) {
   }
   function show(selected) {
     close(); mode = selected; $('login-form').hidden = true; $('forgot-password').hidden = true; form.hidden = false;
+    for (const input of $('login-form').querySelectorAll('input')) input.disabled = true;
     for (const [id, visible] of [['recovery-username', selected === 'forgot'], ['recovery-password', selected === 'reset'], ['recovery-confirm', selected === 'reset']]) {
       const input = $(id); input.closest('label').hidden = !visible; input.disabled = !visible; input.required = visible;
     }

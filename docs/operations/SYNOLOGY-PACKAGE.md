@@ -34,7 +34,7 @@ a random one-time setup code: copy it before finishing. No database administrato
 password is retained by Timekeeper.
 
 Use **Open**, choose **First administrator setup**, and enter that code to create
-your username and password. Codes expire 15 minutes after installation. New
+your username, password and primary recovery email. Codes expire 15 minutes after installation. New
 identities use a random stable owner ID; claiming existing data requires its
 explicit existing owner ID. [Account operations](ACCOUNTS.md) describes privacy,
 sessions, named Eclipse tokens and recovery.
@@ -156,7 +156,18 @@ earlier pending codes; it never reopens completed account setup.
 Provisioning records an installation ID on its dedicated role/database so an
 interrupted operation can resume without taking over an unrelated object.
 Same-schema upgrades replace the pinned application image and record deployment
-time. Schema changes require explicit maintenance and are refused automatically.
+time. The supported schema-2 → schema-3 upgrade runs while the package is stopped:
+the incoming installer validates the canonical schema, saves a native pre-upgrade
+backup, and adds the recovery tables in one transaction. An interruption keeps
+the backup and a maintenance marker; startup stays blocked until retry completes.
+After database commit, retry publishes the new configuration without rerunning
+the migration or replacing the original backup. Other schema changes/downgrades
+are refused. The pre-upgrade check itself does not modify data.
+
+SMTP is optional and initially disabled. Retained `config/mail.properties` and
+`secrets/smtp_password` configure it independently of regenerated runtime files.
+See [email recovery and hostname changes](ACCOUNTS.md#recovery-email-addresses)
+before enabling delivery or changing a VPN/public hostname.
 
 Back up before upgrades. A failed application upgrade leaves native data and
 retained configuration intact; retain the previous `.spk` for recovery. Real DSM
@@ -205,7 +216,8 @@ sudo -u timekeeper env SYNOPKG_PKGNAME=timekeeper /var/packages/timekeeper/scrip
 ```
 
 Restore validates the complete archive before touching data, then uses PostgreSQL
-17 `pg_restore` in one transaction. It restores business/account data and setup/token
+17 `pg_restore` to render SQL, then applies that SQL and any supported schema
+upgrade in one database transaction. It restores business/account data and setup/token
 configuration into the current dedicated database, retaining the current service
 role/password, HTTPS address and port. Start Timekeeper after success. If a restore
 fails, leave the package stopped and resolve the error before retrying. Restoring
@@ -229,7 +241,7 @@ databases or the shared PostgreSQL package.
 ## Migrating from containerized PostgreSQL 18
 
 The supported logical transfer is **PostgreSQL 18.6 → 17.11, canonical Timekeeper
-schema 2**. Upgrade the source server using the explicit schema-upgrade procedure in
+schema 2 or 3** into a schema-3 package. Upgrade an older source using the explicit schema-upgrade procedure in
 [account operations](ACCOUNTS.md) and complete its first-administrator setup before
 exporting. Existing owners must be claimed by their explicit IDs. The exporter
 refuses an older/custom schema, unfinished account setup or connected API clients.
@@ -268,8 +280,12 @@ refuses an older/custom schema, unfinished account setup or connected API client
 
    The current dedicated database service role/password and DSM address/port are
    retained. The importer applies only source data to the canonical PostgreSQL 17
-   schema, then compares fingerprints of **all 14 tables before committing** the
-   single transaction. No UUID remapping or timestamp conversion is performed.
+   schema, then compares fingerprints of **all source tables before committing**
+   (14 for schema 2, 17 for schema 3). Schema-2 imports then add empty recovery
+   state and update the schema marker to 3 in that transaction. Schema-3 imports
+   retain verified/pending email addresses and recovery state. No UUID remapping
+   or timestamp conversion is performed. Configure SMTP separately for the target;
+   use a newer origin epoch if the address changes before enabling mail.
 
 4. Start Timekeeper and sign in with an existing source account. Point clients at
    the target address and check their own data. Existing API tokens remain bound

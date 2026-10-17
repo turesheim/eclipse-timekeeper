@@ -95,9 +95,9 @@ def build(output, commit, image, revision, channel):
                 shutil.copyfile(source, outer/'scripts'/source.name)
                 (outer/'scripts'/source.name).chmod(0o755)
         (outer/'scripts/migration').mkdir()
-        for name in ('postgresql-shape.sql','schema-v2-postgresql.shape'):
+        for name in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','recovery-v3.sql'):
             shutil.copyfile(ROOT/'server/app/src/main/resources/db'/name,outer/'scripts/migration'/name)
-        release = {'commit':commit,'image':image,'serverSchema':2}
+        release = {'commit':commit,'image':image,'serverSchema':3}
         release_json = json.dumps(release, indent=2)+'\n'
         (outer/'scripts/release.json').write_text(release_json)
         # SYNOPKG_PKGINST_TEMP_DIR contains the extracted package.tgz payload,
@@ -145,7 +145,7 @@ def build(output, commit, image, revision, channel):
         destination.with_suffix('.spk.sha256').write_text(digest+'  '+name+'\n')
         manifest={'format':1,'channel':channel,'package':'timekeeper','version':version,'commit':commit,
                   'architecture':'r1000','image':image,'imageId':image_id,'sha256':digest,
-                  'serverSchema':2,'nativePostgreSQLMajor':17,'realDsmAcceptance':'required'}
+                  'serverSchema':3,'nativePostgreSQLMajor':17,'realDsmAcceptance':'required'}
         destination.with_suffix('.json').write_text(json.dumps(manifest,indent=2)+'\n')
         validate(destination)
         return destination
