@@ -17,19 +17,23 @@ project/tag/description text and dates while retaining seven intervals totaling
 
 ## Local runs and limits
 
-- Full server reactor: 95 application tests plus domain/service/HTTP-client suites
-  passed on `2a6e141`. Subsequent per-entry audit and expanded Undo-step handling
-  passed the focused 12-test ledger/API/import/Undo run. The final CI repeats the
-  complete server suite at its checked-out source.
-- Web unit tests: 49 passed, including the anonymized real fixture and skipped-date
-  batch planning.
-- Full packaged Chromium: 65 passed, one SMTP-only test skipped on `2a6e141`.
-- Packaged HTTPS WebKit: six passed on `cb69a7d`, including administrator setup,
-  actual loopback SMTP recovery and all four import scenarios. Audit JSON downloads
-  retain source lines, exact durations and per-entry outcomes.
-- PostgreSQL replica/restore runs passed with image source `7954211` on both
-  supported PostgreSQL versions. Their JSON receipts record the actual server
-  source and every asserted durability boundary.
+- Clean server reactor: 100 application tests plus domain/service/HTTP-client
+  suites passed after the work-session extension. Focused import/API/provenance/Undo
+  checks cover both modes (15 tests), including continuous DST intervals, independent
+  source claims, reused sessions, edits, owner denial and deliberate re-import.
+- Web unit tests: 49 passed, including the anonymized real fixture, work-session
+  default/client mapping and skipped-date activity batch planning.
+- Packaged Chromium: all six import scenarios passed. Both activity and work-session
+  jobs resume a 201-row import after a dropped reply and reload, then review edited
+  records during Undo. The real seven-row session fixture contributes 42h 4m to
+  Track’s monthly client total and creates no companion records.
+- Packaged HTTPS WebKit: all six import scenarios passed on `7f70f0d`, including
+  accessibility checks and narrow-screen history. Earlier full-suite and SMTP
+  recovery runs remain recorded in the preceding implementation’s CI history.
+- PostgreSQL replica/restore runs exercise both import modes on 17.11 and 18.6.
+  They verify concurrent session batches, restart and protected restore of a partial
+  session job, edited/reused-session Undo and mode-isolated repeat detection.
+  JSON receipts record the server source and each asserted durability boundary.
 - Eclipse reactor compilation and all 96 local persistence tests passed. The
   optional repository hook delegates to ordinary save in the Eclipse adapter;
   no Eclipse import UI is added.
