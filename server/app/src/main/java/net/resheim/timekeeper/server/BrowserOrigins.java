@@ -10,6 +10,21 @@ import java.util.List;
 @ApplicationScoped
 public class BrowserOrigins {
     @ConfigProperty(name="timekeeper.auth.public-origin",defaultValue="NONE") String publicOrigin;
+    boolean configured() {return !publicOrigin.equals("NONE");}
+    /** Host cookies cross ports: require the configured page origin even on reads. */
+    void cookie(UriInfo uri,List<String> origins,List<String> referers,boolean write) {
+        if(!configured()) {check(uri,origins);return;}
+        if(origins!=null && !origins.isEmpty()) {check(uri,origins);return;}
+        if(write || referers==null || referers.size()!=1) throw new ApiFailure(403,"CSRF_FAILED");
+        String origin;
+        try {
+            URI referer=URI.create(referers.getFirst());
+            if(referer.getHost()==null || referer.getRawUserInfo()!=null || referer.getRawFragment()!=null)
+                throw new IllegalArgumentException();
+            origin=referer.getScheme()+"://"+referer.getRawAuthority();
+        } catch(RuntimeException invalid) {throw new ApiFailure(403,"CSRF_FAILED");}
+        check(uri,List.of(origin));
+    }
     void check(UriInfo uri,List<String> origins) {
         if(origins==null || origins.isEmpty()) return;
         String expected=publicOrigin.equals("NONE") ? uri.getBaseUri().getScheme()+"://"+uri.getBaseUri().getRawAuthority() : publicOrigin;
