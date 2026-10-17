@@ -73,5 +73,15 @@ class ImportProvenanceTest {
             ledger.undoBatch(uuid(next.get("id")),0,object(),state->{state.put("state","UNDONE");return object();});
             assertFalse(references.usedByAnotherImport("ACTIVITY",uuid(first.get("activityId")),uuid(job.get("id"))));return null;
         });
+        var repeated=store.transaction(owner,()->ledger.create("Repeated file",hash("member"),"UTC",hash("another file"),hash("plan")));
+        store.transaction(owner,()->ledger.batch(uuid(repeated.get("id")),0,object(),true,state->{
+            var existing=store.service().activity(new ActivityId(uuid(first.get("activityId")))).orElseThrow();
+            provenance.reuseActive(state,hash("entry"),hash("content"),0,List.of(existing));return object();
+        }));
+        store.transaction(owner,()->{
+            assertEquals(job.path("id").asText(),provenance.active(repeated,hash("entry"),0).orElseThrow().path("jobId").asText());
+            assertTrue(new ImportReferences(store).usedByAnotherImport("ACTIVITY",uuid(first.get("activityId")),uuid(job.get("id"))));
+            assertTrue(ledger.required(ImportLedger.Kind.IMPORT_ITEM,ledger.itemId(uuid(repeated.get("id")),0)).has("sharedClaimItemId"));return null;
+        });
     }
 }

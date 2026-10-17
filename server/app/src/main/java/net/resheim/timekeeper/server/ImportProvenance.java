@@ -27,8 +27,16 @@ final class ImportProvenance {
         return found;
     }
     ObjectNode record(ObjectNode job,String fingerprint,String contentFingerprint,int occurrence,List<Activity> activities,boolean created) {
+        return record(job,fingerprint,contentFingerprint,occurrence,activities,created,false);
+    }
+    ObjectNode reuseActive(ObjectNode job,String fingerprint,String contentFingerprint,int occurrence,List<Activity> activities) {
+        return record(job,fingerprint,contentFingerprint,occurrence,activities,false,true);
+    }
+    private ObjectNode record(ObjectNode job,String fingerprint,String contentFingerprint,int occurrence,List<Activity> activities,boolean created,boolean reuseClaim) {
         digest(fingerprint);digest(contentFingerprint);
-        if(activities.isEmpty() || activities.size()>1000 || active(job,fingerprint,occurrence).isPresent()) throw ApiFailure.conflict();
+        var claim=active(job,fingerprint,occurrence);
+        if(activities.isEmpty() || activities.size()>1000 || (!reuseClaim && claim.isPresent())
+                || (reuseClaim && (claim.isEmpty() || !contentFingerprint.equals(claim.get().path("contentFingerprint").asText())))) throw ApiFailure.conflict();
         if(activities.stream().anyMatch(value->!value.ownerId().value().equals(store.owner()) || value.end().isEmpty())) throw ApiFailure.validation();
         if(activities.stream().map(Activity::id).distinct().count()!=activities.size()) throw ApiFailure.validation();
         for(var activity:activities) {
@@ -37,12 +45,13 @@ final class ImportProvenance {
         }
         var item=object();item.put("kind","ENTRY");item.put("created",created);item.put("fingerprint",fingerprint);
         item.put("contentFingerprint",contentFingerprint);item.put("occurrence",occurrence);item.put("state","PENDING");
+        if(reuseClaim) item.put("sharedClaimItemId",claim.orElseThrow().path("itemId").asText());
         var parts=item.putArray("parts");activities.forEach(value->parts.add(part(store.owner(),value,true)));
         var saved=ledger.appendItem(job,item);
         String authority=hash(job.path("sourceKey").asText()+"\n"+fingerprint+"\n"+occurrence);
         UUID keyId=ImportLedger.identifier("entry-key",authority);
         var key=object();key.put("authority",authority);key.put("jobId",job.path("id").asText());key.put("itemId",saved.path("id").asText());
-        key.put("contentFingerprint",contentFingerprint);ledger.insert(ImportLedger.Kind.IMPORT_KEY,keyId,key);
+        key.put("contentFingerprint",contentFingerprint);if(!reuseClaim) ledger.insert(ImportLedger.Kind.IMPORT_KEY,keyId,key);
         for(var activity:activities) {
             if(created) origin(job,saved,activity,true);
             new ImportReferences(store).add("ACTIVITY",activity.id().value(),uuid(job.get("id")),uuid(saved.get("id")),created);
