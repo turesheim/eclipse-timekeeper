@@ -23,7 +23,7 @@ class RecoveryMail {
     @Inject RecoveryOrigin origin;
     @Inject Vertx vertx;
     @Inject ServiceSettings settings;
-    private MailClient client;
+    private MailConfig configuration;
     private String sender;
     @ConfigProperty(name="timekeeper.mail.enabled",defaultValue="false") boolean enabled;
     private final ThreadPoolExecutor workers=new ThreadPoolExecutor(2,2,30,TimeUnit.SECONDS,new ArrayBlockingQueue<>(128),work->{
@@ -32,31 +32,36 @@ class RecoveryMail {
 
     void initialize() {if(enabled) origin.initialize();}
     void configure(JsonNode value,String password) {
-        if(client!=null) {client.close();client=null;}
+        configuration=null;
         enabled=value.path("emailRecoveryEnabled").asBoolean();sender=value.path("smtpFrom").asText();
         if(!enabled) return;
         var config=new MailConfig().setHostname(value.path("smtpHost").asText()).setPort(value.path("smtpPort").asInt())
                 .setSsl(value.path("smtpTls").asBoolean()).setStarttls(StartTLSOptions.valueOf(value.path("smtpStartTls").asText()))
                 .setTrustAll(false).setHostnameVerificationAlgorithm("HTTPS").setConnectTimeout(5000).setSslHandshakeTimeout(5)
-                .setKeepAlive(false).setMaxPoolSize(2);
+                .setIdleTimeout(10).setIdleTimeoutUnit(TimeUnit.SECONDS)
+                .setKeepAlive(false).setMaxPoolSize(1);
         String username=value.path("smtpUsername").asText();
         if(!username.isEmpty()) config.setUsername(username).setPassword(password==null ? "" : password).setLogin(LoginOption.REQUIRED);
         else config.setLogin(LoginOption.DISABLED);
-        client=MailClient.create(vertx,config);
+        configuration=config;
     }
     boolean configuredEnabled() {return enabled;}
     boolean enabled() {return enabled && settings.available();}
     private void send(String address,String subject,String body) {
+        if(!enabled()) return;
+        // Each bounded worker owns its transport. A rejected/stalled mailbox
+        // cannot exhaust another delivery's pool. The transport also has a
+        // network idle deadline, so a timed-out Future cannot leave it open.
+        var client=MailClient.create(vertx,new MailConfig(configuration));
         try {
-            if(!enabled()) return;
             client.sendMail(new MailMessage().setFrom(sender).setTo(address).setSubject(subject).setText(body))
                     .toCompletionStage().toCompletableFuture().get(10,TimeUnit.SECONDS);
         } catch(InterruptedException stopped) {Thread.currentThread().interrupt();throw new IllegalStateException("Mail delivery interrupted");}
         catch(java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException failed) {throw new IllegalStateException("Mail delivery failed");}
+        finally {client.close();}
     }
     @PreDestroy void close() {
         workers.shutdownNow();workers.getQueue().clear();
-        if(client!=null) client.close();
         try {if(!workers.awaitTermination(5,TimeUnit.SECONDS)) LOG.warn("Recovery mail workers did not stop within the shutdown deadline");}
         catch(InterruptedException stopped) {Thread.currentThread().interrupt();}
     }

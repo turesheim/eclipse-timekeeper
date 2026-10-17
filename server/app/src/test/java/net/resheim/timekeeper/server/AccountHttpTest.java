@@ -35,7 +35,7 @@ class AccountHttpTest {
         return new Browser(cookie.split(";",2)[0],reply.jsonPath().getString("csrf"),reply.jsonPath().getString("ownerId"));
     }
     @BeforeEach void clear() throws Exception {
-        var actual=io.quarkus.arc.ClientProxy.unwrap(store);
+        var actual=io.quarkus.arc.ClientProxy.unwrap(store);actual.stopMaintenance();
         try(var c=actual.datasource.getConnection();var s=c.createStatement()) {
             for(String table:List.of("tk_recovery_link","tk_recovery_address","tk_auth_session","tk_api_token","tk_auth_challenge","tk_account","tk_active","tk_relation","tk_external_reference","tk_receipt","tk_change","tk_resource","tk_owner","tk_auth_throttle")) s.executeUpdate("DELETE FROM "+table);
             s.executeUpdate("UPDATE tk_auth_control SET bootstrap_completed=FALSE");
