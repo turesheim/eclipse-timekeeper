@@ -121,7 +121,7 @@ def main():
             start(1,vpn,1);start(2,vpn,1)
             alice=session(api(1,'/auth/setup',{'code':code,'username':'alice','password':account_password,'displayName':'Alice','email':'alice@example.invalid'}))
             verify('alice@example.invalid')
-            expect_status(api(1,'/auth/users',{'username':'bob','password':account_password,'displayName':'Bob','administrator':False,'email':'bob@example.invalid'},alice),201,'Independent user creation')
+            expect_status(api(1,'/admin/users',{'username':'bob','password':account_password,'displayName':'Bob','administrator':False,'email':'bob@example.invalid'},alice),201,'Independent user creation')
             bob=session(api(2,'/auth/login',{'username':'bob','password':account_password,'remember':False}))
             alice_other=session(api(2,'/auth/login',{'username':'alice','password':account_password,'remember':False}))
             for index,owner in ((1,alice),(2,bob)):

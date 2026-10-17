@@ -10,7 +10,7 @@ async function api(request, method, path, data, headers = {}) {
 }
 async function fresh(request) {
   const username = 'settings-' + randomUUID().slice(0, 8), password = 'private settings passphrase';
-  const {user} = await (await api(request, 'POST', '/auth/users', {username, password, displayName: username, email: username + '@example.org', administrator: false})).json();
+  const {user} = await (await api(request, 'POST', '/admin/users', {username, password, displayName: username, email: username + '@example.org', administrator: false})).json();
   return {...user, password};
 }
 async function login(page, user, hash = '') {
@@ -68,8 +68,8 @@ test('profile drafts survive cancelled navigation and stale saves; blank display
   await page.getByLabel('Display name (optional)', {exact: true}).fill('My unsaved name');
   page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('link', {name: 'Password', exact: true}).click();
   await expect(page.getByLabel('Display name (optional)', {exact: true})).toHaveValue('My unsaved name');
-  const loaded = await api(request, 'GET', '/auth/users/' + key(user));
-  await api(request, 'PUT', '/auth/users/' + key(user), {username: user.username, displayName: 'Peer name', enabled: true, administrator: false}, {'If-Match': loaded.headers().etag});
+  const loaded = await api(request, 'GET', '/admin/users/' + key(user));
+  await api(request, 'PUT', '/admin/users/' + key(user), {username: user.username, displayName: 'Peer name', enabled: true, administrator: false}, {'If-Match': loaded.headers().etag});
   await page.getByRole('button', {name: 'Save profile', exact: true}).click();
   await expect(page.locator('#account-content')).toContainText('Your draft is kept');
   await expect(page.getByLabel('Display name (optional)', {exact: true})).toHaveValue('My unsaved name');
@@ -88,20 +88,20 @@ test('Users page protects the last administrator, keeps stale drafts and confirm
   await page.getByRole('link', {name: 'Back to users', exact: true}).click(); await ready(page);
   await page.locator('#account-content tr').filter({hasText: user.username}).getByRole('link', {name: 'Edit', exact: true}).click(); await ready(page);
   await page.getByLabel('Display name (optional)', {exact: true}).fill('Retain this user draft');
-  const loaded = await api(request, 'GET', '/auth/users/' + key(user));
-  await api(request, 'PUT', '/auth/users/' + key(user), {username: user.username, displayName: 'Changed by peer', enabled: true, administrator: false}, {'If-Match': loaded.headers().etag});
+  const loaded = await api(request, 'GET', '/admin/users/' + key(user));
+  await api(request, 'PUT', '/admin/users/' + key(user), {username: user.username, displayName: 'Changed by peer', enabled: true, administrator: false}, {'If-Match': loaded.headers().etag});
   await page.getByRole('button', {name: 'Save user', exact: true}).click(); await expect(page.locator('#account-content')).toContainText('Your draft is kept');
   await expect(page.getByLabel('Display name (optional)', {exact: true})).toHaveValue('Retain this user draft');
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', {name: 'Reload current values', exact: true}).click(); await ready(page);
   await page.getByLabel('Enabled', {exact: true}).uncheck();
   page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('button', {name: 'Save user', exact: true}).click();
-  expect((await (await api(request, 'GET', '/auth/users/' + key(user))).json()).user.state).toBe('ENABLED');
+  expect((await (await api(request, 'GET', '/admin/users/' + key(user))).json()).user.state).toBe('ENABLED');
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', {name: 'Save user', exact: true}).click();
   await expect(page.locator('#account-content tr').filter({hasText: user.username})).toContainText('Disabled');
   await page.locator('#account-content tr').filter({hasText: user.username}).getByRole('link', {name: 'Edit', exact: true}).click(); await ready(page);
   await page.getByLabel('Enabled', {exact: true}).check(); await page.getByRole('button', {name: 'Save user', exact: true}).click();
   await expect(page.locator('#account-content tr').filter({hasText: user.username})).toContainText('Enabled');
-  expect((await (await api(request, 'GET', '/auth/users/' + key(self))).json()).user.administrator).toBe(true);
+  expect((await (await api(request, 'GET', '/admin/users/' + key(self))).json()).user.administrator).toBe(true);
   await page.screenshot({path: 'test-results/users-desktop.png', fullPage: true});
   await page.setViewportSize({width: 390, height: 844}); await page.screenshot({path: 'test-results/users-mobile.png', fullPage: true});
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
@@ -151,7 +151,7 @@ test('password validation preserves drafts and a successful change revokes only 
 test('standard users cannot open Users directly and a late account response cannot survive sign-out', async ({page, request}) => {
   const user = await fresh(request); await login(page, user, '#users'); await ready(page);
   await expect(page.locator('#users-link')).not.toBeVisible(); await expect(page.locator('#account-content')).toContainText('Administrator access is required');
-  expect((await browserRequest(page).get('/api/v1/auth/users')).status()).toBe(403);
+  expect((await browserRequest(page).get('/api/v1/admin/users')).status()).toBe(403);
   await page.evaluate(() => {
     const fetch = window.fetch;
     window.fetch = async (...args) => {

@@ -141,6 +141,14 @@ changing their role revokes their sessions/tokens; enabling does not resurrect
 old credentials. The last enabled administrator cannot be disabled or demoted.
 Account deletion is not exposed: disabling retains the user's data.
 
+User-management API requests use `/api/v1/admin/users` and
+`/api/v1/admin/users/{key}`. The older preview `/api/v1/auth/users` routes are
+removed so they cannot bypass a reverse-proxy policy on the administration
+prefix; update preview automation to use the new paths.
+`GET /api/v1/admin/settings` returns the deployment's general configuration to
+administrators, without database URLs, passwords, tokens or SMTP credentials.
+These settings remain operator-managed through the deployment configuration.
+
 Both settings pages support bookmarks and browser Back under `/web/`:
 `#account/profile`, `#account/password`, `#account/tokens` and `#users`.
 Navigation keeps activity/work-session timers running. Unsaved forms prompt

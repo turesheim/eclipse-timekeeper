@@ -48,6 +48,25 @@ class AccountHttpTest {
         var body=JsonValues.object();body.put("code",code);body.put("username","admin");body.put("password",PASSWORD);body.put("displayName","Administrator");body.put("email","admin@example.org");
         Browser result=browser(call(null,"POST","/auth/setup",body,false));assertEquals(401,call(null,"POST","/auth/setup",body,false).statusCode());return result;
     }
+    @Test void administrationHasASeparateNamespaceAndSettingsNeverExposeDeploymentSecrets() throws Exception {
+        var admin=setup();
+        assertEquals(401,call(null,"GET","/admin/settings",null,false).statusCode());
+        assertEquals(404,call(admin,"GET","/auth/users",null,false).statusCode(),"The retired route would bypass an admin-prefix proxy policy");
+        var reply=call(admin,"GET","/admin/settings",null,false);assertEquals(200,reply.statusCode());assertEquals("no-store",reply.header("Cache-Control"));
+        var settings=node(reply.asString());
+        assertEquals(Set.of("configurationManagedBy","databaseType","schemaVersion","publicOrigin","originEpoch","passkeysEnabled","passkeyRpId","emailRecoveryEnabled"),
+                JsonValues.MAPPER.convertValue(settings,java.util.Map.class).keySet());
+        assertEquals("deployment",settings.path("configurationManagedBy").asText());assertEquals("h2",settings.path("databaseType").asText());
+        assertEquals(ServerSchema.CURRENT,settings.path("schemaVersion").asInt());assertTrue(settings.path("publicOrigin").isNull());assertTrue(settings.path("passkeyRpId").isNull());
+        assertEquals(400,call(admin,"GET","/admin/settings?unexpected=1",null,false).statusCode());
+        assertEquals(201,call(admin,"POST","/admin/users",node("{\"username\":\"ordinary\",\"password\":\""+PASSWORD+"\",\"displayName\":\"Ordinary user\",\"email\":\"ordinary@example.org\",\"administrator\":false}"),true).statusCode());
+        var user=browser(call(null,"POST","/auth/login",node("{\"username\":\"ordinary\",\"password\":\""+PASSWORD+"\",\"remember\":false}"),false));
+        assertEquals(403,call(user,"GET","/admin/settings",null,false).statusCode());
+        assertEquals(403,call(user,"GET","/admin/users",null,false).statusCode());
+        var token=call(admin,"POST","/auth/tokens",node("{\"name\":\"Read-only client\",\"permissions\":[\"read\"],\"expiresAt\":null}"),true);
+        assertEquals(201,token.statusCode());
+        assertEquals(403,given().header("Authorization","Bearer "+node(token.asString()).path("token").asText()).get("/api/v1/admin/settings").statusCode());
+    }
     @Test void browserSessionsUseCsrfAndAccountBoundDataAndLogoutRevokesOnlyTheCurrentSession() throws Exception {
         var admin=setup();
         var passkeys=call(admin,"GET","/auth/passkeys",null,false);assertEquals(200,passkeys.statusCode());assertFalse(node(passkeys.asString()).path("enabled").asBoolean());
@@ -76,19 +95,19 @@ class AccountHttpTest {
         assertEquals(401,given().header("Authorization","Bearer "+raw).get("/api/v1/me").statusCode());assertEquals(200,call(second,"GET","/me",null,false).statusCode());
     }
     @Test void administratorCannotReadOtherBusinessDataAndDisableTerminatesOutstandingPolls() throws Exception {
-        var admin=setup();var user=call(admin,"POST","/auth/users",node("{\"username\":\"other\",\"password\":\""+PASSWORD+"\",\"displayName\":\"Other\",\"email\":\"other@example.org\",\"administrator\":false}"),true);
+        var admin=setup();var user=call(admin,"POST","/admin/users",node("{\"username\":\"other\",\"password\":\""+PASSWORD+"\",\"displayName\":\"Other\",\"email\":\"other@example.org\",\"administrator\":false}"),true);
         assertEquals(201,user.statusCode());String owner=node(user.asString()).get("user").get("ownerId").asText();
         var other=browser(call(null,"POST","/auth/login",node("{\"username\":\"other\",\"password\":\""+PASSWORD+"\",\"remember\":false}"),false));assertEquals(owner,other.owner());
         var created=call(other,"POST","/clients",node("{\"name\":\"Other private client\",\"color\":\"#102030\"}"),true);assertEquals(201,created.statusCode());String id=node(created.asString()).get("id").asText();
-        assertEquals(404,call(admin,"GET","/clients/"+id,null,false).statusCode());assertEquals(403,call(other,"GET","/auth/users",null,false).statusCode());
+        assertEquals(404,call(admin,"GET","/clients/"+id,null,false).statusCode());assertEquals(403,call(other,"GET","/admin/users",null,false).statusCode());
         assertEquals(404,call(admin,"POST","/projects",node("{\"name\":\"Foreign client\",\"clientId\":\""+id+"\"}"),true).statusCode());
         long revision=node(call(other,"GET","/projects",null,false).asString()).get("revision").asLong();
-        String key=OwnerBinding.encode(owner);var loaded=call(admin,"GET","/auth/users/"+key,null,false);assertEquals(200,loaded.statusCode());
+        String key=OwnerBinding.encode(owner);var loaded=call(admin,"GET","/admin/users/"+key,null,false);assertEquals(200,loaded.statusCode());
         try(var pool=Executors.newSingleThreadExecutor()) {
             var poll=pool.submit(()->call(other,"GET","/changes?after="+revision+"&waitSeconds=25",null,false));
             Thread.sleep(300);assertFalse(poll.isDone());
             var body=node("{\"username\":\"other\",\"displayName\":\"Other\",\"enabled\":false,\"administrator\":false}");
-            var disabled=given().header("Cookie",admin.cookie()).header("X-CSRF-Token",admin.csrf()).header("If-Match",loaded.header("ETag")).contentType("application/json").body(body.toString()).put("/api/v1/auth/users/"+key);assertEquals(200,disabled.statusCode(),disabled.asString());
+            var disabled=given().header("Cookie",admin.cookie()).header("X-CSRF-Token",admin.csrf()).header("If-Match",loaded.header("ETag")).contentType("application/json").body(body.toString()).put("/api/v1/admin/users/"+key);assertEquals(200,disabled.statusCode(),disabled.asString());
             assertEquals(401,poll.get(5,TimeUnit.SECONDS).statusCode());
         }
         assertEquals(401,call(other,"GET","/clients/"+id,null,false).statusCode());

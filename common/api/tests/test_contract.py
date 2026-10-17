@@ -42,7 +42,7 @@ class ContractTest(unittest.TestCase):
                     self.assertEqual([], operation['security'])
                     continue
                 self.assertNotIn('security', operation)
-                self.assertEqual(('write' if path.startswith('/auth/users') else 'read') if method == 'get' else ('read' if path in ('/auth/logout', '/auth/token-login') else 'write'),
+                self.assertEqual(('write' if path.startswith('/admin/users') else 'read') if method == 'get' else ('read' if path in ('/auth/logout', '/auth/token-login') else 'write'),
                                  operation['x-required-permission'])
                 self.assertIn('401', operation['responses'])
                 self.assertIn('403', operation['responses'])

@@ -17,7 +17,7 @@ async function signOut(page) {await openAccountMenu(page);await page.getByRole('
 const addForm=page=>page.getByRole('heading',{name:'Add passkey',exact:true}).locator('..');
 async function fresh(request) {
   const username='key-'+randomUUID().slice(0,8);
-  const reply=await request.post('/api/v1/auth/users',{headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},data:{username,password,displayName:username,email:username+'@example.invalid',administrator:false}});
+  const reply=await request.post('/api/v1/admin/users',{headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},data:{username,password,displayName:username,email:username+'@example.invalid',administrator:false}});
   expect(reply.status()).toBe(201);return {...(await reply.json()).user,password};
 }
 async function virtual(page,automatic=true) {

@@ -216,7 +216,7 @@ def exercise(system):
     system.server_commit=versions[0]['commit']
     if any(value['commit']!=system.server_commit or value['dirty'] for value in versions):raise AssertionError('Replica build identities are inconsistent or dirty')
     if system.args.expected_commit and system.server_commit!=system.args.expected_commit:raise AssertionError('Replica does not run the expected source commit')
-    expect(system.request(2,alice,'/auth/users',{'username':'bob','password':PASSWORD,'displayName':'Bob','administrator':False,'email':'bob@example.invalid'}),201,'Independent account creation')
+    expect(system.request(2,alice,'/admin/users',{'username':'bob','password':PASSWORD,'displayName':'Bob','administrator':False,'email':'bob@example.invalid'}),201,'Independent account creation')
     bob=system.password_login('bob',index=2)
     for browser in (alice,bob):
         client=expect(system.request(1,browser,'/clients',{'name':'Owner private client','color':'#246bad'}),201,'Private client')

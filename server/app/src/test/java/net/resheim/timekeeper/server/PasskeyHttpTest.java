@@ -87,7 +87,7 @@ class PasskeyHttpTest {
             register(signed,secondKey,object().put("proof",addProof));assertEquals(2,success(call(signed,"GET","/auth/passkeys",null),200).path("items").size());
             var renamed=given().header("Origin",ORIGIN).header("Cookie",signed.cookie()).header("X-CSRF-Token",signed.csrf()).header("If-Match",first.header("ETag")).contentType("application/json").body(Map.of("name","Renamed first key")).put("/api/v1/auth/passkeys/"+firstId).then().statusCode(200).extract().response();
             assertEquals("Renamed first key",renamed.jsonPath().getString("name"));
-            success(call(signed,"POST","/auth/users",Map.of("username","http-other","password",PASSWORD,"displayName","Other owner","email","other@example.org","administrator",false)),201);
+            success(call(signed,"POST","/admin/users",Map.of("username","http-other","password",PASSWORD,"displayName","Other owner","email","other@example.org","administrator",false)),201);
             var other=anonymous();other=issued(other,call(other,"POST","/auth/login",Map.of("username","http-other","password",PASSWORD,"remember",false)));
             assertEquals(0,success(call(other,"GET","/auth/passkeys",null),200).path("items").size());
             given().header("Origin",ORIGIN).header("Cookie",other.cookie()).header("X-CSRF-Token",other.csrf()).header("If-Match",renamed.header("ETag")).contentType("application/json").body(Map.of("name","Foreign rename")).put("/api/v1/auth/passkeys/"+firstId).then().statusCode(404);

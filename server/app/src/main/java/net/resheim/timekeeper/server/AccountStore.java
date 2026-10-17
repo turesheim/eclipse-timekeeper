@@ -298,6 +298,7 @@ public class AccountStore {
         requireWrite(principal);tx(c->{lock(c);guard(c,principal);
             if(execute(c,"UPDATE tk_api_token SET revoked=TRUE,version=version+1 WHERE owner_id=? AND id=?",principal.owner(),id)!=1) throw ApiFailure.notFound();return null;});
     }
+    void requireAdministration(TokenRegistry.Principal principal) {tx(c->{guard(c,principal);requireAdmin(c,principal);return null;});}
     JsonNode users(TokenRegistry.Principal principal) {
         return tx(c->{guard(c,principal);requireAdmin(c,principal);var items=array();
             try(var statement=query(c,"SELECT owner_id FROM tk_account ORDER BY owner_id");var rows=statement.executeQuery()) {while(rows.next()) items.add(account(c,rows.getString(1),false));}

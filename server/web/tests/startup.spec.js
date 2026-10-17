@@ -4,7 +4,7 @@ import {browserRequest} from './browser-request.js';
 
 test('cached modules restore a browser session after reload and opening another tab',async({page,request})=>{
   const username='startup-'+randomUUID().slice(0,8),password='Disposable browser startup passphrase';
-  const created=await request.post('/api/v1/auth/users',{data:{username,password,displayName:username,email:username+'@example.invalid',administrator:false},headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`}});
+  const created=await request.post('/api/v1/admin/users',{data:{username,password,displayName:username,email:username+'@example.invalid',administrator:false},headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`}});
   expect(created.status()).toBe(201);
   const diagnostics=[];
   await page.context().addInitScript(()=>{
