@@ -70,4 +70,10 @@ class BrowserSignIns {
             return null;
         });
     }
+    void logout(TokenRegistry.Principal principal,String browser,String cookie) {
+        accounts.tx(c->{lock(c);accounts.guard(c,principal);var current=realm.current(c);
+            if(current.origin()!=null) new PasskeyCeremonies(c).cancelBrowser(new PasskeyCeremonies.Scope(browser,cookie,current.origin(),URI.create(current.origin()).getHost(),current.epoch()));
+            if(principal.kind().equals("SESSION")) execute(c,"DELETE FROM tk_auth_session WHERE digest=? AND owner_id=?",principal.digest(),principal.owner());return null;
+        });
+    }
 }

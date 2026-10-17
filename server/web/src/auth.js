@@ -23,7 +23,7 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
   $('auth-mode').addEventListener('change',mode); mode();
   async function publicRequest(path, body) {
     if (!isSecureOrigin()) throw new Error();
-    const response = await fetch(`/api/v1/auth/${path}`, {method:body ? 'POST':'GET', credentials:'same-origin', redirect:'error', cache:'no-store', headers:{Accept:'application/json', ...(body ? {'Content-Type':'application/json'} : {})}, ...(body ? {body:JSON.stringify(body)} : {})});
+    const response = await fetch(`/api/v1/auth/${path}`, {method:body ? 'POST':'GET', credentials:'same-origin', redirect:'error', referrerPolicy:'origin', cache:'no-store', headers:{Accept:'application/json', ...(body ? {'Content-Type':'application/json'} : {})}, ...(body ? {body:JSON.stringify(body)} : {})});
     const data = response.status === 204 ? null : await response.json(); if (!response.ok) throw new ApiError(data.code, response.status); return data;
   }
   async function attach(data, current) {
@@ -42,6 +42,8 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
   }
   async function exchange(token, current) {
     if(!isSecureOrigin()) throw new Error();
+    await publicRequest('status');
+    if(current !== generation) return;
     const bearer = new Api(token);
     try { const {data} = await bearer.request('/auth/token-login',{method:'POST'}); forgetToken(token); await attach(data,current); }
     catch (error) { if (error.status === 401) forgetToken(token); throw error; }
@@ -63,7 +65,7 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
       let issued = false;
       try {
         if(selected === 'token') await exchange(token,current);
-        else { const data = await publicRequest(selected,body); issued = true; await attach(data,current); }
+        else { await publicRequest('status'); if(current !== generation) return; const data = await publicRequest(selected,body); issued = true; await attach(data,current); }
       }
       catch(error) {
         if(current !== generation) return;

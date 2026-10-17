@@ -8286,7 +8286,8 @@
         "additionalProperties": false,
         "required": [
           "setupRequired",
-          "emailRecoveryEnabled"
+          "emailRecoveryEnabled",
+          "passkeysEnabled"
         ],
         "properties": {
           "setupRequired": {
@@ -8302,6 +8303,10 @@
           },
           "emailRecoveryEnabled": {
             "type": "boolean"
+          },
+          "passkeysEnabled": {
+            "type": "boolean",
+            "description": "Whether the explicitly configured HTTPS origin supports passkey ceremonies."
           }
         }
       },

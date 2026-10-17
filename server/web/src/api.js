@@ -55,7 +55,7 @@ export class Api {
       if (body !== undefined) headers['Content-Type'] = 'application/json';
       if (etag) headers['If-Match'] = etag;
       if (key) headers['Idempotency-Key'] = key;
-      const response = await this.fetcher(`/api/v1${path}`, {method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, redirect: 'error', credentials: this.#token && path !== '/auth/token-login' ? 'omit' : 'same-origin', cache: 'no-store'});
+      const response = await this.fetcher(`/api/v1${path}`, {method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, redirect: 'error', referrerPolicy:'origin', credentials: this.#token && path !== '/auth/token-login' ? 'omit' : 'same-origin', cache: 'no-store'});
       const data = response.status === 204 ? null : await response.json();
       if (!response.ok) throw new ApiError(typeof data?.code === 'string' ? data.code : 'UNAVAILABLE', response.status);
       if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);

@@ -1,3 +1,4 @@
+import {browserRequest} from './browser-request.js';
 import {openAccountMenu} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -133,22 +134,23 @@ for(const explicitUtc of [false,true]) test(explicitUtc ? 'explicit UTC remains 
   expect((await call(request,'POST','/auth/users',{username,password:secret,displayName:username,email:username+'@example.org',administrator:false})).status()).toBe(201);
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,timezoneId:'Europe/Oslo',locale:'en-GB'}),page=await context.newPage();
   try {
-    const login=await context.request.post('/api/v1/auth/login',{data:{username,password:secret,remember:false}});expect(login.status()).toBe(200);
+    await browserRequest(context).get('/api/v1/auth/status');
+    const login=await browserRequest(context).post('/api/v1/auth/login',{data:{username,password:secret,remember:false}});expect(login.status()).toBe(200);
     const account=await login.json(),headers={'X-CSRF-Token':account.csrf,'X-Timekeeper-Owner':Buffer.from(account.ownerId).toString('base64url')};
-    const before=await context.request.get('/api/v1/me');expect((await before.json()).zoneId).toBe('UTC');
-    if(explicitUtc) expect((await context.request.put('/api/v1/me',{data:{zoneId:'UTC'},headers:{...headers,'If-Match':before.headers().etag}})).status()).toBe(200);
-    const created=await context.request.post('/api/v1/clients',{data:{name:'Local clock client',color:'#176653'},headers});expect(created.status()).toBe(201);
+    const before=await browserRequest(context).get('/api/v1/me');expect((await before.json()).zoneId).toBe('UTC');
+    if(explicitUtc) expect((await browserRequest(context).put('/api/v1/me',{data:{zoneId:'UTC'},headers:{...headers,'If-Match':before.headers().etag}})).status()).toBe(200);
+    const created=await browserRequest(context).post('/api/v1/clients',{data:{name:'Local clock client',color:'#176653'},headers});expect(created.status()).toBe(201);
     const client=await created.json();
-    const response=await context.request.post('/api/v1/work-sessions',{data:{title:'At the office',clientId:client.id,summary:'Local clock regression',start:'2025-10-16T07:59:20.123456789Z',end:null},headers});expect(response.status()).toBe(201);
+    const response=await browserRequest(context).post('/api/v1/work-sessions',{data:{title:'At the office',clientId:client.id,summary:'Local clock regression',start:'2025-10-16T07:59:20.123456789Z',end:null},headers});expect(response.status()).toBe(201);
     const session=await response.json();
     await page.goto('/web/');await expect(page.locator('#status')).toHaveText('Up to date');
     const clock=explicitUtc ? '07:59:20':'09:59:20';
     await expect(page.locator('#work-session-current')).toContainText(clock);
     if(!explicitUtc) {await expect(page.locator('#work-session-current')).not.toContainText('UTC');await expect(page.locator('#zone-caption')).toContainText('Europe/Oslo');}
-    const profile=await (await context.request.get('/api/v1/me')).json();expect(profile.zoneId).toBe(explicitUtc ? 'UTC':'Europe/Oslo');expect(profile.version).toBe(1);
-    expect(await (await context.request.get('/api/v1/work-sessions/'+session.id)).json()).toEqual(session);
+    const profile=await (await browserRequest(context).get('/api/v1/me')).json();expect(profile.zoneId).toBe(explicitUtc ? 'UTC':'Europe/Oslo');expect(profile.version).toBe(1);
+    expect(await (await browserRequest(context).get('/api/v1/work-sessions/'+session.id)).json()).toEqual(session);
     await page.reload();await expect(page.locator('#work-session-current')).toContainText(clock);
-    expect((await (await context.request.get('/api/v1/me')).json()).version).toBe(1);
+    expect((await (await browserRequest(context).get('/api/v1/me')).json()).version).toBe(1);
     await page.screenshot({path:`test-results/work-session-${explicitUtc ? 'explicit-utc':'local-time'}.png`,fullPage:true});
   } finally {await context.close();}
 });

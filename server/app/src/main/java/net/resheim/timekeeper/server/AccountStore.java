@@ -18,6 +18,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 public class AccountStore {
     @Inject AgroalDataSource datasource;
     @Inject TokenRegistry registry;
+    @Inject PasskeyRealm realm;
     @ConfigProperty(name="timekeeper.auth.setup-file",defaultValue="NONE") String setupFile;
     @ConfigProperty(name="quarkus.datasource.jdbc.url") String jdbcUrl;
     private static final String DUMMY=AccountPasswords.hash("This is a dummy password for constant work");
@@ -189,11 +190,18 @@ public class AccountStore {
         return tx(c->{lock(c);guard(c,principal);return issuer.issue(c,principal.owner(),principal.permissions(),false,Instant.now(),principal.digest());});
     }
     TokenRegistry.Principal session(String secret) {
+        return session(secret,null,false);
+    }
+    TokenRegistry.Principal session(String secret,String browser) {
+        return session(secret,browser,true);
+    }
+    private TokenRegistry.Principal session(String secret,String browser,boolean checkBrowser) {
         if(secret==null || !secret.matches("[A-Za-z0-9_-]{43}")) throw ApiFailure.unauthorized(false);
         String digest=hash(secret);
         return tx(c->{
-            try(var statement=query(c,"SELECT s.owner_id,s.permissions,t.permissions,t.legacy_digest FROM tk_auth_session s LEFT JOIN tk_api_token t ON t.owner_id=s.owner_id AND t.digest=s.parent_digest WHERE s.digest=?",digest);var rows=statement.executeQuery()) {
+            try(var statement=query(c,"SELECT s.owner_id,s.permissions,t.permissions,t.legacy_digest,s.browser_digest FROM tk_auth_session s LEFT JOIN tk_api_token t ON t.owner_id=s.owner_id AND t.digest=s.parent_digest WHERE s.digest=?",digest);var rows=statement.executeQuery()) {
                 if(!rows.next()) throw ApiFailure.unauthorized(false);
+                if(checkBrowser && rows.getString(5)!=null && (browser==null || !browser.matches("[A-Za-z0-9_-]{43}") || !rows.getString(5).equals(hash(browser)))) throw ApiFailure.unauthorized(false);
                 var grants=new HashSet<>(permissions(rows.getString(2)));if(rows.getString(3)!=null) grants.retainAll(permissions(rows.getString(3)));
                 var principal=new TokenRegistry.Principal(rows.getString(1),Set.copyOf(grants),"SESSION",digest,rows.getString(4));guard(c,principal);return principal;
             }catch(SQLException failure) {throw databaseFailure(failure);}
@@ -224,9 +232,20 @@ public class AccountStore {
         if(account.get("state").asText().equals("DISABLED")) throw ApiFailure.unauthorized(true);
         if(principal.kind().equals("SESSION")) {
             if(!account.get("state").asText().equals("ENABLED") && !account.get("state").asText().equals("UNCLAIMED")) throw ApiFailure.unauthorized(false);
-            try(var statement=query(c,"SELECT expires_at,last_seen_at,persistent,parent_digest FROM tk_auth_session WHERE digest=? AND owner_id=? FOR UPDATE",principal.digest(),principal.owner());var rows=statement.executeQuery()) {
+            try(var statement=query(c,"SELECT expires_at,last_seen_at,persistent,parent_digest,origin_epoch,browser_digest,passkey_id FROM tk_auth_session WHERE digest=? AND owner_id=? FOR UPDATE",principal.digest(),principal.owner());var rows=statement.executeQuery()) {
                 Instant now=Instant.now();
                 if(!rows.next() || !Instant.parse(rows.getString(1)).isAfter(now) || !Instant.parse(rows.getString(2)).plus(rows.getBoolean(3) ? Duration.ofDays(7) : Duration.ofMinutes(30)).isAfter(now)) throw ApiFailure.unauthorized(false);
+                // Plain reads preserve the auth-control -> account/session mutation lock order.
+                var current=realm.current(c);
+                if(current.origin()==null) {
+                    if(rows.getLong(5)!=0 || rows.getString(6)!=null || rows.getObject(7)!=null) throw ApiFailure.unauthorized(false);
+                } else if(rows.getLong(5)!=current.epoch() || rows.getString(6)==null) throw ApiFailure.unauthorized(false);
+                if(rows.getObject(7)!=null) {
+                    if(!account.path("state").asText().equals("ENABLED")) throw ApiFailure.unauthorized(false);
+                    try(var key=query(c,"SELECT rp_id FROM tk_passkey_credential WHERE id=? AND owner_id=? AND revoked=FALSE",rows.getObject(7),principal.owner());var credentials=key.executeQuery()) {
+                        if(!credentials.next() || !realm.rpId().filter(credentials.getString(1)::equals).isPresent()) throw ApiFailure.unauthorized(false);
+                    }
+                }
                 if(rows.getString(4)!=null) guard(c,new TokenRegistry.Principal(principal.owner(),principal.permissions(),"TOKEN",rows.getString(4)));
                 execute(c,"UPDATE tk_auth_session SET last_seen_at=? WHERE digest=?",now.toString(),principal.digest());
             }catch(SQLException failure) {throw databaseFailure(failure);}

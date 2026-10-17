@@ -42,4 +42,5 @@ final class BrowserCookies {
         if(!secret(secret)) throw ApiFailure.validation();
         return BROWSER+"="+secret+"; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000";
     }
+    static String clearBindingCookie() {return BROWSER+"=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0";}
 }

@@ -12,6 +12,7 @@ import com.yubico.webauthn.data.PublicKeyCredentialCreationOptions;
 import io.quarkus.test.junit.*;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 @QuarkusTest @TestProfile(PasskeyStoreTest.Profile.class)
@@ -23,6 +24,7 @@ class PasskeyStoreTest {
     @Inject AccountStore accounts;
     PasskeyStore passkeys;
     BrowserSignIns signIns;
+    PasskeyRealm originalRealm;
     record Browser(String owner,String browser,AccountStore.Issued session,TokenRegistry.Principal principal) { }
     @BeforeEach void initialize() {
         accounts.tx(c->{lock(c);
@@ -35,12 +37,15 @@ class PasskeyStoreTest {
         });
         var origin=new RecoveryOrigin();origin.accounts=accounts;origin.configured=ORIGIN;origin.epoch=1;
         var realm=new PasskeyRealm();realm.origin=origin;realm.configuredEnabled=true;realm.configuredRp="AUTO";realm.initialize();
+        originalRealm=io.quarkus.arc.ClientProxy.unwrap(accounts).realm;
+        io.quarkus.arc.ClientProxy.unwrap(accounts).realm=realm;
         signIns=new BrowserSignIns();signIns.accounts=accounts;signIns.realm=realm;
         passkeys=new PasskeyStore();passkeys.accounts=accounts;passkeys.realm=realm;passkeys.browserSignIns=signIns;
     }
+    @AfterEach void restoreRealm() {io.quarkus.arc.ClientProxy.unwrap(accounts).realm=originalRealm;}
     private Browser browser(String owner) {
-        String binding=AccountPasswords.secret();var session=accounts.login(owner,PASSWORD,false);
-        accounts.tx(c->{execute(c,"UPDATE tk_auth_session SET browser_digest=?,origin_epoch=1 WHERE digest=?",hash(binding),hash(session.secret()));return null;});
+        String binding=AccountPasswords.secret();var attempt=signIns.begin(BrowserSignIns.Method.PASSWORD,binding,null,"fixture");
+        var session=accounts.login(owner,PASSWORD,false,signIns.issuer(attempt));
         return new Browser(owner,binding,session,accounts.session(session.secret()));
     }
     private String request(JsonNode options) {
@@ -82,7 +87,8 @@ class PasskeyStoreTest {
         assertEquals(2,passkeys.list(alice.principal()).path("items").size());
         var token=accounts.createToken(alice.principal(),"Eclipse",Set.of("read","write"),null);var principal=accounts.managed(hash(token.path("token").asText()));
         assertEquals(403,assertThrows(ApiFailure.class,()->passkeys.registerOptions(principal,alice.browser(),alice.session().secret(),"fixture",object().put("name","Forbidden").put("currentPassword",PASSWORD))).status);
-        var exchanged=accounts.exchange(principal);assertEquals(403,assertThrows(ApiFailure.class,()->passkeys.list(accounts.session(exchanged.secret()))).status);
+        var exchange=signIns.begin(BrowserSignIns.Method.TOKEN,AccountPasswords.secret(),null,"fixture");
+        var exchanged=accounts.exchange(principal,signIns.issuer(exchange));assertEquals(403,assertThrows(ApiFailure.class,()->passkeys.list(accounts.session(exchanged.secret()))).status);
     }
     @Test void rejectedSignaturesCommitConsumptionAndBrowserOwnerSwitchesInvalidateOlderFlowsAndSessions() throws Exception {
         var alice=browser("pk-alice");var key=new WebAuthnProtocolTest.Authenticator("login replay key");register(alice,key,object().put("currentPassword",PASSWORD));
@@ -181,6 +187,7 @@ class PasskeyStoreTest {
         var old=signIns.begin(BrowserSignIns.Method.PASSWORD,alice.browser(),exchanged.secret(),"fixture");
         var origin=new RecoveryOrigin();origin.accounts=accounts;origin.configured="https://timekeeper.example:9443";origin.epoch=2;
         var realm=new PasskeyRealm();realm.origin=origin;realm.configuredEnabled=false;realm.configuredRp="AUTO";realm.initialize();
+        io.quarkus.arc.ClientProxy.unwrap(accounts).realm=realm;
         var moved=new BrowserSignIns();moved.accounts=accounts;moved.realm=realm;
         assertEquals(503,assertThrows(ApiFailure.class,()->signIns.begin(BrowserSignIns.Method.PASSWORD,alice.browser(),exchanged.secret(),"fixture")).status);
         assertEquals(401,assertThrows(ApiFailure.class,()->accounts.login(alice.owner(),PASSWORD,false,moved.issuer(old))).status);
