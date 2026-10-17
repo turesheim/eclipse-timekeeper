@@ -36,17 +36,22 @@ class PasskeyStoreTest {
     PasskeyRealm originalRealm;
     record Browser(String owner,String browser,AccountStore.Issued session,TokenRegistry.Principal principal) { }
     @BeforeEach void initialize() {
+        originalRealm=io.quarkus.arc.ClientProxy.unwrap(accounts).realm;
         accounts.tx(c->{lock(c);
             for(String table:List.of("tk_auth_session","tk_passkey_ceremony","tk_passkey_credential","tk_passkey_user","tk_recovery_link","tk_recovery_address","tk_api_token","tk_auth_challenge","tk_auth_throttle")) execute(c,"DELETE FROM "+table);
-            execute(c,"DELETE FROM tk_account WHERE owner_id IN ('pk-alice','pk-bob')");execute(c,"UPDATE tk_recovery_control SET origin=NULL,epoch=0");
+            execute(c,"UPDATE tk_recovery_control SET origin=NULL,epoch=0");
             for(String owner:List.of("pk-alice","pk-bob")) {
                 execute(c,"INSERT INTO tk_owner(id,zone_id,version,revision,cursor_secret) SELECT ?,'UTC',0,0,'cursor' WHERE NOT EXISTS(SELECT 1 FROM tk_owner WHERE id=?)",owner,owner);
-                execute(c,"INSERT INTO tk_account(owner_id,username,password_hash,display_name,state,administrator,version) VALUES(?,?,?,?,'ENABLED',FALSE,0)",owner,owner,AccountPasswords.hash(PASSWORD),owner);
+                String password=AccountPasswords.hash(PASSWORD);
+                // Maintenance holds an owner lock while initializing accounts.
+                // Reinsertion would need an FK owner lock after locking the
+                // account, reversing that order. Reset the existing row in place.
+                if(execute(c,"UPDATE tk_account SET username=?,password_hash=?,display_name=?,state='ENABLED',administrator=FALSE,version=0 WHERE owner_id=?",owner,password,owner,owner)==0)
+                    execute(c,"INSERT INTO tk_account(owner_id,username,password_hash,display_name,state,administrator,version) VALUES(?,?,?,?,'ENABLED',FALSE,0)",owner,owner,password,owner);
             }return null;
         });
         var origin=new RecoveryOrigin();origin.accounts=accounts;origin.configured=ORIGIN;origin.epoch=1;
         var realm=new PasskeyRealm();realm.origin=origin;realm.configuredEnabled=true;realm.configuredRp="AUTO";realm.initialize();
-        originalRealm=io.quarkus.arc.ClientProxy.unwrap(accounts).realm;
         io.quarkus.arc.ClientProxy.unwrap(accounts).realm=realm;
         signIns=new BrowserSignIns();signIns.accounts=accounts;signIns.realm=realm;
         passkeys=new PasskeyStore();passkeys.accounts=accounts;passkeys.realm=realm;passkeys.browserSignIns=signIns;
