@@ -22,7 +22,7 @@ test('administration has its own protected API namespace and sign-in return page
   const response=await page.goto('/admin/');expect(response.status()).toBe(200);
   expect(response.headers()['content-security-policy']).toContain("script-src 'self'");expect(response.headers()['x-content-type-options']).toBe('nosniff');
   await expect(page.getByRole('link',{name:'Sign in to administration',exact:true})).toBeVisible();await expect(page.locator('#account-navigation')).toBeHidden();
-  expect((await request.get('/api/v1/admin/settings')).status()).toBe(401);expect((await request.get('/web/admin/index.html')).status()).toBe(404);
+  expect((await request.get('/api/v1/admin/settings',{headers:{Origin:origin()}})).status()).toBe(401);expect((await request.get('/web/admin/index.html')).status()).toBe(404);
   await page.getByRole('link',{name:'Sign in to administration',exact:true}).click();await page.locator('#username').fill('browser-admin');await page.locator('#password').fill(password);await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await expect(page).toHaveURL(/\/admin\/$/);await expect(page.getByRole('heading',{name:'General settings',exact:true})).toBeVisible();
   const settings=await browserRequest(page).get('/api/v1/admin/settings');expect(settings.status()).toBe(200);expect(settings.headers()['cache-control']).toBe('no-store');

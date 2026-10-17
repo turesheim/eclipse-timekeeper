@@ -74,7 +74,7 @@ test('incorrect credentials explain the login failure without reporting an expir
 });
 test('account UI creates an isolated user and named Eclipse token shown once',async({page,request,browser})=>{
   const suffix=randomUUID().slice(0,8),username='user-'+suffix,display='Private user '+suffix,otherPassword='private passphrase '+suffix;
-  await login(page);await openAccountMenu(page);await page.locator('#users-link').click();await page.getByRole('link',{name:'Add user',exact:true}).click();
+  await login(page);await openAccountMenu(page);await page.locator('#users-link').click();await page.getByRole('link',{name:'Users',exact:true}).click();await page.getByRole('link',{name:'Add user',exact:true}).click();
   await page.getByLabel('New user username',{exact:true}).fill(username);await page.getByLabel('New user recovery email',{exact:true}).fill(username+'@example.org');await page.getByLabel('Display name (optional)',{exact:true}).fill(display);await page.getByLabel('Temporary password',{exact:true}).fill(otherPassword);await page.getByLabel('Confirm temporary password',{exact:true}).fill(otherPassword);await page.getByRole('button',{name:'Create user',exact:true}).click();await expect(page.locator('#account-content tr').filter({hasText:display})).toBeVisible();
   const peer=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL}),other=await peer.newPage();
   try {
