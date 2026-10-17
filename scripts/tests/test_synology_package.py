@@ -9,7 +9,7 @@ import tarfile
 import tempfile
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]/'server/scripts'))
-from validate_synology import REQUIRED, validate
+from validate_synology import REQUIRED, MIGRATION_FILES, validate
 
 ROOT=Path(__file__).resolve().parents[2]
 COMMIT='a'*40
@@ -31,7 +31,7 @@ def archive(files, compressed=False, extra=None):
 
 
 class SynologyPackageTest(unittest.TestCase):
-    def candidate(self, *, image_tag=IMAGE, architecture='amd64', missing_launcher=False, missing_staged_release=False, staged_commit=COMMIT, empty_project=False, elevated=False, late_share=False, install_type=None, outer_extra=None, checksum=None):
+    def candidate(self, *, image_tag=IMAGE, architecture='amd64', missing_launcher=False, missing_staged_release=False, staged_commit=COMMIT, missing_staged_migration=None, changed_staged_migration=None, empty_project=False, elevated=False, late_share=False, install_type=None, outer_extra=None, checksum=None):
         image=archive({'manifest.json':json.dumps([{'RepoTags':[image_tag],'Config':'config.json','Layers':[]}]).encode(),
                        'config.json':json.dumps({'architecture':architecture,'os':'linux'}).encode()},True)
         payload={'image.tar.gz':image,'project/compose.yaml':(ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',IMAGE).encode(),
@@ -39,6 +39,9 @@ class SynologyPackageTest(unittest.TestCase):
                  **{name:b'guide' for name in ('README.md','ACCOUNTS.md','TAILSCALE.md')}}
         if not missing_staged_release:
             payload['scripts/release.json']=json.dumps({'commit':staged_commit,'image':IMAGE,'serverSchema':3}).encode()
+        migrations={name:(ROOT/'server/app/src/main/resources/db'/Path(name).name).read_bytes() for name in MIGRATION_FILES}
+        payload.update({name:value for name,value in migrations.items() if name!=missing_staged_migration})
+        if changed_staged_migration:payload[changed_staged_migration]+=b'\nchanged\n'
         if not missing_launcher:payload['ui/config']=(ROOT/'server/synology/ui/config').read_bytes()
         if empty_project:payload['project/compose.yaml']=b'{"services":{}}'
         payload=archive(payload,True)
@@ -47,6 +50,7 @@ class SynologyPackageTest(unittest.TestCase):
               'precheckstartstop':'yes','checksum':checksum or hashlib.md5(payload,usedforsecurity=False).hexdigest()}
         if install_type is not None:info['install_type']=install_type
         files={name:b'#!/bin/sh\nexit 0\n' for name in REQUIRED}
+        files.update(migrations)
         helper=bytearray(64);helper[:5]=b'\x7fELF\x02';struct.pack_into('<H',helper,18,62)
         files.update({'INFO':''.join(key+'='+json.dumps(value)+'\n' for key,value in info.items()).encode(),
                       'package.tgz':payload,'scripts/timekeeper-dsm':bytes(helper),
@@ -88,3 +92,11 @@ class SynologyPackageTest(unittest.TestCase):
         for overrides in ({'missing_staged_release':True},{'staged_commit':'b'*40}):
             with self.subTest(overrides=overrides),self.assertRaises(ValueError):
                 self.check(self.candidate(**overrides))
+
+    def test_upgrade_payload_requires_every_matching_incoming_schema_resource(self):
+        # The installed controller reads these from package.tgz during
+        # preupgrade, before the outer SPK scripts have replaced it.
+        for name in MIGRATION_FILES:
+            for overrides in ({'missing_staged_migration':name},{'changed_staged_migration':name}):
+                with self.subTest(overrides=overrides),self.assertRaises(ValueError):
+                    self.check(self.candidate(**overrides))

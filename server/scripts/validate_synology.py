@@ -18,6 +18,7 @@ REQUIRED = {'INFO','LICENSE','PACKAGE_ICON.PNG','PACKAGE_ICON_256.PNG','package.
             'scripts/migration/postgresql-shape.sql','scripts/migration/schema-v2-postgresql.shape',
             'scripts/migration/schema-v3-postgresql.shape','scripts/migration/recovery-v3.sql',
             *('scripts/'+name for name in ('preinst','postinst','preupgrade','postupgrade','preuninst','postuninst','start-stop-status'))}
+MIGRATION_FILES = {name for name in REQUIRED if name.startswith('scripts/migration/')}
 
 
 def safe_members(archive):
@@ -96,6 +97,12 @@ def validate(path):
                 raise ValueError('Incomplete payload/Open configuration')
             if json.load(inner.extractfile('scripts/release.json')) != release:
                 raise ValueError('Incoming DSM payload release identity differs from the control scripts')
+            if not MIGRATION_FILES.issubset(contents):
+                raise ValueError('Missing staged DSM schema validation/migration files')
+            for name in MIGRATION_FILES:
+                staged=inner.extractfile(name)
+                if staged is None or not (value:=staged.read()).strip() or value!=read(name):
+                    raise ValueError('Staged DSM schema validation/migration files differ from the control scripts')
             if not contents['private'].isdir() or contents['private'].mode & 0o777 != 0o700:
                 raise ValueError('Package runtime configuration needs a private parent directory')
             project=json.load(inner.extractfile('project/compose.yaml'))
