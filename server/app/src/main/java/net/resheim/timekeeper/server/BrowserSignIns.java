@@ -64,9 +64,9 @@ class BrowserSignIns {
         execute(c,"UPDATE tk_auth_session SET origin_epoch=?,browser_digest=?,passkey_id=? WHERE digest=? AND owner_id=?",scope.epoch(),scope.browser(),passkey,hash(issued.secret()),owner);
         return issued;
     }
-    void cancel(String browser,String cookie) {
+    void cancel(String browser,String cookie,String ceremony) {
         accounts.tx(c->{lock(c);var current=realm.current(c);
-            if(current.origin()!=null) new PasskeyCeremonies(c).cancelBrowser(new PasskeyCeremonies.Scope(browser,cookie,current.origin(),URI.create(current.origin()).getHost(),current.epoch()));
+            if(current.origin()!=null) new PasskeyCeremonies(c).cancel(new PasskeyCeremonies.Scope(browser,cookie,current.origin(),URI.create(current.origin()).getHost(),current.epoch()),ceremony);
             return null;
         });
     }

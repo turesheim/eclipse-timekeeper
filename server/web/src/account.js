@@ -2,11 +2,13 @@ import {instantText, localDateTimeToInstant} from './model.js';
 import {node, button, field, passwordField, validatePassword, section, form, table} from './account-ui.js';
 import {renderRecoveryEmails} from './recovery-emails.js';
 import {renderImports} from './imports.js';
+import {renderPasskeys} from './passkeys.js';
 
 export async function renderAccount(view, part) {
   const [loaded, profile] = await Promise.all([view.session.request('/auth/account'), view.session.request('/me')]);
   if (!view.valid()) return;
   const account = loaded.data, zone = profile.data.zoneId;
+  if (part === 'passkeys') {await renderPasskeys(view, zone);return;}
   if (part === 'import') {await renderImports(view, zone); return;}
   if (part === 'tokens') {await renderTokens(view, zone); return;}
   if (account.state === 'UNCLAIMED') {

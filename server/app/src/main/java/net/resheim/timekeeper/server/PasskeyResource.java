@@ -38,10 +38,13 @@ public class PasskeyResource {
         return sessions.issued(passkeys.login(cookies.requireBrowser(),cookies.replacementSession(),peer(),value),cookies);
     }
     @POST @Path("/cancel") public Response cancel(JsonNode body) {
-        var cookies=boundary(true);input("PasskeyCancelInput",body);signIns.cancel(cookies.requireBrowser(),cookies.replacementSession());
+        var cookies=boundary(true);var value=input("PasskeyCancelInput",body);signIns.cancel(cookies.requireBrowser(),cookies.replacementSession(),value.path("ceremony").asText());
         return Response.noContent().header("Cache-Control","no-store").build();
     }
-    @GET public Response list() {boundary(false);return ok(passkeys.list(identity.principal()));}
+    @GET public Response list() {
+        if(origins.configured()) boundary(false);else ContractInputs.queries(uri.getQueryParameters());
+        return ok(passkeys.list(identity.principal()));
+    }
     @POST @Path("/register/options") public Response registerOptions(JsonNode body) {
         var cookies=boundary(true);var value=input("PasskeyRegisterInput",body);
         return ok(passkeys.registerOptions(identity.principal(),cookies.requireBrowser(),cookies.session(),peer(),value));

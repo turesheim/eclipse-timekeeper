@@ -67,5 +67,16 @@ final class PasskeyCeremonies {
         return new Pending(secret,purpose,owner,value.session(),((ObjectNode)value.payload().get("data")).deepCopy(),value.expires());
     }
     void cancelBrowser(Scope scope) {execute(connection,"UPDATE tk_passkey_ceremony SET consumed=TRUE WHERE browser_digest=? AND consumed=FALSE",scope.browser());}
+    /** A delayed tab may cancel its own ceremony, never a newer browser sign-in. */
+    void cancel(Scope scope,String secret) {
+        if(!secret(secret)) return;
+        try(var statement=query(connection,"SELECT digest,browser_digest,purpose,owner_id,session_digest,payload,expires_at,consumed FROM tk_passkey_ceremony WHERE digest=? FOR UPDATE",hash(secret));var rows=statement.executeQuery()) {
+            if(!rows.next()) return;var value=saved(rows);
+            if(!value.browser().equals(scope.browser()) || !value.payload().path("expectedSession").asText().equals(scope.session())
+                    || !value.payload().path("origin").asText().equals(scope.origin()) || !value.payload().path("rpId").asText().equals(scope.rpId())
+                    || value.payload().path("epoch").asLong()!=scope.epoch()) return;
+            execute(connection,"UPDATE tk_passkey_ceremony SET consumed=TRUE WHERE digest=?",value.digest());
+        }catch(SQLException failure) {throw databaseFailure(failure);}
+    }
     static void cancelOwner(Connection connection,String owner) {execute(connection,"UPDATE tk_passkey_ceremony SET consumed=TRUE WHERE owner_id=? AND consumed=FALSE",owner);}
 }

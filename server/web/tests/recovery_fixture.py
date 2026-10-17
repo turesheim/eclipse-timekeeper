@@ -13,7 +13,8 @@ import threading
 
 
 class RecoveryFixture:
-    def __init__(self, directory, backend, *, https=False, mail=False):
+    def __init__(self, directory, backend, *, https=False, mail=False, hostname='127.0.0.1'):
+        if hostname not in ('127.0.0.1','localhost'):raise ValueError('Fixture must stay on loopback')
         self.servers=[];self.environment={};self.messages=[];self.events=[];self.lock=threading.Lock()
         self.base=f'http://127.0.0.1:{backend}'
         fixture=self
@@ -42,9 +43,9 @@ class RecoveryFixture:
                 do_GET=do_POST=do_PUT=do_DELETE=do_OPTIONS=do_HEAD=relay
             proxy=http.server.ThreadingHTTPServer(('127.0.0.1',0),Proxy)
             key=directory/'fixture-key.pem';certificate=directory/'fixture-cert.pem'
-            subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(key),'-out',str(certificate),'-days','1','-subj','/CN=127.0.0.1','-addext','subjectAltName=IP:127.0.0.1'],check=True,capture_output=True)
+            subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(key),'-out',str(certificate),'-days','1','-subj','/CN=localhost','-addext','subjectAltName=IP:127.0.0.1,DNS:localhost'],check=True,capture_output=True)
             tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(str(certificate),str(key));proxy.socket=tls.wrap_socket(proxy.socket,server_side=True)
-            self.base=f'https://127.0.0.1:{proxy.server_port}';self.start(proxy)
+            self.base=f'https://{hostname}:{proxy.server_port}';self.start(proxy)
         if mail:
             class SMTP(socketserver.StreamRequestHandler):
                 def handle(self):

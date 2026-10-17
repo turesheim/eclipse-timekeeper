@@ -10425,8 +10425,16 @@
       "PasskeyCancelInput": {
         "type": "object",
         "additionalProperties": false,
-        "required": [],
-        "properties": {}
+        "required": [
+          "ceremony"
+        ],
+        "properties": {
+          "ceremony": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "maxLength": 43
+          }
+        }
       },
       "PasskeyActionInput": {
         "oneOf": [

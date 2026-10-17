@@ -100,8 +100,11 @@ class PasskeyHttpTest {
             assertTrue(deleted.jsonPath().getBoolean("signedOut"));assertEquals(2,deleted.getHeaders().getValues("Set-Cookie").stream().filter(v->v.contains("Max-Age=0")).count());
             assertEquals(401,call(signed,"GET","/auth/session",null).statusCode());assertEquals(1,success(call(owner,"GET","/auth/passkeys",null),200).path("items").size());
             var canceled=success(call(login,"POST","/auth/passkeys/login/options",Map.of("remember",false)),200);
-            assertEquals(204,call(login,"POST","/auth/passkeys/cancel",Map.of()).statusCode());
+            var newer=success(call(login,"POST","/auth/passkeys/login/options",Map.of("remember",false)),200);
+            assertEquals(204,call(other,"POST","/auth/passkeys/cancel",Map.of("ceremony",newer.path("ceremony").asText())).statusCode());
+            assertEquals(204,call(login,"POST","/auth/passkeys/cancel",Map.of("ceremony",canceled.path("ceremony").asText())).statusCode());
             assertEquals(401,call(login,"POST","/auth/passkeys/login/finish",assertion(canceled,secondKey,owner.owner(),false)).statusCode());
+            issued(login,call(login,"POST","/auth/passkeys/login/finish",assertion(newer,secondKey,owner.owner(),false)));
         } finally {ClientProxy.unwrap(accounts).setupFile="NONE";}
     }
 }

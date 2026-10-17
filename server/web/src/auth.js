@@ -2,10 +2,12 @@ import {Api, ApiError} from './api.js';
 import {savedToken, forgetToken, isSecureOrigin} from './credentials.js';
 import {connectAccount, closeAccount} from './account-page.js';
 import {emailRecovery} from './email-recovery.js';
+import {PasskeyCeremony, passkeysSupported, canceledPasskey} from './webauthn.js';
 
 const $ = id => document.getElementById(id);
 export function authentication({connect, clear, updateAccount, refreshProfile}) {
   let active = null, generation = 0, recovery = null;
+  let passkeysEnabled = false, passkeyBusy = false, passkeyStage = '';
   const errorText = error => error instanceof ApiError ? error.message : 'Unable to sign in. Use HTTPS and check your account details.';
   function mode() {
     const value = $('auth-mode').value, code = ['setup','recover'].includes(value), token = value === 'token';
@@ -18,6 +20,12 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
     }
     $('password').autocomplete = code ? 'new-password' : 'current-password';
     $('forgot-password').hidden = value !== 'login';
+    $('passkey-sign-in').hidden = value !== 'login';$('passkey-support').hidden = value !== 'login';
+    $('passkey-sign-in').disabled = passkeyBusy || !passkeysEnabled || !passkeysSupported();
+    $('passkey-cancel').hidden = !passkeyBusy;$('passkey-cancel').disabled = passkeyStage === 'finish';
+    $('passkey-support').textContent = passkeyBusy ? 'Complete the request in your browser or password manager.' : !passkeysEnabled
+      ? 'Passkey sign-in requires a configured HTTPS hostname. You can use your username and password.' : !passkeysSupported()
+        ? 'Passkeys are unavailable in this browser. You can use your username and password.' : '';
     $('auth-hint').textContent = code ? 'Get a one-time code from the server operator. New passwords must contain at least 15 characters.' : token ? 'Exchange an existing API token for a browser session. The token is never saved in browser storage.' : 'Use your Timekeeper account. API tokens are managed after signing in.';
   }
   $('auth-mode').addEventListener('change',mode); mode();
@@ -26,6 +34,12 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
     const response = await fetch(`/api/v1/auth/${path}`, {method:body ? 'POST':'GET', credentials:'same-origin', redirect:'error', referrerPolicy:'origin', cache:'no-store', headers:{Accept:'application/json', ...(body ? {'Content-Type':'application/json'} : {})}, ...(body ? {body:JSON.stringify(body)} : {})});
     const data = response.status === 204 ? null : await response.json(); if (!response.ok) throw new ApiError(data.code, response.status); return data;
   }
+  const loginPasskey = new PasskeyCeremony(publicRequest);
+  function passkeyState(busy,stage = '') {
+    passkeyBusy = busy;passkeyStage = stage;$('auth-mode').disabled = busy;
+    $('login-form').querySelector('[type="submit"]').disabled = busy;mode();
+  }
+  function capabilities(status) {passkeysEnabled = status.passkeysEnabled === true;mode();return status;}
   async function attach(data, current) {
     if (current !== generation) return;
     const session = new Api(null, undefined, data); active = session; forgetToken();
@@ -34,6 +48,7 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
     if (current === generation && active === session) await connectAccount(session, data, reset, updateAccount, refreshProfile);
   }
   function reset(message = '', retry = null) {
+    loginPasskey.cancel();passkeyState(false);
     ++generation; active?.close(); active = null; closeAccount(); clear();
     recovery?.close();
     $('login-form').reset();
@@ -42,7 +57,7 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
   }
   async function exchange(token, current) {
     if(!isSecureOrigin()) throw new Error();
-    await publicRequest('status');
+    capabilities(await publicRequest('status'));
     if(current !== generation) return;
     const bearer = new Api(token);
     try { const {data} = await bearer.request('/auth/token-login',{method:'POST'}); forgetToken(token); await attach(data,current); }
@@ -51,6 +66,7 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
   }
   $('login-form').addEventListener('submit', event => {
     event.preventDefault();
+    if(passkeyBusy) return;
     const selected = $('auth-mode').value;
     if (['setup','recover'].includes(selected) && $('password').value !== $('password-confirm').value) {
       $('login-error').textContent = 'Passwords do not match.'; $('password-confirm').focus(); return;
@@ -65,7 +81,7 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
       let issued = false;
       try {
         if(selected === 'token') await exchange(token,current);
-        else { await publicRequest('status'); if(current !== generation) return; const data = await publicRequest(selected,body); issued = true; await attach(data,current); }
+        else { capabilities(await publicRequest('status')); if(current !== generation) return; const data = await publicRequest(selected,body); issued = true; await attach(data,current); }
       }
       catch(error) {
         if(current !== generation) return;
@@ -90,6 +106,27 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
       finally { submit.disabled = false; }
     })();
   });
+  $('passkey-sign-in').addEventListener('click', () => {
+    if(passkeyBusy || !passkeysEnabled || !passkeysSupported()) return;
+    const current = ++generation;$('password').value = '';$('login-error').textContent = '';passkeyState(true);
+    void (async () => {
+      try {
+        capabilities(await publicRequest('status'));if(current !== generation) return;
+        const data = await loginPasskey.run('passkeys/login/options','passkeys/login/finish',{remember:$('remember').checked},
+          {valid:()=>current === generation,stage:stage=>{if(current === generation) passkeyState(true,stage);}});
+        await attach(data,current);
+      } catch(error) {
+        if(current !== generation) return;
+        $('login-error').textContent = canceledPasskey(error) ? 'Passkey request canceled. You can sign in with your username and password.'
+          : error instanceof ApiError ? error.message : 'The passkey request could not be completed. Use your username and password.';
+      } finally {if(current === generation) passkeyState(false);}
+    })();
+  });
+  $('passkey-cancel').addEventListener('click', () => {
+    if(!passkeyBusy || passkeyStage === 'finish') return;
+    ++generation;loginPasskey.cancel();passkeyState(false);$('login-error').textContent = 'Passkey request canceled.';$('username').focus();
+  });
+  window.addEventListener('pagehide',()=>{++generation;loginPasskey.cancel();});
   $('sign-out').addEventListener('click', () => {
     const session = active; if(!session) return;
     $('sign-out').disabled = true;
@@ -110,7 +147,7 @@ export function authentication({connect, clear, updateAccount, refreshProfile}) 
       const token = savedToken();
       if(token) {try {await exchange(token,current); return;} catch(failure) {$('login-error').textContent = errorText(failure);}}
       try {
-        const status = await publicRequest('status');
+        const status = capabilities(await publicRequest('status'));
         if(current === generation) {
           $('login-build').textContent = status.spkVersion ? `SPK ${status.spkVersion}` : '';
           if(status.setupRequired && $('auth-mode').value === 'login') {$('auth-mode').value = 'setup';mode();}

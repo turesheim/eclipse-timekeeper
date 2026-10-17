@@ -323,8 +323,10 @@ test('calendar touch gestures move a work session between days on a narrow scree
 test('calendar copy and paste create only a new session and clear the clipboard on sign-out',async({page,request})=>{
   const f=await fixture(request);
   try {
-    await calendar(page);await bar(page,f.session.id).focus();await bar(page,f.session.id).click();
+    await calendar(page);await bar(page,f.session.id).click();
+    const select=bar(page,f.session.id).locator('.calendar-session-select');await select.focus();await expect(select).toBeFocused();
     await page.keyboard.press('ControlOrMeta+c');
+    await expect(page.locator('#calendar-message')).toHaveText('Work session copied.');
     const targetDay=page.getByRole('button',{name:'Select 2025-10-21',exact:true});
     await targetDay.click();await expect(targetDay).toBeFocused();await page.keyboard.press('ControlOrMeta+v');
     await expect(page.locator('#editor-title')).toHaveText('Paste work session');
