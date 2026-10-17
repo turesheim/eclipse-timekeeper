@@ -164,7 +164,8 @@ export class WeekCalendar {
     bar.style.backgroundColor=colors.background;bar.style.color=colors.foreground;bar.style.borderColor=colors.foreground;
     const elapsed=instantNanos(session.end || this.data.report.generatedAt)-instantNanos(session.start);
     const duration=nanosText(elapsed>0n ? elapsed : 0n);
-    const description=`${client?.name || 'Client'} · ${session.title || 'Work session'}${session.summary ? ' · '+session.summary : ''} · ${instantText(session.start,this.calendar.zone)} → ${instantText(session.end,this.calendar.zone)} · ${duration}`;
+    const labels=(session.labelIds || []).map(id=>this.data.labels.find(label=>label.id===id)?.name).filter(Boolean).join(', ');
+    const description=`${client?.name || 'Client'} · ${session.title || 'Work session'}${session.summary ? ' · '+session.summary : ''}${labels ? ' · '+labels : ''} · ${instantText(session.start,this.calendar.zone)} → ${instantText(session.end,this.calendar.zone)} · ${duration}`;
     bar.title=description;bar.setAttribute('aria-label',description);bar.setAttribute('role','group');bar.tabIndex=-1;
     bar.dataset.selected=String(this.selectedId===session.id);
     const label=node('span',undefined,'calendar-session-label');

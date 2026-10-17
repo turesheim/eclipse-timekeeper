@@ -68,7 +68,7 @@ export async function renderImports(view, zone) {
     const source = field(work, 'Source user', parsed.people.length === 1 ? parsed.people[0].key : '', {choices:[['','Choose source user'],...parsed.people.map(person => [person.key,[person.name,person.email].filter(Boolean).join(' · ')])]});
     if(parsed.unsupported.length) work.append(node('p', `Unsupported metadata: ${parsed.unsupported.join(', ')}. These columns will not be imported.`, 'alert alert-info'));
     const fallbackClient = field(work, 'Client for entries without a client', 'Imported from Toggl', {maxLength:1000});
-    if(importMode.value==='WORK_SESSION') work.append(node('p','Each entry becomes one work session. Descriptions become titles and are retained in full as notes. Source projects suggest client names when Client is missing; review each client below. Tasks and tags are retained in the import audit only.'));
+    if(importMode.value==='WORK_SESSION') work.append(node('p','Each entry becomes one work session. Descriptions become titles and are retained in full as notes. Source projects suggest client names when Client is missing; review each client below. Tags become work-session labels; tasks remain in the import audit only.'));
     const fallbackProject = importMode.value==='ACTIVITY' ? field(work, 'Project for entries without a project', 'Imported time', {maxLength:1000}) : null;
     const invalid = field(work, 'Exclude invalid rows after reviewing the diagnostics', false, {type:'checkbox'});
     const duplicates = field(work, 'Keep indistinguishable source rows as separate entries', false, {type:'checkbox'});
@@ -100,7 +100,8 @@ export async function renderImports(view, zone) {
       for(const row of selected) row.duplicateReviewed = duplicates.checked;
       selectedPerson = source.value;
       const result = await runWorker({operation:'plan',rows:parsed.rows,personKey:source.value,reportZone:resume?.reportZone || zone,
-        options:{mode:importMode.value,fallbackClient:fallbackClient.value,fallbackProject:fallbackProject?.value}});
+        options:{mode:importMode.value,fallbackClient:fallbackClient.value,fallbackProject:fallbackProject?.value,
+          mapWorkSessionTags:!resume || resume.mappings.some(value=>value.resourceType==='LABEL')}});
       if(!view.valid()) return;plan = result.plan;batches = result.batches;reviews = [];
       if(resume) {
         if(plan.mode !== (resume.mode || 'ACTIVITY') || plan.sourceKey !== resume.sourceKey || plan.selectedEntries !== resume.selectedEntries || plan.selectedNanos !== resume.selectedNanos

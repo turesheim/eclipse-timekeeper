@@ -220,6 +220,14 @@ A work session is an independent interval for one client. Its tools are **Edit**
 and **Delete**. Create or edit activities in Workweek or Calendar; task timers
 run independently. There are no session selectors or manual activity links.
 
+Work sessions may have several labels selected in the start, record and edit
+forms. The compact card and Workweek show their names; calendar strips include
+them in their accessible description without changing the client's color.
+Moving, resizing, stopping and copying a session preserve its labels without
+changing any activity labels. JSON and CSV transfers remap labels into the
+destination account. Older sessions and exports may omit `labelIds`; omitted
+labels are preserved on edits, and an empty array explicitly clears them.
+
 Reports derive context from that account's activities overlapping the session,
 including running timers. Tracked time sums clipped intervals; covered time is
 their union. Unallocated time subtracts that union from session duration.
@@ -357,6 +365,8 @@ Each CSV row defaults to one continuous work session with a reviewed client and
 description-derived title. Activity import is an explicit alternative. Both modes
 share durable progress, duplicate review and whole-job Undo; sessions create no
 companion task/activity records and contribute to Track’s client totals.
+Source tags become reviewed work-session labels. Resuming an older import keeps
+its original mappings, and repeat imports preserve existing session edits.
 
 Open **My Account → Import** for the source preview, catalog mappings and duplicate
 review. Import history supports resume, audit download and a single whole-job

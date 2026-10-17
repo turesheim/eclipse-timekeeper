@@ -50,7 +50,7 @@ public final class CsvSnapshot {
             if(snapshot.has("clients") && !snapshot.getAsJsonArray("clients").isEmpty()) throw invalid();
             for(var item:snapshot.getAsJsonArray("projects")) if(item.getAsJsonObject().has("clientId")) throw invalid();
             if(snapshot.has("workSessions")) for(var item:snapshot.getAsJsonArray("workSessions"))
-                if(item.getAsJsonObject().has("clientId") || item.getAsJsonObject().has("title")) throw invalid();
+                if(item.getAsJsonObject().has("clientId") || item.getAsJsonObject().has("title") || item.getAsJsonObject().has("labelIds")) throw invalid();
         }
         if(!sessions) {
             if(snapshot.has("workSessions") && !snapshot.getAsJsonArray("workSessions").isEmpty()) throw invalid();
@@ -64,12 +64,16 @@ public final class CsvSnapshot {
         int count = 0;
         for (var table : columns(sessions,clients).entrySet()) {
             checkCancelled();
-            StringBuilder csv = new StringBuilder();row(csv, table.getValue());
             JsonArray items = snapshot.getAsJsonArray(table.getKey());
+            var names=new ArrayList<>(table.getValue());
+            if(clients && table.getKey().equals("workSessions"))
+                for(var item:items) if(item.getAsJsonObject().has("labelIds")) {names.add("labelIds");break;}
+            StringBuilder csv = new StringBuilder();row(csv, names);
             for (JsonElement item : items) {
                 List<String> fields = new ArrayList<>();
-                for (String column : table.getValue()) {
+                for (String column : names) {
                     JsonElement value = item.getAsJsonObject().get(column);
+                    if(value==null && table.getKey().equals("workSessions") && column.equals("labelIds")) value=new JsonArray();
                     if (value == null && !List.of("workSessionId","projectId").contains(column)) throw invalid();
                     if(value==null) value=JsonNull.INSTANCE;
                     fields.add(value.isJsonNull() ? null : value.isJsonPrimitive() ? value.getAsString() : value.toString());
@@ -98,14 +102,16 @@ public final class CsvSnapshot {
             for (var table : columns(sessions,clients).entrySet()) {
                 checkCancelled();
                 List<List<String>> rows = parse(readFile(folder.resolve(table.getKey() + ".csv"), remaining));
-                if (rows.isEmpty() || !rows.removeFirst().equals(table.getValue()) || rows.size() > 10000) throw invalid();
+                if(rows.isEmpty()) throw invalid();
+                var names=rows.removeFirst();var extended=new ArrayList<>(table.getValue());extended.add("labelIds");
+                if ((!names.equals(table.getValue()) && !(clients && table.getKey().equals("workSessions") && names.equals(extended))) || rows.size() > 10000) throw invalid();
                 JsonArray items = new JsonArray();
                 for (List<String> fields : rows) {
                     checkCancelled();
-                    if (fields.size() != table.getValue().size()) throw invalid();
+                    if (fields.size() != names.size()) throw invalid();
                     JsonObject item = new JsonObject();
                     for (int i = 0; i < fields.size(); i++) {
-                        String column = table.getValue().get(i), value = fields.get(i);
+                        String column = names.get(i), value = fields.get(i);
                         if (value == null) item.add(column, JsonNull.INSTANCE);
                         else if (column.equals("externalReferences") || column.equals("labelIds")) {
                             JsonElement array = JsonParser.parseString(value);if (!array.isJsonArray()) throw invalid();item.add(column, array);

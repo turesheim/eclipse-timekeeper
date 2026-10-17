@@ -99,7 +99,7 @@ const auth = authentication({
     return refresh();
   },
   clear() {
-    $('week-sessions').replaceChildren(); $('week-sessions-section').hidden = true;
+    $('week-sessions').replaceChildren(); $('week-sessions-section').hidden = true; $('work-session-labels').replaceChildren(); $('work-session-labels').hidden = true;
     refreshing = null; reloadAgain = false;
     ++serverInfoRequest; clearServerInfo(); api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null; accountName = '';
     calendar.reset(); track.reset(); collapsed.clear(); canWrite = false;
@@ -245,6 +245,8 @@ function renderWorkweek(s, zone) {
       const title = element('span', undefined, 'workweek-session-title'), client = s.clients.find(client => client.id === value.clientId);
       const caption = element('span', value.title, 'client-color'); if (/^#[0-9a-f]{6}$/i.test(client?.color)) caption.style.setProperty('--client-color', client.color);
       title.append(caption, element('small', client?.name || 'Client'));
+      const labels=(value.labelIds || []).map(id=>name(s.labels,id)).join(', ');
+      if(labels) title.append(element('small',labels));
       if (!value.end) title.append(element('span', 'Running', 'badge rounded-pill text-bg-success'));
       const actions=[action(`Edit session ${value.title}`, () => openRecord('work-sessions', value.id)),action(`Delete session ${value.title}`, () => openDelete('work-sessions', value.id))];
       for(const action of actions) action.disabled=!connected || !canWrite;
@@ -347,6 +349,7 @@ function refreshClientChoices() {
 function sessionFields(value) {
   field('Title','title',value.title || '',{required:true,max:1000});clientField(value.clientId || calendar.preferredClient());
   field('Summary','summary',value.summary || '',{max:2000});
+  labelFields(value.labelIds);
 }
 function begin(title, state) {
   if (editor || $('editor').open) return false;
@@ -459,7 +462,7 @@ function values() {
   const time = key => editor.timeValue ? editor.timeValue(key) : get(key);
   const labels = () => [...$('fields').querySelectorAll('[name="labelIds"]:checked')].map(node => node.value);
   if (editor.command === 'stop' || editor.command === 'session-stop' || editor.remove) return undefined;
-  if (editor.command === 'session-start') return {summary:get('summary'),title:get('title'),clientId:get('clientId')};
+  if (editor.command === 'session-start') return {summary:get('summary'),title:get('title'),clientId:get('clientId'),labelIds:labels()};
   if (editor.command === 'start') return {taskId: get('taskId'), summary: get('summary'), labelIds: labels(), expectedActiveId: editor.expected?.id ?? null, expectedActiveVersion: editor.expected?.version ?? null};
   switch (editor.collection) {
     case 'clients': return {name:get('name'),color:get('color')};
@@ -467,7 +470,7 @@ function values() {
     case 'labels': return {name: get('name'), color: get('color') || null};
     case 'tasks': return {summary: get('summary'), projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null};
     case 'activities': return {...(editor.id ? {} : {taskId: get('taskId') || null, projectId:get('taskId') ? null : get('projectId') || null}), summary: get('summary'), start: localDateTimeToInstant(get('start'), editor.zone), end: get('end') ? localDateTimeToInstant(get('end'), editor.zone) : null, labelIds: labels()};
-    case 'work-sessions': return {title:get('title'),clientId:get('clientId'),summary:get('summary'),start:localDateTimeToInstant(time('start'),editor.zone),end:time('end') ? localDateTimeToInstant(time('end'),editor.zone) : null};
+    case 'work-sessions': return {title:get('title'),clientId:get('clientId'),summary:get('summary'),labelIds:labels(),start:localDateTimeToInstant(time('start'),editor.zone),end:time('end') ? localDateTimeToInstant(time('end'),editor.zone) : null};
   }
 }
 function freeze(state) { for (const input of $('fields').querySelectorAll('input,select')) input.disabled = state || (editor.collection === 'activities' && !!editor.id && input.name === 'taskId'); }
@@ -519,6 +522,9 @@ function renderSession() {
   $('work-session').style.setProperty('--session-color', snapshot.clients.find(client => client.id === session?.clientId)?.color || 'var(--accent)');
   const zone=snapshot.profile.data.zoneId;
   $('work-session-current').textContent=session ? `${name(snapshot.clients,session.clientId)} · ${active ? 'Started ' : ''}${instantText(session.start,zone)}${session.end ? ' → '+instantText(session.end,zone) : ''}` : '';
+  const labels=$('work-session-labels');labels.replaceChildren();
+  for(const id of session?.labelIds || []) labels.append(element('span',name(snapshot.labels,id),'badge rounded-pill text-bg-secondary'));
+  labels.hidden=!labels.childElementCount;
   $('work-session-timing').hidden=!session;
   updateSessionActions();
   renderSessionTime();

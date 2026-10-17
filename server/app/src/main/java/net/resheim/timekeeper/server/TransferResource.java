@@ -87,20 +87,26 @@ public class TransferResource {
             var end=optionalText(item.get("end")).map(Instant::parse);
             if(end.filter(value -> value.isBefore(start)).isPresent()) throw ApiFailure.validation();
             if(end.isEmpty()) openSessions++;
+            for(var label:item.path("labelIds")) if(!sourceLabels.contains(uuid(label))) throw ApiFailure.validation();
         }
         if(openSessions>1) throw ApiFailure.validation();
         if(openSessions==1 && store.workSessionService().activeWorkSession(new OwnerId(store.owner())).isPresent()) throw ApiFailure.conflict();
+        // Labels must exist before their work-session references are remapped.
+        for(JsonNode item:input.get("labels")) {
+            var created=service.createLabel(new CreateLabel(item.get("name").asText(),optionalText(item.get("color"))));labels.put(uuid(item.get("id")),created.id());mapping(mappings,"LABEL",item,created.id().value());
+        }
         for(JsonNode item:input.path("workSessions")) {
             var created=store.workSessionService().createWorkSession(new CreateWorkSession(new OwnerId(store.owner()),Instant.parse(item.get("start").asText()),
                     optionalText(item.get("end")).map(Instant::parse),item.get("summary").asText()));
             details("WORK_SESSION",created.id().value(),item,clients);
+            if(item.has("labelIds")) {
+                var fields=object();var assigned=fields.putArray("labelIds");item.get("labelIds").forEach(label->assigned.add(required(labels,uuid(label)).value().toString()));
+                store.clientDetails("WORK_SESSION",created.id().value(),fields);
+            }
             sessions.put(uuid(item.get("id")),created.id());mapping(mappings,"WORK_SESSION",item,created.id().value());
         }
         for(JsonNode item:input.get("projects")) {
             var created=service.createProject(new CreateProject(item.get("name").asText()));details("PROJECT",created.id().value(),item,clients);projects.put(uuid(item.get("id")),created.id());mapping(mappings,"PROJECT",item,created.id().value());
-        }
-        for(JsonNode item:input.get("labels")) {
-            var created=service.createLabel(new CreateLabel(item.get("name").asText(),optionalText(item.get("color"))));labels.put(uuid(item.get("id")),created.id());mapping(mappings,"LABEL",item,created.id().value());
         }
         Map<UUID,JsonNode> pending=new LinkedHashMap<>();input.get("tasks").forEach(item -> pending.put(uuid(item.get("id")),item));
         while(!pending.isEmpty()) {

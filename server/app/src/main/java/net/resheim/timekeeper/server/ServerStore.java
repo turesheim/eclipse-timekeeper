@@ -216,7 +216,11 @@ public class ServerStore {
             var previous=find(type,uuid(node.get("id"))).orElse(null);
             node.put("clientId",previous!=null && previous.hasNonNull("clientId") ? previous.get("clientId").asText()
                     : creationClient.get()!=null ? creationClient.get().toString() : defaultClient().get("id").asText());
-            if(type.equals("WORK_SESSION")) node.put("title",previous!=null && previous.hasNonNull("title") ? previous.get("title").asText() : legacyTitle(node));
+            if(type.equals("WORK_SESSION")) {
+                node.put("title",previous!=null && previous.hasNonNull("title") ? previous.get("title").asText() : legacyTitle(node));
+                // Web-only metadata survives domain timer/interval writes.
+                node.set("labelIds",previous!=null && previous.has("labelIds") ? previous.get("labelIds").deepCopy() : array());
+            }
         }
         UUID id = uuid(node.get("id")); long version = node.get("version").asLong();
         if (version==0) update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,?,?)",owner(),type,id,version,node.toString());
@@ -244,6 +248,7 @@ public class ServerStore {
             else if (!active().orElseThrow().get("id").asText().equals(id.toString())) throw ApiFailure.conflict();
         }
         if (node.hasNonNull("clientId")) relation(type,id,"client","CLIENT",uuid(node.get("clientId")));
+        if(type.equals("WORK_SESSION")) node.path("labelIds").forEach(label -> relation(type,id,"label","LABEL",uuid(label)));
         return value;
     }
     /** Server-only client metadata: common/Eclipse interval and project models stay independent. */
@@ -290,6 +295,14 @@ public class ServerStore {
             UUID client=uuid(input.get("clientId"));find("CLIENT",client).orElseThrow(ApiFailure::notFound);node.put("clientId",client.toString());
         }
         if(type.equals("WORK_SESSION") && input.has("title")) node.put("title",input.get("title").asText().strip());
+        if(type.equals("WORK_SESSION") && input.has("labelIds")) {
+            var assigned=node.putArray("labelIds");
+            labels(input.get("labelIds")).stream().map(label->label.value()).sorted().forEach(label->{
+                find("LABEL",label).orElseThrow(ApiFailure::notFound);assigned.add(label.toString());
+            });
+            update("DELETE FROM tk_relation WHERE owner_id=? AND from_type='WORK_SESSION' AND from_id=? AND kind='label'",owner(),id);
+            assigned.forEach(label->relation(type,id,"label","LABEL",uuid(label)));
+        }
         if(update("UPDATE tk_resource SET payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",node.toString(),owner(),type,id,node.get("version").asLong())!=1) throw new ApiFailure(412,"STALE_VERSION");
         update("DELETE FROM tk_relation WHERE owner_id=? AND from_type=? AND from_id=? AND kind='client'",owner(),type,id);
         relation(type,id,"client","CLIENT",uuid(node.get("clientId")));return node;
