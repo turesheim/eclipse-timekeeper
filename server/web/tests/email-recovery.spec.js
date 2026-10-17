@@ -47,7 +47,11 @@ test('email recovery verifies independent mailboxes, replaces a primary safely a
     await page.getByRole('button',{name:'Save primary email',exact:true}).click();
     await expect(page.locator('#account-content')).toContainText('Verified: '+primary);await expect(page.locator('#account-content')).toContainText('Awaiting verification: '+next);
     await verify(action,await delivered(request,next,'verify-email'));
-    await page.reload();await expect(page.locator('#account-content')).toContainText('Verified: '+next);
+    expect((await context.request.get('/api/v1/auth/session')).status(),'Verifying a replacement keeps the existing session valid').toBe(200);
+    await page.reload();
+    expect((await context.request.get('/api/v1/auth/session')).status(),'Reload retains the secure session cookie').toBe(200);
+    await expect(page.locator('#status')).toHaveText('Up to date');
+    await expect(page.locator('#account-content')).toContainText('Verified: '+next);
 
     // A reset invalidates this owner's cookie and API token, but never the
     // administrator or another owner's data. Keep the old page signed in.
@@ -56,7 +60,7 @@ test('email recovery verifies independent mailboxes, replaces a primary safely a
     expect(issued.status()).toBe(201);const oldToken=(await issued.json()).token;
     expect(typeof oldToken).toBe('string');
     await action.goto('/web/');await action.getByRole('button',{name:'Forgot password?',exact:true}).click();
-    await action.getByLabel('Username',{exact:true}).fill(username);await action.getByRole('button',{name:'Request reset link',exact:true}).click();
+    await action.locator('#email-recovery-form').getByLabel('Username',{exact:true}).fill(username);await action.getByRole('button',{name:'Request reset link',exact:true}).click();
     await expect(action.locator('#email-recovery-feedback')).toContainText('If this account has verified recovery email');
     const reset=await delivered(request,backup,'reset-password');await delivered(request,next,'reset-password');
     const secret=new URL(reset).hash.split('/')[1];

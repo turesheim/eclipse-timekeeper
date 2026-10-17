@@ -14,7 +14,7 @@ import threading
 
 class RecoveryFixture:
     def __init__(self, directory, backend, *, https=False, mail=False):
-        self.servers=[];self.environment={};self.messages=[];self.lock=threading.Lock()
+        self.servers=[];self.environment={};self.messages=[];self.events=[];self.lock=threading.Lock()
         self.base=f'http://127.0.0.1:{backend}'
         fixture=self
         if https:
@@ -26,7 +26,10 @@ class RecoveryFixture:
                     connection=http.client.HTTPConnection('127.0.0.1',backend,timeout=35)
                     try:
                         connection.request(self.command,self.path,body=body,headers=headers)
-                        response=connection.getresponse();data=response.read();self.send_response(response.status)
+                        response=connection.getresponse();data=response.read()
+                        if self.path.startswith('/api/v1/auth/'):
+                            with fixture.lock:fixture.events.append({'method':self.command,'path':self.path.split('?',1)[0],'status':response.status})
+                        self.send_response(response.status)
                         for key,value in response.getheaders():
                             if key.lower() not in ('connection','content-length','transfer-encoding'):self.send_header(key,value)
                         self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)

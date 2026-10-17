@@ -87,6 +87,7 @@ def main():
                 if result.returncode: raise RuntimeError('Browser acceptance failed')
                 (output / 'acceptance.json').write_text(json.dumps({'distributionSha256':digest, 'sourceCommit':manifest['commit'], 'serverPid':process.pid, 'browser':args.browser, 'https':args.https,'loopbackSmtp':args.mail,'passed':True}, indent=2) + '\n')
             finally:
+                (output / 'transport.json').write_text(json.dumps({'authenticationRequests':fixture.events},indent=2)+'\n')
                 fixture.close()
                 process.terminate()
                 try: process.wait(timeout=10)
