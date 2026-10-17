@@ -1,3 +1,4 @@
+import {openAccountMenu, setTimeZone} from './navigation.js';
 import {localDateTime} from '../src/model.js';
 import {test, expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -39,8 +40,7 @@ test('account time zone controls local editors and build dates across DST and br
   const summary='Local clock '+randomUUID(); let session, activity;
   try {
     await signIn(page);
-    await page.getByRole('button',{name:'Time zone',exact:true}).click();
-    await page.getByRole('textbox',{name:'Time zone',exact:true}).fill('Europe/Oslo');await save(page);
+    await setTimeZone(page,'Europe/Oslo');
     await expect(page.locator('#server-build')).toContainText('10:30:00');
     await page.getByRole('button',{name:'Record work session',exact:true}).click();
     await page.getByLabel('Title',{exact:true}).fill(summary);await page.getByLabel('Client',{exact:true}).selectOption({index:1});
@@ -65,8 +65,7 @@ test('account time zone controls local editors and build dates across DST and br
     await page.getByLabel('Summary',{exact:true}).fill(summary+' edited');await save(page);
     let saved=await (await api(request,'GET',`/work-sessions/${session.id}`)).json();
     expect([saved.start,saved.end]).toEqual([session.start,session.end]);
-    await page.getByRole('button',{name:'Time zone',exact:true}).click();
-    await page.getByRole('textbox',{name:'Time zone',exact:true}).fill('Europe/Oslo');await save(page);
+    await setTimeZone(page,'Europe/Oslo');
     await editSessionFromWorkweek(page,request,session);
     await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-26T02:30');
     await expect(page.getByLabel('Start time occurrence',{exact:true})).toBeVisible();
@@ -123,7 +122,7 @@ test('server build and deployment details describe the actual packaged server af
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   await page.reload();
   await expect(page.locator('#server-build')).toContainText(information.commit.slice(0,8));
-  await page.getByRole('button', {name:'Sign out',exact:true}).click();
+  await openAccountMenu(page);await page.getByRole('button', {name:'Sign out',exact:true}).click();
   await expect(page.locator('#server-info')).not.toBeVisible();
 });
 test('core browser workflow manages records, tracks time, and preserves exact reports', async ({page, request}) => {
@@ -135,7 +134,7 @@ test('core browser workflow manages records, tracks time, and preserves exact re
   await page.locator('#editor').getByLabel(label, {exact:true}).check(); await page.locator('#editor').getByRole('button', {name:'Start', exact:true}).click();
   await expect(page.locator('#editor')).not.toBeVisible(); await expect(page.locator('#active-title')).toHaveText(task);
   await page.getByRole('button', {name:'Stop tracking', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Stop', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible();
-  await page.getByRole('button', {name:'Time zone', exact:true}).click(); await page.getByRole('textbox', {name:'Time zone', exact:true}).fill('Europe/Oslo'); await save(page);
+  await setTimeZone(page,'Europe/Oslo');
   await page.getByRole('button', {name:'Workweek', exact:true}).click(); await page.getByLabel('Week containing').fill('2025-10-26');
   await expect(page.locator('#zone-caption')).toContainText('2025-10-20'); await page.getByRole('button', {name:'Add time', exact:true}).click();
   await page.getByLabel('Task', {exact:true}).selectOption({label:task}); await page.getByLabel('Summary', {exact:true}).fill('Autumn DST');
@@ -168,8 +167,7 @@ test('manual intervals spanning midnight create editable daily records with exac
   const label = (await (await api(request, 'GET', '/labels')).json()).items[0];
   const summary = 'Daily interval ' + randomUUID();
   await signIn(page);
-  await page.getByRole('button', {name:'Time zone', exact:true}).click();
-  await page.getByRole('textbox', {name:'Time zone', exact:true}).fill('Europe/Oslo'); await save(page);
+  await setTimeZone(page,'Europe/Oslo');
   await page.getByLabel('Week containing').fill('2025-10-26');
   await page.getByRole('button', {name:'Add time', exact:true}).click();
   await page.getByLabel('Task', {exact:true}).selectOption({label:task.summary});
@@ -215,10 +213,11 @@ test('live peer changes preserve a draft and a stale save cannot overwrite them'
   const record = await (await api(request, 'GET', '/tasks/' + task.id)).json(); expect(record.summary).toBe('Peer edit ' + task.id); await peer.close();
 });
 test('read-only authorization and validation remain visible with the draft intact', async ({page}) => {
-  await signIn(page, readToken); await page.getByRole('button', {name:'Projects', exact:true}).click(); await page.getByRole('button', {name:'New project', exact:true}).click(); await page.getByLabel('Name', {exact:true}).fill('Read-only draft'); await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click();
+  await signIn(page, readToken); await page.getByRole('button', {name:'Projects', exact:true}).click(); await page.getByRole('button', {name:'New project', exact:true}).click(); await page.getByLabel('Name', {exact:true}).fill('Read-only draft'); await page.getByLabel('Client',{exact:true}).selectOption({index:1}); await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click();
   await expect(page.locator('#editor-error')).toContainText('permission'); await expect(page.getByLabel('Name', {exact:true})).toHaveValue('Read-only draft');
-  await page.getByRole('button', {name:'Cancel', exact:true}).click(); await page.getByRole('button', {name:'Sign out', exact:true}).click(); await signIn(page);
-  await page.getByRole('button', {name:'Time zone', exact:true}).click(); await page.getByRole('textbox', {name:'Time zone', exact:true}).fill('Invalid/Zone'); await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click(); await expect(page.locator('#editor-error')).toContainText('Check'); await expect(page.getByRole('textbox', {name:'Time zone', exact:true})).toHaveValue('Invalid/Zone');
+  await page.getByRole('button', {name:'Cancel', exact:true}).click(); await openAccountMenu(page);await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#login')).toBeVisible(); await signIn(page);
+  await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('textbox', {name:'Time zone', exact:true}).fill('Invalid/Zone');await page.getByRole('button',{name:'Save time zone',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Enter a valid time zone'); await expect(page.getByRole('textbox', {name:'Time zone', exact:true})).toHaveValue('Invalid/Zone');
+  page.once('dialog',dialog=>dialog.accept());await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
 });
 test('lost start/stop replies retry the exact durable command only once', async ({page, request}) => {
   const task = await createTask(request); await signIn(page); await page.getByRole('button', {name:'Tasks', exact:true}).click();
@@ -256,7 +255,7 @@ test('reload restores the HttpOnly session and sign-out removes it', async ({pag
   expect(await page.evaluate(() => ({keys:Object.keys(localStorage), session:sessionStorage.length}))).toEqual({keys:[], session:0});
   await page.reload(); await expect(page.locator('#workspace')).toBeVisible(); await expect(page.locator('#status')).toHaveText('Up to date');
   await expect(page.locator('#login')).not.toBeVisible(); expect(await page.locator('#token').inputValue()).toBe('');
-  await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#tasks')).toBeEmpty();
+  await openAccountMenu(page);await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#tasks')).toBeEmpty();
   expect(await page.evaluate(() => localStorage.getItem('timekeeper.access-token'))).toBeNull();
   await page.reload(); await expect(page.locator('#login')).toBeVisible(); await expect(page.locator('#workspace')).not.toBeVisible();
 });
@@ -270,7 +269,7 @@ test('an invalid remembered token is forgotten and a valid replacement can sign 
 test('blocked legacy storage still allows cookie sign-in and reload', async ({page}) => {
   await page.addInitScript(() => Object.defineProperty(window, 'localStorage', {get() {throw new DOMException('Blocked', 'SecurityError');}}));
   await signIn(page);await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');
-  await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#login')).toBeVisible();await page.reload();await expect(page.locator('#workspace')).not.toBeVisible();
+  await openAccountMenu(page);await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#login')).toBeVisible();await page.reload();await expect(page.locator('#workspace')).not.toBeVisible();
 });
 test('future starts are rejected without losing browser drafts or changing recorded time', async ({page, request}) => {
   const task = await createTask(request, 'Future boundary ' + randomUUID());

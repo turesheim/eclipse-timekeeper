@@ -1,3 +1,4 @@
+import {openAccountMenu} from './navigation.js';
 import {test, expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {randomUUID} from 'node:crypto';
@@ -86,7 +87,7 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
         }
         await page.screenshot({path:`test-results/design-${tab}-${name}.png`,fullPage:true});
       }
-      await page.getByRole('link',{name:'My Account',exact:true}).click();
+      await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();
       await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');
       await accessible(page); await page.screenshot({path:`test-results/design-account-${name}.png`,fullPage:true});
       await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();

@@ -1,3 +1,4 @@
+import {openAccountMenu} from './navigation.js';
 import {test, expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {randomUUID} from 'node:crypto';
@@ -158,8 +159,8 @@ test('standard users cannot open Users directly and a late account response cann
       return response;
     };
   });
-  await page.getByRole('link', {name: 'My Account', exact: true}).click(); await expect.poll(() => page.evaluate(() => window.accountReplyCaptured)).toBe(true);
-  await page.getByRole('button', {name: 'Sign out', exact: true}).click(); await expect(page.locator('#login')).toBeVisible();
+  await openAccountMenu(page);await page.getByRole('link', {name: 'My Account', exact: true}).click(); await expect.poll(() => page.evaluate(() => window.accountReplyCaptured)).toBe(true);
+  await openAccountMenu(page);await page.getByRole('button', {name: 'Sign out', exact: true}).click(); await expect(page.locator('#login')).toBeVisible();
   await page.evaluate(() => window.releaseAccountReply()); await expect(page.locator('#account-content')).toBeEmpty(); await expect(page.locator('#account-page')).not.toBeVisible();
 });
 test('a lost token-creation reply requires review and never repeats the write', async ({page, request}) => {

@@ -1,3 +1,4 @@
+import {openAccountMenu} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import {instantNanos,monday,dateInZone,localDateTime} from '../src/model.js';
@@ -156,7 +157,8 @@ test('drag-created intervals distinguish repeated local times and reject shaded 
   } finally {await f.close();}
 });
 
-test('touch range selection is explicit and leaves normal calendar scrolling available',async({browser,request})=>{
+test('touch range selection is explicit and leaves normal calendar scrolling available',async({browser,request,browserName})=>{
+  test.skip(browserName!=='chromium','Native touch injection uses Chromium CDP. Other calendar interactions run in every browser.');
   const f=await fixture(request),context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,viewport:{width:390,height:844},isMobile:true,hasTouch:true});
   const page=await context.newPage();
   try {
@@ -294,7 +296,8 @@ test('calendar copying a running session leaves it running and lets the copy rec
   }
 });
 
-test('calendar touch gestures move a work session between days on a narrow screen',async({browser,request})=>{
+test('calendar touch gestures move a work session between days on a narrow screen',async({browser,request,browserName})=>{
+  test.skip(browserName!=='chromium','Native touch injection uses Chromium CDP. Other calendar interactions run in every browser.');
   const f=await fixture(request),context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,viewport:{width:390,height:844},isMobile:true,hasTouch:true});
   const page=await context.newPage();
   try {
@@ -322,7 +325,7 @@ test('calendar copy and paste create only a new session and clear the clipboard 
     await page.locator('#calendar-copy').click();await page.getByRole('button',{name:'Select 2025-10-22',exact:true}).click();await page.locator('#calendar-paste').click();await save(page);
     sessions=(await (await api(request,'GET','/work-sessions')).json()).items.filter(value=>value.summary===f.session.summary);expect(sessions).toHaveLength(3);
     expect(await read(request,'work-sessions',f.session.id)).toEqual(f.session);await unchangedActivities(request,f);
-    await page.getByRole('button',{name:'Sign out',exact:true}).click();
+    await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();
     await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
     await page.getByRole('button',{name:'Calendar',exact:true}).click();await expect(page.locator('#calendar-paste')).toBeDisabled();
   } finally {await f.close();}
@@ -366,7 +369,7 @@ test('calendar committed-but-lost moves require review and read-only moves leave
     await expect(page.locator('#editor-notice')).toContainText('outcome is unknown');await expect(page.locator('#save')).toBeDisabled();
     let current=await read(request,'work-sessions',f.session.id);expect(current.start).toBe('2025-10-20T06:18:00.123456789Z');expect(current.version).toBe(f.session.version+1);expect(writes).toBe(1);
     await unchangedActivities(request,f);await page.locator('#cancel').click();await page.unroute(`**/api/v1/work-sessions/${f.session.id}`);
-    await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();await calendar(page,readToken);
+    await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();await calendar(page,readToken);
     await bar(page,f.session.id).focus();await bar(page,f.session.id).press('ArrowDown');
     await expect(page.locator('#editor-error')).toContainText('permission');expect(await read(request,'work-sessions',f.session.id)).toEqual(current);await unchangedActivities(request,f);
     await page.locator('#cancel').click();

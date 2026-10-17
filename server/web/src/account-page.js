@@ -42,7 +42,7 @@ async function show(hash, ask = true) {
     clean(form) {if (valid()) this.dirty.delete(form);},
     changed(account) {if (!valid()) return; scope.account = {...scope.account, ...account}; this.account = scope.account; scope.updateAccount(account); $('owner').textContent = account.displayName; $('account-identity').textContent = `Signed in as ${account.username || account.displayName}. Your work data is private to your account.`;},
     signOut: message => {if (valid()) scope.signOut(message);},
-    refreshProfile: async () => {if (valid()) await scope.refreshProfile?.();},
+    refreshProfile: async profile => {if (valid()) await scope.refreshProfile?.(profile);},
     navigate: next => {if (valid()) location.hash = next;},
     async run(work, {submit, feedback = $('account-error'), write = false} = {}) {
       if (!valid() || this.busy || (write && (!this.canWrite || this.uncertain))) return;

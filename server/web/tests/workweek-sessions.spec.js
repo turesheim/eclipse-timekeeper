@@ -1,3 +1,4 @@
+import {openAccountMenu} from './navigation.js';
 import {test, expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import {dateInZone, localDateTime, durationNanos, nanosText, decimalHoursText} from '../src/model.js';
@@ -44,7 +45,7 @@ test('Workweek shows client-colored session rows with local DST/week clipping an
     expect(await page.locator('#week-sessions').evaluate(value => value.scrollWidth > value.clientWidth)).toBeTruthy();
     await page.screenshot({path: 'test-results/workweek-sessions-mobile.png', fullPage: true});
     await page.getByLabel('Week containing', {exact: true}).fill('2025-10-27'); await expect(page.locator('#zone-caption')).toContainText('2025-10-27'); await expect(row.locator('td').nth(1)).toHaveText('2.50h'); await expect(row.locator('td').nth(8)).toHaveText('2.50h');
-    await page.getByRole('button', {name: 'Sign out', exact: true}).click(); await expect(page.locator('#login')).toBeVisible(); await expect(page.locator('#week-sessions')).toBeEmpty();
+    await openAccountMenu(page);await page.getByRole('button', {name: 'Sign out', exact: true}).click(); await expect(page.locator('#login')).toBeVisible(); await expect(page.locator('#week-sessions')).toBeEmpty();
   } finally {await f.close();}
 });
 test('running Workweek sessions remain editable without losing exact times and read-only writes are rejected', async ({page, request}) => {
@@ -57,7 +58,7 @@ test('running Workweek sessions remain editable without losing exact times and r
     await expect(page.getByLabel('Start (local time)', {exact: true})).toHaveValue(localDateTime(session.start, 'Europe/Oslo').slice(0,19).replace(/:00$/, ''));
     await page.getByLabel('Title', {exact: true}).fill('Updated running session'); await page.locator('#save').click(); await expect(page.locator('#editor')).not.toBeVisible(); await expect(row).toContainText('Updated running session');
     const saved = await (await api(request, 'GET', '/work-sessions/' + session.id)).json(); expect(saved.start).toBe(session.start); expect(saved.end).toBeNull();
-    await page.getByRole('button', {name: 'Sign out', exact: true}).click(); await expect(page.locator('#login')).toBeVisible(); await signIn(page, process.env.TIMEKEEPER_WEB_READ_TOKEN);
+    await openAccountMenu(page);await page.getByRole('button', {name: 'Sign out', exact: true}).click(); await expect(page.locator('#login')).toBeVisible(); await signIn(page, process.env.TIMEKEEPER_WEB_READ_TOKEN);
     await expect(row.getByRole('button', {name: 'Edit session Updated running session', exact: true})).toBeDisabled();
     await expect(row.getByRole('button', {name: 'Delete session Updated running session', exact: true})).toBeDisabled();
     const current = await api(request, 'GET', '/work-sessions/' + session.id);

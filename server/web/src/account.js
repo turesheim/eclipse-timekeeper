@@ -40,7 +40,7 @@ export async function renderAccount(view, part) {
     if (!view.valid()) return; profile.etag = reply.etag; view.clean(preferences.value); preferences.feedback.textContent = 'Time zone saved. Stored activity times are unchanged.';
     // The preference write is confirmed. Refreshing hidden tracking reports
     // must not keep account navigation reserved after the save succeeds.
-    void view.refreshProfile().catch(() => {});
+    void view.refreshProfile(reply).catch(() => {});
   });
   const input = field(preferences.value, 'Time zone', zone), preview = node('p', '', 'hint'); input.setAttribute('aria-describedby', 'account-zone-preview'); preview.id = 'account-zone-preview';
   const updatePreview = () => {try {preview.textContent = `${input.value}: ${instantText(new Date().toISOString(), input.value.trim())}`;} catch {preview.textContent = 'Enter a valid IANA time zone.';}};
