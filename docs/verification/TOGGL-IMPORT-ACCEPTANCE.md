@@ -27,7 +27,7 @@ project/tag/description text and dates while retaining seven intervals totaling
   jobs resume a 201-row import after a dropped reply and reload, then review edited
   records during Undo. The real seven-row session fixture contributes 42h 4m to
   Track’s monthly client total and creates no companion records.
-- Packaged HTTPS WebKit: all six import scenarios passed on `7f70f0d`, including
+- Packaged HTTPS WebKit: all six import scenarios passed on `277e042`, including ignored workspace metadata,
   accessibility checks and narrow-screen history. Earlier full-suite and SMTP
   recovery runs remain recorded in the preceding implementation’s CI history.
 - PostgreSQL replica/restore runs exercise both import modes on 17.11 and 18.6.
