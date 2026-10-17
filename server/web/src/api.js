@@ -47,12 +47,12 @@ export class Api {
   constructor(token = null, fetcher = (...args) => globalThis.fetch(...args), context = {}) { this.#token = token; this.#csrf = context.csrf; this.#owner = context.ownerId ?? null; this.fetcher = fetcher; }
   get owner() { return this.#owner; }
   close() { this.#closed = true; this.#token = ''; this.#csrf = null; for (const request of this.#requests) request.abort(); }
-  async request(path, {method = 'GET', body, etag, key, timeout = 15000} = {}) {
+  async request(path, {method = 'GET', body, etag, key, timeout = 15000, binary = false} = {}) {
     if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);
     const controller = new AbortController(); this.#requests.add(controller);
     const timer = setTimeout(() => controller.abort(), timeout);
     try {
-      const headers = {Accept: 'application/json'};
+      const headers = {Accept: binary ? 'application/zip' : 'application/json'};
       if (this.#token) headers.Authorization = `Bearer ${this.#token}`;
       else if (this.#csrf && !['GET', 'HEAD', 'OPTIONS'].includes(method)) headers['X-CSRF-Token'] = this.#csrf;
       if (this.#owner !== null) headers['X-Timekeeper-Owner'] = ownerHeader(this.#owner);
@@ -60,7 +60,8 @@ export class Api {
       if (etag) headers['If-Match'] = etag;
       if (key) headers['Idempotency-Key'] = key;
       const response = await this.fetcher(`/api/v1${path}`, {method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, redirect: 'error', referrerPolicy:'origin', credentials: this.#token && path !== '/auth/token-login' ? 'omit' : 'same-origin', cache: 'no-store'});
-      const data = response.status === 204 ? null : await response.json();
+      if (binary && response.ok && !/^application\/zip(?:;|$)/i.test(response.headers.get('Content-Type') || '')) throw new ApiError('UNAVAILABLE');
+      const data = response.status === 204 ? null : binary && response.ok ? await response.blob() : await response.json();
       if (!response.ok) throw new ApiError(typeof data?.code === 'string' ? data.code : 'UNAVAILABLE', response.status);
       if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);
       const owner = decodeOwner(response.headers.get('X-Timekeeper-Owner'));

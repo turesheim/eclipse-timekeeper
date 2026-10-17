@@ -48,8 +48,8 @@ async function show(hash, ask = true) {
   const currentView = view;
   if (!view.canWrite) view.root.append(node('p', 'This session is read-only. Sign in with your password to change settings.', 'alert alert-info'));
   if (page === 'account') {
-    const part = ['profile', 'password', 'passkeys', 'tokens', 'import'].includes(hash.split('/')[1]) ? hash.split('/')[1] : 'profile';
-    for (const [key, title] of [['profile','Profile'],['password','Password'],['passkeys','Passkeys'],['tokens','API tokens'],['import','Import']]) {
+    const part = ['profile', 'password', 'passkeys', 'tokens', 'data', 'import'].includes(hash.split('/')[1]) ? hash.split('/')[1] : 'profile';
+    for (const [key, title] of [['profile','Profile'],['password','Password'],['passkeys','Passkeys'],['tokens','API tokens'],['data','Your data'],['import','Import']]) {
       const item = link(title, `#account/${key}`, 'nav-link'); if (key === part) {item.classList.add('active'); item.setAttribute('aria-current', 'page');}
       $('account-navigation').append(item);
     }

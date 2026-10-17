@@ -2,6 +2,15 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Api} from '../src/api.js';
 const reply = (body, owner = 'b3duZXItYQ', status = 200) => new Response(body === null ? null : JSON.stringify(body), {status, headers: {'X-Timekeeper-Owner': owner, ETag: '"opaque"'}});
+test('private binary downloads retain cookie/owner checks and reject late or foreign files', async()=>{
+  const zip=(owner='b3duZXItYQ')=>new Response('synthetic archive',{headers:{'Content-Type':'application/zip','X-Timekeeper-Owner':owner}});
+  const api=new Api(null,async(url,options)=>{assert.equal(options.headers.Accept,'application/zip');assert.equal(options.credentials,'same-origin');return zip();},{ownerId:'owner-a'});
+  assert.equal(await (await api.request('/data/account/export',{binary:true})).data.text(),'synthetic archive');
+  const foreign=new Api(null,async()=>zip('b3duZXItYg'),{ownerId:'owner-a'});await assert.rejects(foreign.request('/data/account/export',{binary:true}),error=>error.code==='OWNER_CHANGED');
+  const invalid=new Api(null,async()=>reply({private:'must not be treated as ZIP'}));await assert.rejects(invalid.request('/data/account/export',{binary:true}),error=>error.code==='UNAVAILABLE');
+  let finish;const late=new Api(null,()=>new Promise(resolve=>{finish=resolve;}));const pending=late.request('/data/account/export',{binary:true});late.close();finish(zip());await assert.rejects(pending,error=>error.code==='UNAUTHENTICATED');
+  const denied=new Api(null,async()=>reply({code:'FORBIDDEN'},'b3duZXItYQ',403));await assert.rejects(denied.request('/data/account/export',{binary:true}),error=>error.code==='FORBIDDEN');
+});
 test('first empty page binds the session and rejects later owner changes', async () => {
   let index = 0;
   const api = new Api('never-display-token', async (url, options) => {
