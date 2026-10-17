@@ -30,7 +30,7 @@ class AccountArchive {
     record Download(Path file,long length) implements AutoCloseable {
         @Override public void close() {try {Files.deleteIfExists(file);Files.deleteIfExists(file.getParent());}catch(IOException ignored) {}}
     }
-    private static Path privateDirectory() throws IOException {
+    static Path privateDirectory() throws IOException {
         Path folder=Files.createTempDirectory("timekeeper-account-download-");
         if(Files.getFileStore(folder).supportsFileAttributeView("posix")) Files.setPosixFilePermissions(folder,PosixFilePermissions.fromString("rwx------"));
         return folder;
