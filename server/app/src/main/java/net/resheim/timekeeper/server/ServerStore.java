@@ -414,6 +414,9 @@ public class ServerStore {
             public boolean existsByTask(TaskId id) { check(); return related("task","TASK",id.value()); }
             public boolean existsByLabel(LabelId id) { check(); return related("label","LABEL",id.value()); }
             public Activity save(Activity value) { check(); return ServerStore.this.save("ACTIVITY",value); }
+            public Activity saveDailyPart(Activity value,Activity prior,boolean unchangedWork) {
+                var saved=save(value);ImportProvenance.dailyPart(ServerStore.this,prior,saved,unchangedWork);return saved;
+            }
             public void delete(ActivityId id) { check(); ServerStore.this.delete("ACTIVITY",id.value()); }
         }; }
     }
