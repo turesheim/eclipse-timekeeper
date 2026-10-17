@@ -74,7 +74,7 @@ test('incorrect credentials explain the login failure without reporting an expir
 });
 test('account UI creates an isolated user and named Eclipse token shown once',async({page,request,browser})=>{
   const suffix=randomUUID().slice(0,8),username='user-'+suffix,display='Private user '+suffix,otherPassword='private passphrase '+suffix;
-  await login(page);await openAccountMenu(page);await page.locator('#users-link').click();await page.getByRole('link',{name:'Add user',exact:true}).click();
+  await login(page);await openAccountMenu(page);await page.locator('#users-link').click();await page.getByRole('link',{name:'Users',exact:true}).click();await page.getByRole('link',{name:'Add user',exact:true}).click();
   await page.getByLabel('New user username',{exact:true}).fill(username);await page.getByLabel('New user recovery email',{exact:true}).fill(username+'@example.org');await page.getByLabel('Display name (optional)',{exact:true}).fill(display);await page.getByLabel('Temporary password',{exact:true}).fill(otherPassword);await page.getByLabel('Confirm temporary password',{exact:true}).fill(otherPassword);await page.getByRole('button',{name:'Create user',exact:true}).click();await expect(page.locator('#account-content tr').filter({hasText:display})).toBeVisible();
   const peer=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL}),other=await peer.newPage();
   try {
@@ -99,7 +99,7 @@ test('remember me persists a cookie while local storage holds no password or bea
 });
 test('another tab changing the cookie clears the old account and rejects a late refresh',async({page,request})=>{
   const username='switched-'+randomUUID().slice(0,8),secret='separate account passphrase';
-  const created=await call(request,'POST','/auth/users',{username,password:secret,displayName:'Other tab user',email:username+'@example.org',administrator:false});expect(created.status()).toBe(201);
+  const created=await call(request,'POST','/admin/users',{username,password:secret,displayName:'Other tab user',email:username+'@example.org',administrator:false});expect(created.status()).toBe(201);
   await login(page);
   let captured,release;const arrived=new Promise(resolve=>{captured=resolve;}),gate=new Promise(resolve=>{release=resolve;});
   await page.route('**/api/v1/clients?*',async route=>{const response=await route.fetch();captured();await gate;await route.fulfill({response});});
@@ -131,7 +131,7 @@ test('API token expiry uses the account time zone even when the browser uses ano
 });
 for(const explicitUtc of [false,true]) test(explicitUtc ? 'explicit UTC remains selected when signing in from Oslo':'an untouched account shows running work-session times in local time',async({browser,request})=>{
   const username='zone-'+randomUUID().slice(0,8),secret='local time zone test passphrase';
-  expect((await call(request,'POST','/auth/users',{username,password:secret,displayName:username,email:username+'@example.org',administrator:false})).status()).toBe(201);
+  expect((await call(request,'POST','/admin/users',{username,password:secret,displayName:username,email:username+'@example.org',administrator:false})).status()).toBe(201);
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,timezoneId:'Europe/Oslo',locale:'en-GB'}),page=await context.newPage();
   try {
     await browserRequest(context).get('/api/v1/auth/status');

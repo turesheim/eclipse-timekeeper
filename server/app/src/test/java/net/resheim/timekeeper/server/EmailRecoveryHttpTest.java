@@ -34,11 +34,12 @@ class EmailRecoveryHttpTest {
         private final Set<Socket> sockets=ConcurrentHashMap.newKeySet();
         private final BlockingQueue<String> received=new LinkedBlockingQueue<>();
         private final AtomicBoolean rejectPrimary=new AtomicBoolean();
+        private final AtomicBoolean stallPrimary=new AtomicBoolean();
         @Override public Map<String,String> start() {
             try {
                 server=new ServerSocket(0,20,InetAddress.getLoopbackAddress());
                 threads.submit(()->{while(!server.isClosed()) try {var socket=server.accept();sockets.add(socket);threads.submit(()->serve(socket));}catch(IOException stopped) {if(!server.isClosed()) throw new UncheckedIOException(stopped);}});
-                return Map.of("quarkus.mailer.host","localhost","quarkus.mailer.port",Integer.toString(server.getLocalPort()),"quarkus.mailer.start-tls","DISABLED","quarkus.mailer.tls","false","quarkus.mailer.mock","false","quarkus.mailer.from","timekeeper@example.org");
+                return Map.of("quarkus.mailer.host","localhost","quarkus.mailer.port",Integer.toString(server.getLocalPort()),"quarkus.mailer.start-tls","DISABLED","quarkus.mailer.tls","false","quarkus.mailer.mock","false","quarkus.mailer.from","Timekeeper <timekeeper@example.org>");
             }catch(IOException failure) {throw new UncheckedIOException(failure);}
         }
         private void serve(Socket socket) {
@@ -49,6 +50,7 @@ class EmailRecoveryHttpTest {
                     if(command.startsWith("EHLO") || command.startsWith("HELO")) output.print("250-localhost\r\n250 8BITMIME\r\n");
                     else if(command.startsWith("MAIL FROM")) {recipient=null;output.print("250 OK\r\n");}
                     else if(command.startsWith("RCPT TO")) {
+                        while(stallPrimary.get() && line.contains("primary@example.org") && !server.isClosed()) Thread.sleep(25);
                         if(rejectPrimary.get() && line.contains("primary@example.org")) output.print("550 Test primary unavailable\r\n");
                         else {recipient=line;output.print("250 OK\r\n");}
                     } else if(command.equals("DATA") && recipient!=null) {
@@ -61,10 +63,11 @@ class EmailRecoveryHttpTest {
                     output.flush();
                 }
             }catch(IOException stopped) {if(!server.isClosed()) throw new UncheckedIOException(stopped);}
+            catch(InterruptedException stopped) {Thread.currentThread().interrupt();}
             finally {sockets.remove(socket);}
         }
         @Override public void inject(Object test) {
-            for(var entry:Map.of("received",received,"rejectPrimary",rejectPrimary).entrySet()) try {
+            for(var entry:Map.of("received",received,"rejectPrimary",rejectPrimary,"stallPrimary",stallPrimary).entrySet()) try {
                 var field=test.getClass().getDeclaredField(entry.getKey());field.setAccessible(true);field.set(test,entry.getValue());
             }catch(ReflectiveOperationException failure) {throw new RuntimeException(failure);}
         }
@@ -74,6 +77,7 @@ class EmailRecoveryHttpTest {
     }
     BlockingQueue<String> received;
     AtomicBoolean rejectPrimary;
+    AtomicBoolean stallPrimary;
     @Inject AccountStore accounts;
     @TempDir Path temporary;
 
@@ -107,6 +111,14 @@ class EmailRecoveryHttpTest {
         try {
             verify(cookie,csrf,"PRIMARY","primary@example.org");verify(cookie,csrf,"BACKUP","backup@example.org");
             var rejected=given().header("Cookie",cookie).header("Origin","https://attacker.example.org").header("X-CSRF-Token",csrf).contentType("application/json").body("{}").post("/api/v1/auth/email/addresses/BACKUP/resend");assertEquals(403,rejected.statusCode());
+            // A mailbox that never answers must not exhaust transport capacity
+            // for the independently verified backup address.
+            stallPrimary.set(true);
+            try {
+                given().header("Origin",ORIGIN).contentType("application/json").body(Map.of("username","mail-admin")).post("/api/v1/auth/email/forgot").then().statusCode(202);
+                String available=link("backup@example.org","reset-password");
+                given().header("Origin",ORIGIN).contentType("application/json").body(Map.of("token",available,"purpose","RESET")).post("/api/v1/auth/email/preview").then().statusCode(204);
+            } finally {stallPrimary.set(false);}
             rejectPrimary.set(true);
             var known=given().header("Origin",ORIGIN).contentType("application/json").body(Map.of("username","mail-admin")).post("/api/v1/auth/email/forgot").then().statusCode(202).extract().response();
             var unknown=given().header("Origin",ORIGIN).contentType("application/json").body(Map.of("username","missing-account")).post("/api/v1/auth/email/forgot").then().statusCode(202).extract().response();

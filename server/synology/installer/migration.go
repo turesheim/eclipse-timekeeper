@@ -21,6 +21,9 @@ func migrationTablesFor(schema int) []string {
 	if schema >= 4 {
 		tables = append(tables, "tk_passkey_user", "tk_passkey_credential", "tk_passkey_ceremony")
 	}
+	if schema >= 5 {
+		tables = append(tables, "tk_service_settings")
+	}
 	return tables
 }
 

@@ -4586,7 +4586,7 @@
         }
       ]
     },
-    "/auth/users": {
+    "/admin/users": {
       "get": {
         "operationId": "listUserAccounts",
         "summary": "listUserAccounts",
@@ -4736,7 +4736,7 @@
         }
       }
     },
-    "/auth/users/{key}": {
+    "/admin/users/{key}": {
       "get": {
         "operationId": "getUserAccount",
         "summary": "getUserAccount",
@@ -7110,6 +7110,166 @@
           }
         },
         "description": "Requires the exact configured HTTPS origin and a host-only HttpOnly browser-binding cookie from GET /auth/status. Credential-management routes additionally require an account browser session; API tokens and token-derived sessions cannot manage passkeys. Completion JSON is limited to 98,304 UTF-8 bytes."
+      }
+    },
+    "/admin/settings": {
+      "get": {
+        "operationId": "getAdministrationSettings",
+        "summary": "Read saved and effective service settings",
+        "tags": [
+          "Accounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdministrationSettings"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque version required by If-Match on saves."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator-only redacted desired/effective configuration. Secrets are never returned. Changes require current administrator account proof and a coordinated restart."
+      },
+      "put": {
+        "operationId": "updateAdministrationSettings",
+        "summary": "Save service settings for activation at coordinated restart",
+        "tags": [
+          "Accounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdministrationSettings"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque version required by If-Match on saves."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator-only redacted desired/effective configuration. Secrets are never returned. Changes require current administrator account proof and a coordinated restart.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdministrationSettingsInput"
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -10909,6 +11069,251 @@
             "type": "boolean"
           }
         }
+      },
+      "AdministrationSettings": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "configurationManagedBy",
+          "databaseType",
+          "schemaVersion",
+          "publicOrigin",
+          "originEpoch",
+          "passkeysEnabled",
+          "passkeyRpId",
+          "emailRecoveryEnabled",
+          "version",
+          "effectiveVersion",
+          "restartRequired",
+          "smtpPasswordConfigured",
+          "effectiveSmtpPasswordConfigured",
+          "saved",
+          "effective",
+          "canEdit"
+        ],
+        "properties": {
+          "configurationManagedBy": {
+            "type": "string",
+            "const": "administration"
+          },
+          "databaseType": {
+            "type": "string",
+            "enum": [
+              "h2",
+              "postgresql"
+            ]
+          },
+          "schemaVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "publicOrigin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "originEpoch": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "passkeysEnabled": {
+            "type": "boolean"
+          },
+          "passkeyRpId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "emailRecoveryEnabled": {
+            "type": "boolean"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "effectiveVersion": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "restartRequired": {
+            "type": "boolean"
+          },
+          "smtpPasswordConfigured": {
+            "type": "boolean"
+          },
+          "effectiveSmtpPasswordConfigured": {
+            "type": "boolean"
+          },
+          "saved": {
+            "$ref": "#/components/schemas/ServiceConfiguration"
+          },
+          "effective": {
+            "$ref": "#/components/schemas/ServiceConfiguration"
+          },
+          "canEdit": {
+            "type": "boolean",
+            "description": "True only for an actual administrator account session, not a token-derived session."
+          }
+        }
+      },
+      "ServiceConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "publicOrigin": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2048
+          },
+          "passkeysEnabled": {
+            "type": "boolean"
+          },
+          "passkeyRpId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "emailRecoveryEnabled": {
+            "type": "boolean"
+          },
+          "smtpHost": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "smtpPort": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "smtpFrom": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 320
+          },
+          "smtpUsername": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "smtpTls": {
+            "type": "boolean"
+          },
+          "smtpStartTls": {
+            "type": "string",
+            "enum": [
+              "DISABLED",
+              "OPTIONAL",
+              "REQUIRED"
+            ]
+          },
+          "originEpoch": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "publicOrigin",
+          "passkeysEnabled",
+          "passkeyRpId",
+          "emailRecoveryEnabled",
+          "smtpHost",
+          "smtpPort",
+          "smtpFrom",
+          "smtpUsername",
+          "smtpTls",
+          "smtpStartTls",
+          "originEpoch"
+        ]
+      },
+      "AdministrationSettingsInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "publicOrigin": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2048
+          },
+          "passkeysEnabled": {
+            "type": "boolean"
+          },
+          "passkeyRpId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "emailRecoveryEnabled": {
+            "type": "boolean"
+          },
+          "smtpHost": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "smtpPort": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "smtpFrom": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 320
+          },
+          "smtpUsername": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "smtpTls": {
+            "type": "boolean"
+          },
+          "smtpStartTls": {
+            "type": "string",
+            "enum": [
+              "DISABLED",
+              "OPTIONAL",
+              "REQUIRED"
+            ]
+          },
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "smtpPasswordAction": {
+            "enum": [
+              "PRESERVE",
+              "REPLACE",
+              "CLEAR"
+            ]
+          },
+          "smtpPassword": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "publicOrigin",
+          "passkeysEnabled",
+          "passkeyRpId",
+          "emailRecoveryEnabled",
+          "smtpHost",
+          "smtpPort",
+          "smtpFrom",
+          "smtpUsername",
+          "smtpTls",
+          "smtpStartTls",
+          "currentPassword",
+          "smtpPasswordAction"
+        ],
+        "description": "Administrator account session and current password required. Save desired settings using If-Match; coordinated restart activates them centrally and revokes retired authentication state. SMTP password is write-only: preserve, replace or clear explicitly."
       }
     },
     "parameters": {

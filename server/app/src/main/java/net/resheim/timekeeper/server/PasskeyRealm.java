@@ -13,6 +13,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 @ApplicationScoped
 class PasskeyRealm {
     @Inject RecoveryOrigin origin;
+    @Inject ServiceSettings settings;
     @ConfigProperty(name="timekeeper.auth.passkeys-enabled",defaultValue="true") boolean configuredEnabled;
     @ConfigProperty(name="timekeeper.auth.passkey-rp-id",defaultValue="AUTO") String configuredRp;
 
@@ -31,6 +32,7 @@ class PasskeyRealm {
             throw new IllegalArgumentException("Passkey RP ID must equal the configured HTTPS hostname; changing it requires a documented origin cutover");
         return Optional.of(host);
     }
+    void configure(boolean enabled,String rp) {configuredEnabled=enabled;configuredRp=rp;}
     Optional<String> rpId() {return rp(origin.configured(),configuredRp,configuredEnabled);}
     boolean enabled() {return rpId().isPresent();}
     void initialize() {
@@ -39,10 +41,11 @@ class PasskeyRealm {
     }
     /** Plain read avoids reversing the global-control -> account/session lock order. */
     RecoveryOrigin.Current current(Connection connection) {
+        settings.requireCurrent(connection);
         try(var statement=query(connection,"SELECT origin,epoch FROM tk_recovery_control WHERE id=1");var rows=statement.executeQuery()) {
             if(!rows.next()) throw new SQLException("Missing authentication origin control");
             var value=new RecoveryOrigin.Current(rows.getString(1),rows.getLong(2));
-            boolean matches=origin.configured().equals("NONE") ? value.origin()==null && value.epoch()==0
+            boolean matches=origin.configured().equals("NONE") ? value.origin()==null && value.epoch()==origin.epoch()
                     : origin.configured().equals(value.origin()) && origin.epoch()==value.epoch();
             if(!matches) throw new ApiFailure(503,"UNAVAILABLE");return value;
         }catch(SQLException failure) {throw databaseFailure(failure);}

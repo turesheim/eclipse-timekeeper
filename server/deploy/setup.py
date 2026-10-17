@@ -60,7 +60,7 @@ def main():
     # Optional transport configuration is retained across setup/upgrade. Keep the
     # password out of Compose's interpolated environment and generated metadata.
     optional_files = {
-        config / 'mail.properties': ('timekeeper.mail.enabled=false\nquarkus.mailer.host=localhost\n'
+        config / 'mail.properties': ('# Initial configuration or explicit operator recovery only.\n# After first startup, use Administration.\ntimekeeper.mail.enabled=false\nquarkus.mailer.host=localhost\n'
             'quarkus.mailer.port=587\nquarkus.mailer.from=timekeeper@localhost\n'
             'quarkus.mailer.username=\nquarkus.mailer.tls=false\nquarkus.mailer.start-tls=REQUIRED\n', 0o644),
         credentials / 'timekeeper_smtp_password': ('', 0o444),

@@ -9,7 +9,9 @@ import java.util.List;
 /** Explicit public origin for a TLS reverse proxy; forwarded headers are not trusted implicitly. */
 @ApplicationScoped
 public class BrowserOrigins {
-    @ConfigProperty(name="timekeeper.auth.public-origin",defaultValue="NONE") String publicOrigin;
+    @ConfigProperty(name="timekeeper.auth.public-origin",defaultValue="NONE") volatile String publicOrigin;
+    String currentOrigin() {return publicOrigin;}
+    void configure(String value) {publicOrigin=value;}
     boolean configured() {return !publicOrigin.equals("NONE");}
     /** Host cookies cross ports: require the configured page origin even on reads. */
     void cookie(UriInfo uri,List<String> origins,List<String> referers,boolean write) {

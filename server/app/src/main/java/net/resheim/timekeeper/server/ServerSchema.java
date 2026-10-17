@@ -13,9 +13,10 @@ import org.h2.tools.RunScript;
 public final class ServerSchema {
     private ServerSchema() { }
     private static final Set<String> LEGACY_TABLES=Set.of("TK_SCHEMA","TK_OWNER","TK_RESOURCE","TK_RELATION","TK_EXTERNAL_REFERENCE","TK_ACTIVE","TK_RECEIPT","TK_CHANGE");
-    public static final int CURRENT=4;
+    public static final int CURRENT=5;
     private static final Set<String> AUTH_TABLES;
     private static final Set<String> RECOVERY_TABLES;
+    private static final Set<String> PASSKEY_TABLES;
     private static final Set<String> TABLES;
     static {
         var tables=new HashSet<>(LEGACY_TABLES);
@@ -24,13 +25,15 @@ public final class ServerSchema {
         tables.addAll(Set.of("TK_RECOVERY_CONTROL","TK_RECOVERY_ADDRESS","TK_RECOVERY_LINK"));
         RECOVERY_TABLES=Set.copyOf(tables);
         tables.addAll(Set.of("TK_PASSKEY_USER","TK_PASSKEY_CREDENTIAL","TK_PASSKEY_CEREMONY"));
+        PASSKEY_TABLES=Set.copyOf(tables);
+        tables.add("TK_SERVICE_SETTINGS");
         TABLES=Set.copyOf(tables);
     }
     private static class Reference {
         static final List<String> SHAPE=referenceShape();
         private static List<String> referenceShape() {
             try(var connection=DriverManager.getConnection("jdbc:h2:mem:schema_reference_"+UUID.randomUUID())) {
-                create(connection);applyAuth(connection);applyRecovery(connection);applyPasskeys(connection);return shape(connection,TABLES);
+                create(connection);applyAuth(connection);applyRecovery(connection);applyPasskeys(connection);applySettings(connection);return shape(connection,TABLES);
             } catch(Exception e) {throw new ExceptionInInitializerError(e);}
         }
     }
@@ -58,9 +61,15 @@ public final class ServerSchema {
             RunScript.execute(connection,new InputStreamReader(input,StandardCharsets.UTF_8));
         }
     }
+    static void applySettings(Connection connection) throws Exception {
+        try(var input=ServerSchema.class.getResourceAsStream("/db/settings-v5.sql")) {
+            if(input==null) throw new SQLException("Missing service settings schema resource");
+            RunScript.execute(connection,new InputStreamReader(input,StandardCharsets.UTF_8));
+        }
+    }
     private static List<String> priorShape(int version,Set<String> tables) throws Exception {
         try(var connection=DriverManager.getConnection("jdbc:h2:mem:prior_reference_"+UUID.randomUUID())) {
-            create(connection);if(version>=2) applyAuth(connection);if(version>=3) applyRecovery(connection);return shape(connection,tables);
+            create(connection);if(version>=2) applyAuth(connection);if(version>=3) applyRecovery(connection);if(version>=4) applyPasskeys(connection);return shape(connection,tables);
         }
     }
     public static void initializeOrValidate(Connection connection) throws Exception {initializeOrValidate(connection,false);}
@@ -71,10 +80,10 @@ public final class ServerSchema {
         }
         var existing=tables(connection);
         if(existing.isEmpty()) {
-            create(connection);applyAuth(connection);applyRecovery(connection);applyPasskeys(connection);validateShape(connection);
+            create(connection);applyAuth(connection);applyRecovery(connection);applyPasskeys(connection);applySettings(connection);validateShape(connection);
             try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET schema_version="+CURRENT+",state='READY' WHERE id=1");}
         } else if(!existing.equals(TABLES)) {
-            int version=existing.equals(LEGACY_TABLES) ? 1 : existing.equals(AUTH_TABLES) ? 2 : existing.equals(RECOVERY_TABLES) ? 3 : 0;
+            int version=existing.equals(LEGACY_TABLES) ? 1 : existing.equals(AUTH_TABLES) ? 2 : existing.equals(RECOVERY_TABLES) ? 3 : existing.equals(PASSKEY_TABLES) ? 4 : 0;
             if(version==0) throw new SQLException("Unsupported or incomplete server schema");
             if(!allowUpgrade) throw new SQLException("Schema upgrade requires explicit operator authorization after stopping older server replicas");
             if(!shape(connection,existing).equals(priorShape(version,existing))) throw new SQLException("Unsupported prior server schema");
@@ -83,7 +92,7 @@ public final class ServerSchema {
             }
             // H2 commits DDL. An interruption remains explicitly MIGRATING.
             try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET state='MIGRATING' WHERE id=1");}
-            if(version<2) applyAuth(connection);if(version<3) applyRecovery(connection);applyPasskeys(connection);validateShape(connection);
+            if(version<2) applyAuth(connection);if(version<3) applyRecovery(connection);if(version<4) applyPasskeys(connection);applySettings(connection);validateShape(connection);
             try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET schema_version="+CURRENT+",state='READY' WHERE id=1");}
         }
         validate(connection);

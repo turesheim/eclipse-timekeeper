@@ -40,6 +40,7 @@ class EmailRecoveryStoreTest {
         }
     }
     @Inject AccountStore accounts;
+    @Inject ServiceSettings settings;
     @Inject TokenRegistry registry;
     @Inject ServerStore store;
     @TempDir Path temporary;
@@ -63,7 +64,7 @@ class EmailRecoveryStoreTest {
         });
         // Establish the trusted origin before opening sessions: a cutover
         // deliberately invalidates every session issued at the previous origin.
-        origin=new RecoveryOrigin();origin.accounts=accounts;origin.configured="https://vpn.example.org:8443";origin.epoch=1;origin.initialize();
+        origin=new RecoveryOrigin();origin.accounts=accounts;origin.settings=settings;origin.configured="https://vpn.example.org:8443";origin.epoch=1;origin.initialize();
         originalRealm=ClientProxy.unwrap(accounts).realm;useOrigin(origin);
         aliceSession=accounts.complete(challenge("SETUP",null),"alice",PASSWORD,"Alice",false,null,issuer(BrowserSignIns.Method.SETUP));alice=accounts.session(aliceSession.secret());
         accounts.createUser(alice,"bob",PASSWORD,"Bob",false);bobSession=login("bob",PASSWORD);bob=accounts.session(bobSession.secret());
@@ -71,7 +72,7 @@ class EmailRecoveryStoreTest {
     }
     @AfterEach void resetSetupFile() {ClientProxy.unwrap(accounts).setupFile="NONE";ClientProxy.unwrap(accounts).realm=originalRealm;}
     private void useOrigin(RecoveryOrigin origin) {
-        var realm=new PasskeyRealm();realm.origin=origin;realm.configuredEnabled=true;realm.configuredRp="AUTO";
+        var realm=new PasskeyRealm();realm.origin=origin;realm.settings=settings;realm.configuredEnabled=true;realm.configuredRp="AUTO";
         ClientProxy.unwrap(accounts).realm=realm;signIns=new BrowserSignIns();signIns.accounts=accounts;signIns.realm=realm;
     }
     private AccountStore.SessionIssuer issuer(BrowserSignIns.Method method) {
@@ -177,7 +178,7 @@ class EmailRecoveryStoreTest {
 
     @Test void newHostnamePreservesVerifiedAddressesAndCannotReviveOldLinksOnRollback() {
         enroll(alice,"PRIMARY","alice@example.org");var old=recovery.requestReset("alice").getFirst();
-        var external=new RecoveryOrigin();external.accounts=accounts;external.configured="https://time.example.org";external.epoch=2;external.initialize();var moved=replica(external);
+        var external=new RecoveryOrigin();external.accounts=accounts;external.settings=settings;external.configured="https://time.example.org";external.epoch=2;external.initialize();var moved=replica(external);
         assertFalse(recovery.deliverable(old));assertThrows(ApiFailure.class,()->moved.preview(old.secret(),"RESET"));
         var fresh=moved.requestReset("alice").getFirst();assertEquals("https://time.example.org",fresh.origin());
         moved.reset(fresh.secret(),NEXT);useOrigin(external);assertEquals(alice.owner(),login("alice",NEXT).account().path("ownerId").asText());

@@ -388,11 +388,11 @@ func TestProjectUsesPinnedImageNativeDatabasePrivateFilesAndTheSelectedPort(t *t
 			t.Fatal(err)
 		}
 		properties, err := os.ReadFile(filepath.Join(target, "private/config/runtime.properties"))
-		if err != nil || !strings.Contains(string(properties), "quarkus.http.host-validation.allowed-hosts=localhost,127.0.0.1,[::1],"+item.host+"\n") {
-			t.Fatal("public hostname or local health checks missing from Host allowlist")
+		if err != nil || !strings.Contains(string(properties), "quarkus.http.host-validation.require-localhost=false\n") {
+			t.Fatal("runtime must use the server central Host policy")
 		}
-		if strings.Contains(string(properties), "require-localhost=false") || strings.Contains(string(properties), "proxy-address-forwarding=true") {
-			t.Fatal("Host allowlist bypasses validation or trusts forwarded headers")
+		if strings.Contains(string(properties), "host-validation.allowed-hosts=") || strings.Contains(string(properties), "proxy-address-forwarding=true") {
+			t.Fatal("runtime pins a stale hostname or trusts forwarded headers")
 		}
 	}
 }

@@ -97,18 +97,4 @@ public class AccountResource {
     @DELETE @Path("/tokens/{id}") public Response revoke(@PathParam("id") String id) {
         origin();ContractInputs.queries(uri.getQueryParameters());accounts.revokeToken(identity.principal(),ContractInputs.pathId(id));return Response.noContent().header("Cache-Control","no-store").build();
     }
-    @GET @Path("/users") public JsonNode users() {ContractInputs.queries(uri.getQueryParameters());return accounts.users(identity.principal());}
-    @POST @Path("/users") public Response user(JsonNode body) {
-        origin();ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("UserCreateInput",body);
-        var user=accounts.createUser(identity.principal(),text(value,"username",200),text(value,"password",1024),text(value,"displayName",400),flag(value,"administrator"),text(value,"email",320));
-        recoveryMail.initialVerification(user.path("ownerId").asText());return userReply(201,user);
-    }
-    private Response userReply(int status,JsonNode user) {var body=object();body.set("user",user);return new ApiReplies(status,body,etag(user),null).response();}
-    @GET @Path("/users/{key}") public Response user(@PathParam("key") String key) {
-        ContractInputs.queries(uri.getQueryParameters());return userReply(200,accounts.user(identity.principal(),OwnerBinding.decode(key)));
-    }
-    @PUT @Path("/users/{key}") public Response user(@PathParam("key") String key,@HeaderParam("If-Match") String match,JsonNode body) {
-        origin();ContractInputs.queries(uri.getQueryParameters());var value=inputs.validate("UserInput",body);
-        return userReply(200,accounts.updateUser(identity.principal(),OwnerBinding.decode(key),match,text(value,"username",200),text(value,"displayName",400),flag(value,"enabled"),flag(value,"administrator")));
-    }
 }

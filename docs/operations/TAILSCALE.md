@@ -93,11 +93,12 @@ Use the full HTTPS DNS name printed by Serve. For example:
 Replace the example hostname with your host's printed name. Use that DNS name
 for certificate validation; Eclipse requires HTTPS outside loopback. Browser
 sessions use normal account sign-in; Eclipse uses a personal API token created
-under **Account**. Set `TIMEKEEPER_PUBLIC_ORIGIN` to the exact HTTPS origin
-(including the port when non-default) and recreate both server replicas. This
-allows browser Origin validation behind Tailscale Serve. Both use the same
-private account and persistent database as local sessions. See the
-[account guide](ACCOUNTS.md).
+under **My Account**. On first deployment, set `TIMEKEEPER_PUBLIC_ORIGIN` to
+the exact HTTPS origin (including the port when non-default). After installation,
+change the public address in **Administration → General settings** and restart
+every server instance. If the saved address is unreachable, use the explicit
+operator recovery in the [account guide](ACCOUNTS.md#change-the-public-hostname).
+Both access paths use the same private account and persistent database.
 
 ## Verify and remove the endpoint
 
@@ -127,3 +128,9 @@ To remove this endpoint, run on the server host:
 ```sh
 tailscale serve --bg --https=8443 off
 ```
+
+After schema-5 initialization, change the public HTTPS address in
+[Administration](ACCOUNTS.md) and restart Timekeeper. Tailscale forwarding remains
+an operator command; changing the application address does not create a Serve
+rule. The account guide also covers recovery when the previous hostname is no
+longer reachable.

@@ -201,7 +201,7 @@ func publishConfiguration(root, target string, s Settings) error {
 	if err := ensureMailConfiguration(root); err != nil {
 		return err
 	}
-	publicURL, err := url.Parse(s.PublicOrigin)
+	_, err := url.Parse(s.PublicOrigin)
 	if err != nil {
 		return err
 	}
@@ -230,14 +230,9 @@ func publishConfiguration(root, target string, s Settings) error {
 			return err
 		}
 	}
-	// Quarkus restricts Host to localhost when bound to loopback. Serve preserves
-	// the public Host, so allow that exact hostname as well as local health checks.
-	// No forwarded headers or arbitrary hostnames need to be trusted.
-	publicHost := strings.ToLower(publicURL.Hostname())
-	if strings.Contains(publicHost, ":") {
-		publicHost = "[" + publicHost + "]"
-	}
-	properties := fmt.Sprintf("quarkus.datasource.jdbc.url=jdbc:postgresql://127.0.0.1:%d/%s\nquarkus.datasource.username=%s\nquarkus.http.port=%d\nquarkus.http.host-validation.allowed-hosts=localhost,127.0.0.1,[::1],%s\ntimekeeper.auth.public-origin=%s\ntimekeeper.deployed-at=%s\ntimekeeper.schema.allow-upgrade=false\n", s.DatabasePort, s.Database, s.Role, s.HTTPPort, publicHost, s.PublicOrigin, s.DeployedAt)
+	// The server's HostPolicy follows the effective central hostname. A static
+	// deployment allowlist would prevent a hostname saved in Administration.
+	properties := fmt.Sprintf("quarkus.datasource.jdbc.url=jdbc:postgresql://127.0.0.1:%d/%s\nquarkus.datasource.username=%s\nquarkus.http.port=%d\nquarkus.http.host-validation.require-localhost=false\ntimekeeper.auth.public-origin=%s\ntimekeeper.deployed-at=%s\ntimekeeper.schema.allow-upgrade=false\n", s.DatabasePort, s.Database, s.Role, s.HTTPPort, s.PublicOrigin, s.DeployedAt)
 	// SYNOPKG_PKGDEST can be /volumeN/@appstore/timekeeper, so its parent is
 	// not the package metadata directory. DSM always keeps INFO at this alias.
 	properties += "timekeeper.spk-version=" + spkVersionAt("/var/packages/"+packageID+"/INFO") + "\n"

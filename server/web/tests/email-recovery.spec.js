@@ -32,7 +32,7 @@ async function verify(page,link) {
 test('email recovery verifies independent mailboxes, replaces a primary safely and resets without signing in',async({browser,request})=> {
   const username='mail-'+randomUUID().slice(0,8),password='Initial recovery fixture password',replacement='Replacement recovery fixture password';
   const primary=username+'@example.invalid',backup=username+'-backup@example.invalid',next=username+'-new@example.invalid';
-  const created=await request.post('/api/v1/auth/users',{headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},data:{username,password,email:primary,displayName:username,administrator:false}});
+  const created=await request.post('/api/v1/admin/users',{headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},data:{username,password,email:primary,displayName:username,administrator:false}});
   expect(created.status()).toBe(201);
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true}),page=await context.newPage();
   const actionContext=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true}),action=await actionContext.newPage();

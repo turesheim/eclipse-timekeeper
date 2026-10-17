@@ -53,13 +53,14 @@ mode to 0644, set `TIMEKEEPER_SERVER_SETUP_FILE=/config/account-setup.json` in
 
 ## Existing data and accounts
 
-Back up before upgrading. Schema 4 upgrades only the exact canonical server
-schema 1, 2 or 3, preserving owner IDs, UUIDs, timestamps, relations, versions and
+Back up before upgrading. Schema 5 upgrades only the exact canonical server
+schema 1, 2, 3 or 4, preserving owner IDs, UUIDs, timestamps, relations, versions and
 revisions. PostgreSQL upgrades transactionally under a database advisory lock.
 Stop both replicas for the first schema upgrade: an older replica cannot serve
-schema 4. Existing browser sessions are ended because earlier versions did not
-record their origin and browser binding; passwords and Eclipse API tokens remain
-valid. Upgrading is refused by default. After backing up and stopping both
+schema 5. Pre-schema-4 browser sessions are ended because earlier versions did
+not record their origin and browser binding. Schema-4 sessions and passkeys are
+preserved; changing service settings later retires sessions at activation.
+Passwords and Eclipse API tokens remain valid. Upgrading is refused by default. After backing up and stopping both
 older replicas, set `TIMEKEEPER_ALLOW_SCHEMA_UPGRADE=true` in `.env` (or the JVM
 environment), select the same new image for both replicas, and start them. Remove
 the flag after successful migration. A fresh database needs no upgrade flag.
@@ -131,7 +132,8 @@ editors and the calendar clipboard. Other browser sessions and Eclipse tokens
 remain valid. Expired/revoked sessions and owner changes clear the local account
 view before another account can sign in.
 
-The separate **Users** page is available only to administrators with write
+Open **Account menu → Administration** (`/admin/`) for service settings and
+**Users**. This page is available only to administrators with write
 access. It lists independent accounts with their username, role and access
 state. **Add user** and each row's **Edit** action open a full details page;
 **Back to users** returns to the list. Administrators can create, enable,
@@ -141,8 +143,48 @@ changing their role revokes their sessions/tokens; enabling does not resurrect
 old credentials. The last enabled administrator cannot be disabled or demoted.
 Account deletion is not exposed: disabling retains the user's data.
 
-Both settings pages support bookmarks and browser Back under `/web/`:
-`#account/profile`, `#account/password`, `#account/tokens` and `#users`.
+User-management API requests use `/api/v1/admin/users` and
+`/api/v1/admin/users/{key}`. The older preview `/api/v1/auth/users` routes are
+removed so they cannot bypass a reverse-proxy policy on the administration
+prefix; update preview automation to use the new paths.
+**Administration → General settings** edits the public HTTPS address, passkey
+configuration and SMTP delivery. Saved and effective values are shown separately.
+Changes are stored centrally, so every server instance uses the same saved
+configuration. Database connection details remain deployment-managed.
+
+Saves require an administrator account session and the current administrator
+password. An API token or a session created from an API token cannot save service
+settings. Conditional versions protect concurrent edits; a lost reply requires
+reading current values rather than repeating the write. SMTP passwords are
+write-only: leave the field blank to preserve a saved password, supply a
+replacement, or explicitly clear it. Reads never return the password or a hash.
+
+After reviewing the saved values, stop and restart every server instance
+(Timekeeper in Package Center, or both Compose API services). The first startup
+activates the saved version and advances the shared authentication epoch. Browser
+sessions, unfinished passkey requests and old recovery links are retired; account
+identities, passwords, passkeys, API tokens and private work records remain.
+An old running instance fails readiness and cannot continue browser or API access.
+The effective hostname also controls the HTTP Host allowlist, alongside local
+health-check names. Forwarded host headers never select the trusted hostname.
+
+Schema 5 seeds settings once from the existing Docker/Synology configuration.
+Normal upgrades and restarts preserve central settings; editing the old deployment
+variables/files afterward does not overwrite them. `GET /api/v1/admin/settings`
+returns a redacted snapshot and ETag; `PUT` saves the reviewed desired settings.
+
+A reverse proxy can apply an additional network/access policy to `/admin` and
+`/admin/` (including descendants) **and** `/api/v1/admin/` (including descendants).
+Protect both namespaces; restricting the HTML alone does not restrict API
+requests. Keep the backend reachable only by trusted infrastructure. Server-side
+administrator/write checks and normal cookie/CSRF rules apply regardless of
+proxy policy. Old `/web/#users` bookmarks redirect to `/admin/#users`; there is
+no legacy user-management API alias.
+
+Personal settings support `/web/#account/profile`, `/web/#account/password`,
+`/web/#account/passkeys`, `/web/#account/tokens` and `/web/#account/import`.
+Administration supports `/admin/#settings`, `/admin/#users` and
+`/admin/#users/new`.
 Navigation keeps activity/work-session timers running. Unsaved forms prompt
 before leaving, stale conditional saves retain the draft, and uncertain writes
 require reviewing current records before another submission. Sign-out or an
@@ -176,7 +218,10 @@ when mail is disabled; initial addresses remain pending for later verification.
 
 ### Configure SMTP
 
-Use a trusted SMTP service with an authorized sender address. For Docker Compose,
+Use a trusted SMTP service with an authorized sender address. After schema 5 is
+initialized, use **Administration → General settings** and restart to apply changes.
+The following deployment-file recipe seeds a new installation or an explicit
+operator recovery; it does not replace existing central settings. For Docker Compose,
 run the bundle's `python3 setup.py` once after upgrading to create the optional
 mail files without replacing existing settings. Stop both API replicas, edit
 `state/config/mail.properties`, and put the SMTP password in
@@ -217,28 +262,36 @@ the incoming Host header or forwarded headers. Moving from a VPN hostname to a
 public hostname does not change account ownership or verified email addresses.
 Choose the intended long-term hostname when possible, but migration is supported:
 
-1. Stop every replica and retain a database/configuration backup. Set the new
-   origin, configure HTTPS/forwarding for it, and retire access through the old
-   origin. Do not allow an old replica to continue serving the old configuration.
-2. Increase `TIMEKEEPER_AUTH_ORIGIN_EPOCH` in Compose `.env` on every replica;
-   for a JVM, set that environment variable, or for DSM increase
-   `timekeeper.auth.origin-epoch` in retained `config/mail.properties` and update
-   the public origin through the upgrade wizard. The first epoch is 1. Use a
-   strictly larger value even when deliberately returning to an earlier hostname.
-3. Start the new configuration consistently. The database records the origin and
-   epoch; a stale/mismatched replica refuses browser sign-in and mail recovery.
-   Existing browser sessions, pending passkey requests and previous email links
-   are invalidated; pending deliveries recheck the epoch. Ask users to
-   request fresh verification/reset links at the new address. Old hostname cookies
-   do not transfer; users sign in again at the new hostname.
+1. Retain a protected database/configuration backup. If the current address is
+   reachable, sign in as administrator, save the new exact HTTPS address and RP
+   setting in General settings, and review the pending values.
+2. Stop every instance, configure the new DNS/certificate/proxy/Tailscale route,
+   retire the old route and restart every instance. Activation chooses a strictly
+   newer authentication epoch; do not restore an old database to undo routing.
+3. Sign in at the new address and verify recovery delivery. Existing accounts and
+   verified addresses remain. Old sessions, passkey requests and email links are
+   invalidated. An unrelated RP hostname requires replacement passkey enrollment.
 
-Restarting with the same origin/epoch leaves unexpired links usable. Restoring a
-backup or importing from another host retains verified addresses and the stored
-origin; carry forward that epoch for the same origin, or configure a strictly
-newer epoch before starting at a different origin, even with mail disabled.
+If the old address is already unreachable, use explicit **operator recovery**:
+stop every instance and retain a protected backup; set the desired public origin,
+RP/mail deployment values and an authentication epoch strictly higher than the
+saved/effective epochs. Set `TIMEKEEPER_SETTINGS_RECOVERY=true` for a JVM/Compose,
+or `timekeeper.service-settings.recover=true` in DSM's retained
+`/var/packages/timekeeper/var/server/config/mail.properties`. In DSM, the same
+file can explicitly set `timekeeper.auth.public-origin`,
+`timekeeper.auth.passkey-rp-id`, and `timekeeper.auth.origin-epoch`; add
+`config_ordinal=500` so these explicit recovery values take precedence over the
+generated runtime file. Remove the recovery flag before the normal restart. For Compose,
+use `.env` for the origin/RP/epoch and the retained mail file for SMTP settings.
+Start **one** instance to publish recovery configuration, stop it, remove the
+recovery flag, then start all instances normally. A repeated or older recovery
+epoch is refused; leaving the flag set deliberately prevents an accidental second
+recovery. Ordinary deployment defaults never override the central configuration.
+This operation replaces service settings, not account passwords or work data.
+
 Protect dumps and mail configuration as credentials. Current native and Compose
 backups include mail settings and the SMTP password. Restoring a schema-2 native
-backup upgrades its database to schema 4 and keeps the target's current SMTP
+backup upgrades its database to schema 5 and keeps the target's current SMTP
 configuration, because older backups did not contain those settings.
 
 ## Passkeys
@@ -268,10 +321,10 @@ lost, use your password, verified-email recovery, or operator recovery.
 
 ### Configure the origin and RP
 
-Deployed passkeys require HTTPS with a DNS hostname. Set
-`TIMEKEEPER_PUBLIC_ORIGIN` to the exact browser address, without a trailing slash
-or path. `TIMEKEEPER_PASSKEY_RP_ID=AUTO` selects that hostname without its port;
-you can pin it explicitly to the same hostname. Subdomains, unrelated domains,
+Deployed passkeys require HTTPS with a DNS hostname. In **Administration → General
+settings**, set the public address to the exact browser origin, without a trailing
+slash or path. Passkey RP ID `AUTO` selects that hostname without its port; you can
+pin it explicitly to the same hostname. Subdomains, unrelated domains,
 wildcards and forwarded request headers do not select the RP. IP-based addresses
 do not offer passkeys; password sign-in remains available. HTTPS `localhost` is
 supported for isolated development tests.
@@ -281,12 +334,17 @@ For `https://seshat.tailad1f0.ts.net:8443`, use RP
 the container still listens on its private HTTP address. See the
 [Tailscale guide](TAILSCALE.md). Do not create a separate Tailscale instance.
 
-Compose passes `TIMEKEEPER_PASSKEYS_ENABLED` (default `true`) and
-`TIMEKEEPER_PASSKEY_RP_ID` (default `AUTO`) to both replicas. For DSM, stop the
-package and set `timekeeper.auth.passkeys-enabled` or
-`timekeeper.auth.passkey-rp-id` in retained `config/mail.properties`, then start
-it in Package Center. These operator settings survive upgrades and protected
-native backups. Disabling passkeys keeps credential records and password access.
+Save the configuration and restart every server instance to activate it.
+Disabling passkeys keeps credential records and password access. Central settings
+survive upgrades and protected backups.
+
+For initial deployment or explicit operator recovery, Compose passes
+`TIMEKEEPER_PUBLIC_ORIGIN`, `TIMEKEEPER_PASSKEYS_ENABLED` (default `true`) and
+`TIMEKEEPER_PASSKEY_RP_ID` (default `AUTO`) to both replicas. DSM accepts the
+corresponding `timekeeper.auth.public-origin`, `timekeeper.auth.passkeys-enabled`
+and `timekeeper.auth.passkey-rp-id` properties in retained `config/mail.properties`.
+These deployment values do not overwrite existing central settings on a normal
+restart; use the recovery procedure above when the saved address is unreachable.
 
 Changing the network, server IP or proxy while keeping the HTTPS hostname and
 port unchanged preserves passkeys, sessions and pending requests. A port change
@@ -295,7 +353,7 @@ the coordinated epoch cutover above and sign in again. Browser cookies are scope
 to hosts, not ports; retired ports cannot use the new origin's browser authority.
 
 An unrelated hostname requires new passkeys. Follow the cutover procedure, using
-a strictly newer epoch on every replica, and sign in at the new address with the
+the managed cutover or explicit operator recovery above, and sign in at the new address with the
 existing password or recovery method. Add and test a replacement key there before
 removing old ones. Old-RP credentials are identified as unavailable at this server;
 their public keys are retained for owner review, not relabeled. This path works
@@ -306,7 +364,7 @@ There is no cross-host redirect carrying authentication secrets.
 To roll back an origin configuration, keep the current database and use an epoch
 higher than every previously deployed value, including on the old hostname. Never
 lower the epoch or restore an older authentication backup merely to undo a routing
-change. A schema-3 binary cannot serve schema 4: rolling back that binary requires
+change. A schema-4 binary cannot serve schema 5: rolling back that binary requires
 a matching pre-upgrade backup and loses later changes. Perform backup recovery
 offline and account for revoked credentials as described below.
 

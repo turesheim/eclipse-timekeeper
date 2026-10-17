@@ -1,6 +1,6 @@
 import {renderAccount} from './account.js';
-import {renderUsers} from './users.js';
-import {node, link, button} from './account-ui.js';
+import {settingsView} from './settings-view.js';
+import {node, link} from './account-ui.js';
 const $ = id => document.getElementById(id);
 let context = null, generation = 0, view = null, acceptedHash = '';
 function disposeView() {for (const cleanup of view?.cleanup || []) cleanup(); view = null;}
@@ -24,50 +24,29 @@ async function show(hash, ask = true) {
   if (!context) return;
   if (ask && !canLeave()) {restoreRoute(); return;}
   if ($('editor').open) {restoreRoute(); return;}
+  if(hash === '#administration' || hash.startsWith('#users')) {
+    const legacy = /^#users(?:\/(?:new|[A-Za-z0-9_-]{1,1100}))?$/.test(hash) ? hash : '';
+    location.assign('/admin/' + legacy);return;
+  }
   acceptedHash = hash; const current = ++generation, scope = context;
   disposeView();
   const valid = () => generation === current && context === scope;
-  const page = hash.startsWith('#users') ? 'users' : hash.startsWith('#account') ? 'account' : 'tracking';
+  const page = hash.startsWith('#account') ? 'account' : 'tracking';
   $('account-content').replaceChildren(); $('account-error').replaceChildren(); $('account-navigation').replaceChildren();
   $('account-content').setAttribute('aria-busy', 'false');
   $('workspace').hidden = page !== 'tracking'; $('account-page').hidden = page === 'tracking';
   view = null;
   if (page === 'tracking') { $('workspace-navigation').focus(); return; }
-  $('account-heading').textContent = page === 'users' ? 'Users' : 'My Account';
+  $('account-heading').textContent = 'My Account';
   $('account-identity').textContent = `Signed in as ${scope.account.username || scope.account.displayName}. Your work data is private to your account.`;
   $('account-heading').focus();
-  view = {
-    root: $('account-content'), session: scope.session, account: scope.account, valid,
-    canWrite: !!scope.account.permissions?.includes('write'), dirty: new Set(), cleanup: new Set(), busy: false, pending: 0, uncertain: false,
-    clean(form) {if (valid()) this.dirty.delete(form);},
-    changed(account) {if (!valid()) return; scope.account = {...scope.account, ...account}; this.account = scope.account; scope.updateAccount(account); $('owner').textContent = account.displayName; $('account-identity').textContent = `Signed in as ${account.username || account.displayName}. Your work data is private to your account.`;},
-    signOut: message => {if (valid()) scope.signOut(message);},
-    refreshProfile: async profile => {if (valid()) await scope.refreshProfile?.(profile);},
-    navigate: next => {if (valid()) location.hash = next;},
-    async run(work, {submit, feedback = $('account-error'), write = false, canSubmit = () => true} = {}) {
-      if (!valid() || this.busy || (write && (!this.canWrite || this.uncertain || !canSubmit()))) return;
-      feedback.replaceChildren(); if (submit) submit.disabled = true;
-      if (write) this.busy = true;
-      ++this.pending; this.root.setAttribute('aria-busy', 'true');
-      try {await work();}
-      catch (error) {
-        if (!valid()) return;
-        if (error.status === 401) {scope.signOut(error.message); return;}
-        feedback.textContent = write && error.uncertain ? 'The outcome is unknown. Review current records before making another change.' : error.code?.startsWith('IMPORT_') ? error.message : [412,409].includes(error.status) ? 'These records changed or conflict with this change. Your draft is kept. Review current values before saving again.' : error.message;
-        if ((write && error.uncertain) || [412,409].includes(error.status)) {
-          if (error.uncertain) this.uncertain = true;
-          feedback.append(' ', button('Reload current values', () => {if (acceptedHash === '#users/new') this.navigate('#users'); else void show(acceptedHash);}));
-        }
-      } finally {
-        if (valid()) {if (write) this.busy = false; --this.pending; this.root.setAttribute('aria-busy', String(this.pending > 0)); if (submit) submit.disabled = !this.canWrite || this.uncertain || !canSubmit();}
-      }
-    }
-  };
+  view = settingsView({root:$('account-content'),session:scope.session,account:scope.account,valid,feedback:$('account-error'),
+    changed(account) {scope.account={...scope.account,...account};scope.updateAccount(account);$('owner').textContent=account.displayName;$('account-identity').textContent=`Signed in as ${account.username || account.displayName}. Your work data is private to your account.`;},
+    signOut:scope.signOut,refreshProfile:scope.refreshProfile,navigate:next=>{location.hash=next;},
+    reload:()=>void show(acceptedHash)
+  });
   const currentView = view;
   if (!view.canWrite) view.root.append(node('p', 'This session is read-only. Sign in with your password to change settings.', 'alert alert-info'));
-  if (page === 'users' && (!scope.account.administrator || !view.canWrite)) {
-    view.root.append(node('p', 'Administrator access is required to manage independent user accounts.', 'alert alert-warning')); return;
-  }
   if (page === 'account') {
     const part = ['profile', 'password', 'passkeys', 'tokens', 'import'].includes(hash.split('/')[1]) ? hash.split('/')[1] : 'profile';
     for (const [key, title] of [['profile','Profile'],['password','Password'],['passkeys','Passkeys'],['tokens','API tokens'],['import','Import']]) {
@@ -75,9 +54,6 @@ async function show(hash, ask = true) {
       $('account-navigation').append(item);
     }
     await view.run(() => renderAccount(currentView, part));
-  } else {
-    $('account-navigation').append(link('Users', '#users', 'nav-link active'));
-    await view.run(() => renderUsers(currentView, hash.split('/')[1] || ''));
   }
 }
 window.addEventListener('hashchange', () => {if (context) void show(route());});

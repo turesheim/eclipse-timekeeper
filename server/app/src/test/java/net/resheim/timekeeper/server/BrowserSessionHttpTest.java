@@ -93,7 +93,7 @@ class BrowserSessionHttpTest {
         var browser=setup();var principal=accounts.session(browser.sid(),browser.binding());
         var managed=accounts.createToken(principal,"Eclipse",Set.of("read"),null);var token=managed.path("token").asText();
         var writable=accounts.createToken(principal,"Automation",Set.of("read","write"),null).path("token").asText();
-        given().header("Authorization","Bearer "+writable).contentType("application/json").body(Map.of("username","bearer-created","password",PASSWORD,"displayName","Independent user","email","bearer@example.org","administrator",false)).post("/api/v1/auth/users").then().statusCode(201);
+        given().header("Authorization","Bearer "+writable).contentType("application/json").body(Map.of("username","bearer-created","password",PASSWORD,"displayName","Independent user","email","bearer@example.org","administrator",false)).post("/api/v1/admin/users").then().statusCode(201);
         given().header("Authorization","Bearer "+token).get("/api/v1/me").then().statusCode(200);
         var delayed=signIns.begin(BrowserSignIns.Method.PASSWORD,browser.binding(),browser.sid(),"fixture");
         String replacement="https://timekeeper.example:9443";ClientProxy.unwrap(authority).configured=replacement;ClientProxy.unwrap(authority).epoch=2;ClientProxy.unwrap(origins).publicOrigin=replacement;realm.initialize();

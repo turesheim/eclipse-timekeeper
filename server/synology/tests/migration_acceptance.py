@@ -25,8 +25,8 @@ DB=ROOT/'server/app/src/main/resources/db'
 def quote(value):return "'"+value.replace("'","''")+"'"
 
 
-def fixture_sql(schema=4):
-    if schema not in (2,3,4):raise ValueError('Unsupported fixture schema')
+def fixture_sql(schema=5):
+    if schema not in (2,3,4,5):raise ValueError('Unsupported fixture schema')
     sql=(DB/'schema-v1-postgresql.sql').read_text()+(DB/'auth-v2.sql').read_text()
     sql+="UPDATE tk_schema SET schema_version=2,state='READY'; UPDATE tk_auth_control SET bootstrap_completed=TRUE;\n"
     now='2026-10-14T12:34:56.123456789Z'
@@ -88,13 +88,20 @@ def fixture_sql(schema=4):
                 sql+=f"INSERT INTO tk_auth_session(digest,owner_id,csrf,permissions,created_at,expires_at,last_seen_at,persistent,origin_epoch,browser_digest,passkey_id) VALUES('{secrets.token_hex(32)}',{quote(owner)},'{secrets.token_urlsafe(32)}','READ_WRITE',{quote(now)},'2030-01-01T00:00:00Z',{quote(now)},TRUE,7,'{secrets.token_hex(32)}','{identifier}');\n"
         payload=json.dumps({'origin':'https://timekeeper.example.invalid','rpId':'timekeeper.example.invalid','epoch':7,'expectedSession':'','data':{'method':'PASSKEY','request':'fixture options'}})
         sql+=f"INSERT INTO tk_passkey_ceremony VALUES('{secrets.token_hex(32)}','{secrets.token_hex(32)}','LOGIN',NULL,NULL,{quote(payload)},'2030-01-01T00:00:00Z',FALSE);\n"
+    if schema>=5:
+        sql+=(DB/'settings-v5.sql').read_text()
+        effective={'publicOrigin':'https://timekeeper.example.invalid','originEpoch':7,'passkeysEnabled':True,'passkeyRpId':'AUTO','emailRecoveryEnabled':True,
+            'smtpHost':'smtp.example.invalid','smtpPort':587,'smtpFrom':'timekeeper@example.invalid','smtpUsername':'fixture-user','smtpTls':False,'smtpStartTls':'REQUIRED'}
+        saved={**effective,'smtpPort':2525,'originEpoch':8}
+        sql+="UPDATE tk_schema SET schema_version=5;\n"
+        sql+=f"INSERT INTO tk_service_settings VALUES(1,9,8,{quote(json.dumps(saved))},{quote(json.dumps(effective))},{quote(secrets.token_urlsafe(32))},{quote(secrets.token_urlsafe(32))});\n"
     return sql
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--server-image')
-    parser.add_argument('--source-schema',type=int,choices=(2,3,4),default=4)
+    parser.add_argument('--source-schema',type=int,choices=(2,3,4,5),default=5)
     args=parser.parse_args()
     suffix=secrets.token_hex(4);source='timekeeper-migrate18-'+suffix;target='timekeeper-migrate17-'+suffix
     names=[]
@@ -132,13 +139,13 @@ def main():
                 'for tool in psql pg_dump pg_restore; do ln -s /usr/lib/postgresql/17/bin/$tool /var/packages/postgresql/target/bin/$tool; done; '
                 'chown -R 10001:10001 /var/packages/timekeeper')
             command('docker','cp',str(binary),target+':/var/packages/timekeeper/scripts/timekeeper-dsm')
-            release=folder/'release.json';release.write_text(json.dumps({'commit':'a'*40,'image':'ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+'a'*40,'serverSchema':4}))
+            release=folder/'release.json';release.write_text(json.dumps({'commit':'a'*40,'image':'ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+'a'*40,'serverSchema':5}))
             command('docker','cp',str(release),target+':/var/packages/timekeeper/scripts/release.json')
             blueprint=folder/'compose.yaml'
             blueprint.write_text((ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',json.loads(release.read_text())['image']))
             command('docker','exec',target,'mkdir','-p','/var/packages/timekeeper/target/project')
             command('docker','cp',str(blueprint),target+':/var/packages/timekeeper/target/project/compose.yaml')
-            for file in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','recovery-v3.sql','passkeys-v4.sql'):
+            for file in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','schema-v5-postgresql.shape','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql'):
                 command('docker','cp',str(DB/file),target+':/var/packages/timekeeper/scripts/migration/'+file)
             env={'SYNOPKG_PKGNAME':'timekeeper','SYNOPKG_PKGDEST':'/var/packages/timekeeper/target','wizard_database':'timekeeper_fixture','wizard_database_role':'timekeeper_fixture_app',
                  'wizard_database_port':'5433','wizard_http_port':'8098','wizard_public_origin':'https://timekeeper.example.invalid','wizard_owner':'',
@@ -149,7 +156,7 @@ def main():
                 if (result.returncode==0)!=(expected==0):raise AssertionError('Native migration action failed: '+action+' '+result.stderr)
                 return result
             helper('install')
-            ddl=''.join((DB/name).read_text() for name in ('schema-v1-postgresql.sql','auth-v2.sql','recovery-v3.sql','passkeys-v4.sql'))+"UPDATE tk_schema SET schema_version=4,state='READY';"
+            ddl=''.join((DB/name).read_text() for name in ('schema-v1-postgresql.sql','auth-v2.sql','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql'))+"UPDATE tk_schema SET schema_version=5,state='READY';"
             canonical="SET ROLE timekeeper_fixture_app; "+ddl
             command('docker','exec','-i',target,'psql','-X','-q','-v','ON_ERROR_STOP=1','-U','postgres','-p','5433','-d','timekeeper_fixture',input=canonical)
             archive.chmod(0o644);command('docker','cp',str(archive),target+':/var/packages/timekeeper/var/server/backups/migration.tar')
@@ -171,12 +178,12 @@ def main():
             command('docker','exec',target,'test','-f','/var/packages/timekeeper/var/server/config/maintenance-pending.json')
             helper('cancel-empty-import')
             helper('import-postgresql18',native_archive)
-            compared=[table for table in exporter.tables(args.source_schema) if (table!='tk_schema' or args.source_schema==4) and (table!='tk_auth_session' or args.source_schema>=4)]
+            compared=[table for table in exporter.tables(args.source_schema) if (table!='tk_schema' or args.source_schema==5) and (table!='tk_auth_session' or args.source_schema>=4)]
             fingerprints=client('psql',['-X','-q','-A','-t'],sql='\n'.join(exporter.fingerprint_sql(table) for table in compared))
             actual=command('docker','exec','-i',target,'psql','-X','-q','-A','-t','-U','postgres','-p','5433','-d','timekeeper_fixture',input='\n'.join(exporter.fingerprint_sql(table) for table in compared)).stdout.strip()
             if actual!=fingerprints:raise AssertionError('Migration changed source data')
             metadata=command('docker','exec',target,'psql','-X','-At','-U','postgres','-p','5433','-d','timekeeper_fixture','-c',"SELECT schema_version||'|'||state FROM tk_schema WHERE id=1").stdout.strip()
-            if metadata!='4|READY':raise AssertionError('Migration did not produce the current ready schema')
+            if metadata!='5|READY':raise AssertionError('Migration did not produce the current ready schema')
             if args.source_schema<4:
                 sessions=command('docker','exec',target,'psql','-X','-At','-U','postgres','-p','5433','-d','timekeeper_fixture','-c','SELECT count(*) FROM tk_auth_session').stdout.strip()
                 if sessions!='0':raise AssertionError('Migration retained sessions without origin/browser provenance')
@@ -220,7 +227,7 @@ def main():
                     helper('prestart')
                 from native_server import verify
                 native=verify(command,target,folder,args.server_image)
-            print(json.dumps({'source':'postgres:18.6-bookworm' ,'target':'postgres:17.11-bookworm','sourceSchema':args.source_schema,'targetSchema':4,'sourceTablesCompared':len(compared),'backupTablesCompared':len(exporter.TABLES),
+            print(json.dumps({'source':'postgres:18.6-bookworm' ,'target':'postgres:17.11-bookworm','sourceSchema':args.source_schema,'targetSchema':5,'sourceTablesCompared':len(compared),'backupTablesCompared':len(exporter.TABLES),
                 'allTableFingerprintsMatch':True,'twoOwnersWithSharedResourceIds':True,'exactNanosecondTimestampsAndLargeRevisions':True,
                 'schemaMetadataUpgraded':args.source_schema<4,'verifiedAndPendingRecoveryAddressesPreserved':args.source_schema>=3,
                 'passkeyCredentialsAndRevocationTombstonesPreserved':args.source_schema>=4,'legacyBrowserSessionsRevoked':args.source_schema<4,

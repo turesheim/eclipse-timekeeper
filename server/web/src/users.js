@@ -2,7 +2,7 @@ import {ownerHeader} from './api.js';
 import {node, link, field, passwordField, validatePassword, section, form, table} from './account-ui.js';
 
 export async function renderUsers(view, key) {
-  const {data} = await view.session.request('/auth/users'); if (!view.valid()) return;
+  const {data} = await view.session.request('/admin/users'); if (!view.valid()) return;
   if (!key) {
     const card = section(view, 'Independent accounts');
     card.append(node('p', 'Manage account access. Administrator status does not grant access to another user’s clients, projects, activities, work sessions or reports.'), link('Add user', '#users/new', 'btn btn-primary'));
@@ -11,7 +11,7 @@ export async function renderUsers(view, key) {
   }
   view.root.append(link('Back to users', '#users'));
   const creating = key === 'new';
-  const loaded = creating ? null : await view.session.request(`/auth/users/${encodeURIComponent(key)}`);
+  const loaded = creating ? null : await view.session.request(`/admin/users/${encodeURIComponent(key)}`);
   if (!view.valid()) return;
   const user = loaded?.data.user;
   if (user?.state === 'UNCLAIMED') {view.root.append(node('p', 'The operator must issue an explicit owner-bound recovery code to claim this account.', 'alert alert-info')); return;}
@@ -21,7 +21,7 @@ export async function renderUsers(view, key) {
       if (!window.confirm(`Change access for “${user.username}”? This revokes their sessions and API tokens. Their work data will be retained.`)) return;
     }
     const body = {username: username.value, displayName: display.value.trim() || username.value, administrator: admin.checked, ...(creating ? {password: password.value, email: email.value} : {enabled: enabled.checked})};
-    const reply = await view.session.request(creating ? '/auth/users' : `/auth/users/${encodeURIComponent(key)}`, {method: creating ? 'POST' : 'PUT', etag: loaded?.etag, body});
+    const reply = await view.session.request(creating ? '/admin/users' : `/admin/users/${encodeURIComponent(key)}`, {method: creating ? 'POST' : 'PUT', etag: loaded?.etag, body});
     if (!view.valid()) return;
     view.clean(edit.value);
     if (!creating && user.ownerId === view.account.ownerId) {

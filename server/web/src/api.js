@@ -4,6 +4,7 @@ const messages = {
   UNAUTHENTICATED: 'Your session is no longer authorized. Sign in again with your account.',
   OWNER_CHANGED: 'The account for this session has changed. Sign out before using the intended account.',
   FORBIDDEN: 'Your account does not have permission to make this change.',
+  SERVICE_PROOF_REQUIRED: 'Confirm your current administrator password to save service settings.',
   PASSKEY_PROOF_REQUIRED: 'Confirm your current password or use an existing passkey to make this change.',
   PASSKEY_REJECTED: 'The passkey could not be verified. Try again or use your username and password.',
   PASSKEY_ACCOUNT_SIGN_IN_REQUIRED: 'Sign in with your account password or a passkey to manage passkeys. An API token cannot authorize this change.',

@@ -451,3 +451,10 @@ Undo with explicit edited-record decisions. See the
 Work sessions support an optional project in start, record and edit dialogs.
 Selecting a project selects its client; changing to a different client clears the
 project. Calendar movement, resizing and copying retain the project. Toggl work-session imports review projects under their client without creating task activities.
+
+Service administration uses `/admin/` and `/api/v1/admin/`. General settings show
+saved versus effective configuration; versioned saves require a real account
+session and the administrator password. SMTP passwords are never prefilled or
+returned, and administrator proof and SMTP credentials use separate browser
+autocomplete sections. Changes activate on a coordinated restart; a stale replica
+leaves readiness and cannot continue using its old policy.
