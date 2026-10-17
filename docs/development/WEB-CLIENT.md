@@ -108,7 +108,7 @@ totals. At sign-in, an untouched UTC profile (version zero) adopts the browser's
 local IANA time zone. This is saved to the account so work sessions, activities,
 calendar boundaries and other clients use the same zone. An explicitly selected
 zone, including UTC, is retained when signing in from another device. Read-only
-tokens retain the existing account zone. Use **Time zone** to change it explicitly.
+tokens retain the existing account zone. Use **Account menu → My Account → Profile → Time zone** to change it explicitly.
 Workweek shows the sessions overlapping the selected week in a separate
 **Work sessions** grid above the task/activity breakdown. Each row shows the
 session title, client name/color, seven local-day durations, a weekly total and
@@ -152,6 +152,17 @@ the authenticated owner and reject live token owner reassignment.
 ## Personal settings and independent user accounts
 
 **My Account** is a dedicated page with Profile, Password, API tokens and Import sections.
+Open it from the header’s **Account menu**, which also contains **Sign out** and,
+for administrators with write access, **Users**. Time-zone settings are in Profile.
+The menu keeps the header on one row at phone widths and supports normal Tab
+navigation, Enter/Space, Escape and outside-click dismissal.
+
+![Account menu on a phone-width screen](../assets/screenshots/account-menu-mobile.png)
+
+Safari’s **Add to Home Screen** uses the bundled Timekeeper clock icon through
+[`apple-touch-icon` metadata](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariWebContent/ConfiguringWebApplications/ConfiguringWebApplications.html).
+The icon is served before sign-in and matches the web favicon and Synology icon.
+Adding the shortcut does not add offline access or change session behavior.
 It uses a side navigation on desktop and wrapping navigation on narrow screens.
 Profile includes an optional display name and an explicit time-zone preference;
 the device-zone shortcut never overwrites a saved choice without a save action.
