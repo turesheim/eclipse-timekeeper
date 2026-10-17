@@ -107,9 +107,14 @@ class Replicas:
     def initialize(self):
         # A dedicated bridge isolates these containers; PostgreSQL has no host
         # port. --internal suppresses published loopback API ports on Docker Desktop.
-        self.command('docker','network','create',self.network);self.network_created=True
-        ranges=json.loads(self.command('docker','network','inspect','--format','{{json .IPAM.Config}}',self.network).stdout)
-        self.subnet=ipaddress.ip_network(next(item['Subnet'] for item in ranges if ':' not in item['Subnet']))
+        # Linux Docker requires an explicitly configured subnet for --ip. Retry
+        # only pool collisions; never alter an existing network to make room.
+        for _ in range(32):
+            self.subnet=ipaddress.ip_network('10.253.'+str(secrets.randbelow(256))+'.0/24')
+            created=self.command('docker','network','create','--subnet',str(self.subnet),self.network,check=False)
+            if created.returncode==0:self.network_created=True;break
+            if 'overlap' not in created.stderr.lower():raise RuntimeError('Disposable passkey fixture network could not be created')
+        else:raise RuntimeError('Disposable passkey fixture could not allocate an unused subnet')
         env=self.folder/'postgres.env';env.write_text('POSTGRES_PASSWORD='+self.password+'\n');env.chmod(0o600)
         self.command('docker','run','-d','--name',self.database,'--network',self.network,'--env-file',str(env),self.args.postgres_image);self.names.append(self.database)
         for _ in range(120):
