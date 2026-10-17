@@ -163,6 +163,14 @@ Safari’s **Add to Home Screen** uses the bundled Timekeeper clock icon through
 [`apple-touch-icon` metadata](https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariWebContent/ConfiguringWebApplications/ConfiguringWebApplications.html).
 The icon is served before sign-in and matches the web favicon and Synology icon.
 Adding the shortcut does not add offline access or change session behavior.
+
+Navigation validation uses the checksum-verified server archive. On `f119288`,
+70 Chromium tests passed (the SMTP-only case runs separately), and 69 HTTPS WebKit
+tests passed with a loopback SMTP fixture. The two native touch-injection tests
+require Chromium CDP and are skipped in WebKit; pointer/keyboard calendar checks
+still run there. Coverage includes menu keyboard focus, 320px layouts, role-based
+Users visibility, sign-out and opening an editor while a saved-zone report refresh
+is deliberately held pending. Web unit tests: 50 passed.
 It uses a side navigation on desktop and wrapping navigation on narrow screens.
 Profile includes an optional display name and an explicit time-zone preference;
 the device-zone shortcut never overwrites a saved choice without a save action.
