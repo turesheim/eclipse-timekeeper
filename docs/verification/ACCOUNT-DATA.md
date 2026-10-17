@@ -2,26 +2,32 @@
 
 Local verification on 2026-10-17 for #341, integrated with main’s optional
 work-session projects and service administration. The packaged runtime at
-`115f6f55854dac9bb3958c39eabe136923c02b0f` has schema 5. Its ZIP SHA-256 is
-`26e801c3ec470b0624b08fb16d655d75db911628868ad1c1226a18b9c48ba49d`.
-Subsequent documentation and fixture changes do not change that runtime.
+`69c21b54ee574ec7033b89eaa631506aadac5013` has schema 5. Its ZIP SHA-256 is
+`c1dc7ba158c77326672943ec6745d58d3ce91fb3d7e0e438bd8c5dcb592c82a9`.
+Subsequent documentation updates retain the same application code.
 
 | Boundary | Verified behavior |
 | --- | --- |
 | Complete private download | Administrator, ordinary and read-only exports remain owner-scoped. JSON and CSV contain all six work types, preferences, management metadata and inert import audit. A real export of 11,001 tasks exceeds 20 MiB without list-page truncation. |
 | Secrets and spreadsheet reuse | Actual stored token digests, passkey IDs/handles/public keys, another owner’s address and global SMTP secrets are excluded. CSV quotes values and neutralizes formula prefixes after Unicode whitespace/control characters; JSON preserves the original text. |
-| Reviewed restore | Fresh IDs retain task hierarchy, external references, labels, optional work-session projects and exact nanoseconds. Identity, password, roles, recovery addresses, passkeys and API tokens remain those of the target account. Source import authority is retained only as inert audit. |
+| Reviewed restore | Preview shows record and relationship counts. Fresh IDs retain task hierarchy, external references, labels, optional work-session projects and exact nanoseconds. Identity, password, roles, recovery addresses, passkeys and API tokens remain those of the target account. Source import authority is retained only as inert audit. |
 | Validation and concurrency | Malformed ZIP/JSON, broken references, owner substitution, running-timer conflicts, stale work/profile versions and changed archive identity are rejected atomically. Repeated or concurrent commits retain one graph and one durable outcome. |
 | Restart and recovery | Two actual JVMs on PostgreSQL 17.11 and 18.6 resume private chunks across a literal container restart and reconcile simultaneous restores. Protected database backup/restore retains work, upload outcomes and receipts together. |
 | Browser lifecycle | Actual ZIP download, worker hashing, lost chunk reply/reload/reselection, stale review and lost committed reply are exercised. Read-only users can download repeatedly. Desktop, 390px and 320px layouts have no horizontal overflow and pass automated accessibility checks. |
 
-The integrated server reactor passed all 188 application tests plus the domain,
-service and HTTP-client suites. Nine archive integration tests passed on each
+The integrated server reactor passed all 189 application tests plus the domain,
+service and HTTP-client suites. Ten archive integration tests passed on each
 real PostgreSQL major. The API contract suite passed 12 tests, web unit tests
 passed 58, and packaging/channel tooling passed 74. Full packaged HTTPS Chromium
 passed 93 browser scenarios. Full packaged HTTPS WebKit passed 87, with six
 expected skips for Chromium-only virtual authenticators and CDP touch fixtures.
-All four account portability scenarios passed in both engines.
+All four account portability scenarios passed in both engines. All 13 inline
+web-guide images are bundled locally; the packaging test rejects image links
+that fall back to GitHub HTML pages.
+
+Replica/restart/backup checks initially passed on `115f6f5`; CI repeats these
+against its exact current source. The latest local PostgreSQL runs include the
+new task-hierarchy and work-session-label restore regression on both majors.
 
 These use synthetic private fixtures and do not modify existing accounts or the
 NAS. WebKit automation does not claim manual Safari, Touch ID or security-key

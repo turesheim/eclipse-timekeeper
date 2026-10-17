@@ -463,8 +463,8 @@ leaves readiness and cannot continue using its old policy.
 ## Account data portability
 
 **My Account → Your data** downloads the signed-in account as a private ZIP with
-JSON and CSV. A reviewed restore adds work with remapped relationships and an
-optional time-zone change; it preserves the target account’s identity,
+JSON and CSV. A reviewed restore shows record and link counts, then adds work with remapped
+relationships and an optional time-zone change; it preserves the target account’s identity,
 permissions and credentials. Interrupted uploads resume after file reselection,
 and an uncertain restore can be reconciled without duplicating records.
 
