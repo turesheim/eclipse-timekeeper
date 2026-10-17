@@ -12,7 +12,7 @@ async function login(page,username='browser-admin',secret=password) {
   await page.locator('#username').fill(username);await page.locator('#password').fill(secret);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
 }
 test.beforeAll(async({request})=>{
-  const status=await request.get('/api/v1/auth/status');
+  const status=await request.get('/api/v1/auth/status',{headers:{Origin:origin()}});
   if((await status.json()).setupRequired) {
     const setup=await request.post('/api/v1/auth/setup',{headers:{Origin:origin()},data:{code:process.env.TIMEKEEPER_WEB_SETUP_CODE,username:'browser-admin',displayName:'browser-admin',password,email:'browser-admin@example.org'}});expect(setup.status()).toBe(200);
     const account=await setup.json();await request.post('/api/v1/auth/logout',{headers:{Origin:origin(),'X-CSRF-Token':account.csrf}});
