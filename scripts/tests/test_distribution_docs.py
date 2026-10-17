@@ -81,6 +81,7 @@ class DistributionDocumentationTest(unittest.TestCase):
             for name in ('bootstrap-work-session-desktop.png','bootstrap-work-session-narrow.png',
                          'passkeys-desktop.png','passkeys-mobile.png',
                          'account-data-review-desktop.png','account-data-review-mobile.png',
+                         'account-menu-mobile.png','work-session-labels-desktop.png','work-session-labels-mobile.png',
                          'track-month-desktop.png','track-month-narrow.png',
                          'toggl-import-review.png','toggl-import-history-narrow.png'):
                 image = root/'docs/assets/screenshots'/name
@@ -96,6 +97,10 @@ class DistributionDocumentationTest(unittest.TestCase):
                 self.assertIn('[Synology deployment guide](DEPLOYMENT.md)',guide)
                 self.assertIn('[local Docker guide](LOCAL-DOCKER.md)',guide)
                 web = archive.read('timekeeper-server/WEB-CLIENT.md').decode()
+                for url in re.findall(r'!\[[^\]]*\]\(([^\s)]+)\)', web):
+                    parts = urlsplit(url)
+                    self.assertFalse(parts.scheme or parts.netloc, url)
+                    self.assertTrue(archive.read('timekeeper-server/'+parts.path).startswith(b'\x89PNG\r\n\x1a\n'), url)
                 for view in ('passkeys','account-data-review'):
                     for size in ('desktop','mobile'):
                         name=f'images/{view}-{size}.png'
