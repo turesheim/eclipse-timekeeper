@@ -60,16 +60,22 @@ def main():
             if mail_environment is None:raise RuntimeError('Isolated SMTP fixture did not start')
             mail_environment.pop('TIMEKEEPER_WEB_MAIL_FIXTURE')
             bases={index:'http://127.0.0.1:'+command('docker','port',database,str(8080+index)+'/tcp').stdout.strip().rsplit(':',1)[1] for index in (1,2)}
-            origins={}
+            origins={};browser_bindings={}
             def api(index,path,data=None,session=None,*,method=None,headers=None):
                 selected={'Origin':origins[index],**(headers or {})}
                 if session:
                     selected.update({'Cookie':session['cookie'],'X-CSRF-Token':session['csrf']})
                 elif path!='/auth/status' and 'Authorization' not in selected:
                     # A real browser first obtains its HttpOnly binding cookie.
-                    status=api(index,'/auth/status')
-                    if status[0]!=200:raise AssertionError('Browser status did not establish a binding')
-                    selected['Cookie']='; '.join(value.split(';',1)[0] for value in status[2].get_all('Set-Cookie',[]))
+                    binding=(index,origins[index])
+                    # Each fixture sign-in represents a separate browser; later
+                    # anonymous recovery calls reuse the already bound browser.
+                    if path in ('/auth/setup','/auth/login'):browser_bindings.pop(binding,None)
+                    if binding not in browser_bindings:
+                        status=api(index,'/auth/status')
+                        if status[0]!=200:raise AssertionError('Browser status did not establish a binding')
+                        browser_bindings[binding]='; '.join(value.split(';',1)[0] for value in status[2].get_all('Set-Cookie',[]))
+                    selected['Cookie']=browser_bindings[binding]
                 if data is not None:selected['Content-Type']='application/json'
                 request=Request(bases[index]+'/api/v1'+path,data=None if data is None else json.dumps(data).encode(),headers=selected,method=method or ('GET' if data is None else 'POST'))
                 try:response=urlopen(request,timeout=20)
@@ -95,7 +101,7 @@ def main():
                 # hostname migrations; normal starts load central configuration.
                 control=command('docker','exec',database,'psql','-U','postgres','-X','-A','-t','-c','SELECT epoch FROM tk_recovery_control WHERE id=1',check=False)
                 current=int(control.stdout.strip()) if control.returncode==0 and control.stdout.strip().isdigit() else 0
-                if not ready or epoch>current:environment['TIMEKEEPER_SETTINGS_RECOVERY']='true'
+                if not ready or (current>0 and epoch>current):environment['TIMEKEEPER_SETTINGS_RECOVERY']='true'
                 env_file=folder/('api-'+str(index)+'.env');env_file.write_text(''.join(key+'='+value+'\n' for key,value in environment.items()));env_file.chmod(0o600)
                 command('docker','run','-d','--name',name,'--network','container:'+database,'--read-only','--tmpfs','/tmp',
                     '--env-file',str(env_file),'-v',str(config)+':/config:ro',args.server_image);names.append(name)
