@@ -201,3 +201,23 @@ for(const mode of ['WORK_SESSION','ACTIVITY']) test(`Toggl ${mode} maps several 
   await undo(page,0);const undone=await api(request,'/data/export');expect(undone.clients).toEqual(before.clients);expect(undone[collection]).toEqual(before[collection]);
   expect(await api(request,'/clients/'+destination.id)).toEqual(destination);
 });
+
+test('Toggl review explains missing durations beside the continue action and excludes only reviewed invalid rows',async({page})=>{
+  await login(page);
+  const header='Description,Duration,Member,Email,Project,Start date,Start time,Stop date,Stop time';
+  const lines=Array.from({length:351},(_,index)=>{
+    const start=new Date(Date.UTC(2025,9,20,9,0,index)),end=new Date(+start+1000);
+    return [`Annual entry ${index}`,index===21 || index===22 ? '-' : '00:00:01','Annual member','annual@example.invalid','Annual project','2025-10-20',start.toISOString().slice(11,19),'2025-10-20',end.toISOString().slice(11,19)].join(',');
+  });
+  await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');
+  await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles({name:'annual-anonymized.csv',mimeType:'text/csv',buffer:Buffer.from([header,...lines].join('\r\n'))});
+  await page.getByRole('button',{name:'Read CSV',exact:true}).click();
+  await expect(page.locator('#account-content')).toContainText('351 source rows · 2 invalid.');
+  await expect(page.locator('#account-content')).toContainText('This row has no recorded duration. Exclude it or correct the CSV before importing.');
+  await page.getByRole('button',{name:'Review mappings',exact:true}).click();
+  const exclude=page.getByLabel('Exclude invalid rows after reviewing the diagnostics',{exact:true});
+  await expect(exclude).toBeFocused();await expect(page.getByText('2 invalid rows cannot be imported.',{exact:true})).toBeInViewport();
+  await expect(page.locator('#account-content')).toContainText('Review and explicitly exclude invalid rows before continuing.');
+  await exclude.check();await page.getByRole('button',{name:'Review mappings',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Review mappings',exact:true})).toBeVisible();await expect(page.locator('#account-content')).toContainText('349 work sessions');
+});

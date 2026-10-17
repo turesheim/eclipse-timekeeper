@@ -30,6 +30,9 @@ rejected.
    account; it creates no login accounts, memberships or shared workspaces.
    Review row errors, unsupported columns and excluded rows. Incomplete timers,
    future intervals and mismatched durations require correction or exclusion.
+   A `-` duration means no recorded duration. After reviewing diagnostics,
+   select **Exclude invalid rows** beside **Review mappings** to continue with
+   the valid rows; no missing time is inferred.
 3. Under **Client mappings**, choose an existing Timekeeper client for each
    Toggl client, or choose **Create a new client** and review its name and color.
    Several Toggl clients can use the same existing client. Reusing a client
