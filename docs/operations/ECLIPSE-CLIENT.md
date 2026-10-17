@@ -65,25 +65,26 @@ exported files together; an activity's session reference requires the session fi
 
 ## Work sessions
 
-The compact **Work Session** panel above Workweek shows the current running status,
-session start/end, duration, tracked time, covered time and unallocated time.
+The compact **Work Session** panel on every tracking tab shows the running session,
+or the latest completed session, with its title, client, local times and duration.
 **Start work session** and **Stop work session** operate independently of task
 timers. Stopping the session leaves a running activity unchanged. Only one
 session may run per account; several completed sessions can be recorded in a day.
 Sessions can span midnight without stopping, while their activities split into
 daily records and retain the association.
 
-Expand **Session details** to show history, associated activities and editing
-actions. Use **Record session** for an earlier interval, or choose a session in the history
-list and use **Edit session**. These editors use the user’s Timekeeper time zone and retain fractional
+The timing and recording actions are separated from **Edit work session**,
+**Delete work session**, **Add activity to session** and **Associate activity**
+by a divider. Tools act on the session displayed in the panel. Use **Record work
+session** for an earlier interval, or edit/delete historical sessions from Workweek
+and edit them in Calendar. These editors use the user’s Timekeeper time zone and retain fractional
 seconds. Repeated clock times include an explicit offset so the intended instant
 is retained; nonexistent local times are rejected. Leave the end blank for a running session.
 **Add activity** assigns the new interval to the selected session; choosing a
 task is optional, and a taskless activity can optionally belong directly to a
 project. **Associate activity** links an existing interval without changing its
-times or task. Select a row and use **Remove association** to detach it. Double
-click an associated row to edit the activity. A session must be detached from
-all activities before deletion.
+times or task; choose **Standalone** in that dialog to detach it. Edit activities
+from Workweek. A session must be detached from all activities before deletion.
 
 Tracked time sums each activity's overlap with the session. Covered time counts
 the union of those intervals, so overlaps do not cover time twice. Unallocated

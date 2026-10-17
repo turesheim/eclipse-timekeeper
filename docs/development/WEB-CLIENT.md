@@ -160,15 +160,17 @@ never placed in routes or browser storage.
 
 ## Work sessions
 
-The compact **Work Session** card stays visible on every tracking tab and shows
-the running session's title, client, local start time and live duration. Start/stop
-controls operate independently of activity timers. **Session history and tools**
-is collapsed initially; expand it to select a historical session and see its
-start/end, duration, tracked, covered and unallocated time. Selecting history does
-not change the running session's heading, color or duration. Counters use server
-timestamps and elapsed browser time; when offline they freeze at the last
-confirmed report. The activity breakdown appears in Workweek and Calendar;
-the session card does not duplicate it or show an empty activity list.
+The compact **Work Session** card stays visible on every tracking tab. It shows
+the running session, or the most recent completed session, with its title, client,
+local times and duration. Its timing/recording buttons sit beside the session
+tools, separated by a divider; on narrow screens the tools wrap below a horizontal
+divider. Tools target the session shown in the card and are disabled when no
+session exists or access is read-only. Workweek provides historical edit/delete
+actions, and Calendar provides historical editing. Opening a historical editor
+does not change the shared panel's target. Start/stop controls remain independent
+of activity timers. Counters use server timestamps and elapsed browser time;
+when offline they freeze. The card contains no history selector, duplicate totals
+or activity list; those views remain in Workweek and Calendar.
 
 The expanded tools provide retrospective session creation/editing, taskless
 activity creation and management of existing-activity associations. Edit activities
@@ -268,8 +270,9 @@ Task cards use the task's title and issue link and list its activities. Separate
 gaps remain visible. Taskless activity cards and overlapping intervals are also
 shown. Tasks without recorded time remain available in the Tasks tab.
 Activity times and associations remain unchanged when a work
-session is moved, resized or copied. Out-of-bounds activity warnings remain in
-the session details.
+session is moved, resized or copied. The activity editor warns when a new
+interval extends beyond its selected session; the API report retains exact
+tracked, covered and unallocated totals.
 
 Repeated clock times have separate rows; shaded slots do not occur on a given
 day. A drag retains the original session snapshot and saves with its opaque
