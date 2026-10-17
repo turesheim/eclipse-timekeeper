@@ -78,7 +78,7 @@ public class ImportResource {
         UUID job=ContractInputs.pathId(id);noQueries();return tx(()->json(new ImportUndo(store).preview(job)));
     }
     @POST @Path("/jobs/{id}/undo/batches/{index}") public Response undoBatch(@PathParam("id") String id,@PathParam("index") String index,JsonNode body) {
-        UUID job=ContractInputs.pathId(id);int number=ContractInputs.number(index,-1,0,100000);var input=inputs.validate("ImportUndoBatchInput",body);noQueries();
+        UUID job=ContractInputs.pathId(id);int number=ContractInputs.number(index,-1,0,Integer.MAX_VALUE-1);var input=inputs.validate("ImportUndoBatchInput",body);noQueries();
         return tx(()->json(new ImportUndo(store).apply(job,number,input)));
     }
 }

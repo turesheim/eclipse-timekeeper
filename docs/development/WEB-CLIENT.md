@@ -325,3 +325,15 @@ titles and colors. Older v1/v2 imports receive General automatically.
 Client management and session titles are server/web features. Eclipse project
 creation receives General on the server, and Eclipse project edits preserve its
 client. No client selection or title fields are added to Eclipse.
+
+## Toggl Track import
+
+Open **My Account → Import** for the source preview, catalog mappings and duplicate
+review. Import history supports resume, audit download and a single whole-job
+Undo with explicit edited-record decisions. See the
+[user guide](../operations/TOGGL-IMPORT.md) and
+[verification report](../verification/TOGGL-IMPORT-ACCEPTANCE.md).
+
+![Reviewed Toggl Track import on desktop](../assets/screenshots/toggl-import-review.png)
+
+![Import history on a narrow screen](../assets/screenshots/toggl-import-history-narrow.png)

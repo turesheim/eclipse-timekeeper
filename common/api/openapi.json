@@ -6187,7 +6187,7 @@
             "schema": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 100000
+              "maximum": 2147483646
             }
           },
           {

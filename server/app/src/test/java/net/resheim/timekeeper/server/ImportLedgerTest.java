@@ -74,4 +74,15 @@ class ImportLedgerTest {
         assertThrows(ApiFailure.class,()->store.transaction(owner,()->ledger.batch(id,1,object(),true,state->{throw new AssertionError("Changed zone was silently accepted");})));
         store.transaction(owner,()->{assertEquals(1,store.service().projects().size());assertEquals(1,ledger.required(ImportLedger.Kind.IMPORT_JOB,id).path("nextBatch").asInt());return null;});
     }
+    @Test void undoCanAdvanceBeyondTheSourceBatchLimitWhenEntriesHaveManyDailyParts() {
+        String owner="import-many-parts-"+UUID.randomUUID();var ledger=new ImportLedger(store);
+        UUID id=uuid(store.transaction(owner,()->create(ledger)).get("id"));
+        store.transaction(owner,()->{
+            var state=ledger.beginUndo(id,etag(ledger.required(ImportLedger.Kind.IMPORT_JOB,id)));
+            // Model restored progress without materializing ten million fixture activities.
+            state.put("undoNextBatch",100001);ledger.update(ImportLedger.Kind.IMPORT_JOB,state);
+            var result=ledger.undoBatch(id,100001,object(),job->object().put("continued",true));
+            assertTrue(result.path("continued").asBoolean());assertEquals(100002,ledger.required(ImportLedger.Kind.IMPORT_JOB,id).path("undoNextBatch").asInt());return null;
+        });
+    }
 }

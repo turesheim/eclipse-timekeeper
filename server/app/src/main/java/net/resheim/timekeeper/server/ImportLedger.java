@@ -63,7 +63,8 @@ final class ImportLedger {
         return execute(id,index,input,false,true,work);
     }
     private ObjectNode execute(UUID id,int index,JsonNode input,boolean finished,boolean undo,Function<ObjectNode,ObjectNode> work) {
-        if(index<0 || index>100000) throw ApiFailure.validation();
+        // Undo counts daily records, not source rows: a source entry can produce 1,000 parts.
+        if(index<0 || index>(undo ? Integer.MAX_VALUE-1 : 100000)) throw ApiFailure.validation();
         var job=required(Kind.IMPORT_JOB,id);var type=undo ? Kind.IMPORT_UNDO : Kind.IMPORT_BATCH;
         UUID batchId=identifier(type.name(),id.toString(),Integer.toString(index));
         String fingerprint=hash(type.name()+"\n"+id+"\n"+index+"\n"+canonical(input)+"\n"+finished);
