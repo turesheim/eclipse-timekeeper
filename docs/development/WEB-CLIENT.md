@@ -52,6 +52,10 @@ client above it. Only clients with logged time in the selected month are shown.
 Multiple sessions for the same client are combined. Use the controls on the left
 to move between months or return to the current month. The calendar button inside
 the Month selector opens a month/year picker; a month can also be entered as `YYYY-MM`.
+On mobile, swipe left across the month to go forward or right to go back.
+Workweek, Activities and Calendar also support swiping between weeks on their
+headings or other non-scrolling areas. Wide tables and the calendar grid keep
+their normal scrolling and editing gestures. Date controls remain available.
 Hover over a daily client total to see its sessions, summaries, projects, labels,
 local start/end times and durations in a tooltip. These details are also available
 when viewing the account with read-only access.

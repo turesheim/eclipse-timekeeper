@@ -9,6 +9,8 @@ import {WorkweekSessions} from './workweek-sessions.js';
 import {projectCatalog} from './project-icons.js';
 import {UndoNotice} from './undo.js';
 import {accountMenu} from './account-menu.js';
+import {periodSwipe} from './period-swipe.js';
+import {shiftMonth} from './month-model.js';
 
 const $ = id => document.getElementById(id);
 accountMenu($('account-menu'));
@@ -24,7 +26,7 @@ const displayNanos = value => decimalHours ? decimalHoursText(value) : nanosText
 const displayDuration = value => decimalHours ? decimalHoursText(durationNanos(value)) : durationText(value);
 const calendar = new WeekCalendar($('calendar-panel'), {
   taskLabel,
-  onDate: date => {if(!date) return;$('week-date').value=date;selectedDay=null;void refresh().catch(()=>{});},
+  onDate: selectWeek,
   onEditActivity: id => void openRecord('activities',id).catch(error=>setStatus(errorText(error))),
   onEditSession: id => void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error))),
   onNew: input => void openRecord('work-sessions',null,input).catch(error=>setStatus(errorText(error))),
@@ -43,6 +45,24 @@ const weekSessions=new WorkweekSessions($('week-sessions'),{
   onDelete:id=>void openDelete('work-sessions',id).catch(error=>setStatus(errorText(error))),
   onSaved:async()=>{connected=false;readOnlyWhileDisconnected();await refresh().catch(()=>{});},
   onUnauthorized:error=>auth.clear(errorText(error)),
+});
+function selectWeek(date) {
+  if(!date)return;
+  $('week-date').value=date;selectedDay=null;void refresh().catch(()=>{});
+}
+periodSwipe($('workspace'),{
+  enabled:()=>snapshot && connected && !weekSessions.draft && !calendar.drag && !calendar.busy && !calendar.rangeMode &&
+    ['track','week','activities','calendar'].includes($('workspace').dataset.view) &&
+    !document.querySelector('dialog[open], [popover]:popover-open'),
+  navigate:direction=>{
+    if($('workspace').dataset.view==='track') {
+      track.select(shiftMonth(track.currentMonth(),direction));
+      $('period-announcement').textContent=$('track-title').textContent;
+    } else {
+      const date=addDays(weekRange($('week-date').value,snapshot.profile.data.zoneId).first,direction*7);selectWeek(date);
+      $('period-announcement').textContent='Week of '+new Intl.DateTimeFormat(undefined,{dateStyle:'long',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
+    }
+  },
 });
 function startWatch(session) {
   if (watchSession === session) return;
@@ -122,6 +142,7 @@ const auth = authentication({
     refreshing = null; reloadAgain = false;
     ++serverInfoRequest; clearServerInfo(); api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null; accountName = '';
     calendar.reset(); track.reset(); collapsed.clear(); collapsedClients.clear(); canWrite = false;
+    $('period-announcement').textContent='';
     $('editor').close(); $('fields').replaceChildren(); $('editor-error').textContent = ''; $('editor-notice').textContent = '';
     for(const id of ['clients','projects','tasks','labels','activities','days']) $(id).replaceChildren();
     for(const id of ['owner','status','active-title','active-details','work-session-current','work-session-state','work-session-elapsed','zone-caption','week-total']) $(id).textContent = '';
