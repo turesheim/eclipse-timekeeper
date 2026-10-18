@@ -49,7 +49,7 @@ async function command(input) {
       await zone(input.zone); await named('Projects', 'project', record.project); await named('Labels', 'label', record.label);
       await tab('Tasks'); await page.getByRole('button', {name:'New task', exact:true}).click();
       await page.getByLabel('Summary', {exact:true}).fill(record.task); await page.getByLabel('Project', {exact:true}).selectOption({label:record.project}); await save();
-      await tab('Workweek'); await page.getByLabel('Week containing').fill(input.date); await page.getByRole('button', {name:'Add time', exact:true}).click();
+      await tab('Activities'); await page.getByLabel('Week containing').fill(input.date); await page.getByRole('button', {name:'Add time', exact:true}).click();
       await page.getByLabel('Task', {exact:true}).selectOption({label:record.task}); await page.getByLabel('Summary', {exact:true}).fill(input.prefix + ' precise interval');
       await page.getByLabel('Start (local time)', {exact:true}).fill(input.start); await page.getByLabel('End (local time, blank while tracking)', {exact:true}).fill(input.end);
       await page.getByLabel(record.label, {exact:true}).check(); await save();
@@ -98,7 +98,7 @@ async function command(input) {
       await expect(page.locator('#active-title')).toHaveText('Ready when you are'); await expect(page.locator('#stop')).not.toBeVisible();
       break;
     case 'report':
-      await tab('Workweek'); await expect(page.locator('#zone-caption')).toContainText(input.zone);
+      await tab('Activities'); await expect(page.locator('#activities')).toBeVisible(); await expect(page.locator('#zone-caption')).toContainText(input.zone);
       await expect(page.locator('#week-total')).toHaveText(durationText(input.total));
       for (const day of JSON.parse(input.days)) await expect(page.locator('#days .day').filter({hasText:day.date})).toContainText(durationText(day.total));
       await expect(page.locator('#activities')).toContainText(record.task);
@@ -106,7 +106,7 @@ async function command(input) {
     case 'cleanup':
       await tab('Tasks');
       const taskId = await page.locator('#tasks tr').filter({hasText:record.task}).locator('.task-title').getAttribute('data-task-id');
-      await tab('Workweek');
+      await tab('Activities');
       const rows = page.locator(`#activities tr[data-kind="activity"][data-task-id="${taskId}"]`);
       while (await rows.count()) {
         const before = await rows.count();
