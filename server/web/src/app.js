@@ -213,11 +213,11 @@ function taskLabel(task) {
 }
 function renderProjects(s) {
   if (!s.projects.length) {table('projects', ['Name', 'Actions'], []);return;}
-  const root = $('projects'), table = element('table', undefined, 'table align-middle mb-0 projects-table');
-  table.setAttribute('aria-label', 'Projects by client');
+  const root = $('projects'), grid = element('table', undefined, 'table align-middle mb-0 projects-table');
+  grid.setAttribute('aria-label', 'Projects by client');
   const head = element('thead'), header = element('tr');
   for (const caption of ['Client / project', 'Actions']) {const cell = element('th', caption);cell.scope = 'col';header.append(cell);}
-  head.append(header);table.append(head);
+  head.append(header);grid.append(head);
   const clients = [...s.clients].sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric:true, sensitivity:'base'}) || a.id.localeCompare(b.id));
   for (const client of clients) {
     const projects = s.projects.filter(project => project.clientId === client.id).sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric:true, sensitivity:'base'}) || a.id.localeCompare(b.id));
@@ -243,9 +243,9 @@ function renderProjects(s) {
       toggle.setAttribute('aria-expanded', String(expanded));toggle.setAttribute('aria-label', `${expanded ? 'Collapse' : 'Expand'} ${client.name}`);
       for (const row of body.querySelectorAll('[data-project-id]')) row.hidden = !expanded;
     }
-    updateToggle();table.append(body);
+    updateToggle();grid.append(body);
   }
-  root.replaceChildren(table);
+  root.replaceChildren(grid);
 }
 function render() {
   const s = snapshot, zone = s.profile.data.zoneId;

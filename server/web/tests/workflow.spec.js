@@ -341,6 +341,7 @@ test('workweek groups linked tasks under projects with seven day columns and con
   await expect(table.locator('tr[data-kind=project]').filter({hasText:project.name})).toContainText('24h 59m 59s');
   const parentRow = table.locator('tr[data-kind=task]').filter({hasText:'PLATFORM-3396: Clean registry '+suffix});
   await expect(parentRow.getByRole('link')).toHaveCSS('font-weight','400');
+  await expect(parentRow.locator('td').nth(8)).toHaveCSS('font-weight','400');
   await expect(parentRow.getByRole('link')).toHaveAttribute('href',jiraUrl);
   await expect(parentRow).toContainText('24h 59m 59s');
   await expect(parentRow.locator('td').nth(8)).toHaveText('24h 59m 59s');

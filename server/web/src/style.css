@@ -108,13 +108,14 @@ td.actions .btn + .btn { margin-left: .3rem; }
 .workweek-table th:first-child { min-width: 300px; }
 .workweek-table th:nth-child(n+2):nth-child(-n+8), .workweek-table td:nth-child(n+2):nth-child(-n+8) { text-align: right; white-space: nowrap; min-width: 75px; font-variant-numeric: tabular-nums; }
 .workweek-table tr[data-kind=project] { --bs-table-bg: #e7efe9; font-weight: 650; }
+.workweek-table tr[data-kind=task] td { font-weight: 400; }
 .workweek-table tr[data-kind=task] { --bs-table-bg: #f6f9f7; font-weight: 400; }
 .workweek-table tr[aria-selected=true] { --bs-table-bg: #dceee3; }
 .workweek-table .active-activity { font-weight: 700; }
 .week-session-table { min-width: 1160px; table-layout: fixed; }
 .week-session-table.table th, .week-session-table.table td { padding: .3rem .35rem; }
 .week-session-table th:first-child { width: 12rem; }
-.week-session-table th:last-child, .week-session-table td:last-child { width: 6rem; text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; border-inline-start: 1px solid var(--line); }
+.week-session-table th:last-child, .week-session-table td:last-child { width: 7.5rem; white-space: nowrap; text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; border-inline-start: 1px solid var(--line); }
 .week-session-table th:not(:first-child), .week-session-client td, .week-session-table tfoot td { text-align: right; font-variant-numeric: tabular-nums; }
 .week-session-client { --bs-table-bg: #e7efe9; font-size: .8rem; }
 .week-session-client .client-color { gap: .4rem; }
