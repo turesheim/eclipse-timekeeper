@@ -298,7 +298,6 @@ button.track-client-day:disabled { opacity: .65; }
 .project-icon-picker .hint { margin-bottom: 0; }
 
 .undo-notice { position: fixed; inset: auto 1rem 1rem; z-index: 1040; width: fit-content; max-width: calc(100vw - 2rem); margin-inline: auto; padding: .6rem .75rem; display: flex; flex-direction: row; align-items: center; gap: .75rem; border-color: var(--accent); }
-.undo-notice p { margin: 0; max-width: 28rem; font-size: .9rem; }
+.undo-notice p { margin: 0; max-width: 28rem; min-width: 0; flex: 1 1 auto; font-size: .9rem; }
+.undo-notice button { flex: 0 0 auto; }
 
-.undo-notice { flex-wrap: wrap; }
-.undo-notice p { min-width: 0; flex: 1 1 12rem; }
