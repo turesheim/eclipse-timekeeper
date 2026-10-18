@@ -63,7 +63,7 @@ for(const mode of ['ACTIVITY','WORK_SESSION']) test(`Toggl ${mode} import resume
   const header = 'Description,Duration,Member,Email,Project,Tags,Start date,Start time,Stop date,Stop time';
   const lines = Array.from({length:201},(_,n)=>{
     const start = new Date(Date.UTC(2025,9,20,9,0,n)),end = new Date(+start+1000);
-    return [`Bulk row ${n}`,'00:00:01','Bulk member','bulk@example.invalid','Bulk project','','2025-10-20',start.toISOString().slice(11,19),'2025-10-20',end.toISOString().slice(11,19)].join(',');
+    return [`Bulk row ${n}`,'00:00:01','Bulk member','bulk@example.invalid','Bulk project','','2025-10-20',start.toISOString().slice(11,19),'2025-10-20',index===21 || index===22 ? '' : end.toISOString().slice(11,19)].join(',');
   });
   const file = {name:'bulk.csv',mimeType:'text/csv',buffer:Buffer.from([header,...lines].join('\r\n'))};
   await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');await page.getByLabel('Toggl CSV',{exact:true}).setInputFiles(file);
@@ -116,7 +116,7 @@ test('Toggl source selection, rejected-row diagnostics and independent task desc
   await login(page);await page.getByLabel('Import as',{exact:true}).selectOption('ACTIVITY');const sent = [];page.on('request',request=>{if(request.url().includes('/api/v1/imports') && request.postData()) sent.push(request.postData());});
   const csv = 'Description,Duration,Member,Email,Client,Project,Task,Tags,Start date,Start time,Stop date,Stop time,Billable,Workspace\r\n'
     +'"=SUM(1,2)",01:00:00,Selected member,selected@example.invalid,Selected client,Selected project,Task name,"Tag one,Tag two",2025-10-20,09:00:00,2025-10-20,10:00:00,Yes,Ignored workspace A\r\n'
-    +'Wrong duration,00:30:00,Selected member,selected@example.invalid,Selected client,Selected project,,,2025-10-20,11:00:00,2025-10-20,12:00:00,No,Ignored workspace B\r\n'
+    +'Inverted interval,00:30:00,Selected member,selected@example.invalid,Selected client,Selected project,,,2025-10-20,12:00:00,2025-10-20,11:00:00,No,Ignored workspace B\r\n'
     +'Other private entry,01:00:00,Other member,other@example.invalid,Other client,Other project,,,2025-10-20,09:00:00,2025-10-20,10:00:00,Yes,Ignored workspace A\r\n';
   await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');await page.getByLabel('Toggl CSV',{exact:true}).setInputFiles({name:'source-selection.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
   await page.getByRole('button',{name:'Read CSV',exact:true}).click();await page.getByRole('button',{name:'Review mappings',exact:true}).click();
@@ -128,7 +128,7 @@ test('Toggl source selection, rejected-row diagnostics and independent task desc
   const pending = page.waitForEvent('download');await page.getByRole('button',{name:'Download preview diagnostics',exact:true}).click();
   const download = await pending,diagnostics = JSON.parse(readFileSync(await download.path(),'utf8'));
   expect(diagnostics.diagnostics).toEqual({sourceRows:3,rejectedRows:1,excludedRows:0,unselectedRows:1,unsupportedFields:['Billable','Workspace']});
-  expect(diagnostics.rows[1].errors.join(' ')).toContain('duration disagree');
+  expect(diagnostics.rows[1].errors.join(' ')).toContain('end precedes the start');
   await page.getByRole('button',{name:'Review mappings',exact:true}).click();await page.getByRole('button',{name:'Review server matches',exact:true}).click();
   await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
   const exported = await api(request,'/data/export'),entry = exported.activities.find(value=>value.summary==='=SUM(1,2)');expect(entry).toBeTruthy();expect(entry.labelIds).toHaveLength(2);
@@ -209,9 +209,9 @@ for(const mode of ['WORK_SESSION','ACTIVITY']) test(`Toggl ${mode} maps several 
   const projectReply=await request.post('/api/v1/projects',{headers,data:{name:'Existing delivery '+suffix,clientId:destination.id}});expect(projectReply.status()).toBe(201);const destinationProject=await projectReply.json(),before=await api(request,'/data/export');
   await login(page);await page.getByLabel('Import as',{exact:true}).selectOption(mode);
   const csv='Description,Duration,Member,Email,Client,Project,Start date,Start time,Stop date,Stop time\r\n'
-    +[`First ${suffix},01:00:00,Mapping ${suffix},${suffix}@example.invalid,Toggl one,First project,2025-10-20,09:00:00,2025-10-20,10:00:00`,
-      `Second ${suffix},01:00:00,Mapping ${suffix},${suffix}@example.invalid,Toggl two,Second project,2025-10-20,10:00:00,2025-10-20,11:00:00`,
-      `Missing client ${suffix},01:00:00,Mapping ${suffix},${suffix}@example.invalid,,Fallback project,2025-10-20,11:00:00,2025-10-20,12:00:00`].join('\r\n');
+    +[`First ${suffix},0.5,Mapping ${suffix},${suffix}@example.invalid,Toggl one,First project,2025-10-20,09:00:00,2025-10-20,10:00:00`,
+      `Second ${suffix},-,Mapping ${suffix},${suffix}@example.invalid,Toggl two,Second project,2025-10-20,10:00:00,2025-10-20,11:00:00`,
+      `Missing client ${suffix},,Mapping ${suffix},${suffix}@example.invalid,,Fallback project,2025-10-20,11:00:00,2025-10-20,12:00:00`].join('\r\n');
   await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');
   await page.getByLabel('Toggl CSV',{exact:true}).setInputFiles({name:'client-mapping.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
   await page.getByRole('button',{name:'Read CSV',exact:true}).click();await page.getByRole('button',{name:'Review mappings',exact:true}).click();
@@ -235,7 +235,7 @@ for(const mode of ['WORK_SESSION','ACTIVITY']) test(`Toggl ${mode} maps several 
   await page.screenshot({path:`test-results/toggl-existing-client-${mode.toLowerCase()}.png`,fullPage:true});
   await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
   const imported=await api(request,'/data/export'),collection=mode==='WORK_SESSION' ? 'workSessions' : 'activities';
-  expect(imported.clients).toEqual(before.clients);const added=imported[collection].filter(value=>!before[collection].some(old=>old.id===value.id));expect(added).toHaveLength(3);
+  expect(imported.clients).toEqual(before.clients);const added=imported[collection].filter(value=>!before[collection].some(old=>old.id===value.id));expect(added).toHaveLength(3);expect(added.every(value=>Date.parse(value.end)-Date.parse(value.start)===3600000)).toBe(true);
   if(mode==='WORK_SESSION') expect(added.every(value=>value.clientId===destination.id)).toBe(true);
   else expect(imported.projects.filter(value=>!before.projects.some(old=>old.id===value.id)).every(value=>value.clientId===destination.id)).toBe(true);
   expect(added.find(value=>value.summary===`First ${suffix}`).projectId).toBe(destinationProject.id);
@@ -246,18 +246,18 @@ for(const mode of ['WORK_SESSION','ACTIVITY']) test(`Toggl ${mode} maps several 
   const current=await request.get('/api/v1/clients/'+destination.id,{headers});expect((await request.delete('/api/v1/clients/'+destination.id,{headers:{...headers,'If-Match':current.headers().etag}})).status()).toBe(204);
 });
 
-test('Toggl review explains missing durations beside the continue action and excludes only reviewed invalid rows',async({page})=>{
+test('Toggl review explains incomplete intervals beside the continue action and excludes only reviewed invalid rows',async({page})=>{
   await login(page);
   const header='Description,Duration,Member,Email,Project,Start date,Start time,Stop date,Stop time';
   const lines=Array.from({length:351},(_,index)=>{
     const start=new Date(Date.UTC(2025,9,20,9,0,index)),end=new Date(+start+1000);
-    return [`Annual entry ${index}`,index===21 || index===22 ? '-' : '00:00:01','Annual member','annual@example.invalid','Annual project','2025-10-20',start.toISOString().slice(11,19),'2025-10-20',end.toISOString().slice(11,19)].join(',');
+    return [`Annual entry ${index}`,index===21 || index===22 ? '-' : '00:00:01','Annual member','annual@example.invalid','Annual project','2025-10-20',start.toISOString().slice(11,19),'2025-10-20',index===21 || index===22 ? '' : end.toISOString().slice(11,19)].join(',');
   });
   await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');
   await page.getByLabel('Toggl CSV',{exact:true}).setInputFiles({name:'annual-anonymized.csv',mimeType:'text/csv',buffer:Buffer.from([header,...lines].join('\r\n'))});
   await page.getByRole('button',{name:'Read CSV',exact:true}).click();
   await expect(page.locator('#account-content')).toContainText('351 source rows · 2 invalid.');
-  await expect(page.locator('#account-content')).toContainText('This row has no recorded duration. Exclude it or correct the CSV before importing.');
+  await expect(page.locator('#account-content')).toContainText('Only completed intervals can be imported.');
   await page.getByRole('button',{name:'Review mappings',exact:true}).click();
   const exclude=page.getByLabel('Exclude invalid rows after reviewing the diagnostics',{exact:true});
   await expect(exclude).toBeFocused();await expect(page.getByText('2 invalid rows cannot be imported.',{exact:true})).toBeInViewport();

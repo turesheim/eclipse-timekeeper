@@ -420,3 +420,21 @@ personal portability archives. HostPolicy applies the exact effective hostname
 and loopback to every HTTP route, including static resources and health checks,
 without forwarded-host trust. The framework localhost default is replaced by
 this dynamic allowlist, rather than pinning the hostname in generated files.
+
+
+### Work-session Undo
+
+Clients may opt into Undo on conditional work-session PUT/DELETE requests with
+`X-Timekeeper-Undo: true`. Successful responses include `X-Timekeeper-Undo-Id`
+and `X-Timekeeper-Undo-Seconds` (600). Existing clients remain unchanged.
+`POST /undo/{id}` accepts `{}` and requires an `Idempotency-Key` and write access.
+Snapshots and command receipts are private to the authenticated owner.
+
+Undo restores the original UUID, timestamps and metadata at a newer version,
+rebuilding validated client/project/label references. It leaves activities
+unchanged. It refuses a changed destination/session or a conflicting running
+session with `UNDO_CONFLICT` (409); expired offers return `UNDO_EXPIRED` (410),
+and missing offers return 404. No partial restore is committed. Repeating a
+successful Undo returns its recorded result without writing again. At most 50
+recent offers are retained per account; expired offers are pruned on subsequent
+opt-in mutations. Undo snapshots are omitted from portable account exports.

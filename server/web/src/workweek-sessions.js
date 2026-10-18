@@ -140,9 +140,9 @@ export class WorkweekSessions {
       const loaded=await draft.api.request('/work-sessions/'+draft.original.id);
       if(this.draft!==draft||this.api!==draft.api)return false;
       if(!this.writable||!sameSession(draft.original,loaded.data))throw new ApiError('STALE_VERSION',412);
-      await draft.api.request('/work-sessions/'+draft.original.id,{method:'PUT',body:payload,etag:loaded.etag});
+      const saved=await draft.api.request('/work-sessions/'+draft.original.id,{method:'PUT',body:payload,etag:loaded.etag,undo:true});
       if(this.draft!==draft||this.api!==draft.api)return false;
-      this.draft=null;this.feedback.textContent='';this.controls.hidden=true;
+      this.callbacks.onUndo?.(saved.undo,draft.api);this.draft=null;this.feedback.textContent='';this.controls.hidden=true;
       await this.callbacks.onSaved();if(this.api===draft.api)this.restoreFocus(focus);return true;
     } catch(error) {
       if(this.draft!==draft||this.api!==draft.api)return false;

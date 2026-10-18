@@ -6,3 +6,7 @@ The unmodified solid WOFF2 is bundled with the server and licensed under SIL OFL
 See [LICENSE.txt](LICENSE.txt) for the included upstream licenses and attribution.
 
 Font SHA-256: `24e5fae26b41c08b2df81c91669f5aaae71d81a84a4713fc56b5c621b78dd456`.
+
+Project icon names, search terms and glyphs in `src/project-icons.js` come from the
+[7.3.1 free solid metadata](https://github.com/FortAwesome/Font-Awesome/blob/7.3.1/metadata/icons.json).
+The existing twelve project identifiers are retained as compatible names.

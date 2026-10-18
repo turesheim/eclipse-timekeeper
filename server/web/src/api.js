@@ -1,6 +1,8 @@
 const nameOrder = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
 const sortedNames = values => [...values].sort((a,b) => nameOrder.compare(a.name,b.name) || a.id.localeCompare(b.id));
 const messages = {
+  UNDO_CONFLICT: 'This work session or its references changed. Undo cannot replace the current records.',
+  UNDO_EXPIRED: 'The time to undo this change has expired.',
   UNAUTHENTICATED: 'Your session is no longer authorized. Sign in again with your account.',
   OWNER_CHANGED: 'The account for this session has changed. Sign out before using the intended account.',
   FORBIDDEN: 'Your account does not have permission to make this change.',
@@ -47,7 +49,7 @@ export class Api {
   constructor(token = null, fetcher = (...args) => globalThis.fetch(...args), context = {}) { this.#token = token; this.#csrf = context.csrf; this.#owner = context.ownerId ?? null; this.fetcher = fetcher; }
   get owner() { return this.#owner; }
   close() { this.#closed = true; this.#token = ''; this.#csrf = null; for (const request of this.#requests) request.abort(); }
-  async request(path, {method = 'GET', body, etag, key, timeout = 15000, binary = false} = {}) {
+  async request(path, {method = 'GET', body, etag, key, timeout = 15000, binary = false, undo = false} = {}) {
     if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);
     const controller = new AbortController(); this.#requests.add(controller);
     const timer = setTimeout(() => controller.abort(), timeout);
@@ -59,6 +61,7 @@ export class Api {
       if (body !== undefined) headers['Content-Type'] = 'application/json';
       if (etag) headers['If-Match'] = etag;
       if (key) headers['Idempotency-Key'] = key;
+      if (undo) headers['X-Timekeeper-Undo'] = 'true';
       const response = await this.fetcher(`/api/v1${path}`, {method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, redirect: 'error', referrerPolicy:'origin', credentials: this.#token && path !== '/auth/token-login' ? 'omit' : 'same-origin', cache: 'no-store'});
       if (binary && response.ok && !/^application\/zip(?:;|$)/i.test(response.headers.get('Content-Type') || '')) throw new ApiError('UNAVAILABLE');
       const data = response.status === 204 ? null : binary && response.ok ? await response.blob() : await response.json();
@@ -69,7 +72,9 @@ export class Api {
       this.#owner = owner;
       if (data?.ownerId !== undefined && data.ownerId !== owner) throw new ApiError('OWNER_CHANGED', 401);
       if (data?.items?.some(row => row.ownerId !== undefined && row.ownerId !== owner)) throw new ApiError('OWNER_CHANGED', 401);
-      return {data, etag: response.headers.get('ETag')};
+      const undoId=response.headers.get('X-Timekeeper-Undo-Id'),seconds=Number(response.headers.get('X-Timekeeper-Undo-Seconds'));
+      const offer=undoId&&/^[a-f0-9-]{36}$/.test(undoId)&&seconds>0&&seconds<=600 ? {id:undoId,seconds}:null;
+      return {data, etag: response.headers.get('ETag'),...(offer ? {undo:offer}:{})};
     } catch (error) {
       if (error instanceof ApiError) throw error;
       // Never expose response bodies, URLs, tokens or fetch exception details.

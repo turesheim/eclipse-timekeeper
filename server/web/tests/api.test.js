@@ -98,3 +98,14 @@ test('a lost time zone write reply is read back without repeating the write', as
   });
   assert.equal((await api.initializeTimeZone('Europe/Oslo')).data.zoneId,'Europe/Oslo');assert.equal(writes,1);
 });
+
+test('work-session Undo metadata is opt-in and validated after owner binding',async()=>{
+  const id='5d905b2d-9783-4dc9-9b10-49c81f875c1f';
+  const api=new Api('token',async(url,options)=>{
+    assert.equal(options.headers['X-Timekeeper-Undo'],'true');const response=reply(null,undefined,204);
+    response.headers.set('X-Timekeeper-Undo-Id',id);response.headers.set('X-Timekeeper-Undo-Seconds','600');return response;
+  });
+  assert.deepEqual((await api.request('/work-sessions/'+id,{method:'DELETE',undo:true})).undo,{id,seconds:600});
+  const foreign=new Api('token',async()=>{const response=reply(null,'b3duZXItYg',204);response.headers.set('X-Timekeeper-Undo-Id',id);response.headers.set('X-Timekeeper-Undo-Seconds','600');return response;},{ownerId:'owner-a'});
+  await assert.rejects(foreign.request('/work-sessions/'+id,{method:'DELETE',undo:true}),error=>error.code==='OWNER_CHANGED');
+});

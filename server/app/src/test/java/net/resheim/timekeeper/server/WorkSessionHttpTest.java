@@ -21,8 +21,10 @@ class WorkSessionHttpTest {
     }
     @TestHTTPResource URI endpoint;
     @Inject ServerStore store;
+    @Inject MockBackendClock clock;
     private HttpTimekeeperService client(String token) {return new HttpTimekeeperService(endpoint,()->token,Duration.ofSeconds(5));}
     @AfterEach void clear() throws Exception {
+        clock.set(null);
         var actual=io.quarkus.arc.ClientProxy.unwrap(store);
         try(var connection=actual.datasource.getConnection()) {
             connection.setAutoCommit(false);
@@ -131,4 +133,60 @@ class WorkSessionHttpTest {
                 .post("/api/v1/work-sessions").then().statusCode(400);
         try(var api=client("test-a")) {assertEquals(1,api.workSessions(OwnerId.LOCAL).size());}
     }
+    private io.restassured.response.Response createSession() {
+        return given().header("Authorization","Bearer test-a").contentType("application/json")
+                .body("{\"start\":\"2025-01-01T08:00:00.123456789Z\",\"end\":\"2025-01-01T16:00:00.987654321Z\",\"summary\":\"Original\"}")
+                .post("/api/v1/work-sessions").then().statusCode(201).extract().response();
+    }
+    private io.restassured.response.Response editSession(io.restassured.response.Response current,String summary) {
+        var input=JsonValues.object().put("start",current.jsonPath().getString("start")).put("end",current.jsonPath().getString("end")).put("summary",summary);
+        return given().header("Authorization","Bearer test-a").header("If-Match",current.header("ETag")).header("X-Timekeeper-Undo","true")
+                .contentType("application/json").body(input.toString()).put("/api/v1/work-sessions/"+current.jsonPath().getString("id"))
+                .then().statusCode(200).extract().response();
+    }
+    private io.restassured.response.Response undo(String id,String token,String key,int status) {
+        return given().header("Authorization","Bearer "+token).header("Idempotency-Key",key).contentType("application/json").body("{}")
+                .post("/api/v1/undo/"+id).then().statusCode(status).extract().response();
+    }
+    @Test void undoRestoresExactSessionAndReplaysWithoutRepeatingTheWrite() throws Exception {
+        var original=createSession();var changed=editSession(original,"Changed");String action=changed.header("X-Timekeeper-Undo-Id"),key=UUID.randomUUID().toString();
+        assertNotNull(action);assertEquals("600",changed.header("X-Timekeeper-Undo-Seconds"));
+        var restored=undo(action,"test-a",key,200);assertEquals(original.jsonPath().getString("start"),restored.jsonPath().getString("session.start"));
+        assertEquals(original.jsonPath().getString("end"),restored.jsonPath().getString("session.end"));assertEquals("Original",restored.jsonPath().getString("session.summary"));
+        assertEquals(2,restored.jsonPath().getInt("session.version"));
+        assertEquals(restored.asString(),undo(action,"test-a",key,200).asString());
+        assertEquals(restored.asString(),undo(action,"test-a",UUID.randomUUID().toString(),200).asString());
+        given().header("Authorization","Bearer test-a").header("If-Match",original.header("ETag")).delete("/api/v1/work-sessions/"+original.jsonPath().getString("id")).then().statusCode(412);
+    }
+    @Test void undoDeletionRestoresIdentityAndReferencesWithoutChangingActivities() {
+        var original=createSession();String id=original.jsonPath().getString("id");
+        var activity=given().header("Authorization","Bearer test-a").contentType("application/json").body("{\"taskId\":null,\"start\":\"2025-01-01T10:00:00Z\",\"end\":\"2025-01-01T11:00:00Z\",\"summary\":\"Independent\",\"labelIds\":[]}")
+                .post("/api/v1/activities").then().statusCode(201).extract().response();
+        var removed=given().header("Authorization","Bearer test-a").header("If-Match",original.header("ETag")).header("X-Timekeeper-Undo","true").delete("/api/v1/work-sessions/"+id).then().statusCode(204).extract().response();
+        var restored=undo(removed.header("X-Timekeeper-Undo-Id"),"test-a",UUID.randomUUID().toString(),200);
+        assertEquals(id,restored.jsonPath().getString("session.id"));assertEquals(1,restored.jsonPath().getInt("session.version"));
+        var actual=given().header("Authorization","Bearer test-a").get("/api/v1/activities/"+activity.jsonPath().getString("id")).then().statusCode(200).extract().response();
+        assertEquals(activity.asString(),actual.asString());
+        // Reconstructed client relation still protects the destination from deletion.
+        String client=restored.jsonPath().getString("session.clientId");var loaded=given().header("Authorization","Bearer test-a").get("/api/v1/clients/"+client).then().statusCode(200).extract().response();
+        given().header("Authorization","Bearer test-a").header("If-Match",loaded.header("ETag")).delete("/api/v1/clients/"+client).then().statusCode(409);
+    }
+    @Test void undoIsOwnerScopedClosedAndCannotOverwriteAPeerEdit() {
+        var changed=editSession(createSession(),"First change");String action=changed.header("X-Timekeeper-Undo-Id");
+        undo(action,"test-b",UUID.randomUUID().toString(),404);undo(action,"test-read",UUID.randomUUID().toString(),403);
+        given().header("Authorization","Bearer test-a").header("Idempotency-Key",UUID.randomUUID().toString()).contentType("application/json").body("{\"ownerId\":\"b\"}").post("/api/v1/undo/"+action).then().statusCode(400);
+        var peer=editSession(changed,"Peer change");undo(action,"test-a",UUID.randomUUID().toString(),409);
+        assertEquals(peer.asString(),given().header("Authorization","Bearer test-a").get("/api/v1/work-sessions/"+peer.jsonPath().getString("id")).then().statusCode(200).extract().asString());
+    }
+    @Test void expiredUndoAndMissingClientCannotRestoreDeletedSession() {
+        var original=createSession();var changed=editSession(original,"Changed");
+        clock.set(Instant.now().plusSeconds(601));undo(changed.header("X-Timekeeper-Undo-Id"),"test-a",UUID.randomUUID().toString(),410);clock.set(null);
+        String id=changed.jsonPath().getString("id"),client=changed.jsonPath().getString("clientId");
+        var deleted=given().header("Authorization","Bearer test-a").header("If-Match",changed.header("ETag")).header("X-Timekeeper-Undo","true").delete("/api/v1/work-sessions/"+id).then().statusCode(204).extract().response();
+        var loaded=given().header("Authorization","Bearer test-a").get("/api/v1/clients/"+client).then().statusCode(200).extract().response();
+        given().header("Authorization","Bearer test-a").header("If-Match",loaded.header("ETag")).delete("/api/v1/clients/"+client).then().statusCode(204);
+        undo(deleted.header("X-Timekeeper-Undo-Id"),"test-a",UUID.randomUUID().toString(),409);
+        given().header("Authorization","Bearer test-a").get("/api/v1/work-sessions/"+id).then().statusCode(404);
+    }
+
 }

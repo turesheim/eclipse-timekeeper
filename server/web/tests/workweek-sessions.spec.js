@@ -69,8 +69,11 @@ test('Workweek groups local session times by client/project with exact DST total
     await expect(page.locator(`#week-sessions [data-work-session-id="${outside.id}"]`)).toHaveCount(0);
     await expect(page.locator('#week-total')).toHaveText(nanosText(activityTotal));
     await page.getByLabel('Duration format', {exact: true}).selectOption('decimal'); await expect(row.locator('td').last()).toHaveText('25.50h'); await expect(page.locator('#week-total')).toHaveText(decimalHoursText(activityTotal));
-    await page.locator('.day button').filter({hasText: '2025-10-21'}).click(); await expect(page.locator('#week-sessions-section')).not.toBeVisible();
-    await page.locator('.day button').filter({hasText: '2025-10-21'}).click(); await expect(page.locator('#week-sessions-section')).toBeVisible();
+    await expect(page.locator('#activities-panel')).not.toBeVisible();await page.locator('[data-tab=activities]').click();
+    await expect(page.locator('#activities')).toBeVisible();await expect(page.locator('#days')).toBeVisible();await expect(page.locator('#week-sessions-section')).not.toBeVisible();
+    await expect(page.getByLabel('Duration format',{exact:true})).toHaveValue('decimal');await expect(page.getByLabel('Week containing',{exact:true})).toHaveValue('2025-10-26');
+    await page.locator('.day button').filter({hasText:'2025-10-21'}).click();await expect(page.locator('#week-total')).toBeVisible();
+    await page.locator('[data-tab=week]').click();await expect(page.locator('#week-sessions-section')).toBeVisible();await expect(row.locator('td').last()).toHaveText('25.50h');await expect(page.locator('#days')).not.toBeVisible();
     await page.screenshot({path: 'test-results/workweek-sessions-desktop.png', fullPage: true});
     await page.setViewportSize({width: 390, height: 844}); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
     expect(await page.locator('#week-sessions').evaluate(value => value.scrollWidth > value.clientWidth)).toBeTruthy();

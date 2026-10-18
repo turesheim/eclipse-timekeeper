@@ -138,6 +138,7 @@ test('optional project icons persist and Track shows distinct icons to the right
     await page.getByRole('button',{name:'Projects',exact:true}).click();await page.getByRole('button',{name:'New project',exact:true}).click();
     await page.getByLabel('Name',{exact:true}).fill(prefix+' Website');await page.getByLabel('Client',{exact:true}).selectOption(client.id);
     await expect(page.getByRole('radio',{name:'None',exact:true})).toBeChecked();await page.getByRole('radio',{name:'Code',exact:true}).check();
+    const search=page.getByRole('searchbox',{name:'Search project icons',exact:true});await search.fill('gavel');await page.getByRole('radio',{name:'Gavel',exact:true}).check();await search.fill('rocket');expect(await page.locator('[name=icon]:checked').inputValue()).toBe('gavel');await search.fill('');await page.getByRole('radio',{name:'Code',exact:true}).check();
     expect((await new AxeBuilder({page}).include('#editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await page.setViewportSize({width:1280,height:900});await page.locator('#editor').screenshot({path:'test-results/project-icon-picker.png'});await save(page);await page.setViewportSize({width:1280,height:720});
     const project=(await (await api(request,'GET','/projects?clientId='+client.id)).json()).items[0];records.unshift(['projects',project.id]);expect(project.icon).toBe('code');

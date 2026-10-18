@@ -157,17 +157,18 @@ Times use the account time zone. Sessions crossing midnight appear on each day;
 edit each endpoint on its actual day. An end of **24:00** means the next midnight.
 For repeated daylight-saving times, include an explicit offset such as
 **02:30+01:00**. Daily/client/project totals are clipped at local-day and week
-boundaries and follow the selected clock/decimal format. Day selection filters
-sessions alongside activities. The grid hides when no sessions overlap the
-selected week/day. Session time is separate from activity report totals.
+boundaries and follow the selected clock/decimal format. The grid hides when no sessions overlap the
+selected week. Session time is separate from activity report totals.
 
 ![Compact Workweek sessions on desktop](../assets/screenshots/compact-workweek-desktop.png)
 
 ![Compact Workweek sessions on a narrow screen](../assets/screenshots/compact-workweek-mobile.png)
 
-The default Workweek groups projects, tasks, subtasks and activities,
+The **Activities** tab groups projects, tasks, subtasks and activities,
 with seven daily duration columns, a weekly total column and expandable rows
-like the Eclipse view. Task totals include their subtasks. **Hide activities**
+like the Eclipse view. Its daily and weekly summaries report activity time.
+Workweek and Activities share the selected week and duration format. Selecting
+a day filters Activities without hiding work sessions in Workweek. Task totals include their subtasks. **Hide activities**
 keeps the project/task outline visible; **Show activities** restores its rows.
 **Duration format** chooses conventional time or decimal hours for this browser
 session. Decimal hours use two places, rounded from each exact aggregate rather
@@ -522,3 +523,22 @@ the [acceptance report](../verification/ACCOUNT-DATA.md) for validation.
 ![Account archive review on desktop](../assets/screenshots/account-data-review-desktop.png)
 
 ![Account archive review on a narrow screen](../assets/screenshots/account-data-review-mobile.png)
+
+
+## Undo work-session changes
+
+After editing or deleting a work session, choose **Undo** in the notification
+within ten minutes. This includes calendar moves/resizes and Workweek time-cell
+edits. Undo restores exact times, client, project, labels and summary; activities
+remain independent. Only the latest acknowledged change is offered in the current
+browser session. Creation, timer start/stop and other record types are outside
+this first version.
+
+If another edit or a removed destination makes restoration unsafe, Undo reports
+that conflict without overwriting current records. A lost response offers
+**Retry undo**, which checks the same command safely. Signing out clears the
+notification. No work snapshots are stored in browser storage.
+
+The project icon picker offers over 1,400 bundled Font Awesome icons. Search by
+name or keyword, or choose **More icons** to browse. Filtering preserves the
+current selection; **None** removes an icon. Icons work offline.
