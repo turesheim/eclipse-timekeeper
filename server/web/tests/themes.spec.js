@@ -20,7 +20,7 @@ test('themes cover tracking, records, editors and account settings with accessib
   await page.addInitScript(()=>{document.addEventListener('securitypolicyviolation',event=>{window.themePolicyViolations??=[];window.themePolicyViolations.push({directive:event.violatedDirective,blocked:event.blockedURI});});});
   try {
     const client=await create('clients',{name:'Theme studio '+randomUUID().slice(0,6),color:'#6750a4'});
-    const label=await create('labels',{name:'Theme preview label'});
+    const label=await create('labels',{name:'Theme preview label',color:'#6750a4'});
     const project=await create('projects',{name:'Theme preview',clientId:client.id,icon:'code'}),task=await create('tasks',{projectId:project.id,parentTaskId:null,url:'https://example.invalid/theme-preview',summary:'Review palette'});
     await create('work-sessions',{clientId:client.id,projectId:project.id,summary:'Palette review',start:'2025-10-20T06:00:00Z',end:'2025-10-20T14:00:00Z'});
     await create('activities',{taskId:task.id,summary:'Review contrast',start:'2025-10-20T06:00:00Z',end:'2025-10-20T07:00:00Z',labelIds:[]});
@@ -33,7 +33,10 @@ test('themes cover tracking, records, editors and account settings with accessib
       await page.locator('[data-tab=track]').click();await page.screenshot({path:`test-results/theme-${id}-desktop.png`,fullPage:false});
       for(const view of ['track','week','activities','calendar','tasks','clients','projects','labels']) {
         await page.locator(`[data-tab=${view}]`).click();
-        if(view==='activities')await page.locator('#activities tr[data-kind=activity] .activity-title').first().click();
+        if(view==='activities') {
+          const activity=page.locator('#activities tr[data-kind=activity]').first();
+          if(await activity.getAttribute('aria-selected')!=='true')await activity.locator('.activity-title').click();
+        }
         await audit(page);
       }
       await page.getByRole('button',{name:'Record work session',exact:true}).click();await page.getByRole('checkbox',{name:label.name,exact:true}).check();await audit(page);await page.locator('#cancel').click();
