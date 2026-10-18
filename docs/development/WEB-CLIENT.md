@@ -207,7 +207,7 @@ administrator is protected in the UI and by the server. This does not grant
 access to another account's work data or introduce workspaces, members or
 invitations. Personal settings remain separate from other-user administration.
 
-**Import** supports Toggl Track Detailed Report CSV as work sessions (default)
+**Import** supports Toggl Track Detailed Report and Legacy CSV as work sessions (default)
 or activities, with explicit source-user and
 time-zone selection, explicit catalog mappings, duplicate review, durable
 bounded commits and whole-job Undo. A cancellable module worker handles parsing
@@ -430,6 +430,11 @@ creation receives General on the server, and Eclipse project edits preserve its
 client. No client selection or title fields are added to Eclipse.
 
 ## Toggl Track import
+
+Detailed Report (Member/Stop) and Legacy (User/End) CSV exports use the same
+review flow. Legacy exports retain source client names independently of projects;
+review each client mapping before importing. A newer export without a Client
+column continues to use reviewed project-based suggestions.
 
 Each CSV row defaults to one continuous work session with a reviewed client and
 description-derived title. Activity import is an explicit alternative. Both modes

@@ -1,0 +1,8 @@
+﻿"User","Email","Client","Project","Task","Description","Billable","Start date","Start time","End date","End time","Duration","Tags"
+"Example Member","member@example.invalid","Legacy client","Legacy project","","","No","2025-10-18","09:04:20","2025-10-18","09:04:22","00:00:02",""
+"Example Member","member@example.invalid","Legacy client","Legacy project","","","No","2025-10-18","09:04:17","2025-10-18","09:04:19","00:00:02",""
+"Example Member","member@example.invalid","Legacy client","Legacy project","","","No","2025-10-17","08:14:57","2025-10-17","16:36:13","08:21:16",""
+"Example Member","member@example.invalid","Legacy client","Legacy project","","","No","2025-10-16","08:17:00","2025-10-16","16:17:00","08:00:00",""
+"Example Member","member@example.invalid","Legacy client","Legacy project","","","No","2025-10-15","08:17:00","2025-10-15","16:17:00","08:00:00",""
+"Example Member","member@example.invalid","Legacy client","Legacy project","","","No","2025-10-14","07:20:57","2025-10-14","16:18:20","08:57:23",""
+"Example Member","member@example.invalid","Legacy client","Legacy project","","","No","2025-10-13","08:17:08","2025-10-13","17:02:47","08:45:39",""

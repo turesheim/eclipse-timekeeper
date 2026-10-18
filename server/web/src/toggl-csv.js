@@ -65,9 +65,9 @@ export function parseTogglDetailedCsv(text, {zone, dateFormat = 'ISO', now = new
   const member = has('Member') ? 'Member' : has('User') ? 'User' : null;
   const end = has('Stop date') && has('Stop time') ? 'Stop' : has('End date') && has('End time') ? 'End' : null;
   if (!member || !end || !['Description','Duration','Start date','Start time'].every(has))
-    throw new Error('Choose a Toggl Track Detailed Report CSV with individual start/end times; summary reports are unsupported.');
+    throw new Error('Choose a Toggl Track Detailed Report or Legacy CSV with individual start/end times; summary reports are unsupported.');
   if ((has('Member') && has('User')) || (has('Stop date') && has('End date')))
-    throw new Error('The CSV mixes incompatible Detailed Report headers.');
+    throw new Error('The CSV mixes incompatible Detailed Report and Legacy headers.');
   const recognized = new Set(['Description','Duration',member,'Email','Client','Project','Task','Tags','Start date','Start time',`${end} date`,`${end} time`,'Time Entry ID']);
   const unsupported = header.filter(value => !recognized.has(value));
   const people = new Map(), occurrences = new Map(); let totalNanos = 0n;

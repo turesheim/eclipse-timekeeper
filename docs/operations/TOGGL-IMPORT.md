@@ -6,6 +6,12 @@ data are not saved in browser storage.
 
 ## Export from Track
 
+Both **Detailed Report** and **Legacy** CSV exports are supported. Choose Legacy
+when you need the source client names: the verified Legacy export includes a
+`Client` column, while the verified newer Detailed Report export does not.
+Clients can then be mapped directly to existing Timekeeper clients or created
+under their source names, independently of their projects.
+
 In classic Toggl Track, select the correct source workspace, open **Reports →
 Detailed**, choose the date range and turn rounding off. Include individual
 start/end dates and times, descriptions and durations. Export CSV with an
@@ -23,7 +29,7 @@ rejected.
 
 ## Review and import
 
-1. Choose **Work sessions** (the default) or **Activities**, then choose the CSV and its original IANA time zone, for example `Europe/Oslo`.
+1. Choose **Work sessions** (the default) or **Activities**, then select either export under **Toggl CSV** and its original IANA time zone, for example `Europe/Oslo`.
    Confirm its date format. Toggl workspace columns are ignored; Timekeeper has
    no workspaces and imports only into the signed-in user's account.
 2. Select one source user. This selects whose entries to copy into your current
