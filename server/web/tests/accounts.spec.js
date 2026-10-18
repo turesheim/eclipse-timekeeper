@@ -1,5 +1,5 @@
 import {browserRequest} from './browser-request.js';
-import {openAccountMenu} from './navigation.js';
+import {openAccountMenu,openAbout} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 const password=process.env.TIMEKEEPER_WEB_PASSWORD;
@@ -59,9 +59,10 @@ test('first administrator claims the explicit existing owner once and uses a sec
   const account=await (await call(request,'GET','/auth/account')).json();expect(account.ownerId).toBe('web-owner');expect(account.username).toBe('browser-admin');
   expect((await browserRequest(page).post('/api/v1/auth/setup',{data:{code:process.env.TIMEKEEPER_WEB_SETUP_CODE,username:'hijacker',password,displayName:'Other',email:'other@example.org'}})).status()).toBe(401);
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');
-  await expect(page.locator('#server-build')).toContainText('SPK 1.99.0-146');
-  await page.locator('#server-build').click();await expect(page.locator('#server-spk')).toHaveText('1.99.0-146');
+  await openAbout(page);await expect(page.locator('#server-build')).toContainText('SPK 1.99.0-146');
+  await expect(page.locator('#server-spk')).toHaveText('1.99.0-146');
   await page.screenshot({path:'test-results/account-signed-in.png',fullPage:true});
+  await page.locator('#about-close').click();
   await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();
   await login(page);await expect(page.locator('#owner')).toHaveText('browser-admin');
 });

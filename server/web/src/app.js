@@ -12,6 +12,9 @@ import {accountMenu} from './account-menu.js';
 
 const $ = id => document.getElementById(id);
 accountMenu($('account-menu'));
+$('about-open').addEventListener('click',()=>$('server-info').showModal());
+$('about-close').addEventListener('click',()=>$('server-info').close());
+$('server-info').addEventListener('close',()=>{if(!$('session').hidden)$('account-menu').querySelector('summary').focus();});
 let api = null, snapshot = null, connected = false, refreshing = null, reloadAgain = false;
 let editor = null, selectedActivity = null, selectedDay = null;
 let watchSession = null;
@@ -121,6 +124,7 @@ const auth = authentication({
     undoNotice.clear();weekSessions.reset(); $('week-sessions-section').hidden = true; $('work-session-labels').replaceChildren(); $('work-session-labels').hidden = true;
     refreshing = null; reloadAgain = false;
     ++serverInfoRequest; clearServerInfo(); api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null; accountName = '';
+    $('server-info').close();
     calendar.reset(); track.reset(); collapsed.clear(); collapsedClients.clear(); canWrite = false;
     $('editor').close(); $('fields').replaceChildren(); $('editor-error').textContent = ''; $('editor-notice').textContent = '';
     for(const id of ['clients','projects','tasks','labels','activities','days']) $(id).replaceChildren();

@@ -223,8 +223,8 @@ button.track-client-day:disabled { opacity: .65; }
 @font-face { font-family: "Font Awesome 7 Free"; font-style: normal; font-weight: 900; font-display: block; src: url("./assets/fontawesome/fa-solid-900.woff2") format("woff2"); }
 .icon { font-family: "Font Awesome 7 Free"; font-style: normal; font-weight: 900; font-size: 1.1rem; line-height: 1; display: inline-block; flex-shrink: 0; text-align: center; width: 1.25rem; -webkit-font-smoothing: antialiased; }
 .icon-button, .tree-toggle { width: 2.75rem; height: 2.75rem; padding: 0; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
-.server-info { margin: 1.5rem 0 .5rem; color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
-.server-info summary { cursor: pointer; min-height: 2.75rem; padding-block: .6rem; }
+.server-info { font-size: .9rem; overflow-wrap: anywhere; }
+#server-build { color: var(--muted); }
 .server-info dl { display: grid; grid-template-columns: auto 1fr; gap: .3rem 1rem; margin-block: .5rem; }
 .server-info dd { margin: 0; font-variant-numeric: tabular-nums; }
 #account-page { max-width: 1200px; margin-inline: auto; }

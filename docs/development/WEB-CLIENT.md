@@ -1,6 +1,6 @@
 # Timekeeper web client
 
-The signed-in footer reads `/api/v1/server` to identify the running server
+The account menu's **About** dialog reads `/api/v1/server` to identify the running server
 version and commit. Its details distinguish immutable build time, explicitly
 recorded deployment time and process-start time. Information refreshes after
 long polls and manual refreshes, including during rolling updates. Missing
@@ -81,6 +81,8 @@ Labels remain visible on wide screens and hide when space is limited; every
 button retains its accessible name and hover title. The bar stays within the
 device's safe area, and content and Undo notifications leave room above it.
 Account settings and sign-in use their own navigation.
+Open **About** in the account menu to see the server version, SPK version, commit
+and build, deployment and start times. Close it with its button or Escape.
 
 Bootstrap 5.3.8 supplies the shared buttons, forms, navigation, cards and tables.
 The small application theme in `style.css` defines the green palette, typography,

@@ -1,6 +1,6 @@
 import {workSessionAction} from './workweek-session-actions.js';
 import {browserRequest} from './browser-request.js';
-import {openAccountMenu, setTimeZone} from './navigation.js';
+import {openAccountMenu, openAbout, setTimeZone} from './navigation.js';
 import {localDateTime} from '../src/model.js';
 import {test, expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -43,7 +43,9 @@ test('account time zone controls local editors and build dates across DST and br
   try {
     await signIn(page);
     await setTimeZone(page,'Europe/Oslo');
+    await openAbout(page);
     await expect(page.locator('#server-build')).toContainText('10:30:00');
+    await page.locator('#about-close').click();
     await page.getByRole('button',{name:'Record work session',exact:true}).click();
     await page.getByLabel('Summary',{exact:true}).fill(summary);await page.getByLabel('Client',{exact:true}).selectOption({index:1});
     const startPicker=page.getByLabel('Start (local time)',{exact:true}),endPicker=page.getByLabel('End (local time, blank while running)',{exact:true});
@@ -112,8 +114,8 @@ test('server build and deployment details describe the actual packaged server af
   expect(information.startedAt).not.toBe(information.deployedAt);
   expect(Date.parse(information.builtAt)).toBeLessThanOrEqual(Date.now());
   await signIn(page);
+  await expect(page.locator('#server-info')).not.toBeVisible();await openAbout(page);
   await expect(page.locator('#server-build')).toContainText(information.commit.slice(0,8));
-  await page.locator('#server-build').click();
   await expect(page.locator('#server-version')).toHaveText(information.version);
   await expect(page.locator('#server-commit')).toHaveText(information.commit);
   await expect(page.locator('#server-deployed')).not.toHaveText('Not recorded');
@@ -123,7 +125,9 @@ test('server build and deployment details describe the actual packaged server af
   await page.screenshot({path:'test-results/server-information-mobile.png', fullPage:true});
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   await page.reload();
+  await expect(page.locator('#server-info')).not.toBeVisible();await openAbout(page);
   await expect(page.locator('#server-build')).toContainText(information.commit.slice(0,8));
+  await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Account menu',exact:true})).toBeFocused();
   await openAccountMenu(page);await page.getByRole('button', {name:'Sign out',exact:true}).click();
   await expect(page.locator('#server-info')).not.toBeVisible();
 });
