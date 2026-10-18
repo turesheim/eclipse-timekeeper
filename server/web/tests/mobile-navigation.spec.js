@@ -1,3 +1,4 @@
+import {workSessionAction} from './workweek-session-actions.js';
 import {browserRequest} from './browser-request.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -38,7 +39,7 @@ test('saved account zone applies to new editors while hidden reports refresh',as
     await page.getByLabel('Time zone',{exact:true}).fill('Europe/Oslo');await page.getByRole('button',{name:'Save time zone',exact:true}).click();
     await expect(page.locator('#account-content')).toContainText('Time zone saved.');await expect.poll(()=>waiting).toBe(true);
     await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
-    await page.locator(`#week-sessions tr[data-work-session-id="${session.id}"]`).getByRole('button',{name:/^Edit session /}).click();
+    await workSessionAction(page,session.id,'Edit');
     await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue(localDateTime(session.start,'Europe/Oslo').slice(0,19).replace(/:00$/, ''));
     await page.locator('#cancel').click();
   } finally {

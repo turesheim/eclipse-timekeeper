@@ -47,6 +47,7 @@ class WorkSessionTransferTest {
             var from=Instant.parse("2025-10-25T21:59:59.123456789Z");var end=Instant.parse("2025-10-27T22:00:00.987654321Z");
             var session=source.createWorkSession(new CreateWorkSession(OwnerId.LOCAL,from,Optional.of(end),"Session, æøå"));
             var project=source.createProject(new CreateProject("Direct project, æøå"));
+            store.transaction("a",()->store.clientDetails("PROJECT",project.id().value(),JsonValues.object().put("icon","code")));
             var label=source.createLabel(new CreateLabel("Label, æøå",Optional.of("12,34,56")));
             source.createActivity(new CreateActivity(null,OwnerId.LOCAL,from,Optional.of(end),"Unassigned activity",Set.of(label.id()),Optional.of(session.id()),Optional.empty()));
             source.createActivity(new CreateActivity(null,OwnerId.LOCAL,from.plusSeconds(1),Optional.of(from.plusSeconds(61)),"Direct project",Set.of(),Optional.of(session.id()),Optional.of(project.id())));
@@ -65,6 +66,7 @@ class WorkSessionTransferTest {
             assertNotEquals(sourceClient,copiedWire.get("clientId"));
             assertEquals(copiedWire.get("clientId"),transferred.getAsJsonArray("projects").get(0).getAsJsonObject().get("clientId"));
             var after=target.workSessionReport(copied.id());assertEquals(before.time(),after.time());assertEquals(4,after.activities().size());assertTrue(target.tasks().isEmpty());
+            assertEquals("code",transferred.getAsJsonArray("projects").get(0).getAsJsonObject().get("icon").getAsString());
             var copiedProject=target.projects().stream().filter(value->value.name().equals(project.name())).findFirst().orElseThrow();assertNotEquals(project.id(),copiedProject.id());
             var copiedLabel=target.labels().stream().filter(value->value.name().equals(label.name())).findFirst().orElseThrow();assertNotEquals(label.id(),copiedLabel.id());
             for(var activity:after.activities()) {

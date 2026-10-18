@@ -330,8 +330,12 @@ client behavior, unsaved-edit and reconnect acceptance before the parent closes.
 
 `/clients` provides owned, paginated CRUD for a name and required `#RRGGBB` color,
 using the same authorization, opaque ETags and change feed as projects. A project
-has exactly one `clientId`, and a client can own many projects. Work sessions
-have exactly one `clientId` and a nonblank `title`, separate from `summary`.
+has exactly one `clientId`, and a client can own many projects. An optional
+`icon` selects a bundled project symbol; omitted icon fields preserve the current
+value on edits and explicit null clears it. The published `ProjectIcon` enum
+limits values to known identifiers. Icons remain server metadata, survive legacy
+Eclipse writes, and round-trip through account archives and domain JSON/CSV
+transfers. Work sessions have exactly one `clientId` and an optional `summary`.
 An optional, owned `projectId` derives the session client from the project.
 A conflicting explicit client is rejected. Omitted projects are preserved on
 edits; explicit null removes the project. Project filters are available on

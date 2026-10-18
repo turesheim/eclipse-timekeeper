@@ -8107,6 +8107,9 @@
           },
           "clientId": {
             "$ref": "#/components/schemas/Id"
+          },
+          "icon": {
+            "$ref": "#/components/schemas/ProjectIcon"
           }
         },
         "required": [
@@ -8445,6 +8448,9 @@
           },
           "clientId": {
             "$ref": "#/components/schemas/Id"
+          },
+          "icon": {
+            "$ref": "#/components/schemas/ProjectIcon"
           }
         },
         "required": [
@@ -8937,6 +8943,9 @@
           },
           "clientId": {
             "$ref": "#/components/schemas/Id"
+          },
+          "icon": {
+            "$ref": "#/components/schemas/ProjectIcon"
           }
         },
         "required": [
@@ -13063,6 +13072,31 @@
         "type": "string",
         "maxLength": 4000,
         "description": "The optional work-session description. Empty summaries are allowed. Existing titles are folded into this field without losing notes."
+      },
+      "ProjectIcon": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": [
+              "briefcase",
+              "code",
+              "globe",
+              "building",
+              "tools",
+              "flask",
+              "book",
+              "palette",
+              "chart",
+              "folder",
+              "mobile",
+              "cloud"
+            ]
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Optional bundled project icon. Null clears the icon; omitted project edits preserve the existing icon."
       }
     },
     "parameters": {

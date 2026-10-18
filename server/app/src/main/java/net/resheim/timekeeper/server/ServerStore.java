@@ -220,6 +220,7 @@ public class ServerStore {
             var previous=find(type,uuid(node.get("id"))).orElse(null);
             node.put("clientId",previous!=null && previous.hasNonNull("clientId") ? previous.get("clientId").asText()
                     : creationClient.get()!=null ? creationClient.get().toString() : defaultClient().get("id").asText());
+            if(type.equals("PROJECT") && previous!=null && previous.has("icon")) node.set("icon",previous.get("icon").deepCopy());
             if(type.equals("WORK_SESSION")) {
                 // Web-only metadata survives domain timer/interval writes.
                 node.set("labelIds",previous!=null && previous.has("labelIds") ? previous.get("labelIds").deepCopy() : array());
@@ -309,6 +310,7 @@ public class ServerStore {
         if(input.has("clientId")) {
             UUID client=uuid(input.get("clientId"));find("CLIENT",client).orElseThrow(ApiFailure::notFound);node.put("clientId",client.toString());
         }
+        if(type.equals("PROJECT") && input.has("icon")) node.set("icon",input.get("icon").deepCopy());
         if(type.equals("PROJECT") && input.has("clientId")) {
             // Reassign sessions explicitly before moving a project to another client.
             // Historical client totals must never change as a side effect of editing a project.

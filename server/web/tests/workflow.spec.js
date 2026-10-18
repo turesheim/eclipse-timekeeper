@@ -1,3 +1,4 @@
+import {workSessionAction} from './workweek-session-actions.js';
 import {browserRequest} from './browser-request.js';
 import {openAccountMenu, setTimeZone} from './navigation.js';
 import {localDateTime} from '../src/model.js';
@@ -23,7 +24,7 @@ async function editorTime(request, instant) {
 async function editSessionFromWorkweek(page, request, session) {
   await page.locator('[data-tab=week]').click();
   await page.getByLabel('Week containing').fill((await editorTime(request,session.start)).slice(0,10));
-  await page.locator(`#week-sessions tr[data-work-session-id="${session.id}"]`).getByRole('button',{name:/^Edit session /}).click();
+  await workSessionAction(page,session.id,'Edit');
 }
 async function createTask(request, summary = 'Browser task ' + randomUUID()) {
   return (await api(request, 'POST', '/tasks', {summary, projectId:null, parentTaskId:null, url:null})).json();
@@ -339,6 +340,8 @@ test('workweek groups linked tasks under projects with seven day columns and con
   await expect(table.locator('th')).toHaveCount(11);
   await expect(table.locator('tr[data-kind=project]').filter({hasText:project.name})).toContainText('24h 59m 59s');
   const parentRow = table.locator('tr[data-kind=task]').filter({hasText:'PLATFORM-3396: Clean registry '+suffix});
+  await expect(parentRow.getByRole('link')).toHaveCSS('font-weight','400');
+  await expect(parentRow.locator('td').nth(8)).toHaveCSS('font-weight','400');
   await expect(parentRow.getByRole('link')).toHaveAttribute('href',jiraUrl);
   await expect(parentRow).toContainText('24h 59m 59s');
   await expect(parentRow.locator('td').nth(8)).toHaveText('24h 59m 59s');
@@ -496,7 +499,7 @@ test('session toolbar targets the displayed session and preserves historical too
   await page.getByRole('button',{name:'Refresh',exact:true}).click();
   // Opening a historical record must not leave an invisible selection behind in the shared panel.
   await page.locator('[data-tab=week]').click();await page.getByLabel('Week containing').fill('2025-10-20');
-  await page.locator(`#week-sessions tr[data-work-session-id="${history.id}"]`).getByRole('button',{name:/^Edit session /}).click();
+  await workSessionAction(page,history.id,'Edit');
   await expect(page.getByLabel('Summary',{exact:true})).toHaveValue(history.summary);await page.getByRole('button',{name:'Cancel',exact:true}).click();
   await page.getByRole('button',{name:'Edit work session',exact:true}).click();
   await expect(page.getByLabel('Summary',{exact:true})).toHaveValue(active.summary);await page.getByRole('button',{name:'Cancel',exact:true}).click();
@@ -524,7 +527,7 @@ test('session toolbar targets the displayed session and preserves historical too
     for(const id of ['session-start','session-new','session-edit','session-delete']) await expect(peer.locator('#'+id)).toBeDisabled();
   } finally {await context.close();}
   await page.locator('[data-tab=week]').click();
-  await page.locator(`#week-sessions tr[data-work-session-id="${history.id}"]`).getByRole('button',{name:/^Delete session /}).click();
+  await workSessionAction(page,history.id,'Delete');
   await expect(page.locator('#fields')).toContainText(history.summary);await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();
   await expect(page.locator('#work-session-title')).toHaveText('Your work session');
   for(const action of await tools.getByRole('button').all()) await expect(action).toBeDisabled();

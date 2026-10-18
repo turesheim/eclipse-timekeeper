@@ -1,5 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
+import AxeBuilder from '@axe-core/playwright';
 const token=process.env.TIMEKEEPER_WEB_TOKEN;
 async function api(request,method,path,data,headers={}) {
   const response=await request.fetch(`/api/v1${path}`,{method,data,headers:{Authorization:`Bearer ${token}`,...headers}});
@@ -49,7 +50,7 @@ test('clients maintain names and colors, own projects and color work-session sum
       await page.getByLabel('Name',{exact:true}).fill(prefix+' project '+i);await page.getByLabel('Client',{exact:true}).selectOption(client.id);await save(page);
     }
     projects.push(...(await (await api(request,'GET','/projects?clientId='+client.id)).json()).items);expect(projects).toHaveLength(2);
-    for(const project of projects) await expect(page.locator('#projects tr').filter({hasText:project.name})).toContainText(prefix);
+    for(const project of projects) await expect(page.locator(`#projects tbody[data-client-id="${client.id}"] [data-project-id="${project.id}"]`)).toHaveText(new RegExp(project.name));
     await page.getByRole('button',{name:'Record work session',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill(prefix+' planning');await page.getByLabel('Client',{exact:true}).selectOption(client.id);
     await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveAttribute('type','datetime-local');await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveAttribute('type','datetime-local');
     await expect(page.getByLabel('Enter exact times',{exact:true})).toHaveCount(0);
@@ -101,5 +102,65 @@ test('optional work-session projects select their client and survive start, stop
     for(const [collection,records] of [['work-sessions',sessions],['projects',project ? [project]:[]],['clients',clients]]) for(const record of records) {
       const current=await api(request,'GET',`/${collection}/${record.id}`);await api(request,'DELETE',`/${collection}/${record.id}`,undefined,{'If-Match':current.headers().etag});
     }
+  }
+});
+
+test('Projects groups clients with keyboard collapsible headings and retains groups through refresh and reassignment',async({page,request})=>{
+  const prefix='Grouped '+randomUUID().slice(0,6),clients=[],projects=[];
+  try {
+    for(const suffix of ['Beta','Alpha'])clients.push(await (await api(request,'POST','/clients',{name:prefix+' '+suffix,color:'#6750a4'})).json());
+    for(const [index,name] of [[0,'Shared project'],[0,'Another project'],[1,'Shared project']])projects.push(await (await api(request,'POST','/projects',{name,clientId:clients[index].id})).json());
+    await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+    await page.getByRole('button',{name:'Projects',exact:true}).click();
+    const beta=page.locator(`#projects tbody[data-client-id="${clients[0].id}"]`),alpha=page.locator(`#projects tbody[data-client-id="${clients[1].id}"]`);
+    await expect(beta.locator('[data-project-id]')).toHaveCount(2);await expect(alpha.locator('[data-project-id]')).toHaveCount(1);
+    const toggle=beta.getByRole('button',{name:'Collapse '+clients[0].name,exact:true});await toggle.focus();await page.keyboard.press('Enter');
+    await expect(beta.getByRole('button',{name:'Expand '+clients[0].name,exact:true})).toBeFocused();await expect(beta.locator('[data-project-id]').first()).not.toBeVisible();await expect(alpha.locator('[data-project-id]')).toBeVisible();
+    await page.getByRole('button',{name:'Refresh',exact:true}).click();await expect(beta.getByRole('button',{name:'Expand '+clients[0].name,exact:true})).toHaveAttribute('aria-expanded','false');
+    await beta.getByRole('button',{name:'Expand '+clients[0].name,exact:true}).press('Space');await expect(beta.locator('[data-project-id]').first()).toBeVisible();
+    await beta.locator(`[data-project-id="${projects[0].id}"]`).getByRole('button',{name:'Edit',exact:true}).click();await page.getByLabel('Client',{exact:true}).selectOption(clients[1].id);await save(page);
+    await expect(beta.locator('[data-project-id]')).toHaveCount(1);await expect(alpha.locator('[data-project-id]')).toHaveCount(2);
+    await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.locator('#projects').screenshot({path:'test-results/projects-grouped-mobile.png'});
+    await alpha.getByRole('button',{name:'Collapse '+clients[1].name,exact:true}).click();await expect(alpha.locator('[data-project-id]').first()).not.toBeVisible();
+  } finally {
+    for(const [collection,records] of [['projects',projects],['clients',clients]])for(const record of records){const current=await api(request,'GET',`/${collection}/${record.id}`);await api(request,'DELETE',`/${collection}/${record.id}`,undefined,{'If-Match':current.headers().etag});}
+  }
+});
+
+test('optional project icons persist and Track shows distinct icons to the right of daily durations',async({page,request})=>{
+  const prefix='Icon '+randomUUID().slice(0,6),records=[],previous=await (await api(request,'GET','/me')).json();
+  async function create(collection,data){const value=await (await api(request,'POST','/'+collection,data)).json();records.unshift([collection,value.id]);return value;}
+  try {
+    const profile=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:'Europe/Oslo'},{'If-Match':profile.headers().etag});
+    const client=await create('clients',{name:prefix+' client',color:'#176653'});
+    await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+    await page.getByRole('button',{name:'Projects',exact:true}).click();await page.getByRole('button',{name:'New project',exact:true}).click();
+    await page.getByLabel('Name',{exact:true}).fill(prefix+' Website');await page.getByLabel('Client',{exact:true}).selectOption(client.id);
+    await expect(page.getByRole('radio',{name:'None',exact:true})).toBeChecked();await page.getByRole('radio',{name:'Code',exact:true}).check();
+    expect((await new AxeBuilder({page}).include('#editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
+    await page.setViewportSize({width:1280,height:900});await page.locator('#editor').screenshot({path:'test-results/project-icon-picker.png'});await save(page);await page.setViewportSize({width:1280,height:720});
+    const project=(await (await api(request,'GET','/projects?clientId='+client.id)).json()).items[0];records.unshift(['projects',project.id]);expect(project.icon).toBe('code');
+    const other=await create('projects',{name:prefix+' Backend',clientId:client.id,icon:'code'}),globe=await create('projects',{name:prefix+' Research',clientId:client.id,icon:'globe'});
+    for(const [index,projectId] of [project.id,project.id,other.id,globe.id,null].entries())await create('work-sessions',{clientId:client.id,projectId,summary:prefix+' session '+index,start:`2025-10-20T${String(6+index).padStart(2,'0')}:00:00Z`,end:`2025-10-20T${String(7+index).padStart(2,'0')}:00:00Z`});
+    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Projects',exact:true}).click();
+    const row=page.locator(`#projects [data-project-id="${project.id}"]`);await expect(row.locator('[data-project-icon=code]')).toBeVisible();await row.getByRole('button',{name:'Edit',exact:true}).click();await expect(page.getByRole('radio',{name:'Code',exact:true})).toBeChecked();
+    await page.getByLabel('Name',{exact:true}).fill(prefix+' Website renamed');await save(page);
+    await page.getByRole('button',{name:'Workweek',exact:true}).click();await page.getByLabel('Week containing',{exact:true}).fill('2025-10-20');await expect(page.locator(`#week-sessions [data-week-project="${project.id}"] [data-project-icon=code]`)).toBeVisible();
+    await page.getByRole('button',{name:'Track',exact:true}).click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
+    const entry=page.locator(`[data-track-date="2025-10-20"] [data-track-daily-client="${client.id}"]`),icons=entry.locator('.track-project-icons [data-project-icon]');
+    await expect(entry.locator('.track-client-day-time')).toHaveText('5h 0m');await expect(icons).toHaveCount(2);await expect(entry.locator('[data-project-icon=code]')).toHaveAttribute('title',new RegExp(other.name));await expect(entry).toHaveAttribute('title',new RegExp(globe.name));
+    async function iconsFollow(duration){const clock=await duration.boundingBox();for(const icon of await icons.all()){const box=await icon.boundingBox();expect(box.x).toBeGreaterThanOrEqual(clock.x+clock.width-.5);}}
+    await iconsFollow(entry.locator('.track-client-day-time'));await page.screenshot({path:'test-results/track-project-icons.png',fullPage:true});
+    await page.setViewportSize({width:390,height:844});await expect(entry.locator('.track-client-day-time-short')).toHaveText('5h');await iconsFollow(entry.locator('.track-client-day-time-short'));expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    expect((await new AxeBuilder({page}).include('#track-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
+    await page.screenshot({path:'test-results/track-project-icons-mobile.png',fullPage:true});
+    await page.getByRole('button',{name:'Projects',exact:true}).click();await row.getByRole('button',{name:'Edit',exact:true}).click();await page.getByRole('radio',{name:'None',exact:true}).check();await save(page);await expect(row.locator('[data-project-icon]')).toHaveCount(0);
+    expect((await (await api(request,'GET','/projects/'+project.id)).json()).icon).toBeNull();
+    const current=await api(request,'GET','/projects/'+other.id);await api(request,'PUT','/projects/'+other.id,{name:other.name,icon:null},{'If-Match':current.headers().etag});
+    await page.getByRole('button',{name:'Track',exact:true}).click();await expect(icons).toHaveCount(1);await expect(entry.locator('[data-project-icon=globe]')).toBeVisible();await expect(entry.locator('.track-client-day-time-short')).toHaveText('5h');
+  } finally {
+    for(const [collection,id] of records){const current=await api(request,'GET',`/${collection}/${id}`);await api(request,'DELETE',`/${collection}/${id}`,undefined,{'If-Match':current.headers().etag});}
+    const profile=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:previous.zoneId},{'If-Match':profile.headers().etag});
   }
 });
