@@ -278,14 +278,17 @@ public class ServerStore {
     }
     /** Owner-locked, repeatable payload migration; interval and catalogue links stay intact. */
     void migrateWorkSessionDescriptions() {
+        var migrated=new java.util.HashMap<UUID,ImportProvenance.DescriptionMigration>();
         for(var old:list("WORK_SESSION")) {
             if(!old.has("title")) continue;
             var node=((ObjectNode)old).deepCopy();long version=node.path("version").asLong();
             node.put("summary",WorkSessionDescriptions.summary(old));node.remove("title");node.put("version",version+1);
             if(update("UPDATE tk_resource SET payload=?,version=? WHERE owner_id=? AND entity_type='WORK_SESSION' AND id=? AND version=?",
                     node.toString(),version+1,owner(),uuid(node.get("id")),version)!=1) throw new ApiFailure(412,"STALE_VERSION");
+            migrated.put(uuid(node.get("id")),new ImportProvenance.DescriptionMigration(version,hash(canonical(old).toString()),node));
             change("WORK_SESSION","UPDATED",node.path("id").asText());
         }
+        ImportProvenance.workSessionDescriptions(this,migrated);
     }
     JsonNode createClient(JsonNode input) {
         var node=((ObjectNode)input).deepCopy();node.put("id",UUID.randomUUID().toString());node.put("ownerId",owner());node.put("version",0);

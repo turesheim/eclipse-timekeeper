@@ -110,6 +110,10 @@ Choose **Undo import** in history and confirm. This stops further batches of
 that job and reverses all committed batches, including a partial import. Undo
 itself is bounded and resumable; **Resume Undo** continues after interruption.
 
+An upgrade that moves old work-session titles into Summary preserves automatic
+Undo for otherwise untouched imported sessions. Sessions you edited still require
+review before deletion.
+
 Created work sessions or activities are removed first. Newly created catalog records are removed
 only when unused; reused records and unrelated dependants stay. Edited records
 require explicit **Keep** or **Delete** after reviewing current values. Running

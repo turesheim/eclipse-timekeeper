@@ -154,6 +154,28 @@ class TogglImportTest {
         }
         fail("Undo did not finish");
     }
+    @Test void retiringTitlesPreservesAutomaticUndoOnlyForUntouchedImportedSessions() {
+        for(boolean edited:List.of(false,true)) {
+            String owner="title-migration-undo-"+UUID.randomUUID();var importer=new TogglImport(store);var rows=array().add(sessionRow().put("title","Independent description"));
+            UUID job=uuid(store.transaction(owner,()->importer.create(sessionSource())).get("id"));
+            store.transaction(owner,()->{
+                commit(importer,job,rows,0,true);
+                var session=((ObjectNode)store.list("WORK_SESSION").getFirst()).deepCopy();session.put("title","Independent description");
+                // Model the persisted resource and trusted baseline produced by the previous server.
+                var ledger=new ImportLedger(store);var item=(ObjectNode)store.list("IMPORT_ITEM").stream().filter(value->value.path("kind").asText().equals("ENTRY")).findFirst().orElseThrow();
+                var part=(ObjectNode)item.path("parts").get(0);part.set("baseline",session.deepCopy());part.put("baselineHash",hash(canonical(session).toString()));ledger.update(ImportLedger.Kind.IMPORT_ITEM,item);
+                if(edited)session.put("version",session.path("version").asLong()+1).put("summary","User-edited notes");
+                store.update("UPDATE tk_resource SET payload=?,version=? WHERE owner_id=? AND entity_type='WORK_SESSION' AND id=?",session.toString(),session.path("version").asLong(),owner,uuid(session.get("id")));
+                store.migrateWorkSessionDescriptions();store.migrateWorkSessionDescriptions();
+                var undo=new ImportUndo(store);undo.start(job,etag(ledger.required(ImportLedger.Kind.IMPORT_JOB,job)));
+                var preview=undo.preview(job);var target=preview.path("targets").get(0);assertEquals(edited ? "REVIEW":"DELETE",target.path("status").asText());
+                var input=object().put("reviewToken",preview.path("reviewToken").asText());var choices=input.putObject("choices");if(edited)choices.put(target.path("key").asText(),"KEEP");
+                undo.apply(job,0,input);assertEquals(edited,store.find("WORK_SESSION",uuid(session.get("id"))).isPresent());
+                if(edited)assertEquals("Independent description\n\nUser-edited notes",store.find("WORK_SESSION",uuid(session.get("id"))).orElseThrow().path("summary").asText());
+                return null;
+            });
+        }
+    }
     @Test void titlelessSourceRowsKeepHistoricalDuplicateIdentityIncludingTruncatedUnicodeDescriptions() {
         for(String summary:List.of("Independent description","A"+"🙂".repeat(800))) {
             String owner="summary-import-"+UUID.randomUUID();var importer=new TogglImport(store);

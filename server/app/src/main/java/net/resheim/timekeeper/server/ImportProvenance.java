@@ -8,6 +8,7 @@ import net.resheim.eclipse.timekeeper.domain.Activity;
 
 /** Entry claims and daily-part lineage share the business write's owner transaction. */
 final class ImportProvenance {
+    record DescriptionMigration(long beforeVersion,String beforeHash,JsonNode after) { }
     private final ServerStore store;
     private final ImportLedger ledger;
     ImportProvenance(ServerStore store) {this.store=store;this.ledger=new ImportLedger(store);}
@@ -18,6 +19,23 @@ final class ImportProvenance {
         var value=object();value.put("id",activity.id().value().toString());
         value.put("baselineVersion",eligible ? activity.version() : -1);value.put("baselineHash",eligible ? baseline(owner,activity) : "");
         if(eligible) value.set("baseline",snapshot(owner,activity));return value;
+    }
+    /** Format changes preserve Undo eligibility only when the prior record exactly matched its import baseline. */
+    static void workSessionDescriptions(ServerStore store,Map<UUID,DescriptionMigration> migrated) {
+        if(migrated.isEmpty()) return;
+        var ledger=new ImportLedger(store);
+        for(var value:store.list("IMPORT_ITEM")) {
+            if(!value.path("kind").asText().equals("ENTRY") || !value.path("recordType").asText().equals("WORK_SESSION")) continue;
+            var item=((ObjectNode)value).deepCopy();boolean changed=false;
+            for(var raw:item.path("parts")) {
+                var migration=migrated.get(uuid(raw.get("id")));if(migration==null) continue;
+                if(raw.path("baselineVersion").asLong(-1)!=migration.beforeVersion()
+                        || !raw.path("baselineHash").asText().equals(migration.beforeHash())) continue;
+                var part=(ObjectNode)raw;part.put("baselineVersion",migration.after().path("version").asLong());
+                part.put("baselineHash",hash(canonical(migration.after()).toString()));part.set("baseline",migration.after().deepCopy());changed=true;
+            }
+            if(changed) ledger.update(ImportLedger.Kind.IMPORT_ITEM,item);
+        }
     }
     Optional<ObjectNode> active(ObjectNode job,String fingerprint,int occurrence) {
         digest(fingerprint);if(occurrence<0 || occurrence>100000) throw ApiFailure.validation();
