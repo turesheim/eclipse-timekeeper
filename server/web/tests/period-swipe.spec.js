@@ -72,8 +72,11 @@ test('native mobile swipes preserve taps, vertical scrolling and horizontal tabl
     await signIn(page);const month=page.locator('#track-month');await month.fill('2025-12');
     const cdp=await context.newCDPSession(page);
     async function nativeSwipe(locator,dx,dy=0) {
-      await locator.scrollIntoViewIfNeeded();const box=await locator.boundingBox();
-      const x=Math.min(330,Math.max(90,box.x+box.width/2)),y=Math.min(650,Math.max(160,box.y+box.height/2));
+      await locator.scrollIntoViewIfNeeded();
+      const {x,y}=await locator.evaluate(node=>{
+        const box=node.getBoundingClientRect();
+        return {x:(Math.max(24,box.left)+Math.min(innerWidth-24,box.right))/2,y:(Math.max(32,box.top)+Math.min(innerHeight-32,box.bottom))/2};
+      });
       await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
       for(let step=1;step<=8;step++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+dx*step/8,y:y+dy*step/8}]});
       await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});

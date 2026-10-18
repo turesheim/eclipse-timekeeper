@@ -40,6 +40,8 @@ export function periodSwipe(root,{enabled,navigate}) {
     navigate(dx<0 ? 1:-1);
   },{passive:false});
   root.addEventListener('touchcancel',cancel,{passive:true});
+  // A new mouse press is independent input, rather than a touch compatibility click.
+  root.addEventListener('pointerdown',event=>{if(event.pointerType==='mouse')suppressClickUntil=0;},true);
   root.addEventListener('click',event=>{
     if(event.detail && performance.now()<suppressClickUntil) {
       suppressClickUntil=0;event.preventDefault();event.stopImmediatePropagation();
