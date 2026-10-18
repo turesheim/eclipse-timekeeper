@@ -5,6 +5,7 @@ import {icon, iconButton} from './icons.js';
 import {WeekCalendar} from './calendar.js';
 import {sameSession} from './calendar-model.js';
 import {MonthTrack} from './track.js';
+import {WorkweekSessions} from './workweek-sessions.js';
 import {accountMenu} from './account-menu.js';
 
 const $ = id => document.getElementById(id);
@@ -15,7 +16,7 @@ let watchSession = null;
 let accountName = '', canWrite = false;
 let serverInfoRequest = 0;
 let snapshotAt = 0, activeAsOf = 0n;
-const collapsed = new Set();
+const collapsed = new Set(), collapsedClients = new Set();
 let decimalHours = false, activitiesCollapsed = false;
 const displayNanos = value => decimalHours ? decimalHoursText(value) : nanosText(value);
 const displayDuration = value => decimalHours ? decimalHoursText(durationNanos(value)) : durationText(value);
@@ -29,6 +30,12 @@ const calendar = new WeekCalendar($('calendar-panel'), {
   onChange: changeCalendarSession,
 });
 const track = new MonthTrack($('track-panel'),{onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))});
+const weekSessions=new WorkweekSessions($('week-sessions'),{
+  onEdit:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error))),
+  onDelete:id=>void openDelete('work-sessions',id).catch(error=>setStatus(errorText(error))),
+  onSaved:async()=>{connected=false;readOnlyWhileDisconnected();await refresh().catch(()=>{});},
+  onUnauthorized:error=>auth.clear(errorText(error)),
+});
 function startWatch(session) {
   if (watchSession === session) return;
   watchSession = session;
@@ -70,12 +77,14 @@ function readOnlyWhileDisconnected() {
   for (const action of document.querySelectorAll('td.actions button')) action.disabled = !connected;
   calendar.setConnected(connected);
   track.setWritable(connected && canWrite);
+  weekSessions.setWritable(connected && canWrite);
   updateSessionActions();
 }
 function tab(name) {
   for (const item of ['track','week', 'calendar', 'tasks', 'clients', 'projects', 'labels']) $(`${item}-panel`).hidden = item !== name;
   $('workspace').dataset.view=name;if(name==='calendar') calendar.show();else calendar.hide();
   if(name!=='track')track.hide();
+  if(name!=='week')weekSessions.hide();
   for (const item of document.querySelectorAll('[data-tab]')) {
     item.classList.toggle('active', item.dataset.tab === name);
     if (item.dataset.tab === name) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
@@ -100,10 +109,10 @@ const auth = authentication({
     return refresh();
   },
   clear() {
-    $('week-sessions').replaceChildren(); $('week-sessions-section').hidden = true; $('work-session-labels').replaceChildren(); $('work-session-labels').hidden = true;
+    weekSessions.reset(); $('week-sessions-section').hidden = true; $('work-session-labels').replaceChildren(); $('work-session-labels').hidden = true;
     refreshing = null; reloadAgain = false;
     ++serverInfoRequest; clearServerInfo(); api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null; accountName = '';
-    calendar.reset(); track.reset(); collapsed.clear(); canWrite = false;
+    calendar.reset(); track.reset(); collapsed.clear(); collapsedClients.clear(); canWrite = false;
     $('editor').close(); $('fields').replaceChildren(); $('editor-error').textContent = ''; $('editor-notice').textContent = '';
     for(const id of ['clients','projects','tasks','labels','activities','days']) $(id).replaceChildren();
     for(const id of ['owner','status','active-title','active-details','work-session-current','work-session-state','work-session-elapsed','zone-caption','week-total']) $(id).textContent = '';
@@ -202,6 +211,42 @@ function taskLabel(task) {
   if (url) { node.href = url; node.target = '_blank'; node.rel = 'noopener noreferrer'; }
   return node;
 }
+function renderProjects(s) {
+  if (!s.projects.length) {table('projects', ['Name', 'Actions'], []);return;}
+  const root = $('projects'), table = element('table', undefined, 'table align-middle mb-0 projects-table');
+  table.setAttribute('aria-label', 'Projects by client');
+  const head = element('thead'), header = element('tr');
+  for (const caption of ['Client / project', 'Actions']) {const cell = element('th', caption);cell.scope = 'col';header.append(cell);}
+  head.append(header);table.append(head);
+  const clients = [...s.clients].sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric:true, sensitivity:'base'}) || a.id.localeCompare(b.id));
+  for (const client of clients) {
+    const projects = s.projects.filter(project => project.clientId === client.id).sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric:true, sensitivity:'base'}) || a.id.localeCompare(b.id));
+    if (!projects.length) continue;
+    const body = element('tbody'), group = element('tr', undefined, 'projects-client'), label = element('th');
+    body.dataset.clientId = client.id;label.colSpan = 2;label.scope = 'rowgroup';
+    const toggle = button('', () => {
+      if (collapsedClients.has(client.id)) collapsedClients.delete(client.id);else collapsedClients.add(client.id);
+      updateToggle();
+    });
+    toggle.className = 'btn projects-client-toggle';
+    const name = element('span', client.name, 'client-color');
+    if (/^#[0-9a-f]{6}$/i.test(client.color)) name.style.setProperty('--client-color', client.color);
+    const count = element('span', String(projects.length), 'badge text-bg-secondary');count.setAttribute('aria-label', `${projects.length} projects`);
+    label.append(toggle);group.append(label);body.append(group);
+    for (const project of projects) {
+      const record = row([project.name], [action('Edit', () => openRecord('projects', project.id)), action('Delete', () => openDelete('projects', project.id))]);
+      record.dataset.projectId = project.id;record.firstElementChild.className = 'projects-project-name';body.append(record);
+    }
+    function updateToggle() {
+      const expanded = !collapsedClients.has(client.id);
+      toggle.replaceChildren(icon(expanded ? 'down' : 'right'), name, count);
+      toggle.setAttribute('aria-expanded', String(expanded));toggle.setAttribute('aria-label', `${expanded ? 'Collapse' : 'Expand'} ${client.name}`);
+      for (const row of body.querySelectorAll('[data-project-id]')) row.hidden = !expanded;
+    }
+    updateToggle();table.append(body);
+  }
+  root.replaceChildren(table);
+}
 function render() {
   const s = snapshot, zone = s.profile.data.zoneId;
   $('owner').textContent = accountName;
@@ -212,7 +257,7 @@ function render() {
   $('active-details').textContent = active ? `Started ${instantText(active.start, zone)} · ${active.summary || 'Tracking time'}` : 'Choose a task below to start tracking.';
   $('stop').hidden = !active; readOnlyWhileDisconnected();
   table('clients', ['Name', 'Color', 'Actions'], s.clients.map(value => row([value.name, colorSwatch(value.color)], [action('Edit', () => openRecord('clients', value.id)), action('Delete', () => openDelete('clients', value.id))])));
-  table('projects', ['Name', 'Client', 'Actions'], s.projects.map(value => row([value.name, name(s.clients, value.clientId)], [action('Edit', () => openRecord('projects', value.id)), action('Delete', () => openDelete('projects', value.id))])));
+  renderProjects(s);
   table('tasks', ['Task', 'Project', 'Parent', 'Actions'], s.tasks.map(value => row([taskLabel(value), name(s.projects, value.projectId), value.parentTaskId ? name(s.tasks, value.parentTaskId, 'summary') : '—'], [action('Start', () => openStart(value.id)), action('Edit', () => openRecord('tasks', value.id)), action('Delete', () => openDelete('tasks', value.id))])));
   table('labels', ['Name', 'Color', 'Actions'], s.labels.map(value => row([value.name, /^#[0-9a-f]{6}$/i.test(value.color) ? colorSwatch(value.color) : value.color || '—'], [action('Edit', () => openRecord('labels', value.id)), action('Delete', () => openDelete('labels', value.id))])));
   refreshLabelFields(); refreshClientChoices(); renderSession();
@@ -239,23 +284,7 @@ function renderWorkweek(s, zone) {
     const daily = dates.map(date => activities.reduce((sum, activity) => sum + activityDayNanos(activity, date, zone, s.report.generatedAt), 0n));
     return [...daily, daily.reduce((sum, value) => sum + value, 0n)].map((value, index) => value || index === 7 ? displayNanos(value) : '—');
   };
-  const sessions = [...s.workSessions].sort((a,b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id)).filter(value => visible(value) && instantNanos(value.start) < instantNanos(s.dates.to) && instantNanos(value.end || s.report.generatedAt) > instantNanos(s.dates.from));
-  $('week-sessions-section').hidden = !sessions.length; $('week-sessions').replaceChildren();
-  if (sessions.length) {
-    const sessionRows = sessions.map(value => {
-      const title = element('span', undefined, 'workweek-session-title'), client = s.clients.find(client => client.id === value.clientId);
-      const caption = element('span', value.summary || 'Work session', 'client-color'); if (/^#[0-9a-f]{6}$/i.test(client?.color)) caption.style.setProperty('--client-color', client.color);
-      title.append(caption, element('small', client?.name || 'Client'));
-      const labels=(value.labelIds || []).map(id=>name(s.labels,id)).join(', ');
-      if(labels) title.append(element('small',labels));
-      if (!value.end) title.append(element('span', 'Running', 'badge rounded-pill text-bg-success'));
-      const actions=[action(`Edit session ${value.summary || 'Work session'}`, () => openRecord('work-sessions', value.id)),action(`Delete session ${value.summary || 'Work session'}`, () => openDelete('work-sessions', value.id))];
-      for(const action of actions) action.disabled=!connected || !canWrite;
-      const item = row([title, ...totals([value])], actions); item.dataset.workSessionId = value.id; return item;
-    });
-    table('week-sessions', ['Work session', ...headings, 'Weekly total', 'Actions'], sessionRows);
-    const grid = $('week-sessions').querySelector('table'); grid.classList.remove('record-table'); grid.classList.add('workweek-table');
-  }
+  weekSessions.update(s,activeAsOf,displayNanos,api,connected&&canWrite,selectedDay);
   const titleCell = (content, level, key, title) => {
     const node = element('div', undefined, 'tree-title'); node.style.setProperty('--level', level);
     if (key) {
@@ -548,6 +577,7 @@ function renderSessionTime() {
   if(connected) activeAsOf=instantNanos(snapshot.report.generatedAt)+elapsed;
   if(session) $('work-session-elapsed').textContent=displayNanos(sessionTimeNanos(session,[],activeAsOf).duration);
   track.tick(activeAsOf);
+  weekSessions.tick(activeAsOf);
 }
 $('session-start').addEventListener('click',()=> {
   if(!connected || snapshot.activeWorkSession.data || !begin('Start work session',{command:'session-start',key:crypto.randomUUID()})) return;

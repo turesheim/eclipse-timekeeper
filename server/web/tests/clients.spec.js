@@ -49,7 +49,7 @@ test('clients maintain names and colors, own projects and color work-session sum
       await page.getByLabel('Name',{exact:true}).fill(prefix+' project '+i);await page.getByLabel('Client',{exact:true}).selectOption(client.id);await save(page);
     }
     projects.push(...(await (await api(request,'GET','/projects?clientId='+client.id)).json()).items);expect(projects).toHaveLength(2);
-    for(const project of projects) await expect(page.locator('#projects tr').filter({hasText:project.name})).toContainText(prefix);
+    for(const project of projects) await expect(page.locator(`#projects tbody[data-client-id="${client.id}"] [data-project-id="${project.id}"]`)).toHaveText(new RegExp(project.name));
     await page.getByRole('button',{name:'Record work session',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill(prefix+' planning');await page.getByLabel('Client',{exact:true}).selectOption(client.id);
     await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveAttribute('type','datetime-local');await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveAttribute('type','datetime-local');
     await expect(page.getByLabel('Enter exact times',{exact:true})).toHaveCount(0);
@@ -101,5 +101,28 @@ test('optional work-session projects select their client and survive start, stop
     for(const [collection,records] of [['work-sessions',sessions],['projects',project ? [project]:[]],['clients',clients]]) for(const record of records) {
       const current=await api(request,'GET',`/${collection}/${record.id}`);await api(request,'DELETE',`/${collection}/${record.id}`,undefined,{'If-Match':current.headers().etag});
     }
+  }
+});
+
+test('Projects groups clients with keyboard collapsible headings and retains groups through refresh and reassignment',async({page,request})=>{
+  const prefix='Grouped '+randomUUID().slice(0,6),clients=[],projects=[];
+  try {
+    for(const suffix of ['Beta','Alpha'])clients.push(await (await api(request,'POST','/clients',{name:prefix+' '+suffix,color:'#6750a4'})).json());
+    for(const [index,name] of [[0,'Shared project'],[0,'Another project'],[1,'Shared project']])projects.push(await (await api(request,'POST','/projects',{name,clientId:clients[index].id})).json());
+    await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+    await page.getByRole('button',{name:'Projects',exact:true}).click();
+    const beta=page.locator(`#projects tbody[data-client-id="${clients[0].id}"]`),alpha=page.locator(`#projects tbody[data-client-id="${clients[1].id}"]`);
+    await expect(beta.locator('[data-project-id]')).toHaveCount(2);await expect(alpha.locator('[data-project-id]')).toHaveCount(1);
+    const toggle=beta.getByRole('button',{name:'Collapse '+clients[0].name,exact:true});await toggle.focus();await page.keyboard.press('Enter');
+    await expect(beta.getByRole('button',{name:'Expand '+clients[0].name,exact:true})).toBeFocused();await expect(beta.locator('[data-project-id]').first()).not.toBeVisible();await expect(alpha.locator('[data-project-id]')).toBeVisible();
+    await page.getByRole('button',{name:'Refresh',exact:true}).click();await expect(beta.getByRole('button',{name:'Expand '+clients[0].name,exact:true})).toHaveAttribute('aria-expanded','false');
+    await beta.getByRole('button',{name:'Expand '+clients[0].name,exact:true}).press('Space');await expect(beta.locator('[data-project-id]').first()).toBeVisible();
+    await beta.locator(`[data-project-id="${projects[0].id}"]`).getByRole('button',{name:'Edit',exact:true}).click();await page.getByLabel('Client',{exact:true}).selectOption(clients[1].id);await save(page);
+    await expect(beta.locator('[data-project-id]')).toHaveCount(1);await expect(alpha.locator('[data-project-id]')).toHaveCount(2);
+    await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.locator('#projects').screenshot({path:'test-results/projects-grouped-mobile.png'});
+    await alpha.getByRole('button',{name:'Collapse '+clients[1].name,exact:true}).click();await expect(alpha.locator('[data-project-id]').first()).not.toBeVisible();
+  } finally {
+    for(const [collection,records] of [['projects',projects],['clients',clients]])for(const record of records){const current=await api(request,'GET',`/${collection}/${record.id}`);await api(request,'DELETE',`/${collection}/${record.id}`,undefined,{'If-Match':current.headers().etag});}
   }
 });

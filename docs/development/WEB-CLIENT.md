@@ -142,15 +142,21 @@ local IANA time zone. This is saved to the account so work sessions, activities,
 calendar boundaries and other clients use the same zone. An explicitly selected
 zone, including UTC, is retained when signing in from another device. Read-only
 tokens retain the existing account zone. Use **Account menu → My Account → Profile → Time zone** to change it explicitly.
-Workweek shows the sessions overlapping the selected week in a separate
-**Work sessions** grid above the task/activity breakdown. Each row shows the
-session summary, client name/color, seven local-day durations, a weekly total and
-an Edit action. Running sessions are marked and update with live snapshots.
-Durations are clipped at the week and local-day boundaries, including daylight
-saving changes, and follow the selected clock/decimal display format.
-Day selection filters session rows alongside activity rows. The section is
-hidden when no sessions overlap the selected week/day. Session time is not
-added to the activity report totals; both describe different intervals.
+Workweek shows overlapping sessions in a compact **Work sessions** grid grouped
+by client and project. Each daily cell contains a start/end pair for every
+session; edit a time and press Enter or leave the pair to save, or Escape to
+cancel. The details menu shows summaries and labels and provides the full editor
+and delete action. Running sessions remain marked. Edits preserve unchanged
+endpoint precision and metadata; stale or uncertain saves keep the proposal for
+review instead of repeating the write.
+
+Times use the account time zone. Sessions crossing midnight appear on each day;
+edit each endpoint on its actual day. An end of **24:00** means the next midnight.
+For repeated daylight-saving times, include an explicit offset such as
+**02:30+01:00**. Daily/client/project totals are clipped at local-day and week
+boundaries and follow the selected clock/decimal format. Day selection filters
+sessions alongside activities. The grid hides when no sessions overlap the
+selected week/day. Session time is separate from activity report totals.
 
 The default Workweek groups projects, tasks, subtasks and activities,
 with seven daily duration columns, a weekly total column and expandable rows
@@ -414,6 +420,10 @@ preserve the proposed interval for review instead of silently overwriting data
 or repeating an ordinary write.
 
 ## Clients, projects and work sessions
+
+The **Projects** view groups projects beneath their client, with its color and
+project count. Use the client chevron to expand or collapse its projects.
+Groups retain their expanded state while the account is signed in.
 
 Use **Clients** to create, rename, recolor or delete a client. A client has a
 required name and hex color. Each project belongs to exactly one client; choose
