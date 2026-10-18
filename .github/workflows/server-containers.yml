@@ -150,6 +150,7 @@ jobs:
           python server/synology/tests/migration_acceptance.py --source-schema 2
           python server/synology/tests/migration_acceptance.py --source-schema 3
           python server/synology/tests/migration_acceptance.py --source-schema 4
+          python server/synology/tests/migration_acceptance.py
           python server/synology/tests/migration_acceptance.py --server-image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA"
       - name: Verify PostgreSQL 17 schema and concurrent bootstrap
         env:
