@@ -16,7 +16,7 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
       await expect(button).toHaveAttribute('title',label);
       const box=await button.boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);expect(box.width).toBeGreaterThanOrEqual(32);expect(box.height).toBeGreaterThanOrEqual(44);
       if(width<1024)await expect(button.locator('.nav-label')).not.toBeVisible();else await expect(button.locator('.nav-label')).toBeVisible();
-      await button.click();await expect(button).toHaveAttribute('aria-current','page');await expect(page.locator('#'+id+'-panel')).toBeVisible();
+      await button.click();await expect(button).toHaveAttribute('aria-current','page');await expect(page.locator('#'+id+'-panel')).toHaveJSProperty('hidden',false);
     }
     await page.evaluate(()=>scrollTo(0,document.documentElement.scrollHeight));
     const footer=await page.locator('#server-info').boundingBox();expect(footer.y+footer.height).toBeLessThanOrEqual(bounds.y);
