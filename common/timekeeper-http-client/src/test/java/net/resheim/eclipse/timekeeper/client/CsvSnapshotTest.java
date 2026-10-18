@@ -27,6 +27,16 @@ class CsvSnapshotTest {
         data.addProperty("format","timekeeper-domain-v2");assertThrows(IOException.class,()->CsvSnapshot.write(data,temporary.resolve("downgrade")));
         Files.delete(folder.resolve("clients.csv"));assertThrows(IOException.class,()->CsvSnapshot.read(folder));
     }
+    @Test void v3CsvRoundTripsTitlelessSessionsAndMixedLegacyTitles() throws Exception {
+        var data=JsonParser.parseString("""
+            {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[],"projects":[],"tasks":[],"labels":[],"activities":[],
+             "workSessions":[{"id":"session","start":"2025-10-20T08:00:00Z","end":null,"summary":"Only a summary","clientId":"client"}]}
+            """).getAsJsonObject();
+        var current=temporary.resolve("summary-only");CsvSnapshot.write(data,current);assertEquals(data,CsvSnapshot.read(current));
+        assertTrue(Files.readString(current.resolve("workSessions.csv")).startsWith("\"id\",\"start\",\"end\",\"summary\",\"clientId\"\r\n"));
+        var legacy=data.getAsJsonArray("workSessions").get(0).getAsJsonObject().deepCopy();legacy.addProperty("id","legacy");legacy.addProperty("title","Earlier title");data.getAsJsonArray("workSessions").add(legacy);
+        var mixed=temporary.resolve("mixed");CsvSnapshot.write(data,mixed);assertEquals(data,CsvSnapshot.read(mixed));
+    }
     @Test void v3CsvRetainsOptionalWorkSessionLabelsAndStillReadsTheEarlierHeader() throws Exception {
         var data=JsonParser.parseString("""
             {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[],"projects":[],"tasks":[],"labels":[],"activities":[],

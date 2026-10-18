@@ -115,6 +115,7 @@ public final class CsvSnapshot {
                     JsonObject item = new JsonObject();
                     for (int i = 0; i < fields.size(); i++) {
                         String column = names.get(i), value = fields.get(i);
+                        if (column.equals("title") && value == null) continue; // Optional legacy column in mixed v3 exports.
                         if (value == null) item.add(column, JsonNull.INSTANCE);
                         else if (column.equals("externalReferences") || column.equals("labelIds")) {
                             JsonElement array = JsonParser.parseString(value);if (!array.isJsonArray()) throw invalid();item.add(column, array);

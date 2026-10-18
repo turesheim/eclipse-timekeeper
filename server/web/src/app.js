@@ -454,7 +454,7 @@ async function changeCalendarSession(original, proposal, scope) {
 async function openDelete(collection, id) {
   const session = api, loaded = await session.request(`/${collection}/${id}`);
   if (session !== api || !connected || !begin('Delete record', {collection, id, etag: loaded.etag, remove: true})) return;
-  $('fields').append(element('p', `Delete “${loaded.data.name || loaded.data.title || loaded.data.summary || 'Activity'}”? This cannot be undone. Records with dependencies may be rejected.`));
+  $('fields').append(element('p', `Delete “${loaded.data.name || loaded.data.summary || (collection==='work-sessions' ? 'Work session':'Activity')}”? This cannot be undone. Records with dependencies may be rejected.`));
   $('save').textContent = 'Delete'; showEditor();
 }
 async function openStart(id) {
