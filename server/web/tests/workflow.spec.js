@@ -245,10 +245,17 @@ test('same-token owner reassignment cannot switch a live browser session', async
   const file = process.env.TIMEKEEPER_WEB_REGISTRY, original = await readFile(file, 'utf8');
   await signIn(page); await page.getByRole('button', {name:'Projects', exact:true}).click(); await page.getByRole('button', {name:'New project', exact:true}).click(); await page.getByLabel('Name', {exact:true}).fill('Keep in original account');
   try {
-    const registry = JSON.parse(original); registry[0].ownerId = 'web-other-owner'; const temporary = file + '.new'; await writeFile(temporary, JSON.stringify(registry), {mode:0o600}); await rename(temporary, file);
+    // Change the owner only after the write is in flight, so a background watch
+    // cannot clear the editor before the test has clicked Save.
+    let reassigned=false;
+    await page.route('**/api/v1/projects',async route=>{
+      if(route.request().method()!=='POST')return route.continue();
+      const registry=JSON.parse(original);registry[0].ownerId='web-other-owner';const temporary=file+'.new';
+      await writeFile(temporary,JSON.stringify(registry),{mode:0o600});await rename(temporary,file);reassigned=true;await route.continue();
+    });
     await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click(); await expect(page.locator('#login')).toBeVisible();await expect(page.locator('#workspace')).not.toBeVisible();await expect(page.locator('#fields')).toBeEmpty();
-    expect((await (await api(request,'GET','/projects')).json()).items).toHaveLength(0);
-  } finally { const temporary = file + '.new'; await writeFile(temporary, original, {mode:0o600}); await rename(temporary, file); }
+    expect(reassigned).toBe(true);expect((await (await api(request,'GET','/projects')).json()).items).toHaveLength(0);
+  } finally { const temporary = file + '.new'; await writeFile(temporary, original, {mode:0o600}); await rename(temporary, file);await page.unroute('**/api/v1/projects'); }
 });
 test('reload restores the HttpOnly session and sign-out removes it', async ({page}) => {
   await signIn(page); expect(await page.locator('#token').inputValue()).toBe('');
