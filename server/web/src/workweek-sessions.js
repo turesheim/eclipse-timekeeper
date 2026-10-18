@@ -96,7 +96,7 @@ export class WorkweekSessions {
         if(input.readOnly||!this.writable)return;
         if(this.draft&&this.draft.original.id!==record.id){input.blur();return;}
         if(!this.draft)this.draft={original:record,api:this.api,zone:this.snapshot.profile.data.zoneId,first:this.snapshot.dates.first,edits:{}};
-        input.value=this.draft.edits[key]?.text??(entry[key].endsWith(':00') ? compactClock(entry[key]):entry[key]);input.select();
+        input.value=this.draft.edits[key]?.text??(/^\d{2}:\d{2}:00$/.test(entry[key]) ? compactClock(entry[key]):entry[key]);input.select();
       });
       input.addEventListener('input',()=>{
         if(this.draft?.original.id!==record.id||input.readOnly)return;

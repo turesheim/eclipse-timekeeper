@@ -121,7 +121,9 @@ test('compact Workweek cells group sessions and edit exact endpoints without cha
     const saved=await (await api(request,'GET','/work-sessions/'+first.id)).json();expect(saved.start).toBe(first.start);expect(saved.summary).toBe(first.summary);expect(saved.clientId).toBe(first.clientId);expect(saved.projectId).toBe(first.projectId);expect(saved.labelIds).toEqual(first.labelIds);expect(writes).toBe(1);
     expect(await (await api(request,'GET','/activities/'+activity.id)).json()).toEqual(activity);
     await expect(end).toBeEnabled();await end.fill('14:00');await end.press('Escape');await expect(end).toHaveValue('13:30');expect(writes).toBe(1);
-    await page.getByRole('heading',{name:'Work sessions',exact:true}).click();
+    await end.fill('14:00');await page.getByRole('heading',{name:'Work sessions',exact:true}).click();
+    await expect.poll(async()=>(await (await api(request,'GET','/work-sessions/'+first.id)).json()).end).toBe('2025-10-20T12:00:00Z');expect(writes).toBe(2);
+    await expect(page.locator('.week-session-draft')).not.toBeVisible();
     const audit=await new AxeBuilder({page}).include('#week-sessions-section').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
     await page.screenshot({path:'test-results/compact-workweek-desktop.png',fullPage:true});
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(await page.locator('#week-sessions').evaluate(node=>node.scrollWidth>node.clientWidth)).toBe(true);
