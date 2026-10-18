@@ -32,6 +32,8 @@ overlap provides context.
   totals. Start a task timer or record time manually, including taskless work.
 - **Clients and projects** organize your work with client colors and searchable
   project icons.
+- **Themes** include the original Timekeeper palette, Timekeeper Dark, Solarized
+  Light/Dark, Nord and Dracula. Choose a theme in the account menu.
 - **Toggl Track import** maps source clients and projects to new or existing
   records and supports undoing a whole import. Prefer the Legacy CSV export
   because it includes client names. Duration is calculated from Start/End times;
@@ -47,6 +49,8 @@ Administrators manage account access without access to other users' work records
 
 The server exposes API v1 at `/api/v1` and includes the web interface at `/web/`.
 The browser client needs no separate frontend service or Node.js process.
+Open **About** in the account menu for the server/SPK version, build identity and
+deployment time.
 
 Choose a deployment:
 
