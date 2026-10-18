@@ -69,6 +69,8 @@ Los Angeles time while the account uses Oslo time.
 
 ![Track month view on a narrow screen](../assets/screenshots/track-month-narrow.png)
 
+![Track month and year picker](../assets/screenshots/track-month-picker.png)
+
 ## Design baseline
 
 Bootstrap 5.3.8 supplies the shared buttons, forms, navigation, cards and tables.
