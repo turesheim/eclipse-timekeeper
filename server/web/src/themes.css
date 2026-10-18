@@ -74,7 +74,7 @@
   & .workweek-table tr[aria-selected=true] { --bs-table-bg: var(--theme-selected); }
   & .workweek-table tr[aria-selected=true] .activity-title small { color: var(--bs-body-color); }
   & .empty h3 { color: var(--bs-body-color); }
-  & a.task-title { color: var(--theme-hover); }
+  & a.task-title { color: color-mix(in srgb, var(--accent) 50%, var(--bs-body-color)); }
   & .day { background: var(--theme-soft); }
   & .client-color::before { border-color: var(--line); }
   & .project-icon-option:has(:checked) { background: var(--theme-group); }
