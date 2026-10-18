@@ -6,12 +6,12 @@
 }
 :root[data-theme=solarized-light] {
   --theme-page: #eee8d5; --bs-body-bg: #fdf6e3; --bs-body-color: #073642;
-  --bs-secondary-color: #586e75; --bs-primary: #006b70; --bs-primary-rgb: 0,107,112;
+  --bs-secondary-color: #4e646b; --bs-primary: #006b70; --bs-primary-rgb: 0,107,112;
   --theme-on-accent: #fdf6e3; --theme-scheme: light;
 }
 :root[data-theme=solarized-dark] {
   --theme-page: #002b36; --bs-body-bg: #073642; --bs-body-color: #eee8d5;
-  --bs-secondary-color: #a3b3b3; --bs-primary: #2aa198; --bs-primary-rgb: 42,161,152;
+  --bs-secondary-color: #a3b3b3; --bs-primary: #5dbdb5; --bs-primary-rgb: 93,189,181;
   --theme-on-accent: #002b36; --theme-scheme: dark;
 }
 :root[data-theme=nord] {
@@ -73,6 +73,7 @@
   & .workweek-table tr[data-kind=task] { --bs-table-bg: var(--theme-soft); }
   & .workweek-table tr[aria-selected=true] { --bs-table-bg: var(--theme-selected); }
   & .empty h3 { color: var(--bs-body-color); }
+  & a.task-title { color: var(--theme-hover); }
   & .day { background: var(--theme-soft); }
   & .client-color::before { border-color: var(--line); }
   & .project-icon-option:has(:checked) { background: var(--theme-group); }
