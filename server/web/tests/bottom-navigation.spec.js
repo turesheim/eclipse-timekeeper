@@ -19,7 +19,7 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
       await button.click();await expect(button).toHaveAttribute('aria-current','page');await expect(page.locator('#'+id+'-panel')).toHaveJSProperty('hidden',false);
     }
     await page.evaluate(()=>scrollTo(0,document.documentElement.scrollHeight));
-    const content=await page.locator('#labels-panel').boundingBox();expect(content.y+content.height).toBeLessThanOrEqual(bounds.y);
+    await expect.poll(async()=>{const content=await page.locator('#labels-panel').boundingBox();return content.y+content.height;}).toBeLessThanOrEqual(bounds.y);
     expect((await bar.boundingBox()).y).toBeCloseTo(bounds.y,0);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     const audit=await new AxeBuilder({page}).include('#workspace-navigation').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
