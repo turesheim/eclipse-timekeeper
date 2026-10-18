@@ -80,7 +80,7 @@ test('portability: concurrent session refreshes do not interrupt private archive
   await account(page,request);
   for(let round=0;round<3;round++) {
     const replies=await page.evaluate(async()=>Promise.all(Array.from({length:12},async(_,index)=>{
-      const archive=index%2===0,response=await fetch('/api/v1'+(archive ? '/data/account/export':'/auth/session'),{headers:{Accept:archive ? 'application/zip':'application/json'}});
+      const archive=index%2===0,response=await fetch('/api/v1'+(archive ? '/data/account/export':'/auth/session'),{headers:{Accept:archive ? 'application/zip':'application/json'},referrerPolicy:'origin',credentials:'same-origin',cache:'no-store'});
       const bytes=new Uint8Array(await response.arrayBuffer());
       return {status:response.status,archive,type:response.headers.get('Content-Type'),zip:bytes[0]===0x50&&bytes[1]===0x4b};
     })));
