@@ -11,7 +11,7 @@ test.beforeAll(async({request})=>{const clients=(await (await api(request,'GET',
 async function signIn(page, credential = token) {
   await page.goto('/web/'); await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(credential); await page.getByRole('button', {name:'Sign in', exact:true}).click();
   await expect(page.locator('#status')).toHaveText('Up to date');
-  await page.locator('[data-tab=week]').click();
+  await page.locator('[data-tab=activities]').click();
 }
 async function api(request, method, path, data, headers = {}) {
   const response = await request.fetch(`/api/v1${path}`, {method, data, headers:{Authorization:`Bearer ${token}`, ...headers}});
@@ -75,7 +75,7 @@ test('account time zone controls local editors and build dates across DST and br
     await page.getByLabel('Start time occurrence',{exact:true}).selectOption('+01:00');await save(page);
     saved=await (await api(request,'GET',`/work-sessions/${session.id}`)).json();
     expect(saved.start).toBe('2025-10-26T01:30:00Z');
-    await page.getByLabel('Week containing').fill('2025-10-26');
+    await page.locator('[data-tab=activities]').click();await page.getByLabel('Week containing').fill('2025-10-26');
     await page.getByRole('button',{name:'Add time',exact:true}).click();
     await page.getByLabel('Summary',{exact:true}).fill(summary+' activity');
     await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-26T02:30:00.123456789+02:00');
@@ -137,7 +137,7 @@ test('core browser workflow manages records, tracks time, and preserves exact re
   await expect(page.locator('#editor')).not.toBeVisible(); await expect(page.locator('#active-title')).toHaveText(task);
   await page.getByRole('button', {name:'Stop tracking', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Stop', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible();
   await setTimeZone(page,'Europe/Oslo');
-  await page.getByRole('button', {name:'Workweek', exact:true}).click(); await page.getByLabel('Week containing').fill('2025-10-26');
+  await page.getByRole('button', {name:'Activities', exact:true}).click(); await page.getByLabel('Week containing').fill('2025-10-26');
   await expect(page.locator('#zone-caption')).toContainText('2025-10-20'); await page.getByRole('button', {name:'Add time', exact:true}).click();
   await page.getByLabel('Task', {exact:true}).selectOption({label:task}); await page.getByLabel('Summary', {exact:true}).fill('Autumn DST');
   await page.getByLabel('Start (local time)', {exact:true}).fill('2025-10-25T22:00:00Z'); await page.getByLabel('End (local time, blank while tracking)', {exact:true}).fill('2025-10-26T23:00:00Z'); await save(page);
@@ -155,7 +155,7 @@ test('core browser workflow manages records, tracks time, and preserves exact re
   // Dependency rejection keeps the delete confirmation and does not cascade.
   await page.getByRole('button', {name:'Projects', exact:true}).click(); await page.locator('#projects tr').filter({hasText:project}).getByRole('button', {name:'Delete', exact:true}).click();
   await page.locator('#editor').getByRole('button', {name:'Delete', exact:true}).click(); await expect(page.locator('#editor-error')).toContainText('conflicts'); await page.getByRole('button', {name:'Cancel', exact:true}).click();
-  await page.getByRole('button', {name:'Workweek', exact:true}).click(); await page.locator('#activities tr').filter({hasText:'One nanosecond'}).getByRole('button', {name:'Delete', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Delete', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible();
+  await page.getByRole('button', {name:'Activities', exact:true}).click(); await page.locator('#activities tr').filter({hasText:'One nanosecond'}).getByRole('button', {name:'Delete', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Delete', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible();
   const tasks = await (await api(request, 'GET', '/tasks')).json(); expect(tasks.items.find(v => v.summary === task)).toBeTruthy();
   // Start/stop interval remains; delete it explicitly before task/project cleanup.
   const id = tasks.items.find(v => v.summary === task).id;
@@ -245,10 +245,17 @@ test('same-token owner reassignment cannot switch a live browser session', async
   const file = process.env.TIMEKEEPER_WEB_REGISTRY, original = await readFile(file, 'utf8');
   await signIn(page); await page.getByRole('button', {name:'Projects', exact:true}).click(); await page.getByRole('button', {name:'New project', exact:true}).click(); await page.getByLabel('Name', {exact:true}).fill('Keep in original account');
   try {
-    const registry = JSON.parse(original); registry[0].ownerId = 'web-other-owner'; const temporary = file + '.new'; await writeFile(temporary, JSON.stringify(registry), {mode:0o600}); await rename(temporary, file);
+    // Change the owner only after the write is in flight, so a background watch
+    // cannot clear the editor before the test has clicked Save.
+    let reassigned=false;
+    await page.route('**/api/v1/projects',async route=>{
+      if(route.request().method()!=='POST')return route.continue();
+      const registry=JSON.parse(original);registry[0].ownerId='web-other-owner';const temporary=file+'.new';
+      await writeFile(temporary,JSON.stringify(registry),{mode:0o600});await rename(temporary,file);reassigned=true;await route.continue();
+    });
     await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click(); await expect(page.locator('#login')).toBeVisible();await expect(page.locator('#workspace')).not.toBeVisible();await expect(page.locator('#fields')).toBeEmpty();
-    expect((await (await api(request,'GET','/projects')).json()).items).toHaveLength(0);
-  } finally { const temporary = file + '.new'; await writeFile(temporary, original, {mode:0o600}); await rename(temporary, file); }
+    expect(reassigned).toBe(true);expect((await (await api(request,'GET','/projects')).json()).items).toHaveLength(0);
+  } finally { const temporary = file + '.new'; await writeFile(temporary, original, {mode:0o600}); await rename(temporary, file);await page.unroute('**/api/v1/projects'); }
 });
 test('reload restores the HttpOnly session and sign-out removes it', async ({page}) => {
   await signIn(page); expect(await page.locator('#token').inputValue()).toBe('');
@@ -543,7 +550,7 @@ test('independent taskless activities derive overlap context and survive session
   session=await (await api(request,'PUT',`/work-sessions/${session.id}`,{clientId:session.clientId,summary:session.summary,start:'2007-10-27T22:00:00.123456789Z',end:'2007-10-28T23:00:00.123456789Z'},{'If-Match':loaded.headers().etag})).json();
   const label = (await (await api(request,'GET','/labels')).json()).items[0];
   for (const [summary,start,end] of [['First overlap','2007-10-28T08:00:00.123456789Z','2007-10-28T12:00:00.123456789Z'],['Second overlap','2007-10-28T10:00:00.123456789Z','2007-10-28T14:00:00.123456789Z']]) {
-    await page.locator('[data-tab=week]').click();await page.getByRole('button',{name:'Add time',exact:true}).click();
+    await page.locator('[data-tab=activities]').click();await page.getByRole('button',{name:'Add time',exact:true}).click();
     await expect(page.getByLabel('Task',{exact:true})).toHaveValue('');await expect(page.locator('#editor').getByLabel('Work session',{exact:true})).toHaveCount(0);
     await page.getByLabel('Summary',{exact:true}).fill(summary);await page.getByLabel('Start (local time)',{exact:true}).fill(start);
     await page.getByLabel('End (local time, blank while tracking)',{exact:true}).fill(end);await page.locator('#editor').getByLabel(label.name,{exact:true}).check();await save(page);
@@ -556,7 +563,7 @@ test('independent taskless activities derive overlap context and survive session
   await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue((await editorTime(request, session.start)).slice(0,16));
   await page.getByLabel('Summary',{exact:true}).fill('Renamed without changing precise times');await save(page);
   const unchanged=await (await api(request,'GET',`/work-sessions/${session.id}`)).json();expect([unchanged.start,unchanged.end]).toEqual([session.start,session.end]);
-  await page.locator('[data-tab=week]').click();await page.getByRole('button',{name:'Add time',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill('Outside session');
+  await page.locator('[data-tab=activities]').click();await page.getByRole('button',{name:'Add time',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill('Outside session');
   await page.getByLabel('Start (local time)',{exact:true}).fill('2007-10-29T00:00:00Z');await page.getByLabel('End (local time, blank while tracking)',{exact:true}).fill('2007-10-29T01:00:00Z');
   await expect(page.locator('#activity-session-warning')).toHaveCount(0);await save(page);
   expect((await (await api(request,'GET',`/work-sessions/${session.id}/report`)).json()).activities).toHaveLength(2);

@@ -62,6 +62,7 @@ class ContractTest(unittest.TestCase):
             'StartActivityInput': {'taskId': ID, 'summary': '', 'labelIds': [],
                                    'expectedActiveId': None, 'expectedActiveVersion': None},
             'ProfileInput': {'zoneId': 'Europe/Oslo'},
+            'UndoInput': {},
         }
         for name, body in inputs.items():
             with self.subTest(schema=name):
@@ -74,7 +75,7 @@ class ContractTest(unittest.TestCase):
                     self.assertFalse(validator(name).is_valid(missing))
 
     def test_optional_project_icons_are_bounded_metadata(self):
-        for icon in ('code', 'globe', None):
+        for icon in ('code', 'globe', 'gavel', 'rocket', None):
             validator('ProjectInput').validate({'name': 'Project', 'icon': icon})
             validator('TransferProject').validate({'id': ID, 'name': 'Project', 'icon': icon})
         validator('ProjectInput').validate({'name': 'Earlier client'})
@@ -202,7 +203,7 @@ class ContractTest(unittest.TestCase):
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
             'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',
             'createWorkSession', 'getWorkSession', 'updateWorkSession', 'deleteWorkSession', 'listWorkSessions',
-            'getActiveWorkSession', 'startWorkSession', 'stopWorkSession', 'associateWorkSession', 'reportWorkSession',
+            'undoWorkSessionChange', 'getActiveWorkSession', 'startWorkSession', 'stopWorkSession', 'associateWorkSession', 'reportWorkSession',
             'getAuthStatus', 'login', 'setupAccount', 'recoverAccount', 'exchangeApiToken', 'getAuthSession', 'logout', 'getAccount', 'updateAccount', 'changePassword', 'listPersonalTokens', 'createPersonalToken', 'revokePersonalToken', 'listUserAccounts', 'createUserAccount', 'getUserAccount', 'updateUserAccount',
             'requestEmailRecovery', 'previewEmailLink', 'verifyRecoveryEmail', 'resetPasswordByEmail', 'getRecoveryEmail', 'changeRecoveryEmail', 'resendRecoveryEmailVerification',
             'passkeyLoginOptions', 'passkeyLogin', 'cancelPasskeyCeremonies', 'listPasskeys', 'passkeyRegistrationOptions', 'registerPasskey',

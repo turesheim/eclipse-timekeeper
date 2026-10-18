@@ -1,11 +1,13 @@
 import {Api, ApiError} from './api.js';
 import {addDays, dateInZone, dayStart, durationText, durationNanos, instantText, instantNanos, weekRange, taskPresentation, activityDayNanos, nanosText, decimalHoursText, workweekGroups, sessionTimeNanos, localDateTime, localDateTimeToInstant, localDateTimeOffsets} from './model.js';
 import {authentication} from './auth.js';
-import {icon, iconButton, projectIcons, projectIcon} from './icons.js';
+import {icon, iconButton, projectIcon} from './icons.js';
 import {WeekCalendar} from './calendar.js';
 import {sameSession} from './calendar-model.js';
 import {MonthTrack} from './track.js';
 import {WorkweekSessions} from './workweek-sessions.js';
+import {projectCatalog} from './project-icons.js';
+import {UndoNotice} from './undo.js';
 import {accountMenu} from './account-menu.js';
 
 const $ = id => document.getElementById(id);
@@ -30,7 +32,13 @@ const calendar = new WeekCalendar($('calendar-panel'), {
   onChange: changeCalendarSession,
 });
 const track = new MonthTrack($('track-panel'),{onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))});
+const undoNotice=new UndoNotice($('undo-notice'),{
+  available:session=>session===api&&connected&&canWrite&&!editor&&(!weekSessions.draft||(!weekSessions.draft.busy&&!weekSessions.draft.review&&!Object.keys(weekSessions.draft.edits).length)),
+  changed:async session=>{if(session===api){if(weekSessions.draft&&!weekSessions.draft.busy&&!weekSessions.draft.review&&!Object.keys(weekSessions.draft.edits).length)weekSessions.cancel();connected=false;readOnlyWhileDisconnected();await refresh().catch(()=>{});}},
+  unauthorized:error=>auth.clear(errorText(error)),
+});
 const weekSessions=new WorkweekSessions($('week-sessions'),{
+  onUndo:(info,session)=>undoNotice.offer(info,session),
   onEdit:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error))),
   onDelete:id=>void openDelete('work-sessions',id).catch(error=>setStatus(errorText(error))),
   onSaved:async()=>{connected=false;readOnlyWhileDisconnected();await refresh().catch(()=>{});},
@@ -81,7 +89,8 @@ function readOnlyWhileDisconnected() {
   updateSessionActions();
 }
 function tab(name) {
-  for (const item of ['track','week', 'calendar', 'tasks', 'clients', 'projects', 'labels']) $(`${item}-panel`).hidden = item !== name;
+  for (const item of ['track','week','activities', 'calendar', 'tasks', 'clients', 'projects', 'labels']) $(`${item}-panel`).hidden = item !== name;
+  $('week-toolbar').hidden=!['week','activities'].includes(name);$('week-report-title').textContent=name==='activities' ? 'Your activities':'Your workweek';$('add-activity').hidden=name!=='activities';
   $('workspace').dataset.view=name;if(name==='calendar') calendar.show();else calendar.hide();
   if(name!=='track')track.hide();
   if(name!=='week')weekSessions.hide();
@@ -109,7 +118,7 @@ const auth = authentication({
     return refresh();
   },
   clear() {
-    weekSessions.reset(); $('week-sessions-section').hidden = true; $('work-session-labels').replaceChildren(); $('work-session-labels').hidden = true;
+    undoNotice.clear();weekSessions.reset(); $('week-sessions-section').hidden = true; $('work-session-labels').replaceChildren(); $('work-session-labels').hidden = true;
     refreshing = null; reloadAgain = false;
     ++serverInfoRequest; clearServerInfo(); api?.close(); api = null; snapshot = null; connected = false; editor = null; selectedActivity = null; selectedDay = null; accountName = '';
     calendar.reset(); track.reset(); collapsed.clear(); collapsedClients.clear(); canWrite = false;
@@ -285,7 +294,7 @@ function renderWorkweek(s, zone) {
     const daily = dates.map(date => activities.reduce((sum, activity) => sum + activityDayNanos(activity, date, zone, s.report.generatedAt), 0n));
     return [...daily, daily.reduce((sum, value) => sum + value, 0n)].map((value, index) => value || index === 7 ? displayNanos(value) : '—');
   };
-  weekSessions.update(s,activeAsOf,displayNanos,api,connected&&canWrite,selectedDay);
+  weekSessions.update(s,activeAsOf,displayNanos,api,connected&&canWrite,null);
   const titleCell = (content, level, key, title) => {
     const node = element('div', undefined, 'tree-title'); node.style.setProperty('--level', level);
     if (key) {
@@ -329,11 +338,21 @@ function renderWorkweek(s, zone) {
 function projectIconField(selected) {
   const group=element('fieldset',undefined,'project-icon-picker'),choices=element('div',undefined,'project-icon-choices');
   group.append(element('legend','Icon (optional)'));
-  for(const [id,text] of [['','None'],...projectIcons]) {
+  const search=element('input',undefined,'form-control');search.type='search';search.setAttribute('aria-label','Search project icons');search.placeholder='Search icons';search.autocomplete='off';
+  const more=button('More icons',()=>{limit+=60;filter();}),status=element('p','','hint');status.setAttribute('role','status');
+  const options=[];let limit=60;
+  for(const [id,text,,terms] of [['','None','',''],...projectCatalog]) {
     const label=element('label',undefined,'project-icon-option'),input=element('input');input.type='radio';input.name='icon';input.value=id;input.checked=id===(selected||'');input.className='form-check-input';
-    label.append(input);if(id)label.append(icon(id));label.append(element('span',text));choices.append(label);
+    label.append(input);if(id)label.append(projectIcon({icon:id,name:text}));label.append(element('span',text));choices.append(label);options.push({id,label,input,search:(id+' '+text+' '+terms).toLocaleLowerCase()});
   }
-  group.append(choices);$('fields').append(group);
+  function filter() {
+    const query=search.value.trim().toLocaleLowerCase(),matches=options.filter(option=>option.id&&query.split(/\s+/).every(term=>option.search.includes(term)));
+    const visible=new Set(matches.slice(0,limit));
+    for(const option of options)option.label.hidden=!!option.id&&!visible.has(option)&&!(option.input.checked&&!query);
+    status.textContent=matches.length ? `${Math.min(limit,matches.length)} of ${matches.length} icons`:'No matching icons.';more.hidden=limit>=matches.length;
+  }
+  search.addEventListener('input',()=>{limit=60;choices.scrollTop=0;filter();});filter();
+  group.append(search,choices,status,more);$('fields').append(group);
 }
 function field(labelText, key, value = '', options = {}) {
   const label = element('label', labelText), input = element(options.choices ? 'select' : options.multiline ? 'textarea':'input'); input.name = key;
@@ -494,7 +513,7 @@ async function changeCalendarSession(original, proposal, scope) {
 async function openDelete(collection, id) {
   const session = api, loaded = await session.request(`/${collection}/${id}`);
   if (session !== api || !connected || !begin('Delete record', {collection, id, etag: loaded.etag, remove: true})) return;
-  $('fields').append(element('p', `Delete “${loaded.data.name || loaded.data.summary || (collection==='work-sessions' ? 'Work session':'Activity')}”? This cannot be undone. Records with dependencies may be rejected.`));
+  $('fields').append(element('p', `Delete “${loaded.data.name || loaded.data.summary || (collection==='work-sessions' ? 'Work session':'Activity')}”? ${collection==='work-sessions' ? 'Undo will be available for ten minutes.':'This cannot be undone. Records with dependencies may be rejected.'}`));
   $('save').textContent = 'Delete'; showEditor();
 }
 async function openStart(id) {
@@ -535,8 +554,9 @@ async function saveEditor(event) {
     current.payload = body; freeze(true);
     const path = current.command === 'session-start' ? '/work-sessions/start' : current.command === 'session-stop' ? `/work-sessions/${current.id}/stop` : current.command === 'start' ? '/activities/start' : current.command === 'stop' ? `/activities/${current.id}/stop` : `/${current.collection}${current.id ? '/' + current.id : ''}`;
     const method = current.command ? 'POST' : current.remove ? 'DELETE' : current.id !== null ? 'PUT' : 'POST';
-    const saved = await current.session.request(path, {method, body, etag: current.etag, key: current.key});
+    const saved = await current.session.request(path, {method, body, etag: current.etag, key: current.key,undo:current.collection==='work-sessions'&&(method==='PUT'||method==='DELETE')});
     if (current.session !== api || current !== editor) return;
+    undoNotice.offer(saved.undo,current.session,current.remove ? 'Work session deleted':'Work session updated');
     if(!current.calendarChange && !current.remove && (current.collection==='work-sessions' || current.command==='session-start')) calendar.rememberClient(saved.data?.clientId);
     editor = null; $('editor').close(); $('fields').replaceChildren();
     connected = false; readOnlyWhileDisconnected(); setStatus('Refreshing saved changes…', 'working');

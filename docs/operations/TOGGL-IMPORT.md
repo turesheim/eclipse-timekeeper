@@ -17,9 +17,8 @@ missing, work-session imports suggest client names from projects instead; review
 and correct those mappings before importing.
 
 In classic Toggl Track, select the correct source workspace, open **Reports →
-Detailed**, choose the date range and turn rounding off. Include individual
-start/end dates and times, descriptions and durations. Export CSV with an
-`HH:MM:SS` duration format. Toggl documents CSV export as a paid-plan feature;
+Detailed**, choose the date range. Include individual
+start/end dates and times and descriptions. Toggl documents CSV export as a paid-plan feature;
 PDF summaries and Toggl 2.0/Focus exports are different formats.
 See [Detailed Reports](https://support.toggl.com/en-us/article/detailed-report-k9bzy2/)
 and [export prerequisites](https://support.toggl.com/en-us/article/exporting-data-z53uki/).
@@ -27,9 +26,10 @@ and [export prerequisites](https://support.toggl.com/en-us/article/exporting-dat
 Supported headers include `Member` with `Stop date`/`Stop time`, and the legacy
 `User` with `End date`/`End time`. Files must be UTF-8; a BOM, CRLF and quoted
 commas/newlines are supported. Dates can be ISO `YYYY-MM-DD`, `DD/MM/YYYY` or
-`MM/DD/YYYY`, as explicitly selected. Durations may include up to nine fractional
-second digits. Rounded decimal-hour durations and summary-only reports are
-rejected.
+`MM/DD/YYYY`, as explicitly selected. Timekeeper calculates duration from Start
+and End, preserving up to nine fractional second digits. The exported Duration
+column is ignored, including missing, rounded or conflicting values. Summary-only
+reports without individual timestamps are unsupported.
 
 ## Review and import
 
@@ -39,10 +39,10 @@ rejected.
 2. Select one source user. This selects whose entries to copy into your current
    account; it creates no login accounts, memberships or shared workspaces.
    Review row errors, unsupported columns and excluded rows. Incomplete timers,
-   future intervals and mismatched durations require correction or exclusion.
-   A `-` duration means no recorded duration. After reviewing diagnostics,
+   future intervals and invalid timestamps require correction or exclusion.
+   After reviewing diagnostics,
    select **Exclude invalid rows** beside **Review mappings** to continue with
-   the valid rows; no missing time is inferred.
+   the valid rows.
 3. Under **Client mappings**, choose an existing Timekeeper client for each
    Toggl client, or choose **Create a new client** and review its name and color.
    Several Toggl clients can use the same existing client. Reusing a client
@@ -127,7 +127,7 @@ possible. Retained records keep duplicate protection. **Download audit** provide
 a JSON record of committed outcomes and Undo decisions. Protected server
 database backups preserve this history; portable work-data exports omit its
 private import authority.
-The audit retains each selected entry's original interval, exact source duration,
+The audit retains each selected entry's original interval, duration calculated from its Start/End,
 source line/ID when available, selected source descriptions/project/task/tags,
 import mode and imported/reused outcome. Reused source time can
 differ from the current duration of a record that was edited after import.

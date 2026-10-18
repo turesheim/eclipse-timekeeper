@@ -81,11 +81,11 @@ The small application theme in `style.css` defines the green palette, typography
 spacing and visible keyboard focus. The work-session card establishes the baseline:
 a client-color accent, summary, explicit running/stopped status, local times,
 duration and consistently sized icon actions. Historical records and detailed
-totals are available in Workweek and Calendar. Client color is always accompanied
+totals are available in Workweek, Activities and Calendar. Client color is always accompanied
 by text.
 The same controls apply to sign-in/setup/recovery, account management, activities,
 clients, projects, tasks and labels. Record tables become labelled cards on narrow
-screens so actions stay in view; Workweek and Calendar retain their specialized
+screens so actions stay in view; Workweek, Activities and Calendar retain their specialized
 scrollable layouts. Calendar geometry is isolated in `calendar.css`.
 
 These screenshots use synthetic records from `tests/design.spec.js` at 1440 and
@@ -139,6 +139,8 @@ ordinary write requires cancel, refresh and review; uncertain start/stop offers
 explicit retry of the same frozen payload/key. Acknowledged saves remain
 successful when a subsequent refresh fails.
 
+## Workweek and Activities
+
 Reports use the account's IANA time zone and the server's exact daily/weekly
 totals. At sign-in, an untouched UTC profile (version zero) adopts the browser's
 local IANA time zone. This is saved to the account so work sessions, activities,
@@ -157,17 +159,18 @@ Times use the account time zone. Sessions crossing midnight appear on each day;
 edit each endpoint on its actual day. An end of **24:00** means the next midnight.
 For repeated daylight-saving times, include an explicit offset such as
 **02:30+01:00**. Daily/client/project totals are clipped at local-day and week
-boundaries and follow the selected clock/decimal format. Day selection filters
-sessions alongside activities. The grid hides when no sessions overlap the
-selected week/day. Session time is separate from activity report totals.
+boundaries and follow the selected clock/decimal format. The grid hides when no sessions overlap the
+selected week. Session time is separate from activity report totals.
 
 ![Compact Workweek sessions on desktop](../assets/screenshots/compact-workweek-desktop.png)
 
 ![Compact Workweek sessions on a narrow screen](../assets/screenshots/compact-workweek-mobile.png)
 
-The default Workweek groups projects, tasks, subtasks and activities,
+The **Activities** tab groups projects, tasks, subtasks and activities,
 with seven daily duration columns, a weekly total column and expandable rows
-like the Eclipse view. Task totals include their subtasks. **Hide activities**
+like the Eclipse view. Its daily and weekly summaries report activity time.
+Workweek and Activities share the selected week and duration format. Selecting
+a day filters Activities without hiding work sessions in Workweek. Task totals include their subtasks. **Hide activities**
 keeps the project/task outline visible; **Show activities** restores its rows.
 **Duration format** chooses conventional time or decimal hours for this browser
 session. Decimal hours use two places, rounded from each exact aggregate rather
@@ -176,6 +179,8 @@ Daily and weekly summaries show whole seconds; stored times and calculations
 retain nanoseconds. Linked task titles include their external ID (the Jira browse
 key or GitHub issue number when available) and open the recorded HTTP/HTTPS issue
 URL in a separate tab. Native task UUIDs are not display IDs.
+![Activities and daily totals on a narrow screen](../assets/screenshots/activities-mobile.png)
+
 Activity fields show and accept local dates and times in the account’s configured
 time zone, retaining up to nine fractional digits. Intervals across
 midnight are stored as separate activities in the account's time zone, including
@@ -260,10 +265,11 @@ actions, and Calendar provides historical editing. Opening a historical editor
 does not change the shared panel's target. Start/stop controls remain independent
 of activity timers. Counters use server timestamps and elapsed browser time;
 when offline they freeze. The card contains no history selector, duplicate totals
-or activity list; those views remain in Workweek and Calendar.
+or activity list; historical records and detailed reports remain in Workweek,
+Activities and Calendar.
 
 A work session is an independent interval for one client. Its tools are **Edit**
-and **Delete**. Create or edit activities in Workweek or Calendar; task timers
+and **Delete**. Create or edit activities in Activities or Calendar; task timers
 run independently. There are no session selectors or manual activity links.
 
 Work sessions may have several labels selected in the start, record and edit
@@ -366,7 +372,7 @@ Final release installation remains a separate gate.
 
 ## Calendar
 
-The **Calendar** tab beside Workweek shows all seven days. Both tabs share the
+The **Calendar** tab shows all seven days. Calendar, Workweek and Activities share the
 chosen week and the account's time zone. Use the arrows, **Today**, or the date
 field to navigate. On smaller screens, scroll inside the calendar to see the
 remaining days and hours.
@@ -435,6 +441,10 @@ Collapse choices survive refreshes and tab changes. Create or edit a project to
 select an optional icon from the bundled picker, or choose **None** to remove it.
 Icons also appear beside project names in Workweek and beside daily durations
 in Track. They are retained in account downloads and JSON/CSV transfers.
+
+The project icon picker offers over 1,400 bundled Font Awesome icons. Search by
+name or keyword, or choose **More icons** to browse. Filtering preserves the
+current selection; **None** removes an icon. Icons work offline.
 
 ![Optional project icon picker](../assets/screenshots/project-icon-picker.png)
 
@@ -522,3 +532,18 @@ the [acceptance report](../verification/ACCOUNT-DATA.md) for validation.
 ![Account archive review on desktop](../assets/screenshots/account-data-review-desktop.png)
 
 ![Account archive review on a narrow screen](../assets/screenshots/account-data-review-mobile.png)
+
+
+## Undo work-session changes
+
+After editing or deleting a work session, choose **Undo** in the notification
+within ten minutes. This includes calendar moves/resizes and Workweek time-cell
+edits. Undo restores exact times, client, project, labels and summary; activities
+remain independent. Only the latest acknowledged change is offered in the current
+browser session. Creation, timer start/stop and other record types are outside
+this first version.
+
+If another edit or a removed destination makes restoration unsafe, Undo reports
+that conflict without overwriting current records. A lost response offers
+**Retry undo**, which checks the same command safely. Signing out clears the
+notification. No work snapshots are stored in browser storage.

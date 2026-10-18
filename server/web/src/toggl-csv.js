@@ -35,14 +35,6 @@ export function csvRecords(text) {
   return records;
 }
 
-export function togglDuration(value) {
-  if (!value.trim() || value.trim() === '-') throw new Error('This row has no recorded duration. Exclude it or correct the CSV before importing.');
-  const match = /^(\d{1,8}):([0-5]\d):([0-5]\d)(?:\.(\d{1,9}))?$/.exec(value.trim());
-  if (!match) throw new Error('Use an unrounded HH:MM:SS duration, with up to nine fractional digits.');
-  return (BigInt(match[1]) * 3600n + BigInt(match[2]) * 60n + BigInt(match[3])) * 1000000000n
-    + BigInt((match[4] || '').padEnd(9, '0'));
-}
-
 function date(value, format) {
   const text = value.trim(); let result;
   if (format === 'ISO') result = /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
@@ -64,7 +56,7 @@ export function parseTogglDetailedCsv(text, {zone, dateFormat = 'ISO', now = new
   const has = value => header.includes(value);
   const member = has('Member') ? 'Member' : has('User') ? 'User' : null;
   const end = has('Stop date') && has('Stop time') ? 'Stop' : has('End date') && has('End time') ? 'End' : null;
-  if (!member || !end || !['Description','Duration','Start date','Start time'].every(has))
+  if (!member || !end || !['Description','Start date','Start time'].every(has))
     throw new Error('Choose a Toggl Track Detailed Report or Legacy CSV with individual start/end times; summary reports are unsupported.');
   if ((has('Member') && has('User')) || (has('Stop date') && has('End date')))
     throw new Error('The CSV mixes incompatible Detailed Report and Legacy headers.');
@@ -91,9 +83,8 @@ export function parseTogglDetailedCsv(text, {zone, dateFormat = 'ISO', now = new
       result.start = localDateTimeToInstant(`${date(value['Start date'],dateFormat)}T${value['Start time'].trim()}`,zone);
       result.end = localDateTimeToInstant(`${date(value[`${end} date`],dateFormat)}T${value[`${end} time`].trim()}`,zone);
       const elapsed = instantNanos(result.end) - instantNanos(result.start);
-      result.durationNanos = togglDuration(value.Duration);
+      result.durationNanos = elapsed;
       if (elapsed < 0n) throw new Error('The end precedes the start.');
-      if (elapsed !== result.durationNanos) throw new Error('Start/end times and duration disagree. Disable export rounding or resolve the time-zone/offset mismatch.');
       if (instantNanos(result.start) > instantNanos(now)) throw new Error('The entry starts in the future.');
       if (instantNanos(result.end) > instantNanos(now)) throw new Error('Only completed intervals ending in the past can be imported.');
     } catch (error) { result.errors.push(error.message); }

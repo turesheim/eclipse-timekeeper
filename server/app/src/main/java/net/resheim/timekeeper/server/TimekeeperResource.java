@@ -54,10 +54,11 @@ public class TimekeeperResource {
             JsonNode snapshot=stored(type,value,input);return ApiReplies.resource(201,snapshot,"/api/v1/"+collection+"/"+snapshot.get("id").asText());
         });
     }
-    @PUT @Path("/{collection}/{id}") public Response update(@PathParam("collection") String collection,@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
+    @PUT @Path("/{collection}/{id}") public Response update(@PathParam("collection") String collection,@PathParam("id") String id,@HeaderParam("If-Match") String match,@HeaderParam("X-Timekeeper-Undo") String undo,JsonNode body) {
         String type=ContractInputs.type(collection);UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate(ContractInputs.input(type,false),body);
+        boolean reversible=WorkSessionUndo.requested(undo,type);
         ContractInputs.queries(uri.getQueryParameters());return tx(() -> {
-            long version=ApiReplies.match(required(type,key),match);
+            var before=required(type,key);long version=ApiReplies.match(before,match);
             if(type.equals("CLIENT")) return ApiReplies.resource(200,store.updateClient(key,version,input),null);
             var service=store.service();Object value=switch(type) {
                 case "PROJECT" -> service.updateProject(new UpdateProject(new ProjectId(key),version,input.get("name").asText()));
@@ -66,13 +67,15 @@ public class TimekeeperResource {
                 case "ACTIVITY" -> service.updateActivity(new UpdateActivity(new ActivityId(key),version,Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText(),labels(input.get("labelIds"))));
                 case "WORK_SESSION" -> store.workSessionService().updateWorkSession(new UpdateWorkSession(new WorkSessionId(key),version,Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),WorkSessionDescriptions.summary(input)));
                 default -> throw ApiFailure.notFound();
-            };return ApiReplies.resource(200,stored(type,value,input),null);
+            };var after=stored(type,value,input);var reply=ApiReplies.resource(200,after,null);
+            return reversible ? new WorkSessionUndo(store).offer(before,after,reply):reply;
         });
     }
-    @DELETE @Path("/{collection}/{id}") public Response delete(@PathParam("collection") String collection,@PathParam("id") String id,@HeaderParam("If-Match") String match) {
+    @DELETE @Path("/{collection}/{id}") public Response delete(@PathParam("collection") String collection,@PathParam("id") String id,@HeaderParam("If-Match") String match,@HeaderParam("X-Timekeeper-Undo") String undo) {
         String type=ContractInputs.type(collection);UUID key=ContractInputs.pathId(id);ContractInputs.queries(uri.getQueryParameters());
+        boolean reversible=WorkSessionUndo.requested(undo,type);
         return tx(() -> {
-            long version=ApiReplies.match(required(type,key),match);var service=store.service();
+            var before=required(type,key);long version=ApiReplies.match(before,match);var service=store.service();
             switch(type) {
                 case "CLIENT" -> {store.delete(type,key);store.change(type,"DELETED",key.toString());}
                 case "PROJECT" -> service.deleteProject(new DeleteProject(new ProjectId(key),version));
@@ -81,7 +84,7 @@ public class TimekeeperResource {
                 case "ACTIVITY" -> service.deleteActivity(new DeleteActivity(new ActivityId(key),version));
                 case "WORK_SESSION" -> store.workSessionService().deleteWorkSession(new DeleteWorkSession(new WorkSessionId(key),version));
                 default -> throw ApiFailure.notFound();
-            }return empty();
+            }return reversible ? new WorkSessionUndo(store).offer(before,null,empty()):empty();
         });
     }
     private JsonNode stored(String type,Object value,JsonNode input) {

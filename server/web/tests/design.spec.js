@@ -73,7 +73,7 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
       await page.mouse.move(0,0);
       await page.screenshot({path:`test-results/design-work-session-${name}.png`,fullPage:true});
       await page.locator('#work-session').screenshot({path:`test-results/design-session-card-${name}.png`});
-      for(const tab of ['week','calendar','tasks','clients','projects','labels']) {
+      for(const tab of ['week','activities','calendar','tasks','clients','projects','labels']) {
         await page.locator(`[data-tab=${tab}]`).click();
         await expect(page.locator(`[data-tab=${tab}]`)).toHaveAttribute('aria-current','page');
         await expect(page.locator('#work-session')).toBeVisible();
@@ -82,7 +82,7 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
         expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
         await accessible(page);
         await iconTargets(page);
-        if(tab!=='week' && tab!=='calendar') {
+        if(tab!=='week' && tab!=='calendar' && tab!=='activities') {
           for(const action of await page.locator(`#${tab} td.actions button`).all()) {
             const rect=await action.boundingBox();expect(rect.x+rect.width).toBeLessThanOrEqual(width);
           }

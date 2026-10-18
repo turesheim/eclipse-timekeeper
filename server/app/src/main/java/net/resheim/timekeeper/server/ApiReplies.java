@@ -3,13 +3,16 @@ package net.resheim.timekeeper.server;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.ws.rs.core.Response;
 
-public record ApiReplies(int status,JsonNode body,String etag,String location) {
+public record ApiReplies(int status,JsonNode body,String etag,String location,JsonNode undo) {
+    public ApiReplies(int status,JsonNode body,String etag,String location) {this(status,body,etag,location,null);}
+    public ApiReplies withUndo(JsonNode value) {return new ApiReplies(status,body,etag,location,value);}
     public static ApiReplies resource(int status,JsonNode body,String location) { return new ApiReplies(status,body,JsonValues.etag(body),location); }
     public Response response() {
         var builder=Response.status(status).header("Cache-Control","no-store");
         if (body!=null) builder.type("application/json").entity(body);
         if (etag!=null) builder.header("ETag",etag);
         if (location!=null) builder.header("Location",location);
+        if(undo!=null)builder.header("X-Timekeeper-Undo-Id",undo.path("id").asText()).header("X-Timekeeper-Undo-Seconds",undo.path("seconds").asLong());
         return builder.build();
     }
     public static long match(JsonNode value,String header) {
