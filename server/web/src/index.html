@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Timekeeper</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" sizes="256x256" href="./apple-touch-icon.png">
@@ -15,7 +15,7 @@
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
-  <header class="app-header"><a class="brand" href="./">Timekeeper <small>2.0</small></a><div id="session" hidden><span id="owner"></span><details id="account-menu" class="account-menu"><summary class="btn btn-outline-secondary" role="button" aria-expanded="false" aria-controls="account-menu-items" aria-label="Account menu" title="Account menu"><span class="icon" aria-hidden="true">&#xf0c9;</span></summary><nav id="account-menu-items" class="account-menu-items" aria-label="Account"><a class="btn btn-link" id="account" tabindex="0" href="#account/profile">My Account</a><a class="btn btn-link" id="users-link" tabindex="0" href="/admin/" hidden>Administration</a><button class="btn btn-link" id="sign-out" type="button">Sign out</button></nav></details></div></header>
+  <header class="app-header"><a class="brand" href="./">Timekeeper <small>2.0</small></a><div id="session" hidden><span id="owner"></span><details id="account-menu" class="account-menu"><summary class="btn btn-outline-secondary" role="button" aria-expanded="false" aria-controls="account-menu-items" aria-label="Account menu" title="Account menu"><span class="icon" aria-hidden="true">&#xf0c9;</span></summary><nav id="account-menu-items" class="account-menu-items" aria-label="Account"><a class="btn btn-link" id="account" tabindex="0" href="#account/profile">My Account</a><a class="btn btn-link" id="users-link" tabindex="0" href="/admin/" hidden>Administration</a><button class="btn btn-link" id="about-open" type="button">About</button><button class="btn btn-link" id="sign-out" type="button">Sign out</button></nav></details></div></header>
   <main id="main-content" tabindex="-1">
     <section id="login" class="card login">
       <p class="eyebrow">YOUR WORK, RECORDED</p><h1>Make time count.</h1>
@@ -61,7 +61,16 @@
           </div></div>
       </section>
       <section class="card tracking"><div><p class="eyebrow">IN PROGRESS</p><h2 id="active-title">Ready when you are</h2><p id="active-details" class="hint">Choose a task below to start tracking.</p></div><button class="btn btn-primary" id="stop" hidden>Stop tracking</button></section>
-      <nav id="workspace-navigation" class="nav nav-pills workspace-nav" aria-label="Workspace" tabindex="-1"><button class="nav-link active" data-tab="track" aria-current="page">Track</button><button class="nav-link" data-tab="week">Workweek</button><button class="nav-link" data-tab="activities">Activities</button><button class="nav-link" data-tab="calendar">Calendar</button><button class="nav-link" data-tab="tasks">Tasks</button><button class="nav-link" data-tab="clients">Clients</button><button class="nav-link" data-tab="projects">Projects</button><button class="nav-link" data-tab="labels">Labels</button></nav>
+      <nav id="workspace-navigation" class="nav nav-pills workspace-nav" aria-label="Time tracking views" tabindex="-1">
+        <button class="nav-link active" data-tab="track" aria-current="page" aria-label="Track" title="Track"><span class="icon" aria-hidden="true">&#xf080;</span><span class="nav-label">Track</span></button>
+        <button class="nav-link" data-tab="week" aria-label="Workweek" title="Workweek"><span class="icon" aria-hidden="true">&#xf00a;</span><span class="nav-label">Workweek</span></button>
+        <button class="nav-link" data-tab="activities" aria-label="Activities" title="Activities"><span class="icon" aria-hidden="true">&#xf2f2;</span><span class="nav-label">Activities</span></button>
+        <button class="nav-link" data-tab="calendar" aria-label="Calendar" title="Calendar"><span class="icon" aria-hidden="true">&#xf133;</span><span class="nav-label">Calendar</span></button>
+        <button class="nav-link" data-tab="tasks" aria-label="Tasks" title="Tasks"><span class="icon" aria-hidden="true">&#xf0ae;</span><span class="nav-label">Tasks</span></button>
+        <button class="nav-link" data-tab="clients" aria-label="Clients" title="Clients"><span class="icon" aria-hidden="true">&#xf1ad;</span><span class="nav-label">Clients</span></button>
+        <button class="nav-link" data-tab="projects" aria-label="Projects" title="Projects"><span class="icon" aria-hidden="true">&#xf07b;</span><span class="nav-label">Projects</span></button>
+        <button class="nav-link" data-tab="labels" aria-label="Labels" title="Labels"><span class="icon" aria-hidden="true">&#xf02c;</span><span class="nav-label">Labels</span></button>
+      </nav>
       <p id="period-announcement" class="visually-hidden" role="status" aria-live="polite"></p>
       <section id="track-panel" aria-labelledby="track-title">
         <div class="toolbar track-toolbar">
@@ -99,13 +108,13 @@
       <section id="projects-panel" hidden><div class="toolbar"><h2>Projects</h2><button class="btn btn-primary" id="add-project">New project</button></div><div id="projects" class="card table-wrap"></div></section>
       <section id="labels-panel" hidden><div class="toolbar"><h2>Labels</h2><button class="btn btn-primary" id="add-label">New label</button></div><div id="labels" class="card table-wrap"></div></section>
       <aside id="undo-notice" class="card undo-notice shadow" aria-label="Undo work-session change" hidden><p role="status" aria-live="polite"></p><button type="button" class="btn btn-primary" data-undo>Undo</button><button type="button" class="btn btn-outline-secondary" data-dismiss-undo>Dismiss</button></aside>
-      <footer id="server-info" class="server-info" aria-label="Server information">
-        <details><summary id="server-build">Server build information unavailable</summary>
-          <dl><dt>Version</dt><dd id="server-version">—</dd><dt>SPK version</dt><dd id="server-spk">—</dd><dt>Commit</dt><dd id="server-commit">—</dd><dt>Built</dt><dd id="server-built">—</dd><dt>Deployed</dt><dd id="server-deployed">—</dd><dt>Started</dt><dd id="server-started">—</dd></dl>
-        </details>
-      </footer>
     </div>
   </main>
+  <dialog class="app-dialog server-info shadow-lg" id="server-info" aria-labelledby="about-title">
+    <h2 id="about-title">About Timekeeper</h2><p id="server-build">Server build information unavailable</p>
+    <dl><dt>Version</dt><dd id="server-version">—</dd><dt>SPK version</dt><dd id="server-spk">—</dd><dt>Commit</dt><dd id="server-commit">—</dd><dt>Built</dt><dd id="server-built">—</dd><dt>Deployed</dt><dd id="server-deployed">—</dd><dt>Started</dt><dd id="server-started">—</dd></dl>
+    <div class="dialog-actions"><button class="btn btn-outline-secondary" id="about-close" type="button">Close</button></div>
+  </dialog>
   <dialog class="app-dialog shadow-lg" id="editor" aria-labelledby="editor-title"><form id="editor-form"><h2 id="editor-title"></h2><div id="fields"></div><p id="editor-error" class="alert alert-danger" role="alert" tabindex="-1"></p><p id="editor-notice" class="alert alert-info" role="status"></p><div class="dialog-actions"><button class="btn btn-outline-secondary" id="cancel" type="button">Cancel</button><button class="btn btn-primary" id="save" type="submit">Save</button></div></form></dialog>
 </body>
 </html>
