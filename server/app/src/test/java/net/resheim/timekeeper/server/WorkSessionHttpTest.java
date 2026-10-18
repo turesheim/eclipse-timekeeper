@@ -199,7 +199,7 @@ class WorkSessionHttpTest {
             var removed=given().header("Authorization","Bearer test-a").header("If-Match",tagged.header("ETag")).header("X-Timekeeper-Undo","true").delete("/api/v1/work-sessions/"+tagged.jsonPath().getString("id")).then().statusCode(204).extract().response();
             var restored=undo(removed.header("X-Timekeeper-Undo-Id"),"test-a",UUID.randomUUID().toString(),200);
             var expected=(com.fasterxml.jackson.databind.node.ObjectNode)JsonValues.parse(tagged.asString());expected.put("version",expected.path("version").asLong()+1);
-            assertEquals(expected,JsonValues.parse(restored.asString()).path("session"));
+            assertEquals(JsonValues.parse(expected.toString()),JsonValues.parse(restored.asString()).path("session"));
             assertThrows(RemoteFailure.class,()->api.deleteLabel(new DeleteLabel(label.id(),label.version())));
             var running=api.startWorkSession(new StartWorkSession(OwnerId.LOCAL,"First running"));
             var loaded=given().header("Authorization","Bearer test-a").get("/api/v1/work-sessions/"+running.id().value()).then().statusCode(200).extract().response();
