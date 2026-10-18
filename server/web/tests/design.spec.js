@@ -118,6 +118,7 @@ test('narrow-screen editors support keyboard focus, validation and visible error
   await page.locator('#save').focus();
   await page.keyboard.press(browserName==='webkit' && process.platform==='darwin' ? 'Alt+Shift+Tab' : 'Shift+Tab');
   await expect(page.locator('#cancel')).toBeFocused();
-  expect(await page.locator('#cancel').evaluate(button=>getComputedStyle(button).outlineStyle)).toBe('solid');
+  const focus=await page.locator('#cancel').evaluate(button=>({visible:button.matches(':focus-visible'),outline:getComputedStyle(button).outlineStyle,shadow:getComputedStyle(button).boxShadow}));
+  expect(focus.visible).toBe(true);expect(focus.outline).toBe('none');expect(focus.shadow).not.toBe('none');
   await page.keyboard.press('Enter');await expect(page.locator('#editor')).not.toBeVisible();await expect(create).toBeFocused();
 });
