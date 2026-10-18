@@ -122,7 +122,7 @@ td.actions .btn + .btn { margin-left: .3rem; }
 .week-session-client .client-color::before { width: .8rem; height: .8rem; }
 .week-session-project { padding-inline-start: 1.5rem !important; font-weight: 500; overflow-wrap: anywhere; }
 .week-session-interval { display: grid; grid-template-columns: minmax(0, 1fr) .4rem minmax(0, 1fr) 2rem; align-items: center; gap: .15rem; margin-block: .15rem; }
-.week-session-time.form-control { min-width: 0; min-height: 1.9rem; height: 1.9rem; margin: 0; padding: .2rem .15rem; font-size: .75rem; text-align: center; font-variant-numeric: tabular-nums; border-color: var(--line); border-radius: .25rem; }
+.week-session-time.form-control { min-width: 0; min-height: 1.9rem; height: 1.9rem; margin: 0; padding: .2rem 0; font-size: .75rem; text-align: center; font-variant-numeric: tabular-nums; border-color: var(--line); border-radius: .25rem; }
 .week-session-time[readonly] { border-color: transparent; color: var(--muted); background: var(--bs-tertiary-bg); }
 .week-session-more.btn { width: 2rem; min-height: 2rem; height: 2rem; border-color: transparent; }
 .week-session-more .icon { font-size: 1rem; }

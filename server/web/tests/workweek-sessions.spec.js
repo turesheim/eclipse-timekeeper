@@ -127,6 +127,8 @@ test('compact Workweek cells group sessions and edit exact endpoints without cha
     const audit=await new AxeBuilder({page}).include('#week-sessions-section').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
     await page.screenshot({path:'test-results/compact-workweek-desktop.png',fullPage:true});
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(await page.locator('#week-sessions').evaluate(node=>node.scrollWidth>node.clientWidth)).toBe(true);
+    // Every compact clock must fit its field even at the table's minimum width.
+    for(const input of await page.locator('#week-sessions input').all())expect(await input.evaluate(node=>{const style=getComputedStyle(node),canvas=document.createElement('canvas'),context=canvas.getContext('2d');context.font=style.font;return context.measureText(node.value).width+parseFloat(style.paddingLeft)+parseFloat(style.paddingRight)<=node.clientWidth;})).toBe(true);
     await page.screenshot({path:'test-results/compact-workweek-mobile.png',fullPage:true});
     const details=await workSessionDetails(page,first.id);await expect(details).toContainText('Morning planning');await expect(details).toContainText(label.name);await expect(details).toContainText(project.name);
   } finally {await context.close();await f.close();}

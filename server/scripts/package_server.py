@@ -58,6 +58,9 @@ def package(output, tag, commit):
               'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
               'docs/development/WEB-CLIENT.md': 'WEB-CLIENT.md'}
     illustrations = {
+        'docs/assets/screenshots/compact-workweek-desktop.png': 'images/compact-workweek-desktop.png',
+        'docs/assets/screenshots/compact-workweek-mobile.png': 'images/compact-workweek-mobile.png',
+        'docs/assets/screenshots/projects-grouped-mobile.png': 'images/projects-grouped-mobile.png',
         'docs/assets/screenshots/account-menu-mobile.png': 'images/account-menu-mobile.png',
         'docs/assets/screenshots/work-session-labels-desktop.png': 'images/work-session-labels-desktop.png',
         'docs/assets/screenshots/work-session-labels-mobile.png': 'images/work-session-labels-mobile.png',

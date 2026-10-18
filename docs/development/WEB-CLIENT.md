@@ -158,6 +158,10 @@ boundaries and follow the selected clock/decimal format. Day selection filters
 sessions alongside activities. The grid hides when no sessions overlap the
 selected week/day. Session time is separate from activity report totals.
 
+![Compact Workweek sessions on desktop](../assets/screenshots/compact-workweek-desktop.png)
+
+![Compact Workweek sessions on a narrow screen](../assets/screenshots/compact-workweek-mobile.png)
+
 The default Workweek groups projects, tasks, subtasks and activities,
 with seven daily duration columns, a weekly total column and expandable rows
 like the Eclipse view. Task totals include their subtasks. **Hide activities**
@@ -260,8 +264,9 @@ and **Delete**. Create or edit activities in Workweek or Calendar; task timers
 run independently. There are no session selectors or manual activity links.
 
 Work sessions may have several labels selected in the start, record and edit
-forms. The compact card and Workweek show their names; calendar strips include
-them in their accessible description without changing the client's color.
+forms. The compact card shows their names; Workweek tooltips and the session
+details menu include them. Calendar strips include them in their accessible
+description without changing the client's color.
 Moving, resizing, stopping and copying a session preserve its labels without
 changing any activity labels. JSON and CSV transfers remap labels into the
 destination account. Older sessions and exports may omit `labelIds`; omitted
@@ -423,7 +428,9 @@ or repeating an ordinary write.
 
 The **Projects** view groups projects beneath their client, with its color and
 project count. Use the client chevron to expand or collapse its projects.
-Groups retain their expanded state while the account is signed in.
+Collapse choices survive refreshes and tab changes.
+
+![Projects grouped by client](../assets/screenshots/projects-grouped-mobile.png)
 
 Use **Clients** to create, rename, recolor or delete a client. A client has a
 required name and hex color. Each project belongs to exactly one client; choose
