@@ -14,13 +14,13 @@ async function audit(page) {
 test('themes cover tracking, records, editors and account settings with accessible contrast',async({page,request,browserName})=>{
   test.setTimeout(150000);
   const records=[],headers={Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`};
-  async function api(method,path,data,extra={}) {const response=await request.fetch('/api/v1'+path,{method,data,headers:{...headers,...extra}});expect(response.ok()).toBe(true);return response;}
+  async function api(method,path,data,extra={}) {const response=await request.fetch('/api/v1'+path,{method,data,headers:{...headers,...extra}});expect(response.ok(),method+' '+path+': '+response.status()).toBe(true);return response;}
   async function create(collection,data) {const value=await (await api('POST','/'+collection,data)).json();records.unshift([collection,value.id]);return value;}
   const external=[],violations=[];page.on('request',request=>{if(new URL(request.url()).origin!==new URL(process.env.TIMEKEEPER_WEB_URL).origin)external.push(request.url());});
   await page.addInitScript(()=>{document.addEventListener('securitypolicyviolation',event=>{window.themePolicyViolations??=[];window.themePolicyViolations.push({directive:event.violatedDirective,blocked:event.blockedURI});});});
   try {
     const client=await create('clients',{name:'Theme studio '+randomUUID().slice(0,6),color:'#6750a4'});
-    const project=await create('projects',{name:'Theme preview',clientId:client.id,icon:'code'}),task=await create('tasks',{projectId:project.id,summary:'Review palette'});
+    const project=await create('projects',{name:'Theme preview',clientId:client.id,icon:'code'}),task=await create('tasks',{projectId:project.id,parentTaskId:null,url:null,summary:'Review palette'});
     await create('work-sessions',{clientId:client.id,projectId:project.id,summary:'Palette review',start:'2025-10-20T06:00:00Z',end:'2025-10-20T14:00:00Z'});
     await create('activities',{taskId:task.id,summary:'Review contrast',start:'2025-10-20T06:00:00Z',end:'2025-10-20T07:00:00Z',labelIds:[]});
     await signIn(page);await expect(page.locator('html')).toHaveAttribute('data-theme','timekeeper');
