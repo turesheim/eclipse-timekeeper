@@ -22,7 +22,7 @@ async function account(page,request) {
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');await page.locator('#username').fill(username);await page.locator('#password').fill(password);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
   const client=await own(page,'POST','/clients',{name:'Private client',color:'#176653'});expect(client.status()).toBe(201);
   const project=await own(page,'POST','/projects',{name:'Archive project',clientId:(await client.json()).id});expect(project.status()).toBe(201);
-  const session=await own(page,'POST','/work-sessions',{projectId:(await project.json()).id,title:'Recorded work',summary:'Exact private notes',start:'2026-10-16T06:00:00.123456789Z',end:'2026-10-16T07:00:00.987654321Z'});expect(session.status()).toBe(201);
+  const session=await own(page,'POST','/work-sessions',{projectId:(await project.json()).id,summary:'Exact private notes',start:'2026-10-16T06:00:00.123456789Z',end:'2026-10-16T07:00:00.987654321Z'});expect(session.status()).toBe(201);
   await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Your data',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Download my data',exact:true})).toBeVisible();return {username,session:await session.json()};
 }

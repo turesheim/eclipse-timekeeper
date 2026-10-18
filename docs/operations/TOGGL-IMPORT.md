@@ -58,8 +58,7 @@ rejected.
 4. Review matching entries, then confirm the additive import. Existing records
    and running timers remain intact. In work-session mode, each row becomes one
    completed session with its original start/end, client and description. The
-   description supplies the title (first 1,000 characters, or “Imported work
-   session” when blank) and is retained in full as notes. Source tags become
+   description is retained as the optional summary; there is no separate title. Source tags become
    reviewed work-session labels. Source projects have reviewed mappings to new or
    existing Timekeeper projects under the selected client. Entries without a
    source project remain projectless. No tasks or activities are created alongside
@@ -110,6 +109,10 @@ existing unclaimed matches require reviewed reuse or distinct creation.
 Choose **Undo import** in history and confirm. This stops further batches of
 that job and reverses all committed batches, including a partial import. Undo
 itself is bounded and resumable; **Resume Undo** continues after interruption.
+
+An upgrade that moves old work-session titles into Summary preserves automatic
+Undo for otherwise untouched imported sessions. Sessions you edited still require
+review before deletion.
 
 Created work sessions or activities are removed first. Newly created catalog records are removed
 only when unused; reused records and unrelated dependants stay. Edited records

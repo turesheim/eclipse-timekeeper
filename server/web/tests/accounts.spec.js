@@ -141,7 +141,7 @@ for(const explicitUtc of [false,true]) test(explicitUtc ? 'explicit UTC remains 
     if(explicitUtc) expect((await browserRequest(context).put('/api/v1/me',{data:{zoneId:'UTC'},headers:{...headers,'If-Match':before.headers().etag}})).status()).toBe(200);
     const created=await browserRequest(context).post('/api/v1/clients',{data:{name:'Local clock client',color:'#176653'},headers});expect(created.status()).toBe(201);
     const client=await created.json();
-    const response=await browserRequest(context).post('/api/v1/work-sessions',{data:{title:'At the office',clientId:client.id,summary:'Local clock regression',start:'2025-10-16T07:59:20.123456789Z',end:null},headers});expect(response.status()).toBe(201);
+    const response=await browserRequest(context).post('/api/v1/work-sessions',{data:{clientId:client.id,summary:'Local clock regression',start:'2025-10-16T07:59:20.123456789Z',end:null},headers});expect(response.status()).toBe(201);
     const session=await response.json();
     await page.goto('/web/');await expect(page.locator('#status')).toHaveText('Up to date');
     const clock=explicitUtc ? '07:59:20':'09:59:20';

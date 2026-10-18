@@ -89,7 +89,7 @@ for(const mode of ['ACTIVITY','WORK_SESSION']) test(`Toggl ${mode} import resume
   const collection=mode==='WORK_SESSION' ? 'work-sessions' : 'activities',records=mode==='WORK_SESSION' ? 'workSessions' : 'activities';
   const activity = imported[records].find(value=>value.summary==='Bulk row 0');
   const current = await request.get('/api/v1/'+collection+'/'+activity.id,{headers:{Authorization:`Bearer ${token}`}});const body = await current.json();
-  const changed = await request.put('/api/v1/'+collection+'/'+activity.id,{headers:{Authorization:`Bearer ${token}`,'If-Match':current.headers().etag},data:{start:body.start,end:body.end,summary:'Edited bulk entry',...(mode==='WORK_SESSION' ? {title:body.title,clientId:body.clientId} : {labelIds:body.labelIds})}});expect(changed.status()).toBe(200);
+  const changed = await request.put('/api/v1/'+collection+'/'+activity.id,{headers:{Authorization:`Bearer ${token}`,'If-Match':current.headers().etag},data:{start:body.start,end:body.end,summary:'Edited bulk entry',...(mode==='WORK_SESSION' ? {clientId:body.clientId} : {labelIds:body.labelIds})}});expect(changed.status()).toBe(200);
   const history = page.getByRole('heading',{name:'Import history',exact:true}).locator('..');
   await history.getByRole('button',{name:'Undo import',exact:true}).click();await page.getByRole('button',{name:'Confirm Undo',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Review records retained or changed since import',exact:true})).toBeVisible();
@@ -150,7 +150,7 @@ test('Toggl defaults to work sessions with client totals, repeat detection and w
   const importedProjects=imported.projects.filter(value=>!before.projects.some(old=>old.id===value.id));expect(importedProjects).toHaveLength(1);expect(sessions.every(value=>value.projectId===importedProjects[0].id)).toBe(true);
   expect(imported.labels.length).toBe(before.labels.length+1);const importedLabel=imported.labels.find(value=>!before.labels.some(old=>old.id===value.id));
   expect(sessions.every(value=>value.labelIds.includes(importedLabel.id))).toBe(true);
-  expect(sessions.every(value=>value.title===value.summary && value.clientId===sessions[0].clientId)).toBe(true);
+  expect(sessions.every(value=>!('title' in value) && value.clientId===sessions[0].clientId)).toBe(true);
   expect(sessions.reduce((sum,value)=>sum+(+new Date(value.end)-+new Date(value.start)),0)).toBe(151462000);
   const job=(await api(request,'/imports')).items.find(value=>value.mode==='WORK_SESSION' && value.state==='IMPORTED' && value.selectedEntries===7);expect(job.workSessionCount).toBe(7);expect(job.importedNanos).toBe('151462000000000');
   await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await page.locator('[data-tab=track]').click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
@@ -185,7 +185,7 @@ for(const reuse of [false,true]) test(`Toggl Legacy export ${reuse ? 'maps to an
   await expect(mapping).toContainText(reuse ? 'Use existing: '+destination.name : 'Create new: Legacy client');
   await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
   const imported=await api(request,'/data/export'),sessions=imported.workSessions.filter(value=>!before.workSessions.some(old=>old.id===value.id));
-  expect(sessions).toHaveLength(7);expect(sessions.every(value=>value.title==='Imported work session')).toBe(true);
+  expect(sessions).toHaveLength(7);expect(sessions.every(value=>value.summary==='' && !('title' in value))).toBe(true);
   if(!reuse) destination=imported.clients.find(value=>!before.clients.some(old=>old.id===value.id));
   expect(destination).toBeTruthy();if(!reuse) expect(destination.name).toBe('Legacy client');
   const projects=imported.projects.filter(value=>!before.projects.some(old=>old.id===value.id));expect(projects).toHaveLength(1);

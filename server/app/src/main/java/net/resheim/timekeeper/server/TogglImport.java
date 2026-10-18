@@ -185,7 +185,7 @@ final class TogglImport {
             var client=catalog.resolve(job,row.input().path("clientKey").asText(),"CLIENT");
             var value=store.withCreationClient(uuid(client.get("id")),()->store.workSessionService().createWorkSession(
                     new CreateWorkSession(new OwnerId(store.owner()),row.start(),Optional.of(row.end()),summary(row.input()))));
-            var details=object().put("title",title(row.input()));
+            var details=object();
             if(row.input().hasNonNull("projectKey")) {
                 var project=catalog.resolve(job,row.input().path("projectKey").asText(),"PROJECT");
                 if(!client.get("id").equals(project.get("clientId"))) throw ApiFailure.validation();
@@ -222,7 +222,7 @@ final class TogglImport {
             if(!sessions(job) && ChronoUnit.DAYS.between(start.atZone(zone).toLocalDate(),end.atZone(zone).toLocalDate())>1000) throw new ApiFailure(422,"IMPORT_INTERVAL_TOO_LARGE");
             var parts=sessions(job) ? List.of(new ActivityDailySegments.Interval(start,Optional.of(end))) : ActivityDailySegments.split(start,Optional.of(end),zone,store.now());count+=parts.size();if(count>1000) throw new ApiFailure(422,"IMPORT_BATCH_TOO_LARGE");
             if(sessions(job)) {
-                mapping(definitions,value.path("clientKey").asText(),"CLIENT");title(value);
+                mapping(definitions,value.path("clientKey").asText(),"CLIENT");legacySourceTitle(value);
                 if(value.hasNonNull("projectKey")) {
                     mapping(definitions,value.path("projectKey").asText(),"PROJECT");
                     if(!definitions.get(value.path("projectKey").asText()).path("parentKey").asText().equals(value.path("clientKey").asText())) throw ApiFailure.validation();
@@ -242,7 +242,7 @@ final class TogglImport {
             int occurrence=integer(value,"occurrence",0,100000);String sourceId=value.path("sourceId").isNull() ? "" : value.path("sourceId").asText("");
             if(sourceId.length()>255 || !sourceId.isEmpty() && occurrence!=0 || occurrence>0 && !value.path("duplicateReviewed").asBoolean()) throw ApiFailure.validation();
             var content=array().add(instantNanos(start)).add(instantNanos(end)).add(text(value,"client",1000)).add(text(value,"project",1000)).add(text(value,"task",1000)).add(summary(value));
-            var tags=content.addArray();tagNames.stream().sorted().forEach(tags::add);if(sessions(job)) content.add(title(value));String contentHash=hash(canonical(content).toString());
+            var tags=content.addArray();tagNames.stream().sorted().forEach(tags::add);if(sessions(job)) content.add(legacySourceTitle(value));String contentHash=hash(canonical(content).toString());
             String fingerprint=sourceId.isEmpty() ? contentHash : hash(array().add("id").add(sourceId).toString());
             result.add(new Row(value,start,end,duration,fingerprint,contentHash,occurrence,parts));
         }
@@ -253,7 +253,13 @@ final class TogglImport {
         if(!Set.of("ACTIVITY","WORK_SESSION").contains(mode)) throw ApiFailure.validation();return mode;
     }
     private static boolean sessions(JsonNode job) {return mode(job).equals("WORK_SESSION");}
-    private static String title(JsonNode row) {
+    private static String legacySourceTitle(JsonNode row) {
+        // Keep the historical source hash stable for repeat/resumed imports.
+        if(!row.has("title")) {
+            String value=summary(row).strip();if(value.isEmpty()) return "Imported work session";
+            value=value.substring(0,Math.min(1000,value.length()));
+            return Character.isHighSurrogate(value.charAt(value.length()-1)) ? value.substring(0,value.length()-1) : value;
+        }
         String value=text(row,"title",1000).strip();if(value.isEmpty()) throw ApiFailure.validation();return value;
     }
     private void resolveCatalog(ObjectNode job,Row row) {
@@ -278,7 +284,7 @@ final class TogglImport {
                 if(++count>500) throw new ApiFailure(409,"IMPORT_TOO_MANY_MATCHES");var value=parse(rows.getString(1));
                 var labels=new TreeSet<String>();value.path("labelIds").forEach(label->labels.add(label.asText()));
                 if((project==null ? !value.hasNonNull("projectId") : project.get("id").equals(value.get("projectId"))) && labels.equals(expectedLabels) && value.path("start").asText().equals(row.start().toString()) && value.path("end").asText().equals(row.end().toString())
-                        && value.path("clientId").asText().equals(client.path("id").asText()) && value.path("title").asText().equals(title(row.input()))
+                        && value.path("clientId").asText().equals(client.path("id").asText())
                         && value.path("summary").asText().equals(summary(row.input()))) group.add(object().put("id",value.path("id").asText()).put("etag",etag(value)));
             }
         } catch(SQLException failure) {throw new ApiFailure(503,"UNAVAILABLE");}return result;

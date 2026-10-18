@@ -35,7 +35,7 @@ public final class CsvSnapshot {
         if(clients) {
             columns.put("clients",List.of("id","name","color"));
             columns.put("projects",List.of("id","name","clientId"));
-            columns.put("workSessions",List.of("id","start","end","summary","clientId","title"));
+            columns.put("workSessions",List.of("id","start","end","summary","clientId"));
         }
         return columns;
     }
@@ -67,7 +67,7 @@ public final class CsvSnapshot {
             JsonArray items = snapshot.getAsJsonArray(table.getKey());
             var names=new ArrayList<>(table.getValue());
             if(clients && table.getKey().equals("workSessions"))
-                for(String optional:List.of("labelIds","projectId"))
+                for(String optional:List.of("title","labelIds","projectId"))
                     for(var item:items) if(item.getAsJsonObject().has(optional)) {names.add(optional);break;}
             StringBuilder csv = new StringBuilder();row(csv, names);
             for (JsonElement item : items) {
@@ -75,7 +75,7 @@ public final class CsvSnapshot {
                 for (String column : names) {
                     JsonElement value = item.getAsJsonObject().get(column);
                     if(value==null && table.getKey().equals("workSessions") && column.equals("labelIds")) value=new JsonArray();
-                    if (value == null && !List.of("workSessionId","projectId").contains(column)) throw invalid();
+                    if (value == null && !List.of("workSessionId","projectId","title").contains(column)) throw invalid();
                     if(value==null) value=JsonNull.INSTANCE;
                     fields.add(value.isJsonNull() ? null : value.isJsonPrimitive() ? value.getAsString() : value.toString());
                 }
@@ -106,7 +106,7 @@ public final class CsvSnapshot {
                 if(rows.isEmpty()) throw invalid();
                 var names=rows.removeFirst();var expected=new ArrayList<>(table.getValue());
                 if(clients && table.getKey().equals("workSessions"))
-                    for(String optional:List.of("labelIds","projectId")) if(names.contains(optional)) expected.add(optional);
+                    for(String optional:List.of("title","labelIds","projectId")) if(names.contains(optional)) expected.add(optional);
                 if(!names.equals(expected) || rows.size()>10000) throw invalid();
                 JsonArray items = new JsonArray();
                 for (List<String> fields : rows) {
@@ -115,6 +115,7 @@ public final class CsvSnapshot {
                     JsonObject item = new JsonObject();
                     for (int i = 0; i < fields.size(); i++) {
                         String column = names.get(i), value = fields.get(i);
+                        if (column.equals("title") && value == null) continue; // Optional legacy column in mixed v3 exports.
                         if (value == null) item.add(column, JsonNull.INSTANCE);
                         else if (column.equals("externalReferences") || column.equals("labelIds")) {
                             JsonElement array = JsonParser.parseString(value);if (!array.isJsonArray()) throw invalid();item.add(column, array);

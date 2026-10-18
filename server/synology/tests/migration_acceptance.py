@@ -25,7 +25,7 @@ DB=ROOT/'server/app/src/main/resources/db'
 def quote(value):return "'"+value.replace("'","''")+"'"
 
 
-def fixture_sql(schema=5):
+def fixture_sql(schema=5, *, runtime=False):
     if schema not in (2,3,4,5):raise ValueError('Unsupported fixture schema')
     sql=(DB/'schema-v1-postgresql.sql').read_text()+(DB/'auth-v2.sql').read_text()
     sql+="UPDATE tk_schema SET schema_version=2,state='READY'; UPDATE tk_auth_control SET bootstrap_completed=TRUE;\n"
@@ -36,10 +36,11 @@ def fixture_sql(schema=5):
         salt=secrets.token_bytes(16)
         encoded=lambda value:base64.urlsafe_b64encode(value).decode().rstrip('=')
         password='pbkdf2-sha256$600000$'+encoded(salt)+'$'+encoded(hashlib.pbkdf2_hmac('sha256',b'migration password fixture',salt,600000))
-        # Keep the beyond-JavaScript sequence on a closed interval. The active
-        # owner's sequence needs room for legitimate day-boundary writes when
-        # this historical fixture is started by the real server on later dates.
-        sequence=42 if index==0 else 9007199254740993
+        # Data-only import/restore checks must preserve integers beyond the
+        # JavaScript range exactly. A running server enforces the API's safe
+        # integer limit, and startup migrations can write for either owner.
+        # Keep a large valid revision with room for those writes in that case.
+        sequence=42 if index==0 else (9007199254740001 if runtime else 9007199254740993)
         sql+=f"INSERT INTO tk_owner VALUES({quote(owner)},'Europe/Oslo',7,{sequence},{quote(secrets.token_hex(32))});\n"
         sql+=f"INSERT INTO tk_account VALUES({quote(owner)},'account{index}',{quote(password)},'Private account','ENABLED',{str(index==0)},TRUE,8);\n"
         for kind,identifier in ids.items():
@@ -117,7 +118,7 @@ def main():
                     if command('docker','exec',name,'pg_isready','-h','127.0.0.1','-U','postgres','-p',port,check=False).returncode==0:break
                     time.sleep(.1)
                 else:raise RuntimeError('Migration fixture did not start')
-            command('docker','exec','-i',source,'psql','-X','-q','-v','ON_ERROR_STOP=1','-U','postgres',input=fixture_sql(args.source_schema))
+            command('docker','exec','-i',source,'psql','-X','-q','-v','ON_ERROR_STOP=1','-U','postgres',input=fixture_sql(args.source_schema,runtime=bool(args.server_image)))
             def client(program,arguments,*,sql=None,output=None):
                 filtered=[];skip=False
                 for arg in arguments:
@@ -229,6 +230,7 @@ def main():
                 native=verify(command,target,folder,args.server_image)
             print(json.dumps({'source':'postgres:18.6-bookworm' ,'target':'postgres:17.11-bookworm','sourceSchema':args.source_schema,'targetSchema':5,'sourceTablesCompared':len(compared),'backupTablesCompared':len(exporter.TABLES),
                 'allTableFingerprintsMatch':True,'twoOwnersWithSharedResourceIds':True,'exactNanosecondTimestampsAndLargeRevisions':True,
+                'beyondJavaScriptIntegerRange':not bool(args.server_image),
                 'schemaMetadataUpgraded':args.source_schema<4,'verifiedAndPendingRecoveryAddressesPreserved':args.source_schema>=3,
                 'passkeyCredentialsAndRevocationTombstonesPreserved':args.source_schema>=4,'legacyBrowserSessionsRevoked':args.source_schema<4,
                 'accountAndTokenHashesPreserved':True,'legacyRegistryPreserved':True,'usedTargetRefused':True,'fingerprintMismatchRollsBackAtomically':True,'emptyFailedImportCanBeCancelled':True,'freshInstallationRestoreWithNewServiceCredential':True,'otherDatabaseUntouched':True,**native}))

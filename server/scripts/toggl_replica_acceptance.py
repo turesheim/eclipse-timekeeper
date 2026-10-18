@@ -335,7 +335,7 @@ def main():
             current_session = completed_sessions['workSessions'][0]
             session_current = api(2, 'GET', '/work-sessions/' + current_session['id'])
             expect(api(1, 'PUT', '/work-sessions/' + current_session['id'],
-                       {**{key: current_session[key] for key in ('start', 'end', 'title', 'clientId')}, 'summary': 'Edited attendance'}, etag=session_current[2]['ETag']))
+                       {**{key: current_session[key] for key in ('start', 'end', 'clientId')}, 'summary': 'Edited attendance'}, etag=session_current[2]['ETag']))
             repeat_sessions = expect(api(2, 'POST', '/imports/toggl/jobs', session_input, key=str(uuid.uuid4())), 201)
             assert any(row['status'] == 'REUSED_EDITED' for row in get_preview(repeat_sessions, session_rows)['rows'])
             expect(api(1, 'POST', job_path(repeat_sessions) + '/batches/0', batch(repeat_sessions, session_rows, 0, True)))

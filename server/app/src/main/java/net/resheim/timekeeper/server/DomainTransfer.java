@@ -80,7 +80,7 @@ final class DomainTransfer {
         }
         for(JsonNode item:input.path("workSessions")) {
             var created=store.workSessionService().createWorkSession(new CreateWorkSession(new OwnerId(store.owner()),Instant.parse(item.get("start").asText()),
-                    optionalText(item.get("end")).map(Instant::parse),item.get("summary").asText()));
+                    optionalText(item.get("end")).map(Instant::parse),WorkSessionDescriptions.summary(item)));
             details("WORK_SESSION",created.id().value(),item,clients);
             var fields=object();
             if(item.has("labelIds")) {var assigned=fields.putArray("labelIds");item.get("labelIds").forEach(label->assigned.add(required(labels,uuid(label)).value().toString()));}
@@ -121,7 +121,7 @@ final class DomainTransfer {
     private void details(String type,UUID id,JsonNode item,Map<UUID,UUID> clients) {
         if(!item.has("clientId")) return;
         var fields=object();fields.put("clientId",required(clients,uuid(item.get("clientId"))).toString());
-        if(item.has("title")) fields.put("title",item.get("title").asText());store.clientDetails(type,id,fields);
+        store.clientDetails(type,id,fields);
     }
     private static <T> T required(Map<UUID,T> values,UUID id) {T value=values.get(id);if(value==null) throw ApiFailure.validation();return value;}
     private static void mapping(com.fasterxml.jackson.databind.node.ArrayNode mappings,String type,JsonNode source,UUID id) {

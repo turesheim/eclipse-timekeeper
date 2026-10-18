@@ -30,7 +30,7 @@ async function fixture(request) {
   const client = await create('clients',{name:'Northwind Studio',color:'#6750a4'});
   const project = await create('projects',{name:'Website refresh',clientId:client.id});
   const task = await create('tasks',{summary:'Plan the new website',projectId:project.id,parentTaskId:null,url:null});
-  const session = await create('work-sessions',{title:'Website planning',clientId:client.id,summary:'Design workshop and project planning',start:'2025-10-20T06:00:00Z',end:'2025-10-20T14:00:00Z'});
+  const session = await create('work-sessions',{clientId:client.id,summary:'Website planning',start:'2025-10-20T06:00:00Z',end:'2025-10-20T14:00:00Z'});
   await create('activities',{taskId:task.id,summary:'Design workshop',start:'2025-10-20T06:30:00Z',end:'2025-10-20T09:00:00Z',workSessionId:session.id,labelIds:[]});
   await create('activities',{taskId:task.id,summary:'Project planning',start:'2025-10-20T10:00:00Z',end:'2025-10-20T12:00:00Z',workSessionId:session.id,labelIds:[]});
   return {session, async close() {

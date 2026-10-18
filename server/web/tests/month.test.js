@@ -47,6 +47,8 @@ test('daily client totals combine all same-client sessions and keep clients and 
   ],'2025-11-01T00:00:00Z');
   const day=result.days.find(value=>value.date==='2025-10-26');assert.equal(day.clients.size,2);
   assert.equal(day.clients.get('a').duration,27n*hour-1n);assert.equal(day.clients.get('b').duration,2n*hour);
+  assert.deepEqual(day.clients.get('a').sessionIds,['overnight','fall','extra']);assert.deepEqual(day.clients.get('b').sessionIds,['other']);
+  assert.deepEqual(result.days.find(value=>value.date==='2025-10-25').clients.get('a').sessionIds,['overnight']);
   assert.equal(result.days.find(value=>value.date==='2025-10-25').clients.get('a').duration,hour);
   assert.equal(day.total,[...day.clients.values()].reduce((sum,value)=>sum+value.duration,0n));
   assert.equal(result.days.reduce((sum,day)=>sum+day.total,0n),result.total);

@@ -41,7 +41,8 @@ export function monthSessions(calendar,sessions,asOf) {
       const duration=overlap(start,end,day.from,day.to);
       if(duration) {
         day.total+=duration;
-        const client=day.clients.get(session.clientId) || {clientId:session.clientId,duration:0n,running:false};
+        const client=day.clients.get(session.clientId) || {clientId:session.clientId,duration:0n,running:false,sessionIds:[]};
+        client.sessionIds.push(session.id);
         client.duration+=duration;client.running ||= !session.end && now>=day.from && now<day.to;
         day.clients.set(session.clientId,client);
       }

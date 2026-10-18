@@ -165,11 +165,11 @@ export class WeekCalendar {
     const elapsed=instantNanos(session.end || this.data.report.generatedAt)-instantNanos(session.start);
     const duration=nanosText(elapsed>0n ? elapsed : 0n);
     const labels=(session.labelIds || []).map(id=>this.data.labels.find(label=>label.id===id)?.name).filter(Boolean).join(', ');
-    const description=`${client?.name || 'Client'} · ${session.title || 'Work session'}${session.summary ? ' · '+session.summary : ''}${labels ? ' · '+labels : ''} · ${instantText(session.start,this.calendar.zone)} → ${instantText(session.end,this.calendar.zone)} · ${duration}`;
+    const description=`${client?.name || 'Client'} · ${session.summary || 'Work session'}${labels ? ' · '+labels : ''} · ${instantText(session.start,this.calendar.zone)} → ${instantText(session.end,this.calendar.zone)} · ${duration}`;
     bar.title=description;bar.setAttribute('aria-label',description);bar.setAttribute('role','group');bar.tabIndex=-1;
     bar.dataset.selected=String(this.selectedId===session.id);
     const label=node('span',undefined,'calendar-session-label');
-    label.append(node('span',session.title || 'Work session','calendar-session-title'),node('span',`${session.end ? '' : 'Running · '}${duration}`,'calendar-session-duration'));
+    label.append(node('span',session.summary || 'Work session','calendar-session-title'),node('span',`${session.end ? '' : 'Running · '}${duration}`,'calendar-session-duration'));
     if(preview) bar.append(label);
     if(!preview) {
       const select=button('',()=>this.selectSession(session,piece.date,Math.floor(piece.top)),'calendar-session-select');
@@ -187,7 +187,7 @@ export class WeekCalendar {
         if(edge==='start' ? endpoint!==piece.start : endpoint!==piece.end) continue;
         const handle=button('',()=>{},`calendar-resize ${edge}`);handle.dataset.edge=edge;handle.dataset.sessionId=session.id;handle.dataset.date=piece.date;
         handle.tabIndex=0;
-        handle.setAttribute('aria-label',`Resize ${edge} of ${session.title || 'work session'}`);handle.title=`Resize ${edge}; arrow keys adjust 15 minutes`;
+        handle.setAttribute('aria-label',`Resize ${edge} of ${session.summary || 'work session'}`);handle.title=`Resize ${edge}; arrow keys adjust 15 minutes`;
         bar.append(handle);
       }
     }return bar;
@@ -228,7 +228,7 @@ export class WeekCalendar {
   }
   create() {
     if(!this.connected || this.busy || !this.selection) return;
-    try {const start=calendarAnchor(this.calendar,this.selection.date,this.selection.row);this.callbacks.onNew({title:'',clientId:this.preferredClient(),summary:'',start:nanosInstant(start),end:nanosInstant(start+3600000000000n)});}
+    try {const start=calendarAnchor(this.calendar,this.selection.date,this.selection.row);this.callbacks.onNew({clientId:this.preferredClient(),summary:'',start:nanosInstant(start),end:nanosInstant(start+3600000000000n)});}
     catch(error) {this.text(error.message);}
   }
   edit() {const value=this.selected();if(value && this.connected && !this.busy) this.callbacks.onEditSession(value.id);}
@@ -316,7 +316,7 @@ export class WeekCalendar {
       if(state.scope!==this.scope || this.root.hidden || !this.connected || !state.moved || !state.proposal) return;
       if(state.mode==='create') {
         this.setRangeMode(false);this.selectedId=null;
-        this.callbacks.onNew({title:'',clientId:state.clientId,summary:'',...state.proposal});
+        this.callbacks.onNew({clientId:state.clientId,summary:'',...state.proposal});
       } else void this.commit(state.session,state.proposal);
     };
     const cancel=value=>{if(this.drag?.pointer===value.pointerId) {this.cancelDrag();this.show();}};

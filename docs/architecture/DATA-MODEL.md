@@ -369,7 +369,7 @@ require the corresponding work-session file.
 
 The server's portable domain-v3 JSON and CSV formats include clients, projects,
 tasks, labels, activities and independent work sessions. They preserve mandatory
-project/session client links and session titles, and remap identifiers on import.
+project/session client links and session summaries, and remap identifiers on import.
 Imports also accept v1/v2 snapshots, assign their projects and sessions to the
 General client, and ignore retired activity/session links. Native table CSV and
 portable server CSV are distinct formats; see the
@@ -404,8 +404,8 @@ advances changed existing session versions instead of reusing stale versions.
 
 The server/web model adds `CLIENT` (owned UUID, version, name, required color).
 Every server `PROJECT` and `WORK_SESSION` refers to exactly one owned client.
-Clients may have many projects and work sessions; sessions also have a required
-title separate from their summary. Client deletion is restricted while either
+Clients may have many projects and work sessions; sessions have a single
+optional summary, with no separate title. Client deletion is restricted while either
 kind of record references it. These fields live in the server’s generic resource
 payloads and foreign-key relations, without extending Eclipse’s physical schema.
 See [API-V1.md](API-V1.md#clients-in-the-server-and-web-client) for migration and

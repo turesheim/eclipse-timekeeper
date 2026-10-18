@@ -29,7 +29,7 @@ test('work-session label choices, compact display and timer edits stay independe
     const first=await f.create('labels',{name:'Office '+randomUUID().slice(0,6),color:'#176653'});
     const second=await f.create('labels',{name:'Billable '+randomUUID().slice(0,6),color:'#6750a4'});
     await signIn(page);await page.getByRole('button',{name:'Start work session',exact:true}).click();
-    await page.getByLabel('Title',{exact:true}).fill('Labelled working day');await page.getByLabel('Client',{exact:true}).selectOption(f.client.id);
+    await page.getByLabel('Summary',{exact:true}).fill('Labelled working day');await page.getByLabel('Client',{exact:true}).selectOption(f.client.id);
     await page.getByLabel(first.name,{exact:true}).check();await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();
     const active=await (await api(request,'GET','/work-sessions/active')).json();id=active.id;expect(active.labelIds).toEqual([first.id]);
     await expect(page.locator('#work-session-labels')).toContainText(first.name);
@@ -54,8 +54,8 @@ test('Workweek shows client-colored session rows with local DST/week clipping an
   try {
     const baseline = await (await api(request, 'GET', '/reports/activities?from=2025-10-19T22:00:00Z&to=2025-10-26T23:00:00Z&zoneId=Europe%2FOslo')).json();
     const activityTotal = durationNanos(baseline.total) + 3600000000000n;
-    const session = await f.create('work-sessions', {title: 'Weekend work', clientId: f.client.id, summary: '', start: '2025-10-25T21:30:00Z', end: '2025-10-27T01:30:00Z'});
-    const outside = await f.create('work-sessions', {title: 'Earlier week', clientId: f.client.id, summary: '', start: '2025-10-01T08:00:00Z', end: '2025-10-01T09:00:00Z'});
+    const session = await f.create('work-sessions', {clientId: f.client.id, summary:'Weekend work', start: '2025-10-25T21:30:00Z', end: '2025-10-27T01:30:00Z'});
+    const outside = await f.create('work-sessions', {clientId: f.client.id, summary:'Earlier week', start: '2025-10-01T08:00:00Z', end: '2025-10-01T09:00:00Z'});
     await f.create('activities', {taskId: null, projectId: null, summary: 'Separate tracked time', labelIds: [], start: '2025-10-26T09:00:00Z', end: '2025-10-26T10:00:00Z'});
     await signIn(page); await page.getByLabel('Week containing', {exact: true}).fill('2025-10-26'); await expect(page.locator('#zone-caption')).toContainText('2025-10-20');
     const row = page.locator(`#week-sessions tr[data-work-session-id="${session.id}"]`);
@@ -78,19 +78,19 @@ test('Workweek shows client-colored session rows with local DST/week clipping an
 test('running Workweek sessions remain editable without losing exact times and read-only writes are rejected', async ({page, request}) => {
   const f = await fixture(request);
   try {
-    const session = await f.create('work-sessions', {title: 'Running workweek session', clientId: f.client.id, summary: '', start: new Date(Date.now() - 120000).toISOString(), end: null});
+    const session = await f.create('work-sessions', {clientId: f.client.id, summary:'Running workweek session', start: new Date(Date.now() - 120000).toISOString(), end: null});
     await signIn(page); await page.getByLabel('Week containing', {exact: true}).fill(dateInZone(Date.now(), 'Europe/Oslo'));
     const row = page.locator(`#week-sessions tr[data-work-session-id="${session.id}"]`); await expect(row).toContainText('Running');
     await row.getByRole('button', {name: 'Edit session Running workweek session', exact: true}).click();
     await expect(page.getByLabel('Start (local time)', {exact: true})).toHaveValue(localDateTime(session.start, 'Europe/Oslo').slice(0,19).replace(/:00$/, ''));
-    await page.getByLabel('Title', {exact: true}).fill('Updated running session'); await page.locator('#save').click(); await expect(page.locator('#editor')).not.toBeVisible(); await expect(row).toContainText('Updated running session');
+    await page.getByLabel('Summary', {exact: true}).fill('Updated running session'); await page.locator('#save').click(); await expect(page.locator('#editor')).not.toBeVisible(); await expect(row).toContainText('Updated running session');
     const saved = await (await api(request, 'GET', '/work-sessions/' + session.id)).json(); expect(saved.start).toBe(session.start); expect(saved.end).toBeNull();
     await openAccountMenu(page);await page.getByRole('button', {name: 'Sign out', exact: true}).click(); await expect(page.locator('#login')).toBeVisible(); await signIn(page, process.env.TIMEKEEPER_WEB_READ_TOKEN);
     await expect(row.getByRole('button', {name: 'Edit session Updated running session', exact: true})).toBeDisabled();
     await expect(row.getByRole('button', {name: 'Delete session Updated running session', exact: true})).toBeDisabled();
     const current = await api(request, 'GET', '/work-sessions/' + session.id);
-    const denied = await request.put('/api/v1/work-sessions/' + session.id, {data: {...saved, title: 'Rejected read-only change'}, headers: {Authorization: `Bearer ${process.env.TIMEKEEPER_WEB_READ_TOKEN}`, 'If-Match': current.headers().etag}});
+    const denied = await request.put('/api/v1/work-sessions/' + session.id, {data: {...saved, summary: 'Rejected read-only change'}, headers: {Authorization: `Bearer ${process.env.TIMEKEEPER_WEB_READ_TOKEN}`, 'If-Match': current.headers().etag}});
     expect(denied.status()).toBe(403);
-    expect((await (await api(request, 'GET', '/work-sessions/' + session.id)).json()).title).toBe('Updated running session');
+    expect((await (await api(request, 'GET', '/work-sessions/' + session.id)).json()).summary).toBe('Updated running session');
   } finally {await f.close();}
 });

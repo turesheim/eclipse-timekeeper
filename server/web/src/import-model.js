@@ -29,6 +29,7 @@ export async function importPlan(sourceRows, personKey, {fallbackClient, fallbac
     const taskKey = mode === 'ACTIVITY' && source.task ? await mapping(['TASK', source.client, source.project, source.task], 'TASK', source.task, projectKey) : null;
     const labelKeys = [];
     for (const tag of mode === 'ACTIVITY' || mapWorkSessionTags ? source.tags : []) labelKeys.push(await mapping(['LABEL', tag], 'LABEL', tag));
+    // Retain legacy source metadata for resumable plans and duplicate hashes; sessions store summary alone.
     rows.push({sourceKey, sourceId: source.sourceId, ...(source.line ? {sourceLine:source.line} : {}), start: source.start, end: source.end,
       durationNanos: source.durationNanos.toString(), client: source.client, project: source.project, task: source.task,
       summary: source.summary, tags: source.tags, ...(mode === 'WORK_SESSION' ? {clientKey, ...(projectKey ? {projectKey} : {}), title:source.summary.trim().slice(0,1000).replace(/[\uD800-\uDBFF]$/, '') || 'Imported work session',...(mapWorkSessionTags ? {labelKeys} : {})} : {projectKey, taskKey, labelKeys}), occurrence: source.occurrence,

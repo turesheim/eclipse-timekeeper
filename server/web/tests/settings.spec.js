@@ -33,7 +33,7 @@ test('My Account direct links, mobile layouts and Back navigation preserve runni
   await expect(page.locator('#workspace')).not.toBeVisible(); await expect(page.locator('#users-link')).not.toBeVisible();
   const headers = await ownHeaders(page);
   const client = await (await browserRequest(page).post('/api/v1/clients', {headers, data: {name: 'Private timer client', color: '#176653'}})).json();
-  const running = await browserRequest(page).post('/api/v1/work-sessions/start', {headers: {...headers, 'Idempotency-Key': randomUUID()}, data: {title: 'Private running session', clientId: client.id, summary: ''}});
+  const running = await browserRequest(page).post('/api/v1/work-sessions/start', {headers: {...headers, 'Idempotency-Key': randomUUID()}, data: {clientId: client.id, summary:'Private running session'}});
   expect(running.status()).toBe(201); const session = await running.json();
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({width, height: 900});

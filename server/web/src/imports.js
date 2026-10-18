@@ -69,7 +69,7 @@ export async function renderImports(view, zone) {
     const source = field(work, 'Source user', parsed.people.length === 1 ? parsed.people[0].key : '', {choices:[['','Choose source user'],...parsed.people.map(person => [person.key,[person.name,person.email].filter(Boolean).join(' · ')])]});
     if(parsed.unsupported.length) work.append(node('p', `Unsupported metadata: ${parsed.unsupported.join(', ')}. These columns will not be imported.`, 'alert alert-info'));
     const fallbackClient = field(work, 'Client for entries without a client', 'Imported from Toggl', {maxLength:1000});
-    if(importMode.value==='WORK_SESSION') work.append(node('p','Each entry becomes one work session. Descriptions become titles and are retained in full as notes. Source projects suggest client names when Client is missing; review each client below. Tags become work-session labels; tasks remain in the import audit only.'));
+    if(importMode.value==='WORK_SESSION') work.append(node('p','Each entry becomes one work session. Descriptions become work-session summaries. Source projects suggest client names when Client is missing; review each client below. Tags become work-session labels; tasks remain in the import audit only.'));
     const fallbackProject = importMode.value==='ACTIVITY' ? field(work, 'Project for entries without a project', 'Imported time', {maxLength:1000}) : null;
     const decisions = node('div'), invalidSummary = node('p');decisions.append(invalidSummary);
     const invalid = field(decisions, 'Exclude invalid rows after reviewing the diagnostics', false, {type:'checkbox'});
@@ -86,9 +86,9 @@ export async function renderImports(view, zone) {
       const rows = selected.slice(page * 100, (page + 1) * 100).map(row => {
         const select = node('input');select.type = 'checkbox';select.className = 'form-check-input';select.checked = !row.excluded && !row.errors.length;select.disabled = !!row.errors.length;
         select.setAttribute('aria-label', `Include source line ${row.line}`);select.addEventListener('change', () => {row.excluded = !select.checked;view.dirty.add(upload.value);});
-        return [select,String(row.line),row.start ? instantText(row.start,zone) : '',row.end ? instantText(row.end,zone) : '',row.durationNanos === undefined ? '' : nanosText(row.durationNanos),...(importMode.value==='WORK_SESSION' ? [row.summary.trim().slice(0,1000) || 'Imported work session'] : []),row.summary || '',[...row.errors,...row.warnings,...(row.ambiguousDuplicate ? ['Indistinguishable duplicate source row.'] : [])].join(' ')];
+        return [select,String(row.line),row.start ? instantText(row.start,zone) : '',row.end ? instantText(row.end,zone) : '',row.durationNanos === undefined ? '' : nanosText(row.durationNanos),row.summary || '',[...row.errors,...row.warnings,...(row.ambiguousDuplicate ? ['Indistinguishable duplicate source row.'] : [])].join(' ')];
       });
-      rowList.append(table(['Include','Line','Start','End','Duration',...(importMode.value==='WORK_SESSION' ? ['Work-session title'] : []),'Description','Diagnostics'],rows));
+      rowList.append(table(['Include','Line','Start','End','Duration','Description','Diagnostics'],rows));
       if(selected.length > 100) {
         const previous = button('Previous rows', () => {page--;showRows();});previous.disabled = page === 0;
         const next = button('Next rows', () => {page++;showRows();});next.disabled = (page + 1) * 100 >= selected.length;
@@ -124,7 +124,6 @@ export async function renderImports(view, zone) {
   function mappingReview() {
     work.replaceChildren(node('h2','Review mappings'),node('p',`${plan.selectedEntries} ${plan.mode==='WORK_SESSION' ? 'work sessions' : 'activity entries'} · ${nanosText(BigInt(plan.selectedNanos))} · ${plan.mappings.length} catalog mappings`));
     if(resume) work.append(node('p','The original mapping plan is retained while resuming.','alert alert-info'));
-    if(plan.mode==='WORK_SESSION' && plan.rows.some(row=>row.summary.trim().length>1000)) work.append(node('p','Long descriptions use the first 1,000 characters as the title. The full description is retained as notes.','alert alert-info'));
     const list = node('div');work.append(list);const definitions = new Map(plan.mappings.map(value => [value.key,value]));
     clientSourceNames.clear();
     for(const row of plan.rows) {

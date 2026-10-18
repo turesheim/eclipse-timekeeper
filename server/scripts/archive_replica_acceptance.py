@@ -74,7 +74,7 @@ def exercise(system):
         label=post(2,browser,'/labels',{'name':name+' label','color':'#114455'})
         interval={'start':'2026-10-12T07:00:00.123456789Z','end':'2026-10-12T08:00:00.987654321Z','summary':name+' notes'}
         post(1,browser,'/activities',{**interval,'taskId':task['id'],'projectId':project['id'],'labelIds':[label['id']]})
-        post(2,browser,'/work-sessions',{**interval,'clientId':client['id'],'projectId':project['id'],'title':name+' work'})
+        post(2,browser,'/work-sessions',{**interval,'clientId':client['id'],'projectId':project['id'],'summary':name+' work\n\n'+name+' notes'})
 
     alice=system.browser();expect(system.request(1,alice,'/auth/setup',{'code':system.code,'username':'alice','password':PASSWORD,'displayName':'Alice','email':'alice@example.invalid'}),200,'First administrator setup')
     information=[expect(system.request(index,alice,'/server'),200,'Actual replica identity') for index in (1,2)]
@@ -127,7 +127,7 @@ def exercise(system):
     for name in ('clients','projects','tasks','labels','activities','workSessions'):
         old={value['id'] for value in before[name]};source_ids={value['id'] for value in source['work'][name]};actual={value['id'] for value in after[name]}
         if not old.issubset(actual) or len(actual)!=len(old)+len(source_ids) or (actual-old)&source_ids:raise AssertionError('Restore lost, duplicated or failed to remap owned work')
-    copied=next(value for value in after['workSessions'] if value['title']=='alice work');project=next(value for value in after['projects'] if value['id']==copied['projectId'])
+    copied=next(value for value in after['workSessions'] if value['summary']=='alice work\n\nalice notes');project=next(value for value in after['projects'] if value['id']==copied['projectId'])
     if copied['clientId']!=project['clientId'] or copied['start']!=source['work']['workSessions'][0]['start'] or copied['end']!=source['work']['workSessions'][0]['end']:raise AssertionError('Restore changed project/client links or exact timestamps')
     if expect(system.request(1,bob,'/auth/account'),200,'Preserved identity')!=identity or expect(system.request(2,bob,'/auth/email/addresses/PRIMARY'),200,'Preserved recovery address')!=address:raise AssertionError('Archive changed account identity or recovery authority')
     if system.password_login('bob',index=1).owner!=bob.owner or system.key_login(target_key,index=2).owner!=bob.owner:raise AssertionError('Archive invalidated target sign-in credentials')

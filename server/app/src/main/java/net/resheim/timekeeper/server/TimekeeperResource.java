@@ -48,7 +48,7 @@ public class TimekeeperResource {
                 case "TASK" -> service.createTask(new CreateTask(project(input),parent(input),input.get("summary").asText(),optionalText(input.get("url")),references(input.get("externalReferences"))));
                 case "LABEL" -> service.createLabel(new CreateLabel(input.get("name").asText(),optionalText(input.get("color"))));
                 case "ACTIVITY" -> service.createActivity(new CreateActivity(optionalText(input.get("taskId")).map(UUID::fromString).map(TaskId::new).orElse(null),new OwnerId(store.owner()),Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText(),labels(input.get("labelIds")),optionalText(input.get("workSessionId")).map(UUID::fromString).map(WorkSessionId::new),project(input)));
-                case "WORK_SESSION" -> store.workSessionService().createWorkSession(new CreateWorkSession(new OwnerId(store.owner()),Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText()));
+                case "WORK_SESSION" -> store.workSessionService().createWorkSession(new CreateWorkSession(new OwnerId(store.owner()),Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),WorkSessionDescriptions.summary(input)));
                 default -> throw ApiFailure.notFound();
             };
             JsonNode snapshot=stored(type,value,input);return ApiReplies.resource(201,snapshot,"/api/v1/"+collection+"/"+snapshot.get("id").asText());
@@ -64,7 +64,7 @@ public class TimekeeperResource {
                 case "TASK" -> service.updateTask(new UpdateTask(new TaskId(key),version,project(input),parent(input),input.get("summary").asText(),optionalText(input.get("url"))));
                 case "LABEL" -> service.updateLabel(new UpdateLabel(new LabelId(key),version,input.get("name").asText(),optionalText(input.get("color"))));
                 case "ACTIVITY" -> service.updateActivity(new UpdateActivity(new ActivityId(key),version,Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText(),labels(input.get("labelIds"))));
-                case "WORK_SESSION" -> store.workSessionService().updateWorkSession(new UpdateWorkSession(new WorkSessionId(key),version,Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText()));
+                case "WORK_SESSION" -> store.workSessionService().updateWorkSession(new UpdateWorkSession(new WorkSessionId(key),version,Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),WorkSessionDescriptions.summary(input)));
                 default -> throw ApiFailure.notFound();
             };return ApiReplies.resource(200,stored(type,value,input),null);
         });
@@ -137,7 +137,7 @@ public class TimekeeperResource {
     @POST @Path("/work-sessions/start") public Response startWorkSession(@HeaderParam("Idempotency-Key") String key,JsonNode body) {
         var input=inputs.validate("StartWorkSessionInput",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> receipts.execute(key,"POST","/work-sessions/start",null,input,() -> {
-            var value=store.workSessionService().startWorkSession(new StartWorkSession(new OwnerId(store.owner()),input.get("summary").asText()));
+            var value=store.workSessionService().startWorkSession(new StartWorkSession(new OwnerId(store.owner()),WorkSessionDescriptions.summary(input)));
             return ApiReplies.resource(201,store.clientDetails("WORK_SESSION",value.id().value(),input),"/api/v1/work-sessions/"+value.id().value());
         }));
     }
@@ -186,7 +186,7 @@ public class TimekeeperResource {
             validateFilters(query);List<JsonNode> values;
             if(type.equals("ACTIVITY")) values=activities(query).stream().map(value -> (JsonNode)snapshot(store.owner(),value)).toList();
             else values=store.list(type).stream().filter(value -> {
-                if(!value.get(type.equals("WORK_SESSION") ? "title" : type.equals("TASK") ? "summary" : "name").asText().toLowerCase(Locale.ROOT).contains(q)) return false;
+                if(!value.get(Set.of("WORK_SESSION","TASK").contains(type) ? "summary" : "name").asText().toLowerCase(Locale.ROOT).contains(q)) return false;
                 if(query.containsKey("clientId") && !value.path("clientId").asText().equals(ContractInputs.pathId(query.getFirst("clientId")).toString())) return false;
                 if(query.containsKey("labelId") && !labels(value.path("labelIds")).contains(new LabelId(ContractInputs.pathId(query.getFirst("labelId"))))) return false;
                 if(type.equals("WORK_SESSION") && query.containsKey("projectId") && !value.path("projectId").asText().equals(ContractInputs.pathId(query.getFirst("projectId")).toString())) return false;

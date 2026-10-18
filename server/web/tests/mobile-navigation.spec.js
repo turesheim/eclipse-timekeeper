@@ -24,7 +24,7 @@ test('saved account zone applies to new editors while hidden reports refresh',as
   try {
     await api('PUT','/me',{zoneId:'America/New_York'},{'If-Match':original.headers().etag});
     client=await (await api('POST','/clients',{name:'Zone refresh '+randomUUID(),color:'#176653'})).json();
-    const now=Date.now();session=await (await api('POST','/work-sessions',{title:'Confirmed time zone',clientId:client.id,summary:'',start:new Date(now-7200000).toISOString(),end:new Date(now-3600000).toISOString()})).json();
+    const now=Date.now();session=await (await api('POST','/work-sessions',{clientId:client.id,summary:'Confirmed time zone',start:new Date(now-7200000).toISOString(),end:new Date(now-3600000).toISOString()})).json();
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_TOKEN);
     await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
     await page.locator('[data-tab=week]').click();await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();
