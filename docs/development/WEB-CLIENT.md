@@ -1,6 +1,6 @@
 # Timekeeper web client
 
-The signed-in footer reads `/api/v1/server` to identify the running server
+The account menu's **About** dialog reads `/api/v1/server` to identify the running server
 version and commit. Its details distinguish immutable build time, explicitly
 recorded deployment time and process-start time. Information refreshes after
 long polls and manual refreshes, including during rolling updates. Missing
@@ -78,7 +78,34 @@ Los Angeles time while the account uses Oslo time.
 
 ![Track month and year picker](../assets/screenshots/track-month-picker.png)
 
+## Themes
+
+Choose **Theme** in the account menu to switch between Timekeeper (the default),
+Timekeeper Dark, Solarized Light, Solarized Dark, Nord and Dracula. The selection
+is saved on this browser and shared with other open Timekeeper tabs, including
+Administration. A saved theme also applies to sign-in and loads before the
+stylesheets to avoid flashing a light page. If browser storage is unavailable,
+theme selection still works for the current page.
+
+Theme tokens cover forms, tables, calendar surfaces, dialogs and account pages.
+Client colors remain the colors chosen for those clients. The palettes use
+[Solarized](https://ethanschoonover.com/solarized/),
+[Nord](https://www.nordtheme.com/docs/colors-and-palettes/) and
+[Dracula](https://draculatheme.com/spec), with text/accent contrast adjusted for
+web controls. All styles and checkbox/radio assets are bundled locally.
+`tests/themes.spec.js` checks WCAG A/AA contrast in every view, editors and account
+settings, persistence, cross-tab updates and unavailable storage. It captures
+desktop and mobile previews for every theme under `server/web/test-results/`.
+
 ## Design baseline
+
+The main views share a fixed bottom navigation bar, with an icon for each view.
+Labels remain visible on wide screens and hide when space is limited; every
+button retains its accessible name and hover title. The bar stays within the
+device's safe area, and content and Undo notifications leave room above it.
+Account settings and sign-in use their own navigation.
+Open **About** in the account menu to see the server version, SPK version, commit
+and build, deployment and start times. Close it with its button or Escape.
 
 Bootstrap 5.3.8 supplies the shared buttons, forms, navigation, cards and tables.
 The small application theme in `style.css` defines the green palette, typography,

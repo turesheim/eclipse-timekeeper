@@ -7,6 +7,11 @@ export async function openAccountMenu(page) {
   if (await menu.getAttribute('open') === null) await toggle.click();
 }
 
+export async function openAbout(page) {
+  await openAccountMenu(page);await page.getByRole('button',{name:'About',exact:true}).click();
+  await expect(page.getByRole('dialog',{name:'About Timekeeper',exact:true})).toBeVisible();
+}
+
 export async function setTimeZone(page, zone) {
   await openAccountMenu(page);
   await page.getByRole('link', {name:'My Account',exact:true}).click();
