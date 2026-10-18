@@ -76,6 +76,25 @@ Los Angeles time while the account uses Oslo time.
 
 ## Design baseline
 
+### Themes
+
+Choose **Theme** in the account menu to switch between Timekeeper (the default),
+Timekeeper Dark, Solarized Light, Solarized Dark, Nord and Dracula. The selection
+is saved on this browser and shared with other open Timekeeper tabs, including
+Administration. A saved theme also applies to sign-in and loads before the
+stylesheets to avoid flashing a light page. If browser storage is unavailable,
+theme selection still works for the current page.
+
+Theme tokens cover forms, tables, calendar surfaces, dialogs and account pages.
+Client colors remain the colors chosen for those clients. The palettes use
+[Solarized](https://ethanschoonover.com/solarized/),
+[Nord](https://www.nordtheme.com/docs/colors-and-palettes/) and
+[Dracula](https://draculatheme.com/spec), with text/accent contrast adjusted for
+web controls. All styles and checkbox/radio assets are bundled locally.
+`tests/themes.spec.js` checks WCAG A/AA contrast in every view, editors and account
+settings, persistence, cross-tab updates and unavailable storage. It captures
+desktop and mobile previews for every theme under `server/web/test-results/`.
+
 Bootstrap 5.3.8 supplies the shared buttons, forms, navigation, cards and tables.
 The small application theme in `style.css` defines the green palette, typography,
 spacing and visible keyboard focus. The work-session card establishes the baseline:
