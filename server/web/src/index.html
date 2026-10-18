@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Timekeeper</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" sizes="256x256" href="./apple-touch-icon.png">
@@ -61,7 +61,16 @@
           </div></div>
       </section>
       <section class="card tracking"><div><p class="eyebrow">IN PROGRESS</p><h2 id="active-title">Ready when you are</h2><p id="active-details" class="hint">Choose a task below to start tracking.</p></div><button class="btn btn-primary" id="stop" hidden>Stop tracking</button></section>
-      <nav id="workspace-navigation" class="nav nav-pills workspace-nav" aria-label="Workspace" tabindex="-1"><button class="nav-link active" data-tab="track" aria-current="page">Track</button><button class="nav-link" data-tab="week">Workweek</button><button class="nav-link" data-tab="activities">Activities</button><button class="nav-link" data-tab="calendar">Calendar</button><button class="nav-link" data-tab="tasks">Tasks</button><button class="nav-link" data-tab="clients">Clients</button><button class="nav-link" data-tab="projects">Projects</button><button class="nav-link" data-tab="labels">Labels</button></nav>
+      <nav id="workspace-navigation" class="nav nav-pills workspace-nav" aria-label="Time tracking views" tabindex="-1">
+        <button class="nav-link active" data-tab="track" aria-current="page" aria-label="Track" title="Track"><span class="icon" aria-hidden="true">&#xf080;</span><span class="nav-label">Track</span></button>
+        <button class="nav-link" data-tab="week" aria-label="Workweek" title="Workweek"><span class="icon" aria-hidden="true">&#xf00a;</span><span class="nav-label">Workweek</span></button>
+        <button class="nav-link" data-tab="activities" aria-label="Activities" title="Activities"><span class="icon" aria-hidden="true">&#xf2f2;</span><span class="nav-label">Activities</span></button>
+        <button class="nav-link" data-tab="calendar" aria-label="Calendar" title="Calendar"><span class="icon" aria-hidden="true">&#xf133;</span><span class="nav-label">Calendar</span></button>
+        <button class="nav-link" data-tab="tasks" aria-label="Tasks" title="Tasks"><span class="icon" aria-hidden="true">&#xf0ae;</span><span class="nav-label">Tasks</span></button>
+        <button class="nav-link" data-tab="clients" aria-label="Clients" title="Clients"><span class="icon" aria-hidden="true">&#xf1ad;</span><span class="nav-label">Clients</span></button>
+        <button class="nav-link" data-tab="projects" aria-label="Projects" title="Projects"><span class="icon" aria-hidden="true">&#xf07b;</span><span class="nav-label">Projects</span></button>
+        <button class="nav-link" data-tab="labels" aria-label="Labels" title="Labels"><span class="icon" aria-hidden="true">&#xf02c;</span><span class="nav-label">Labels</span></button>
+      </nav>
       <section id="track-panel" aria-labelledby="track-title">
         <div class="toolbar track-toolbar">
           <div class="track-controls">

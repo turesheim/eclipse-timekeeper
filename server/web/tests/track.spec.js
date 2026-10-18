@@ -26,7 +26,7 @@ test('Track is the default month overview with exact client session hours, local
     await create('work-sessions',{clientId:b.id,summary:'Other client session',start:'2025-10-26T15:00:00Z',end:'2025-10-26T17:00:00Z'});
     await create('work-sessions',{clientId:b.id,summary:'Next month boundary',start:'2025-10-31T22:00:00Z',end:'2025-11-01T02:00:00Z'});
     await signIn(page);
-    await expect(page.locator('[data-tab]').first()).toHaveText('Track');await expect(page.locator('[data-tab=track]')).toHaveAttribute('aria-current','page');
+    await expect(page.locator('[data-tab]').first()).toHaveAccessibleName('Track');await expect(page.locator('[data-tab=track]')).toHaveAttribute('aria-current','page');
     await expect(page.locator('#track-panel')).toBeVisible();await expect(page.locator('#week-panel')).not.toBeVisible();
     await page.getByLabel('Month',{exact:true}).fill('2025-10');
     await expect(page.locator('#track-title')).toContainText('2025');await expect(page.locator('#track-zone')).toHaveText('Europe/Oslo');

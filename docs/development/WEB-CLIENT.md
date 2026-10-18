@@ -76,6 +76,12 @@ Los Angeles time while the account uses Oslo time.
 
 ## Design baseline
 
+The main views share a fixed bottom navigation bar, with an icon for each view.
+Labels remain visible on wide screens and hide when space is limited; every
+button retains its accessible name and hover title. The bar stays within the
+device's safe area, and content and Undo notifications leave room above it.
+Account settings and sign-in use their own navigation.
+
 Bootstrap 5.3.8 supplies the shared buttons, forms, navigation, cards and tables.
 The small application theme in `style.css` defines the green palette, typography,
 spacing and visible keyboard focus. The work-session card establishes the baseline:
