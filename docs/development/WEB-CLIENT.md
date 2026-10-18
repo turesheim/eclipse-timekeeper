@@ -436,6 +436,12 @@ select an optional icon from the bundled picker, or choose **None** to remove it
 Icons also appear beside project names in Workweek and beside daily durations
 in Track. They are retained in account downloads and JSON/CSV transfers.
 
+![Optional project icon picker](../assets/screenshots/project-icon-picker.png)
+
+![Project icons beside Track durations](../assets/screenshots/track-project-icons.png)
+
+![Project icons in Track on a narrow screen](../assets/screenshots/track-project-icons-mobile.png)
+
 ![Projects grouped by client](../assets/screenshots/projects-grouped-mobile.png)
 
 Use **Clients** to create, rename, recolor or delete a client. A client has a
