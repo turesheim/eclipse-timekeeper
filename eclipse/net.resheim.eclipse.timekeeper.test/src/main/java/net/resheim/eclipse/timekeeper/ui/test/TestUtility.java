@@ -49,9 +49,9 @@ public class TestUtility {
 	static void createActivity(int dayOfWeek, Task ttask, String text) {
 		ZonedDateTime now = Instant.now().atZone(TimekeeperUiPlugin.getCalendarZone());
 		TemporalField fieldISO = WeekFields.of(Locale.getDefault()).dayOfWeek();
-		// Keep the entire one-hour fixture within the requested civil day.
-		// Using the current wall time clips it at midnight on early CI runs.
-		Instant start = now.with(fieldISO, dayOfWeek).withHour(12).withMinute(0).withSecond(0).withNano(0).toInstant();
+		// Use the previous locale week so every requested day and the full interval
+		// are in the past, including early builds on the first day of a week.
+		Instant start = now.minusWeeks(1).with(fieldISO, dayOfWeek).withHour(12).withMinute(0).withSecond(0).withNano(0).toInstant();
 		TimekeeperUiPlugin.getDefault().getTimekeeperService().createActivity(
 				new net.resheim.eclipse.timekeeper.service.Commands.CreateActivity(ttask.id(),
 						net.resheim.eclipse.timekeeper.domain.OwnerId.LOCAL, start.minus(Duration.ofHours(1)),
