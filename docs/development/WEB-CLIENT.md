@@ -48,7 +48,10 @@ fonts and their upstream license are included in the server distribution.
 
 **Track** is the default workspace tab. Its Monday-to-Sunday month grid shows
 one client-coloured summary per client and day, with recorded session hours per
-client above it. Multiple sessions for the same client are combined.
+client above it. Only clients with logged time in the selected month are shown.
+Multiple sessions for the same client are combined. Use the controls on the left
+to move between months or return to the current month. The calendar button inside
+the Month selector opens a month/year picker; a month can also be entered as `YYYY-MM`.
 Hover over a daily client total to see its sessions, summaries, projects, labels,
 local start/end times and durations in a tooltip. These details are also available
 when viewing the account with read-only access.
@@ -65,6 +68,8 @@ Los Angeles time while the account uses Oslo time.
 ![Track month view on desktop](../assets/screenshots/track-month-desktop.png)
 
 ![Track month view on a narrow screen](../assets/screenshots/track-month-narrow.png)
+
+![Track month and year picker](../assets/screenshots/track-month-picker.png)
 
 ## Design baseline
 

@@ -82,7 +82,7 @@ class DistributionDocumentationTest(unittest.TestCase):
                          'passkeys-desktop.png','passkeys-mobile.png',
                          'account-data-review-desktop.png','account-data-review-mobile.png',
                          'account-menu-mobile.png','work-session-labels-desktop.png','work-session-labels-mobile.png',
-                         'track-month-desktop.png','track-month-narrow.png',
+                         'track-month-desktop.png','track-month-narrow.png','track-month-picker.png',
                          'toggl-import-review.png','toggl-import-history-narrow.png'):
                 image = root/'docs/assets/screenshots'/name
                 image.parent.mkdir(parents=True,exist_ok=True)

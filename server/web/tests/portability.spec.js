@@ -76,3 +76,14 @@ test('portability: read-only sessions can download repeatedly while restore stay
   await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Your data',exact:true}).click();await expect(page.getByRole('button',{name:'Review archive',exact:true})).toBeDisabled();
   await download(page);await expect(page.getByRole('button',{name:'Download my data',exact:true})).toBeEnabled();await download(page);
 });
+test('portability: concurrent session refreshes do not interrupt private archive downloads',async({page,request})=>{
+  await account(page,request);
+  for(let round=0;round<3;round++) {
+    const replies=await page.evaluate(async()=>Promise.all(Array.from({length:12},async(_,index)=>{
+      const archive=index%2===0,response=await fetch('/api/v1'+(archive ? '/data/account/export':'/auth/session'),{headers:{Accept:archive ? 'application/zip':'application/json'},referrerPolicy:'origin',credentials:'same-origin',cache:'no-store'});
+      const bytes=new Uint8Array(await response.arrayBuffer());
+      return {status:response.status,archive,type:response.headers.get('Content-Type'),zip:bytes[0]===0x50&&bytes[1]===0x4b};
+    })));
+    for(const reply of replies) {expect(reply.status).toBe(200);if(reply.archive){expect(reply.type).toBe('application/zip');expect(reply.zip).toBe(true);}}
+  }
+});

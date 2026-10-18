@@ -22,6 +22,47 @@ class AccountArchiveTest {
     @Inject ServerStore store;
     @Inject TokenRegistry tokens;
     @Inject ContractInputs inputs;
+    @Inject AccountStore accounts;
+    @Inject io.agroal.api.AgroalDataSource datasource;
+
+    /** Commit an authentication change after the archive's MVCC snapshot starts. */
+    private AccountArchive racingArchive(String owner,Runnable change,java.util.concurrent.atomic.AtomicInteger attempts) {
+        var archive=new AccountArchive();archive.accounts=accounts;archive.tokens=tokens;
+        archive.datasource=(io.agroal.api.AgroalDataSource)java.lang.reflect.Proxy.newProxyInstance(
+            getClass().getClassLoader(),new Class<?>[]{io.agroal.api.AgroalDataSource.class},(proxy,method,args)->{
+                try {
+                    Object result=method.invoke(datasource,args);
+                    if(!method.getName().equals("getConnection")) return result;
+                    var connection=(java.sql.Connection)result;
+                    return java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{java.sql.Connection.class},(ignored,operation,values)->{
+                        try {
+                            Object value=operation.invoke(connection,values);
+                            if(operation.getName().equals("setAutoCommit") && Boolean.FALSE.equals(values[0]) && attempts.incrementAndGet()==1) {
+                                try(var query=AccountStore.query(connection,"SELECT revision FROM tk_owner WHERE id=?",owner);var rows=query.executeQuery()) {assertTrue(rows.next());}
+                                change.run();
+                            }
+                            return value;
+                        }catch(java.lang.reflect.InvocationTargetException failure) {throw failure.getCause();}
+                    });
+                }catch(java.lang.reflect.InvocationTargetException failure) {throw failure.getCause();}
+            });
+        return archive;
+    }
+    @Test void concurrentAuthenticationTouchRestartsTheSnapshotBeforeReturningAnArchive() throws Exception {
+        var principal=tokens.authenticate("Bearer test-read");var attempts=new java.util.concurrent.atomic.AtomicInteger();
+        var archive=racingArchive(principal.owner(),()->accounts.tx(c->{accounts.guard(c,principal);return null;}),attempts);
+        try(var download=archive.download(principal)) {
+            assertEquals(2,attempts.get());
+            assertEquals(principal.owner(),AccountArchiveInput.read(download.file(),"application/zip").path("account").path("ownerId").asText());
+        }
+    }
+    @Test void snapshotRetryMustRecheckRevocationInsteadOfReturningPrivateData() {
+        var principal=tokens.authenticate("Bearer test-b");var attempts=new java.util.concurrent.atomic.AtomicInteger();
+        var archive=racingArchive(principal.owner(),()->accounts.tx(c->{AccountStore.execute(c,"UPDATE tk_api_token SET revoked=TRUE WHERE digest=?",principal.digest());return null;}),attempts);
+        try {
+            assertEquals(401,assertThrows(ApiFailure.class,()->archive.download(principal)).status);assertEquals(2,attempts.get());
+        } finally {accounts.tx(c->{AccountStore.execute(c,"UPDATE tk_api_token SET revoked=FALSE WHERE digest=?",principal.digest());return null;});}
+    }
 
     @Test void administratorDownloadIsPrivateAndManagementMetadataContainsNoCredentials() throws Exception {
         var alice=tokens.authenticate("Bearer test-a");tokens.authenticate("Bearer test-b");

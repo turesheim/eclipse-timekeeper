@@ -36,6 +36,24 @@ class AccountArchive {
         return folder;
     }
     Download download(TokenRegistry.Principal principal) {
+        for(int attempt=0;;attempt++) {
+            try {return snapshot(principal);}
+            catch(RuntimeException failure) {
+                if(attempt>=4 || !snapshotConflict(failure)) throw failure;
+                // A concurrent authenticated read can update last-seen metadata
+                // after this repeatable-read snapshot starts. Retry the complete
+                // private export, with fresh authorization, before streaming bytes.
+                try {Thread.sleep(5L*(attempt+1));}
+                catch(InterruptedException stopped) {Thread.currentThread().interrupt();throw failure;}
+            }
+        }
+    }
+    private static boolean snapshotConflict(Throwable failure) {
+        for(Throwable cause=failure;cause!=null;cause=cause.getCause())
+            if(cause instanceof SQLException sql && "40001".equals(sql.getSQLState())) return true;
+        return false;
+    }
+    private Download snapshot(TokenRegistry.Principal principal) {
         Path folder=null,file=null;
         try {
             folder=privateDirectory();file=folder.resolve("timekeeper-account.zip");
@@ -58,7 +76,7 @@ class AccountArchive {
             return new Download(file,Files.size(file));
         }catch(SQLException | IOException failure) {
             if(file!=null) new Download(file,0).close();else if(folder!=null) try {Files.deleteIfExists(folder);}catch(IOException ignored) {}
-            throw new ApiFailure(503,"UNAVAILABLE");
+            throw new ApiFailure(503,"UNAVAILABLE",failure);
         }catch(RuntimeException failure) {
             if(file!=null) new Download(file,0).close();throw failure;
         }

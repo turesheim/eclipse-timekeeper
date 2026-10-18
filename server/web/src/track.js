@@ -1,6 +1,7 @@
 import {dateInZone,instantNanos,instantText} from './model.js';
 import {monthCalendar,monthSessions,shiftMonth} from './month-model.js';
 import {iconButton} from './icons.js';
+import {MonthPicker} from './month-picker.js';
 
 const node=(tag,text,className)=> {const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 function compactTime(value) {
@@ -12,6 +13,7 @@ export class MonthTrack {
     this.callbacks=callbacks;
     this.root=root;this.input=root.querySelector('#track-month');
     this.grid=root.querySelector('#track-calendar');this.totals=root.querySelector('#track-clients');
+    this.monthPicker=new MonthPicker(root,()=>this.currentMonth(),month=>this.select(month));
     for(const [id,glyph,label,offset] of [['track-previous','left','Previous month',-1],['track-next','right','Next month',1]]) {
       const button=root.querySelector('#'+id);iconButton(button,glyph,label);
       button.addEventListener('click',()=>this.select(shiftMonth(this.currentMonth(),offset)));
@@ -39,7 +41,7 @@ export class MonthTrack {
   }
   currentDate() {return dateInZone(Number(this.asOf/1000000n),this.snapshot.profile.data.zoneId);}
   currentMonth() {return this.month||this.currentDate().slice(0,7);}
-  select(month) {this.closePicker();this.month=month;this.input.setCustomValidity('');this.paint(true);}
+  select(month) {this.closePicker();this.monthPicker.close();this.month=month;this.input.setCustomValidity('');this.paint(true);}
   update(snapshot,asOf,format,writable) {
     this.snapshot=snapshot;this.sessionsById=new Map(snapshot.workSessions.map(session=>[session.id,session]));this.asOf=asOf;this.format=format;this.setWritable(writable);this.paint(true);
   }
@@ -48,7 +50,7 @@ export class MonthTrack {
     for(const button of this.grid.querySelectorAll('button')) button.disabled=!writable;
     if(!writable)this.closePicker();
   }
-  hide() {this.closePicker();}
+  hide() {this.closePicker();this.monthPicker.close();}
   closePicker() {this.picking=null;if(this.picker.open)this.picker.close();this.choices.replaceChildren();}
   sessions(date,clientId) {
     const ids=new Set(this.days?.find(day=>day.date===date)?.clients.get(clientId)?.sessionIds || []);
@@ -93,6 +95,7 @@ export class MonthTrack {
     if(focused)([...this.choices.children].find(choice=>choice.dataset.trackSessionChoice===focused)||this.choices.firstElementChild)?.focus();
   }
   reset() {
+    this.monthPicker.close();
     this.closePicker();this.days=null;this.sessionsById?.clear();this.writable=false;this.pickerOrigin=null;this.pickerContext.textContent='';
     this.snapshot=null;this.month=null;this.calendar=null;this.layout=null;this.grid.replaceChildren();this.totals.replaceChildren();
     this.dailyTimes?.clear();this.clientTimes?.clear();this.input.value='';this.input.setCustomValidity('');
@@ -109,11 +112,12 @@ export class MonthTrack {
     if(this.calendar?.month!==month||this.calendar?.zone!==zone)this.calendar=monthCalendar(month,zone);
     const result=monthSessions(this.calendar,this.snapshot.workSessions,this.asOf);
     this.days=result.days;
-    const layout=month+'|'+zone+'|'+today+'|'+result.days.map(day=>[...day.clients.keys()].sort().join(',')).join(';');
+    const layout=month+'|'+zone+'|'+today+'|'+[...result.clients.keys()].sort().join(',')+'|'+result.days.map(day=>[...day.clients.keys()].sort().join(',')).join(';');
     if(force||this.layout!==layout) {
       const active=document.activeElement,focused=active?.dataset.trackDailyClient && this.grid.contains(active) ? {date:active.closest('[data-track-date]').dataset.trackDate,client:active.dataset.trackDailyClient}:null;
       this.layout=layout;this.date=today;this.input.value=month;
-      this.root.querySelector('#track-title').textContent=new Intl.DateTimeFormat(undefined,{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(month+'-15T12:00:00Z'));
+      const title=new Intl.DateTimeFormat(undefined,{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(month+'-15T12:00:00Z'));
+      this.root.querySelector('#track-title').textContent=title.charAt(0).toLocaleUpperCase()+title.slice(1);
       this.root.querySelector('#track-zone').textContent=zone;
       this.grid.replaceChildren();this.totals.replaceChildren();this.dailyTimes=new Map();this.clientTimes=new Map();
       const table=node('table',undefined,'track-month'),head=node('thead'),row=node('tr'),body=node('tbody');
@@ -150,13 +154,13 @@ export class MonthTrack {
           cell.append(summary);
         }
       }
-      const clients=[...this.snapshot.clients].sort((a,b)=>a.name.localeCompare(b.name));
+      const clients=this.snapshot.clients.filter(client=>result.clients.has(client.id)).sort((a,b)=>a.name.localeCompare(b.name));
       for(const client of clients) {
         const card=node('div',undefined,'card track-client'),label=node('span',client.name,'client-color'),total=node('strong');
         if(/^#[0-9a-f]{6}$/i.test(client.color))label.style.setProperty('--client-color',client.color);
         card.dataset.trackClient=client.id;card.append(label,total);this.totals.append(card);this.clientTimes.set(client.id,total);
       }
-      if(!clients.length)this.totals.append(node('p','No clients yet.','hint'));
+      if(!clients.length)this.totals.append(node('p','No work sessions this month.','hint'));
       if(focused)this.dailyTimes.get(focused.date+'/'+focused.client)?.summary.focus();
       this.paintPicker();
     }

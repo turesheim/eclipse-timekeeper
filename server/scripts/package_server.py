@@ -69,6 +69,7 @@ def package(output, tag, commit):
         'docs/assets/screenshots/bootstrap-work-session-narrow.png': 'images/work-session-narrow.png',
         'docs/assets/screenshots/track-month-desktop.png': 'images/track-month-desktop.png',
         'docs/assets/screenshots/track-month-narrow.png': 'images/track-month-narrow.png',
+        'docs/assets/screenshots/track-month-picker.png': 'images/track-month-picker.png',
         'docs/assets/screenshots/toggl-import-review.png': 'images/toggl-import-review.png',
         'docs/assets/screenshots/toggl-import-history-narrow.png': 'images/toggl-import-history-narrow.png',
     }

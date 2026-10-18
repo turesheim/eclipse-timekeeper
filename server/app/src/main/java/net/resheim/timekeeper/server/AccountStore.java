@@ -39,7 +39,7 @@ public class AccountStore {
     }
     static RuntimeException databaseFailure(SQLException failure) {
         if("23505".equals(failure.getSQLState())) return ApiFailure.conflict();
-        return new ApiFailure(503,"UNAVAILABLE");
+        return new ApiFailure(503,"UNAVAILABLE",failure);
     }
     static PreparedStatement query(Connection c,String sql,Object... values) throws SQLException {
         var statement=c.prepareStatement(sql);for(int i=0;i<values.length;i++) statement.setObject(i+1,values[i]);return statement;
