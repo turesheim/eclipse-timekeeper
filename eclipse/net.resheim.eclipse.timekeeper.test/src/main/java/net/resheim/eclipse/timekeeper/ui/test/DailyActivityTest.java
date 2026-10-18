@@ -33,8 +33,8 @@ public class DailyActivityTest {
         var project=service.createProject(new CreateProject("Daily editor "+UUID.randomUUID()));
         var task=service.createTask(new CreateTask(Optional.of(project.id()),"Daily editor task",Optional.empty()));
         var zone=TimekeeperUiPlugin.getCalendarZone();
-        var monday=LocalDate.now(zone).with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks(1);
-        var query=new ActivityQuery(monday.atStartOfDay(zone).toInstant(),monday.plusDays(7).atStartOfDay(zone).toInstant(),
+        var firstDay=LocalDate.now(zone).with(java.time.temporal.WeekFields.of(Locale.getDefault()).dayOfWeek(),1).minusWeeks(1);
+        var query=new ActivityQuery(firstDay.atStartOfDay(zone).toInstant(),firstDay.plusDays(7).atStartOfDay(zone).toInstant(),
                 Optional.of(OwnerId.LOCAL),Optional.of(task.id()),Optional.empty(),zone);
         try {
             bot.viewByTitle("Workweek").setFocus();bot.viewByTitle("Workweek").toolbarButton("Show current week").click();
@@ -45,8 +45,8 @@ public class DailyActivityTest {
             });
             bot.treeWithId("workweek-editor-tree").getTreeItem(project.name()).getNode(task.summary()).contextMenu("New activity").click();
             bot.shell("New activity").activate();bot.textWithLabel("Summary").setText("Across midnight");
-            bot.textWithLabel("Start (yyyy-MM-dd HH:mm)").setText(monday+" 23:30");
-            bot.textWithLabel("End (yyyy-MM-dd HH:mm)").setText(monday.plusDays(1)+" 01:30");
+            bot.textWithLabel("Start (yyyy-MM-dd HH:mm)").setText(firstDay+" 23:30");
+            bot.textWithLabel("End (yyyy-MM-dd HH:mm)").setText(firstDay.plusDays(1)+" 01:30");
             var label=service.labels().getFirst();bot.tableWithId("activity-labels").getTableItem(label.name()).check();bot.button("Save").click();
             bot.waitUntil(new DefaultCondition() {
                 public boolean test() {return service.activities(query).activities().size()==2;}
@@ -63,8 +63,8 @@ public class DailyActivityTest {
                 public String getFailureMessage() {return "Daily activity rows did not refresh";}
             });
             bot.treeWithId("workweek-editor-tree").getTreeItem(project.name()).getNode(task.summary()).getNode("Across midnight").contextMenu("Edit activity...").click();
-            bot.shell("Edit activity").activate();assertEquals(monday.plusDays(1)+" 00:00",bot.textWithLabel("Start (yyyy-MM-dd HH:mm)").getText());
-            bot.textWithLabel("Summary").setText("Edited later day");bot.textWithLabel("End (yyyy-MM-dd HH:mm)").setText(monday.plusDays(1)+" 02:00");bot.button("Save").click();
+            bot.shell("Edit activity").activate();assertEquals(firstDay.plusDays(1)+" 00:00",bot.textWithLabel("Start (yyyy-MM-dd HH:mm)").getText());
+            bot.textWithLabel("Summary").setText("Edited later day");bot.textWithLabel("End (yyyy-MM-dd HH:mm)").setText(firstDay.plusDays(1)+" 02:00");bot.button("Save").click();
             assertEquals(earlier,service.activity(first.id()).orElseThrow());assertEquals("Edited later day",service.activity(last.id()).orElseThrow().summary());
             assertEquals(Duration.ofMinutes(150),service.activities(query).total());
         } finally {
@@ -82,8 +82,8 @@ public class DailyActivityTest {
         onUi(()->{try {var window=PlatformUI.getWorkbench().getActiveWorkbenchWindow();window.getShell().forceActive();window.getActivePage().showView(WorkWeekView.VIEW_ID);}
             catch(Exception failure) {throw new AssertionError(failure);}});
         var service=TimekeeperUiPlugin.getDefault().getTimekeeperService();var zone=TimekeeperUiPlugin.getCalendarZone();
-        var monday=LocalDate.now(zone).with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks(1);
-        var from=monday.atTime(9,0).atZone(zone).toInstant();var end=from.plusSeconds(3600);
+        var firstDay=LocalDate.now(zone).with(java.time.temporal.WeekFields.of(Locale.getDefault()).dayOfWeek(),1).minusWeeks(1);
+        var from=firstDay.atTime(9,0).atZone(zone).toInstant();var end=from.plusSeconds(3600);
         var label=service.labels().getFirst();var tasks=service.tasks();
         var project=service.createProject(new CreateProject("Taskless project "+UUID.randomUUID()));
         var standalone=service.createActivity(new CreateActivity(null,OwnerId.LOCAL,from,Optional.of(end),"Unassigned activity check",Set.of(label.id())));

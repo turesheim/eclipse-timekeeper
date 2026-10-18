@@ -296,6 +296,7 @@ public class IntegrationTest {
 					.project(reloaded.projectId().orElseThrow()).orElseThrow().name());
 		});
 		bot.activePart().toolbarButton("Show current week").click();
+		bot.activePart().toolbarButton("Show previous week").click();
 		var row = bot.treeWithId("workweek-editor-tree").getTreeItem("Historical records")
 				.getNode("9002: Keep recorded time");
 		assertEquals("1:00", row.cell(1));
@@ -538,6 +539,8 @@ public class IntegrationTest {
 		// text editor instead.
 		if (!Platform.getOS().equals(Platform.OS_LINUX)) {
 			SWTBotView workweek = prepareWorkweekView();
+			workweek.toolbarButton("Show current week").click();
+			workweek.toolbarButton("Show previous week").click();
 			assertTrue(bot.viewByTitle(MAIN_VIEW_NAME).isActive());
 			var tree = workweek.bot().treeWithId("workweek-editor-tree");
 			// verify that a text field can be edited, first day of week

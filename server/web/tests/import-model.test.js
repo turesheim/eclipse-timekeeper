@@ -21,6 +21,20 @@ test('work sessions are the default, using reviewed clients and projects without
   assert.notEqual(activityPlan.selectionFingerprint,plan.selectionFingerprint);
 });
 
+test('real Legacy client names take precedence over project suggestions and fallback clients in both import modes', async () => {
+  const parsed = parseTogglDetailedCsv(readFileSync(new URL('./fixtures/toggl/legacy-user-end.csv', import.meta.url), 'utf8'), {zone:'Europe/Oslo'});
+  for(const mode of ['WORK_SESSION','ACTIVITY']) {
+    const plan = await importPlan(parsed.rows,parsed.people[0].key,{mode,fallbackClient:'Fallback client',fallbackProject:'Fallback project'});
+    assert.equal(plan.selectedEntries,7);assert.equal(plan.selectedNanos,'151462000000000');
+    const client = plan.mappings.find(value=>value.resourceType==='CLIENT'),project = plan.mappings.find(value=>value.resourceType==='PROJECT');
+    assert.equal(client.name,'Legacy client');assert.equal(project.name,'Legacy project');assert.equal(project.parentKey,client.key);
+    assert.deepEqual(plan.mappings.map(value=>value.resourceType),['CLIENT','PROJECT']);
+    assert.ok(plan.rows.every(row=>row.client==='Legacy client' && row.projectKey===project.key));
+    if(mode==='WORK_SESSION') assert.ok(plan.rows.every(row=>row.clientKey===client.key && row.title==='Imported work session'));
+    else assert.ok(plan.rows.every(row=>row.taskKey===null));
+  }
+});
+
 test('the real anonymized export produces a reviewed taskless plan without changing source ownership', async () => {
   const text = readFileSync(new URL('./fixtures/toggl/detailed-member-stop.csv', import.meta.url), 'utf8');
   const parsed = parseTogglDetailedCsv(text, {zone: 'Europe/Oslo'});

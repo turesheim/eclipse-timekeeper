@@ -8,5 +8,10 @@ fields. Other parser cases are explicitly synthetic.
 
 Toggl documents [Detailed Report exports](https://support.toggl.com/en-us/article/detailed-report-k9bzy2/)
 and [Track export prerequisites](https://support.toggl.com/en-us/article/exporting-data-z53uki/).
-The User/End variant in unit tests is a synthetic compatibility case; do not
-describe it as another captured real export.
+`legacy-user-end.csv` is based on a real Toggl Track Legacy export supplied on
+2026-10-18. User, email, client and project names are replaced. Dates shift by
+364 days and clocks by 17 minutes, retaining the same Europe/Oslo offset,
+seven intervals and exact total of 42:04:22. Empty Task/Description/Tags fields,
+the Billable column, User/End headers, BOM and CRLF are retained; quoting is
+normalized to quote all fields. The original file is unchanged. Other User/End
+cases in unit tests are synthetic.

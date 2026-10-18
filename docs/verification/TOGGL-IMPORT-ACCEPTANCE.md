@@ -3,7 +3,11 @@
 Local candidate verification on 2026-10-17 for #319. The real supplied Detailed
 Report remains unchanged. The committed Member/Stop fixture replaces identities,
 project/tag/description text and dates while retaining seven intervals totaling
-42:04:22. User/End compatibility cases are synthetic, not another captured export.
+42:04:22. A second real export, supplied on 2026-10-18, provides the Legacy
+User/End fixture with distinct Client and Project columns and the same seven
+durations. Its identities, client/project names and timestamps are anonymized;
+the original file remains unchanged. Parser and planner regression tests cover
+both formats, including Legacy client precedence in both import modes.
 
 | Boundary | Verified behavior |
 | --- | --- |

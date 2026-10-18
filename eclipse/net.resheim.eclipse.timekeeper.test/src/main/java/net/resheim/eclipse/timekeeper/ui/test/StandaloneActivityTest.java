@@ -69,11 +69,13 @@ public class StandaloneActivityTest {
 		var project = service.createProject(new CreateProject("Standalone activity checks"));
 		var task = service.createTask(new CreateTask(Optional.of(project.id()), "Unlinked task", Optional.empty()));
 		LocalDate today = LocalDate.now(TimekeeperUiPlugin.getCalendarZone());
-		LocalDate monday = today.with(WeekFields.of(Locale.getDefault()).dayOfWeek(), 1);
-		String date = DateTimeFormatter.ISO_LOCAL_DATE.format(monday);
+		// Keep the complete editable interval in the past, even on early first-day CI runs.
+		LocalDate firstDay = today.with(WeekFields.of(Locale.getDefault()).dayOfWeek(), 1).minusWeeks(1);
+		String date = DateTimeFormatter.ISO_LOCAL_DATE.format(firstDay);
 		try {
 			bot.viewByTitle("Workweek").setFocus();
 			bot.viewByTitle("Workweek").toolbarButton("Show current week").click();
+			bot.viewByTitle("Workweek").toolbarButton("Show previous week").click();
 			bot.waitUntil(new DefaultCondition() {
 				@Override public boolean test() {
 					try { return bot.treeWithId("workweek-editor-tree").getTreeItem(project.name()).expand().getNode(task.summary()) != null; }
@@ -97,11 +99,11 @@ public class StandaloneActivityTest {
 					bot.shell("New activity").widget, "standalone-activity-dialog.png"));
 			bot.shell("New activity").bot().button("Save").click();
 			bot.waitUntil(new DefaultCondition() {
-				@Override public boolean test() { return recorded(service, task.id(), monday).isPresent(); }
+				@Override public boolean test() { return recorded(service, task.id(), firstDay).isPresent(); }
 				@Override public String getFailureMessage() { return "Recorded activity was not saved"; }
 			});
-			Activity created = recorded(service, task.id(), monday).orElseThrow();
-			assertEquals(monday.atTime(9, 0).atZone(TimekeeperUiPlugin.getCalendarZone()).toInstant(), created.start());
+			Activity created = recorded(service, task.id(), firstDay).orElseThrow();
+			assertEquals(firstDay.atTime(9, 0).atZone(TimekeeperUiPlugin.getCalendarZone()).toInstant(), created.start());
 			assertTrue(created.labelIds().contains(label.id()));
 			assertTrue(created.manual());
 			bot.treeWithId("workweek-editor-tree").getTreeItem(project.name()).getNode(task.summary())
@@ -127,7 +129,7 @@ public class StandaloneActivityTest {
 			bot.button("Save").click();
 			Activity edited = service.activity(created.id()).orElseThrow();
 			assertEquals("Edited without Mylyn", edited.summary());
-			assertEquals(7200, service.activities(query(task.id(), monday)).total().getSeconds());
+			assertEquals(7200, service.activities(query(task.id(), firstDay)).total().getSeconds());
 			var precise = service.updateActivity(new net.resheim.eclipse.timekeeper.service.Commands.UpdateActivity(
 					edited.id(), edited.version(), edited.start().plusNanos(123456789),
 					Optional.of(edited.end().orElseThrow().plusSeconds(17).plusNanos(987654321)),
@@ -156,6 +158,7 @@ public class StandaloneActivityTest {
 			bot.treeWithId("workweek-editor-tree").getTreeItem(project.name()).getNode(task.summary())
 					.expand().getNode(edited.summary()).contextMenu("Delete activity").click();
 			assertTrue(service.activity(created.id()).isEmpty());
+			bot.viewByTitle("Workweek").toolbarButton("Show current week").click();
 			bot.treeWithId("workweek-editor-tree").getTreeItem(project.name()).getNode(task.summary())
 					.contextMenu("Activate task").click();
 			Activity ongoing = service.activeActivity(OwnerId.LOCAL).orElseThrow();
@@ -169,7 +172,7 @@ public class StandaloneActivityTest {
 			// Restore the production adapter and Mylyn state for the remaining suites.
 			service.activeActivity(OwnerId.LOCAL).filter(value -> value.taskId().equals(task.id())).ifPresent(value ->
 					service.deleteActivity(new net.resheim.eclipse.timekeeper.service.Commands.DeleteActivity(value.id(), value.version())));
-			for (Activity value : service.activities(query(task.id(), monday)).activities()) {
+			for (Activity value : service.activities(query(task.id(), firstDay)).activities()) {
 				service.deleteActivity(new net.resheim.eclipse.timekeeper.service.Commands.DeleteActivity(value.id(), value.version()));
 			}
 			service.deleteTask(new DeleteTask(task.id(), service.task(task.id()).orElseThrow().version()));
@@ -181,12 +184,12 @@ public class StandaloneActivityTest {
 		}
 	}
 	private static Optional<Activity> recorded(net.resheim.eclipse.timekeeper.service.TimekeeperService service,
-			net.resheim.eclipse.timekeeper.domain.TaskId task, LocalDate monday) {
-		return service.activities(query(task, monday)).activities().stream().findFirst();
+			net.resheim.eclipse.timekeeper.domain.TaskId task, LocalDate firstDay) {
+		return service.activities(query(task, firstDay)).activities().stream().findFirst();
 	}
-	private static ActivityQuery query(net.resheim.eclipse.timekeeper.domain.TaskId task, LocalDate monday) {
+	private static ActivityQuery query(net.resheim.eclipse.timekeeper.domain.TaskId task, LocalDate firstDay) {
 		var zone = TimekeeperUiPlugin.getCalendarZone();
-		return new ActivityQuery(monday.atStartOfDay(zone).toInstant(), monday.plusDays(7).atStartOfDay(zone).toInstant(),
+		return new ActivityQuery(firstDay.atStartOfDay(zone).toInstant(), firstDay.plusDays(7).atStartOfDay(zone).toInstant(),
 				Optional.empty(), Optional.of(task), Optional.empty(), zone);
 	}
 	private static void onUi(Runnable action) throws Exception {

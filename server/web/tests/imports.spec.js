@@ -6,6 +6,7 @@ import {createHash,randomBytes,randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 
 const fixture = fileURLToPath(new URL('./fixtures/toggl/detailed-member-stop.csv',import.meta.url));
+const legacyFixture = fileURLToPath(new URL('./fixtures/toggl/legacy-user-end.csv',import.meta.url));
 const token = process.env.TIMEKEEPER_WEB_TOKEN;
 async function api(request,path) {
   const response = await request.get('/api/v1'+path,{headers:{Authorization:`Bearer ${token}`}});expect(response.status()).toBe(200);return response.json();
@@ -16,7 +17,7 @@ async function login(page) {
   await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();
 }
 async function review(page) {
-  await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles(fixture);
+  await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');await page.getByLabel('Toggl CSV',{exact:true}).setInputFiles(fixture);
   await page.getByRole('button',{name:'Read CSV',exact:true}).click();await expect(page.getByRole('heading',{name:'Review import',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Review mappings',exact:true}).click();await expect(page.getByRole('heading',{name:'Review mappings',exact:true})).toBeVisible();
   await page.getByLabel('New client name',{exact:true}).fill('Browser imported client');
@@ -65,7 +66,7 @@ for(const mode of ['ACTIVITY','WORK_SESSION']) test(`Toggl ${mode} import resume
     return [`Bulk row ${n}`,'00:00:01','Bulk member','bulk@example.invalid','Bulk project','','2025-10-20',start.toISOString().slice(11,19),'2025-10-20',end.toISOString().slice(11,19)].join(',');
   });
   const file = {name:'bulk.csv',mimeType:'text/csv',buffer:Buffer.from([header,...lines].join('\r\n'))};
-  await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles(file);
+  await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');await page.getByLabel('Toggl CSV',{exact:true}).setInputFiles(file);
   await page.getByRole('button',{name:'Read CSV',exact:true}).click();await page.getByRole('button',{name:'Review mappings',exact:true}).click();
   await page.getByLabel('New client name',{exact:true}).fill('Bulk client');await page.getByRole('button',{name:'Review server matches',exact:true}).click();
   let dropped = false;
@@ -76,9 +77,9 @@ for(const mode of ['ACTIVITY','WORK_SESSION']) test(`Toggl ${mode} import resume
   expect(dropped).toBe(true);await page.unroute('**/api/v1/imports/jobs/*/batches/0');
   const job = (await api(request,'/imports')).items.find(value=>value.selectedEntries===201 && value.mode===mode && value.state==='IMPORTING');expect(job.nextBatch).toBe(1);expect(job.importedEntries).toBe(100);
   page.once('dialog',dialog=>dialog.accept());await page.reload();await expect(page.getByRole('heading',{name:'Import history',exact:true})).toBeVisible();
-  await expect(page.getByLabel('Detailed Report CSV',{exact:true})).toHaveValue('');
+  await expect(page.getByLabel('Toggl CSV',{exact:true})).toHaveValue('');
   await page.getByRole('button',{name:'Resume',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Choose the original CSV, source user and row exclusions to resume.');
-  await expect(page.getByLabel('Detailed Report CSV',{exact:true})).toBeEnabled();await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles(file);
+  await expect(page.getByLabel('Toggl CSV',{exact:true})).toBeEnabled();await page.getByLabel('Toggl CSV',{exact:true}).setInputFiles(file);
   await page.getByRole('button',{name:'Read CSV',exact:true}).click();await page.getByRole('button',{name:'Review mappings',exact:true}).click();
   await expect(page.getByLabel('New client name',{exact:true})).toBeDisabled();
   await page.getByRole('button',{name:'Review server matches',exact:true}).click();await page.getByRole('button',{name:'Resume import',exact:true}).click();
@@ -99,14 +100,14 @@ for(const mode of ['ACTIVITY','WORK_SESSION']) test(`Toggl ${mode} import resume
 test('Toggl worker and previous-account preview are cleared on sign-out and account switch',async({page})=>{
   await login(page);let release;const blocked = new Promise(resolve=>{release=resolve;});let intercepted=false;
   await page.route('**/web/toggl-worker.js',async route=>{intercepted=true;await blocked;try{await route.continue();}catch{}});
-  await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles(fixture);await page.getByRole('button',{name:'Read CSV',exact:true}).click();
+  await page.getByLabel('Toggl CSV',{exact:true}).setInputFiles(fixture);await page.getByRole('button',{name:'Read CSV',exact:true}).click();
   await expect.poll(()=>intercepted).toBe(true);await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#account-content')).toBeEmpty();release();
   const other = randomBytes(32).toString('base64url'),owner = 'import-owner-'+randomUUID();
   const registryPath = process.env.TIMEKEEPER_WEB_REGISTRY,registry = JSON.parse(readFileSync(registryPath,'utf8'));
   registry.push({ownerId:owner,sha256:createHash('sha256').update(other).digest('hex'),permissions:['read','write']});writeFileSync(registryPath,JSON.stringify(registry));
   await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(other);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
   await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();
-  await expect(page.getByLabel('Detailed Report CSV',{exact:true})).toHaveValue('');await expect(page.locator('#account-content')).toContainText('No imports yet.');
+  await expect(page.getByLabel('Toggl CSV',{exact:true})).toHaveValue('');await expect(page.locator('#account-content')).toContainText('No imports yet.');
   await expect(page.getByRole('heading',{name:'Review import',exact:true})).not.toBeVisible();
   expect(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length}))).toEqual({local:0,session:0});
 });
@@ -117,7 +118,7 @@ test('Toggl source selection, rejected-row diagnostics and independent task desc
     +'"=SUM(1,2)",01:00:00,Selected member,selected@example.invalid,Selected client,Selected project,Task name,"Tag one,Tag two",2025-10-20,09:00:00,2025-10-20,10:00:00,Yes,Ignored workspace A\r\n'
     +'Wrong duration,00:30:00,Selected member,selected@example.invalid,Selected client,Selected project,,,2025-10-20,11:00:00,2025-10-20,12:00:00,No,Ignored workspace B\r\n'
     +'Other private entry,01:00:00,Other member,other@example.invalid,Other client,Other project,,,2025-10-20,09:00:00,2025-10-20,10:00:00,Yes,Ignored workspace A\r\n';
-  await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles({name:'source-selection.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+  await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');await page.getByLabel('Toggl CSV',{exact:true}).setInputFiles({name:'source-selection.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
   await page.getByRole('button',{name:'Read CSV',exact:true}).click();await page.getByRole('button',{name:'Review mappings',exact:true}).click();
   await expect(page.locator('#account-content')).toContainText('Choose the source user.');
   await page.getByLabel('Source user',{exact:true}).selectOption({label:'Selected member · selected@example.invalid'});
@@ -164,6 +165,43 @@ test('Toggl defaults to work sessions with client totals, repeat detection and w
 });
 
 
+for(const reuse of [false,true]) test(`Toggl Legacy export ${reuse ? 'maps to an existing client' : 'creates the source client'} independently of its project`,async({page,request})=>{
+  const headers={Authorization:`Bearer ${token}`};let destination;
+  if(reuse) {
+    const response=await request.post('/api/v1/clients',{headers,data:{name:'Legacy destination '+randomUUID().slice(0,8),color:'#176653'}});
+    expect(response.status()).toBe(201);destination=await response.json();
+  }
+  const before=await api(request,'/data/export'),previousJobs=new Set((await api(request,'/imports')).items.map(value=>value.id));await login(page);
+  await expect(page.locator('#account-content')).toContainText('Detailed Report or Legacy CSV');
+  await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');await page.getByLabel('Toggl CSV',{exact:true}).setInputFiles(legacyFixture);
+  await page.getByRole('button',{name:'Read CSV',exact:true}).click();await expect(page.locator('#account-content')).toContainText('7 source rows · 0 invalid');
+  await page.getByRole('button',{name:'Review mappings',exact:true}).click();
+  const client=page.getByLabel('Timekeeper client for Legacy client',{exact:true});await expect(client).toBeVisible();
+  await expect(page.getByLabel('New client name',{exact:true})).toHaveValue('Legacy client');
+  await expect(page.getByLabel('New project name',{exact:true})).toHaveValue('Legacy project');
+  if(reuse) await client.selectOption(destination.id);
+  await page.getByRole('button',{name:'Review server matches',exact:true}).click();
+  const mapping=page.getByRole('table').filter({has:page.getByRole('columnheader',{name:'Toggl client',exact:true})});
+  await expect(mapping).toContainText(reuse ? 'Use existing: '+destination.name : 'Create new: Legacy client');
+  await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
+  const imported=await api(request,'/data/export'),sessions=imported.workSessions.filter(value=>!before.workSessions.some(old=>old.id===value.id));
+  expect(sessions).toHaveLength(7);expect(sessions.every(value=>value.title==='Imported work session')).toBe(true);
+  if(!reuse) destination=imported.clients.find(value=>!before.clients.some(old=>old.id===value.id));
+  expect(destination).toBeTruthy();if(!reuse) expect(destination.name).toBe('Legacy client');
+  const projects=imported.projects.filter(value=>!before.projects.some(old=>old.id===value.id));expect(projects).toHaveLength(1);
+  expect(projects[0].name).toBe('Legacy project');expect(projects[0].clientId).toBe(destination.id);
+  expect(sessions.every(value=>value.clientId===destination.id && value.projectId===projects[0].id)).toBe(true);
+  for(const type of ['activities','tasks','labels']) expect(imported[type]).toEqual(before[type]);
+  expect(imported.clients.length).toBe(before.clients.length+(reuse ? 0 : 1));
+  const job=(await api(request,'/imports')).items.find(value=>!previousJobs.has(value.id));expect(job.importedEntries).toBe(7);expect(job.importedNanos).toBe('151462000000000');
+  await undo(page,0);const after=await api(request,'/data/export');
+  for(const type of ['clients','projects','workSessions']) expect(after[type]).toEqual(before[type]);
+  if(reuse) {
+    expect(await api(request,'/clients/'+destination.id)).toEqual(destination);
+    const current=await request.get('/api/v1/clients/'+destination.id,{headers});expect((await request.delete('/api/v1/clients/'+destination.id,{headers:{...headers,'If-Match':current.headers().etag}})).status()).toBe(204);
+  }
+});
+
 for(const mode of ['WORK_SESSION','ACTIVITY']) test(`Toggl ${mode} maps several source clients to an existing client and Undo preserves it`,async({page,request})=>{
   const suffix=randomUUID().slice(0,8),headers={Authorization:`Bearer ${token}`};
   const created=await request.post('/api/v1/clients',{headers,data:{name:'Existing destination '+suffix,color:'#176653'}});expect(created.status()).toBe(201);
@@ -175,7 +213,7 @@ for(const mode of ['WORK_SESSION','ACTIVITY']) test(`Toggl ${mode} maps several 
       `Second ${suffix},01:00:00,Mapping ${suffix},${suffix}@example.invalid,Toggl two,Second project,2025-10-20,10:00:00,2025-10-20,11:00:00`,
       `Missing client ${suffix},01:00:00,Mapping ${suffix},${suffix}@example.invalid,,Fallback project,2025-10-20,11:00:00,2025-10-20,12:00:00`].join('\r\n');
   await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');
-  await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles({name:'client-mapping.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+  await page.getByLabel('Toggl CSV',{exact:true}).setInputFiles({name:'client-mapping.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
   await page.getByRole('button',{name:'Read CSV',exact:true}).click();await page.getByRole('button',{name:'Review mappings',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Client mappings',exact:true})).toBeVisible();
   const sources=['Toggl one','Toggl two',mode==='WORK_SESSION' ? 'Fallback project' : 'Entries without a client'];
@@ -216,7 +254,7 @@ test('Toggl review explains missing durations beside the continue action and exc
     return [`Annual entry ${index}`,index===21 || index===22 ? '-' : '00:00:01','Annual member','annual@example.invalid','Annual project','2025-10-20',start.toISOString().slice(11,19),'2025-10-20',end.toISOString().slice(11,19)].join(',');
   });
   await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');
-  await page.getByLabel('Detailed Report CSV',{exact:true}).setInputFiles({name:'annual-anonymized.csv',mimeType:'text/csv',buffer:Buffer.from([header,...lines].join('\r\n'))});
+  await page.getByLabel('Toggl CSV',{exact:true}).setInputFiles({name:'annual-anonymized.csv',mimeType:'text/csv',buffer:Buffer.from([header,...lines].join('\r\n'))});
   await page.getByRole('button',{name:'Read CSV',exact:true}).click();
   await expect(page.locator('#account-content')).toContainText('351 source rows · 2 invalid.');
   await expect(page.locator('#account-content')).toContainText('This row has no recorded duration. Exclude it or correct the CSV before importing.');

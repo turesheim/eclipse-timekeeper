@@ -9,9 +9,9 @@ export async function renderImports(view, zone) {
   let worker = null, cancelWorker = null, pause = false, undoPause = false, historyAfter = null, historyItems = [], createKey = null;
   const api = view.session, catalog = {}, clientSourceNames = new Map();
   const upload = form(view, 'Import from Toggl Track', 'Read CSV', read);
-  upload.value.append(node('p', 'Detailed Report CSV. Import completed entries as work sessions or activities.'));
+  upload.value.append(node('p', 'Detailed Report or Legacy CSV. Use Legacy to retain source client names. Import completed entries as work sessions or activities.'));
   const importMode = field(upload.value, 'Import as', 'WORK_SESSION', {choices:[['WORK_SESSION','Work sessions'],['ACTIVITY','Activities']]});
-  const file = field(upload.value, 'Detailed Report CSV', '', {type:'file'});file.accept = '.csv,text/csv';
+  const file = field(upload.value, 'Toggl CSV', '', {type:'file'});file.accept = '.csv,text/csv';
   const sourceZone = field(upload.value, 'Source time zone', zone);
   const dateFormat = field(upload.value, 'Source date format', 'ISO', {choices:[['ISO','YYYY-MM-DD'],['DMY','DD/MM/YYYY'],['MDY','MM/DD/YYYY']]});
   const stopParsing = button('Cancel reading', () => cancelWorker?.());stopParsing.hidden = true;upload.value.append(stopParsing);upload.finish();

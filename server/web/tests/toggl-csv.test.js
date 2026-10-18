@@ -25,6 +25,21 @@ test('legacy User/End headers retain independent description, task, client, proj
   assert.equal(report.rows[0].summary,'Description A');assert.deepEqual(report.unsupported,[]);
 });
 
+test('anonymized real Legacy export retains client names and all seven exact intervals', () => {
+  const text = readFileSync(new URL('fixtures/toggl/legacy-user-end.csv',import.meta.url),'utf8');
+  const report = parse(text);
+  assert.equal(report.variant,'user-end');assert.equal(report.validRows,7);assert.equal(report.rejectedRows,0);
+  assert.equal(report.people.length,1);assert.equal(report.totalNanos,togglDuration('42:04:22'));
+  assert.ok(report.rows.every(row => row.client === 'Legacy client' && row.project === 'Legacy project'));
+  assert.ok(report.rows.every(row => row.task === '' && row.summary === '' && row.tags.length === 0));
+  assert.deepEqual(report.unsupported,['Billable']);
+  assert.equal(report.rows[0].start,'2025-10-18T07:04:20Z');
+  assert.equal(report.rows[0].durationNanos,2000000000n);
+  const detailed = parse(text.replace('"User"','"Member"').replace('"End date"','"Stop date"').replace('"End time"','"Stop time"'));
+  assert.equal(detailed.variant,'member-stop');
+  assert.deepEqual(report.rows.map(row => row.identity),detailed.rows.map(row => row.identity));
+});
+
 test('CSV handles BOM, quoted commas/newlines, doubled quotes and empty fields without interpreting formula text', () => {
   assert.deepEqual(csvRecords('\uFEFFA,B,C\r\n"a,b","line 1\r\nline ""2""",\r\n').map(row=>row.fields),[
     ['A','B','C'],['a,b','line 1\r\nline "2"','']]);
