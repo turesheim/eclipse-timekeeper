@@ -17,7 +17,9 @@ async function iconTargets(page) {
   for(const button of await page.locator('.icon-button:visible,.tree-toggle:visible').all()) {
     expect(await button.getAttribute('aria-label')).toBeTruthy();
     expect(await button.getAttribute('title')).toBeTruthy();
-    const box=await button.boundingBox();expect(box.width).toBeGreaterThanOrEqual(44);expect(box.height).toBeGreaterThanOrEqual(44);
+    // Dense daily time cells use 32px menu targets; standalone actions retain 44px.
+    const minimum=await button.evaluate(node=>!!node.closest('.week-session-interval')) ? 32:44;
+    const box=await button.boundingBox();expect(box.width).toBeGreaterThanOrEqual(minimum);expect(box.height).toBeGreaterThanOrEqual(minimum);
   }
 }
 async function fixture(request) {

@@ -112,7 +112,7 @@ td.actions .btn + .btn { margin-left: .3rem; }
 .workweek-table tr[data-kind=task] { --bs-table-bg: #f6f9f7; font-weight: 400; }
 .workweek-table tr[aria-selected=true] { --bs-table-bg: #dceee3; }
 .workweek-table .active-activity { font-weight: 700; }
-.week-session-table { min-width: 1220px; table-layout: fixed; }
+.week-session-table { min-width: 1232px; table-layout: fixed; }
 .week-session-table.table th, .week-session-table.table td { padding: .3rem .35rem; }
 .week-session-table th:first-child { width: 12rem; }
 .week-session-table th:last-child, .week-session-table td:last-child { width: 7.5rem; white-space: nowrap; text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; border-inline-start: 1px solid var(--line); }
@@ -121,11 +121,11 @@ td.actions .btn + .btn { margin-left: .3rem; }
 .week-session-client .client-color { gap: .4rem; }
 .week-session-client .client-color::before { width: .8rem; height: .8rem; }
 .week-session-project { padding-inline-start: 1.5rem !important; font-weight: 500; overflow-wrap: anywhere; }
-.week-session-interval { display: grid; grid-template-columns: minmax(0, 1fr) .4rem minmax(0, 1fr) 1.5rem; align-items: center; gap: .15rem; margin-block: .15rem; }
+.week-session-interval { display: grid; grid-template-columns: minmax(0, 1fr) .4rem minmax(0, 1fr) 2rem; align-items: center; gap: .15rem; margin-block: .15rem; }
 .week-session-time.form-control { min-width: 0; min-height: 1.9rem; height: 1.9rem; margin: 0; padding: .2rem .15rem; font-size: .75rem; text-align: center; font-variant-numeric: tabular-nums; border-color: var(--line); border-radius: .25rem; }
 .week-session-time[readonly] { border-color: transparent; color: var(--muted); background: var(--bs-tertiary-bg); }
-.week-session-more.btn { width: 1.5rem; min-height: 1.9rem; height: 1.9rem; border-color: transparent; }
-.week-session-more .icon { font-size: .85rem; }
+.week-session-more.btn { width: 2rem; min-height: 2rem; height: 2rem; border-color: transparent; }
+.week-session-more .icon { font-size: 1rem; }
 .week-session-separator { font-size: .75rem; color: var(--muted); }
 .week-session-feedback { margin: .5rem; font-size: .85rem; overflow-wrap: anywhere; }
 .week-session-feedback:empty { display: none; }
