@@ -6,11 +6,15 @@ data are not saved in browser storage.
 
 ## Export from Track
 
-Both **Detailed Report** and **Legacy** CSV exports are supported. Choose Legacy
-when you need the source client names: the verified Legacy export includes a
-`Client` column, while the verified newer Detailed Report export does not.
-Clients can then be mapped directly to existing Timekeeper clients or created
-under their source names, independently of their projects.
+**Prefer Toggl Track’s Legacy CSV export for Timekeeper imports.** It preserves
+source client names in a `Client` column, so you can map them directly to existing
+Timekeeper clients or create clients under their source names, independently of
+their projects.
+
+Both **Legacy** and **Detailed Report** CSV exports are supported. The newer
+Detailed Report export we verified omits client names. When that column is
+missing, work-session imports suggest client names from projects instead; review
+and correct those mappings before importing.
 
 In classic Toggl Track, select the correct source workspace, open **Reports →
 Detailed**, choose the date range and turn rounding off. Include individual

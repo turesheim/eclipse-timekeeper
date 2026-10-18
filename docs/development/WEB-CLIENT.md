@@ -431,10 +431,11 @@ client. No client selection or title fields are added to Eclipse.
 
 ## Toggl Track import
 
-Detailed Report (Member/Stop) and Legacy (User/End) CSV exports use the same
-review flow. Legacy exports retain source client names independently of projects;
-review each client mapping before importing. A newer export without a Client
-column continues to use reviewed project-based suggestions.
+Prefer **Legacy (User/End) CSV** exports because they retain source client names
+independently of projects. Detailed Report (Member/Stop) exports are also
+supported and use the same review flow. A newer export without a Client column
+uses project-based suggestions instead; review and correct each client mapping
+before importing.
 
 Each CSV row defaults to one continuous work session with a reviewed client and
 description-derived title. Activity import is an explicit alternative. Both modes
