@@ -1,7 +1,7 @@
 import {ApiError} from './api.js';
 import {instantText} from './model.js';
 import {sameSession} from './calendar-model.js';
-import {iconButton} from './icons.js';
+import {iconButton,projectIcon} from './icons.js';
 import {workweekSessionGroups,compactClock,sessionTimeEdit} from './workweek-session-model.js';
 
 const node=(tag,text,css)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(css)value.className=css;return value;};
@@ -69,7 +69,7 @@ export class WorkweekSessions {
       label.append(name);row.append(label,...client.daily.map(value=>node('td',value ? this.format(value):'—')),node('td',this.format(client.total)));body.append(row);
       for(const project of client.projects) {
         const row=node('tr');row.dataset.weekProject=project.id||'';row.dataset.clientId=client.id;
-        const label=node('th',project.name,'week-session-project');label.scope='row';row.append(label);
+        const label=node('th',undefined,'week-session-project'),caption=node('span',undefined,'project-caption'),glyph=projectIcon(s.projects.find(value=>value.id===project.id));if(glyph)caption.append(glyph);caption.append(node('span',project.name));label.append(caption);label.scope='row';row.append(label);
         for(const day of project.days) {
           const cell=node('td');cell.dataset.sessionDate=day.date;
           if(!day.entries.length)cell.append(node('span','—','text-body-secondary'));

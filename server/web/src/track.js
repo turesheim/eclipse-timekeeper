@@ -1,6 +1,6 @@
 import {dateInZone,instantNanos,instantText} from './model.js';
 import {monthCalendar,monthSessions,shiftMonth} from './month-model.js';
-import {iconButton} from './icons.js';
+import {iconButton,projectIcon} from './icons.js';
 import {MonthPicker} from './month-picker.js';
 
 const node=(tag,text,className)=> {const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
@@ -149,7 +149,13 @@ export class MonthTrack {
           if(/^#[0-9a-f]{6}$/i.test(client?.color)) summary.style.setProperty('--client-color',client.color);
           const duration=node('span',undefined,'track-client-day-time'),short=node('span',undefined,'track-client-day-time-short');short.setAttribute('aria-hidden','true');
           this.dailyTimes.set(day.date+'/'+entry.clientId,{duration,short,summary,name:client?.name || 'Client',details:this.details(day.date,entry.clientId)});
-          summary.append(node('strong',client?.name || 'Client'),' ',duration,short);
+          const line=node('span',undefined,'track-client-day-total'),icons=node('span',undefined,'track-project-icons'),projects=new Map();
+          for(const session of this.sessions(day.date,entry.clientId)) {
+            const project=this.snapshot.projects.find(project=>project.id===session.projectId);
+            if(projectIcon(project)) {const names=projects.get(project.icon)||new Set();names.add(project.name);projects.set(project.icon,names);}
+          }
+          for(const [id,names] of projects)icons.append(projectIcon({icon:id,name:[...names].join(', ')}));
+          icons.setAttribute('aria-hidden','true');line.append(duration,short,icons);summary.append(node('strong',client?.name || 'Client'),' ',line);
           if(entry.running) summary.append(node('span','Running','visually-hidden'));
           cell.append(summary);
         }

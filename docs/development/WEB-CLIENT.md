@@ -59,6 +59,9 @@ Month boundaries and daily slices follow the account's time zone, including DST;
 running sessions use the server's report time. Activity/task time is independent
 of these totals. Month navigation does not alter recorded sessions. Click a daily client total to edit its work session. When several sessions
 contribute to the total, choose one by its summary, project and local times.
+Optional project icons appear to the right of each daily duration. The same icon
+is shown once when several contributing projects use it; hover details retain
+all project names. Sessions without an icon add no placeholder.
 The same editor is available in Calendar and Workweek. Daily summaries remain
 readable in read-only sessions, where editing is unavailable.
 
@@ -428,7 +431,10 @@ or repeating an ordinary write.
 
 The **Projects** view groups projects beneath their client, with its color and
 project count. Use the client chevron to expand or collapse its projects.
-Collapse choices survive refreshes and tab changes.
+Collapse choices survive refreshes and tab changes. Create or edit a project to
+select an optional icon from the bundled picker, or choose **None** to remove it.
+Icons also appear beside project names in Workweek and beside daily durations
+in Track. They are retained in account downloads and JSON/CSV transfers.
 
 ![Projects grouped by client](../assets/screenshots/projects-grouped-mobile.png)
 

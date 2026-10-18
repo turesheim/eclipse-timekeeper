@@ -1,7 +1,7 @@
 import {Api, ApiError} from './api.js';
 import {addDays, dateInZone, dayStart, durationText, durationNanos, instantText, instantNanos, weekRange, taskPresentation, activityDayNanos, nanosText, decimalHoursText, workweekGroups, sessionTimeNanos, localDateTime, localDateTimeToInstant, localDateTimeOffsets} from './model.js';
 import {authentication} from './auth.js';
-import {icon, iconButton} from './icons.js';
+import {icon, iconButton, projectIcons, projectIcon} from './icons.js';
 import {WeekCalendar} from './calendar.js';
 import {sameSession} from './calendar-model.js';
 import {MonthTrack} from './track.js';
@@ -234,7 +234,8 @@ function renderProjects(s) {
     const count = element('span', String(projects.length), 'badge text-bg-secondary');count.setAttribute('aria-label', `${projects.length} projects`);
     label.append(toggle);group.append(label);body.append(group);
     for (const project of projects) {
-      const record = row([project.name], [action('Edit', () => openRecord('projects', project.id)), action('Delete', () => openDelete('projects', project.id))]);
+      const caption=element('span',undefined,'project-caption'),glyph=projectIcon(project);if(glyph)caption.append(glyph);caption.append(element('span',project.name));
+      const record = row([caption], [action('Edit', () => openRecord('projects', project.id)), action('Delete', () => openDelete('projects', project.id))]);
       record.dataset.projectId = project.id;record.firstElementChild.className = 'projects-project-name';body.append(record);
     }
     function updateToggle() {
@@ -317,12 +318,22 @@ function renderWorkweek(s, zone) {
   for (const group of workweekGroups(s.tasks, s.projects, s.activities)) {
     const activities = [...group.tasks.flatMap(allActivities), ...(group.activities || [])]; if (!activities.some(visible)) continue;
     const key = `project:${group.id}`;
-    const projectRow = row([titleCell(element('span', group.name), 0, key, group.name), ...totals(activities), '']);
+    const caption=element('span',undefined,'project-caption'),glyph=projectIcon(s.projects.find(project=>project.id===group.id));if(glyph)caption.append(glyph);caption.append(element('span',group.name));
+    const projectRow = row([titleCell(caption, 0, key, group.name), ...totals(activities), '']);
     projectRow.dataset.kind = 'project'; rows.push(projectRow);
     if (!collapsed.has(key)) { for (const node of group.tasks) addTask(node, 1); for (const value of (group.activities || []).filter(visible)) addActivity(value, 1); }
   }
   table('activities', ['Activity', ...headings, 'Weekly total', 'Labels', 'Actions'], rows);
   $('activities').querySelector('table')?.classList.add('workweek-table');
+}
+function projectIconField(selected) {
+  const group=element('fieldset',undefined,'project-icon-picker'),choices=element('div',undefined,'project-icon-choices');
+  group.append(element('legend','Icon (optional)'));
+  for(const [id,text] of [['','None'],...projectIcons]) {
+    const label=element('label',undefined,'project-icon-option'),input=element('input');input.type='radio';input.name='icon';input.value=id;input.checked=id===(selected||'');input.className='form-check-input';
+    label.append(input);if(id)label.append(icon(id));label.append(element('span',text));choices.append(label);
+  }
+  group.append(choices);$('fields').append(group);
 }
 function field(labelText, key, value = '', options = {}) {
   const label = element('label', labelText), input = element(options.choices ? 'select' : options.multiline ? 'textarea':'input'); input.name = key;
@@ -407,7 +418,7 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
   if (!begin(caption || `${id ? 'Edit' : 'New'} ${titles[collection]}`, {collection, id, etag: loaded.etag})) return;
   if (['clients','projects','labels'].includes(collection)) field('Name', 'name', value.name, {required: true, max: 1000});
   if (collection === 'clients') field('Color','color',value.color || '#2563eb',{type:'color',required:true});
-  if (collection === 'projects') clientField(value.clientId);
+  if (collection === 'projects') {clientField(value.clientId);projectIconField(value.icon);}
   if (collection === 'labels') field('Color (optional)', 'color', value.color, {hint: 'Hex color, for example #176653.'});
   if (collection === 'tasks') {
     field('Summary', 'summary', value.summary, {required: true, max: 1000});
@@ -507,7 +518,7 @@ function values() {
   if (editor.command === 'start') return {taskId: get('taskId'), summary: get('summary'), labelIds: labels(), expectedActiveId: editor.expected?.id ?? null, expectedActiveVersion: editor.expected?.version ?? null};
   switch (editor.collection) {
     case 'clients': return {name:get('name'),color:get('color')};
-    case 'projects': return {name: get('name'),clientId:get('clientId')};
+    case 'projects': return {name: get('name'),clientId:get('clientId'),icon:$('fields').querySelector('[name=icon]:checked')?.value || null};
     case 'labels': return {name: get('name'), color: get('color') || null};
     case 'tasks': return {summary: get('summary'), projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null};
     case 'activities': return {...(editor.id ? {} : {taskId: get('taskId') || null, projectId:get('taskId') ? null : get('projectId') || null}), summary: get('summary'), start: localDateTimeToInstant(get('start'), editor.zone), end: get('end') ? localDateTimeToInstant(get('end'), editor.zone) : null, labelIds: labels()};

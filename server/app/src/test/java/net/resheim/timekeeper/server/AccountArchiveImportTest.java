@@ -46,6 +46,7 @@ class AccountArchiveImportTest {
         store.transaction("a",()->{
             store.updateProfile("Europe/Oslo");store.update("UPDATE tk_account SET administrator=TRUE,display_name='Source administrator' WHERE owner_id=?",store.owner());
             var service=store.service();var project=service.createProject(new CreateProject("Archive project"));
+            store.clientDetails("PROJECT",project.id().value(),object().put("icon","code"));
             var task=service.createTask(new CreateTask(Optional.of(project.id()),Optional.empty(),"Archive task",Optional.of("https://example.invalid/task"),Set.of()));
             var label=service.createLabel(new CreateLabel("Archive label",Optional.of("#0c2238")));
             var start=Instant.parse("2025-10-20T06:03:00.123456789Z");var end=Instant.parse("2025-10-20T07:03:00.987654321Z");
@@ -78,7 +79,7 @@ class AccountArchiveImportTest {
             catch(java.sql.SQLException failure) {throw new RuntimeException(failure);}
             assertEquals("Europe/Oslo",store.profile().path("zoneId").asText());
             var session=store.list("WORK_SESSION").getFirst();var project=store.list("PROJECT").getFirst();var activity=store.list("ACTIVITY").getFirst();var task=store.list("TASK").getFirst();
-            assertEquals(project.get("id"),session.get("projectId"));assertEquals(project.get("clientId"),session.get("clientId"));assertEquals(project.get("id"),task.get("projectId"));assertEquals(task.get("id"),activity.get("taskId"));
+            assertEquals("code",project.path("icon").asText());assertEquals(project.get("id"),session.get("projectId"));assertEquals(project.get("clientId"),session.get("clientId"));assertEquals(project.get("id"),task.get("projectId"));assertEquals(task.get("id"),activity.get("taskId"));
             assertEquals(archive.path("work").path("workSessions").get(0).get("start"),session.get("start"));assertEquals(archive.path("work").path("activities").get(0).get("end"),activity.get("end"));
             var sourceIds=new HashSet<String>();for(String name:DomainTransfer.TYPES.keySet()) archive.path("work").path(name).forEach(value->sourceIds.add(value.path("id").asText()));
             for(String type:DomainTransfer.TYPES.values()) for(var value:store.list(type)) {assertEquals("b",value.path("ownerId").asText());assertFalse(sourceIds.contains(value.path("id").asText()));}

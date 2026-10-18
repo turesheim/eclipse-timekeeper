@@ -119,9 +119,10 @@ final class DomainTransfer {
         result.put("revision",store.revision());return new ApiReplies(201,result,null,null);
     }
     private void details(String type,UUID id,JsonNode item,Map<UUID,UUID> clients) {
-        if(!item.has("clientId")) return;
-        var fields=object();fields.put("clientId",required(clients,uuid(item.get("clientId"))).toString());
-        store.clientDetails(type,id,fields);
+        var fields=object();
+        if(item.has("clientId")) fields.put("clientId",required(clients,uuid(item.get("clientId"))).toString());
+        if(type.equals("PROJECT") && item.has("icon")) fields.set("icon",item.get("icon").deepCopy());
+        if(!fields.isEmpty()) store.clientDetails(type,id,fields);
     }
     private static <T> T required(Map<UUID,T> values,UUID id) {T value=values.get(id);if(value==null) throw ApiFailure.validation();return value;}
     private static void mapping(com.fasterxml.jackson.databind.node.ArrayNode mappings,String type,JsonNode source,UUID id) {

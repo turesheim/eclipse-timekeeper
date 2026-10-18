@@ -65,6 +65,24 @@ class ClientHttpTest {
         current=call("test-a","GET","/clients/"+disposable.get("id").asText(),null,null);
         assertEquals(204,call("test-a","DELETE","/clients/"+disposable.get("id").asText(),null,current.header("ETag")).statusCode());
     }
+    @Test void optionalProjectIconsSurviveLegacyWritesAndRemainOwnedAndVersioned() {
+        var fields=JsonValues.object().put("name","Icon project "+UUID.randomUUID()).put("icon","code");
+        var created=call("test-a","POST","/projects",fields,null);var project=json(created,201);String path="/projects/"+project.path("id").asText();
+        assertEquals("code",project.path("icon").asText());
+        assertEquals(404,call("test-b","GET",path,null,null).statusCode());
+        var legacy=JsonValues.object().put("name","Renamed by an older client");
+        var renamed=call("test-a","PUT",path,legacy,created.header("ETag"));
+        assertEquals("code",json(renamed,200).path("icon").asText());
+        assertEquals(project.path("clientId"),json(call("test-a","GET",path,null,null),200).path("clientId"));
+        fields.putNull("icon");assertEquals(412,call("test-a","PUT",path,fields,created.header("ETag")).statusCode());
+        assertEquals(403,call("test-read","PUT",path,fields,renamed.header("ETag")).statusCode());
+        for(String invalid:List.of("","unknown","https://example.invalid/icon.svg","<svg onload=alert(1)>")) {
+            fields.put("icon",invalid);assertEquals(422,call("test-a","PUT",path,fields,renamed.header("ETag")).statusCode());
+        }
+        var unchanged=call("test-a","GET",path,null,null);assertEquals(renamed.header("ETag"),unchanged.header("ETag"));assertEquals("code",json(unchanged,200).path("icon").asText());
+        fields.putNull("icon");var cleared=call("test-a","PUT",path,fields,unchanged.header("ETag"));assertTrue(json(cleared,200).path("icon").isNull());
+        assertTrue(json(call("test-a","PUT",path,legacy,cleared.header("ETag")),200).path("icon").isNull());
+    }
     @Test void existingDataGetsOneRealClientOnceWithoutChangingTimes() {
         String owner="client-migration-"+UUID.randomUUID();var project=UUID.randomUUID();var session=UUID.randomUUID();
         store.transaction(owner,()->{

@@ -73,6 +73,14 @@ class ContractTest(unittest.TestCase):
                     del missing[field]
                     self.assertFalse(validator(name).is_valid(missing))
 
+    def test_optional_project_icons_are_bounded_metadata(self):
+        for icon in ('code', 'globe', None):
+            validator('ProjectInput').validate({'name': 'Project', 'icon': icon})
+            validator('TransferProject').validate({'id': ID, 'name': 'Project', 'icon': icon})
+        validator('ProjectInput').validate({'name': 'Earlier client'})
+        for icon in ('', 'unknown', '<svg onload=alert(1)>', 'https://example.invalid/icon.svg', 1, {}, []):
+            self.assertFalse(validator('ProjectInput').is_valid({'name': 'Project', 'icon': icon}))
+
     def test_atomic_provider_linking_is_available_at_task_creation(self):
         body = {'summary': 'Jira issue', 'projectId': None, 'parentTaskId': None, 'url': None}
         validator('TaskCreateInput').validate(body)

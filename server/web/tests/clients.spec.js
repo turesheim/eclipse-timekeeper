@@ -126,3 +126,38 @@ test('Projects groups clients with keyboard collapsible headings and retains gro
     for(const [collection,records] of [['projects',projects],['clients',clients]])for(const record of records){const current=await api(request,'GET',`/${collection}/${record.id}`);await api(request,'DELETE',`/${collection}/${record.id}`,undefined,{'If-Match':current.headers().etag});}
   }
 });
+
+test('optional project icons persist and Track shows distinct icons to the right of daily durations',async({page,request})=>{
+  const prefix='Icon '+randomUUID().slice(0,6),records=[],previous=await (await api(request,'GET','/me')).json();
+  async function create(collection,data){const value=await (await api(request,'POST','/'+collection,data)).json();records.unshift([collection,value.id]);return value;}
+  try {
+    const profile=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:'Europe/Oslo'},{'If-Match':profile.headers().etag});
+    const client=await create('clients',{name:prefix+' client',color:'#176653'});
+    await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+    await page.getByRole('button',{name:'Projects',exact:true}).click();await page.getByRole('button',{name:'New project',exact:true}).click();
+    await page.getByLabel('Name',{exact:true}).fill(prefix+' Website');await page.getByLabel('Client',{exact:true}).selectOption(client.id);
+    await expect(page.getByRole('radio',{name:'None',exact:true})).toBeChecked();await page.getByRole('radio',{name:'Code',exact:true}).check();
+    await page.locator('#editor').screenshot({path:'test-results/project-icon-picker.png'});await save(page);
+    const project=(await (await api(request,'GET','/projects?clientId='+client.id)).json()).items[0];records.unshift(['projects',project.id]);expect(project.icon).toBe('code');
+    const other=await create('projects',{name:prefix+' Backend',clientId:client.id,icon:'code'}),globe=await create('projects',{name:prefix+' Research',clientId:client.id,icon:'globe'});
+    for(const [index,projectId] of [project.id,project.id,other.id,globe.id,null].entries())await create('work-sessions',{clientId:client.id,projectId,summary:prefix+' session '+index,start:`2025-10-20T${String(6+index).padStart(2,'0')}:00:00Z`,end:`2025-10-20T${String(7+index).padStart(2,'0')}:00:00Z`});
+    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Projects',exact:true}).click();
+    const row=page.locator(`#projects [data-project-id="${project.id}"]`);await expect(row.locator('[data-project-icon=code]')).toBeVisible();await row.getByRole('button',{name:'Edit',exact:true}).click();await expect(page.getByRole('radio',{name:'Code',exact:true})).toBeChecked();
+    await page.getByLabel('Name',{exact:true}).fill(prefix+' Website renamed');await save(page);
+    await page.getByRole('button',{name:'Workweek',exact:true}).click();await page.getByLabel('Week containing',{exact:true}).fill('2025-10-20');await expect(page.locator(`#week-sessions [data-week-project="${project.id}"] [data-project-icon=code]`)).toBeVisible();
+    await page.getByRole('button',{name:'Track',exact:true}).click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
+    const entry=page.locator(`[data-track-date="2025-10-20"] [data-track-daily-client="${client.id}"]`),icons=entry.locator('.track-project-icons [data-project-icon]');
+    await expect(entry.locator('.track-client-day-time')).toHaveText('5h 0m');await expect(icons).toHaveCount(2);await expect(entry.locator('[data-project-icon=code]')).toHaveAttribute('title',new RegExp(other.name));await expect(entry).toHaveAttribute('title',new RegExp(globe.name));
+    async function iconsFollow(duration){const clock=await duration.boundingBox();for(const icon of await icons.all()){const box=await icon.boundingBox();expect(box.x).toBeGreaterThanOrEqual(clock.x+clock.width-.5);}}
+    await iconsFollow(entry.locator('.track-client-day-time'));await page.screenshot({path:'test-results/track-project-icons.png',fullPage:true});
+    await page.setViewportSize({width:390,height:844});await expect(entry.locator('.track-client-day-time-short')).toHaveText('5h');await iconsFollow(entry.locator('.track-client-day-time-short'));expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.screenshot({path:'test-results/track-project-icons-mobile.png',fullPage:true});
+    await page.getByRole('button',{name:'Projects',exact:true}).click();await row.getByRole('button',{name:'Edit',exact:true}).click();await page.getByRole('radio',{name:'None',exact:true}).check();await save(page);await expect(row.locator('[data-project-icon]')).toHaveCount(0);
+    expect((await (await api(request,'GET','/projects/'+project.id)).json()).icon).toBeNull();
+    const current=await api(request,'GET','/projects/'+other.id);await api(request,'PUT','/projects/'+other.id,{name:other.name,icon:null},{'If-Match':current.headers().etag});
+    await page.getByRole('button',{name:'Track',exact:true}).click();await expect(icons).toHaveCount(1);await expect(entry.locator('[data-project-icon=globe]')).toBeVisible();await expect(entry.locator('.track-client-day-time-short')).toHaveText('5h');
+  } finally {
+    for(const [collection,id] of records){const current=await api(request,'GET',`/${collection}/${id}`);await api(request,'DELETE',`/${collection}/${id}`,undefined,{'If-Match':current.headers().etag});}
+    const profile=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:previous.zoneId},{'If-Match':profile.headers().etag});
+  }
+});

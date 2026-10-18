@@ -284,3 +284,12 @@ button.track-client-day:disabled { opacity: .65; }
 .projects-client-toggle .badge { margin-inline-start: auto; }
 .projects-table .projects-project-name { padding-inline-start: 3.5rem; overflow-wrap: anywhere; }
 .projects-table .actions { width: 7rem; white-space: nowrap; }
+
+.project-caption { display: inline-flex; align-items: center; gap: .45rem; }
+.project-caption .icon { font-size: 1rem; color: var(--muted); }
+.project-icon-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: .4rem; }
+.project-icon-picker .project-icon-option { margin: 0; padding: .4rem .5rem; border: 1px solid var(--line); border-radius: .35rem; cursor: pointer; }
+.project-icon-option:has(:checked) { background: #e7efea; border-color: var(--accent); }
+.track-client-day .track-client-day-total { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .3rem; align-items: center; overflow: visible; white-space: normal; }
+.track-project-icons { display: flex; flex-wrap: wrap; gap: .25rem; min-width: 0; }
+.track-project-icons .icon { font-size: .75rem; width: 1em; line-height: 1.25; }

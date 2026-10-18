@@ -27,6 +27,17 @@ class CsvSnapshotTest {
         data.addProperty("format","timekeeper-domain-v2");assertThrows(IOException.class,()->CsvSnapshot.write(data,temporary.resolve("downgrade")));
         Files.delete(folder.resolve("clients.csv"));assertThrows(IOException.class,()->CsvSnapshot.read(folder));
     }
+    @Test void optionalProjectIconsRoundTripAlongsideEarlierProjectsWithoutIcons() throws Exception {
+        var data=JsonParser.parseString("""
+            {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[],"tasks":[],"labels":[],"activities":[],"workSessions":[],
+             "projects":[{"id":"first","name":"Code","clientId":"client","icon":"code"},{"id":"legacy","name":"Earlier","clientId":"client"}]}
+            """).getAsJsonObject();
+        var folder=temporary.resolve("icons");CsvSnapshot.write(data,folder);assertEquals(data,CsvSnapshot.read(folder));
+        assertTrue(Files.readString(folder.resolve("projects.csv")).startsWith("\"id\",\"name\",\"clientId\",\"icon\""));
+        data.getAsJsonArray("projects").get(0).getAsJsonObject().remove("icon");
+        var legacy=temporary.resolve("earlier-project-header");CsvSnapshot.write(data,legacy);assertEquals(data,CsvSnapshot.read(legacy));
+        assertTrue(Files.readString(legacy.resolve("projects.csv")).startsWith("\"id\",\"name\",\"clientId\"\r\n"));
+    }
     @Test void v3CsvRoundTripsTitlelessSessionsAndMixedLegacyTitles() throws Exception {
         var data=JsonParser.parseString("""
             {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[],"projects":[],"tasks":[],"labels":[],"activities":[],
