@@ -140,10 +140,10 @@ records. Day maintenance and all parts of a write commit atomically under the
 same per-owner lock, including across server replicas.
 
 Portable interchange exports `timekeeper-domain-v3` JSON, including clients, mandatory
-project/session client links, session titles and optional task, direct-project
+project/session client links, session summaries and optional task, direct-project
 assignments. Import also accepts older `timekeeper-domain-v1` and
 `timekeeper-domain-v2` snapshots, assigning their projects/sessions to General.
-The formats contain no SQL/JPA table names. CSV v3 adds `clients.csv` and client/title
+The formats contain no SQL/JPA table names. CSV v3 adds `clients.csv` and client/summary
 columns; v2 includes `workSessions.csv`. Every declared
 file must be present. Older CSV clients reject the new format instead of silently
 discarding independent sessions or client metadata.
@@ -341,13 +341,16 @@ client until its sessions have been reassigned, preserving historical totals.
 client must belong to the authenticated owner. Deleting a referenced client is
 409, with the whole transaction rolled back.
 
-Client associations and titles are server metadata stored in the canonical
-resource payload and owned foreign-key relations. The common interval/project
-models and Eclipse persistence/UI do not need client fields. Web writes supply
-clientId and title. Legacy API writes omitting these fields create records under
-General (title from summary or Work session) and preserve existing values on
-update; explicit null clients or blank titles are rejected. A server stop retains
-both fields. Each mutation commits metadata and its domain changes under one
+Client associations are server metadata stored in the canonical resource payload
+and owned foreign-key relations. The common interval/project models and Eclipse
+persistence/UI do not need client fields. Web writes supply clientId and an
+optional summary (up to 4,000 characters). Omitted clients use General on creation
+and preserve the existing client on edits; explicit null clients are rejected.
+The separate title field is retired. Startup moves existing titles into summary,
+preserving distinct notes and avoiding duplicate prefixes. Legacy title inputs
+and archives remain accepted and are folded into summary; new responses omit title.
+A server stop preserves the summary and client. Each mutation commits metadata
+and its domain changes under one
 owner lock, version and change event, and responses/ETags cover the complete
 stored representation.
 

@@ -232,7 +232,7 @@ def exercise(system):
     bob=system.password_login('bob',index=2)
     for browser in (alice,bob):
         client=expect(system.request(1,browser,'/clients',{'name':'Owner private client','color':'#246bad'}),201,'Private client')
-        expect(system.request(2,browser,'/work-sessions',{'clientId':client['id'],'title':'Private closed interval','summary':'No shared accounts','start':'2026-10-12T07:00:00.123456789Z','end':'2026-10-12T15:00:00.987654321Z'}),201,'Private work session')
+        expect(system.request(2,browser,'/work-sessions',{'clientId':client['id'],'summary':'No shared accounts','start':'2026-10-12T07:00:00.123456789Z','end':'2026-10-12T15:00:00.987654321Z'}),201,'Private work session')
     private={browser.owner:system.private_data(browser) for browser in (alice,bob)}
     first=Authenticator(system.folder);second=Authenticator(system.folder)
     first_record=system.enroll(alice,first);system.enroll(alice,second)

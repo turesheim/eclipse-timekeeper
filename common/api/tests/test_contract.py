@@ -160,7 +160,7 @@ class ContractTest(unittest.TestCase):
         changed['format'] = 'legacy-h2'
         self.assertFalse(validator('TransferSnapshot').is_valid(changed))
 
-    def test_client_graph_and_title_are_required_in_v3_transfer(self):
+    def test_client_graph_is_required_and_summary_replaces_titles_in_v3_transfer(self):
         value = {'format': 'timekeeper-domain-v3', 'zoneId': 'UTC',
                  'clients': [{'id': ID, 'name': 'Client', 'color': '#ffdd88'}],
                  'projects': [{'id': ID, 'name': 'Project', 'clientId': ID}],
@@ -168,7 +168,10 @@ class ContractTest(unittest.TestCase):
                  'workSessions': [{'id': ID, 'clientId': ID, 'title': 'Planning',
                                    'summary': '', 'start': '2025-10-20T08:00:00Z', 'end': None}]}
         validator('TransferSnapshot').validate(value)
-        for collection, field in [('projects', 'clientId'), ('workSessions', 'clientId'), ('workSessions', 'title')]:
+        without_title = copy.deepcopy(value)
+        del without_title['workSessions'][0]['title']
+        validator('TransferSnapshot').validate(without_title)
+        for collection, field in [('projects', 'clientId'), ('workSessions', 'clientId')]:
             missing = copy.deepcopy(value)
             del missing[collection][0][field]
             self.assertFalse(validator('TransferSnapshot').is_valid(missing))

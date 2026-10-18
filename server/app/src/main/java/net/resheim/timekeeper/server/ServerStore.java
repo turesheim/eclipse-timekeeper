@@ -92,7 +92,7 @@ public class ServerStore {
             while(rows.next()) owners.add(rows.getString(1));
         } catch(SQLException failure) {throw databaseFailure(failure);}
         for (String owner : owners) {
-            transaction(owner,() -> { initializeDefaultLabels(); migrateClientDetails(); retireSessionLinks(); return null; });
+            transaction(owner,() -> { initializeDefaultLabels(); migrateClientDetails(); migrateWorkSessionDescriptions(); retireSessionLinks(); return null; });
         }
     }
     private void initializeDefaultLabels() {
@@ -221,7 +221,6 @@ public class ServerStore {
             node.put("clientId",previous!=null && previous.hasNonNull("clientId") ? previous.get("clientId").asText()
                     : creationClient.get()!=null ? creationClient.get().toString() : defaultClient().get("id").asText());
             if(type.equals("WORK_SESSION")) {
-                node.put("title",previous!=null && previous.hasNonNull("title") ? previous.get("title").asText() : legacyTitle(node));
                 // Web-only metadata survives domain timer/interval writes.
                 node.set("labelIds",previous!=null && previous.has("labelIds") ? previous.get("labelIds").deepCopy() : array());
                 if(previous!=null && previous.has("projectId")) node.set("projectId",previous.get("projectId").deepCopy());
@@ -259,11 +258,6 @@ public class ServerStore {
         }
         return value;
     }
-    /** Server-only client metadata: common/Eclipse interval and project models stay independent. */
-    private static String legacyTitle(JsonNode value) {
-        String summary=value.path("summary").asText().strip();
-        return summary.isEmpty() ? "Work session" : summary.substring(0,summary.offsetByCodePoints(0,Math.min(1000,summary.codePointCount(0,summary.length()))));
-    }
     private JsonNode defaultClient() {
         UUID id=UUID.nameUUIDFromBytes(("timekeeper-default-client:"+owner()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
         return find("CLIENT",id).orElseGet(() -> {
@@ -273,14 +267,24 @@ public class ServerStore {
     }
     void migrateClientDetails() {
         for(String type:List.of("PROJECT","WORK_SESSION")) for(var old:list(type)) {
-            if(old.hasNonNull("clientId") && (!type.equals("WORK_SESSION") || old.hasNonNull("title"))) continue;
+            if(old.hasNonNull("clientId")) continue;
             var node=((ObjectNode)old).deepCopy();long version=node.get("version").asLong();
             node.put("clientId",defaultClient().get("id").asText());
-            if(type.equals("WORK_SESSION")) node.put("title",legacyTitle(node));
             node.put("version",version+1);
             if(update("UPDATE tk_resource SET payload=?,version=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",node.toString(),version+1,owner(),type,uuid(node.get("id")),version)!=1) throw new ApiFailure(412,"STALE_VERSION");
             relation(type,uuid(node.get("id")),"client","CLIENT",uuid(node.get("clientId")));
             change(type,"UPDATED",node.get("id").asText());
+        }
+    }
+    /** Owner-locked, repeatable payload migration; interval and catalogue links stay intact. */
+    void migrateWorkSessionDescriptions() {
+        for(var old:list("WORK_SESSION")) {
+            if(!old.has("title")) continue;
+            var node=((ObjectNode)old).deepCopy();long version=node.path("version").asLong();
+            node.put("summary",WorkSessionDescriptions.summary(old));node.remove("title");node.put("version",version+1);
+            if(update("UPDATE tk_resource SET payload=?,version=? WHERE owner_id=? AND entity_type='WORK_SESSION' AND id=? AND version=?",
+                    node.toString(),version+1,owner(),uuid(node.get("id")),version)!=1) throw new ApiFailure(412,"STALE_VERSION");
+            change("WORK_SESSION","UPDATED",node.path("id").asText());
         }
     }
     JsonNode createClient(JsonNode input) {
@@ -318,7 +322,6 @@ public class ServerStore {
             update("DELETE FROM tk_relation WHERE owner_id=? AND from_type='WORK_SESSION' AND from_id=? AND kind='project'",owner(),id);
             if(node.hasNonNull("projectId")) relation(type,id,"project","PROJECT",uuid(node.get("projectId")));
         }
-        if(type.equals("WORK_SESSION") && input.has("title")) node.put("title",input.get("title").asText().strip());
         if(type.equals("WORK_SESSION") && input.has("labelIds")) {
             var assigned=node.putArray("labelIds");
             labels(input.get("labelIds")).stream().map(label->label.value()).sorted().forEach(label->{

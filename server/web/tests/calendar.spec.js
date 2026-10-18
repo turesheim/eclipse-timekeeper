@@ -12,7 +12,7 @@ async function api(request,method,path,data,headers={}) {
 async function read(request,collection,id) {return (await api(request,'GET',`/${collection}/${id}`)).json();}
 async function put(request,collection,value,changes) {
   const response=await api(request,'GET',`/${collection}/${value.id}`);
-  return (await api(request,'PUT',`/${collection}/${value.id}`,{clientId:value.clientId,projectId:value.projectId || null,title:value.title,summary:value.summary,start:value.start,end:value.end,...changes},{'If-Match':response.headers().etag})).json();
+  return (await api(request,'PUT',`/${collection}/${value.id}`,{clientId:value.clientId,projectId:value.projectId || null,summary:value.summary,start:value.start,end:value.end,...changes},{'If-Match':response.headers().etag})).json();
 }
 async function save(page) {await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');}
 async function calendar(page,credential=token,date='2025-10-20') {
@@ -32,7 +32,7 @@ async function fixture(request) {
   const task=await (await api(request,'POST','/tasks',{summary:prefix+' task',projectId:project.id,parentTaskId:null,url,externalReferences:[{providerId:'github',repositoryId:'https://github.com/example/calendar',externalId:issue,externalUrl:url}]})).json();
   const empty=await (await api(request,'POST','/tasks',{summary:prefix+' unrecorded',projectId:project.id,parentTaskId:null,url:null})).json();
   const label=await (await api(request,'POST','/labels',{name:prefix+' label',color:'#176653'})).json();
-  const session=await (await api(request,'POST','/work-sessions',{labelIds:[label.id],clientId:client.id,projectId:project.id,title:prefix+' planning',summary:prefix+' session',start:'2025-10-20T06:03:00.123456789Z',end:'2025-10-20T14:03:00.987654321Z'})).json();
+  const session=await (await api(request,'POST','/work-sessions',{labelIds:[label.id],clientId:client.id,projectId:project.id,summary:prefix+' session',start:'2025-10-20T06:03:00.123456789Z',end:'2025-10-20T14:03:00.987654321Z'})).json();
   const activities=[];
   for(const [start,end,summary] of [['2025-10-20T06:10:00.123456789Z','2025-10-20T07:00:00Z','first interval'],['2025-10-20T07:00:00Z','2025-10-20T08:00:00.987654321Z','second interval']])
     activities.push(await (await api(request,'POST','/activities',{taskId:task.id,summary:prefix+' '+summary,start,end,labelIds:[],workSessionId:session.id})).json());
@@ -118,9 +118,9 @@ test('dragging empty calendar space previews a new session and saves only after 
     expect(creates).toBe(0);await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-21T09:00');
     await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-21T10:30');
     await page.screenshot({path:'test-results/calendar-range-review-desktop.png'});
-    await page.getByLabel('Title',{exact:true}).fill(f.prefix+' dragged');await page.getByLabel('Client',{exact:true}).selectOption(otherClient.id);
+    await page.getByLabel('Client',{exact:true}).selectOption(otherClient.id);
     await page.getByLabel('Summary',{exact:true}).fill(f.prefix+' dragged interval');await save(page);expect(creates).toBe(1);
-    const created=(await (await api(request,'GET','/work-sessions?clientId='+otherClient.id)).json()).items.find(value=>value.title===f.prefix+' dragged');
+    const created=(await (await api(request,'GET','/work-sessions?clientId='+otherClient.id)).json()).items.find(value=>value.summary===f.prefix+' dragged interval');
     expect(created.start).toBe('2025-10-21T07:00:00Z');expect(created.end).toBe('2025-10-21T08:30:00Z');
     expect((await (await api(request,'GET',`/work-sessions/${created.id}/report`)).json()).activities).toEqual([]);
     await unchangedActivities(request,f);
@@ -148,9 +148,9 @@ test('drag-created intervals distinguish repeated local times and reject shaded 
     await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-26T02:15');
     await expect(page.getByLabel('Start time occurrence',{exact:true})).toHaveValue('+02:00');
     await expect(page.getByLabel('End time occurrence',{exact:true})).toHaveValue('+01:00');
-    await page.getByLabel('Title',{exact:true}).fill(f.prefix+' repeated hour');await page.getByLabel('Client',{exact:true}).selectOption(f.client.id);
+    await page.getByLabel('Client',{exact:true}).selectOption(f.client.id);
     await page.getByLabel('Summary',{exact:true}).fill(f.prefix+' repeated');await save(page);
-    const created=(await (await api(request,'GET','/work-sessions?clientId='+f.client.id)).json()).items.find(value=>value.title===f.prefix+' repeated hour');
+    const created=(await (await api(request,'GET','/work-sessions?clientId='+f.client.id)).json()).items.find(value=>value.summary===f.prefix+' repeated');
     expect(instantNanos(created.end)-instantNanos(created.start)).toBe(3600000000000n);
     await dragRange(page,{date:'2025-10-26',clock:'01:45/0'},{date:'2025-10-20',clock:'02:15/1'});await page.mouse.up();
     await expect(page.locator('#editor')).not.toBeVisible();await expect(page.locator('#calendar-message')).toContainText('does not occur');
@@ -185,14 +185,14 @@ test('touch range selection is explicit and leaves normal calendar scrolling ava
 test('calendar shows seven days, task links and activity lists beside multi-day work sessions',async({page,request})=>{
   const f=await fixture(request);
   try {
-    const long=await (await api(request,'POST','/work-sessions',{clientId:f.client.id,title:'Overnight work',summary:f.prefix+' overnight',start:'2025-10-25T21:30:00.123456789Z',end:'2025-10-27T00:30:00.987654321Z'})).json();
+    const long=await (await api(request,'POST','/work-sessions',{clientId:f.client.id,summary:f.prefix+' overnight',start:'2025-10-25T21:30:00.123456789Z',end:'2025-10-27T00:30:00.987654321Z'})).json();
     await page.setViewportSize({width:1440,height:1100});
     await calendar(page);
     await expect(page.locator('[data-tab=calendar]')).toHaveAttribute('aria-current','page');
     await expect(bar(page,f.session.id)).toBeAttached();
     await expect(bar(page,f.session.id)).toHaveCSS('background-color','rgb(255, 221, 136)');
     await expect(bar(page,f.session.id)).toHaveCSS('color','rgb(0, 0, 0)');
-    await expect(bar(page,f.session.id).locator('.calendar-session-title')).toHaveText(f.session.title);
+    await expect(bar(page,f.session.id).locator('.calendar-session-title')).toHaveText(f.session.summary);
     await expect(bar(page,f.session.id).locator('.calendar-session-duration')).toHaveText('8h 0m');
     await expect(bar(page,f.session.id)).toHaveCSS('border-radius','6px');
     const handles=bar(page,f.session.id).locator('.calendar-resize');
@@ -285,7 +285,7 @@ test('calendar lost paste replies cannot create duplicates and future pastes rem
 test('calendar copying a running session leaves it running and lets the copy receive an end',async({page,request})=>{
   const f=await fixture(request);let running;
   try {
-    running=await (await api(request,'POST','/work-sessions/start',{clientId:f.client.id,title:'Running work',summary:f.prefix+' running session'},{'Idempotency-Key':randomUUID()})).json();
+    running=await (await api(request,'POST','/work-sessions/start',{clientId:f.client.id,summary:f.prefix+' running session'},{'Idempotency-Key':randomUUID()})).json();
     const today=dateInZone(running.start,'Europe/Oslo');await calendar(page,token,today);
     await expect(bar(page,running.id)).toBeAttached();await bar(page,running.id).focus();await bar(page,running.id).press('ControlOrMeta+c');
     await page.getByRole('button',{name:`Select ${today}`,exact:true}).click();await page.locator('#calendar-paste').click();
@@ -331,7 +331,7 @@ test('calendar copy and paste create only a new session and clear the clipboard 
     await expect(page.locator('#editor-title')).toHaveText('Paste work session');
     await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-21T08:03');await save(page);
     let sessions=(await (await api(request,'GET','/work-sessions')).json()).items.filter(value=>value.summary===f.session.summary);expect(sessions).toHaveLength(2);
-    const copy=sessions.find(value=>value.id!==f.session.id);expect(copy.projectId).toBe(f.project.id);expect(copy.labelIds).toEqual([f.label.id]);expect(copy.clientId).toBe(f.client.id);expect(copy.title).toBe(f.session.title);expect(copy.start).toBe('2025-10-21T06:03:00.123456789Z');expect(copy.end).toBe('2025-10-21T14:03:00.987654321Z');
+    const copy=sessions.find(value=>value.id!==f.session.id);expect(copy.projectId).toBe(f.project.id);expect(copy.labelIds).toEqual([f.label.id]);expect(copy.clientId).toBe(f.client.id);expect(copy.summary).toBe(f.session.summary);expect(copy.start).toBe('2025-10-21T06:03:00.123456789Z');expect(copy.end).toBe('2025-10-21T14:03:00.987654321Z');
     expect((await (await api(request,'GET',`/work-sessions/${copy.id}/report`)).json()).activities).toEqual([]);
     await page.locator('#calendar-copy').click();await page.getByRole('button',{name:'Select 2025-10-22',exact:true}).click();await page.locator('#calendar-paste').click();await save(page);
     sessions=(await (await api(request,'GET','/work-sessions')).json()).items.filter(value=>value.summary===f.session.summary);expect(sessions).toHaveLength(3);

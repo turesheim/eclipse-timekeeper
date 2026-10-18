@@ -154,6 +154,20 @@ class TogglImportTest {
         }
         fail("Undo did not finish");
     }
+    @Test void titlelessSourceRowsKeepHistoricalDuplicateIdentityIncludingTruncatedUnicodeDescriptions() {
+        for(String summary:List.of("Independent description","A"+"🙂".repeat(800))) {
+            String owner="summary-import-"+UUID.randomUUID();var importer=new TogglImport(store);
+            String legacy=summary.substring(0,Math.min(1000,summary.length()));
+            if(Character.isHighSurrogate(legacy.charAt(legacy.length()-1))) legacy=legacy.substring(0,legacy.length()-1);
+            var source=sessionRow().put("summary",summary).put("title",legacy);var rows=array().add(source);
+            UUID original=uuid(store.transaction(owner,()->importer.create(sessionSource())).get("id"));
+            store.transaction(owner,()->{assertEquals(1,commit(importer,original,rows,0,true).path("importedEntries").asInt());return null;});
+            source.remove("title");UUID repeat=uuid(store.transaction(owner,()->importer.create(sessionSource())).get("id"));
+            store.transaction(owner,()->{assertEquals("REUSED",importer.preview(repeat,rows).path("rows").get(0).path("status").asText());
+                assertEquals(1,commit(importer,repeat,rows,0,true).path("skippedEntries").asInt());
+                var session=store.list("WORK_SESSION").getFirst();assertEquals(summary,session.path("summary").asText());assertFalse(session.has("title"));return null;});
+        }
+    }
     @Test void sessionsPreserveOneContinuousDstIntervalAndReuseWithoutCompanionRecordsThenUndoAndReimport() {
         String owner="toggl-sessions-"+UUID.randomUUID();int labelCount=store.transaction(owner,()->store.list("LABEL").size());var importer=new TogglImport(store);var rows=array().add(sessionRow());
         UUID job=uuid(store.transaction(owner,()->{store.updateProfile("Europe/Oslo");return importer.create(sessionSource());}).get("id"));
@@ -162,7 +176,7 @@ class TogglImportTest {
         assertEquals(receipt.toString(),store.transaction(owner,()->importer.batch(job,0,request)).toString());
         store.transaction(owner,()->{
             var session=store.list("WORK_SESSION").get(0);assertEquals(sessionRow().path("start").asText(),session.path("start").asText());assertEquals(sessionRow().path("end").asText(),session.path("end").asText());
-            assertEquals("Imported attendance",session.path("title").asText());assertEquals("Independent description",session.path("summary").asText());assertEquals(store.list("CLIENT").get(0).path("id"),session.path("clientId"));
+            assertFalse(session.has("title"));assertEquals("Independent description",session.path("summary").asText());assertEquals(store.list("CLIENT").get(0).path("id"),session.path("clientId"));
             for(String type:List.of("PROJECT","TASK","ACTIVITY")) assertTrue(store.list(type).isEmpty());assertEquals(labelCount,store.list("LABEL").size());return null;
         });
         UUID repeat=uuid(store.transaction(owner,()->importer.create(sessionSource())).get("id"));

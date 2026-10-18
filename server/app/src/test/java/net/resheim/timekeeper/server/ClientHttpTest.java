@@ -34,7 +34,7 @@ class ClientHttpTest {
         var sessionInput=JsonValues.object();sessionInput.put("clientId",first.get("id").asText());sessionInput.put("title","Planning");sessionInput.put("summary","Description");
         sessionInput.put("start","2025-10-20T06:03:00.123456789Z");sessionInput.put("end","2025-10-20T14:03:00.987654321Z");
         var session=json(call("test-a","POST","/work-sessions",sessionInput,null),201);
-        assertEquals(first.get("id"),session.get("clientId"));assertEquals("Planning",session.get("title").asText());
+        assertEquals(first.get("id"),session.get("clientId"));assertFalse(session.has("title"));assertEquals("Planning\n\nDescription",session.path("summary").asText());
         var current=call("test-a","GET","/projects/"+project.get("id").asText(),null,null);
         var legacy=JsonValues.object();legacy.put("name","Renamed by Eclipse");
         var renamed=json(call("test-a","PUT","/projects/"+project.get("id").asText(),legacy,current.header("ETag")),200);
@@ -56,7 +56,7 @@ class ClientHttpTest {
         current=call("test-a","GET","/work-sessions/"+session.get("id").asText(),null,null);
         sessionInput.put("clientId",second.get("id").asText());sessionInput.put("title","New title");
         var changed=json(call("test-a","PUT","/work-sessions/"+session.get("id").asText(),sessionInput,current.header("ETag")),200);
-        assertEquals(second.get("id"),changed.get("clientId"));assertEquals("New title",changed.get("title").asText());
+        assertEquals(second.get("id"),changed.get("clientId"));assertFalse(changed.has("title"));assertEquals("New title\n\nDescription",changed.path("summary").asText());
         var report=json(call("test-a","GET","/work-sessions/"+session.get("id").asText()+"/report",null,null),200);
         assertEquals(changed,report.get("session"));
         var list=json(call("test-a","GET","/projects?clientId="+first.get("id").asText(),null,null),200);
@@ -65,7 +65,7 @@ class ClientHttpTest {
         current=call("test-a","GET","/clients/"+disposable.get("id").asText(),null,null);
         assertEquals(204,call("test-a","DELETE","/clients/"+disposable.get("id").asText(),null,current.header("ETag")).statusCode());
     }
-    @Test void existingDataGetsOneRealClientAndStableTitlesOnceWithoutChangingTimes() {
+    @Test void existingDataGetsOneRealClientOnceWithoutChangingTimes() {
         String owner="client-migration-"+UUID.randomUUID();var project=UUID.randomUUID();var session=UUID.randomUUID();
         store.transaction(owner,()->{
             for(var entry:Map.of("PROJECT",project,"WORK_SESSION",session).entrySet()) {
@@ -80,10 +80,17 @@ class ClientHttpTest {
         store.initializeConfiguredOwners();
         store.transaction(owner,()->{
             var migrated=store.find("WORK_SESSION",session).orElseThrow();
-            assertEquals("Legacy session",migrated.get("title").asText());assertEquals("2025-10-20T06:03:00.123456789Z",migrated.get("start").asText());
+            assertFalse(migrated.has("title"));assertEquals("Legacy session",migrated.path("summary").asText());assertEquals("2025-10-20T06:03:00.123456789Z",migrated.get("start").asText());
             assertEquals(5,migrated.get("version").asLong());assertEquals(migrated.get("clientId"),store.find("PROJECT",project).orElseThrow().get("clientId"));
             assertTrue(store.find("CLIENT",JsonValues.uuid(migrated.get("clientId"))).isPresent());assertEquals(1,store.list("CLIENT").size());
             long revision=store.revision();store.migrateClientDetails();assertEquals(revision,store.revision());assertEquals(migrated,store.find("WORK_SESSION",session).orElseThrow());return null;
         });
+    }
+    @Test void titlelessSessionsAllowEmptyMultilineAndMigratedLengthSummaries() {
+        for(String summary:List.of("","Planning\n\nExisting notes","T".repeat(1000)+"\n\n"+"N".repeat(2000))) {
+            var input=JsonValues.object().put("summary",summary).put("start","2025-10-20T06:00:00Z").put("end","2025-10-20T07:00:00Z");
+            var session=json(call("test-a","POST","/work-sessions",input,null),201);
+            assertEquals(summary,session.path("summary").asText());assertFalse(session.has("title"));
+        }
     }
 }

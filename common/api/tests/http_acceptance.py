@@ -120,15 +120,15 @@ class HttpAcceptance(unittest.TestCase):
             self.call('DELETE', f'/{resource}/{identifier}', owner=owner,
                       headers={'If-Match': headers['ETag']}, status=204)
 
-    def test_clients_own_projects_and_titled_sessions_with_portable_relations(self):
+    def test_clients_own_projects_and_session_summaries_with_portable_relations(self):
         client = self.create('clients', {'name': self.prefix, 'color': '#ffee00'})
         second = self.create('projects', {'name': self.prefix + ' second', 'clientId': client['id']})
         _, project_headers = self.call('GET', '/projects/' + self.project['id'])
         project, _ = self.call('PUT', '/projects/' + self.project['id'],
                                headers={'If-Match': project_headers['ETag']},
                                body={'name': self.project['name'], 'clientId': client['id']})
-        session = self.create('work-sessions', {'clientId': client['id'], 'title': 'Planning',
-                              'summary': 'Description', 'start': '2025-10-20T08:00:00.123456789Z',
+        session = self.create('work-sessions', {'clientId': client['id'],
+                              'summary': 'Planning\n\nDescription', 'start': '2025-10-20T08:00:00.123456789Z',
                               'end': '2025-10-20T16:00:00.987654321Z'})
         report, _ = self.call('GET', '/work-sessions/' + session['id'] + '/report')
         self.assertEqual(session, report['session'])
@@ -159,7 +159,8 @@ class HttpAcceptance(unittest.TestCase):
         copied_project, _ = self.call('GET', '/projects/' + remapped[second['id']], owner='b')
         self.assertEqual(remapped[client['id']], copied['clientId'])
         self.assertEqual(copied['clientId'], copied_project['clientId'])
-        self.assertEqual('Planning', copied['title'])
+        self.assertNotIn('title', copied)
+        self.assertEqual('Planning\n\nDescription', copied['summary'])
         self.assertEqual(session['start'], copied['start'])
         self.assertNotEqual(client['id'], copied['clientId'])
 

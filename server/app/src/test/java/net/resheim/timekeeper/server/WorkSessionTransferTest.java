@@ -60,7 +60,7 @@ class WorkSessionTransferTest {
             var sessions=target.workSessions(OwnerId.LOCAL);assertEquals(1,sessions.size());var copied=sessions.getFirst();assertNotEquals(session.id(),copied.id());
             var transferred=target.exportData();
             var copiedWire=transferred.getAsJsonArray("workSessions").get(0).getAsJsonObject();
-            assertEquals("Session, æøå",copiedWire.get("title").getAsString());
+            assertFalse(copiedWire.has("title"));assertEquals("Session, æøå",copiedWire.get("summary").getAsString());
             var sourceClient=export.getAsJsonArray("workSessions").get(0).getAsJsonObject().get("clientId");
             assertNotEquals(sourceClient,copiedWire.get("clientId"));
             assertEquals(copiedWire.get("clientId"),transferred.getAsJsonArray("projects").get(0).getAsJsonObject().get("clientId"));

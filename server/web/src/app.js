@@ -28,7 +28,7 @@ const calendar = new WeekCalendar($('calendar-panel'), {
   onPaste: input => void openRecord('work-sessions',null,input,'Paste work session').catch(error=>setStatus(errorText(error))),
   onChange: changeCalendarSession,
 });
-const track = new MonthTrack($('track-panel'));
+const track = new MonthTrack($('track-panel'),{onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))});
 function startWatch(session) {
   if (watchSession === session) return;
   watchSession = session;
@@ -75,6 +75,7 @@ function readOnlyWhileDisconnected() {
 function tab(name) {
   for (const item of ['track','week', 'calendar', 'tasks', 'clients', 'projects', 'labels']) $(`${item}-panel`).hidden = item !== name;
   $('workspace').dataset.view=name;if(name==='calendar') calendar.show();else calendar.hide();
+  if(name!=='track')track.hide();
   for (const item of document.querySelectorAll('[data-tab]')) {
     item.classList.toggle('active', item.dataset.tab === name);
     if (item.dataset.tab === name) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
@@ -243,12 +244,12 @@ function renderWorkweek(s, zone) {
   if (sessions.length) {
     const sessionRows = sessions.map(value => {
       const title = element('span', undefined, 'workweek-session-title'), client = s.clients.find(client => client.id === value.clientId);
-      const caption = element('span', value.title, 'client-color'); if (/^#[0-9a-f]{6}$/i.test(client?.color)) caption.style.setProperty('--client-color', client.color);
+      const caption = element('span', value.summary || 'Work session', 'client-color'); if (/^#[0-9a-f]{6}$/i.test(client?.color)) caption.style.setProperty('--client-color', client.color);
       title.append(caption, element('small', client?.name || 'Client'));
       const labels=(value.labelIds || []).map(id=>name(s.labels,id)).join(', ');
       if(labels) title.append(element('small',labels));
       if (!value.end) title.append(element('span', 'Running', 'badge rounded-pill text-bg-success'));
-      const actions=[action(`Edit session ${value.title}`, () => openRecord('work-sessions', value.id)),action(`Delete session ${value.title}`, () => openDelete('work-sessions', value.id))];
+      const actions=[action(`Edit session ${value.summary || 'Work session'}`, () => openRecord('work-sessions', value.id)),action(`Delete session ${value.summary || 'Work session'}`, () => openDelete('work-sessions', value.id))];
       for(const action of actions) action.disabled=!connected || !canWrite;
       const item = row([title, ...totals([value])], actions); item.dataset.workSessionId = value.id; return item;
     });
@@ -295,10 +296,10 @@ function renderWorkweek(s, zone) {
   $('activities').querySelector('table')?.classList.add('workweek-table');
 }
 function field(labelText, key, value = '', options = {}) {
-  const label = element('label', labelText), input = element(options.choices ? 'select' : 'input'); input.name = key;
+  const label = element('label', labelText), input = element(options.choices ? 'select' : options.multiline ? 'textarea':'input'); input.name = key;
   input.id = `field-${key}`; label.htmlFor = input.id; input.setAttribute('aria-label', labelText);
   if (options.choices) for (const [id, text] of options.choices) { const option = element('option', text); option.value = id; input.append(option); }
-  else { input.type = options.type || 'text'; if (options.max) input.maxLength = options.max; }
+  else { if(options.multiline)input.rows=3;else input.type = options.type || 'text'; if (options.max) input.maxLength = options.max; }
   input.value = value ?? ''; input.required = !!options.required; label.append(input);
   label.className = 'form-label'; input.className = options.choices ? 'form-select' : `form-control${input.type === 'color' ? ' form-control-color' : ''}`;
   if (options.hint) { const hint = element('p', options.hint, 'hint'); hint.id = `hint-${key}`; label.append(hint); input.setAttribute('aria-describedby', hint.id); }
@@ -355,12 +356,11 @@ function refreshClientChoices() {
 }
 function sessionProjectChoices() {return [['','No project'],...snapshot.projects.map(project=>[project.id,`${project.name} · ${name(snapshot.clients,project.clientId)}`])];}
 function sessionFields(value) {
-  field('Title','title',value.title || '',{required:true,max:1000});
   const client=clientField(value.clientId || calendar.preferredClient());
   const project=field('Project (optional)','projectId',value.projectId,{choices:sessionProjectChoices()});
   project.addEventListener('change',()=>{const selected=snapshot.projects.find(value=>value.id===project.value);if(selected) client.value=selected.clientId;});
   client.addEventListener('change',()=>{const selected=snapshot.projects.find(value=>value.id===project.value);if(selected && selected.clientId!==client.value) project.value='';});
-  field('Summary','summary',value.summary || '',{max:2000});
+  field('Summary','summary',value.summary || '',{max:4000,multiline:true});
   labelFields(value.labelIds);
 }
 function begin(title, state) {
@@ -369,7 +369,7 @@ function begin(title, state) {
   $('save').className = `btn ${state.remove ? 'btn-danger' : 'btn-primary'}`;
   $('editor-title').textContent = title; $('save').textContent = 'Save'; $('save').disabled = false; $('cancel').disabled = false; return true;
 }
-function showEditor() { $('editor').showModal(); $('fields').querySelector('input,select')?.focus(); }
+function showEditor() { $('editor').showModal(); $('fields').querySelector('input,select,textarea')?.focus(); }
 async function openRecord(collection, id = null, initial = {}, caption = null) {
   const session = api;
   const loaded = id ? await session.request(`/${collection}/${id}`) : {data: initial, etag: null};
@@ -474,7 +474,7 @@ function values() {
   const time = key => editor.timeValue ? editor.timeValue(key) : get(key);
   const labels = () => [...$('fields').querySelectorAll('[name="labelIds"]:checked')].map(node => node.value);
   if (editor.command === 'stop' || editor.command === 'session-stop' || editor.remove) return undefined;
-  if (editor.command === 'session-start') return {summary:get('summary'),title:get('title'),clientId:get('clientId'),projectId:get('projectId') || null,labelIds:labels()};
+  if (editor.command === 'session-start') return {summary:get('summary'),clientId:get('clientId'),projectId:get('projectId') || null,labelIds:labels()};
   if (editor.command === 'start') return {taskId: get('taskId'), summary: get('summary'), labelIds: labels(), expectedActiveId: editor.expected?.id ?? null, expectedActiveVersion: editor.expected?.version ?? null};
   switch (editor.collection) {
     case 'clients': return {name:get('name'),color:get('color')};
@@ -482,10 +482,10 @@ function values() {
     case 'labels': return {name: get('name'), color: get('color') || null};
     case 'tasks': return {summary: get('summary'), projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null};
     case 'activities': return {...(editor.id ? {} : {taskId: get('taskId') || null, projectId:get('taskId') ? null : get('projectId') || null}), summary: get('summary'), start: localDateTimeToInstant(get('start'), editor.zone), end: get('end') ? localDateTimeToInstant(get('end'), editor.zone) : null, labelIds: labels()};
-    case 'work-sessions': return {title:get('title'),clientId:get('clientId'),projectId:get('projectId') || null,summary:get('summary'),labelIds:labels(),start:localDateTimeToInstant(time('start'),editor.zone),end:time('end') ? localDateTimeToInstant(time('end'),editor.zone) : null};
+    case 'work-sessions': return {clientId:get('clientId'),projectId:get('projectId') || null,summary:get('summary'),labelIds:labels(),start:localDateTimeToInstant(time('start'),editor.zone),end:time('end') ? localDateTimeToInstant(time('end'),editor.zone) : null};
   }
 }
-function freeze(state) { for (const input of $('fields').querySelectorAll('input,select')) input.disabled = state || (editor.collection === 'activities' && !!editor.id && input.name === 'taskId'); }
+function freeze(state) { for (const input of $('fields').querySelectorAll('input,select,textarea')) input.disabled = state || (editor.collection === 'activities' && !!editor.id && input.name === 'taskId'); }
 async function saveEditor(event) {
   event?.preventDefault(); const current = editor;
   if (!current || current.busy || current.loading || current.reviewRequired || current.session !== api) return;
@@ -530,7 +530,7 @@ function renderSession() {
   const active=snapshot.activeWorkSession.data, session=displayedSession();
   $('work-session-state').textContent=active ? 'Running' : 'Stopped';
   $('work-session-state').className = `badge rounded-pill ${active ? 'text-bg-success' : 'text-bg-secondary'}`;
-  $('work-session-title').textContent = session?.title || 'Your work session';
+  $('work-session-title').textContent = session?.summary || 'Your work session';
   $('work-session').style.setProperty('--session-color', snapshot.clients.find(client => client.id === session?.clientId)?.color || 'var(--accent)');
   const zone=snapshot.profile.data.zoneId;
   $('work-session-current').textContent=session ? `${[name(snapshot.clients,session.clientId),session.projectId ? name(snapshot.projects,session.projectId) : null].filter(Boolean).join(' · ')} · ${active ? 'Started ' : ''}${instantText(session.start,zone)}${session.end ? ' → '+instantText(session.end,zone) : ''}` : '';

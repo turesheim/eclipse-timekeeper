@@ -49,11 +49,15 @@ fonts and their upstream license are included in the server distribution.
 **Track** is the default workspace tab. Its Monday-to-Sunday month grid shows
 one client-coloured summary per client and day, with recorded session hours per
 client above it. Multiple sessions for the same client are combined.
+Hover over a daily client total to see its sessions, summaries, projects, labels,
+local start/end times and durations in a tooltip. These details are also available
+when viewing the account with read-only access.
 Month boundaries and daily slices follow the account's time zone, including DST;
 running sessions use the server's report time. Activity/task time is independent
-of these totals. Month navigation does not alter recorded sessions. Individual
-sessions are available in Calendar and Workweek. Daily summaries remain readable
-in read-only sessions.
+of these totals. Month navigation does not alter recorded sessions. Click a daily client total to edit its work session. When several sessions
+contribute to the total, choose one by its summary, project and local times.
+The same editor is available in Calendar and Workweek. Daily summaries remain
+readable in read-only sessions, where editing is unavailable.
 
 These views use synthetic records from `tests/track.spec.js`; the browser uses
 Los Angeles time while the account uses Oslo time.
@@ -67,7 +71,7 @@ Los Angeles time while the account uses Oslo time.
 Bootstrap 5.3.8 supplies the shared buttons, forms, navigation, cards and tables.
 The small application theme in `style.css` defines the green palette, typography,
 spacing and visible keyboard focus. The work-session card establishes the baseline:
-a client-color accent, title, explicit running/stopped status, local times,
+a client-color accent, summary, explicit running/stopped status, local times,
 duration and consistently sized icon actions. Historical records and detailed
 totals are available in Workweek and Calendar. Client color is always accompanied
 by text.
@@ -135,7 +139,7 @@ zone, including UTC, is retained when signing in from another device. Read-only
 tokens retain the existing account zone. Use **Account menu → My Account → Profile → Time zone** to change it explicitly.
 Workweek shows the sessions overlapping the selected week in a separate
 **Work sessions** grid above the task/activity breakdown. Each row shows the
-session title, client name/color, seven local-day durations, a weekly total and
+session summary, client name/color, seven local-day durations, a weekly total and
 an Edit action. Running sessions are marked and update with live snapshots.
 Durations are clipped at the week and local-day boundaries, including daylight
 saving changes, and follow the selected clock/decimal display format.
@@ -229,7 +233,7 @@ never placed in routes or browser storage.
 ## Work sessions
 
 The compact **Work Session** card stays visible on every tracking tab. It shows
-the running session, or the most recent completed session, with its title, client,
+the running session, or the most recent completed session, with its summary, client,
 local times and duration. Its timing/recording buttons sit beside the session
 tools, separated by a divider; on narrow screens the tools wrap below a horizontal
 divider. Tools target the session shown in the card and are disabled when no
@@ -350,7 +354,7 @@ remaining days and hours.
 
 Drag across empty calendar space to preview a new work-session interval, in either
 direction and across days. Release opens the normal editor with the selected times;
-choose a title, review the interval and client, then save. The client from the last
+optionally enter a summary, review the interval and client, then save. The client from the last
 saved work-session editor is preselected during this sign-in. Before that, the
 selected, running or latest session supplies a valid client. Cancelled edits do
 not change this choice, and signing out or switching accounts clears it.
@@ -368,7 +372,7 @@ users can select a day/time with the arrow keys and press Enter, or use **Record
 work session**, then enter the desired end time in the editor.
 
 Strips represent work sessions, using the associated client’s color, session
-title and elapsed duration. Small resize grips appear when hovering over a strip
+summary and elapsed duration. Small resize grips appear when hovering over a strip
 or focusing its controls with the keyboard; on touchscreens, select the strip to
 reveal them. Select a strip to see its full interval;
 double-click it or use **Edit selected work session** to edit. Drag the strip
@@ -384,7 +388,7 @@ identity while appearing in each affected day.
 Use **Copy work session** and **Paste work session**, or Ctrl/Cmd+C and Ctrl/Cmd+V,
 to create a separate session. Select a day heading to retain the copied start
 clock time, or select a calendar slot to choose a new time. The paste editor
-lets you review the interval before saving. The client, title, interval and summary are
+lets you review the interval before saving. The client, interval and summary are
 copied; activities and task references are not. The copy buffer is private to
 the signed-in browser session and is cleared on sign-out. A running source keeps
 its blank end in the copy; finish the copy's interval if another session is
@@ -409,9 +413,10 @@ or repeating an ordinary write.
 Use **Clients** to create, rename, recolor or delete a client. A client has a
 required name and hex color. Each project belongs to exactly one client; choose
 it in the project editor. A client may have many projects. Each work session also
-belongs to exactly one client and has a required title plus an optional summary.
-Choose these when starting or recording a session. The calendar uses the title
-and client color; light colors receive dark text and dark colors receive light
+belongs to exactly one client and has an optional summary, with no separate
+title. Choose the client and optionally enter a summary when starting or recording
+a session. Summaries support multiple lines and up to 4,000 characters. The
+calendar uses the summary (or “Work session” when empty) and client color; light colors receive dark text and dark colors receive light
 text. Changing a client’s color updates all its sessions without editing them.
 
 Create a client before creating your first project or work session. Clients in
@@ -419,15 +424,18 @@ use by projects or sessions cannot be deleted; reassign or remove those records
 first. A project’s client and a session’s client can be changed independently.
 Existing activities and their times are retained when these associations change.
 
-On server upgrade, existing projects and sessions are assigned to **General**.
-Existing session summaries remain descriptions and also supply the initial title
-(or **Work session** when empty). General can be renamed and recolored like any
-other client. Import/export v3 preserves clients, project ownership, session
-titles and colors. Older v1/v2 imports receive General automatically.
+On server upgrade, projects and sessions without a client are assigned to
+**General**. Existing session titles move into Summary. If a title contains text
+not already at the start of the summary, it is placed before the existing notes,
+separated by a blank line. Existing descriptions, exact times, clients, projects
+and labels are retained; the migration is repeatable. General can be renamed and
+recolored like any other client. Import/export v3 preserves clients, project
+ownership, summaries and colors, and older archives with titles remain importable.
+Older v1/v2 imports receive General automatically.
 
-Client management and session titles are server/web features. Eclipse project
+Client management is a server/web feature. Eclipse project
 creation receives General on the server, and Eclipse project edits preserve its
-client. No client selection or title fields are added to Eclipse.
+client. No client selection fields are added to Eclipse.
 
 ## Toggl Track import
 
@@ -438,7 +446,7 @@ uses project-based suggestions instead; review and correct each client mapping
 before importing.
 
 Each CSV row defaults to one continuous work session with a reviewed client and
-description-derived title. Activity import is an explicit alternative. Both modes
+optional description in Summary. Activity import is an explicit alternative. Both modes
 share durable progress, duplicate review and whole-job Undo; sessions create no
 companion task/activity records and contribute to Track’s client totals.
 Source tags become reviewed work-session labels. Resuming an older import keeps
