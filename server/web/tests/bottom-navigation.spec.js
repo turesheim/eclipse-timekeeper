@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import {openAccountMenu} from './navigation.js';
+import {openAccountMenu,openAbout} from './navigation.js';
 
 test('bottom navigation keeps every view accessible, stationary and clear of content at narrow and wide widths',async({page,browserName})=>{
   await page.goto('/web/');const bar=page.locator('#workspace-navigation');await expect(bar).not.toBeVisible();
@@ -27,6 +27,9 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
   }
   const activities=bar.getByRole('button',{name:'Activities',exact:true});await activities.focus();await page.keyboard.press('Enter');await expect(activities).toHaveAttribute('aria-current','page');
   await page.keyboard.press(browserName==='webkit' && process.platform==='darwin' ? 'Alt+Tab':'Tab');await expect(bar.getByRole('button',{name:'Calendar',exact:true})).toBeFocused();
+  await page.setViewportSize({width:390,height:844});await openAbout(page);
+  const aboutAudit=await new AxeBuilder({page}).include('#server-info').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(aboutAudit.violations).toEqual([]);
+  await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Account menu',exact:true})).toBeFocused();
   await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await expect(bar).not.toBeVisible();
   await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await expect(bar).toBeVisible();
   await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(bar).not.toBeVisible();

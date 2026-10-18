@@ -71,7 +71,7 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
       await expect(page.locator('#work-session-elapsed')).toHaveText('8h 0m');
       await expect(page.locator('#work-session')).toHaveCSS('border-top-color','rgb(103, 80, 164)');
       await page.mouse.move(0,0);
-      await page.screenshot({path:`test-results/design-work-session-${name}.png`,fullPage:true});
+      await page.screenshot({path:`test-results/design-work-session-${name}.png`,fullPage:false});
       await page.locator('#work-session').screenshot({path:`test-results/design-session-card-${name}.png`});
       for(const tab of ['week','activities','calendar','tasks','clients','projects','labels']) {
         await page.locator(`[data-tab=${tab}]`).click();
