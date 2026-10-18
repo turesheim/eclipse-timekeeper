@@ -68,11 +68,11 @@ PostgreSQL service. VMM on the same NAS does not remove these shared failure poi
 
    Before the initial Container Manager deployment, run `sh set-deployment-time.sh`
    over SSH in the deployment directory. It records `TIMEKEEPER_DEPLOYED_AT` in
-   `.env`, which both servers use. The web footer shows the running version,
-   commit and deployment time; expand it for build and process-start times too.
+   `.env`, which both servers use. Open **About** in the web client's account menu
+   for the running version, commit, deployment time, build time and process-start time.
    Keep this timestamp on ordinary restarts. `update.sh` records a new timestamp
    only after both replacement replicas are healthy, and preserves the earlier
-   timestamps when rolling back. During a rolling update the footer describes
+   timestamps when rolling back. During a rolling update **About** describes
    the replica that served its latest information request.
 5. For private access from your tailnet, follow the [shared Tailscale guide](TAILSCALE.md)
    on the NAS. It uses the same loopback gateway and provides HTTPS for Eclipse
