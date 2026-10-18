@@ -1,6 +1,6 @@
 import {dateInZone,instantNanos,instantText} from './model.js';
 import {monthCalendar,monthSessions,shiftMonth} from './month-model.js';
-import {iconButton,projectIcon} from './icons.js';
+import {iconButton,projectIcon,projectIcons} from './icons.js';
 import {MonthPicker} from './month-picker.js';
 
 const node=(tag,text,className)=> {const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
@@ -152,7 +152,7 @@ export class MonthTrack {
           const line=node('span',undefined,'track-client-day-total'),icons=node('span',undefined,'track-project-icons'),projects=new Map();
           for(const session of this.sessions(day.date,entry.clientId)) {
             const project=this.snapshot.projects.find(project=>project.id===session.projectId);
-            if(projectIcon(project)) {const names=projects.get(project.icon)||new Set();names.add(project.name);projects.set(project.icon,names);}
+            if(projectIcons.some(([id])=>id===project?.icon)) {const names=projects.get(project.icon)||new Set();names.add(project.name);projects.set(project.icon,names);}
           }
           for(const [id,names] of projects)icons.append(projectIcon({icon:id,name:[...names].join(', ')}));
           icons.setAttribute('aria-hidden','true');line.append(duration,short,icons);summary.append(node('strong',client?.name || 'Client'),' ',line);

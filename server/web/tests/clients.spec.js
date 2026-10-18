@@ -1,5 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
+import AxeBuilder from '@axe-core/playwright';
 const token=process.env.TIMEKEEPER_WEB_TOKEN;
 async function api(request,method,path,data,headers={}) {
   const response=await request.fetch(`/api/v1${path}`,{method,data,headers:{Authorization:`Bearer ${token}`,...headers}});
@@ -137,7 +138,8 @@ test('optional project icons persist and Track shows distinct icons to the right
     await page.getByRole('button',{name:'Projects',exact:true}).click();await page.getByRole('button',{name:'New project',exact:true}).click();
     await page.getByLabel('Name',{exact:true}).fill(prefix+' Website');await page.getByLabel('Client',{exact:true}).selectOption(client.id);
     await expect(page.getByRole('radio',{name:'None',exact:true})).toBeChecked();await page.getByRole('radio',{name:'Code',exact:true}).check();
-    await page.locator('#editor').screenshot({path:'test-results/project-icon-picker.png'});await save(page);
+    expect((await new AxeBuilder({page}).include('#editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
+    await page.setViewportSize({width:1280,height:900});await page.locator('#editor').screenshot({path:'test-results/project-icon-picker.png'});await save(page);await page.setViewportSize({width:1280,height:720});
     const project=(await (await api(request,'GET','/projects?clientId='+client.id)).json()).items[0];records.unshift(['projects',project.id]);expect(project.icon).toBe('code');
     const other=await create('projects',{name:prefix+' Backend',clientId:client.id,icon:'code'}),globe=await create('projects',{name:prefix+' Research',clientId:client.id,icon:'globe'});
     for(const [index,projectId] of [project.id,project.id,other.id,globe.id,null].entries())await create('work-sessions',{clientId:client.id,projectId,summary:prefix+' session '+index,start:`2025-10-20T${String(6+index).padStart(2,'0')}:00:00Z`,end:`2025-10-20T${String(7+index).padStart(2,'0')}:00:00Z`});
@@ -151,6 +153,7 @@ test('optional project icons persist and Track shows distinct icons to the right
     async function iconsFollow(duration){const clock=await duration.boundingBox();for(const icon of await icons.all()){const box=await icon.boundingBox();expect(box.x).toBeGreaterThanOrEqual(clock.x+clock.width-.5);}}
     await iconsFollow(entry.locator('.track-client-day-time'));await page.screenshot({path:'test-results/track-project-icons.png',fullPage:true});
     await page.setViewportSize({width:390,height:844});await expect(entry.locator('.track-client-day-time-short')).toHaveText('5h');await iconsFollow(entry.locator('.track-client-day-time-short'));expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    expect((await new AxeBuilder({page}).include('#track-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await page.screenshot({path:'test-results/track-project-icons-mobile.png',fullPage:true});
     await page.getByRole('button',{name:'Projects',exact:true}).click();await row.getByRole('button',{name:'Edit',exact:true}).click();await page.getByRole('radio',{name:'None',exact:true}).check();await save(page);await expect(row.locator('[data-project-icon]')).toHaveCount(0);
     expect((await (await api(request,'GET','/projects/'+project.id)).json()).icon).toBeNull();
