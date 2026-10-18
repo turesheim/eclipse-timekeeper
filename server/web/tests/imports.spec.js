@@ -63,7 +63,7 @@ for(const mode of ['ACTIVITY','WORK_SESSION']) test(`Toggl ${mode} import resume
   const header = 'Description,Duration,Member,Email,Project,Tags,Start date,Start time,Stop date,Stop time';
   const lines = Array.from({length:201},(_,n)=>{
     const start = new Date(Date.UTC(2025,9,20,9,0,n)),end = new Date(+start+1000);
-    return [`Bulk row ${n}`,'00:00:01','Bulk member','bulk@example.invalid','Bulk project','','2025-10-20',start.toISOString().slice(11,19),'2025-10-20',index===21 || index===22 ? '' : end.toISOString().slice(11,19)].join(',');
+    return [`Bulk row ${n}`,'00:00:01','Bulk member','bulk@example.invalid','Bulk project','','2025-10-20',start.toISOString().slice(11,19),'2025-10-20',end.toISOString().slice(11,19)].join(',');
   });
   const file = {name:'bulk.csv',mimeType:'text/csv',buffer:Buffer.from([header,...lines].join('\r\n'))};
   await page.getByLabel('Source time zone',{exact:true}).fill('Europe/Oslo');await page.getByLabel('Toggl CSV',{exact:true}).setInputFiles(file);

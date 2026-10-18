@@ -1,7 +1,7 @@
 import {Api, ApiError} from './api.js';
 import {addDays, dateInZone, dayStart, durationText, durationNanos, instantText, instantNanos, weekRange, taskPresentation, activityDayNanos, nanosText, decimalHoursText, workweekGroups, sessionTimeNanos, localDateTime, localDateTimeToInstant, localDateTimeOffsets} from './model.js';
 import {authentication} from './auth.js';
-import {icon, iconButton, projectIcons, projectIcon} from './icons.js';
+import {icon, iconButton, projectIcon} from './icons.js';
 import {WeekCalendar} from './calendar.js';
 import {sameSession} from './calendar-model.js';
 import {MonthTrack} from './track.js';
@@ -33,8 +33,8 @@ const calendar = new WeekCalendar($('calendar-panel'), {
 });
 const track = new MonthTrack($('track-panel'),{onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))});
 const undoNotice=new UndoNotice($('undo-notice'),{
-  available:session=>session===api&&connected&&canWrite&&!editor&&!weekSessions.draft,
-  changed:async session=>{if(session===api){connected=false;readOnlyWhileDisconnected();await refresh().catch(()=>{});}},
+  available:session=>session===api&&connected&&canWrite&&!editor&&(!weekSessions.draft||(!weekSessions.draft.busy&&!weekSessions.draft.review&&!Object.keys(weekSessions.draft.edits).length)),
+  changed:async session=>{if(session===api){if(weekSessions.draft&&!weekSessions.draft.busy&&!weekSessions.draft.review&&!Object.keys(weekSessions.draft.edits).length)weekSessions.cancel();connected=false;readOnlyWhileDisconnected();await refresh().catch(()=>{});}},
   unauthorized:error=>auth.clear(errorText(error)),
 });
 const weekSessions=new WorkweekSessions($('week-sessions'),{

@@ -62,6 +62,7 @@ class ContractTest(unittest.TestCase):
             'StartActivityInput': {'taskId': ID, 'summary': '', 'labelIds': [],
                                    'expectedActiveId': None, 'expectedActiveVersion': None},
             'ProfileInput': {'zoneId': 'Europe/Oslo'},
+            'UndoInput': {},
         }
         for name, body in inputs.items():
             with self.subTest(schema=name):
@@ -74,7 +75,7 @@ class ContractTest(unittest.TestCase):
                     self.assertFalse(validator(name).is_valid(missing))
 
     def test_optional_project_icons_are_bounded_metadata(self):
-        for icon in ('code', 'globe', None):
+        for icon in ('code', 'globe', 'gavel', 'rocket', None):
             validator('ProjectInput').validate({'name': 'Project', 'icon': icon})
             validator('TransferProject').validate({'id': ID, 'name': 'Project', 'icon': icon})
         validator('ProjectInput').validate({'name': 'Earlier client'})

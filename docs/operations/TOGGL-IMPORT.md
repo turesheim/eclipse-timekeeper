@@ -127,7 +127,7 @@ possible. Retained records keep duplicate protection. **Download audit** provide
 a JSON record of committed outcomes and Undo decisions. Protected server
 database backups preserve this history; portable work-data exports omit its
 private import authority.
-The audit retains each selected entry's original interval, exact source duration,
+The audit retains each selected entry's original interval, duration calculated from its Start/End,
 source line/ID when available, selected source descriptions/project/task/tags,
 import mode and imported/reused outcome. Reused source time can
 differ from the current duration of a record that was edited after import.

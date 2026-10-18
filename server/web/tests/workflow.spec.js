@@ -75,7 +75,7 @@ test('account time zone controls local editors and build dates across DST and br
     await page.getByLabel('Start time occurrence',{exact:true}).selectOption('+01:00');await save(page);
     saved=await (await api(request,'GET',`/work-sessions/${session.id}`)).json();
     expect(saved.start).toBe('2025-10-26T01:30:00Z');
-    await page.getByLabel('Week containing').fill('2025-10-26');
+    await page.locator('[data-tab=activities]').click();await page.getByLabel('Week containing').fill('2025-10-26');
     await page.getByRole('button',{name:'Add time',exact:true}).click();
     await page.getByLabel('Summary',{exact:true}).fill(summary+' activity');
     await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-26T02:30:00.123456789+02:00');
@@ -137,7 +137,7 @@ test('core browser workflow manages records, tracks time, and preserves exact re
   await expect(page.locator('#editor')).not.toBeVisible(); await expect(page.locator('#active-title')).toHaveText(task);
   await page.getByRole('button', {name:'Stop tracking', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Stop', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible();
   await setTimeZone(page,'Europe/Oslo');
-  await page.getByRole('button', {name:'Workweek', exact:true}).click(); await page.getByLabel('Week containing').fill('2025-10-26');
+  await page.getByRole('button', {name:'Activities', exact:true}).click(); await page.getByLabel('Week containing').fill('2025-10-26');
   await expect(page.locator('#zone-caption')).toContainText('2025-10-20'); await page.getByRole('button', {name:'Add time', exact:true}).click();
   await page.getByLabel('Task', {exact:true}).selectOption({label:task}); await page.getByLabel('Summary', {exact:true}).fill('Autumn DST');
   await page.getByLabel('Start (local time)', {exact:true}).fill('2025-10-25T22:00:00Z'); await page.getByLabel('End (local time, blank while tracking)', {exact:true}).fill('2025-10-26T23:00:00Z'); await save(page);

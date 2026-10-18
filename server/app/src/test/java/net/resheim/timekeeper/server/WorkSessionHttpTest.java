@@ -189,4 +189,25 @@ class WorkSessionHttpTest {
         given().header("Authorization","Bearer test-a").get("/api/v1/work-sessions/"+id).then().statusCode(404);
     }
 
+    @Test void undoRestoresAllMetadataAndRejectsARunningSessionCollision() {
+        try(var api=client("test-a")) {
+            var project=api.createProject(new CreateProject("Undo project"));var label=api.createLabel(new CreateLabel("Undo label",Optional.of("12,34,56")));
+            var original=createSession();var input=JsonValues.object().put("start",original.jsonPath().getString("start")).put("end",original.jsonPath().getString("end")).put("summary","With metadata").put("projectId",project.id().value().toString());input.putArray("labelIds").add(label.id().value().toString());
+            var tagged=given().header("Authorization","Bearer test-a").header("If-Match",original.header("ETag")).contentType("application/json").body(input.toString())
+                    .put("/api/v1/work-sessions/"+original.jsonPath().getString("id")).then().statusCode(200).extract().response();
+            assertNull(tagged.header("X-Timekeeper-Undo-Id"));
+            var removed=given().header("Authorization","Bearer test-a").header("If-Match",tagged.header("ETag")).header("X-Timekeeper-Undo","true").delete("/api/v1/work-sessions/"+tagged.jsonPath().getString("id")).then().statusCode(204).extract().response();
+            var restored=undo(removed.header("X-Timekeeper-Undo-Id"),"test-a",UUID.randomUUID().toString(),200);
+            var expected=(com.fasterxml.jackson.databind.node.ObjectNode)JsonValues.parse(tagged.asString());expected.put("version",expected.path("version").asLong()+1);
+            assertEquals(expected,JsonValues.parse(restored.asString()).path("session"));
+            assertThrows(RemoteFailure.class,()->api.deleteLabel(new DeleteLabel(label.id(),label.version())));
+            var running=api.startWorkSession(new StartWorkSession(OwnerId.LOCAL,"First running"));
+            var loaded=given().header("Authorization","Bearer test-a").get("/api/v1/work-sessions/"+running.id().value()).then().statusCode(200).extract().response();
+            var deleted=given().header("Authorization","Bearer test-a").header("If-Match",loaded.header("ETag")).header("X-Timekeeper-Undo","true").delete("/api/v1/work-sessions/"+running.id().value()).then().statusCode(204).extract().response();
+            var second=api.startWorkSession(new StartWorkSession(OwnerId.LOCAL,"Second running"));
+            undo(deleted.header("X-Timekeeper-Undo-Id"),"test-a",UUID.randomUUID().toString(),409);
+            assertEquals(second,api.activeWorkSession(OwnerId.LOCAL).orElseThrow());assertTrue(api.workSession(running.id()).isEmpty());
+        }
+    }
+
 }
