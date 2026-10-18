@@ -337,7 +337,7 @@ python3 server/scripts/package_synology.py --commit "$COMMIT" --image "ghcr.io/t
 ```
 
 Preview SPKs use `1.99.0-<revision>` so the eventual stable `2.0.0` package sorts
-higher in DSM. Both identify the actual server build in the web footer. Preloading
+higher in DSM. Both identify the actual server build under **About** in the web client's account menu. Preloading
 the tested image avoids unpublished PR tags and moving registry aliases.
 
 ## Manual installer downloads

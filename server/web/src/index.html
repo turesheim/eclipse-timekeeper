@@ -4,18 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Timekeeper</title>
+  <script src="./theme.js"></script>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" sizes="256x256" href="./apple-touch-icon.png">
   <meta name="apple-mobile-web-app-title" content="Timekeeper">
   <link rel="stylesheet" href="./assets/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./calendar.css">
+  <link rel="stylesheet" href="./themes.css">
   <link rel="preload" href="./assets/fontawesome/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
   <script type="module" src="./app.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
-  <header class="app-header"><a class="brand" href="./">Timekeeper <small>2.0</small></a><div id="session" hidden><span id="owner"></span><details id="account-menu" class="account-menu"><summary class="btn btn-outline-secondary" role="button" aria-expanded="false" aria-controls="account-menu-items" aria-label="Account menu" title="Account menu"><span class="icon" aria-hidden="true">&#xf0c9;</span></summary><nav id="account-menu-items" class="account-menu-items" aria-label="Account"><a class="btn btn-link" id="account" tabindex="0" href="#account/profile">My Account</a><a class="btn btn-link" id="users-link" tabindex="0" href="/admin/" hidden>Administration</a><button class="btn btn-link" id="about-open" type="button">About</button><button class="btn btn-link" id="sign-out" type="button">Sign out</button></nav></details></div></header>
+  <header class="app-header"><a class="brand" href="./">Timekeeper <small>2.0</small></a><div id="session" hidden><span id="owner"></span><details id="account-menu" class="account-menu"><summary class="btn btn-outline-secondary" role="button" aria-expanded="false" aria-controls="account-menu-items" aria-label="Account menu" title="Account menu"><span class="icon" aria-hidden="true">&#xf0c9;</span></summary><nav id="account-menu-items" class="account-menu-items" aria-label="Account"><a class="btn btn-link" id="account" tabindex="0" href="#account/profile">My Account</a><a class="btn btn-link" id="users-link" tabindex="0" href="/admin/" hidden>Administration</a><button class="btn btn-link" id="about-open" type="button">About</button><div class="theme-choice"><label for="theme">Theme</label><select class="form-select" id="theme"></select></div><button class="btn btn-link" id="sign-out" type="button">Sign out</button></nav></details></div></header>
   <main id="main-content" tabindex="-1">
     <section id="login" class="card login">
       <p class="eyebrow">YOUR WORK, RECORDED</p><h1>Make time count.</h1>
