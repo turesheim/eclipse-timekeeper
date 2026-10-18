@@ -63,9 +63,12 @@
       <section class="card tracking"><div><p class="eyebrow">IN PROGRESS</p><h2 id="active-title">Ready when you are</h2><p id="active-details" class="hint">Choose a task below to start tracking.</p></div><button class="btn btn-primary" id="stop" hidden>Stop tracking</button></section>
       <nav id="workspace-navigation" class="nav nav-pills workspace-nav" aria-label="Workspace" tabindex="-1"><button class="nav-link active" data-tab="track" aria-current="page">Track</button><button class="nav-link" data-tab="week">Workweek</button><button class="nav-link" data-tab="calendar">Calendar</button><button class="nav-link" data-tab="tasks">Tasks</button><button class="nav-link" data-tab="clients">Clients</button><button class="nav-link" data-tab="projects">Projects</button><button class="nav-link" data-tab="labels">Labels</button></nav>
       <section id="track-panel" aria-labelledby="track-title">
-        <div class="toolbar track-toolbar"><div><h2 id="track-title">Your month</h2><p id="track-zone" class="hint"></p></div>
-          <div class="calendar-navigation"><button class="btn btn-outline-secondary" id="track-previous">Previous month</button><button class="btn btn-outline-secondary" id="track-today">Current month</button><button class="btn btn-outline-secondary" id="track-next">Next month</button></div>
-          <label class="form-label">Month<input class="form-control" id="track-month" type="month" placeholder="YYYY-MM" required></label>
+        <div class="toolbar track-toolbar">
+          <div class="track-controls">
+            <div class="track-month-field"><label class="form-label" for="track-month">Month</label><div class="input-group"><input class="form-control" id="track-month" type="text" inputmode="numeric" pattern="[0-9]{4}-(0[1-9]|1[0-2])" maxlength="7" placeholder="YYYY-MM" required><button type="button" id="track-month-choose" class="btn btn-outline-secondary" popovertarget="track-month-picker" aria-haspopup="dialog" aria-expanded="false">Choose month and year</button></div></div>
+            <div class="calendar-navigation"><button class="btn btn-outline-secondary" id="track-previous">Previous month</button><button class="btn btn-outline-secondary" id="track-today">Current month</button><button class="btn btn-outline-secondary" id="track-next">Next month</button></div>
+          </div>
+          <div class="track-heading"><h2 id="track-title">Your month</h2><p id="track-zone" class="hint"></p></div>
           <p class="track-total">Work sessions <strong id="track-total">0h 0m</strong></p>
         </div>
         <div id="track-clients" class="track-clients" aria-label="Client hours this month"></div>

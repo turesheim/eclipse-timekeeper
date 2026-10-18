@@ -32,6 +32,7 @@ test('Track is the default month overview with exact client session hours, local
     await expect(page.locator('#track-title')).toContainText('2025');await expect(page.locator('#track-zone')).toHaveText('Europe/Oslo');
     await expect(page.locator(`#track-clients [data-track-client="${a.id}"]`)).toContainText('27h 0m');
     await expect(page.locator(`#track-clients [data-track-client="${b.id}"]`)).toContainText('3h 0m');
+    await expect(page.locator('#track-clients [data-track-client]')).toHaveCount(2);
     await expect(page.locator('.track-month thead th')).toHaveCount(7);await expect(page.locator('.track-month tbody tr')).toHaveCount(5);
     await expect(page.locator('.track-month tbody td').first()).toHaveAttribute('data-track-date','2025-09-29');
     const day=page.locator('[data-track-date="2025-10-26"]');await expect(day.locator('[data-track-daily-client]')).toHaveCount(2);await expect(day.locator(`[data-track-daily-client="${a.id}"]`)).toContainText('26h 0m');await expect(day.locator(`[data-track-daily-client="${b.id}"]`)).toContainText('2h 0m');await expect(day).not.toContainText('Clock change');
@@ -65,6 +66,11 @@ test('Track is the default month overview with exact client session hours, local
     await expect(page.getByLabel('Month',{exact:true})).toHaveValue('2025-10');await page.setViewportSize({width:1280,height:720});
     await page.getByRole('button',{name:'Next month',exact:true}).click();await expect(page.getByLabel('Month',{exact:true})).toHaveValue('2025-11');
     await expect(page.locator(`#track-clients [data-track-client="${b.id}"]`)).toContainText('3h 0m');
+    await expect(page.locator(`#track-clients [data-track-client="${a.id}"]`)).toHaveCount(0);
+    await expect(page.locator('#track-clients [data-track-client]')).toHaveCount(1);
+    await page.getByRole('button',{name:'Next month',exact:true}).click();await expect(page.getByLabel('Month',{exact:true})).toHaveValue('2025-12');
+    await expect(page.locator('#track-clients [data-track-client]')).toHaveCount(0);await expect(page.locator('#track-clients')).toHaveText('No work sessions this month.');
+    await page.getByRole('button',{name:'Previous month',exact:true}).click();
     await page.getByRole('button',{name:'Previous month',exact:true}).click();
     await page.locator('[data-tab=week]').click();await page.locator('[data-tab=track]').click();await expect(page.getByLabel('Month',{exact:true})).toHaveValue('2025-10');
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -81,6 +87,38 @@ test('Track is the default month overview with exact client session hours, local
     for(const [collection,id] of records){const current=await api(request,'GET',`/${collection}/${id}`);await api(request,'DELETE',`/${collection}/${id}`,undefined,{'If-Match':current.headers().etag});}
     const current=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:original.zoneId},{'If-Match':current.headers().etag});
   }
+});
+test('Track month picker supports year selection, keyboard dismissal and a centered localized heading',async({browser})=>{
+  const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,locale:'nb-NO',viewport:{width:1280,height:900},ignoreHTTPSErrors:true}),page=await context.newPage();
+  try {
+    await signIn(page);
+    const month=page.getByLabel('Month',{exact:true}),choose=page.getByRole('button',{name:'Choose month and year',exact:true}),popup=page.getByRole('dialog',{name:'Choose month and year',exact:true});
+    await month.fill('2025-10');await expect(page.locator('#track-title')).toHaveText('Oktober 2025');
+    const toolbar=await page.locator('.track-toolbar').boundingBox(),heading=await page.locator('.track-heading').boundingBox(),controls=await page.locator('.track-controls').boundingBox();
+    expect(Math.abs(heading.x+heading.width/2-toolbar.x-toolbar.width/2)).toBeLessThan(1);expect(controls.x+controls.width).toBeLessThanOrEqual(heading.x);
+    await choose.focus();await choose.press('Enter');await expect(popup).toBeVisible();await expect(choose).toHaveAttribute('aria-expanded','true');
+    await expect(popup.getByLabel('Year',{exact:true})).toHaveValue('2025');await expect(popup.getByRole('button',{name:'oktober',exact:true})).toHaveAttribute('aria-pressed','true');
+    await expect(popup.getByRole('button',{name:'oktober',exact:true})).toBeFocused();
+    const audit=await new AxeBuilder({page}).include('#track-month-picker').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
+    await page.screenshot({path:'test-results/track-month-picker-desktop.png',fullPage:true});
+    await page.keyboard.press('Escape');await expect(popup).not.toBeVisible();await expect(choose).toBeFocused();await expect(month).toHaveValue('2025-10');
+    await choose.click();await popup.getByRole('button',{name:'Next year',exact:true}).click();await expect(popup.getByLabel('Year',{exact:true})).toHaveValue('2026');
+    await popup.getByRole('button',{name:'Previous year',exact:true}).click();await popup.getByLabel('Year',{exact:true}).fill('2024');
+    await popup.getByRole('button',{name:'februar',exact:true}).click();await expect(popup).not.toBeVisible();await expect(month).toHaveValue('2024-02');await expect(page.locator('#track-title')).toHaveText('Februar 2024');await expect(choose).toBeFocused();
+    await choose.click();await popup.getByLabel('Year',{exact:true}).fill('0');await expect(popup.getByRole('button',{name:'januar',exact:true})).toBeDisabled();
+    await popup.getByLabel('Year',{exact:true}).fill('1');await expect(popup.getByRole('button',{name:'Previous year',exact:true})).toBeDisabled();
+    await popup.getByLabel('Year',{exact:true}).fill('9998');await expect(popup.getByRole('button',{name:'Next year',exact:true})).toBeDisabled();
+    await page.keyboard.press('Escape');await expect(month).toHaveValue('2024-02');
+    await page.setViewportSize({width:390,height:844});await choose.click();await expect(popup).toBeVisible();
+    expect(await popup.evaluate(value=>{const rect=value.getBoundingClientRect();return rect.left>=0&&rect.right<=innerWidth&&rect.bottom<=innerHeight;})).toBe(true);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    const mobile=await new AxeBuilder({page}).include('#track-panel').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(mobile.violations).toEqual([]);
+    await page.screenshot({path:'test-results/track-month-picker-mobile.png',fullPage:true});
+    await page.locator('[data-tab=week]').click();await expect(popup).not.toBeVisible();await page.locator('[data-tab=track]').click();await expect(month).toHaveValue('2024-02');
+    await choose.click();await popup.getByRole('button',{name:'desember',exact:true}).click();await page.getByRole('button',{name:'Next month',exact:true}).click();await expect(month).toHaveValue('2025-01');
+    await page.getByRole('button',{name:'Current month',exact:true}).click();await expect(month).not.toHaveValue('2025-01');
+    await choose.click();await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(popup).not.toBeVisible();
+  } finally {await context.close();}
 });
 test('Track updates running session hours without stealing focus and reconciles peer edits',async({page,request})=> {
   const client=await (await api(request,'POST','/clients',{name:'Live monthly client',color:'#176653'})).json();let session;

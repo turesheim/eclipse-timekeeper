@@ -155,7 +155,18 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .session-tools { border-inline-start: 1px solid var(--line); padding-inline-start: .75rem; }
 .client-color { display: inline-flex; align-items: center; gap: .5rem; }
 .client-color::before { content: ""; width: 1.2rem; height: 1.2rem; border: 1px solid #526257; border-radius: .25rem; background: var(--client-color); flex-shrink: 0; }
-.track-toolbar { align-items: center; }
+.track-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; }
+.track-controls { display: flex; align-items: end; flex-wrap: wrap; gap: .75rem; }
+.track-month-field { width: 12rem; max-width: 100%; }
+.track-month-field .form-label { margin-bottom: .25rem; }
+.track-month-field .form-control { min-width: 0; margin-top: 0; }
+.track-heading { text-align: center; }
+.track-toolbar .track-total { justify-self: end; text-align: end; }
+.track-month-picker { inset: auto; margin: 0; width: 18rem; max-width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); overflow: auto; padding: .75rem; color: var(--bs-body-color); background: var(--bs-body-bg); border: 1px solid var(--line); border-radius: var(--bs-border-radius-lg); }
+.track-picker-year { display: flex; align-items: center; gap: .5rem; margin-bottom: .75rem; }
+.track-picker-year input { width: 0; flex: 1; margin-top: 0; text-align: center; font-weight: 600; }
+.track-picker-months { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; }
+.track-picker-months button { min-width: 0; }
 .track-total { margin: 0; display: grid; gap: .2rem; color: var(--muted); }
 .track-total strong { color: var(--bs-body-color); font-size: 1.3rem; font-variant-numeric: tabular-nums; }
 .track-clients { display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1rem; }
@@ -176,6 +187,11 @@ button.track-client-day:focus-visible { outline: 2px solid var(--accent); outlin
 button.track-client-day:disabled { opacity: .65; }
 .track-client-day-time-short { display: none; font-variant-numeric: tabular-nums; }
 @media(max-width: 767px) {
+  .track-toolbar { grid-template-columns: minmax(0, 1fr) auto; gap: .75rem; }
+  .track-heading { grid-column: 1 / -1; grid-row: 1; }
+  .track-controls { grid-column: 1; grid-row: 2; }
+  .track-toolbar .track-total { grid-column: 2; grid-row: 2; font-size: .85rem; }
+  .track-toolbar .track-total strong { font-size: 1.1rem; }
   .track-day { height: 6rem; padding: .1rem; }
   .track-date { width: 1.5rem; height: 1.5rem; }
   .track-client-day { padding: .25rem .15rem; font-size: .75rem; border-inline-start-width: 3px; }
