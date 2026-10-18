@@ -99,6 +99,8 @@ test('Track month picker supports year selection, keyboard dismissal and a cente
     await choose.focus();await choose.press('Enter');await expect(popup).toBeVisible();await expect(choose).toHaveAttribute('aria-expanded','true');
     await expect(popup.getByLabel('Year',{exact:true})).toHaveValue('2025');await expect(popup.getByRole('button',{name:'oktober',exact:true})).toHaveAttribute('aria-pressed','true');
     await expect(popup.getByRole('button',{name:'oktober',exact:true})).toBeFocused();
+    expect(await popup.getByRole('button',{name:'oktober',exact:true}).evaluate(value=>getComputedStyle(value).outlineStyle)).toBe('none');
+    expect(await popup.getByRole('button',{name:'oktober',exact:true}).evaluate(value=>getComputedStyle(value).boxShadow)).not.toBe('none');
     const audit=await new AxeBuilder({page}).include('#track-month-picker').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
     await page.screenshot({path:'test-results/track-month-picker-desktop.png',fullPage:true});
     await page.keyboard.press('Escape');await expect(popup).not.toBeVisible();await expect(choose).toBeFocused();await expect(month).toHaveValue('2025-10');
