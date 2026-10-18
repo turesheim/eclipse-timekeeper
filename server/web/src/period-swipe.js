@@ -1,9 +1,8 @@
 /** Navigate time periods without taking over scrolling, zooming or record editing. */
 export function periodSwipe(root,{enabled,navigate}) {
   let gesture=null,suppressClickUntil=0;
-  const narrow=matchMedia('(max-width: 767px)');
   const cancel=()=>{gesture=null;};
-  const available=()=>narrow.matches && enabled();
+  const available=()=>innerWidth<=767 && enabled();
   root.addEventListener('touchstart',event=>{
     cancel();suppressClickUntil=0;
     if(!available() || event.touches.length!==1 || event.defaultPrevented)return;
@@ -47,5 +46,5 @@ export function periodSwipe(root,{enabled,navigate}) {
       suppressClickUntil=0;event.preventDefault();event.stopImmediatePropagation();
     }
   },true);
-  narrow.addEventListener('change',cancel);
+  window.addEventListener('resize',cancel);
 }
