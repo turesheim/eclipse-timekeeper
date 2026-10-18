@@ -10,9 +10,12 @@ async function signIn(page,token=process.env.TIMEKEEPER_WEB_TOKEN) {
 // uses native browser input to cover scrolling and compatibility-click behavior.
 async function swipe(target,{dx=-140,dy=0,cancel=false,multiple=false}={}) {
   await target.evaluate((node,{dx,dy,cancel,multiple})=>{
-    const touch=(x,y,id=1)=>new Touch({identifier:id,target:node,clientX:x,clientY:y});
+    const touch=(x,y,id=1)=>({identifier:id,target:node,clientX:x,clientY:y});
     const start=touch(200,300),end=touch(200+dx,300+dy);
-    const fire=(type,touches,changedTouches)=>node.dispatchEvent(new TouchEvent(type,{bubbles:true,cancelable:true,touches,changedTouches}));
+    const fire=(type,touches,changedTouches)=>{
+      // Desktop WebKit exposes TouchEvent but disallows constructing Touch objects.
+      const event=new Event(type,{bubbles:true,cancelable:true});Object.assign(event,{touches,changedTouches});node.dispatchEvent(event);
+    };
     fire('touchstart',[start],[start]);
     if(multiple)fire('touchstart',[start,touch(220,300,2)],[touch(220,300,2)]);
     fire('touchmove',multiple ? [end,touch(220,300,2)]:[end],[end]);
