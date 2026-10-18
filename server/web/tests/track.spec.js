@@ -110,7 +110,7 @@ test('Track month picker supports year selection, keyboard dismissal and a cente
     await popup.getByLabel('Year',{exact:true}).fill('9998');await expect(popup.getByRole('button',{name:'Next year',exact:true})).toBeDisabled();
     await page.keyboard.press('Escape');await expect(month).toHaveValue('2024-02');
     await page.setViewportSize({width:390,height:844});await choose.click();await expect(popup).toBeVisible();
-    expect(await popup.evaluate(value=>{const rect=value.getBoundingClientRect();return rect.left>=0&&rect.right<=innerWidth&&rect.bottom<=innerHeight;})).toBe(true);
+    await expect.poll(()=>popup.evaluate(value=>{const rect=value.getBoundingClientRect();return rect.left>=0&&rect.right<=innerWidth&&rect.bottom<=innerHeight;})).toBe(true);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     const mobile=await new AxeBuilder({page}).include('#track-panel').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(mobile.violations).toEqual([]);
     await page.screenshot({path:'test-results/track-month-picker-mobile.png',fullPage:true});

@@ -29,11 +29,14 @@ export class MonthPicker {
     this.year.addEventListener('input',()=>this.paint());
     this.popup.append(navigation,this.months);root.append(this.popup);
     this.popup.addEventListener('beforetoggle',event=>{
-      if(event.newState==='open'){this.year.value=this.currentMonth().slice(0,4);this.paint();}
-    });
-    this.popup.addEventListener('toggle',event=>{
       this.button.setAttribute('aria-expanded',String(event.newState==='open'));
-      if(event.newState==='open'){this.position();this.months.querySelector('[aria-pressed="true"]')?.focus();}
+      if(event.newState==='open') {
+        this.year.value=this.currentMonth().slice(0,4);this.paint();
+        requestAnimationFrame(()=>{
+          if(!this.popup.matches(':popover-open'))return;
+          this.position();this.months.querySelector('[aria-pressed="true"]')?.focus();
+        });
+      }
     });
     window.addEventListener('resize',()=>this.position());document.addEventListener('scroll',()=>this.position(),true);
   }
