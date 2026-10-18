@@ -17,8 +17,7 @@ export class MonthPicker {
     for(let index=1;index<=12;index++) {
       const date=new Date(`2024-${String(index).padStart(2,'0')}-15T12:00:00Z`),button=document.createElement('button');
       button.type='button';button.className='btn btn-outline-secondary';button.dataset.month=String(index).padStart(2,'0');
-      button.textContent=new Intl.DateTimeFormat(undefined,{month:'short',timeZone:'UTC'}).format(date);
-      button.setAttribute('aria-label',new Intl.DateTimeFormat(undefined,{month:'long',timeZone:'UTC'}).format(date));
+      button.textContent=new Intl.DateTimeFormat(undefined,{month:'long',timeZone:'UTC'}).format(date);
       button.addEventListener('click',()=>{
         if(!this.year.reportValidity())return;
         const month=String(this.year.valueAsNumber).padStart(4,'0')+'-'+button.dataset.month;
