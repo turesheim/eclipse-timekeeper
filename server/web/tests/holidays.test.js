@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {holidayRegion,publicHolidayCalendar} from '../src/holidays.js';
 import {monthCalendar,monthSessions} from '../src/month-model.js';
+import {calendarWeek} from '../src/calendar-model.js';
 
 const holidays=(month,locale,zone='UTC')=>publicHolidayCalendar(monthCalendar(month,zone),locale);
 
@@ -27,6 +28,12 @@ test('country defaults and substitute days remain distinct from other countries 
 test('New Year padding and holidays crossing year boundaries are included once',async()=>{
   const january=await holidays('2022-01','en-US');assert.equal(january.days.get('2021-12-31').length,1);assert.match(january.days.get('2021-12-31')[0].name,/New Year's Day/);assert.equal(january.days.get('2021-12-31')[0].substitute,true);
   assert.equal(january.days.get('2022-01-01')[0].substitute,false);
+});
+test('weekly calendars highlight only visible civil dates across month and year boundaries',async()=>{
+  const calendar=calendarWeek('2025-12-29','America/Los_Angeles');
+  const result=await publicHolidayCalendar({month:calendar.first.slice(0,7),days:calendar.days},'nb-NO');
+  assert.deepEqual([...result.days.keys()],['2026-01-01']);
+  assert.equal(result.days.get('2026-01-01')[0].name,'Første nyttårsdag');
 });
 test('multi-day public holidays cover each civil date, and names follow the interface language',async()=>{
   const armenian=await holidays('2026-01','en-AM');assert.equal(armenian.days.get('2026-01-02')[0].name,armenian.days.get('2026-01-01')[0].name);

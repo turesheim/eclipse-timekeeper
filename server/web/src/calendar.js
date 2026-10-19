@@ -3,6 +3,7 @@ import { t as i18nText } from "./i18n.js";import { addDays, dateInZone, instantN
 import { calendarWeek, calendarPieces, calendarAnchor, calendarRange, calendarLanes, shiftSession, shiftSessionDays, pasteSession, clientColors, CALENDAR_STEP } from './calendar-model.js';
 import { icon, iconButton } from './icons.js';
 import {CalendarSubscriptions} from './calendar-subscriptions.js';
+import {publicHolidayCalendar} from './holidays.js';
 
 const ROW_HEIGHT = 16;
 function node(tag, text, className) {
@@ -40,6 +41,7 @@ export class WeekCalendar {
     });
   }
   reset() {
+    this.holidayGeneration=(this.holidayGeneration||0)+1;this.holidayKey=null;this.holidayData=null;
     this.subscriptions?.reset();this.plans={items:[],sources:{}};
     this.cancelDrag();this.scope = null;this.data = null;this.calendar = null;this.calendarKey = null;this.scrollWeek = null;this.selectedId = null;
     this.selection = null;this.clipboard = null;this.lastClientId = null;this.busy = false;this.grid.replaceChildren();
@@ -97,6 +99,7 @@ export class WeekCalendar {
     const today = dateInZone(data.report.generatedAt, zone);
     for (const day of calendar.days) {
       const heading = node('div', undefined, `calendar-heading${day.date === today ? ' today' : ''}`);
+      heading.dataset.date=day.date;
       const title = new Intl.DateTimeFormat(getLocale(), { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${day.date}T12:00:00Z`));
       const pick = button(title, () => {
         pick.focus({ preventScroll: true });
@@ -150,7 +153,7 @@ export class WeekCalendar {
       const day = calendar.days.find((day) => day.date === today && !day.skipped) || calendar.days.find((day) => !day.skipped);
       this.selection = day ? { date: day.date, row: this.defaultRow(day) } : null;
     }
-    this.paintSelection();this.buttons();
+    this.paintSelection();this.buttons();this.paintHolidays();
     if (this.scrollWeek !== key) {
       this.scrollWeek = key;this.scroll.scrollTop = Math.max(0, calendar.rows.indexOf('07:00/0') * ROW_HEIGHT);
     }
@@ -160,6 +163,27 @@ export class WeekCalendar {
       focus.session ? value.dataset.sessionId === focus.session && value.dataset.edge === focus.edge && value.dataset.date === focus.day && value.classList.contains('calendar-session-select') === focus.select : focus.activity ? value.dataset.activityId === focus.activity : focus.day && value.classList.contains('calendar-day') && value.dataset.date === focus.day);
       const fallback = focus.session ? [...this.grid.querySelectorAll('[data-session-id]')].find((value) => value.dataset.sessionId === focus.session && value.dataset.edge === focus.edge && value.classList.contains('calendar-session-select') === focus.select) : null;
       (target || fallback)?.focus({ preventScroll: true });
+    }
+  }
+  paintHolidays() {
+    const key=this.calendar.first+'|'+getLocale();
+    if(this.holidayKey!==key) {
+      this.holidayKey=key;this.holidayData=null;
+      const generation=this.holidayGeneration=(this.holidayGeneration||0)+1;
+      void publicHolidayCalendar({month:this.calendar.first.slice(0,7),days:this.calendar.days},getLocale()).then(data=>{
+        if(generation!==this.holidayGeneration||!this.data)return;
+        this.holidayData=data;if(!this.root.hidden)this.applyHolidays();
+      }).catch(()=>{if(generation===this.holidayGeneration)this.holidayKey=null;});
+    } else if(this.holidayData)this.applyHolidays();
+  }
+  applyHolidays() {
+    for(const [date,holidays] of this.holidayData.days) {
+      const column=this.dayNodes.get(date),heading=this.grid.querySelector(`.calendar-heading[data-date="${date}"]`);
+      if(!column||!heading)continue;
+      const names=holidays.map(value=>value.name).join(' · ');
+      column.classList.add('public-holiday');heading.classList.add('public-holiday');heading.title=names;
+      column.setAttribute('aria-label',`${date}, ${this.calendar.zone}, ${names}`);
+      if(!heading.querySelector('.calendar-holiday-name'))heading.querySelector('button').append(node('span',names,'calendar-holiday-name'));
     }
   }
   defaultRow(day) {return day.byRow.has(this.calendar.rows.indexOf('09:00/0')) ? this.calendar.rows.indexOf('09:00/0') : day.slots[0]?.row || 0;}

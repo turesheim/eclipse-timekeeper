@@ -27,3 +27,8 @@
 
 .calendar-task{padding:0;overflow:hidden}.calendar-activity-select{position:absolute;inset:0;width:100%;height:100%;display:block;text-align:left;padding:.2rem;color:inherit;background:transparent;border:0;line-height:1.1;font-size:.72rem;overflow:hidden}.calendar-activity-select:hover,.calendar-activity-select:focus{color:inherit;background:transparent}.calendar-activity-select strong,.calendar-activity-select small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.calendar-task .calendar-recorded-marker{font-size:.65rem}.calendar-task .calendar-activity-task{position:absolute;top:.1rem;left:.2rem;right:.2rem;z-index:3;display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;max-height:1.3em;margin:0;pointer-events:none}.calendar-activity-task a{pointer-events:auto}.calendar-task.has-task .calendar-activity-select{padding-top:1.05rem}.calendar-activity-select:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
 #calendar-subscription-editor,.calendar-event-details{overflow-wrap:anywhere}
+.calendar-day.public-holiday,.calendar-heading.public-holiday{background:var(--holiday-bg)}
+.calendar-heading.public-holiday{flex-direction:column;min-width:0}
+.calendar-heading.public-holiday button{max-width:100%;min-width:0;padding-block:.15rem;color:var(--holiday-color)}
+.calendar-heading.public-holiday.today{box-shadow:inset 0 -3px var(--accent)}
+.calendar-holiday-name{display:block;max-width:100%;padding:0 .3rem;font-size:.65rem;color:var(--holiday-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
