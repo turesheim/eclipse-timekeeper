@@ -144,12 +144,15 @@ no icon or underline. Select the date or holiday name to read the full date and 
 for that day. This also works with read-only access. On narrow screens the names
 are shortened visually; the dialog, hover title and accessible name retain them.
 Holiday information does not change sessions, totals or editing permissions.
+Holiday dates have a faint red background in Track and Calendar in every theme,
+including weekend holidays. Calendar headers show the holiday name and preserve
+today’s marker.
 
 The locally bundled [date-holidays](https://github.com/commenthol/date-holidays)
 3.37.0 dataset (2026-09-20) supplies national defaults. Regional and municipal
 holidays can differ; subdivision calendars, optional holidays and observances are
 not included. Unsupported regions and years before 0100 show an explicit message.
-The engine loads when Track needs it, without requesting an external calendar.
+The engine loads when either view needs it, without requesting an external calendar.
 A failed load offers Retry and preserves open session drafts. Data attribution
 and the complete upstream license are available through the link below the grid.
 Run `npm run vendor:holidays` in `server/web` to regenerate the pinned engine,

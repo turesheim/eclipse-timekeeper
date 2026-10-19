@@ -1,4 +1,12 @@
 /* Palette references and contrast adaptations are documented in WEB-CLIENT.md. */
+:root {
+  --holiday-bg: color-mix(in srgb, var(--bs-danger) 8%, var(--bs-body-bg));
+  --holiday-color: var(--bs-danger-text-emphasis);
+}
+:root[data-bs-theme=dark] {
+  --holiday-bg: color-mix(in srgb, var(--bs-danger) 14%, var(--bs-body-bg));
+  --holiday-color: color-mix(in srgb, var(--bs-danger-text-emphasis) 70%, var(--bs-body-color));
+}
 :root[data-theme=timekeeper-dark] {
   --theme-page: #14231e; --bs-body-bg: #1c3029; --bs-body-color: #edf5f0;
   --bs-secondary-color: #b8d0c2; --bs-primary: #79d0ad; --bs-primary-rgb: 121,208,173;
@@ -76,8 +84,8 @@
   & .client-color::before { border-color: var(--line); }
   & .project-icon-option:has(:checked) { background: var(--theme-group); }
   & .app-dialog::backdrop { background: rgb(0 0 0 / .6); }
-  & .calendar-heading.today { background: var(--theme-group); }
-  & .calendar-day.weekend { background: var(--theme-soft); }
+  & .calendar-heading.today:not(.public-holiday) { background: var(--theme-group); }
+  & .calendar-day.weekend:not(.public-holiday) { background: var(--theme-soft); }
   & .calendar-slot { border-color: color-mix(in srgb, var(--line) 40%, var(--bs-body-bg)); }
   & .calendar-slot.hour { border-color: var(--line); }
   & .calendar-slot.unavailable { background: repeating-linear-gradient(135deg, var(--theme-soft), var(--theme-soft) 4px, var(--line) 4px, var(--line) 5px); }
