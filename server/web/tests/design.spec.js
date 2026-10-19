@@ -49,6 +49,9 @@ async function signIn(page) {
   await page.getByLabel('Access token').fill(token);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await expect(page.locator('#status')).toHaveText('Up to date');
+  await expect(page.locator('#refresh')).toHaveAccessibleName('Refresh: Up to date');
+  const statusAudit = await new AxeBuilder({page}).include('#refresh').withRules(['label-content-name-mismatch']).analyze();
+  expect(statusAudit.violations).toEqual([]);
 }
 
 for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {

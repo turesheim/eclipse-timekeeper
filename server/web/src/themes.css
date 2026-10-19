@@ -59,11 +59,7 @@
   & .btn-outline-danger { --bs-btn-color: var(--bs-danger-text-emphasis); --bs-btn-border-color: var(--bs-danger-text-emphasis); }
   & :is(a,button,input,select,summary,[tabindex]):focus-visible { box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--accent) 30%, transparent); }
   & :is(.form-control,.form-select):focus { border-color: var(--accent); box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--accent) 25%, transparent); }
-  & #status::before { background: var(--accent); }
   & #status[data-state=error] { color: var(--bs-danger-text-emphasis); }
-  & #status[data-state=error]::before { background: var(--bs-danger-text-emphasis); }
-  & #status[data-state=notice]::before { background: var(--bs-warning-text-emphasis); }
-  & #status[data-state=working]::before { background: transparent; border-color: var(--line); border-top-color: var(--accent); }
   & .workspace-nav { --bs-nav-link-color: var(--bs-body-color); --bs-nav-link-hover-color: var(--accent); }
   & .workspace-nav .nav-link:not(.active):hover { background: var(--theme-group); }
   & .workspace-nav .nav-link[aria-current], & #account-navigation .nav-link.active, & .track-today { color: var(--theme-on-accent); background: var(--accent); }

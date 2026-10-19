@@ -80,7 +80,12 @@ function button(text, action) {
   const node = element('button', text, 'btn btn-outline-secondary'); node.type = 'button'; node.addEventListener('click', action); return node;
 }
 function errorText(error) { return error instanceof ApiError ? error.message : 'Check the entered values, then try again.'; }
-function setStatus(text, state = 'error') { $('status').textContent = text; $('status').dataset.state = state; }
+function setStatus(text, state = 'error') {
+  $('status').textContent = text; $('status').dataset.state = state;
+  $('status-icon').replaceChildren(icon({ready:'check',working:'refresh',notice:'warning',error:'error'}[state] || 'warning'));
+  $('refresh').dataset.state = state; $('refresh').title = `${text}. Click to refresh`;
+  $('refresh').setAttribute('aria-label', `Refresh: ${text}`);
+}
 function clearServerInfo() {
   $('server-build').textContent = 'Server build information unavailable';
   for (const field of ['version', 'spk', 'commit', 'built', 'deployed', 'started']) $(`server-${field}`).textContent = '—';
@@ -154,7 +159,7 @@ const auth = authentication({
     tab('track');
   }
 });
-$('refresh').addEventListener('click', () => { const session = api; void refresh().then(() => { if (session === api) startWatch(session); }).catch(() => {}); });
+$('refresh').addEventListener('click', () => { const session = api; setStatus('Refreshing…', 'working'); void refresh().then(() => { if (session === api) startWatch(session); }).catch(() => {}); });
 $('week-date').addEventListener('change', () => { selectedDay = null; void refresh().catch(() => {}); });
 $('duration-format').addEventListener('change', () => {decimalHours = $('duration-format').value === 'decimal'; if (snapshot) render();});
 $('collapse-activities').addEventListener('click', () => {activitiesCollapsed = true; collapsed.clear(); if (snapshot) render();});
@@ -629,7 +634,7 @@ for(const [id,glyph,label] of [['session-start','start','Start work session'],['
 setInterval(renderSessionTime,1000);
 window.addEventListener('pagehide', () => auth.clear());
 window.addEventListener('pageshow', event => {if(event.persisted) void auth.initialize();});
-iconButton($('refresh'), 'refresh', 'Refresh');
+$('status-icon').append(icon('refresh'));
 iconButton($('collapse-activities'), 'collapse', 'Hide activities');
 iconButton($('expand-activities'), 'expand', 'Show activities');
 $('stop').prepend(icon('stop'));

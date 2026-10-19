@@ -68,15 +68,17 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .login form { margin-top: 1.5rem; }
 .login button { width: 100%; }
 .check { display: flex; align-items: center; gap: .65rem; min-height: 2.75rem; }
-.status-line { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .75rem; min-height: 2.75rem; }
-#status { font-size: .875rem; color: var(--muted); display: flex; align-items: center; gap: .5rem; }
-#status::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: #176653; flex-shrink: 0; }
+.status-line { margin-bottom: .75rem; min-height: 2.75rem; }
+.status-refresh { display: inline-flex; align-items: center; gap: .5rem; min-height: 2.75rem; max-width: 100%; padding: .5rem 0; border: 0; border-radius: .25rem; background: transparent; color: var(--muted); font-size: .875rem; text-align: start; }
+.status-refresh:hover:not(:disabled) { color: var(--accent); }
+.status-refresh:disabled { cursor: wait; }
+#status-icon { display: inline-flex; color: var(--accent); }
 #status[data-state=error] { color: #842029; }
-#status[data-state=error]::before { background: #b02a37; }
-#status[data-state=notice]::before { background: #997404; }
-#status[data-state=working]::before { width: .875rem; height: .875rem; border: 2px solid #b6cfc3; border-top-color: var(--accent); background: transparent; animation: spin 1s linear infinite; }
+#refresh[data-state=error] #status-icon { color: var(--bs-danger-text-emphasis); }
+#refresh[data-state=notice] #status-icon { color: var(--bs-warning-text-emphasis); }
+#refresh[data-state=working] #status-icon .icon { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media(prefers-reduced-motion: reduce) { #status[data-state=working]::before { animation: none; } }
+@media(prefers-reduced-motion: reduce) { #refresh[data-state=working] #status-icon .icon { animation: none; } }
 .alert:empty, .hint:empty { display: none; }
 .alert { margin-top: 1rem; font-size: .9rem; overflow-wrap: anywhere; }
 .tracking { padding: .6rem 1rem; flex-direction: row; align-items: center; justify-content: space-between; gap: 1rem; }
@@ -171,16 +173,16 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .session-elapsed { display: grid; gap: .2rem; margin: 0; flex-shrink: 0; }
 .session-elapsed span { font-size: .8rem; color: var(--muted); }
 .session-elapsed strong { font-size: 1.4rem; font-variant-numeric: tabular-nums; }
-.session-controls { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
-.session-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.session-controls { display: flex; align-items: center; gap: .75rem; flex-shrink: 0; }
+.session-actions { display: flex; gap: .5rem; }
 .session-tools { border-inline-start: 1px solid var(--line); padding-inline-start: .75rem; }
 .client-color { display: inline-flex; align-items: center; gap: .5rem; }
 .client-color::before { content: ""; width: 1.2rem; height: 1.2rem; border: 1px solid #526257; border-radius: .25rem; background: var(--client-color); flex-shrink: 0; }
 .track-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; }
 .track-controls { display: flex; align-items: end; flex-wrap: wrap; gap: .75rem; }
-.track-month-field { width: 12rem; max-width: 100%; }
+.track-month-field { width: calc(7ch + 4.25rem + 2px); max-width: 100%; }
 .track-month-field .form-label { margin-bottom: .25rem; }
-.track-month-field .form-control { min-width: 0; margin-top: 0; }
+.track-month-field .form-control { min-width: 0; margin-top: 0; font-variant-numeric: tabular-nums; }
 .track-heading { text-align: center; }
 .track-toolbar .track-total { justify-self: end; text-align: end; }
 .track-month-picker { inset: auto; margin: 0; width: 18rem; max-width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); overflow: auto; padding: .75rem; color: var(--bs-body-color); background: var(--bs-body-bg); border: 1px solid var(--line); border-radius: var(--bs-border-radius-lg); }
@@ -191,8 +193,8 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .track-total { margin: 0; display: grid; gap: .2rem; color: var(--muted); }
 .track-total strong { color: var(--bs-body-color); font-size: 1.3rem; font-variant-numeric: tabular-nums; }
 .track-clients { display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1rem; }
-.track-client { padding: .75rem 1rem; min-width: 10rem; flex: 1 1 12rem; gap: .5rem; }
-.track-client strong { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.track-client { container-type: inline-size; padding: .75rem 1rem; min-width: 10rem; flex: 1 1 12rem; gap: .5rem; }
+.track-client strong { font-size: min(1.1rem, 11cqi); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .track-client .client-color { min-width: 0; overflow-wrap: anywhere; }
 .track-month { width: 100%; table-layout: fixed; border-collapse: collapse; }
 .track-month th { text-align: center; padding: .65rem .25rem; color: var(--muted); font-size: .85rem; }
@@ -260,12 +262,12 @@ button.track-client-day:disabled { opacity: .65; }
   .login { padding: 1.5rem; margin: 2vh auto; }
   .tracking { padding: 1rem; align-items: flex-start; flex-direction: column; }
   .work-session { padding: .6rem .8rem; }
-  .work-session-heading { display: grid; grid-template-columns: auto 1fr; gap: .5rem; }
+  .work-session-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .5rem; }
   .work-session-heading > :first-child { grid-column: 1 / -1; }
-  .session-controls { display: contents; }
-  .session-controls > .session-actions:first-child { grid-column: 2; justify-content: flex-end; }
-  #work-session-timing[hidden] + .session-controls > .session-actions:first-child { grid-column: 1 / -1; justify-content: flex-start; }
-  .session-tools { grid-column: 1 / -1; border-inline-start: 0; padding-inline-start: 0; border-top: 1px solid var(--line); padding-top: .5rem; }
+  .session-controls { grid-column: 2; gap: .5rem; }
+  .session-actions { gap: .25rem; }
+  #work-session-timing[hidden] + .session-controls { grid-column: 1 / -1; }
+  .session-tools { padding-inline-start: .5rem; }
   .days { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .toolbar { align-items: flex-start; gap: .75rem; }
   .toolbar label { flex: 1 1 11rem; max-width: 100%; }

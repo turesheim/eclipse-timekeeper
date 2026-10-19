@@ -57,7 +57,7 @@ test('account time zone controls local editors and build dates across DST and br
     expect([created.start,created.end]).toEqual(['2025-10-20T06:30:00Z','2025-10-20T08:00:00Z']);
     const createdReply=await api(request,'GET',`/work-sessions/${created.id}`);await api(request,'DELETE',`/work-sessions/${created.id}`,undefined,{'If-Match':createdReply.headers().etag});
     session=await (await api(request,'POST','/work-sessions',{summary,start:'2025-10-25T22:30:00.123456789Z',end:'2025-10-26T02:30:00.987654321Z'})).json();
-    await page.getByRole('button',{name:'Refresh',exact:true}).click();
+    await page.getByRole('button',{name:/^Refresh: /}).click();
     await editSessionFromWorkweek(page,request,session);
     await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-26T00:30');
     await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-26T03:30');
@@ -243,7 +243,7 @@ test('lost create reply requires record review before another submission', async
   const name = 'Uncertain project ' + randomUUID(); await signIn(page); await page.getByRole('button', {name:'Projects', exact:true}).click(); await page.getByRole('button', {name:'New project', exact:true}).click(); await page.getByLabel('Name', {exact:true}).fill(name);await page.getByLabel('Client',{exact:true}).selectOption({index:1});
   await page.route('**/api/v1/projects', async route => { if (route.request().method() !== 'POST') return route.continue(); const response = await route.fetch(); expect(response.status()).toBe(201); await route.abort('failed'); });
   await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click(); await expect(page.locator('#editor-notice')).toContainText('Cancel and refresh'); await expect(page.locator('#save')).toBeDisabled();
-  expect((await (await api(request,'GET','/projects')).json()).items.filter(v => v.name === name)).toHaveLength(1); await page.unroute('**/api/v1/projects'); await page.getByRole('button', {name:'Cancel', exact:true}).click(); await page.getByRole('button', {name:'Refresh', exact:true}).click(); await expect(page.locator('#projects')).toContainText(name);
+  expect((await (await api(request,'GET','/projects')).json()).items.filter(v => v.name === name)).toHaveLength(1); await page.unroute('**/api/v1/projects'); await page.getByRole('button', {name:'Cancel', exact:true}).click(); await page.getByRole('button', {name:/^Refresh: /}).click(); await expect(page.locator('#projects')).toContainText(name);
 });
 test('same-token owner reassignment cannot switch a live browser session', async ({page, request}) => {
   const file = process.env.TIMEKEEPER_WEB_REGISTRY, original = await readFile(file, 'utf8');
@@ -459,7 +459,7 @@ test('work session controls start once and stop independently of a task activity
   }
   const history=await (await api(request,'POST','/work-sessions',{clientId:first.clientId,summary:'History must not replace the live summary',start:'2025-10-20T06:00:00Z',end:'2025-10-20T07:00:00Z'})).json();
   await page.locator('[data-tab=calendar]').click();
-  await page.getByRole('button',{name:'Refresh',exact:true}).click();
+  await page.getByRole('button',{name:/^Refresh: /}).click();
   await expect(page.locator('#work-session-history')).toHaveCount(0);
   await expect(page.locator('#work-session-title')).toHaveText(first.summary);
   await expect(page.locator('#work-session-elapsed')).not.toHaveText('1h 0m');
@@ -500,14 +500,14 @@ test('session toolbar targets the displayed session and preserves historical too
   await expect(page.getByRole('button',{name:'Record work session',exact:true})).toBeEnabled();
   const client=await (await own('POST','/clients',{name:'Toolbar client',color:'#6750a4'})).json();
   const history=await (await own('POST','/work-sessions',{clientId:client.id,summary:'Historical record',start:'2025-10-20T08:00:00Z',end:'2025-10-20T09:00:00Z'})).json();
-  await page.getByRole('button',{name:'Refresh',exact:true}).click();await expect(page.locator('#work-session-title')).toHaveText(history.summary);
+  await page.getByRole('button',{name:/^Refresh: /}).click();await expect(page.locator('#work-session-title')).toHaveText(history.summary);
   await expect(page.locator('#work-session-elapsed')).toHaveText('1h 0m');
   await page.getByRole('button',{name:'Start work session',exact:true}).click();
   await page.getByLabel('Summary',{exact:true}).fill('Current toolbar session');await page.getByLabel('Client',{exact:true}).selectOption(client.id);await page.locator('#save').click();
   await expect(page.locator('#editor')).not.toBeVisible();await expect(page.locator('#work-session-state')).toHaveText('Running');
   const active=await (await own('GET','/work-sessions/active')).json();
   const activity=await (await own('POST','/activities',{taskId:null,summary:'Independent toolbar activity',start:'2025-10-20T08:15:00Z',end:'2025-10-20T08:30:00Z',labelIds:[],workSessionId:null})).json();
-  await page.getByRole('button',{name:'Refresh',exact:true}).click();
+  await page.getByRole('button',{name:/^Refresh: /}).click();
   // Opening a historical record must not leave an invisible selection behind in the shared panel.
   await page.locator('[data-tab=week]').click();await page.getByLabel('Week containing').fill('2025-10-20');
   await workSessionAction(page,history.id,'Edit');
