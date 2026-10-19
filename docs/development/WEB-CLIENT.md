@@ -122,12 +122,22 @@ Los Angeles time while the account uses Oslo time.
 
 ## Public holidays
 
-Track marks national public holidays for the country in the selected language
-and region. With the browser default, the browser locale supplies the country;
-otherwise the language saved in My Account takes precedence. For example,
-Norwegian Bokmål shows Norway, English (United Kingdom) shows the UK and English
-(United States) shows US holidays. The account time zone still controls recorded
-work; it never moves a holiday to a different civil date.
+Track marks national public holidays for the country selected under
+**My Account → Profile → National holidays**. This choice is independent of
+**Language and region**: Norwegian holidays can use an English interface.
+The default uses the browser region; choose a country explicitly to share it
+across devices, or **Do not show national holidays** to hide the calendar.
+Changing the interface language preserves an explicit holiday country. The
+account time zone still controls recorded work; it never moves a holiday to a
+different civil date.
+
+The optional `holidayCountry` field on `/me` stores the owner-scoped choice.
+A supported country code selects its national calendar, `none` hides holidays,
+and `null` uses the browser region. Omission preserves the current choice.
+Preference writes use the profile ETag and change feed. Internal `PROFILE_PREF`
+rows share the existing owner-scoped JSON storage; no schema upgrade is needed.
+
+![Independent national holiday preference](../assets/screenshots/holiday-preferences-mobile.png)
 
 Holiday names appear directly beside the date, with both highlighted in red and
 no icon or underline. Select the date or holiday name to read the full date and all names
@@ -177,8 +187,34 @@ Labels remain visible on wide screens and hide when space is limited; every
 button retains its accessible name and hover title. The bar stays within the
 device's safe area, and content and Undo notifications leave room above it.
 Account settings and sign-in use their own navigation.
-Open **About** in the account menu to see the server version, SPK version, commit
-and build, deployment and start times. Close it with its button or Escape.
+Open **About** in the account menu for Timekeeper copyright, the Eclipse Public
+License, project website, source and issue tracker. Server version, SPK version,
+commit and build, deployment and start times remain available. Expand **Web
+components and licenses** for the exact bundled Bootstrap, Bootstrap Icons,
+i18next and date-holidays versions, upstream copyright and complete local license
+texts, including date-holidays data and dependency notices. External project
+links open separately; viewing About and its license texts needs no third-party
+requests. Close the dialog with its button or Escape.
+
+`npm run vendor:notices` regenerates the About metadata and local license copies
+from pinned dependencies and bundled upstream notices. Asset checks reject stale
+metadata or missing license texts. After updating a dependency, regenerate its
+assets first and then the notices.
+
+Existing browser sessions show a loading status during restoration rather than
+flashing the sign-in form. My Account and Tracking use the same session; leaving
+the page clears private data and returning rechecks the session. Expired sessions
+and explicit sign-out still show sign-in.
+
+**Edit work session** includes **Delete**. A separate confirmation defaults to
+Cancel and leaves the draft intact when canceled or dismissed with Escape.
+Confirmed deletion uses the version originally opened in the editor, rejects
+concurrent changes, and offers Undo for ten minutes. An uncertain reply disables
+further writes until the records have been reviewed.
+
+![About with project references and library licenses](../assets/screenshots/about-references-desktop.png)
+
+![Work-session deletion confirmation on a narrow screen](../assets/screenshots/work-session-editor-delete-confirm.png)
 
 Bootstrap 5.3.8 supplies the shared buttons, forms, navigation, cards and tables.
 The small application theme in `style.css` defines the green palette, typography,

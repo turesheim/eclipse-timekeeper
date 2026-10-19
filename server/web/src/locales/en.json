@@ -895,5 +895,13 @@
   "about.web_components": "Web client libraries and licenses",
   "about.component_license": "{{name}} license: {{license}}",
   "about.dependency_notices": "Dependency licenses and notices",
-  "ui.loading_timekeeper": "Loading Timekeeper…"
+  "ui.loading_timekeeper": "Loading Timekeeper…",
+  "holidays.settings": "National holidays",
+  "holidays.country_label": "Holiday country",
+  "holidays.save": "Save holidays",
+  "holidays.saved": "Holiday settings saved. Language, formatting and recorded work are unchanged.",
+  "holidays.browser": "Use browser region ({{country}})",
+  "holidays.unsupported_country": "no supported country",
+  "holidays.none": "Do not show national holidays",
+  "holidays.independent": "Choose the country whose national holidays you want to see. This is independent of language, regional formatting and time zone."
 }

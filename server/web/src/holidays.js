@@ -36,9 +36,14 @@ function yearHolidays(Holidays,country,locale,year) {
   years.set(key,result);if(years.size>24)years.delete(years.keys().next().value);
   return result;
 }
-export async function publicHolidayCalendar(calendar,locale) {
-  const country=holidayRegion(locale),days=new Map();
-  if(!country)return {country,days,state:'unsupported-region'};
+export function selectedHolidayCountry(preference,languages=globalThis.navigator?.languages || [globalThis.navigator?.language || 'en-GB']) {
+  if(preference==='none')return null;
+  return supported.has(preference)?preference:holidayRegion(languages[0] || 'en-GB');
+}
+export {countries};
+export async function publicHolidayCalendar(calendar,locale,country=holidayRegion(locale)) {
+  const days=new Map();
+  if(!country || !supported.has(country))return {country,days,state:'unsupported-region'};
   const selectedYear=Number(calendar.month.slice(0,4));
   // Upstream uses Date's numeric-year constructor, which maps 0–99 to 1900–99.
   if(selectedYear<100)return {country,days,state:'unsupported-year'};

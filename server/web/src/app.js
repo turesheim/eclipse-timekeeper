@@ -119,6 +119,8 @@ function readOnlyWhileDisconnected() {
   calendar.setConnected(connected);
   track.setWritable(connected && canWrite);
   weekSessions.setWritable(connected && canWrite);
+  $('editor-delete').disabled = !connected || !canWrite || !!(editor?.busy || editor?.loading || editor?.uncertain || editor?.reviewRequired);
+  $('editor-delete-confirm').querySelector('[value=delete]').disabled = $('editor-delete').disabled;
   updateSessionActions();
 }
 function tab(name) {
@@ -616,12 +618,14 @@ $('editor-form').addEventListener('submit', saveEditor);
 $('editor-delete').addEventListener('click', () => {
   if (!editor || editor.collection !== 'work-sessions' || !editor.id || editor.command || editor.remove || editor.busy || editor.loading || editor.uncertain || editor.reviewRequired || editor.session !== api || !connected || !canWrite) return;
   deleteCandidate = editor;
+  $('editor-delete-confirm').querySelector('[value=delete]').disabled = false;
   $('editor-delete-description').textContent = i18nText('ui.delete_681b54', {value0: editor.deletionLabel || i18nText('ui.work_session_21aa04'), value1: i18nText('ui.undo_will_be_available_for_ten_minutes')});
   $('editor-delete-confirm').returnValue = '';$('editor-delete-confirm').showModal();
 });
 $('editor-delete-confirm').addEventListener('close', () => {
   const candidate = deleteCandidate;deleteCandidate = null;
   if ($('editor-delete-confirm').returnValue === 'delete' && candidate && candidate === editor && candidate.session === api && !candidate.busy && !candidate.uncertain && connected && canWrite) void saveEditor(null, true);
+  else if (candidate && candidate === editor && $('editor').open) $('editor-delete').focus();
 });
 $('cancel').addEventListener('click', () => {if (editor?.busy) return;editor = null;$('editor').close();$('fields').replaceChildren();});
 $('editor').addEventListener('cancel', (event) => {if (editor?.busy) event.preventDefault();else {editor = null;$('fields').replaceChildren();}});

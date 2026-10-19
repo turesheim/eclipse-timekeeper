@@ -895,5 +895,13 @@
   "about.web_components": "Nettklientens biblioteker og lisenser",
   "about.component_license": "Lisens for {{name}}: {{license}}",
   "about.dependency_notices": "Lisenser og merknader for avhengigheter",
-  "ui.loading_timekeeper": "Laster Timekeeper…"
+  "ui.loading_timekeeper": "Laster Timekeeper…",
+  "holidays.settings": "Nasjonale helligdager",
+  "holidays.country_label": "Land for helligdager",
+  "holidays.save": "Lagre helligdager",
+  "holidays.saved": "Innstillingene for helligdager er lagret. Språk, formatering og registrert arbeid er uendret.",
+  "holidays.browser": "Bruk nettleserens region ({{country}})",
+  "holidays.unsupported_country": "intet støttet land",
+  "holidays.none": "Ikke vis nasjonale helligdager",
+  "holidays.independent": "Velg landet du vil se nasjonale helligdager for. Dette valget er uavhengig av språk, regional formatering og tidssone."
 }

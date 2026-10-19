@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {holidayRegion,publicHolidayCalendar} from '../src/holidays.js';
+import {holidayRegion,publicHolidayCalendar,selectedHolidayCountry} from '../src/holidays.js';
 import {monthCalendar,monthSessions} from '../src/month-model.js';
 
 const holidays=(month,locale,zone='UTC')=>publicHolidayCalendar(monthCalendar(month,zone),locale);
@@ -44,4 +44,14 @@ test('unsupported countries and the upstream numeric-year limitation return expl
   assert.equal((await holidays('2026-05','en-001')).state,'unsupported-region');
   const ancient=await publicHolidayCalendar({month:'0001-01',days:[{date:'0001-01-01'}]},'nb-NO');assert.equal(ancient.state,'unsupported-year');assert.equal(ancient.days.size,0);
   const distant=await holidays('9998-12','nb-NO');assert.equal(distant.state,'ready');assert.ok(distant.days.has('9998-12-25'));
+});
+
+
+test('an explicit holiday country is independent of interface language and browser region',async()=>{
+  assert.equal(selectedHolidayCountry('NO',['en-US']),'NO');assert.equal(selectedHolidayCountry('US',['nb-NO']),'US');
+  assert.equal(selectedHolidayCountry(null,['nb-NO']),'NO');assert.equal(selectedHolidayCountry(null,['en-US']),'US');assert.equal(selectedHolidayCountry('none',['nb-NO']),null);
+  const english=await publicHolidayCalendar(monthCalendar('2026-05','UTC'),'en-US','NO');
+  assert.equal(english.country,'NO');assert.equal(english.days.get('2026-05-17')[0].name,'Constitution Day');
+  const norwegian=await publicHolidayCalendar(monthCalendar('2026-07','UTC'),'nb-NO','US');
+  assert.equal(norwegian.country,'US');assert.ok(norwegian.days.has('2026-07-04'));
 });
