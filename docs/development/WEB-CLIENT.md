@@ -130,7 +130,7 @@ Norwegian Bokmål shows Norway, English (United Kingdom) shows the UK and Englis
 work; it never moves a holiday to a different civil date.
 
 Holiday names appear directly beside the date, with both highlighted in red and
-no icon or underline. Select a holiday name to read the full date and all names
+no icon or underline. Select the date or holiday name to read the full date and all names
 for that day. This also works with read-only access. On narrow screens the names
 are shortened visually; the dialog, hover title and accessible name retain them.
 Holiday information does not change sessions, totals or editing permissions.
