@@ -84,6 +84,21 @@ then appends separately verified Synology distribution channels.
 Tags, manually dispatched container builds, mixed code/documentation changes,
 workflow changes and unavailable diff history retain full validation.
 
+PR updates cancel superseded runs of the same workflow. Main pushes can start
+validation immediately; they do not wait for an older container workflow to
+finish. Each expensive main job cancels its predecessor when replacement code
+validation reaches that job. Documentation-only pushes skip those jobs and leave
+in-flight code validation running. Platform jobs use separate concurrency groups
+per operating system. Tags and manual container runs have independent groups.
+
+The container workflow builds and tests the H2 server and exports one shared
+server image in **Build shared server image**. The PostgreSQL 18 checks and
+**Synology candidate and PostgreSQL 17** then download and checksum that same
+image and run in parallel on separate runners. All schema, migration, replica,
+backup, recovery, passkey, archive and import checks remain required. Publishing
+still waits for preparation and both database jobs to succeed; an uploaded
+candidate alone is not publication approval.
+
 A main push starts Build. Pages waits for the complete successful workflow;
 there is no separate immediate push deployment. Its `workflow_run` trigger
 deploys only a completed main build that still matches the default-branch head
