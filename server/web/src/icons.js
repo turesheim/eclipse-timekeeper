@@ -1,7 +1,7 @@
 // Font Awesome Free 7.3.1, bundled under assets/fontawesome with its upstream license.
 import {projectCatalog} from './project-icons.js';
 export const projectIcons = projectCatalog.map(([id,label])=>[id,label]);
-const glyphs = {...Object.fromEntries(projectCatalog.map(([id,,glyph])=>[id,glyph])),close:'\uf00d',add:'\uf067', link:'\uf0c1', unlink:'\uf127', left:'\uf053', right:'\uf054', down:'\uf078', clock:'\uf017', calendar:'\uf133', more:'\uf141', start:'\uf04b', stop:'\uf04d', edit:'\uf044', delete:'\uf1f8', refresh:'\uf021', collapse:'\uf102', expand:'\uf103',copy:'\uf0c5',paste:'\uf0ea'};
+const glyphs = {...Object.fromEntries(projectCatalog.map(([id,,glyph])=>[id,glyph])),close:'\uf00d',add:'\uf067', link:'\uf0c1', unlink:'\uf127', left:'\uf053', right:'\uf054', down:'\uf078', clock:'\uf017', calendar:'\uf133', more:'\uf141', start:'\uf04b', stop:'\uf04d', edit:'\uf044', delete:'\uf1f8', refresh:'\uf021', check:'\uf058', warning:'\uf071', error:'\uf06a', collapse:'\uf102', expand:'\uf103',copy:'\uf0c5',paste:'\uf0ea'};
 export function icon(name) {
   const node = document.createElement('span'); node.className = 'icon';
   node.setAttribute('aria-hidden', 'true'); node.textContent = glyphs[name]; return node;
