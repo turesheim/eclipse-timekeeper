@@ -1,5 +1,4 @@
 import {getLocale,t as i18nText} from './i18n.js';
-import {icon} from './icons.js';
 import {publicHolidayCalendar} from './holidays.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
@@ -59,8 +58,8 @@ export class TrackHolidays {
       const names=holidays.map(value=>value.name).join(' · '),button=node('button',undefined,'btn btn-link btn-sm track-holiday-label');button.type='button';button.dataset.trackHolidayDate=date;
       const fullDate=new Intl.DateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
       button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-label',i18nText('holidays.details',{date:fullDate,names}));button.title=names;
-      button.append(icon('calendar-event'),node('span',names,'track-holiday-name'));button.addEventListener('click',()=>this.openHoliday(date));
-      cell.querySelector('.track-date').after(button);
+      button.append(cell.querySelector('.track-date'),node('span',names,'track-holiday-name'));button.addEventListener('click',()=>this.openHoliday(date));
+      cell.querySelector('.track-date-row').replaceChildren(button);
     }
     if(focused&&document.activeElement===document.body)this.grid.querySelector(`[data-track-holiday-date="${focused}"]`)?.focus();
     else if(retryFocused)this.holidayStatus.focus();

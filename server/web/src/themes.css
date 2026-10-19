@@ -63,6 +63,7 @@
   & .workspace-nav { --bs-navbar-color: var(--bs-body-color); --bs-navbar-hover-color: var(--accent); }
   & .workspace-nav .nav-link:not(.active):hover { background: var(--theme-group); }
   & .workspace-nav .nav-link[aria-current], & #account-navigation .nav-link.active, & .track-today { color: var(--theme-on-accent); background: var(--accent); }
+  & .track-public-holiday .track-today { color: var(--track-holiday-color); background: var(--bs-danger-bg-subtle); }
   & .table { --bs-table-color: var(--bs-body-color); --bs-table-hover-color: var(--bs-body-color); --bs-table-hover-bg: var(--theme-soft); }
   & .table thead { --bs-table-bg: var(--theme-soft); --bs-table-color: var(--muted); }
   & .workweek-table tr[data-kind=project], & .week-session-client, & .projects-client { --bs-table-bg: var(--theme-group); }
