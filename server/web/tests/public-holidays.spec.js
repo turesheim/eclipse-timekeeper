@@ -132,14 +132,14 @@ test('public holidays follow Norway civil dates and keep recorded work editable 
     const license=await request.get('/web/assets/date-holidays/LICENSE');expect(license.status()).toBe(200);expect(await license.text()).toContain('CC BY-SA 3.0');
   } finally {releaseEngine();await session.close();}
 });
-test('public holidays use the saved account region instead of the browser language',async({browser,request})=>{
+test('public holidays use their own country preference independently of the interface language',async({browser,request})=>{
   const user=await fresh(request),session=await context(browser),page=await session.newPage();
   try {
-    await signIn(page,user);const api=await ownApi(page);await preference(api,{locale:'en-US'});await page.reload();await trackingReady(page);
+    await signIn(page,user);const api=await ownApi(page);await preference(api,{locale:'en-US',holidayCountry:'US'});await page.reload();await trackingReady(page);
     await expect(page.locator('html')).toHaveAttribute('lang','en-US');expect(await page.evaluate(()=>navigator.language)).toBe('nb-NO');
     await page.locator('#track-month').fill('2026-07');await expect(page.locator('.track-holiday-status')).toContainText('United States');
     await expect(holiday(page,'2026-07-03')).toContainText('Independence Day');await expect(holiday(page,'2026-07-04')).toContainText('Independence Day');
-    await preference(api,{locale:'en-GB'});await page.reload();await trackingReady(page);await expect(page.locator('html')).toHaveAttribute('lang','en-GB');await page.locator('#track-month').fill('2026-05');
+    await preference(api,{locale:'en-GB',holidayCountry:'GB'});await page.reload();await trackingReady(page);await expect(page.locator('html')).toHaveAttribute('lang','en-GB');await page.locator('#track-month').fill('2026-05');
     await expect(page.locator('.track-holiday-status')).toContainText('United Kingdom');await expect(holiday(page,'2026-05-04')).toContainText('Early May bank holiday');await expect(holiday(page,'2026-05-17')).toHaveCount(0);
   } finally {await session.close();}
 });
@@ -196,4 +196,27 @@ test('public holiday details fit narrow screens in every theme and delayed data 
       await expect(page.locator('.track-holiday-status')).toBeHidden();await expect(page.locator('.track-holiday-status span').first()).toHaveText('');await expect(page.locator('#track-calendar')).toBeEmpty();
     } finally {release();}
   } finally {await session.close();}
+});
+
+test('the independent holiday setting persists across languages and devices and can hide holidays',async({browser,request})=>{
+  const user=await fresh(request),first=await context(browser,'en-US'),second=await context(browser,'nb-NO');
+  async function account(page) {await page.locator('#account-menu summary').click();await page.locator('#account').click();await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');}
+  async function choose(page,value) {await page.getByLabel('Holiday country',{exact:true}).selectOption(value);await page.getByRole('button',{name:'Save holidays',exact:true}).click();await expect(page.locator('#account-content')).toContainText('Holiday settings saved.');}
+  async function track(page,month) {await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await page.locator('#track-month').fill(month);await trackingReady(page);}
+  try {
+    const page=await first.newPage();await signIn(page,user);const api=await ownApi(page),work=await seed(api),before=await api('GET','/work-sessions/'+work.id);
+    await account(page);await choose(page,'NO');await expect(page.locator('html')).toHaveAttribute('lang','en-US');
+    await page.getByLabel('Language and region',{exact:true}).selectOption('en-GB');await page.getByRole('button',{name:'Save language',exact:true}).click();
+    await expect(page.locator('html')).toHaveAttribute('lang','en-GB');await expect(page.getByLabel('Holiday country',{exact:true})).toHaveValue('NO');
+    await page.setViewportSize({width:390,height:844});await page.locator('.account-card').filter({has:page.getByRole('heading',{name:'National holidays',exact:true})}).screenshot({path:'test-results/holiday-preferences-mobile.png'});
+    await track(page,'2026-05');await expect(holiday(page,'2026-05-17')).toContainText('Constitution Day');await expect(page.locator('.track-holiday-status')).toContainText('Norway');
+    const peer=await second.newPage();await signIn(peer,user);await peer.locator('#track-month').fill('2026-05');await expect(holiday(peer,'2026-05-17')).toContainText('Constitution Day');expect(await peer.evaluate(()=>navigator.language)).toBe('nb-NO');
+    await account(page);await choose(page,'US');await track(page,'2026-07');await expect(holiday(page,'2026-07-04')).toContainText('Independence Day');
+    await account(page);await choose(page,'none');await track(page,'2026-05');await expect(page.locator('[data-track-holiday-date]')).toHaveCount(0);await expect(page.locator('.track-holiday-status')).toBeHidden();
+    let engines=0;page.on('request',request=>{if(request.url().includes('/date-holidays/engine.js'))engines++;});await page.reload();await trackingReady(page);await expect(page.locator('[data-track-holiday-date]')).toHaveCount(0);expect(engines).toBe(0);
+    const after=await api('GET','/work-sessions/'+work.id);expect(after.headers().etag).toBe(before.headers().etag);expect(await after.json()).toEqual(await before.json());
+    await account(page);await page.getByLabel('Holiday country',{exact:true}).selectOption('NO');
+    await preference(api,{holidayCountry:'GB'});await page.getByRole('button',{name:'Save holidays',exact:true}).click();await expect(page.locator('#account-content')).toContainText('changed');await expect(page.getByLabel('Holiday country',{exact:true})).toHaveValue('NO');
+    expect((await(await api('GET','/me')).json()).holidayCountry).toBe('GB');
+  } finally {await first.close();await second.close();}
 });

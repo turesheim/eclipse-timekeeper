@@ -78,7 +78,8 @@ class DistributionDocumentationTest(unittest.TestCase):
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('Packaging fixture')
             with zipfile.ZipFile(root/'server/app/target/quarkus-app/app/fixture.jar','w') as jar:
                 jar.writestr('timekeeper-build.properties', f'commit={COMMIT}\ndirty=false\n')
-            for name in ('public-holidays-desktop.png','public-holidays-details-mobile.png',
+            for name in ('about-references-desktop.png','work-session-editor-delete-confirm.png','holiday-preferences-mobile.png',
+                         'public-holidays-desktop.png','public-holidays-details-mobile.png',
                          'calendar-subscriptions-desktop.png','calendar-subscriptions-details-mobile.png',
                          'locale-norwegian-account.png','locale-norwegian-administration.png',
                          'activities-mobile.png','project-icon-picker.png','track-project-icons.png','track-project-icons-mobile.png',

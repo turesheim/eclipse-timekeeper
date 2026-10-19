@@ -9,6 +9,8 @@ try {
   const session=await fetch('/api/v1/auth/session',options());
   if(session.ok) {
     setLocale((await session.json()).locale);
+  } else if(session.status===401 && document.getElementById('login')) {
+    document.getElementById('startup').hidden=true;document.getElementById('login').hidden=false;
   }
 } catch { /* Public sign-in remains available with the browser's language. */ }
 applyTranslations();

@@ -1,4 +1,5 @@
 import { getLocale } from './i18n.js';
+import {countries,selectedHolidayCountry} from './holidays.js';
 import { t as i18nText } from "./i18n.js";import { instantText, localDateTimeToInstant } from './model.js';
 import { node, button, field, passwordField, validatePassword, section, form, table } from './account-ui.js';
 import { renderRecoveryEmails } from './recovery-emails.js';
@@ -53,6 +54,18 @@ export async function renderAccount(view, part) {
     ['', i18nText('locale.browser')], ['en-GB', i18nText("ui.english_united_kingdom")], ['en-US', i18nText("ui.english_united_states")], ['nb-NO', i18nText("ui.norsk_bokmal_norge")]]
   });
   localePreferences.finish();
+  const holidayPreferences = form(view, i18nText('holidays.settings'), i18nText('holidays.save'), async () => {
+    const reply = await view.session.request('/me', {method:'PUT',etag:profile.etag,body:{zoneId:profile.data.zoneId,holidayCountry:holidayChoice.value || null}});
+    if(!view.valid())return;
+    profile.etag=reply.etag;profile.data=reply.data;view.clean(holidayPreferences.value);holidayPreferences.feedback.textContent=i18nText('holidays.saved');
+    void view.refreshProfile(reply).catch(()=>{});
+  });
+  const regionNames = new Intl.DisplayNames([getLocale()], {type:'region'}),browserCountry=selectedHolidayCountry(null);
+  const holidayChoice = field(holidayPreferences.value,i18nText('holidays.country_label'),profile.data.holidayCountry || '',{required:false,choices:[
+    ['',i18nText('holidays.browser',{country:browserCountry?regionNames.of(browserCountry):i18nText('holidays.unsupported_country')})],['none',i18nText('holidays.none')],
+    ...countries.map(country=>[country,regionNames.of(country)]).sort((a,b)=>a[1].localeCompare(b[1],getLocale()))
+  ]});
+  holidayPreferences.value.append(node('p',i18nText('holidays.independent'),'hint'));holidayPreferences.finish();
   const preferences = form(view, i18nText("ui.time_zone_b9fe14"), i18nText("ui.save_time_zone"), async () => {
     try {new Intl.DateTimeFormat(getLocale(), { timeZone: input.value.trim() });} catch {throw new Error(i18nText("ui.enter_a_valid_time_zone_for_example_europe_oslo"));}
     const reply = await view.session.request('/me', { method: 'PUT', etag: profile.etag, body: { zoneId: input.value.trim() } });

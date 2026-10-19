@@ -241,6 +241,14 @@ button.track-client-day:disabled { opacity: .65; }
 #server-build { color: var(--muted); }
 .server-info dl { display: grid; grid-template-columns: auto 1fr; gap: .3rem 1rem; margin-block: .5rem; }
 .server-info dd { margin: 0; font-variant-numeric: tabular-nums; }
+.about-links { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin-block: .75rem 1.25rem; }
+.about-notices { margin-top: 1.25rem; }
+.about-notices summary { cursor: pointer; font-weight: 600; padding-block: .5rem; }
+.about-notices ul { list-style: none; padding: 0; margin-bottom: 0; }
+.about-notices li { padding-block: .75rem; border-bottom: 1px solid var(--line); }
+.about-notices li:last-child { border-bottom: 0; }
+.about-notices p { margin-block: .25rem; }
+.about-component-title { font-weight: 600; }
 #account-page { max-width: 1200px; margin-inline: auto; }
 .account-page-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
 .account-layout { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: 1.5rem; }
