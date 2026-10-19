@@ -886,5 +886,14 @@
   "calendar.error.CALENDAR_DUPLICATE_SUBSCRIPTION": "Kontoen abonnerer allerede på denne kalenderadressen. Rediger det eksisterende abonnementet.",
   "calendar.subscriptions_count": "Kalendere ({{count}})",
   "calendar.refresh_errors": "Noen kalendere kunne ikke oppdateres. Utvid abonnementene for detaljer. Sist oppdaterte data beholdes.",
-  "calendar.error.CALENDAR_FUTURE_ACTIVITY": "En aktivitet kan ikke starte i fremtiden. Kontroller det faktiske tidsrommet før du lagrer."
+  "calendar.error.CALENDAR_FUTURE_ACTIVITY": "En aktivitet kan ikke starte i fremtiden. Kontroller det faktiske tidsrommet før du lagrer.",
+  "about.project_references": "Prosjektreferanser",
+  "about.website": "Prosjektets nettsted",
+  "about.source": "Kildekode",
+  "about.issues": "Feil og forslag",
+  "about.server_information": "Serverinformasjon",
+  "about.web_components": "Nettklientens biblioteker og lisenser",
+  "about.component_license": "Lisens for {{name}}: {{license}}",
+  "about.dependency_notices": "Lisenser og merknader for avhengigheter",
+  "ui.loading_timekeeper": "Laster Timekeeper…"
 }

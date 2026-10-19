@@ -12,14 +12,15 @@ import { UndoNotice } from './undo.js';
 import { accountMenu } from './account-menu.js';
 import { periodSwipe } from './period-swipe.js';
 import { shiftMonth } from './month-model.js';
+import {openAbout} from './about.js';
 
 const $ = (id) => document.getElementById(id);
 accountMenu($('account-menu'));
-$('about-open').addEventListener('click', () => $('server-info').showModal());
+$('about-open').addEventListener('click', () => openAbout($('server-info')));
 $('about-close').addEventListener('click', () => $('server-info').close());
 $('server-info').addEventListener('close', () => {if (!$('session').hidden) $('account-menu').querySelector('summary').focus();});
 let api = null,snapshot = null,connected = false,refreshing = null,reloadAgain = false;
-let editor = null,selectedActivity = null,selectedDay = null;
+let editor = null,deleteCandidate = null,selectedActivity = null,selectedDay = null;
 let watchSession = null;
 let accountName = '',canWrite = false;
 let serverInfoRequest = 0;
@@ -140,7 +141,7 @@ const auth = authentication({
     if (session !== api) return;
     if (localeForPreference(profile.locale) !== getLocale()) {location.reload();return false;}
     $('week-date').value = dateInZone(Date.now(), profile.zoneId);
-    $('login').hidden = true;$('workspace').hidden = false;$('session').hidden = false;
+    $('startup').hidden = true;$('login').hidden = true;$('workspace').hidden = false;$('session').hidden = false;
     await refresh();startWatch(session);
   },
   updateAccount(account) {accountName = account.displayName;},
@@ -150,17 +151,17 @@ const auth = authentication({
     if (profile && snapshot) snapshot.profile = profile;
     return refresh();
   },
-  clear() {
+  clear({restoring = false} = {}) {
     undoNotice.clear();weekSessions.reset();$('week-sessions-section').hidden = true;$('work-session-labels').replaceChildren();$('work-session-labels').hidden = true;
     refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
     calendar.reset();track.reset();collapsed.clear();collapsedClients.clear();canWrite = false;
     $('period-announcement').textContent = '';
-    $('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
+    deleteCandidate = null;$('editor-delete-confirm').close();$('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
     for (const id of ['clients', 'projects', 'tasks', 'labels', 'activities', 'days']) $(id).replaceChildren();
     for (const id of ['owner', 'status', 'active-title', 'active-details', 'work-session-current', 'work-session-state', 'work-session-elapsed', 'zone-caption', 'week-total']) $(id).textContent = '';
-    $('login').hidden = false;$('workspace').hidden = true;$('session').hidden = true;$('account-menu').open = false;$('remember-notice').textContent = '';
+    $('startup').hidden = !restoring;$('login').hidden = restoring;$('workspace').hidden = true;$('session').hidden = true;$('account-menu').open = false;$('remember-notice').textContent = '';
     tab('track');
   }
 });
@@ -442,6 +443,8 @@ function begin(title, state) {
   if (editor || $('editor').open) return false;
   editor = { ...state, session: api, zone: snapshot.profile.data.zoneId, busy: false, uncertain: false };$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
   $('save').className = `btn ${state.remove ? 'btn-danger' : 'btn-primary'}`;
+  $('editor-delete').hidden = state.collection !== 'work-sessions' || !state.id || !!state.remove || !!state.command;
+  $('editor-delete').disabled = !connected || !canWrite;
   $('editor-title').textContent = title;$('save').textContent = i18nText("ui.save");$('save').disabled = false;$('cancel').disabled = false;return true;
 }
 function showEditor() {$('editor').showModal();$('fields').querySelector('input,select,textarea')?.focus();}
@@ -450,7 +453,7 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
   const loaded = id ? await session.request(`/${collection}/${id}`) : { data: initial, etag: null };
   if (session !== api || !connected) return;
   const value = loaded.data;
-  if (!begin(caption || i18nText(`record.${id?'edit':'new'}.${collection}`), { collection, id, etag: loaded.etag })) return;
+  if (!begin(caption || i18nText(`record.${id?'edit':'new'}.${collection}`), { collection, id, etag: loaded.etag, deletionLabel: value.summary })) return;
   if (['clients', 'projects', 'labels'].includes(collection)) field(i18nText("ui.name"), 'name', value.name, { required: true, max: 1000 });
   if (collection === 'clients') field(i18nText("ui.color"), 'color', value.color || '#2563eb', { type: 'color', required: true });
   if (collection === 'projects') {clientField(value.clientId);$('fields').append(createProjectIconPicker(value.icon));}
@@ -575,20 +578,23 @@ function values() {
     case 'work-sessions':return { clientId: get('clientId'), projectId: get('projectId') || null, summary: get('summary'), labelIds: labels(), start: localDateTimeToInstant(time('start'), editor.zone), end: time('end') ? localDateTimeToInstant(time('end'), editor.zone) : null };
   }
 }
-function freeze(state) {for (const input of $('fields').querySelectorAll('input,select,textarea')) input.disabled = state || editor.collection === 'activities' && !!editor.id && input.name === 'taskId';}
-async function saveEditor(event) {
+function freeze(state) {
+  for (const input of $('fields').querySelectorAll('input,select,textarea')) input.disabled = state || editor.collection === 'activities' && !!editor.id && input.name === 'taskId';
+  $('editor-delete').disabled = state || !connected || !canWrite || editor.uncertain || editor.reviewRequired;
+}
+async function saveEditor(event, remove = editor?.remove) {
   event?.preventDefault();const current = editor;
   if (!current || current.busy || current.loading || current.reviewRequired || current.session !== api) return;
   current.busy = true;$('save').disabled = true;$('cancel').disabled = true;$('editor-error').textContent = '';
   try {
-    const body = current.uncertain ? current.payload : current.calendarSource?{fromDate:current.calendarSource.fromDate,toDate:current.calendarSource.toDate,eventVersion:current.calendarSource.event.eventVersion,activity:values()}:values();
+    const body = remove ? undefined : current.uncertain ? current.payload : current.calendarSource?{fromDate:current.calendarSource.fromDate,toDate:current.calendarSource.toDate,eventVersion:current.calendarSource.event.eventVersion,activity:values()}:values();
     current.payload = body;freeze(true);
     const path = current.calendarSource?`/calendar-subscriptions/${current.calendarSource.event.subscriptionId}/events/${current.calendarSource.event.key}/activity`:current.command === 'session-start' ? '/work-sessions/start' : current.command === 'session-stop' ? `/work-sessions/${current.id}/stop` : current.command === 'start' ? '/activities/start' : current.command === 'stop' ? `/activities/${current.id}/stop` : `/${current.collection}${current.id ? '/' + current.id : ''}`;
-    const method = current.command ? 'POST' : current.remove ? 'DELETE' : current.id !== null ? 'PUT' : 'POST';
+    const method = current.command ? 'POST' : remove ? 'DELETE' : current.id !== null ? 'PUT' : 'POST';
     const saved = await current.session.request(path, { method, body, etag: current.etag, key: current.key, undo: current.collection === 'work-sessions' && (method === 'PUT' || method === 'DELETE') });
     if (current.session !== api || current !== editor) return;
-    undoNotice.offer(saved.undo, current.session, current.remove ? i18nText("ui.work_session_deleted") : i18nText("ui.work_session_updated"));
-    if (!current.calendarChange && !current.remove && (current.collection === 'work-sessions' || current.command === 'session-start')) calendar.rememberClient(saved.data?.clientId);
+    undoNotice.offer(saved.undo, current.session, remove ? i18nText("ui.work_session_deleted") : i18nText("ui.work_session_updated"));
+    if (!current.calendarChange && !remove && (current.collection === 'work-sessions' || current.command === 'session-start')) calendar.rememberClient(saved.data?.clientId);
     editor = null;$('editor').close();$('fields').replaceChildren();
     connected = false;readOnlyWhileDisconnected();setStatus(i18nText("ui.refreshing_saved_changes"), 'working');
     // Acknowledged saves remain successful even if the following read fails.
@@ -607,6 +613,16 @@ async function saveEditor(event) {
   }
 }
 $('editor-form').addEventListener('submit', saveEditor);
+$('editor-delete').addEventListener('click', () => {
+  if (!editor || editor.collection !== 'work-sessions' || !editor.id || editor.command || editor.remove || editor.busy || editor.loading || editor.uncertain || editor.reviewRequired || editor.session !== api || !connected || !canWrite) return;
+  deleteCandidate = editor;
+  $('editor-delete-description').textContent = i18nText('ui.delete_681b54', {value0: editor.deletionLabel || i18nText('ui.work_session_21aa04'), value1: i18nText('ui.undo_will_be_available_for_ten_minutes')});
+  $('editor-delete-confirm').returnValue = '';$('editor-delete-confirm').showModal();
+});
+$('editor-delete-confirm').addEventListener('close', () => {
+  const candidate = deleteCandidate;deleteCandidate = null;
+  if ($('editor-delete-confirm').returnValue === 'delete' && candidate && candidate === editor && candidate.session === api && !candidate.busy && !candidate.uncertain && connected && canWrite) void saveEditor(null, true);
+});
 $('cancel').addEventListener('click', () => {if (editor?.busy) return;editor = null;$('editor').close();$('fields').replaceChildren();});
 $('editor').addEventListener('cancel', (event) => {if (editor?.busy) event.preventDefault();else {editor = null;$('fields').replaceChildren();}});
 function displayedSession() {return snapshot?.activeWorkSession.data || snapshot?.workSessionReport?.session || null;}
@@ -652,7 +668,7 @@ $('session-stop').addEventListener('click', () => {
 for (const [id, work] of [['session-new', () => openRecord('work-sessions')], ['session-edit', () => openRecord('work-sessions', displayedSession().id)], ['session-delete', () => openDelete('work-sessions', displayedSession().id)]]) $(id).addEventListener('click', () => {if (connected && canWrite) void work().catch((error) => setStatus(errorText(error)));});
 for (const [id, glyph, label] of [['session-start', 'start', i18nText("ui.start_work_session")], ['session-stop', 'stop', i18nText("ui.stop_work_session")], ['session-new', 'add', i18nText("ui.record_work_session")], ['session-edit', 'edit', i18nText("ui.edit_work_session")], ['session-delete', 'delete', i18nText("ui.delete_work_session")]]) iconButton($(id), glyph, label);
 setInterval(renderSessionTime, 1000);
-window.addEventListener('pagehide', () => auth.clear());
+window.addEventListener('pagehide', () => auth.suspend());
 window.addEventListener('pageshow', (event) => {if (event.persisted) void auth.initialize();});
 $('status-icon').append(icon('refresh'));
 iconButton($('collapse-activities'), 'collapse', i18nText("ui.hide_activities"));

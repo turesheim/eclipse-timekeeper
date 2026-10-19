@@ -18,7 +18,8 @@
   <a class="skip-link" href="#main-content"><span data-i18n="ui.skip_to_main_content">Skip to main content</span></a>
   <header class="app-header"><a class="brand" href="./">Timekeeper <small>2.0</small></a><div id="session" hidden=""><span id="owner"></span><details id="account-menu" class="account-menu"><summary class="btn btn-outline-secondary" role="button" aria-expanded="false" aria-controls="account-menu-items" aria-label="Account menu" title="Account menu" data-i18n-aria-label="ui.account_menu" data-i18n-title="ui.account_menu"><span class="icon bi bi-list" aria-hidden="true"></span></summary><nav id="account-menu-items" class="account-menu-items" aria-label="Account" data-i18n-aria-label="ui.account"><a class="btn btn-link" id="account" tabindex="0" href="#account/profile"><span data-i18n="ui.my_account">My Account</span></a><a class="btn btn-link" id="users-link" tabindex="0" href="/admin/" hidden=""><span data-i18n="ui.administration">Administration</span></a><button class="btn btn-link" id="about-open" type="button"><span data-i18n="ui.about">About</span></button><div class="theme-choice"><label for="theme"><span data-i18n="ui.theme">Theme</span></label><select class="form-select" id="theme"></select></div><button class="btn btn-link" id="sign-out" type="button"><span data-i18n="ui.sign_out">Sign out</span></button></nav></details></div></header>
   <main id="main-content" tabindex="-1">
-    <section id="login" class="card login">
+    <p id="startup" role="status" data-i18n="ui.loading_timekeeper">Loading Timekeeper…</p>
+    <section id="login" class="card login" hidden>
       <p class="eyebrow"><span data-i18n="ui.your_work_recorded">YOUR WORK, RECORDED</span></p><h1><span data-i18n="ui.make_time_count">Make time count.</span></h1>
       <p><span data-i18n="ui.track_work_and_manage_your_projects_in_the_browser">Track work and manage your projects in the browser.</span></p><p id="login-build" class="hint"></p>
       <form id="login-form">
@@ -114,11 +115,22 @@
     </div>
   </main>
   <dialog class="app-dialog server-info shadow-lg" id="server-info" aria-labelledby="about-title">
-    <h2 id="about-title"><span data-i18n="ui.about_timekeeper">About Timekeeper</span></h2><p id="server-build"><span data-i18n="ui.server_build_information_unavailable">Server build information unavailable</span></p>
+    <h2 id="about-title" tabindex="-1"><span data-i18n="ui.about_timekeeper">About Timekeeper</span></h2>
+    <p id="about-copyright">Copyright © 2014–2026 Torkild U. Resheim</p>
+    <nav class="about-links" aria-label="Project references" data-i18n-aria-label="about.project_references">
+      <a href="/web/assets/notices/timekeeper-LICENSE.txt" target="_blank" rel="noopener noreferrer">Eclipse Public License 2.0</a>
+      <a href="https://turesheim.github.io/eclipse-timekeeper/" target="_blank" rel="noopener noreferrer" data-i18n="about.website">Project website</a>
+      <a href="https://github.com/turesheim/eclipse-timekeeper" target="_blank" rel="noopener noreferrer" data-i18n="about.source">Source code</a>
+      <a href="https://github.com/turesheim/eclipse-timekeeper/issues" target="_blank" rel="noopener noreferrer" data-i18n="about.issues">Issues and suggestions</a>
+    </nav>
+    <h3 data-i18n="about.server_information">Server information</h3>
+    <p id="server-build"><span data-i18n="ui.server_build_information_unavailable">Server build information unavailable</span></p>
     <dl><dt><span data-i18n="ui.version">Version</span></dt><dd id="server-version">—</dd><dt><span data-i18n="ui.spk_version">SPK version</span></dt><dd id="server-spk">—</dd><dt><span data-i18n="ui.commit">Commit</span></dt><dd id="server-commit">—</dd><dt><span data-i18n="ui.built">Built</span></dt><dd id="server-built">—</dd><dt><span data-i18n="ui.deployed">Deployed</span></dt><dd id="server-deployed">—</dd><dt><span data-i18n="ui.started_ecbc89">Started</span></dt><dd id="server-started">—</dd></dl>
+    <details id="about-notices" class="about-notices"><summary data-i18n="about.web_components">Web client libraries and licenses</summary><ul id="about-components"></ul></details>
     <div class="dialog-actions"><button class="btn btn-outline-secondary" id="about-close" type="button"><span data-i18n="ui.close">Close</span></button></div>
   </dialog>
-  <dialog class="app-dialog shadow-lg" id="editor" aria-labelledby="editor-title"><form id="editor-form"><h2 id="editor-title"></h2><div id="fields"></div><p id="editor-error" class="alert alert-danger" role="alert" tabindex="-1"></p><p id="editor-notice" class="alert alert-info" role="status"></p><div class="dialog-actions"><button class="btn btn-outline-secondary" id="cancel" type="button"><span data-i18n="ui.cancel">Cancel</span></button><button class="btn btn-primary" id="save" type="submit"><span data-i18n="ui.save">Save</span></button></div></form></dialog>
+  <dialog class="app-dialog shadow-lg" id="editor" aria-labelledby="editor-title"><form id="editor-form"><h2 id="editor-title"></h2><div id="fields"></div><p id="editor-error" class="alert alert-danger" role="alert" tabindex="-1"></p><p id="editor-notice" class="alert alert-info" role="status"></p><div class="dialog-actions"><button class="btn btn-outline-danger me-auto" id="editor-delete" type="button" hidden><span data-i18n="ui.delete">Delete</span></button><button class="btn btn-outline-secondary" id="cancel" type="button"><span data-i18n="ui.cancel">Cancel</span></button><button class="btn btn-primary" id="save" type="submit"><span data-i18n="ui.save">Save</span></button></div></form></dialog>
+  <dialog class="app-dialog shadow-lg" id="editor-delete-confirm" aria-labelledby="editor-delete-title" aria-describedby="editor-delete-description"><h2 id="editor-delete-title" data-i18n="ui.delete_work_session">Delete work session</h2><p id="editor-delete-description"></p><form method="dialog" class="dialog-actions"><button class="btn btn-outline-secondary" value="cancel" autofocus data-i18n="ui.cancel">Cancel</button><button class="btn btn-danger" value="delete" data-i18n="ui.delete">Delete</button></form></dialog>
 
 
 </body></html>

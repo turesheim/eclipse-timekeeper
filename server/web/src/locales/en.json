@@ -886,5 +886,14 @@
   "calendar.error.CALENDAR_DUPLICATE_SUBSCRIPTION": "This calendar URL is already subscribed to on your account. Edit the existing subscription instead.",
   "calendar.subscriptions_count": "Calendars ({{count}})",
   "calendar.refresh_errors": "Some calendars could not refresh. Expand subscriptions for details; the last successful data is kept.",
-  "calendar.error.CALENDAR_FUTURE_ACTIVITY": "An activity cannot start in the future. Review the actual interval before saving."
+  "calendar.error.CALENDAR_FUTURE_ACTIVITY": "An activity cannot start in the future. Review the actual interval before saving.",
+  "about.project_references": "Project references",
+  "about.website": "Project website",
+  "about.source": "Source code",
+  "about.issues": "Issues and suggestions",
+  "about.server_information": "Server information",
+  "about.web_components": "Web client libraries and licenses",
+  "about.component_license": "{{name}} license: {{license}}",
+  "about.dependency_notices": "Dependency licenses and notices",
+  "ui.loading_timekeeper": "Loading Timekeeper…"
 }
