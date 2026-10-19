@@ -37,3 +37,38 @@ test('cached modules restore a browser session after reload and opening another 
     await expect(second.locator('#owner')).toHaveText(username);
   } finally {await second.close();}
 });
+
+test('restoring and navigating a valid session never paints the sign-in screen',async({page,request})=>{
+  const username='navigation-'+randomUUID().slice(0,8),password='Independent navigation browser password';
+  expect((await request.post('/api/v1/admin/users',{data:{username,password,displayName:username,email:username+'@example.invalid',administrator:false},headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`}})).status()).toBe(201);
+  const api=browserRequest(page);await api.get('/api/v1/auth/status');expect((await api.post('/api/v1/auth/login',{data:{username,password,remember:true}})).status()).toBe(200);
+  await page.context().addInitScript(()=>{
+    window.loginPaints=0;
+    function frame(){const login=document.getElementById('login');if(login&&!login.hidden&&login.getClientRects().length)window.loginPaints++;requestAnimationFrame(frame);}
+    requestAnimationFrame(frame);
+  });
+  let release,intercepted;const held=new Promise(resolve=>{release=resolve;}),blocked=new Promise(resolve=>{intercepted=resolve;});
+  await page.route('**/api/v1/auth/session',async route=>{intercepted();await held;await route.continue();});
+  try {
+    await page.goto('/web/',{waitUntil:'commit'});await blocked;await expect(page.locator('#startup')).toBeVisible();await expect(page.locator('#login')).toBeHidden();
+    release();await expect(page.locator('#status')).toHaveText('Up to date');await page.unroute('**/api/v1/auth/session');
+    for(let iteration=0;iteration<3;iteration++) {
+      await page.locator('#account-menu summary').click();await page.locator('#account').click();await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');await expect(page.locator('#account-page')).toBeVisible();
+      await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await expect(page.locator('#workspace')).toBeVisible();
+      expect(await page.evaluate(()=>window.loginPaints)).toBe(0);
+    }
+    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');expect(await page.evaluate(()=>window.loginPaints)).toBe(0);
+    await page.route('**/navigation-destination',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Navigation destination</title><p>Destination</p>'}));
+    await page.goto('/navigation-destination');await page.goBack();await expect(page.locator('#status')).toHaveText('Up to date');expect(await page.evaluate(()=>window.loginPaints)).toBe(0);
+    await page.locator('#account-menu summary').click();await page.locator('#sign-out').click();await expect(page.locator('#login')).toBeVisible();await expect(page.locator('#startup')).toBeHidden();await expect(page.locator('#workspace')).toBeHidden();
+  } finally {release();}
+});
+
+test('an expired session reveals the usable sign-in form after the check finishes',async({page})=>{
+  let release,intercepted;const held=new Promise(resolve=>{release=resolve;}),blocked=new Promise(resolve=>{intercepted=resolve;});
+  await page.route('**/api/v1/auth/session',async route=>{intercepted();await held;await route.fulfill({status:401,contentType:'application/json',body:JSON.stringify({code:'unauthorized'})});});
+  try {
+    await page.goto('/web/',{waitUntil:'commit'});await blocked;await expect(page.locator('#login')).toBeHidden();await expect(page.locator('#startup')).toBeVisible();
+    release();await expect(page.locator('#login')).toBeVisible();await expect(page.locator('#login-form button[type=submit]')).toBeEnabled();await expect(page.locator('#startup')).toBeHidden();
+  } finally {release();}
+});

@@ -1,5 +1,5 @@
 import {getLocale,t as i18nText} from './i18n.js';
-import {publicHolidayCalendar} from './holidays.js';
+import {publicHolidayCalendar,selectedHolidayCountry} from './holidays.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 
@@ -24,8 +24,8 @@ export class TrackHolidays {
       if(date&&this.active&&!this.root.hidden)(this.grid.querySelector(`[data-track-holiday-date="${date}"]`)||this.input).focus();
     });
   }
-  update(calendar,cells,focused) {
-    this.active=true;this.calendar=calendar;this.holidayCells=cells;this.paintHolidays(focused);
+  update(calendar,cells,focused,preference) {
+    this.preference=preference;this.active=true;this.calendar=calendar;this.holidayCells=cells;this.paintHolidays(focused);
   }
   hide() {this.closeHoliday();}
   reset() {
@@ -66,11 +66,12 @@ export class TrackHolidays {
   }
   paintHolidays(focused) {
     if(!this.active||!this.calendar)return;
-    const key=this.calendar.month+'|'+getLocale();
+    const country=selectedHolidayCountry(this.preference),key=this.calendar.month+'|'+getLocale()+'|'+this.preference+'|'+country;
     if(this.holidayKey===key) {if(this.holidayData)this.applyHolidays(this.holidayData,focused);return;}
     const generation=++this.holidayGeneration;this.holidayKey=key;this.holidayData=null;
+    if(this.preference==='none') {this.holidayStatus.hidden=true;return;}
     this.holidayStatus.hidden=false;this.holidayMessage.textContent=i18nText('holidays.loading');this.holidaySource.hidden=true;this.holidayRetry.disabled=true;
-    void publicHolidayCalendar(this.calendar,getLocale()).then(data=>{
+    void publicHolidayCalendar(this.calendar,getLocale(),country).then(data=>{
       if(generation!==this.holidayGeneration||!this.active)return;
       this.holidayData=data;this.applyHolidays(data,focused);
     }).catch(()=>{

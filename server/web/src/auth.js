@@ -55,14 +55,14 @@ export function authentication({ connect, clear, updateAccount, refreshProfile }
     if ((await connect(session, data)) === false) return;
     if (current === generation && active === session) await connectAccount(session, data, reset, updateAccount, refreshProfile);
   }
-  function reset(message = '', retry = null) {
+  function reset(message = '', retry = null, {restoring = false} = {}) {
     loginPasskey.cancel();passkeyState(false);
-    ++generation;active?.close();active = null;closeAccount();clear();
+    ++generation;active?.close();active = null;closeAccount();clear({restoring});
     recovery?.close();
     $('login-form').reset();
     if (retry) {$('auth-mode').value = retry.mode;$('username').value = retry.username;}
     mode();$('login-error').textContent = message;
-    const current = generation;void loadStatus().then((status) => {if (current === generation) capabilities(status);}).catch(() => {});
+    if (!restoring) {const current = generation;void loadStatus().then((status) => {if (current === generation) capabilities(status);}).catch(() => {});}
   }
   async function exchange(token, current) {
     if (!isSecureOrigin()) throw new Error();
@@ -147,13 +147,14 @@ export function authentication({ connect, clear, updateAccount, refreshProfile }
   });
   recovery = emailRecovery({ request: publicRequest, signIn: reset });
   window.addEventListener('hashchange', () => {void recovery.initializeFromLocation();});
-  return { clear: reset, async initialize() {
+  return { clear: reset, suspend: () => reset('', null, {restoring: true}), async initialize() {
       if (await recovery.initializeFromLocation()) return;
       const current = ++generation;
       const submit = $('login-form').querySelector('button');submit.disabled = true;
       try {capabilities(await loadStatus());if (current !== generation) return;const session = new Api();const { data } = await session.request('/auth/session');session.close();forgetToken();await attach(data, current);}
       catch (error) {
         if (current !== generation) return;
+        if (active) {reset(errorText(error));return;}
         const token = savedToken();
         if (token) {try {await exchange(token, current);return;} catch (failure) {$('login-error').textContent = errorText(failure);}}
         try {
@@ -163,6 +164,9 @@ export function authentication({ connect, clear, updateAccount, refreshProfile }
             if (status.setupRequired && $('auth-mode').value === 'login') {$('auth-mode').value = 'setup';mode();}
           }
         } catch {/* The sign-in form remains usable during an outage. */}
-      } finally {submit.disabled = false;}
+      } finally {
+        submit.disabled = false;
+        if (current === generation) {$('startup').hidden = true;if (!active) $('login').hidden = false;}
+      }
     } };
 }
