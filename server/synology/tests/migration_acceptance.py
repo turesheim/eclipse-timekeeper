@@ -25,7 +25,7 @@ DB=ROOT/'server/app/src/main/resources/db'
 def quote(value):return "'"+value.replace("'","''")+"'"
 
 
-def fixture_sql(schema=5, *, runtime=False):
+def fixture_sql(schema=6, *, runtime=False):
     if schema not in (2,3,4,5,6):raise ValueError('Unsupported fixture schema')
     sql=(DB/'schema-v1-postgresql.sql').read_text()+(DB/'auth-v2.sql').read_text()
     sql+="UPDATE tk_schema SET schema_version=2,state='READY'; UPDATE tk_auth_control SET bootstrap_completed=TRUE;\n"
@@ -182,12 +182,12 @@ def main():
             command('docker','exec',target,'test','-f','/var/packages/timekeeper/var/server/config/maintenance-pending.json')
             helper('cancel-empty-import')
             helper('import-postgresql18',native_archive)
-            compared=[table for table in exporter.tables(args.source_schema) if (table!='tk_schema' or args.source_schema==5) and (table!='tk_auth_session' or args.source_schema>=4)]
+            compared=[table for table in exporter.tables(args.source_schema) if (table!='tk_schema' or args.source_schema==6) and (table!='tk_auth_session' or args.source_schema>=4)]
             fingerprints=client('psql',['-X','-q','-A','-t'],sql='\n'.join(exporter.fingerprint_sql(table) for table in compared))
             actual=command('docker','exec','-i',target,'psql','-X','-q','-A','-t','-U','postgres','-p','5433','-d','timekeeper_fixture',input='\n'.join(exporter.fingerprint_sql(table) for table in compared)).stdout.strip()
             if actual!=fingerprints:raise AssertionError('Migration changed source data')
             metadata=command('docker','exec',target,'psql','-X','-At','-U','postgres','-p','5433','-d','timekeeper_fixture','-c',"SELECT schema_version||'|'||state FROM tk_schema WHERE id=1").stdout.strip()
-            if metadata!='5|READY':raise AssertionError('Migration did not produce the current ready schema')
+            if metadata!='6|READY':raise AssertionError('Migration did not produce the current ready schema')
             if args.source_schema<4:
                 sessions=command('docker','exec',target,'psql','-X','-At','-U','postgres','-p','5433','-d','timekeeper_fixture','-c','SELECT count(*) FROM tk_auth_session').stdout.strip()
                 if sessions!='0':raise AssertionError('Migration retained sessions without origin/browser provenance')
@@ -231,10 +231,10 @@ def main():
                     helper('prestart')
                 from native_server import verify
                 native=verify(command,target,folder,args.server_image)
-            print(json.dumps({'source':'postgres:18.6-bookworm' ,'target':'postgres:17.11-bookworm','sourceSchema':args.source_schema,'targetSchema':5,'sourceTablesCompared':len(compared),'backupTablesCompared':len(exporter.TABLES),
+            print(json.dumps({'source':'postgres:18.6-bookworm' ,'target':'postgres:17.11-bookworm','sourceSchema':args.source_schema,'targetSchema':6,'sourceTablesCompared':len(compared),'backupTablesCompared':len(exporter.TABLES),
                 'allTableFingerprintsMatch':True,'twoOwnersWithSharedResourceIds':True,'exactNanosecondTimestampsAndLargeRevisions':True,
                 'beyondJavaScriptIntegerRange':not bool(args.server_image),
-                'schemaMetadataUpgraded':args.source_schema<4,'verifiedAndPendingRecoveryAddressesPreserved':args.source_schema>=3,
+                'schemaMetadataUpgraded':args.source_schema<6,'verifiedAndPendingRecoveryAddressesPreserved':args.source_schema>=3,
                 'passkeyCredentialsAndRevocationTombstonesPreserved':args.source_schema>=4,'legacyBrowserSessionsRevoked':args.source_schema<4,
                 'accountAndTokenHashesPreserved':True,'legacyRegistryPreserved':True,'usedTargetRefused':True,'fingerprintMismatchRollsBackAtomically':True,'emptyFailedImportCanBeCancelled':True,'freshInstallationRestoreWithNewServiceCredential':True,'otherDatabaseUntouched':True,**native}))
         finally:
