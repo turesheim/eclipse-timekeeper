@@ -75,11 +75,11 @@ class ContractTest(unittest.TestCase):
                     self.assertFalse(validator(name).is_valid(missing))
 
     def test_optional_project_icons_are_bounded_metadata(self):
-        for icon in ('code', 'globe', 'gavel', 'rocket', None):
+        for icon in ('code', 'globe', 'hammer', 'rocket', 'airplane-engines', 'calendar3', 'phone', None):
             validator('ProjectInput').validate({'name': 'Project', 'icon': icon})
             validator('TransferProject').validate({'id': ID, 'name': 'Project', 'icon': icon})
         validator('ProjectInput').validate({'name': 'Earlier client'})
-        for icon in ('', 'unknown', '<svg onload=alert(1)>', 'https://example.invalid/icon.svg', 1, {}, []):
+        for icon in ('', 'unknown', 'gavel', 'mobile', 'chart', 'dragon', '<svg onload=alert(1)>', 'https://example.invalid/icon.svg', 1, {}, []):
             self.assertFalse(validator('ProjectInput').is_valid({'name': 'Project', 'icon': icon}))
 
     def test_atomic_provider_linking_is_available_at_task_creation(self):

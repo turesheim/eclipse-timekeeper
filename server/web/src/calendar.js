@@ -7,7 +7,7 @@ function node(tag,text,className) {
   const value=document.createElement(tag);if(text!==undefined) value.textContent=text;
   if(className) value.className=className;return value;
 }
-function button(label,operation,className) {
+function button(label,operation,className='btn btn-outline-secondary') {
   const value=node('button',label,className);value.type='button';value.addEventListener('click',operation);return value;
 }
 

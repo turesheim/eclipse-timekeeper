@@ -4,9 +4,11 @@
 `tests/` contains unit, browser and installed-Eclipse peer tests.
 Production uses native browser modules and requires no separate Node service.
 
-Bootstrap CSS and Font Awesome are pinned and bundled under `src/assets`.
-`npm run check:assets` verifies Bootstrap's generated files against the lockfile;
-`npm run vendor:bootstrap` regenerates them after an intentional dependency update.
+Bootstrap CSS and Bootstrap Icons are pinned and bundled under `src/assets`.
+`npm run check:assets` verifies their generated files against the lockfile;
+`npm run vendor:bootstrap` and `npm run vendor:icons` regenerate them after an
+intentional dependency update. The icon command also updates the project catalog
+and API allow-list from Bootstrap icon names.
 No Bootstrap JavaScript or third-party runtime asset requests are needed.
 
 Browser acceptance defaults to Chromium. For WebKit, install its browser with

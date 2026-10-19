@@ -6,10 +6,17 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
   await page.goto('/web/');const bar=page.locator('#workspace-navigation');await expect(bar).not.toBeVisible();
   await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_TOKEN);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+  await expect(bar).toHaveClass(/navbar/);await expect(bar).toHaveClass(/fixed-bottom/);
+  await expect(bar.locator('.navbar-nav')).toHaveCount(1);
+  expect(await page.evaluate(async()=>{
+    await document.fonts.load('18px bootstrap-icons');
+    return [...document.fonts].some(font=>font.family.includes('bootstrap-icons') && font.status==='loaded');
+  })).toBe(true);
+  await expect(page.locator('#refresh')).toHaveClass(/\bbtn\b/);
   const views=[['track','Track'],['week','Workweek'],['activities','Activities'],['calendar','Calendar'],['tasks','Tasks'],['clients','Clients'],['projects','Projects'],['labels','Labels']];
   for(const width of [320,390,768,1440]) {
     await page.setViewportSize({width,height:844});
-    await expect(bar.locator('button')).toHaveCount(8);await expect(bar.locator('.icon[aria-hidden=true]')).toHaveCount(8);
+    await expect(bar.locator('button')).toHaveCount(8);await expect(bar.locator('.bi[aria-hidden=true]')).toHaveCount(8);
     const bounds=await bar.boundingBox();expect(bounds.y+bounds.height).toBeCloseTo(844,0);
     for(const [id,label] of views) {
       const button=bar.getByRole('button',{name:label,exact:true});
