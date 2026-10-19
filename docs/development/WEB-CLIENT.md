@@ -129,7 +129,8 @@ Norwegian Bokmål shows Norway, English (United Kingdom) shows the UK and Englis
 (United States) shows US holidays. The account time zone still controls recorded
 work; it never moves a holiday to a different civil date.
 
-Select a holiday name or its calendar icon to read the full date and all names
+Holiday names appear directly beside the date, with both highlighted in red and
+no icon or underline. Select a holiday name to read the full date and all names
 for that day. This also works with read-only access. On narrow screens the names
 are shortened visually; the dialog, hover title and accessible name retain them.
 Holiday information does not change sessions, totals or editing permissions.
