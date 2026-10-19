@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {workSessionAction} from './workweek-session-actions.js';
 import {browserRequest} from './browser-request.js';
 import {test,expect} from '@playwright/test';
@@ -70,7 +71,7 @@ test('compact account navigation supports touch, keyboard, account settings and 
   }
   await page.setViewportSize({width:390,height:844});await openAccountMenu(page);
   const audit=await new AxeBuilder({page}).include('.app-header').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
-  await page.screenshot({path:'test-results/account-menu-mobile.png',fullPage:true});
+  await captureScreenshot(page,{path:'test-results/account-menu-mobile.png',fullPage:true});
   await page.getByRole('link',{name:'My Account',exact:true}).click();await expect(menu).not.toHaveAttribute('open','');
   await expect(page.getByRole('heading',{name:'Time zone',exact:true})).toBeVisible();await expect(page.getByLabel('Time zone',{exact:true})).toBeVisible();
   await expect(page.locator('.app-header')).not.toContainText('Time zone');

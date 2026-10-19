@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {openTaskManagement} from './navigation.js';
 import {workSessionAction} from './workweek-session-actions.js';
 import {browserRequest} from './browser-request.js';
@@ -96,7 +97,7 @@ test('account time zone controls local editors and build dates across DST and br
     await page.getByLabel('End (local time, blank while tracking)',{exact:true}).fill('2025-03-30T03:30:00');
     await page.locator('#save').click();await expect(page.locator('#editor-error')).toContainText('does not exist');
     await page.getByRole('button',{name:'Cancel',exact:true}).click();
-    await page.screenshot({path:'test-results/local-time-zone.png',fullPage:true});
+    await captureScreenshot(page,{path:'test-results/local-time-zone.png',fullPage:true});
   } finally {
     for (const [collection,value] of [['activities',activity],['work-sessions',session]]) if(value) {
       const read=await api(request,'GET',`/${collection}/${value.id}`);
@@ -121,9 +122,9 @@ test('server build and deployment details describe the actual packaged server af
   await expect(page.locator('#server-commit')).toHaveText(information.commit);
   await expect(page.locator('#server-deployed')).not.toHaveText('Not recorded');
   await expect(page.locator('#server-started')).not.toHaveText(await page.locator('#server-deployed').textContent());
-  await page.screenshot({path:'test-results/server-information-desktop.png', fullPage:true});
+  await captureScreenshot(page,{path:'test-results/server-information-desktop.png', fullPage:true});
   await page.setViewportSize({width:390,height:844});
-  await page.screenshot({path:'test-results/server-information-mobile.png', fullPage:true});
+  await captureScreenshot(page,{path:'test-results/server-information-mobile.png', fullPage:true});
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   await page.reload();
   await expect(page.locator('#server-info')).not.toBeVisible();await openAbout(page);
@@ -154,8 +155,8 @@ test('core browser workflow manages records, tracks time, and preserves exact re
   await expect(page.locator('#week-total')).toHaveText('0h 0m');
   await page.locator('#activities tr').filter({hasText:'One nanosecond'}).getByRole('button', {name:'Edit', exact:true}).click(); await expect(page.getByLabel('Start (local time)', {exact:true})).toHaveValue(await editorTime(request, '2025-10-25T22:00:00.123456789Z'));
   await page.getByRole('button', {name:'Cancel', exact:true}).click();
-  await page.screenshot({path:'test-results/workweek-desktop.png', fullPage:true});
-  await page.setViewportSize({width:390, height:844}); await page.screenshot({path:'test-results/workweek-mobile.png', fullPage:true});
+  await captureScreenshot(page,{path:'test-results/workweek-desktop.png', fullPage:true});
+  await page.setViewportSize({width:390, height:844}); await captureScreenshot(page,{path:'test-results/workweek-mobile.png', fullPage:true});
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   // Dependency rejection keeps the delete confirmation and does not cascade.
   await page.getByRole('button', {name:'Projects', exact:true}).click(); await page.locator('#projects tr').filter({hasText:project}).getByRole('button', {name:'Delete', exact:true}).click();
@@ -378,10 +379,10 @@ test('workweek groups linked tasks under projects with seven day columns and con
   await expect(page.getByLabel('Task',{exact:true})).toHaveValue(child.id);
   await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue(await editorTime(request, '2025-10-25T22:00:00.123456789Z'));
   await page.getByRole('button',{name:'Cancel',exact:true}).click();
-  await page.screenshot({path:'test-results/workweek-hierarchy-desktop.png',fullPage:true});
+  await captureScreenshot(page,{path:'test-results/workweek-hierarchy-desktop.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
-  await page.screenshot({path:'test-results/workweek-hierarchy-mobile.png',fullPage:true});
+  await captureScreenshot(page,{path:'test-results/workweek-hierarchy-mobile.png',fullPage:true});
   const report = await (await api(request,'GET','/reports/activities?from=2025-10-19T22:00:00Z&to=2025-10-26T23:00:00Z&zoneId=Europe%2FOslo')).json();
   expect(report.total).toBe('PT24H59M59.876543211S');
   await openTaskManagement(page);
@@ -579,8 +580,8 @@ test('independent taskless activities derive overlap context and survive session
   expect(moved.activities.map(value=>value.summary)).toEqual(['Outside session']);expect(moved.time.allocatedTime).toBe('PT30M');
   await page.getByRole('button',{name:'Delete work session',exact:true}).click();await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();
   expect((await (await api(request,'GET','/activities?from=2007-10-27T00:00:00Z&to=2007-10-30T00:00:00Z&limit=500')).json()).items).toEqual(before);
-  await page.screenshot({path:'test-results/work-session-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});
-  await page.screenshot({path:'test-results/work-session-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+  await captureScreenshot(page,{path:'test-results/work-session-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});
+  await captureScreenshot(page,{path:'test-results/work-session-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
 });
 test('lost session start and stop replies retry the exact durable command', async ({page,request}) => {
   await signIn(page);const keys=[];

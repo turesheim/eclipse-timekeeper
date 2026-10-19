@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {browserRequest} from './browser-request.js';
 import {openAccountMenu,openAbout} from './navigation.js';
 import {test,expect} from '@playwright/test';
@@ -46,7 +47,7 @@ test('rejected setup stays in setup and sign-in explains that no administrator e
 test('first administrator claims the explicit existing owner once and uses a secure browser cookie',async({page,request})=>{
   const status=await (await request.get('/api/v1/auth/status')).json();expect(status.setupRequired).toBe(true);
   await page.goto('/web/');await expect(page.locator('#auth-mode')).toHaveValue('setup');
-  await page.screenshot({path:'test-results/account-setup.png',fullPage:true});
+  await captureScreenshot(page,{path:'test-results/account-setup.png',fullPage:true});
   await page.getByLabel('One-time setup or recovery code').fill(' '+process.env.TIMEKEEPER_WEB_SETUP_CODE+' ');
   await expect(page.getByLabel('Display name',{exact:true})).toHaveCount(0);
   await page.getByLabel('Recovery email',{exact:true}).fill('browser-admin@example.org');
@@ -61,7 +62,7 @@ test('first administrator claims the explicit existing owner once and uses a sec
   await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');
   await openAbout(page);await expect(page.locator('#server-build')).toContainText('SPK 1.99.0-146');
   await expect(page.locator('#server-spk')).toHaveText('1.99.0-146');
-  await page.screenshot({path:'test-results/account-signed-in.png',fullPage:true});
+  await captureScreenshot(page,{path:'test-results/account-signed-in.png',fullPage:true});
   await page.locator('#about-close').click();
   await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#login')).toBeVisible();
   await login(page);await expect(page.locator('#owner')).toHaveText('browser-admin');
@@ -91,7 +92,7 @@ test('account UI creates an isolated user and named Eclipse token shown once',as
     await other.getByRole('link',{name:'Back to time tracking',exact:true}).click();await openAccountMenu(other);await other.getByRole('button',{name:'Sign out',exact:true}).click();await expect(other.locator('#login')).toBeVisible();await expect(other.locator('#clients')).toBeEmpty();
     await login(other);await other.getByRole('button',{name:'Clients',exact:true}).click();await expect(other.locator('#clients')).not.toContainText('Private client '+suffix);
   } finally {await peer.close();}
-  await page.screenshot({path:'test-results/account-administration.png',fullPage:true});
+  await captureScreenshot(page,{path:'test-results/account-administration.png',fullPage:true});
 });
 test('remember me persists a cookie while local storage holds no password or bearer token',async({page})=>{
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');await page.locator('#login-form').getByLabel('Username',{exact:true}).fill('browser-admin');await page.getByLabel('Password',{exact:true}).fill(password);await page.getByLabel('Remember me on this browser').check();await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
@@ -152,6 +153,6 @@ for(const explicitUtc of [false,true]) test(explicitUtc ? 'explicit UTC remains 
     expect(await (await browserRequest(context).get('/api/v1/work-sessions/'+session.id)).json()).toEqual(session);
     await page.reload();await expect(page.locator('#work-session-current')).toContainText(clock);
     expect((await (await browserRequest(context).get('/api/v1/me')).json()).version).toBe(1);
-    await page.screenshot({path:`test-results/work-session-${explicitUtc ? 'explicit-utc':'local-time'}.png`,fullPage:true});
+    await captureScreenshot(page,{path:`test-results/work-session-${explicitUtc ? 'explicit-utc':'local-time'}.png`,fullPage:true});
   } finally {await context.close();}
 });

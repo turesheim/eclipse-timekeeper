@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -47,8 +48,8 @@ test('day notes can be added from the day menu, edited, canceled and removed wit
     await note(page).focus();await page.keyboard.press('Shift+F10');await expect(page.getByRole('menuitem')).toHaveText('Edit day note');await page.keyboard.press('Escape');await expect(note(page)).toBeFocused();
     await menu(page);await save(page,'Avspasering');await expect(note(page)).toHaveText('Avspasering');
     await note(page,'2026-05-18').click();await save(page,'Ferie');await expect(note(page,'2026-05-18')).toHaveText('Ferie');expect(await day(page,'2026-05-18').locator('[data-track-daily-client]').count()).toBe(0);
-    await page.screenshot({path:'test-results/day-notes-desktop.png',fullPage:true});
-    await menu(page);await page.screenshot({path:'test-results/day-notes-editor.png'});await save(page,'');await expect(note(page)).toHaveClass(/is-empty/);
+    await captureScreenshot(page,{path:'test-results/day-notes-desktop.png',fullPage:true});
+    await menu(page);await captureScreenshot(page,{path:'test-results/day-notes-editor.png'});await save(page,'');await expect(note(page)).toHaveClass(/is-empty/);
     await expect(page.locator('#track-total')).toHaveText(total);const unchanged=await api('GET','/work-sessions/'+work.id);expect(unchanged.headers().etag).toBe(original.headers().etag);expect(await unchanged.json()).toEqual(work);
     await page.reload();await month(page);await expect(note(page,'2026-05-18')).toHaveText('Ferie');await expect(note(page)).toHaveClass(/is-empty/);
     const changed=await api('GET','/me');await api('PUT','/me',{zoneId:'Pacific/Honolulu'},{'If-Match':changed.headers().etag});await page.reload();await month(page);await expect(note(page,'2026-05-18')).toHaveText('Ferie');
@@ -89,7 +90,7 @@ test('day notes fit all themes and narrow screens, and failed reads leave work a
       const audit=await new AxeBuilder({page}).include('#track-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>({id:value.id,nodes:value.nodes.map(node=>node.target)}))).toEqual([]);
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await note(page).click();await expect(page.locator('#track-note-text')).toBeEnabled();const edit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(edit.violations.map(value=>value.id)).toEqual([]);await page.keyboard.press('Escape');
     }
-    await page.setViewportSize({width:320,height:740});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/day-notes-mobile.png',fullPage:true});
+    await page.setViewportSize({width:320,height:740});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:'test-results/day-notes-mobile.png',fullPage:true});
     let failed=true;await page.route('**/api/v1/day-notes?*',route=>failed?route.fulfill({status:503,contentType:'application/problem+json',body:JSON.stringify({code:'UNAVAILABLE'})}):route.continue());await page.reload();await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#track-month').fill('2026-05');await expect(page.locator('.track-note-status')).toContainText('could not be loaded');await expect(page.locator('#session-new')).toBeEnabled();await expect(note(page)).toBeDisabled();
     failed=false;await page.locator('.track-note-status').getByRole('button',{name:'Retry'}).click();await expect(note(page)).toContainText('<Ferie>');await expect(note(page)).toBeEnabled();
   }finally{await owner.close();}

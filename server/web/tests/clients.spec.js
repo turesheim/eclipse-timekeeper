@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {openTaskManagement} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -55,10 +56,10 @@ test('clients maintain names and colors, own projects and color work-session sum
     await page.getByRole('button',{name:'Record work session',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill(prefix+' planning');await page.getByLabel('Client',{exact:true}).selectOption(client.id);
     await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveAttribute('type','datetime-local');await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveAttribute('type','datetime-local');
     await expect(page.getByLabel('Enter exact times',{exact:true})).toHaveCount(0);
-    await page.screenshot({path:'test-results/work-session-date-picker.png',fullPage:true});
+    await captureScreenshot(page,{path:'test-results/work-session-date-picker.png',fullPage:true});
     await page.setViewportSize({width:390,height:844});
     const pickerBox=await page.getByLabel('Start (local time)',{exact:true}).boundingBox();expect(pickerBox.x).toBeGreaterThanOrEqual(0);expect(pickerBox.x+pickerBox.width).toBeLessThanOrEqual(390);
-    await page.screenshot({path:'test-results/work-session-date-picker-narrow.png',fullPage:true});await page.setViewportSize({width:1280,height:720});
+    await captureScreenshot(page,{path:'test-results/work-session-date-picker-narrow.png',fullPage:true});await page.setViewportSize({width:1280,height:720});
     await page.getByLabel('Summary',{exact:true}).fill('A separate description');await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-20T08:00');await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2025-10-20T16:00');await save(page);
     session=(await (await api(request,'GET','/work-sessions?clientId='+client.id)).json()).items[0];expect(session.summary).toBe('A separate description');
     await page.getByRole('button',{name:'Calendar',exact:true}).click();await page.getByLabel('Calendar date',{exact:true}).fill('2025-10-20');
@@ -67,7 +68,7 @@ test('clients maintain names and colors, own projects and color work-session sum
     await page.getByLabel('Name',{exact:true}).fill(prefix+' renamed');await page.getByLabel('Color',{exact:true}).fill('#102030');await save(page);
     await page.getByRole('button',{name:'Calendar',exact:true}).click();await expect(bar).toHaveCSS('background-color','rgb(16, 32, 48)');await expect(bar).toHaveCSS('color','rgb(255, 255, 255)');
     await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Calendar',exact:true}).click();await page.getByLabel('Calendar date',{exact:true}).fill('2025-10-20');await expect(bar).toHaveCSS('background-color','rgb(16, 32, 48)');await expect(bar).toHaveAttribute('title',new RegExp(prefix+' renamed'));
-    await page.screenshot({path:'test-results/client-calendar.png',fullPage:true});
+    await captureScreenshot(page,{path:'test-results/client-calendar.png',fullPage:true});
     await page.getByRole('button',{name:'Clients',exact:true}).click();row=page.locator('#clients tr').filter({hasText:prefix});await row.getByRole('button',{name:'Delete',exact:true}).click();await page.locator('#save').click();await expect(page.locator('#editor-error')).toContainText('conflicts');await page.locator('#cancel').click();
     for(const [collection,values] of [['work-sessions',[session]],['projects',projects]]) for(const value of values) {const current=await api(request,'GET',`/${collection}/${value.id}`);await api(request,'DELETE',`/${collection}/${value.id}`,undefined,{'If-Match':current.headers().etag});}
     session=null;projects.length=0;
@@ -97,7 +98,7 @@ test('optional work-session projects select their client and survive start, stop
     await page.getByLabel('Project (optional)',{exact:true}).selectOption(project.id);await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-20T08:00');await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2025-10-20T16:00');
     await page.setViewportSize({width:390,height:844});await page.getByLabel('Project (optional)',{exact:true}).scrollIntoViewIfNeeded();
     const projectBox=await page.getByLabel('Project (optional)',{exact:true}).boundingBox();expect(projectBox.x).toBeGreaterThanOrEqual(0);expect(projectBox.x+projectBox.width).toBeLessThanOrEqual(390);
-    await page.screenshot({path:'test-results/work-session-project-narrow.png',fullPage:true});await save(page);
+    await captureScreenshot(page,{path:'test-results/work-session-project-narrow.png',fullPage:true});await save(page);
     const all=(await (await api(request,'GET','/work-sessions?projectId='+project.id)).json()).items;sessions.push(...all);expect(all).toHaveLength(1);expect(all[0].summary).toBe(prefix+' manual');expect(all[0].clientId).toBe(clients[0].id);
   } finally {
     for(const [collection,records] of [['work-sessions',sessions],['projects',project ? [project]:[]],['clients',clients]]) for(const record of records) {
@@ -201,10 +202,10 @@ test('optional project icons persist and Track shows distinct icons to the right
     const entry=page.locator(`[data-track-date="2025-10-20"] [data-track-daily-client="${client.id}"]`),icons=entry.locator('.track-project-icons [data-project-icon]');
     await expect(entry.locator('.track-client-day-time')).toHaveText('5h 0m');await expect(icons).toHaveCount(2);await expect(entry.locator('[data-project-icon=code]')).toHaveAttribute('title',new RegExp(other.name));await expect(entry).toHaveAttribute('title',new RegExp(globe.name));
     async function iconsFollow(duration){const clock=await duration.boundingBox();for(const icon of await icons.all()){const box=await icon.boundingBox();expect(box.x).toBeGreaterThanOrEqual(clock.x+clock.width-.5);}}
-    await iconsFollow(entry.locator('.track-client-day-time'));await page.screenshot({path:'test-results/track-project-icons.png',fullPage:true});
+    await iconsFollow(entry.locator('.track-client-day-time'));await captureScreenshot(page,{path:'test-results/track-project-icons.png',fullPage:true});
     await page.setViewportSize({width:390,height:844});await expect(entry.locator('.track-client-day-time-short')).toHaveText('5h');await iconsFollow(entry.locator('.track-client-day-time-short'));expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     expect((await new AxeBuilder({page}).include('#track-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
-    await page.screenshot({path:'test-results/track-project-icons-mobile.png',fullPage:true});
+    await captureScreenshot(page,{path:'test-results/track-project-icons-mobile.png',fullPage:true});
     await page.getByRole('button',{name:'Projects',exact:true}).click();await row.getByRole('button',{name:'Edit',exact:true}).click();await page.getByRole('radio',{name:'None',exact:true}).check();await save(page);await expect(row.locator('[data-project-icon]')).toHaveCount(0);
     expect((await (await api(request,'GET','/projects/'+project.id)).json()).icon).toBeNull();
     const current=await api(request,'GET','/projects/'+other.id);await api(request,'PUT','/projects/'+other.id,{name:other.name,icon:null},{'If-Match':current.headers().etag});

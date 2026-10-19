@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -45,7 +46,7 @@ test('About identifies the project and bundled libraries with complete local lic
   expect(dependencies.status()).toBe(200);expect(await dependencies.text()).toContain('MIT');
   for(const link of await dialog.locator('a').all()) {await expect(link).toHaveAttribute('target','_blank');await expect(link).toHaveAttribute('rel','noopener noreferrer');}
   expect(outside).toEqual([]);
-  await page.setViewportSize({width:1440,height:1400});await page.screenshot({path:'test-results/about-references-desktop.png',fullPage:true});
+  await page.setViewportSize({width:1440,height:1400});await captureScreenshot(page,{path:'test-results/about-references-desktop.png',fullPage:true});
   await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await expect(page.locator('#account-menu summary')).toBeFocused();
 });
 
@@ -62,7 +63,7 @@ test('About follows the saved Norwegian language and remains accessible in every
     expect((await new AxeBuilder({page}).include('#server-info').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
     expect(await dialog.evaluate(node=>node.scrollWidth<=node.clientWidth)).toBe(true);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    if(theme==='timekeeper')await page.screenshot({path:'test-results/about-references-mobile.png',fullPage:false});
+    if(theme==='timekeeper')await captureScreenshot(page,{path:'test-results/about-references-mobile.png',fullPage:false});
     await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await expect(page.locator('#account-menu summary')).toBeFocused();
   }
 });

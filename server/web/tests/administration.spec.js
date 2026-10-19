@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -40,9 +41,9 @@ test('administration settings and user management share accessible desktop and n
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
       const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>value.id)).toEqual([]);
     }
-    await page.screenshot({path:`test-results/administration-users-${width}.png`,fullPage:true});
+    await captureScreenshot(page,{path:`test-results/administration-users-${width}.png`,fullPage:true});
     await page.getByRole('link',{name:'General settings',exact:true}).click();await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');
-    await page.screenshot({path:`test-results/administration-settings-${width}.png`,fullPage:true});
+    await captureScreenshot(page,{path:`test-results/administration-settings-${width}.png`,fullPage:true});
   }
   await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await expect(page).toHaveURL(/\/web\/$/);await expect(page.locator('#status')).toHaveText('Up to date');
 });
@@ -110,9 +111,9 @@ test('administration saves shared settings for restart and keeps SMTP credential
     await page.getByText('Saved and effective settings',{exact:true}).click();await expect(page.getByRole('row').filter({hasText:'SMTP host'})).toContainText(host);await expect(page.getByRole('row').filter({hasText:'SMTP host'})).toContainText(initial.effective.smtpHost);
     await page.getByLabel('Clear saved SMTP password',{exact:true}).check();await page.getByLabel('Current administrator password',{exact:true}).fill(admin.secret);await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.getByLabel('Current administrator password',{exact:true})).toHaveValue('');
     const cleared=await browserRequest(page).get('/api/v1/admin/settings');expect((await cleared.json()).smtpPasswordConfigured).toBe(false);
-    await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:'test-results/administration-editable-desktop.png',fullPage:true});
+    await page.setViewportSize({width:1440,height:1000});await captureScreenshot(page,{path:'test-results/administration-editable-desktop.png',fullPage:true});
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>value.id)).toEqual([]);await page.screenshot({path:'test-results/administration-editable-narrow.png',fullPage:true});
+    const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>value.id)).toEqual([]);await captureScreenshot(page,{path:'test-results/administration-editable-narrow.png',fullPage:true});
   } finally {await admin.close();}
 });
 test('administration preserves service-setting drafts after a peer save and reloads only on request',async({page,request})=>{

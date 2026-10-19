@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -24,7 +25,7 @@ test('editing a work session offers a cancellable deletion with Undo and preserv
   await expect(confirm.getByRole('button',{name:'Cancel',exact:true})).toBeFocused();
   expect((await new AxeBuilder({page}).include('#editor-delete-confirm').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
   await page.setViewportSize({width:390,height:844});const bounds=await confirm.boundingBox();expect(bounds.y).toBeGreaterThanOrEqual(0);expect(bounds.y+bounds.height).toBeLessThanOrEqual(844);
-  await page.screenshot({path:'test-results/work-session-editor-delete-confirm.png',fullPage:false});
+  await captureScreenshot(page,{path:'test-results/work-session-editor-delete-confirm.png',fullPage:false});
   await confirm.getByRole('button',{name:'Cancel',exact:true}).click();await expect(confirm).toBeHidden();await expect(page.locator('#field-summary')).toHaveValue('Unsaved editor draft');await expect(page.locator('#editor-delete')).toBeFocused();expect(writes).toEqual([]);
   await page.locator('#editor-delete').click();await page.keyboard.press('Escape');await expect(confirm).toBeHidden();await expect(editor).toBeVisible();await expect(page.locator('#field-summary')).toHaveValue('Unsaved editor draft');expect(writes).toEqual([]);
   const before=await call('GET',path);await page.locator('#editor-delete').click();await confirm.getByRole('button',{name:'Delete',exact:true}).click();

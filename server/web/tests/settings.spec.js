@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {browserRequest} from './browser-request.js';
 import {openAccountMenu} from './navigation.js';
 import {test, expect} from '@playwright/test';
@@ -44,7 +45,7 @@ test('My Account direct links, mobile layouts and Back navigation preserve runni
       const result = await new AxeBuilder({page}).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
       expect(result.violations.map(value => value.id)).toEqual([]);
     }
-    await page.screenshot({path: `test-results/my-account-profile-${width}.png`, fullPage: true});
+    await captureScreenshot(page,{path: `test-results/my-account-profile-${width}.png`, fullPage: true});
   }
   await page.getByLabel('Time zone', {exact: true}).fill('Invalid/Zone'); await page.getByRole('button', {name: 'Save time zone', exact: true}).click();
   await expect(page.locator('#account-content')).toContainText('Enter a valid time zone');
@@ -102,8 +103,8 @@ test('Users page protects the last administrator, keeps stale drafts and confirm
   await page.getByLabel('Enabled', {exact: true}).check(); await page.getByRole('button', {name: 'Save user', exact: true}).click();
   await expect(page.locator('#account-content tr').filter({hasText: user.username})).toContainText('Enabled');
   expect((await (await api(request, 'GET', '/admin/users/' + key(self))).json()).user.administrator).toBe(true);
-  await page.screenshot({path: 'test-results/users-desktop.png', fullPage: true});
-  await page.setViewportSize({width: 390, height: 844}); await page.screenshot({path: 'test-results/users-mobile.png', fullPage: true});
+  await captureScreenshot(page,{path: 'test-results/users-desktop.png', fullPage: true});
+  await page.setViewportSize({width: 390, height: 844}); await captureScreenshot(page,{path: 'test-results/users-mobile.png', fullPage: true});
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   const result = await new AxeBuilder({page}).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze(); expect(result.violations).toEqual([]);
 });
@@ -136,7 +137,7 @@ test('personal tokens copy distinct secrets and support confirmed revocation and
   await secondRow.getByRole('button', {name: 'Delete', exact: true}).click(); await expect(secondRow).toContainText('Delete “Eclipse desktop”?');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   const accessibility = await new AxeBuilder({page}).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze(); expect(accessibility.violations).toEqual([]);
-  await page.screenshot({path: 'test-results/personal-token-delete-mobile.png', fullPage: true});
+  await captureScreenshot(page,{path: 'test-results/personal-token-delete-mobile.png', fullPage: true});
   await secondRow.getByRole('button', {name: 'Cancel', exact: true}).click(); await expect(secondRow.getByRole('button', {name: 'Revoke', exact: true})).toBeVisible();
   await row.getByRole('button', {name: 'Revoke', exact: true}).click(); await expect(row).toContainText('Revoke “Eclipse laptop”?');
   await row.getByRole('button', {name: 'Cancel', exact: true}).click();

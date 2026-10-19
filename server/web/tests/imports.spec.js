@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {openAccountMenu} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {fileURLToPath} from 'node:url';
@@ -34,7 +35,7 @@ test('Toggl CSV worker, reviewed mappings, repeat import and whole-job Undo pres
   await login(page);await page.getByLabel('Import as',{exact:true}).selectOption('ACTIVITY');const before = await api(request,'/data/export');
   await review(page);await expect(page.locator('#account-content')).toContainText('7 selected entries');
   const accessibility = await new AxeBuilder({page}).include('#account-page').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(accessibility.violations).toEqual([]);
-  await page.screenshot({path:'test-results/toggl-import-review.png',fullPage:true});
+  await captureScreenshot(page,{path:'test-results/toggl-import-review.png',fullPage:true});
   await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
   const first = await api(request,'/data/export');expect(first.activities.length-before.activities.length).toBe(7);expect(first.workSessions.length).toBe(before.workSessions.length);
   const jobs = await api(request,'/imports');expect(jobs.items).toHaveLength(1);expect(jobs.items[0].importedNanos).toBe('151462000000000');expect(jobs.items[0].state).toBe('IMPORTED');
@@ -47,7 +48,7 @@ test('Toggl CSV worker, reviewed mappings, repeat import and whole-job Undo pres
   await expect(page.locator('#account-content')).toContainText('7 already imported');await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
   const repeated = await api(request,'/data/export');expect(repeated.activities.length).toBe(first.activities.length);expect(repeated.clients.length).toBe(first.clients.length);expect(repeated.projects.length).toBe(first.projects.length);
   await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  await page.screenshot({path:'test-results/toggl-import-history-mobile.png',fullPage:true});
+  await captureScreenshot(page,{path:'test-results/toggl-import-history-mobile.png',fullPage:true});
   const ordered = (await api(request,'/imports')).items.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
   await undo(page,ordered.findIndex(job=>job.id!==originalId));
   expect((await api(request,'/data/export')).activities.length).toBe(first.activities.length);
@@ -143,7 +144,7 @@ test('Toggl defaults to work sessions with client totals, repeat detection and w
   await expect(page.getByLabel(/Source workspace/)).toHaveCount(0);await expect(page.getByLabel('Import as',{exact:true})).toHaveValue('WORK_SESSION');await review(page);
   await expect(page.getByLabel('New project name',{exact:true})).toHaveCount(0);await expect(page.getByLabel('New label name',{exact:true})).toHaveCount(0);
   const audit=await new AxeBuilder({page}).include('#account-page').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
-  await page.screenshot({path:'test-results/toggl-session-import-review.png',fullPage:true});
+  await captureScreenshot(page,{path:'test-results/toggl-session-import-review.png',fullPage:true});
   await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
   const imported=await api(request,'/data/export'),sessions=imported.workSessions.filter(value=>!before.workSessions.some(old=>old.id===value.id));expect(sessions).toHaveLength(7);
   for(const type of ['activities','tasks']) expect(imported[type].length).toBe(before[type].length);
@@ -158,7 +159,7 @@ test('Toggl defaults to work sessions with client totals, repeat detection and w
   await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Import',exact:true}).click();await review(page);
   await expect(page.locator('#account-content')).toContainText('7 already imported');await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
   expect((await api(request,'/data/export')).workSessions.length).toBe(imported.workSessions.length);
-  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/toggl-session-import-history-mobile.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:'test-results/toggl-session-import-history-mobile.png',fullPage:true});
   const history=(await api(request,'/imports')).items.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));await undo(page,history.findIndex(value=>value.id!==job.id && value.mode==='WORK_SESSION'));
   const updated=(await api(request,'/imports')).items.filter(value=>['IMPORTING','IMPORTED','BLOCKED','UNDOING'].includes(value.state)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));await undo(page,updated.findIndex(value=>value.id===job.id));
   const after=await api(request,'/data/export');expect(after.workSessions.length).toBe(before.workSessions.length);expect(after.clients.length).toBe(before.clients.length);expect(after.labels.length).toBe(before.labels.length);
@@ -232,7 +233,7 @@ for(const mode of ['WORK_SESSION','ACTIVITY']) test(`Toggl ${mode} maps several 
   const mappingTable=page.getByRole('table').filter({has:page.getByRole('columnheader',{name:'Toggl client',exact:true})});
   for(const source of sources) await expect(mappingTable.getByRole('row').filter({hasText:source})).toContainText('Use existing: '+destination.name);
   await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  await page.screenshot({path:`test-results/toggl-existing-client-${mode.toLowerCase()}.png`,fullPage:true});
+  await captureScreenshot(page,{path:`test-results/toggl-existing-client-${mode.toLowerCase()}.png`,fullPage:true});
   await page.getByRole('button',{name:'Import selected entries',exact:true}).click();await expect(page.getByRole('heading',{name:'Import complete',exact:true})).toBeVisible();
   const imported=await api(request,'/data/export'),collection=mode==='WORK_SESSION' ? 'workSessions' : 'activities';
   expect(imported.clients).toEqual(before.clients);const added=imported[collection].filter(value=>!before[collection].some(old=>old.id===value.id));expect(added).toHaveLength(3);expect(added.every(value=>Date.parse(value.end)-Date.parse(value.start)===3600000)).toBe(true);

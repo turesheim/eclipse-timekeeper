@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import {openAccountMenu} from './navigation.js';
@@ -46,8 +47,8 @@ test('passkeys: add with password and fresh passkey proof, rename, Remember me a
   },{times:1});
   await add.getByLabel('Passkey name',{exact:true}).fill('Security key');await add.getByLabel('Confirm with',{exact:true}).selectOption('passkey');await add.getByRole('button',{name:'Add passkey',exact:true}).click();
   await expect(page.locator('#account-content tr').filter({hasText:'Security key'})).toHaveCount(1);
-  await page.screenshot({path:'test-results/passkeys-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/passkeys-mobile.png',fullPage:true});await page.setViewportSize({width:1280,height:900});
+  await captureScreenshot(page,{path:'test-results/passkeys-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:'test-results/passkeys-mobile.png',fullPage:true});await page.setViewportSize({width:1280,height:900});
   await page.getByRole('button',{name:'Rename Laptop key',exact:true}).click();
   const rename=page.getByRole('heading',{name:'Rename “Laptop key”',exact:true}).locator('..');await rename.getByLabel('Passkey name',{exact:true}).fill('Personal passkey');await rename.getByRole('button',{name:'Save name',exact:true}).click();
   await expect(page.locator('#account-content')).toContainText('Passkey renamed.');await expect(page.locator('#account-content tr').filter({hasText:'Personal passkey'})).toHaveCount(1);
@@ -66,7 +67,7 @@ test('passkeys: add with password and fresh passkey proof, rename, Remember me a
   await page.getByRole('button',{name:'Sign in with a passkey',exact:true}).click();await expect(page.locator('#login-error')).toContainText('could not be verified');
   await login(page,user);await account(page);await expect(page.locator('#account-content')).toContainText('No passkeys added.');
   expect(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length,cookies:document.cookie}))).toEqual({local:0,session:0,cookies:''});
-  await page.screenshot({path:'test-results/passkeys-empty-after-removal.png',fullPage:true});
+  await captureScreenshot(page,{path:'test-results/passkeys-empty-after-removal.png',fullPage:true});
 });
 
 test('passkeys: wrong fresh proof keeps the session, cancellation is normal and a new request still works',async({page,request})=>{

@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -63,7 +64,7 @@ test('calendar subscriptions show client-coloured plans and create reviewed acti
     expect((await api('GET','/work-sessions/'+work.id)).headers().etag).toBe(before.headers().etag);expect((await(await api('GET',activitiesPath)).json()).items).toHaveLength(2);
     await planned(page,subscription).click();await expect(details.getByRole('button',{name:'Create activity',exact:true})).toBeDisabled();await expect(details).toContainText('already been created');await page.keyboard.press('Escape');
     const observed=await(await request.get(feed.control)).json();expect(observed.headers.Authorization).toBeUndefined();expect(observed.headers.Cookie).toBeUndefined();
-    await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:'test-results/calendar-subscriptions-desktop.png',fullPage:true});
+    await page.setViewportSize({width:1440,height:1000});await captureScreenshot(page,{path:'test-results/calendar-subscriptions-desktop.png',fullPage:true});
   }finally{await context.close();}
 });
 
@@ -166,7 +167,7 @@ test('calendar subscriptions and event dialogs fit narrow screens and remain acc
       await planned(page,subscription).click();const event=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(event.violations.map(value=>({id:value.id,nodes:value.nodes.map(node=>node.target)}))).toEqual([]);await page.keyboard.press('Escape');
       await page.locator(`[data-calendar-action="edit:${subscription.id}"]`).click();await expect(page.locator('#calendar-subscription-editor input[name=url]')).toHaveValue('');const edit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(edit.violations.map(value=>({id:value.id,nodes:value.nodes.map(node=>node.target)}))).toEqual([]);await page.locator('#calendar-subscription-editor button[type=button]').click();
     }
-    await setTheme(page,'timekeeper');await page.screenshot({path:'test-results/calendar-subscriptions-mobile.png',fullPage:true});await page.locator('.calendar-all-day-event').click();await expect(page.locator('#calendar-event-details')).toContainText('Hele dagen');await page.screenshot({path:'test-results/calendar-subscriptions-details-mobile.png',fullPage:false});
+    await setTheme(page,'timekeeper');await captureScreenshot(page,{path:'test-results/calendar-subscriptions-mobile.png',fullPage:true});await page.locator('.calendar-all-day-event').click();await expect(page.locator('#calendar-event-details')).toContainText('Hele dagen');await captureScreenshot(page,{path:'test-results/calendar-subscriptions-details-mobile.png',fullPage:false});
   }finally{await context.close();}
 });
 

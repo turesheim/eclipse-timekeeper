@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -70,8 +71,8 @@ test('public holiday highlights stay subtle and consistent in Track and Calendar
       expect(await page.locator('.calendar-day[data-date="2026-05-16"]').evaluate(node=>getComputedStyle(node).backgroundColor)).not.toBe(tint);
       const audit=await new AxeBuilder({page}).include('#calendar-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>({id:value.id,nodes:value.nodes.map(node=>node.target)}))).toEqual([]);
       if(theme==='solarized-dark'||theme==='timekeeper') {
-        await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:`test-results/holiday-calendar-${theme}.png`,fullPage:true});
-        await page.locator('[data-tab=track]').click();await page.screenshot({path:`test-results/holiday-track-${theme}.png`,fullPage:true});
+        await page.setViewportSize({width:1440,height:1000});await captureScreenshot(page,{path:`test-results/holiday-calendar-${theme}.png`,fullPage:true});
+        await page.locator('[data-tab=track]').click();await captureScreenshot(page,{path:`test-results/holiday-track-${theme}.png`,fullPage:true});
       }
     }
     await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill('2026-05-04');
@@ -175,7 +176,7 @@ test('public holiday details fit narrow screens in every theme and delayed data 
   const user=await fresh(request),session=await context(browser),page=await session.newPage();
   try {
     await signIn(page,user);await page.locator('#track-month').fill('2026-05');await expect(holiday(page,'2026-05-17')).toBeVisible();
-    await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:'test-results/public-holidays-desktop.png',fullPage:true});
+    await page.setViewportSize({width:1440,height:1000});await captureScreenshot(page,{path:'test-results/public-holidays-desktop.png',fullPage:true});
     await page.setViewportSize({width:390,height:844});
     for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']) {
       await setTheme(page,theme);
@@ -186,7 +187,7 @@ test('public holiday details fit narrow screens in every theme and delayed data 
       await page.keyboard.press('Escape');
     }
     await setTheme(page,'timekeeper');
-    await page.screenshot({path:'test-results/public-holidays-mobile.png',fullPage:true});await holiday(page,'2026-05-17').click();await page.screenshot({path:'test-results/public-holidays-details-mobile.png',fullPage:false});await page.keyboard.press('Escape');
+    await captureScreenshot(page,{path:'test-results/public-holidays-mobile.png',fullPage:true});await holiday(page,'2026-05-17').click();await captureScreenshot(page,{path:'test-results/public-holidays-details-mobile.png',fullPage:false});await page.keyboard.press('Escape');
     await page.locator('#account-menu > summary').click();await page.locator('#sign-out').click();await expect(page.locator('#workspace')).toBeHidden();
     let release;const ready=new Promise(resolve=>{release=resolve;});
     await page.route('**/assets/date-holidays/engine.js*',async route=>{await ready;await route.continue();});

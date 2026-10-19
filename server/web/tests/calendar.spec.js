@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {openAccountMenu} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -113,11 +114,11 @@ test('dragging empty calendar space previews a new session and saves only after 
     page.on('request',value=>{if(value.method()==='POST' && new URL(value.url()).pathname==='/api/v1/work-sessions') creates++;});
     await dragRange(page,{date:'2025-10-21',clock:'09:00/0'},{date:'2025-10-21',clock:'10:30/0'});
     await expect(page.locator('.calendar-create-preview')).toHaveCount(1);expect(creates).toBe(0);
-    await page.screenshot({path:'test-results/calendar-range-preview-desktop.png'});
+    await captureScreenshot(page,{path:'test-results/calendar-range-preview-desktop.png'});
     await page.mouse.up();await expect(page.locator('#editor')).toBeVisible();
     expect(creates).toBe(0);await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-21T09:00');
     await expect(page.getByLabel('End (local time, blank while running)',{exact:true})).toHaveValue('2025-10-21T10:30');
-    await page.screenshot({path:'test-results/calendar-range-review-desktop.png'});
+    await captureScreenshot(page,{path:'test-results/calendar-range-review-desktop.png'});
     await page.getByLabel('Client',{exact:true}).selectOption(otherClient.id);
     await page.getByLabel('Summary',{exact:true}).fill(f.prefix+' dragged interval');await save(page);expect(creates).toBe(1);
     const created=(await (await api(request,'GET','/work-sessions?clientId='+otherClient.id)).json()).items.find(value=>value.summary===f.prefix+' dragged interval');
@@ -199,7 +200,7 @@ test('calendar shows seven days and editable work sessions while keeping activit
     await position(page,bar(page,f.session.id));await page.locator('#calendar-today').hover();
     await expect(handles.first()).toHaveCSS('opacity','0');
     await bar(page,f.session.id).hover();await expect(handles.first()).toHaveCSS('opacity','1');
-    await page.screenshot({path:'test-results/calendar-session-hover.png',fullPage:true});
+    await captureScreenshot(page,{path:'test-results/calendar-session-hover.png',fullPage:true});
     const select=bar(page,f.session.id).locator('.calendar-session-select');
     await select.click();await expect(select).toHaveAttribute('aria-pressed','true');
     // Browsers differ in whether a pointer click retains :focus-visible after
@@ -216,11 +217,11 @@ test('calendar shows seven days and editable work sessions while keeping activit
     expect(await page.locator('.calendar-day[data-date="2025-10-26"] .unavailable').count()).toBe(0);
     expect(await page.locator('.calendar-day[data-date="2025-10-20"] .unavailable').count()).toBe(4);
     await expect(page.locator('#calendar-panel')).not.toContainText(f.empty.summary);
-    await page.screenshot({path:'test-results/calendar-desktop.png',fullPage:true});
+    await captureScreenshot(page,{path:'test-results/calendar-desktop.png',fullPage:true});
     await page.setViewportSize({width:390,height:844});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
     expect(await page.locator('.calendar-scroll').evaluate(value=>value.scrollWidth>value.clientWidth)).toBeTruthy();
-    await page.screenshot({path:'test-results/calendar-mobile.png',fullPage:true});
+    await captureScreenshot(page,{path:'test-results/calendar-mobile.png',fullPage:true});
     await page.locator('[data-tab=activities]').click();await expect(page.locator('#activities').getByRole('link',{name:`#${f.issue}: ${f.task.summary}`,exact:true}).first()).toHaveAttribute('href',f.url);for(const activity of f.activities)await expect(page.locator(`#activities [data-activity-id="${activity.id}"]`)).toContainText(activity.summary);
     await expect(page.locator('[data-tab=tasks],#tasks-panel')).toHaveCount(0);
     await page.locator('[data-tab=calendar]').click();

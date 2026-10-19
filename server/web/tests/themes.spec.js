@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {setTheme,openThemeSettings} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -31,7 +32,7 @@ test('themes cover tracking, records, editors and account settings with accessib
     for(const id of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']) {
       await page.setViewportSize({width:1440,height:1000});await setTheme(page,id);
       await expect(page.locator('html')).toHaveAttribute('data-theme',id);await audit(page);
-      await page.locator('[data-tab=track]').click();await page.screenshot({path:`test-results/theme-${id}-desktop.png`,fullPage:false});
+      await page.locator('[data-tab=track]').click();await captureScreenshot(page,{path:`test-results/theme-${id}-desktop.png`,fullPage:false});
       for(const view of ['track','week','calendar','activities','clients','projects','labels']) {
         await page.locator(`[data-tab=${view}]`).click();
         if(view==='activities') {
@@ -44,7 +45,7 @@ test('themes cover tracking, records, editors and account settings with accessib
       await page.locator('[data-tab=projects]').click();await page.getByRole('button',{name:'New project',exact:true}).click();await page.getByRole('radio',{name:'Code',exact:true}).check();await audit(page);await page.locator('#cancel').click();
       await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');await audit(page);
       await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await page.locator('[data-tab=track]').click();
-      await page.setViewportSize({width:390,height:844});await audit(page);await page.screenshot({path:`test-results/theme-${id}-mobile.png`,fullPage:false});
+      await page.setViewportSize({width:390,height:844});await audit(page);await captureScreenshot(page,{path:`test-results/theme-${id}-mobile.png`,fullPage:false});
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     }
     violations.push(...await page.evaluate(()=>window.themePolicyViolations || []));expect(external).toEqual([]);

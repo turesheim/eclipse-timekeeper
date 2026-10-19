@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {openAccountMenu} from './navigation.js';
 import {test, expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -66,7 +67,7 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
       for(const mode of ['login','setup','recover','token']) {
         await page.locator('#auth-mode').selectOption(mode); await accessible(page);
       }
-      await page.screenshot({path:`test-results/design-sign-in-${name}.png`,fullPage:true});
+      await captureScreenshot(page,{path:`test-results/design-sign-in-${name}.png`,fullPage:true});
       await signIn(page);await page.locator('[data-tab=week]').click(); await page.locator('#week-date').fill('2025-10-20');await page.locator('#week-date').blur();
       await expect(page.locator('#zone-caption')).toContainText('2025-10-20');
       await expect(page.locator('#work-session-history')).toHaveCount(0);
@@ -74,7 +75,7 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
       await expect(page.locator('#work-session-elapsed')).toHaveText('8h 0m');
       await expect(page.locator('#work-session')).toHaveCSS('border-top-color','rgb(103, 80, 164)');
       await page.mouse.move(0,0);
-      await page.screenshot({path:`test-results/design-work-session-${name}.png`,fullPage:false});
+      await captureScreenshot(page,{path:`test-results/design-work-session-${name}.png`,fullPage:false});
       await page.locator('#work-session').screenshot({path:`test-results/design-session-card-${name}.png`});
       for(const tab of ['week','calendar','activities','clients','projects','labels']) {
         await page.locator(`[data-tab=${tab}]`).click();
@@ -90,11 +91,11 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
             const rect=await action.boundingBox();expect(rect.x+rect.width).toBeLessThanOrEqual(width);
           }
         }
-        await page.screenshot({path:`test-results/design-${tab}-${name}.png`,fullPage:true});
+        await captureScreenshot(page,{path:`test-results/design-${tab}-${name}.png`,fullPage:true});
       }
       await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();
       await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');
-      await accessible(page); await page.screenshot({path:`test-results/design-account-${name}.png`,fullPage:true});
+      await accessible(page); await captureScreenshot(page,{path:`test-results/design-account-${name}.png`,fullPage:true});
       await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
       await expect(page.locator('#account-page')).not.toBeVisible();
       violations.push(...await page.evaluate(()=>window.designPolicyViolations));
@@ -119,7 +120,7 @@ test('narrow-screen editors support keyboard focus, validation and visible error
   await page.route('**/api/v1/clients',route=>route.request().method()==='POST' ? route.fulfill({status:409,json:{code:'CONFLICT'}}) : route.continue());
   await page.locator('#save').click();await expect(page.locator('#editor-error')).toContainText('conflicts');
   await expect(name).not.toHaveValue('');await accessible(page);
-  await page.screenshot({path:'test-results/design-validation-narrow.png',fullPage:true});
+  await captureScreenshot(page,{path:'test-results/design-validation-narrow.png',fullPage:true});
   await page.locator('#save').focus();
   await page.keyboard.press(browserName==='webkit' && process.platform==='darwin' ? 'Alt+Shift+Tab' : 'Shift+Tab');
   await expect(page.locator('#cancel')).toBeFocused();

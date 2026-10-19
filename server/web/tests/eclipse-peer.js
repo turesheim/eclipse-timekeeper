@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 // A real browser controlled by the installed Eclipse acceptance JVM.
 // The line protocol carries synthetic record names/times, never credentials.
 import {chromium, expect} from '@playwright/test';
@@ -126,7 +127,7 @@ try {
     const input = JSON.parse(line); if (input.action === 'quit') break;
     try { await command(input); process.stderr.write('Browser phase passed: ' + input.action + '\n'); process.stdout.write('{"ok":true}\n'); }
     catch (error) {
-      await page.screenshot({path:process.env.TIMEKEEPER_WEB_FAILURE_IMAGE, fullPage:true});
+      await captureScreenshot(page,{path:process.env.TIMEKEEPER_WEB_FAILURE_IMAGE, fullPage:true});
       await writeFile(process.env.TIMEKEEPER_WEB_FAILURE_TEXT, await page.locator('body').innerText());
       const records = {};
       for (const collection of ['projects','labels']) {

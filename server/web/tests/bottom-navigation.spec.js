@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {openAccountMenu,openAbout} from './navigation.js';
@@ -33,7 +34,8 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
     expect((await bar.boundingBox()).y).toBeCloseTo(bounds.y,0);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     const audit=await new AxeBuilder({page}).include('#workspace-navigation').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
-    await page.screenshot({path:`test-results/bottom-navigation-${width}.png`,fullPage:true});
+    const screenshot=await captureScreenshot(page,{path:`test-results/bottom-navigation-${width}.png`,fullPage:true});
+    expect(screenshot.readUInt32BE(16)).toBe(width);expect(screenshot.readUInt32BE(20)).toBe(844);
   }
   const activities=bar.getByRole('button',{name:'Activities',exact:true});await activities.focus();await page.keyboard.press('Enter');await expect(activities).toHaveAttribute('aria-current','page');
   await page.keyboard.press(browserName==='webkit' && process.platform==='darwin' ? 'Alt+Tab':'Tab');await expect(bar.getByRole('button',{name:'Clients',exact:true})).toBeFocused();

@@ -531,6 +531,13 @@ provenance go under `server/web/test-results`. Traces/videos are off because the
 retain authorization headers. CI's Web job uses the same Server artifact as
 Remote-Eclipse.
 
+Use `captureScreenshot` from `server/web/tests/screenshots.js` for browser
+screenshots. When the bottom navigation is visible, it captures the viewport so
+the bar stays at the bottom of the image. A full-page capture includes content
+below the viewport but leaves fixed navigation at its original viewport position,
+which makes the resulting image misleading. Pages without the workspace bar can
+still use full-page captures.
+
 Browser tests cover core tracking, authorization/validation, peer synchronization,
 stale drafts, lost committed replies, exact nanoseconds, autumn DST, mobile
 layout, expandable project/task hierarchy, external issue links and remembered
