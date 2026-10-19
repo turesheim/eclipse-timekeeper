@@ -128,6 +128,34 @@ test('Projects groups clients with keyboard collapsible headings and retains gro
   }
 });
 
+test('project icon picker searches the full catalog with bounded rendering and preserves filtered selections',async({page,request})=>{
+  const prefix='Picker '+randomUUID().slice(0,6);
+  const client=await(await api(request,'POST','/clients',{name:prefix,color:'#176653'})).json();let project;
+  try {
+    await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+    await page.getByRole('button',{name:'Projects',exact:true}).click();await page.getByRole('button',{name:'New project',exact:true}).click();
+    await page.getByLabel('Name',{exact:true}).fill(prefix);await page.getByLabel('Client',{exact:true}).selectOption(client.id);
+    const picker=page.locator('.project-icon-picker'),choices=picker.locator('.project-icon-choices'),search=page.getByRole('searchbox',{name:'Search project icons',exact:true});
+    await expect(choices.locator('input')).toHaveCount(61);
+    const code=await page.getByRole('radio',{name:'Code',exact:true}).elementHandle();
+    await page.getByRole('button',{name:'More icons',exact:true}).click();await expect(choices.locator('input')).toHaveCount(121);
+    expect(await code.evaluate(node=>node.isConnected)).toBe(true);
+    await search.fill('yin-yang');await expect(page.getByRole('radio',{name:'Yin Yang',exact:true})).toBeVisible();await expect(choices.locator('input')).toHaveCount(2);
+    await page.getByRole('radio',{name:'Yin Yang',exact:true}).check();
+    await search.fill('rocket');await expect(page.getByRole('radio',{name:'Rocket',exact:true})).toBeVisible();await expect(picker.locator('[name=icon]:checked')).toHaveValue('yin-yang');
+    await search.fill('no such icon qzqzqz');await expect(picker.getByRole('status')).toContainText('No matching icons.');await expect(picker.getByRole('status')).toContainText('Selected:');await expect(choices.locator('input')).toHaveCount(1);
+    await save(page);project=(await(await api(request,'GET','/projects?clientId='+client.id)).json()).items[0];expect(project.icon).toBe('yin-yang');
+    await page.locator(`#projects [data-project-id="${project.id}"]`).getByRole('button',{name:'Edit',exact:true}).click();
+    await expect(picker.locator('[name=icon]:checked')).toHaveValue('yin-yang');await expect(choices.locator('input')).toHaveCount(61);
+    await search.fill('balance harmony');await expect(page.getByRole('radio',{name:'Yin Yang',exact:true})).toBeChecked();
+    await search.fill('  YÍN_yang  ');await expect(page.getByRole('radio',{name:'Yin Yang',exact:true})).toBeChecked();
+    await page.getByRole('radio',{name:'None',exact:true}).check();await save(page);expect((await(await api(request,'GET','/projects/'+project.id)).json()).icon).toBeNull();
+  } finally {
+    if(project){const current=await api(request,'GET','/projects/'+project.id);await api(request,'DELETE','/projects/'+project.id,undefined,{'If-Match':current.headers().etag});}
+    const current=await api(request,'GET','/clients/'+client.id);await api(request,'DELETE','/clients/'+client.id,undefined,{'If-Match':current.headers().etag});
+  }
+});
+
 test('optional project icons persist and Track shows distinct icons to the right of daily durations',async({page,request})=>{
   const prefix='Icon '+randomUUID().slice(0,6),records=[],previous=await (await api(request,'GET','/me')).json();
   async function create(collection,data){const value=await (await api(request,'POST','/'+collection,data)).json();records.unshift([collection,value.id]);return value;}

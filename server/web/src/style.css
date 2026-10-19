@@ -305,4 +305,7 @@ button.track-client-day:disabled { opacity: .65; }
 .undo-notice { position: fixed; inset: auto 1rem calc(var(--workspace-nav-height) + 1rem); z-index: 1040; width: fit-content; max-width: calc(100vw - 2rem); margin-inline: auto; padding: .6rem .75rem; display: flex; flex-direction: row; align-items: center; gap: .75rem; border-color: var(--accent); }
 .undo-notice p { margin: 0; max-width: 28rem; min-width: 0; flex: 1 1 auto; font-size: .9rem; }
 .undo-notice button { flex: 0 0 auto; }
+.undo-notice { opacity: 1; transition: opacity .25s; }
+.undo-notice.is-fading { opacity: 0; }
+@media(prefers-reduced-motion: reduce) { .undo-notice { transition: none; } }
 

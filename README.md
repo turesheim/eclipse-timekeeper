@@ -27,7 +27,7 @@ overlap provides context.
 - **Workweek** groups sessions by client and project, with editable start/end
   times in daily cells. **Calendar** supports creating, moving, resizing and
   copying sessions. Dates and times use your account's time zone. Work-session
-  edits and deletions offer **Undo** for ten minutes.
+  edits and deletions show a temporary **Undo** notification.
 - **Activities** contains the project/task/activity table and its daily and weekly
   totals. Start a task timer or record time manually, including taskless work.
 - **Clients and projects** organize your work with client colors and searchable

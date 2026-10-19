@@ -7,16 +7,27 @@ export class UndoNotice {
     this.dismiss=root.querySelector('[data-dismiss-undo]');iconButton(this.dismiss,'close','Dismiss undo');
     this.button.addEventListener('pointerdown',event=>event.preventDefault());
     this.button.addEventListener('click',()=>void this.apply());this.dismiss.addEventListener('click',()=>this.clear());
+    this.root.addEventListener('pointerenter',()=>this.paint());
+    this.root.addEventListener('focusin',()=>this.paint());
     this.timer=setInterval(()=>this.paint(),500);
   }
   offer(info,api,label='Work session updated') {
     if(!info)return;
-    this.entry={...info,api,label,key:crypto.randomUUID(),until:performance.now()+info.seconds*1000};this.paint();
+    const now=performance.now();
+    this.entry={...info,api,label,key:crypto.randomUUID(),until:now+info.seconds*1000,duration:10000,hideAt:now+10000};this.paint();
   }
-  clear() {this.entry=null;this.root.hidden=true;this.message.textContent='';}
+  clear() {this.entry=null;this.root.hidden=true;this.root.classList.remove('is-fading');this.message.textContent='';}
   paint() {
     const entry=this.entry;if(!entry)return;
-    if(performance.now()>=entry.until&&!entry.busy&&!entry.uncertain){this.clear();return;}
+    const now=performance.now();
+    if(now>=entry.until&&!entry.done&&!entry.busy&&!entry.uncertain){this.clear();return;}
+    const interacting=(matchMedia('(hover: hover)').matches&&this.root.matches(':hover'))||this.root.contains(document.activeElement);
+    if(entry.busy||entry.uncertain||interacting)entry.hideAt=now+entry.duration;
+    const fading=now>=entry.hideAt;
+    if(!fading)entry.fadeAt=null;
+    else if(entry.fadeAt==null)entry.fadeAt=now;
+    if(fading&&now>=entry.fadeAt+250){this.clear();return;}
+    this.root.classList.toggle('is-fading',fading);
     this.root.hidden=false;
     this.message.textContent=entry.message || entry.label;
     this.button.textContent=entry.uncertain ? 'Retry undo':'Undo';
@@ -30,13 +41,13 @@ export class UndoNotice {
       await entry.api.request('/undo/'+entry.id,{method:'POST',body:{},key:entry.key});
       if(this.entry!==entry)return;
       entry.done=true;entry.uncertain=false;entry.message='Work-session change undone.';
-      entry.until=performance.now()+5000;await this.callbacks.changed(entry.api);
+      entry.duration=5000;entry.hideAt=performance.now()+entry.duration;await this.callbacks.changed(entry.api);
     } catch(error) {
       if(this.entry!==entry)return;
       if(error.status===401){this.callbacks.unauthorized(error);return;}
       entry.uncertain=error.uncertain;
       entry.message=error.uncertain ? 'Undo could not be confirmed. Retry safely to check the same request.' : error.status===404 ? 'Undo is no longer available.' : error.message;
-      entry.done=!error.uncertain;entry.until=performance.now()+10000;
+      entry.done=!error.uncertain;entry.duration=10000;entry.hideAt=performance.now()+entry.duration;
     } finally {if(this.entry===entry){entry.busy=false;this.paint();}}
   }
 }
