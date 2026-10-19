@@ -21,7 +21,7 @@ class ServerBootstrapTest {
         given().when().get("/api/v1/openapi.json").then()
                 .statusCode(200).contentType("application/json")
                 .body("openapi", equalTo("3.1.1"))
-                .body("info.version", equalTo("1.0.0"))
+                .body("info.version", equalTo("1.1.0"))
                 .body("servers.url", hasItem("/api/v1"));
     }
 

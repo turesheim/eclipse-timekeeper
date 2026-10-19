@@ -288,6 +288,40 @@ catches up changes since that revision. The version check remains authoritative
 when notifications race or a resource was deleted. Offline edits stay pending
 and must not silently create an embedded fork or overwrite remote changes.
 
+## Calendar subscriptions and event conversion
+
+API contract 1.1.0 adds owned `/calendar-subscriptions` CRUD, a write-authorized
+manual refresh, `/calendar-events?fromDate=…&toDate=…` and
+`POST /calendar-subscriptions/{id}/events/{key}/activity`. Date windows are civil
+account dates with an exclusive end and at most 31 days. Configuration changes
+use ETags; creation and conversion require an `Idempotency-Key`. Subscription
+representations include refresh outcomes and a safe origin hostname, never the
+credential-bearing feed URL. Leave `url` blank/absent on an update to preserve it.
+
+Events have stable UID/recurrence keys and an `eventVersion` fingerprint covering
+the displayed source interval/details and client association. Conversion supplies
+that version, the original view window and a reviewed `ActivityInput`. The server
+resolves the current cached occurrence again. A changed/cancelled occurrence
+returns `409 CALENDAR_EVENT_CHANGED`; a second conversion command returns
+`409 CALENDAR_ALREADY_CONVERTED`. A future activity start returns
+`422 CALENDAR_FUTURE_ACTIVITY`. All-day events require an explicitly reviewed,
+completed interval; zero-duration timed events remain valid markers.
+
+Private `CAL_SUB`, `CAL_FEED` and `CAL_LINK` records use existing owner-scoped
+storage. Network I/O runs outside owner transactions; refresh claims and final
+publication are fenced by expiring database leases and source configuration.
+Activity creation, daily fragments, permanent occurrence identity and command
+receipt commit under the same owner lock. Conversion authority outlives deleted
+subscriptions/activities; source changes do not mutate recorded work. Activity
+fragments inherit their source history. Account export wraps this history in the
+existing opaque `ARCHIVE_AUDIT` category; imports retain only inert audit copies,
+without subscription credentials, cached feeds or conversion authority. The
+account archive and domain transfer formats remain unchanged.
+
+Subscription/cache changes use a separate read-only refresh in the Calendar view,
+including periodic reads while visible; they do not emit invented client changes
+or unknown domain change types. Creating an activity emits normal ACTIVITY changes.
+
 ## Compatibility and verification
 
 Within `/api/v1`, preserve paths, methods, required inputs, existing fields,

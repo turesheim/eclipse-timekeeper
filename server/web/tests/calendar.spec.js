@@ -16,7 +16,7 @@ async function put(request,collection,value,changes) {
 }
 async function save(page) {await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');}
 async function calendar(page,credential=token,date='2025-10-20') {
-  await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(credential);await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.goto('/web/');await expect(page.locator('#login-form button[type=submit]')).toBeEnabled();await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(credential);await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Calendar',exact:true}).click();
   await page.getByLabel('Calendar date',{exact:true}).fill(date);
   await expect(page.locator('#calendar-zone')).toContainText(monday(date));await expect(page.locator('.calendar-day')).toHaveCount(7);
@@ -210,7 +210,7 @@ test('calendar shows seven days, task links and activity lists beside multi-day 
     await select.focus();await page.keyboard.press('Tab');await expect(handles.first()).toBeFocused();
     await expect(handles.first()).toHaveCSS('opacity','1');
     await page.locator('#calendar-today').focus();await expect(handles.first()).toHaveCSS('opacity','0');
-    await expect(page.locator('.calendar-task').getByRole('link',{name:`#${f.issue}: ${f.task.summary}`,exact:true})).toHaveAttribute('href',f.url);
+    await expect(page.locator('.calendar-task').getByRole('link',{name:`#${f.issue}: ${f.task.summary}`,exact:true}).first()).toHaveAttribute('href',f.url);
     for(const activity of f.activities) await expect(page.locator('.calendar-task').getByRole('button',{name:`Edit activity ${activity.summary}`,exact:true})).toBeAttached();
     await expect(page.locator(`.calendar-session[data-session-id="${long.id}"]`)).toHaveCount(2);
     await expect(page.locator('#calendar-dst')).toBeVisible();

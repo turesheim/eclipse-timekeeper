@@ -60,6 +60,8 @@ def package(output, tag, commit):
     illustrations = {
         'docs/assets/screenshots/public-holidays-desktop.png': 'images/public-holidays-desktop.png',
         'docs/assets/screenshots/public-holidays-details-mobile.png': 'images/public-holidays-details-mobile.png',
+        'docs/assets/screenshots/calendar-subscriptions-desktop.png': 'images/calendar-subscriptions-desktop.png',
+        'docs/assets/screenshots/calendar-subscriptions-details-mobile.png': 'images/calendar-subscriptions-details-mobile.png',
         'docs/assets/screenshots/locale-norwegian-account.png': 'images/locale-norwegian-account.png',
         'docs/assets/screenshots/locale-norwegian-administration.png': 'images/locale-norwegian-administration.png',
         'docs/assets/screenshots/activities-mobile.png': 'images/activities-mobile.png',

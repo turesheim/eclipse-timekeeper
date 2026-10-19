@@ -21,6 +21,8 @@
     <dependency><groupId>${project.groupId}</groupId><artifactId>timekeeper-http-client</artifactId><version>${project.version}</version><scope>test</scope></dependency>
     <dependency><groupId>com.networknt</groupId><artifactId>json-schema-validator</artifactId><version>1.5.9</version></dependency>
     <dependency><groupId>com.yubico</groupId><artifactId>webauthn-server-core</artifactId><version>2.10.1</version></dependency>
+    <dependency><groupId>org.mnode.ical4j</groupId><artifactId>ical4j</artifactId><version>4.4.0</version></dependency>
+    <dependency><groupId>org.apache.httpcomponents.client5</groupId><artifactId>httpclient5</artifactId></dependency>
     <dependency><groupId>${project.groupId}</groupId><artifactId>timekeeper-service</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest-jackson</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-mailer</artifactId></dependency>
