@@ -95,6 +95,28 @@ class PostgresSchemaIT {
             try(var rows=statement.executeQuery("SELECT origin,epoch FROM tk_recovery_control")) {assertTrue(rows.next());assertEquals("https://retained.example.invalid:8443",rows.getString(1));assertEquals(7,rows.getLong(2));}
         }
     }
+    @Test void upgradesCanonicalV5WithBrowserDefaultAndRetainsStoredLocaleOnReopen() throws Exception {
+        try(var connection=connection();var statement=connection.createStatement()) {
+            for(String resource:java.util.List.of("schema-v1-postgresql.sql","auth-v2.sql","recovery-v3.sql","passkeys-v4.sql","settings-v5.sql")) {
+                try(var input=getClass().getResourceAsStream("/db/"+resource)) {statement.execute(new String(input.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));}
+            }
+            statement.executeUpdate("UPDATE tk_schema SET schema_version=5,state='READY'");
+            statement.executeUpdate("INSERT INTO tk_owner VALUES('retained','Europe/Oslo',7,19,'aabb')");
+            var before=PostgresSchema.shape(connection);
+            assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(connection));
+            assertEquals(before,PostgresSchema.shape(connection));
+            ServerSchema.initializeOrValidate(connection,true);ServerSchema.validate(connection);
+            try(var rows=statement.executeQuery("SELECT count(*) FROM tk_locale")) {rows.next();assertEquals(0,rows.getInt(1));}
+            try(var rows=statement.executeQuery("SELECT zone_id,version,revision FROM tk_owner WHERE id='retained'")) {
+                assertTrue(rows.next());assertEquals("Europe/Oslo",rows.getString(1));assertEquals(7,rows.getLong(2));assertEquals(19,rows.getLong(3));
+            }
+            statement.executeUpdate("INSERT INTO tk_locale VALUES('retained','nb-NO')");
+        }
+        try(var connection=connection();var statement=connection.createStatement()) {
+            ServerSchema.initializeOrValidate(connection);
+            try(var rows=statement.executeQuery("SELECT locale FROM tk_locale WHERE owner_id='retained'")) {assertTrue(rows.next());assertEquals("nb-NO",rows.getString(1));}
+        }
+    }
     @Test void checkConstraintsRemainCanonicalAfterLogicalDumpRestoreDeparsing() throws Exception {
         try(var connection=connection();var statement=connection.createStatement()) {
             ServerSchema.initializeOrValidate(connection);var before=PostgresSchema.shape(connection);

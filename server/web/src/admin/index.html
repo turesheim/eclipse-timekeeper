@@ -1,21 +1,21 @@
-<!doctype html>
-<html lang="en">
-<head>
+<!DOCTYPE html><html lang="en"><head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Administration · Timekeeper</title>
+  <title data-i18n="ui.administration_timekeeper">Administration · Timekeeper</title>
   <script src="/web/theme.js"></script>
   <link rel="icon" href="/web/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/web/assets/bootstrap/bootstrap.min.css"><link rel="stylesheet" href="/web/assets/bootstrap-icons/bootstrap-icons.min.css"><link rel="stylesheet" href="/web/style.css">
+  <link rel="stylesheet" href="/web/assets/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/web/assets/bootstrap-icons/bootstrap-icons.min.css"><link rel="stylesheet" href="/web/style.css">
   <link rel="stylesheet" href="/web/themes.css">
-  <script type="module" src="./admin.js"></script>
+  <script type="module" src="/web/bootstrap.js" data-timekeeper-entry="/admin/admin.js"></script>
 </head>
 <body>
-  <a class="skip-link" href="#main-content">Skip to main content</a>
-  <header class="app-header"><a class="brand" href="/web/">Timekeeper <small>2.0</small></a><div id="session" hidden><span id="owner"></span><details id="account-menu" class="account-menu"><summary class="btn btn-outline-secondary" role="button" aria-expanded="false" aria-controls="account-menu-items" aria-label="Account menu" title="Account menu"><span class="icon bi bi-list" aria-hidden="true"></span></summary><nav id="account-menu-items" class="account-menu-items" aria-label="Account"><a class="btn btn-link" href="/web/#account/profile">My Account</a><a class="btn btn-link" id="users-link" href="/admin/" hidden>Administration</a><div class="theme-choice"><label for="theme">Theme</label><select class="form-select" id="theme"></select></div><button class="btn btn-link" id="sign-out" type="button">Sign out</button></nav></details></div></header>
+  <a class="skip-link" href="#main-content"><span data-i18n="ui.skip_to_main_content">Skip to main content</span></a>
+  <header class="app-header"><a class="brand" href="/web/">Timekeeper <small>2.0</small></a><div id="session" hidden=""><span id="owner"></span><details id="account-menu" class="account-menu"><summary class="btn btn-outline-secondary" role="button" aria-expanded="false" aria-controls="account-menu-items" aria-label="Account menu" title="Account menu" data-i18n-aria-label="ui.account_menu" data-i18n-title="ui.account_menu"><span class="icon bi bi-list" aria-hidden="true"></span></summary><nav id="account-menu-items" class="account-menu-items" aria-label="Account" data-i18n-aria-label="ui.account"><a class="btn btn-link" href="/web/#account/profile"><span data-i18n="ui.my_account">My Account</span></a><a class="btn btn-link" id="users-link" href="/admin/" hidden=""><span data-i18n="ui.administration">Administration</span></a><div class="theme-choice"><label for="theme"><span data-i18n="ui.theme">Theme</span></label><select class="form-select" id="theme"></select></div><button class="btn btn-link" id="sign-out" type="button"><span data-i18n="ui.sign_out">Sign out</span></button></nav></details></div></header>
   <main id="main-content" tabindex="-1"><section id="account-page" aria-labelledby="account-heading">
-    <div class="account-page-heading"><div><p class="eyebrow">SERVICE ADMINISTRATION</p><h1 id="account-heading" tabindex="-1">Administration</h1><p id="account-identity" class="hint"></p></div><a class="btn btn-outline-secondary" href="/web/">Back to time tracking</a></div>
-    <p id="status" role="status" aria-live="polite">Loading administration…</p>
-    <div class="account-layout"><nav id="account-navigation" class="nav nav-pills" aria-label="Administration" hidden></nav><div><p id="account-error" class="alert alert-danger" role="alert"></p><div id="account-content" aria-busy="true"></div></div></div>
+    <div class="account-page-heading"><div><p class="eyebrow"><span data-i18n="ui.service_administration">SERVICE ADMINISTRATION</span></p><h1 id="account-heading" tabindex="-1"><span data-i18n="ui.administration">Administration</span></h1><p id="account-identity" class="hint"></p></div><a class="btn btn-outline-secondary" href="/web/"><span data-i18n="ui.back_to_time_tracking">Back to time tracking</span></a></div>
+    <p id="status" role="status" aria-live="polite"><span data-i18n="ui.loading_administration">Loading administration…</span></p>
+    <div class="account-layout"><nav id="account-navigation" class="nav nav-pills" aria-label="Administration" hidden="" data-i18n-aria-label="ui.administration"></nav><div><p id="account-error" class="alert alert-danger" role="alert"></p><div id="account-content" aria-busy="true"></div></div></div>
   </section></main>
-</body>
-</html>
+
+
+</body></html>

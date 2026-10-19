@@ -20,6 +20,39 @@ as hashes on the server. New credentials never enter browser storage. Existing
 saved tokens are exchanged for a parent-bound cookie and then removed. Sign out
 revokes the cookie session and clears records, drafts, requests and clipboard.
 
+## Language and region
+
+The client uses locally bundled **i18next 26.5.2** with complete English and
+Norwegian Bokmål catalogs in `server/web/src/locales/{en,nb}.json`. No CDN or
+translation service is used. `npm run vendor:i18n` validates matching keys and
+interpolation variables, then generates the native-module resources and copies
+the pinned upstream ESM distribution and license. `npm test` verifies these
+assets as well as pluralization, formatting, literal user text and stable import
+fingerprints.
+
+`i18n.js` selects the first supported browser language (Norwegian `nb`, `no` and
+`nn` use Bokmål; English keeps its browser region), with `en-GB` as fallback.
+**My Account → Profile → Language and region** can override this with `en-GB`,
+`en-US`, or `nb-NO`, or restore the browser default. The optional nullable
+`locale` field on `/me` persists account-wide; omission preserves it, while
+`null` removes the override. Existing timezone-only clients remain compatible.
+Schema 6 adds `tk_locale`; older owners have no override. `/auth/session` returns
+the same owner-scoped preference so `bootstrap.js` loads it before evaluating
+UI modules. Signing into an account with another language or saving a language
+reloads the page after confirmation. Other account drafts require explicit
+confirmation before a language change discards them.
+
+Only marked UI text and attributes are translated. User records, identifiers,
+CSV headers, timestamps and import fingerprints remain literal. `Intl` applies
+the region to display dates, numbers and sorting; account time zones remain
+independent. Worker requests carry the UI locale for consistent diagnostics.
+New messages belong in both catalogs, use interpolation for values and i18next
+plural forms for counts, and render through text nodes or attributes.
+
+![Norwegian account preferences on a narrow screen](../assets/screenshots/locale-norwegian-account.png)
+
+![Norwegian administration on a narrow screen](../assets/screenshots/locale-norwegian-administration.png)
+
 ## Passkey sign-in and account management
 
 The sign-in page offers an explicit **Sign in with a passkey** button when the

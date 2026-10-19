@@ -1,37 +1,38 @@
-const nameOrder = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
-const sortedNames = values => [...values].sort((a,b) => nameOrder.compare(a.name,b.name) || a.id.localeCompare(b.id));
+import {getLocale} from './i18n.js';
+import { t as i18nText } from "./i18n.js";const nameOrder = new Intl.Collator(getLocale(), { numeric: true, sensitivity: 'base' });
+const sortedNames = (values) => [...values].sort((a, b) => nameOrder.compare(a.name, b.name) || a.id.localeCompare(b.id));
 const messages = {
-  INVALID_TOKEN: 'The token contains invalid characters or is too long. Copy the complete API token and try again.',
-  UNDO_CONFLICT: 'This work session or its references changed. Undo cannot replace the current records.',
-  UNDO_EXPIRED: 'The time to undo this change has expired.',
-  UNAUTHENTICATED: 'Your session is no longer authorized. Sign in again with your account.',
-  OWNER_CHANGED: 'The account for this session has changed. Sign out before using the intended account.',
-  FORBIDDEN: 'Your account does not have permission to make this change.',
-  SERVICE_PROOF_REQUIRED: 'Confirm your current administrator password to save service settings.',
-  PASSKEY_PROOF_REQUIRED: 'Confirm your current password or use an existing passkey to make this change.',
-  PASSKEY_REJECTED: 'The passkey could not be verified. Try again or use your username and password.',
-  PASSKEY_ACCOUNT_SIGN_IN_REQUIRED: 'Sign in with your account password or a passkey to manage passkeys. An API token cannot authorize this change.',
-  STALE_VERSION: 'This record changed. Your draft is kept; cancel and reopen the editor to review the current record.',
-  PRECONDITION_FAILED: 'This record changed. Your draft is kept; cancel and reopen the editor to review the current record.',
-  ACTIVE_STATE_CHANGED: 'Tracking changed in another client. Review the current activity before trying again.',
-  VALIDATION: 'Check the values and relationships, then try again.',
-  VALIDATION_FAILED: 'Check the values and relationships, then try again.',
-  BAD_REQUEST: 'Check the entered values, then try again.',
-  CONFLICT: 'This change conflicts with another record. Check dependencies and current values.',
-  NOT_FOUND: 'This record no longer exists. Your draft is kept.',
-  UNAVAILABLE: 'The server could not be reached. Reconnecting…',
-  BUSY: 'Records are changing too quickly to load a consistent view. Try Refresh.',
-  IMPORT_SOURCE_CHANGED: 'An entry with this source ID changed. Exclude it or resolve the source change before continuing; existing records were kept.',
-  IMPORT_DUPLICATE_REVIEW_REQUIRED: 'Review matching entries and choose whether to reuse them or create distinct activities.',
-  IMPORT_UNDO_REVIEW_REQUIRED: 'Review the edited or referenced records before continuing Undo.',
-  IMPORT_RUNNING_MATCH: 'A previously imported activity is now running. Stop it or exclude that source entry before importing again.',
-  IMPORT_TOO_MANY_MATCHES: 'Too many existing activities match this start time. Resolve these matches before importing this entry.',
-  IMPORT_INTERVAL_TOO_LARGE: 'An entry spans too many days. Split or exclude that source entry.',
-  IMPORT_BATCH_TOO_LARGE: 'This batch produces more than 1,000 daily activities. Use a smaller batch.',
+  INVALID_TOKEN: "ui.the_token_contains_invalid_characters_or_is_too_long_copy_the_complete_api_token_and_",
+  UNDO_CONFLICT: "ui.this_work_session_or_its_references_changed_undo_cannot_replace_the_current_records",
+  UNDO_EXPIRED: "ui.the_time_to_undo_this_change_has_expired",
+  UNAUTHENTICATED: "ui.your_session_is_no_longer_authorized_sign_in_again_with_your_account",
+  OWNER_CHANGED: "ui.the_account_for_this_session_has_changed_sign_out_before_using_the_intended_account",
+  FORBIDDEN: "ui.your_account_does_not_have_permission_to_make_this_change",
+  SERVICE_PROOF_REQUIRED: "ui.confirm_your_current_administrator_password_to_save_service_settings",
+  PASSKEY_PROOF_REQUIRED: "ui.confirm_your_current_password_or_use_an_existing_passkey_to_make_this_change",
+  PASSKEY_REJECTED: "ui.the_passkey_could_not_be_verified_try_again_or_use_your_username_and_password",
+  PASSKEY_ACCOUNT_SIGN_IN_REQUIRED: "ui.sign_in_with_your_account_password_or_a_passkey_to_manage_passkeys_an_api_token_canno",
+  STALE_VERSION: "ui.this_record_changed_your_draft_is_kept_cancel_and_reopen_the_editor_to_review_the_cur",
+  PRECONDITION_FAILED: "ui.this_record_changed_your_draft_is_kept_cancel_and_reopen_the_editor_to_review_the_cur",
+  ACTIVE_STATE_CHANGED: "ui.tracking_changed_in_another_client_review_the_current_activity_before_trying_again",
+  VALIDATION: "ui.check_the_values_and_relationships_then_try_again",
+  VALIDATION_FAILED: "ui.check_the_values_and_relationships_then_try_again",
+  BAD_REQUEST: "ui.check_the_entered_values_then_try_again",
+  CONFLICT: "ui.this_change_conflicts_with_another_record_check_dependencies_and_current_values",
+  NOT_FOUND: "ui.this_record_no_longer_exists_your_draft_is_kept",
+  UNAVAILABLE: "ui.the_server_could_not_be_reached_reconnecting",
+  BUSY: "ui.records_are_changing_too_quickly_to_load_a_consistent_view_try_refresh",
+  IMPORT_SOURCE_CHANGED: "ui.an_entry_with_this_source_id_changed_exclude_it_or_resolve_the_source_change_before_c",
+  IMPORT_DUPLICATE_REVIEW_REQUIRED: "ui.review_matching_entries_and_choose_whether_to_reuse_them_or_create_distinct_activitie",
+  IMPORT_UNDO_REVIEW_REQUIRED: "ui.review_the_edited_or_referenced_records_before_continuing_undo",
+  IMPORT_RUNNING_MATCH: "ui.a_previously_imported_activity_is_now_running_stop_it_or_exclude_that_source_entry_be",
+  IMPORT_TOO_MANY_MATCHES: "ui.too_many_existing_activities_match_this_start_time_resolve_these_matches_before_impor",
+  IMPORT_INTERVAL_TOO_LARGE: "ui.an_entry_spans_too_many_days_split_or_exclude_that_source_entry",
+  IMPORT_BATCH_TOO_LARGE: "ui.this_batch_produces_more_than_1_000_daily_activities_use_a_smaller_batch"
 };
 export class ApiError extends Error {
-  constructor(code, status = 0) { super(messages[code] || 'The request was rejected. Review the current records and try again.'); this.code = code; this.status = status; }
-  get uncertain() { return this.status === 0 || this.status >= 500; }
+  constructor(code, status = 0) {super(messages[code] ? i18nText(messages[code]) : i18nText("ui.the_request_was_rejected_review_the_current_records_and_try_again"));this.code = code;this.status = status;}
+  get uncertain() {return this.status === 0 || this.status >= 500;}
 }
 export function ownerHeader(owner) {
   return btoa(String.fromCharCode(...new TextEncoder().encode(owner))).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
@@ -39,32 +40,32 @@ export function ownerHeader(owner) {
 function decodeOwner(value) {
   try {
     if (!value || !/^[A-Za-z0-9_-]{1,1100}$/.test(value)) throw new Error();
-    const bytes = Uint8Array.from(atob(value.replaceAll('-', '+').replaceAll('_', '/')), c => c.charCodeAt(0));
-    const owner = new TextDecoder('utf-8', {fatal: true}).decode(bytes);
+    const bytes = Uint8Array.from(atob(value.replaceAll('-', '+').replaceAll('_', '/')), (c) => c.charCodeAt(0));
+    const owner = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     if (!owner.trim() || owner.trim() !== owner || [...owner].length > 200 || ownerHeader(owner) !== value) throw new Error();
     return owner;
-  } catch { throw new ApiError('UNAVAILABLE'); }
+  } catch {throw new ApiError('UNAVAILABLE');}
 }
 export class Api {
-  #token; #csrf; #owner = null; #requests = new Set(); #closed = false;
-  constructor(token = null, fetcher = (...args) => globalThis.fetch(...args), context = {}) { this.#token = token?.trim() ?? null; this.#csrf = context.csrf; this.#owner = context.ownerId ?? null; this.fetcher = fetcher; }
-  get owner() { return this.#owner; }
-  close() { this.#closed = true; this.#token = ''; this.#csrf = null; for (const request of this.#requests) request.abort(); }
-  async request(path, {method = 'GET', body, etag, key, timeout = 15000, binary = false, undo = false} = {}) {
+  #token;#csrf;#owner = null;#requests = new Set();#closed = false;
+  constructor(token = null, fetcher = (...args) => globalThis.fetch(...args), context = {}) {this.#token = token?.trim() ?? null;this.#csrf = context.csrf;this.#owner = context.ownerId ?? null;this.fetcher = fetcher;}
+  get owner() {return this.#owner;}
+  close() {this.#closed = true;this.#token = '';this.#csrf = null;for (const request of this.#requests) request.abort();}
+  async request(path, { method = 'GET', body, etag, key, timeout = 15000, binary = false, undo = false } = {}) {
     if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);
     if (this.#token && (this.#token.length > 4096 || !/^[A-Za-z0-9._~+/-]+=*$/.test(this.#token))) throw new ApiError('INVALID_TOKEN', 401);
-    const controller = new AbortController(); this.#requests.add(controller);
+    const controller = new AbortController();this.#requests.add(controller);
     const timer = setTimeout(() => controller.abort(), timeout);
     try {
-      const headers = {Accept: binary ? 'application/zip' : 'application/json'};
-      if (this.#token) headers.Authorization = `Bearer ${this.#token}`;
-      else if (this.#csrf && !['GET', 'HEAD', 'OPTIONS'].includes(method)) headers['X-CSRF-Token'] = this.#csrf;
+      const headers = { Accept: binary ? 'application/zip' : 'application/json' };
+      if (this.#token) headers.Authorization = `Bearer ${this.#token}`;else
+      if (this.#csrf && !['GET', 'HEAD', 'OPTIONS'].includes(method)) headers['X-CSRF-Token'] = this.#csrf;
       if (this.#owner !== null) headers['X-Timekeeper-Owner'] = ownerHeader(this.#owner);
       if (body !== undefined) headers['Content-Type'] = 'application/json';
-      if (etag) headers['If-Match'] = etag;
-      if (key) headers['Idempotency-Key'] = key;
-      if (undo) headers['X-Timekeeper-Undo'] = 'true';
-      const response = await this.fetcher(`/api/v1${path}`, {method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, redirect: 'error', referrerPolicy:'origin', credentials: this.#token && path !== '/auth/token-login' ? 'omit' : 'same-origin', cache: 'no-store'});
+      if (etag) headers["If-Match"] = etag;
+      if (key) headers["Idempotency-Key"] = key;
+      if (undo) headers["X-Timekeeper-Undo"] = 'true';
+      const response = await this.fetcher(`/api/v1${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, redirect: 'error', referrerPolicy: 'origin', credentials: this.#token && path !== '/auth/token-login' ? 'omit' : 'same-origin', cache: 'no-store' });
       if (binary && response.ok && !/^application\/zip(?:;|$)/i.test(response.headers.get('Content-Type') || '')) throw new ApiError('UNAVAILABLE');
       const data = response.status === 204 ? null : binary && response.ok ? await response.blob() : await response.json();
       if (!response.ok) throw new ApiError(typeof data?.code === 'string' ? data.code : 'UNAVAILABLE', response.status);
@@ -73,36 +74,36 @@ export class Api {
       if (this.#owner !== null && owner !== this.#owner) throw new ApiError('OWNER_CHANGED', 401);
       this.#owner = owner;
       if (data?.ownerId !== undefined && data.ownerId !== owner) throw new ApiError('OWNER_CHANGED', 401);
-      if (data?.items?.some(row => row.ownerId !== undefined && row.ownerId !== owner)) throw new ApiError('OWNER_CHANGED', 401);
-      const undoId=response.headers.get('X-Timekeeper-Undo-Id'),seconds=Number(response.headers.get('X-Timekeeper-Undo-Seconds'));
-      const offer=undoId&&/^[a-f0-9-]{36}$/.test(undoId)&&seconds>0&&seconds<=600 ? {id:undoId,seconds}:null;
-      return {data, etag: response.headers.get('ETag'),...(offer ? {undo:offer}:{})};
+      if (data?.items?.some((row) => row.ownerId !== undefined && row.ownerId !== owner)) throw new ApiError('OWNER_CHANGED', 401);
+      const undoId = response.headers.get("X-Timekeeper-Undo-Id"),seconds = Number(response.headers.get("X-Timekeeper-Undo-Seconds"));
+      const offer = undoId && /^[a-f0-9-]{36}$/.test(undoId) && seconds > 0 && seconds <= 600 ? { id: undoId, seconds } : null;
+      return { data, etag: response.headers.get('ETag'), ...(offer ? { undo: offer } : {}) };
     } catch (error) {
       if (error instanceof ApiError) throw error;
       // Never expose response bodies, URLs, tokens or fetch exception details.
       throw new ApiError('UNAVAILABLE');
-    } finally { clearTimeout(timer); this.#requests.delete(controller); }
+    } finally {clearTimeout(timer);this.#requests.delete(controller);}
   }
   async page(path, parameters = {}) {
-    let cursor = null, revision = null; const items = [], seen = new Set();
+    let cursor = null,revision = null;const items = [],seen = new Set();
     do {
-      const query = new URLSearchParams({...parameters, limit: 500, ...(cursor ? {cursor} : {})});
-      const {data} = await this.request(`${path}?${query}`);
-      if (!Array.isArray(data.items) || !Number.isSafeInteger(data.revision) || (revision !== null && revision !== data.revision)) throw new ApiError('BUSY');
-      revision = data.revision; items.push(...data.items);
+      const query = new URLSearchParams({ ...parameters, limit: 500, ...(cursor ? { cursor } : {}) });
+      const { data } = await this.request(`${path}?${query}`);
+      if (!Array.isArray(data.items) || !Number.isSafeInteger(data.revision) || revision !== null && revision !== data.revision) throw new ApiError('BUSY');
+      revision = data.revision;items.push(...data.items);
       cursor = data.nextCursor;
       if (cursor !== null && (typeof cursor !== 'string' || !cursor || seen.has(cursor))) throw new ApiError('UNAVAILABLE');
       seen.add(cursor);
     } while (cursor !== null);
-    return {items, revision};
+    return { items, revision };
   }
   async initializeTimeZone(zone = Intl.DateTimeFormat().resolvedOptions().timeZone) {
     const profile = await this.request('/me');
     // Version zero is the untouched server default. An explicitly selected UTC
     // zone has a newer version and must be kept, just like any other choice.
     if (profile.data.version !== 0 || profile.data.zoneId !== 'UTC' || !zone || zone === 'UTC' || !profile.etag) return profile;
-    try { new Intl.DateTimeFormat(undefined, {timeZone: zone}); } catch { return profile; }
-    try { return await this.request('/me', {method: 'PUT', body: {zoneId: zone}, etag: profile.etag}); }
+    try {new Intl.DateTimeFormat(getLocale(), { timeZone: zone });} catch {return profile;}
+    try {return await this.request('/me', { method: 'PUT', body: { zoneId: zone }, etag: profile.etag });}
     catch (error) {
       // A peer's selection wins. Read-only clients can still sign in, and a
       // lost response is resolved by reading, never by repeating the write.
@@ -116,29 +117,29 @@ export class Api {
         const profile = await this.request('/me');
         const dates = range(profile.data.zoneId);
         const clients = await this.page('/clients');
-        const projects = await this.page('/projects'), tasks = await this.page('/tasks'), labels = await this.page('/labels');
+        const projects = await this.page('/projects'),tasks = await this.page('/tasks'),labels = await this.page('/labels');
         const workSessions = await this.page('/work-sessions');
         const activeWorkSession = await this.request('/work-sessions/active');
-        const chosen = workSessions.items.find(value => value.id === selectedSession) || activeWorkSession.data || [...workSessions.items].sort((a,b) => b.start.localeCompare(a.start))[0];
+        const chosen = workSessions.items.find((value) => value.id === selectedSession) || activeWorkSession.data || [...workSessions.items].sort((a, b) => b.start.localeCompare(a.start))[0];
         const workSessionReport = chosen ? (await this.request(`/work-sessions/${chosen.id}/report`)).data : null;
-        const activities = await this.page('/activities', {from: dates.from, to: dates.to});
+        const activities = await this.page('/activities', { from: dates.from, to: dates.to });
         const active = await this.request('/activities/active');
-        const report = await this.request(`/reports/activities?${new URLSearchParams({from: dates.from, to: dates.to, zoneId: profile.data.zoneId})}`);
-        const confirmed = await this.request('/me'), head = await this.page('/projects');
-        if ([clients, tasks, labels, activities, workSessions, head, report.data, ...(workSessionReport ? [workSessionReport] : [])].some(v => v.revision !== projects.revision) || profile.data.version !== confirmed.data.version) throw new ApiError('BUSY');
-        return {profile, dates, clients: sortedNames(clients.items), projects: sortedNames(projects.items), tasks: tasks.items, labels: labels.items, activities: activities.items, active, workSessions: workSessions.items, activeWorkSession, workSessionReport, report: report.data, revision: projects.revision};
-      } catch (error) { if (!['BUSY', 'CURSOR_EXPIRED'].includes(error.code) || attempt === 2) throw error; }
+        const report = await this.request(`/reports/activities?${new URLSearchParams({ from: dates.from, to: dates.to, zoneId: profile.data.zoneId })}`);
+        const confirmed = await this.request('/me'),head = await this.page('/projects');
+        if ([clients, tasks, labels, activities, workSessions, head, report.data, ...(workSessionReport ? [workSessionReport] : [])].some((v) => v.revision !== projects.revision) || profile.data.version !== confirmed.data.version) throw new ApiError('BUSY');
+        return { profile, dates, clients: sortedNames(clients.items), projects: sortedNames(projects.items), tasks: tasks.items, labels: labels.items, activities: activities.items, active, workSessions: workSessions.items, activeWorkSession, workSessionReport, report: report.data, revision: projects.revision };
+      } catch (error) {if (!['BUSY', 'CURSOR_EXPIRED'].includes(error.code) || attempt === 2) throw error;}
     }
   }
   async changes(after) {
-    const {data} = await this.request(`/changes?after=${after}&waitSeconds=5`, {timeout: 10000});
+    const { data } = await this.request(`/changes?after=${after}&waitSeconds=5`, { timeout: 10000 });
     let sequence = after;
     if (!Array.isArray(data.items) || typeof data.hasMore !== 'boolean') throw new ApiError('UNAVAILABLE');
     for (const item of data.items) {
       if (!Number.isSafeInteger(item.sequence) || item.sequence <= sequence) throw new ApiError('UNAVAILABLE');
       sequence = item.sequence;
     }
-    if (data.nextSequence !== sequence || (data.hasMore && data.items.length === 0)) throw new ApiError('RESYNC_REQUIRED', 409);
+    if (data.nextSequence !== sequence || data.hasMore && data.items.length === 0) throw new ApiError('RESYNC_REQUIRED', 409);
     return data;
   }
 }

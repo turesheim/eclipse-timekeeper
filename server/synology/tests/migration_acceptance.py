@@ -26,7 +26,7 @@ def quote(value):return "'"+value.replace("'","''")+"'"
 
 
 def fixture_sql(schema=5, *, runtime=False):
-    if schema not in (2,3,4,5):raise ValueError('Unsupported fixture schema')
+    if schema not in (2,3,4,5,6):raise ValueError('Unsupported fixture schema')
     sql=(DB/'schema-v1-postgresql.sql').read_text()+(DB/'auth-v2.sql').read_text()
     sql+="UPDATE tk_schema SET schema_version=2,state='READY'; UPDATE tk_auth_control SET bootstrap_completed=TRUE;\n"
     now='2026-10-14T12:34:56.123456789Z'
@@ -96,13 +96,16 @@ def fixture_sql(schema=5, *, runtime=False):
         saved={**effective,'smtpPort':2525,'originEpoch':8}
         sql+="UPDATE tk_schema SET schema_version=5;\n"
         sql+=f"INSERT INTO tk_service_settings VALUES(1,9,8,{quote(json.dumps(saved))},{quote(json.dumps(effective))},{quote(secrets.token_urlsafe(32))},{quote(secrets.token_urlsafe(32))});\n"
+    if schema>=6:
+        sql+=(DB/'locale-v6.sql').read_text()
+        sql+="UPDATE tk_schema SET schema_version=6; INSERT INTO tk_locale VALUES('owner-a','nb-NO');\n"
     return sql
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--server-image')
-    parser.add_argument('--source-schema',type=int,choices=(2,3,4,5),default=5)
+    parser.add_argument('--source-schema',type=int,choices=(2,3,4,5,6),default=6)
     args=parser.parse_args()
     suffix=secrets.token_hex(4);source='timekeeper-migrate18-'+suffix;target='timekeeper-migrate17-'+suffix
     names=[]
@@ -140,13 +143,13 @@ def main():
                 'for tool in psql pg_dump pg_restore; do ln -s /usr/lib/postgresql/17/bin/$tool /var/packages/postgresql/target/bin/$tool; done; '
                 'chown -R 10001:10001 /var/packages/timekeeper')
             command('docker','cp',str(binary),target+':/var/packages/timekeeper/scripts/timekeeper-dsm')
-            release=folder/'release.json';release.write_text(json.dumps({'commit':'a'*40,'image':'ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+'a'*40,'serverSchema':5}))
+            release=folder/'release.json';release.write_text(json.dumps({'commit':'a'*40,'image':'ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+'a'*40,'serverSchema':6}))
             command('docker','cp',str(release),target+':/var/packages/timekeeper/scripts/release.json')
             blueprint=folder/'compose.yaml'
             blueprint.write_text((ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',json.loads(release.read_text())['image']))
             command('docker','exec',target,'mkdir','-p','/var/packages/timekeeper/target/project')
             command('docker','cp',str(blueprint),target+':/var/packages/timekeeper/target/project/compose.yaml')
-            for file in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','schema-v5-postgresql.shape','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql'):
+            for file in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','schema-v5-postgresql.shape','schema-v6-postgresql.shape','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql'):
                 command('docker','cp',str(DB/file),target+':/var/packages/timekeeper/scripts/migration/'+file)
             env={'SYNOPKG_PKGNAME':'timekeeper','SYNOPKG_PKGDEST':'/var/packages/timekeeper/target','wizard_database':'timekeeper_fixture','wizard_database_role':'timekeeper_fixture_app',
                  'wizard_database_port':'5433','wizard_http_port':'8098','wizard_public_origin':'https://timekeeper.example.invalid','wizard_owner':'',
@@ -157,7 +160,7 @@ def main():
                 if (result.returncode==0)!=(expected==0):raise AssertionError('Native migration action failed: '+action+' '+result.stderr)
                 return result
             helper('install')
-            ddl=''.join((DB/name).read_text() for name in ('schema-v1-postgresql.sql','auth-v2.sql','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql'))+"UPDATE tk_schema SET schema_version=5,state='READY';"
+            ddl=''.join((DB/name).read_text() for name in ('schema-v1-postgresql.sql','auth-v2.sql','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql'))+"UPDATE tk_schema SET schema_version=6,state='READY';"
             canonical="SET ROLE timekeeper_fixture_app; "+ddl
             command('docker','exec','-i',target,'psql','-X','-q','-v','ON_ERROR_STOP=1','-U','postgres','-p','5433','-d','timekeeper_fixture',input=canonical)
             archive.chmod(0o644);command('docker','cp',str(archive),target+':/var/packages/timekeeper/var/server/backups/migration.tar')

@@ -1,6 +1,4 @@
-<!doctype html>
-<html lang="en">
-<head>
+<!DOCTYPE html><html lang="en"><head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Timekeeper</title>
@@ -14,112 +12,113 @@
   <link rel="stylesheet" href="./calendar.css">
   <link rel="stylesheet" href="./themes.css">
   <link rel="preload" href="./assets/bootstrap-icons/fonts/bootstrap-icons.woff2?e34853135f9e39acf64315236852cd5a" as="font" type="font/woff2" crossorigin>
-  <script type="module" src="./app.js"></script>
+  <script type="module" src="./bootstrap.js" data-timekeeper-entry="/web/app.js"></script>
 </head>
 <body>
-  <a class="skip-link" href="#main-content">Skip to main content</a>
-  <header class="app-header"><a class="brand" href="./">Timekeeper <small>2.0</small></a><div id="session" hidden><span id="owner"></span><details id="account-menu" class="account-menu"><summary class="btn btn-outline-secondary" role="button" aria-expanded="false" aria-controls="account-menu-items" aria-label="Account menu" title="Account menu"><span class="icon bi bi-list" aria-hidden="true"></span></summary><nav id="account-menu-items" class="account-menu-items" aria-label="Account"><a class="btn btn-link" id="account" tabindex="0" href="#account/profile">My Account</a><a class="btn btn-link" id="users-link" tabindex="0" href="/admin/" hidden>Administration</a><button class="btn btn-link" id="about-open" type="button">About</button><div class="theme-choice"><label for="theme">Theme</label><select class="form-select" id="theme"></select></div><button class="btn btn-link" id="sign-out" type="button">Sign out</button></nav></details></div></header>
+  <a class="skip-link" href="#main-content"><span data-i18n="ui.skip_to_main_content">Skip to main content</span></a>
+  <header class="app-header"><a class="brand" href="./">Timekeeper <small>2.0</small></a><div id="session" hidden=""><span id="owner"></span><details id="account-menu" class="account-menu"><summary class="btn btn-outline-secondary" role="button" aria-expanded="false" aria-controls="account-menu-items" aria-label="Account menu" title="Account menu" data-i18n-aria-label="ui.account_menu" data-i18n-title="ui.account_menu"><span class="icon bi bi-list" aria-hidden="true"></span></summary><nav id="account-menu-items" class="account-menu-items" aria-label="Account" data-i18n-aria-label="ui.account"><a class="btn btn-link" id="account" tabindex="0" href="#account/profile"><span data-i18n="ui.my_account">My Account</span></a><a class="btn btn-link" id="users-link" tabindex="0" href="/admin/" hidden=""><span data-i18n="ui.administration">Administration</span></a><button class="btn btn-link" id="about-open" type="button"><span data-i18n="ui.about">About</span></button><div class="theme-choice"><label for="theme"><span data-i18n="ui.theme">Theme</span></label><select class="form-select" id="theme"></select></div><button class="btn btn-link" id="sign-out" type="button"><span data-i18n="ui.sign_out">Sign out</span></button></nav></details></div></header>
   <main id="main-content" tabindex="-1">
     <section id="login" class="card login">
-      <p class="eyebrow">YOUR WORK, RECORDED</p><h1>Make time count.</h1>
-      <p>Track work and manage your projects in the browser.</p><p id="login-build" class="hint"></p>
+      <p class="eyebrow"><span data-i18n="ui.your_work_recorded">YOUR WORK, RECORDED</span></p><h1><span data-i18n="ui.make_time_count">Make time count.</span></h1>
+      <p><span data-i18n="ui.track_work_and_manage_your_projects_in_the_browser">Track work and manage your projects in the browser.</span></p><p id="login-build" class="hint"></p>
       <form id="login-form">
-        <label class="form-label">Sign-in method<select class="form-select" id="auth-mode"><option value="login">Username and password</option><option value="setup">First administrator setup</option><option value="recover">Recover account</option><option value="token">Existing API token</option></select></label>
-        <label class="form-label" id="username-field">Username<input class="form-control" id="username" autocomplete="username" required maxlength="64"></label>
-        <label class="form-label" id="setup-email-field" hidden>Recovery email<input class="form-control" id="setup-email" type="email" autocomplete="email" maxlength="254" disabled></label>
-        <label class="form-label" id="password-field">Password<input class="form-control" id="password" type="password" autocomplete="current-password" required></label>
-        <label class="form-label" id="confirm-field" hidden>Confirm password<input class="form-control" id="password-confirm" type="password" autocomplete="new-password" disabled></label>
-        <label class="form-label" id="code-field" hidden>One-time setup or recovery code<input class="form-control" id="setup-code" name="one-time-code" type="text" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" disabled></label>
-        <label class="form-label check" id="remember-field"><input class="form-check-input" id="remember" type="checkbox"> Remember me on this browser</label>
-        <label class="form-label" id="token-field" hidden>Access token<input class="form-control" id="token" type="password" autocomplete="off" disabled></label>
-        <p id="auth-hint" class="hint">Use your Timekeeper account. API tokens are managed after signing in.</p>
-        <p id="login-error" class="alert alert-danger" role="alert" tabindex="-1"></p><button class="btn btn-primary" type="submit" disabled>Sign in</button>
-        <button class="btn btn-outline-secondary" id="passkey-sign-in" type="button" tabindex="0" disabled>Sign in with a passkey</button>
-        <button class="btn btn-outline-secondary" id="passkey-cancel" type="button" tabindex="0" hidden>Cancel passkey request</button>
+        <label class="form-label"><span data-i18n="ui.sign_in_method">Sign-in method</span><select class="form-select" id="auth-mode"><option value="login" data-i18n="ui.username_and_password">Username and password</option><option value="setup" data-i18n="ui.first_administrator_setup">First administrator setup</option><option value="recover" data-i18n="ui.recover_account">Recover account</option><option value="token" data-i18n="ui.existing_api_token">Existing API token</option></select></label>
+        <label class="form-label" id="username-field"><span data-i18n="ui.username">Username</span><input class="form-control" id="username" autocomplete="username" required="" maxlength="64"></label>
+        <label class="form-label" id="setup-email-field" hidden=""><span data-i18n="ui.recovery_email_35e41f">Recovery email</span><input class="form-control" id="setup-email" type="email" autocomplete="email" maxlength="254" disabled=""></label>
+        <label class="form-label" id="password-field"><span data-i18n="ui.password">Password</span><input class="form-control" id="password" type="password" autocomplete="current-password" required=""></label>
+        <label class="form-label" id="confirm-field" hidden=""><span data-i18n="ui.confirm_password">Confirm password</span><input class="form-control" id="password-confirm" type="password" autocomplete="new-password" disabled=""></label>
+        <label class="form-label" id="code-field" hidden=""><span data-i18n="ui.one_time_setup_or_recovery_code">One-time setup or recovery code</span><input class="form-control" id="setup-code" name="one-time-code" type="text" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" disabled=""></label>
+        <label class="form-label check" id="remember-field"><input class="form-check-input" id="remember" type="checkbox"> <span data-i18n="ui.remember_me_on_this_browser">Remember me on this browser</span></label>
+        <label class="form-label" id="token-field" hidden=""><span data-i18n="ui.access_token">Access token</span><input class="form-control" id="token" type="password" autocomplete="off" disabled=""></label>
+        <p id="auth-hint" class="hint"><span data-i18n="ui.use_your_timekeeper_account_api_tokens_are_managed_after_signing_in">Use your Timekeeper account. API tokens are managed after signing in.</span></p>
+        <p id="login-error" class="alert alert-danger" role="alert" tabindex="-1"></p><button class="btn btn-primary" type="submit" disabled=""><span data-i18n="ui.sign_in">Sign in</span></button>
+        <button class="btn btn-outline-secondary" id="passkey-sign-in" type="button" tabindex="0" disabled=""><span data-i18n="ui.sign_in_with_a_passkey">Sign in with a passkey</span></button>
+        <button class="btn btn-outline-secondary" id="passkey-cancel" type="button" tabindex="0" hidden=""><span data-i18n="ui.cancel_passkey_request">Cancel passkey request</span></button>
         <p id="passkey-support" class="hint" role="status"></p>
       </form>
-      <button class="btn btn-link" id="forgot-password" type="button">Forgot password?</button>
-      <form id="email-recovery-form" hidden aria-labelledby="email-recovery-title">
+      <button class="btn btn-link" id="forgot-password" type="button"><span data-i18n="ui.forgot_password">Forgot password?</span></button>
+      <form id="email-recovery-form" hidden="" aria-labelledby="email-recovery-title">
         <h2 id="email-recovery-title"></h2><p id="email-recovery-hint" class="hint"></p>
-        <label class="form-label">Username<input class="form-control" id="recovery-username" autocomplete="username" maxlength="64" disabled></label>
-        <label class="form-label">New password<input class="form-control" id="recovery-password" type="password" autocomplete="new-password" disabled></label>
-        <label class="form-label">Confirm new password<input class="form-control" id="recovery-confirm" type="password" autocomplete="new-password" disabled></label>
+        <label class="form-label"><span data-i18n="ui.username">Username</span><input class="form-control" id="recovery-username" autocomplete="username" maxlength="64" disabled=""></label>
+        <label class="form-label"><span data-i18n="ui.new_password">New password</span><input class="form-control" id="recovery-password" type="password" autocomplete="new-password" disabled=""></label>
+        <label class="form-label"><span data-i18n="ui.confirm_new_password">Confirm new password</span><input class="form-control" id="recovery-confirm" type="password" autocomplete="new-password" disabled=""></label>
         <p id="email-recovery-feedback" role="status" aria-live="polite"></p>
-        <div class="dialog-actions"><button class="btn btn-outline-secondary" id="email-recovery-back" type="button">Back to sign in</button><button class="btn btn-primary" type="submit">Request reset link</button></div>
+        <div class="dialog-actions"><button class="btn btn-outline-secondary" id="email-recovery-back" type="button"><span data-i18n="ui.back_to_sign_in">Back to sign in</span></button><button class="btn btn-primary" type="submit"><span data-i18n="ui.request_reset_link">Request reset link</span></button></div>
       </form>
     </section>
-    <section id="account-page" hidden aria-labelledby="account-heading">
-      <div class="account-page-heading"><div><p class="eyebrow">ACCOUNT SETTINGS</p><h1 id="account-heading" tabindex="-1"></h1><p id="account-identity" class="hint"></p></div><a class="btn btn-outline-secondary" href="#tracking">Back to time tracking</a></div>
-      <div class="account-layout"><nav id="account-navigation" class="nav nav-pills" aria-label="Account settings"></nav><div><p id="account-error" class="alert alert-danger" role="alert"></p><div id="account-content"></div></div></div>
+    <section id="account-page" hidden="" aria-labelledby="account-heading">
+      <div class="account-page-heading"><div><p class="eyebrow"><span data-i18n="ui.account_settings">ACCOUNT SETTINGS</span></p><h1 id="account-heading" tabindex="-1"></h1><p id="account-identity" class="hint"></p></div><a class="btn btn-outline-secondary" href="#tracking"><span data-i18n="ui.back_to_time_tracking">Back to time tracking</span></a></div>
+      <div class="account-layout"><nav id="account-navigation" class="nav nav-pills" aria-label="Account settings" data-i18n-aria-label="ui.account_settings_a587aa"></nav><div><p id="account-error" class="alert alert-danger" role="alert"></p><div id="account-content"></div></div></div>
     </section>
-    <div id="workspace" data-view="track" hidden>
-      <div class="status-line"><button class="btn btn-link status-refresh" id="refresh" type="button" data-state="working" aria-label="Refresh" title="Refresh"><span id="status-icon" aria-hidden="true"></span><span id="status" data-state="working" role="status" aria-live="polite"></span></button></div>
+    <div id="workspace" data-view="track" hidden="">
+      <div class="status-line"><button class="btn btn-link status-refresh" id="refresh" type="button" data-state="working" aria-label="Refresh" title="Refresh" data-i18n-aria-label="ui.refresh_0e9161" data-i18n-title="ui.refresh_0e9161"><span id="status-icon" aria-hidden="true"></span><span id="status" data-state="working" role="status" aria-live="polite"></span></button></div>
       <p id="remember-notice" class="hint" role="status"></p>
-      <section id="work-session" class="card work-session" aria-label="Work session">
-        <div class="work-session-heading"><div><p class="eyebrow">WORK SESSION</p><div class="session-title"><h2 id="work-session-title">Your work session</h2><span id="work-session-state" class="badge rounded-pill text-bg-secondary">Stopped</span></div><p id="work-session-current" class="hint"></p><div id="work-session-labels" class="d-flex flex-wrap gap-1" aria-label="Work session labels" hidden></div></div>
-          <p id="work-session-timing" class="session-elapsed" hidden><span>Duration</span><strong id="work-session-elapsed"></strong></p>
+      <section id="work-session" class="card work-session" aria-label="Work session" data-i18n-aria-label="ui.work_session_21aa04">
+        <div class="work-session-heading"><div><p class="eyebrow"><span data-i18n="ui.work_session_a7e3b2">WORK SESSION</span></p><div class="session-title"><h2 id="work-session-title"><span data-i18n="ui.your_work_session">Your work session</span></h2><span id="work-session-state" class="badge rounded-pill text-bg-secondary"><span data-i18n="ui.stopped">Stopped</span></span></div><p id="work-session-current" class="hint"></p><div id="work-session-labels" class="d-flex flex-wrap gap-1" aria-label="Work session labels" hidden="" data-i18n-aria-label="ui.work_session_labels"></div></div>
+          <p id="work-session-timing" class="session-elapsed" hidden=""><span><span data-i18n="ui.duration">Duration</span></span><strong id="work-session-elapsed"></strong></p>
           <div class="session-controls">
-            <div class="session-actions" role="group" aria-label="Work session timing"><button class="btn btn-primary" id="session-start">Start work session</button><button class="btn btn-outline-danger" id="session-stop" hidden>Stop work session</button><button class="btn btn-outline-secondary" id="session-new">Record work session</button></div>
-            <div class="session-actions session-tools" role="group" aria-label="Work session tools"><button class="btn btn-outline-secondary" id="session-edit" disabled>Edit work session</button><button class="btn btn-outline-danger" id="session-delete" disabled>Delete work session</button></div>
+            <div class="session-actions" role="group" aria-label="Work session timing" data-i18n-aria-label="ui.work_session_timing"><button class="btn btn-primary" id="session-start"><span data-i18n="ui.start_work_session">Start work session</span></button><button class="btn btn-outline-danger" id="session-stop" hidden=""><span data-i18n="ui.stop_work_session">Stop work session</span></button><button class="btn btn-outline-secondary" id="session-new"><span data-i18n="ui.record_work_session">Record work session</span></button></div>
+            <div class="session-actions session-tools" role="group" aria-label="Work session tools" data-i18n-aria-label="ui.work_session_tools"><button class="btn btn-outline-secondary" id="session-edit" disabled=""><span data-i18n="ui.edit_work_session">Edit work session</span></button><button class="btn btn-outline-danger" id="session-delete" disabled=""><span data-i18n="ui.delete_work_session">Delete work session</span></button></div>
           </div></div>
       </section>
-      <section class="card tracking"><div><p class="eyebrow">IN PROGRESS</p><h2 id="active-title">Ready when you are</h2><p id="active-details" class="hint">Choose a task below to start tracking.</p></div><button class="btn btn-primary" id="stop" hidden>Stop tracking</button></section>
-      <nav id="workspace-navigation" class="navbar fixed-bottom bg-body border-top workspace-nav" aria-label="Time tracking views" tabindex="-1">
+      <section class="card tracking"><div><p class="eyebrow"><span data-i18n="ui.in_progress_6a506b">IN PROGRESS</span></p><h2 id="active-title"><span data-i18n="ui.ready_when_you_are">Ready when you are</span></h2><p id="active-details" class="hint"><span data-i18n="ui.choose_a_task_below_to_start_tracking">Choose a task below to start tracking.</span></p></div><button class="btn btn-primary" id="stop" hidden=""><span data-i18n="ui.stop_tracking">Stop tracking</span></button></section>
+      <nav id="workspace-navigation" class="navbar fixed-bottom bg-body border-top workspace-nav" aria-label="Time tracking views" tabindex="-1" data-i18n-aria-label="ui.time_tracking_views">
         <div class="container-fluid px-0"><div class="navbar-nav">
-        <button class="nav-link active" data-tab="track" aria-current="page" aria-label="Track" title="Track"><span class="icon bi bi-bar-chart" aria-hidden="true"></span><span class="nav-label">Track</span></button>
-        <button class="nav-link" data-tab="week" aria-label="Workweek" title="Workweek"><span class="icon bi bi-calendar-week" aria-hidden="true"></span><span class="nav-label">Workweek</span></button>
-        <button class="nav-link" data-tab="activities" aria-label="Activities" title="Activities"><span class="icon bi bi-hourglass-split" aria-hidden="true"></span><span class="nav-label">Activities</span></button>
-        <button class="nav-link" data-tab="calendar" aria-label="Calendar" title="Calendar"><span class="icon bi bi-calendar3" aria-hidden="true"></span><span class="nav-label">Calendar</span></button>
-        <button class="nav-link" data-tab="tasks" aria-label="Tasks" title="Tasks"><span class="icon bi bi-list-check" aria-hidden="true"></span><span class="nav-label">Tasks</span></button>
-        <button class="nav-link" data-tab="clients" aria-label="Clients" title="Clients"><span class="icon bi bi-buildings" aria-hidden="true"></span><span class="nav-label">Clients</span></button>
-        <button class="nav-link" data-tab="projects" aria-label="Projects" title="Projects"><span class="icon bi bi-folder" aria-hidden="true"></span><span class="nav-label">Projects</span></button>
-        <button class="nav-link" data-tab="labels" aria-label="Labels" title="Labels"><span class="icon bi bi-tags" aria-hidden="true"></span><span class="nav-label">Labels</span></button>
-        </div></div>
+        <button class="nav-link active" data-tab="track" aria-current="page" aria-label="Track" title="Track" data-i18n-aria-label="ui.track" data-i18n-title="ui.track"><span class="icon bi bi-bar-chart" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.track">Track</span></span></button>
+        <button class="nav-link" data-tab="week" aria-label="Workweek" title="Workweek" data-i18n-aria-label="ui.workweek" data-i18n-title="ui.workweek"><span class="icon bi bi-calendar-week" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.workweek">Workweek</span></span></button>
+        <button class="nav-link" data-tab="activities" aria-label="Activities" title="Activities" data-i18n-aria-label="ui.activities" data-i18n-title="ui.activities"><span class="icon bi bi-hourglass-split" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.activities">Activities</span></span></button>
+        <button class="nav-link" data-tab="calendar" aria-label="Calendar" title="Calendar" data-i18n-aria-label="ui.calendar" data-i18n-title="ui.calendar"><span class="icon bi bi-calendar3" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.calendar">Calendar</span></span></button>
+        <button class="nav-link" data-tab="tasks" aria-label="Tasks" title="Tasks" data-i18n-aria-label="ui.tasks" data-i18n-title="ui.tasks"><span class="icon bi bi-list-check" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.tasks">Tasks</span></span></button>
+        <button class="nav-link" data-tab="clients" aria-label="Clients" title="Clients" data-i18n-aria-label="ui.clients" data-i18n-title="ui.clients"><span class="icon bi bi-buildings" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.clients">Clients</span></span></button>
+        <button class="nav-link" data-tab="projects" aria-label="Projects" title="Projects" data-i18n-aria-label="ui.projects" data-i18n-title="ui.projects"><span class="icon bi bi-folder" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.projects">Projects</span></span></button>
+        <button class="nav-link" data-tab="labels" aria-label="Labels" title="Labels" data-i18n-aria-label="ui.labels" data-i18n-title="ui.labels"><span class="icon bi bi-tags" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.labels">Labels</span></span></button>
+              </div></div>
       </nav>
       <p id="period-announcement" class="visually-hidden" role="status" aria-live="polite"></p>
       <section id="track-panel" aria-labelledby="track-title">
         <div class="toolbar track-toolbar">
           <div class="track-controls">
-            <div class="track-month-field"><label class="form-label" for="track-month">Month</label><div class="input-group"><input class="form-control" id="track-month" type="text" pattern="[0-9]{4}-(0[1-9]|1[0-2])" maxlength="7" placeholder="YYYY-MM" required><button type="button" id="track-month-choose" class="btn btn-outline-secondary" popovertarget="track-month-picker" aria-haspopup="dialog" aria-expanded="false">Choose month and year</button></div></div>
-            <div class="calendar-navigation"><button class="btn btn-outline-secondary" id="track-previous">Previous month</button><button class="btn btn-outline-secondary" id="track-today">Current month</button><button class="btn btn-outline-secondary" id="track-next">Next month</button></div>
+            <div class="track-month-field"><label class="form-label" for="track-month"><span data-i18n="ui.month">Month</span></label><div class="input-group"><input class="form-control" id="track-month" type="text" pattern="[0-9]{4}-(0[1-9]|1[0-2])" maxlength="7" placeholder="YYYY-MM" required="" data-i18n-placeholder="ui.yyyy_mm"><button type="button" id="track-month-choose" class="btn btn-outline-secondary" popovertarget="track-month-picker" aria-haspopup="dialog" aria-expanded="false"><span data-i18n="ui.choose_month_and_year">Choose month and year</span></button></div></div>
+            <div class="calendar-navigation"><button class="btn btn-outline-secondary" id="track-previous"><span data-i18n="ui.previous_month">Previous month</span></button><button class="btn btn-outline-secondary" id="track-today"><span data-i18n="ui.current_month">Current month</span></button><button class="btn btn-outline-secondary" id="track-next"><span data-i18n="ui.next_month">Next month</span></button></div>
           </div>
-          <div class="track-heading"><h2 id="track-title">Your month</h2><p id="track-zone" class="hint"></p></div>
-          <p class="track-total">Work sessions <strong id="track-total">0h 0m</strong></p>
+          <div class="track-heading"><h2 id="track-title"><span data-i18n="ui.your_month">Your month</span></h2><p id="track-zone" class="hint"></p></div>
+          <p class="track-total"><span data-i18n="ui.work_sessions">Work sessions</span> <strong id="track-total"><span data-i18n="ui.0h_0m">0h 0m</span></strong></p>
         </div>
-        <div id="track-clients" class="track-clients" aria-label="Client hours this month"></div>
+        <div id="track-clients" class="track-clients" aria-label="Client hours this month" data-i18n-aria-label="ui.client_hours_this_month"></div>
         <div id="track-calendar" class="card"></div>
       </section>
-        <div class="toolbar" id="week-toolbar" hidden><div><h2 id="week-report-title">Your workweek</h2><p id="zone-caption" class="hint"></p></div><label class="form-label">Week containing<input class="form-control" id="week-date" type="date" required></label><label class="form-label">Duration format<select class="form-select" id="duration-format" aria-label="Duration format"><option value="clock">Hours, minutes and seconds</option><option value="decimal">Decimal hours</option></select></label><button class="btn btn-outline-secondary" id="add-activity">Add time</button></div>
-      <section id="week-panel" hidden>
-        <section id="week-sessions-section" hidden aria-labelledby="week-sessions-heading"><h2 id="week-sessions-heading">Work sessions</h2><div id="week-sessions" class="card table-wrap"></div></section>
+        <div class="toolbar" id="week-toolbar" hidden=""><div><h2 id="week-report-title"><span data-i18n="ui.your_workweek">Your workweek</span></h2><p id="zone-caption" class="hint"></p></div><label class="form-label"><span data-i18n="ui.week_containing">Week containing</span><input class="form-control" id="week-date" type="date" required=""></label><label class="form-label"><span data-i18n="ui.duration_format">Duration format</span><select class="form-select" id="duration-format" aria-label="Duration format" data-i18n-aria-label="ui.duration_format"><option value="clock" data-i18n="ui.hours_minutes_and_seconds">Hours, minutes and seconds</option><option value="decimal" data-i18n="ui.decimal_hours">Decimal hours</option></select></label><button class="btn btn-outline-secondary" id="add-activity"><span data-i18n="ui.add_time">Add time</span></button></div>
+      <section id="week-panel" hidden="">
+        <section id="week-sessions-section" hidden="" aria-labelledby="week-sessions-heading"><h2 id="week-sessions-heading"><span data-i18n="ui.work_sessions">Work sessions</span></h2><div id="week-sessions" class="card table-wrap"></div></section>
       </section>
-      <section id="activities-panel" hidden aria-labelledby="activities-heading">
-        <div class="outline-actions"><button class="btn btn-outline-secondary" id="collapse-activities">Hide activities</button><button class="btn btn-outline-secondary" id="expand-activities">Show activities</button></div>
-        <h2 id="activities-heading">Activities</h2><div id="activities" class="card table-wrap"></div>
-        <div class="card report"><div class="report-heading"><p>Daily totals</p><span>Week total <strong id="week-total">—</strong></span></div><div id="days" class="days"></div></div>
+      <section id="activities-panel" hidden="" aria-labelledby="activities-heading">
+        <div class="outline-actions"><button class="btn btn-outline-secondary" id="collapse-activities"><span data-i18n="ui.hide_activities">Hide activities</span></button><button class="btn btn-outline-secondary" id="expand-activities"><span data-i18n="ui.show_activities">Show activities</span></button></div>
+        <h2 id="activities-heading"><span data-i18n="ui.activities">Activities</span></h2><div id="activities" class="card table-wrap"></div>
+        <div class="card report"><div class="report-heading"><p><span data-i18n="ui.daily_totals">Daily totals</span></p><span><span data-i18n="ui.week_total">Week total</span> <strong id="week-total">—</strong></span></div><div id="days" class="days"></div></div>
       </section>
-      <section id="calendar-panel" hidden aria-labelledby="calendar-title">
-        <div class="toolbar calendar-toolbar"><div><h2 id="calendar-title">Your calendar</h2><p id="calendar-zone" class="hint"></p></div>
-          <div class="calendar-navigation"><button class="btn btn-outline-secondary" id="calendar-previous">Previous week</button><button class="btn btn-outline-secondary" id="calendar-today">Today</button><button class="btn btn-outline-secondary" id="calendar-next">Next week</button></div>
-          <label class="form-label">Calendar date<input class="form-control" id="calendar-date" type="date" required></label>
-          <div class="calendar-tools"><button class="btn btn-outline-secondary" id="calendar-range" aria-pressed="false">Select time range</button><button class="btn btn-outline-secondary" id="calendar-new">Record work session at selected time</button><button class="btn btn-outline-secondary" id="calendar-edit">Edit selected work session</button><button class="btn btn-outline-secondary" id="calendar-copy">Copy work session</button><button class="btn btn-outline-secondary" id="calendar-paste">Paste work session</button></div>
+      <section id="calendar-panel" hidden="" aria-labelledby="calendar-title">
+        <div class="toolbar calendar-toolbar"><div><h2 id="calendar-title"><span data-i18n="ui.your_calendar">Your calendar</span></h2><p id="calendar-zone" class="hint"></p></div>
+          <div class="calendar-navigation"><button class="btn btn-outline-secondary" id="calendar-previous"><span data-i18n="ui.previous_week">Previous week</span></button><button class="btn btn-outline-secondary" id="calendar-today"><span data-i18n="ui.today">Today</span></button><button class="btn btn-outline-secondary" id="calendar-next"><span data-i18n="ui.next_week">Next week</span></button></div>
+          <label class="form-label"><span data-i18n="ui.calendar_date">Calendar date</span><input class="form-control" id="calendar-date" type="date" required=""></label>
+          <div class="calendar-tools"><button class="btn btn-outline-secondary" id="calendar-range" aria-pressed="false"><span data-i18n="ui.select_time_range">Select time range</span></button><button class="btn btn-outline-secondary" id="calendar-new"><span data-i18n="ui.record_work_session_at_selected_time">Record work session at selected time</span></button><button class="btn btn-outline-secondary" id="calendar-edit"><span data-i18n="ui.edit_selected_work_session">Edit selected work session</span></button><button class="btn btn-outline-secondary" id="calendar-copy"><span data-i18n="ui.copy_work_session">Copy work session</span></button><button class="btn btn-outline-secondary" id="calendar-paste"><span data-i18n="ui.paste_work_session">Paste work session</span></button></div>
         </div>
-        <p id="calendar-dst" class="hint" hidden>The clocks change this week. Repeated times have an extra row; shaded slots do not occur on that day.</p>
+        <p id="calendar-dst" class="hint" hidden=""><span data-i18n="ui.the_clocks_change_this_week_repeated_times_have_an_extra_row_shaded_slots_do_not_occu">The clocks change this week. Repeated times have an extra row; shaded slots do not occur on that day.</span></p>
         <p id="calendar-message" class="hint" role="status" aria-live="polite"></p>
-        <div class="calendar-scroll card" aria-label="Weekly calendar"><div id="calendar-grid" class="calendar-grid"></div></div>
+        <div class="calendar-scroll card" aria-label="Weekly calendar" data-i18n-aria-label="ui.weekly_calendar"><div id="calendar-grid" class="calendar-grid"></div></div>
       </section>
-      <section id="tasks-panel" hidden><div class="toolbar"><h2>Tasks</h2><button class="btn btn-primary" id="add-task">New task</button></div><div id="tasks" class="card table-wrap"></div></section>
-      <section id="clients-panel" hidden><div class="toolbar"><h2>Clients</h2><button class="btn btn-primary" id="add-client">New client</button></div><div id="clients" class="card table-wrap"></div></section>
-      <section id="projects-panel" hidden><div class="toolbar"><h2>Projects</h2><button class="btn btn-primary" id="add-project">New project</button></div><div id="projects" class="card table-wrap"></div></section>
-      <section id="labels-panel" hidden><div class="toolbar"><h2>Labels</h2><button class="btn btn-primary" id="add-label">New label</button></div><div id="labels" class="card table-wrap"></div></section>
-      <aside id="undo-notice" class="card undo-notice shadow" aria-label="Undo work-session change" hidden><p role="status" aria-live="polite"></p><button type="button" class="btn btn-primary" data-undo>Undo</button><button type="button" class="btn btn-outline-secondary" data-dismiss-undo>Dismiss</button></aside>
+      <section id="tasks-panel" hidden=""><div class="toolbar"><h2><span data-i18n="ui.tasks">Tasks</span></h2><button class="btn btn-primary" id="add-task"><span data-i18n="ui.new_task">New task</span></button></div><div id="tasks" class="card table-wrap"></div></section>
+      <section id="clients-panel" hidden=""><div class="toolbar"><h2><span data-i18n="ui.clients">Clients</span></h2><button class="btn btn-primary" id="add-client"><span data-i18n="ui.new_client">New client</span></button></div><div id="clients" class="card table-wrap"></div></section>
+      <section id="projects-panel" hidden=""><div class="toolbar"><h2><span data-i18n="ui.projects">Projects</span></h2><button class="btn btn-primary" id="add-project"><span data-i18n="ui.new_project">New project</span></button></div><div id="projects" class="card table-wrap"></div></section>
+      <section id="labels-panel" hidden=""><div class="toolbar"><h2><span data-i18n="ui.labels">Labels</span></h2><button class="btn btn-primary" id="add-label"><span data-i18n="ui.new_label">New label</span></button></div><div id="labels" class="card table-wrap"></div></section>
+      <aside id="undo-notice" class="card undo-notice shadow" aria-label="Undo work-session change" hidden="" data-i18n-aria-label="ui.undo_work_session_change"><p role="status" aria-live="polite"></p><button type="button" class="btn btn-primary" data-undo=""><span data-i18n="ui.undo_a8283a">Undo</span></button><button type="button" class="btn btn-outline-secondary" data-dismiss-undo=""><span data-i18n="ui.dismiss">Dismiss</span></button></aside>
     </div>
   </main>
   <dialog class="app-dialog server-info shadow-lg" id="server-info" aria-labelledby="about-title">
-    <h2 id="about-title">About Timekeeper</h2><p id="server-build">Server build information unavailable</p>
-    <dl><dt>Version</dt><dd id="server-version">—</dd><dt>SPK version</dt><dd id="server-spk">—</dd><dt>Commit</dt><dd id="server-commit">—</dd><dt>Built</dt><dd id="server-built">—</dd><dt>Deployed</dt><dd id="server-deployed">—</dd><dt>Started</dt><dd id="server-started">—</dd></dl>
-    <div class="dialog-actions"><button class="btn btn-outline-secondary" id="about-close" type="button">Close</button></div>
+    <h2 id="about-title"><span data-i18n="ui.about_timekeeper">About Timekeeper</span></h2><p id="server-build"><span data-i18n="ui.server_build_information_unavailable">Server build information unavailable</span></p>
+    <dl><dt><span data-i18n="ui.version">Version</span></dt><dd id="server-version">—</dd><dt><span data-i18n="ui.spk_version">SPK version</span></dt><dd id="server-spk">—</dd><dt><span data-i18n="ui.commit">Commit</span></dt><dd id="server-commit">—</dd><dt><span data-i18n="ui.built">Built</span></dt><dd id="server-built">—</dd><dt><span data-i18n="ui.deployed">Deployed</span></dt><dd id="server-deployed">—</dd><dt><span data-i18n="ui.started_ecbc89">Started</span></dt><dd id="server-started">—</dd></dl>
+    <div class="dialog-actions"><button class="btn btn-outline-secondary" id="about-close" type="button"><span data-i18n="ui.close">Close</span></button></div>
   </dialog>
-  <dialog class="app-dialog shadow-lg" id="editor" aria-labelledby="editor-title"><form id="editor-form"><h2 id="editor-title"></h2><div id="fields"></div><p id="editor-error" class="alert alert-danger" role="alert" tabindex="-1"></p><p id="editor-notice" class="alert alert-info" role="status"></p><div class="dialog-actions"><button class="btn btn-outline-secondary" id="cancel" type="button">Cancel</button><button class="btn btn-primary" id="save" type="submit">Save</button></div></form></dialog>
-</body>
-</html>
+  <dialog class="app-dialog shadow-lg" id="editor" aria-labelledby="editor-title"><form id="editor-form"><h2 id="editor-title"></h2><div id="fields"></div><p id="editor-error" class="alert alert-danger" role="alert" tabindex="-1"></p><p id="editor-notice" class="alert alert-info" role="status"></p><div class="dialog-actions"><button class="btn btn-outline-secondary" id="cancel" type="button"><span data-i18n="ui.cancel">Cancel</span></button><button class="btn btn-primary" id="save" type="submit"><span data-i18n="ui.save">Save</span></button></div></form></dialog>
+
+
+</body></html>

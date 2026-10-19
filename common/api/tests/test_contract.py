@@ -74,6 +74,15 @@ class ContractTest(unittest.TestCase):
                     del missing[field]
                     self.assertFalse(validator(name).is_valid(missing))
 
+    def test_locale_is_optional_nullable_and_restricted_to_supported_regions(self):
+        for locale in (None, 'en-GB', 'en-US', 'nb-NO'):
+            validator('ProfileInput').validate({'zoneId': 'Europe/Oslo', 'locale': locale})
+        validator('ProfileInput').validate({'zoneId': 'Europe/Oslo'})
+        for locale in ('en', 'no-NO', 'de-DE', '', '<script>', 1, [], {}):
+            self.assertFalse(validator('ProfileInput').is_valid({'zoneId': 'Europe/Oslo', 'locale': locale}))
+        for schema in ('Profile', 'ProfileInput', 'AuthSession'):
+            self.assertNotIn('locale', CONTRACT['components']['schemas'][schema].get('required', []))
+
     def test_optional_project_icons_are_bounded_metadata(self):
         for icon in ('code', 'globe', 'hammer', 'rocket', 'airplane-engines', 'calendar3', 'phone', None):
             validator('ProjectInput').validate({'name': 'Project', 'icon': icon})

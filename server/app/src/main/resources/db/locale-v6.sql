@@ -1,0 +1,1 @@
+CREATE TABLE tk_locale (owner_id VARCHAR(400) PRIMARY KEY REFERENCES tk_owner(id), locale VARCHAR(35) NOT NULL);

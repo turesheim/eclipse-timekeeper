@@ -15,7 +15,8 @@
   apply(selected);
   document.addEventListener('DOMContentLoaded',()=>{
     picker=document.getElementById('theme');if(!picker)return;
-    for(const [id,label] of themes) {const option=document.createElement('option');option.value=id;option.textContent=label;picker.append(option);}
+    for(const [id,label] of themes) {const option=document.createElement('option');option.value=id;option.textContent=label;option.dataset.i18n='theme.'+id;picker.append(option);}
+    window.dispatchEvent(new Event('timekeeper-theme-options'));
     picker.value=selected;
     picker.addEventListener('change',()=>{
       apply(picker.value);

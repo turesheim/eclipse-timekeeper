@@ -33,7 +33,7 @@ class SettingsSchemaUpgradeTest {
             try(var rows=s.executeQuery("SELECT origin_epoch,passkey_id FROM tk_auth_session WHERE digest='retained-session'")) {assertTrue(rows.next());assertEquals(7,rows.getLong(1));assertEquals(UUID.fromString("00000000-0000-4000-8000-000000000001"),rows.getObject(2,UUID.class));}
             try(var rows=s.executeQuery("SELECT credential_id,public_key,version,revoked FROM tk_passkey_credential")) {assertTrue(rows.next());assertEquals("credential",rows.getString(1));assertEquals("public-key",rows.getString(2));assertEquals(2,rows.getLong(3));assertFalse(rows.getBoolean(4));}
             try(var rows=s.executeQuery("SELECT count(*) FROM tk_service_settings")) {rows.next();assertEquals(0,rows.getInt(1));}
-            try(var rows=s.executeQuery("SELECT schema_version,state FROM tk_schema")) {rows.next();assertEquals(5,rows.getInt(1));assertEquals("READY",rows.getString(2));}
+            try(var rows=s.executeQuery("SELECT schema_version,state FROM tk_schema")) {rows.next();assertEquals(ServerSchema.CURRENT,rows.getInt(1));assertEquals("READY",rows.getString(2));}
         }
     }
     @Test void malformedOrInterruptedV4NeverGetsASettingsTable() throws Exception {

@@ -11,6 +11,13 @@ intentional dependency update. The icon command also updates the project catalog
 and API allow-list from Bootstrap icon names.
 No Bootstrap JavaScript or third-party runtime asset requests are needed.
 
+i18next 26.5.2 and its license are also bundled locally. English and Norwegian
+Bokmål catalogs live in `src/locales/`. Run `npm run vendor:i18n` after editing
+either catalog; the generator validates keys and interpolation variables and
+regenerates the native-module resources. `npm run check:assets` verifies them.
+See the language and region section of the development guide for the account
+preference and browser fallback behavior.
+
 Browser acceptance defaults to Chromium. For WebKit, install its browser with
 `npx playwright install --with-deps webkit` from this directory. After building
 and packaging the server, run from the repository root:

@@ -175,7 +175,8 @@ public class TimekeeperResource {
     @GET @Path("/me") public Response profile() { ContractInputs.queries(uri.getQueryParameters());return tx(() -> ApiReplies.resource(200,store.profile(),null)); }
     @PUT @Path("/me") public Response profile(@HeaderParam("If-Match") String match,JsonNode body) {
         var input=inputs.validate("ProfileInput",body);String zone=ContractInputs.zone(input.get("zoneId").asText()).getId();ContractInputs.queries(uri.getQueryParameters());
-        return tx(() -> { ApiReplies.match(store.profile(),match);return ApiReplies.resource(200,store.updateProfile(zone),null); });
+        String locale=input.hasNonNull("locale") ? input.get("locale").asText() : null;
+        return tx(() -> { ApiReplies.match(store.profile(),match);return ApiReplies.resource(200,store.updateProfile(zone,input.has("locale"),locale),null); });
     }
     @GET @Path("/{collection}") public Response list(@PathParam("collection") String collection) {
         String type=ContractInputs.type(collection);var query=uri.getQueryParameters();
