@@ -70,7 +70,7 @@ test('clients maintain names and colors, own projects and color work-session sum
     await page.getByRole('button',{name:'Clients',exact:true}).click();row=page.locator('#clients tr').filter({hasText:prefix});await row.getByRole('button',{name:'Delete',exact:true}).click();await page.locator('#save').click();await expect(page.locator('#editor-error')).toContainText('conflicts');await page.locator('#cancel').click();
     for(const [collection,values] of [['work-sessions',[session]],['projects',projects]]) for(const value of values) {const current=await api(request,'GET',`/${collection}/${value.id}`);await api(request,'DELETE',`/${collection}/${value.id}`,undefined,{'If-Match':current.headers().etag});}
     session=null;projects.length=0;
-    await page.getByRole('button',{name:'Refresh',exact:true}).click();await expect(row).toBeVisible();await row.getByRole('button',{name:'Delete',exact:true}).click();await save(page);await expect(row).toHaveCount(0);client=null;
+    await page.getByRole('button',{name:/^Refresh: /}).click();await expect(row).toBeVisible();await row.getByRole('button',{name:'Delete',exact:true}).click();await save(page);await expect(row).toHaveCount(0);client=null;
   } finally {
     for(const [collection,values] of [['work-sessions',session ? [session] : []],['projects',projects],['clients',client ? [client] : []]]) for(const value of values) {const current=await api(request,'GET',`/${collection}/${value.id}`);await api(request,'DELETE',`/${collection}/${value.id}`,undefined,{'If-Match':current.headers().etag});}
   }
@@ -116,7 +116,7 @@ test('Projects groups clients with keyboard collapsible headings and retains gro
     await expect(beta.locator('[data-project-id]')).toHaveCount(2);await expect(alpha.locator('[data-project-id]')).toHaveCount(1);
     const toggle=beta.getByRole('button',{name:'Collapse '+clients[0].name,exact:true});await toggle.focus();await page.keyboard.press('Enter');
     await expect(beta.getByRole('button',{name:'Expand '+clients[0].name,exact:true})).toBeFocused();await expect(beta.locator('[data-project-id]').first()).not.toBeVisible();await expect(alpha.locator('[data-project-id]')).toBeVisible();
-    await page.getByRole('button',{name:'Refresh',exact:true}).click();await expect(beta.getByRole('button',{name:'Expand '+clients[0].name,exact:true})).toHaveAttribute('aria-expanded','false');
+    await page.getByRole('button',{name:/^Refresh: /}).click();await expect(beta.getByRole('button',{name:'Expand '+clients[0].name,exact:true})).toHaveAttribute('aria-expanded','false');
     await beta.getByRole('button',{name:'Expand '+clients[0].name,exact:true}).press('Space');await expect(beta.locator('[data-project-id]').first()).toBeVisible();
     await beta.locator(`[data-project-id="${projects[0].id}"]`).getByRole('button',{name:'Edit',exact:true}).click();await page.getByLabel('Client',{exact:true}).selectOption(clients[1].id);await save(page);
     await expect(beta.locator('[data-project-id]')).toHaveCount(1);await expect(alpha.locator('[data-project-id]')).toHaveCount(2);

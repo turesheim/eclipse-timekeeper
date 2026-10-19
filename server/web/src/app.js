@@ -84,6 +84,7 @@ function setStatus(text, state = 'error') {
   $('status').textContent = text; $('status').dataset.state = state;
   $('status-icon').replaceChildren(icon({ready:'check',working:'refresh',notice:'warning',error:'error'}[state] || 'warning'));
   $('refresh').dataset.state = state; $('refresh').title = `${text}. Click to refresh`;
+  $('refresh').setAttribute('aria-label', `Refresh: ${text}`);
 }
 function clearServerInfo() {
   $('server-build').textContent = 'Server build information unavailable';
