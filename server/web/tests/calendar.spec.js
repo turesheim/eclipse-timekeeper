@@ -16,7 +16,7 @@ async function put(request,collection,value,changes) {
 }
 async function save(page) {await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');}
 async function calendar(page,credential=token,date='2025-10-20') {
-  await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(credential);await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.goto('/web/');await expect(page.locator('#login-form button[type=submit]')).toBeEnabled();await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(credential);await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Calendar',exact:true}).click();
   await page.getByLabel('Calendar date',{exact:true}).fill(date);
   await expect(page.locator('#calendar-zone')).toContainText(monday(date));await expect(page.locator('.calendar-day')).toHaveCount(7);
