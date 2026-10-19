@@ -59,6 +59,9 @@ export function emailRecovery({ request, signIn }) {
       }
     });
   });
+  // The language bootstrap may still be loading when the sign-in HTML appears.
+  // Enable this action only once its handlers can receive the first click.
+  $('forgot-password').disabled = false;
   return { close, async initializeFromLocation() {
       const match = /^#(reset-password|verify-email)\/(.*)$/.exec(location.hash);
       if (!match) return false;

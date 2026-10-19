@@ -34,6 +34,24 @@ test('public language follows browser preference with Norwegian aliases and an E
     finally {await session.close();}
   }
 });
+test('password recovery waits for localized event handlers and survives a late sign-in status response',async({browser})=>{
+  const session=await context(browser,'nb-NO'),page=await session.newPage();
+  let releaseLocale,releaseStatus,first=true;
+  const localeReady=new Promise(resolve=>{releaseLocale=resolve;}),statusReady=new Promise(resolve=>{releaseStatus=resolve;});
+  await page.route('**/api/v1/auth/session',async route=>{if(first){first=false;await localeReady;}await route.continue();});
+  await page.route('**/api/v1/auth/status',async route=>{await statusReady;await route.continue();});
+  try {
+    await page.goto('/web/',{waitUntil:'commit'});
+    const forgot=page.locator('#forgot-password');await expect(forgot).toBeDisabled();
+    releaseLocale();await expect(forgot).toBeEnabled();await forgot.click();
+    await expect(page.locator('#email-recovery-form')).toBeVisible();
+    const loaded=page.waitForResponse(response=>response.url().endsWith('/api/v1/auth/status'));
+    releaseStatus();await loaded;
+    await expect(page.locator('#login-form button[type=submit]')).toBeEnabled();
+    await expect(page.locator('#login-form')).toBeHidden();
+    await expect(page.locator('#email-recovery-form').getByLabel('Brukernavn',{exact:true})).toBeVisible();
+  } finally {releaseLocale();releaseStatus();await session.close();}
+});
 test('account language persists across devices and can return to browser defaults without translating user records',async({browser,request})=>{
   const user=await fresh(request),first=await context(browser,'nb-NO'),second=await context(browser,'nb-NO');
   try {
