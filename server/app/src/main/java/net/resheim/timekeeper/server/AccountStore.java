@@ -261,6 +261,9 @@ public class AccountStore {
     JsonNode account(TokenRegistry.Principal principal) {return tx(c->{guard(c,principal);return account(c,principal.owner(),false);});}
     JsonNode context(TokenRegistry.Principal principal) {
         return tx(c->{guard(c,principal);var value=account(c,principal.owner(),false);var grants=value.putArray("permissions");principal.permissions().stream().sorted().forEach(grants::add);
+            try(var statement=query(c,"SELECT locale FROM tk_locale WHERE owner_id=?",principal.owner());var rows=statement.executeQuery()) {
+                value.put("locale",rows.next() ? rows.getString(1) : null);
+            }catch(SQLException failure) {throw databaseFailure(failure);}
             if(principal.kind().equals("SESSION")) try(var statement=query(c,"SELECT csrf,expires_at,persistent FROM tk_auth_session WHERE digest=? AND owner_id=?",principal.digest(),principal.owner());var rows=statement.executeQuery()) {
                 if(!rows.next()) throw ApiFailure.unauthorized(false);value.put("csrf",rows.getString(1));value.put("expiresAt",rows.getString(2));value.put("remember",rows.getBoolean(3));
             }catch(SQLException failure) {throw databaseFailure(failure);}

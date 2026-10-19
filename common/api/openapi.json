@@ -8481,6 +8481,22 @@
         "properties": {
           "zoneId": {
             "$ref": "#/components/schemas/ZoneId"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "en-GB",
+                  "en-US",
+                  "nb-NO"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Preferred web language and regional formatting. Null follows browser language. Omitted profile edits preserve the preference."
           }
         },
         "required": [
@@ -8765,6 +8781,22 @@
           },
           "version": {
             "$ref": "#/components/schemas/Version"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "en-GB",
+                  "en-US",
+                  "nb-NO"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Preferred web language and regional formatting. Null follows browser language. Omitted profile edits preserve the preference."
           }
         },
         "required": [
@@ -10166,6 +10198,22 @@
           },
           "remember": {
             "type": "boolean"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "en-GB",
+                  "en-US",
+                  "nb-NO"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Preferred web language and regional formatting. Null follows browser language. Omitted profile edits preserve the preference."
           }
         }
       },

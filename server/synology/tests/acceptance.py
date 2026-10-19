@@ -42,7 +42,7 @@ def main():
         admin_file.chmod(0o444)
         commit = command('git', '-C', str(ROOT), 'rev-parse', 'HEAD').stdout.strip()
         release = folder / 'release.json'
-        release.write_text(json.dumps({'commit':commit, 'image':'ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+commit, 'serverSchema':5}))
+        release.write_text(json.dumps({'commit':commit, 'image':'ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+commit, 'serverSchema':6}))
         binary = folder / 'timekeeper-dsm'
         command('go', '-C', str(ROOT/'server/synology/installer'), 'build', '-trimpath', '-o', str(binary), '.',
                 environment={**os.environ, 'GOOS':'linux', 'GOARCH':architecture, 'CGO_ENABLED':'0', 'GOCACHE':str(folder/'go-cache')})
@@ -80,7 +80,7 @@ def main():
             command('docker','cp',str(binary),name+':/var/packages/timekeeper/scripts/timekeeper-dsm')
             command('docker','cp',str(release),name+':/var/packages/timekeeper/scripts/release.json')
             command('docker','exec',name,'mkdir','-p','/var/packages/timekeeper/scripts/migration')
-            for file in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','schema-v5-postgresql.shape','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql'):
+            for file in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','schema-v5-postgresql.shape','schema-v6-postgresql.shape','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql'):
                 command('docker','cp',str(DB/file),name+':/var/packages/timekeeper/scripts/migration/'+file)
             # DSM stages package.tgz separately from its SPK control scripts.
             # Leave the incoming identity absent first to reproduce the real
@@ -168,8 +168,8 @@ def main():
             # Restore validates the canonical schema, so exercise actual Timekeeper
             # rows rather than the earlier ad-hoc preserved_fixture table.
             payload=json.dumps({'ownerId':'existing-owner','id':'11111111-1111-1111-1111-111111111111','version':0,'name':'owned private data','color':'#176653'})
-            schema='SET ROLE timekeeper_fixture_app; '+''.join((DB/file).read_text() for file in ('schema-v1-postgresql.sql','auth-v2.sql','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql'))
-            schema+="UPDATE tk_schema SET schema_version=5,state='READY'; INSERT INTO tk_owner VALUES('existing-owner','UTC',0,0,'"+'b'*64+"');"
+            schema='SET ROLE timekeeper_fixture_app; '+''.join((DB/file).read_text() for file in ('schema-v1-postgresql.sql','auth-v2.sql','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql'))
+            schema+="UPDATE tk_schema SET schema_version=6,state='READY'; INSERT INTO tk_owner VALUES('existing-owner','UTC',0,0,'"+'b'*64+"');"
             schema+="INSERT INTO tk_account VALUES('existing-owner',NULL,NULL,'Existing owner','UNCLAIMED',FALSE,TRUE,0);"
             schema+="INSERT INTO tk_resource VALUES('existing-owner','LABEL','11111111-1111-1111-1111-111111111111',0,'"+payload+"');"
             command('docker','exec','-i',name,'psql','-X','-v','ON_ERROR_STOP=1','-U','postgres','-p','5433','-d','timekeeper_fixture',input=schema)
@@ -251,7 +251,7 @@ def main():
             log=command('docker','logs',name).stdout+command('docker','logs',name).stderr
             if any(secret in log for secret in (master_password,application_password,code)):
                 raise AssertionError('PostgreSQL statement log contains a plaintext credential')
-            print(json.dumps({'postgresql':args.postgres_image,'architecture':architecture,'serverSchema':5,'canonicalSchemaFixture':True,
+            print(json.dumps({'postgresql':args.postgres_image,'architecture':architecture,'serverSchema':6,'canonicalSchemaFixture':True,
                               'unprivilegedInstaller':True,'dedicatedNonSuperuser':True,'permanentAppdataBeforeResourceStartup':True,
                               'upgradeSurvivesRemovedPackageLinks':True,'missingUpgradeStateRefused':True,
                               'reinstallPreservesCredentials':True,'renewIncompleteSetupWithoutResettingAccounts':True,'interruptedProvisioningPreservesData':True,

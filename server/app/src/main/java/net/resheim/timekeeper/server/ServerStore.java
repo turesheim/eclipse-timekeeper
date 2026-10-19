@@ -173,14 +173,21 @@ public class ServerStore {
         } catch (SQLException e) { throw databaseFailure(e); }
     }
     public ObjectNode profile() {
-        try (var statement = statement("SELECT zone_id,version FROM tk_owner WHERE id=?",owner()); var rows = statement.executeQuery()) {
+        try (var statement = statement("SELECT o.zone_id,o.version,l.locale FROM tk_owner o LEFT JOIN tk_locale l ON l.owner_id=o.id WHERE o.id=?",owner()); var rows = statement.executeQuery()) {
             if (!rows.next()) throw new IllegalStateException("Missing owner");
-            var value = object(); value.put("ownerId",owner()); value.put("zoneId",rows.getString(1)); value.put("version",rows.getLong(2)); return value;
+            var value = object(); value.put("ownerId",owner()); value.put("zoneId",rows.getString(1)); value.put("version",rows.getLong(2));value.put("locale",rows.getString(3)); return value;
         } catch (SQLException e) { throw databaseFailure(e); }
     }
     public ObjectNode updateProfile(String zone) {
+        return updateProfile(zone,false,null);
+    }
+    public ObjectNode updateProfile(String zone,boolean updateLocale,String locale) {
         var profile = profile(); long version = profile.get("version").asLong();
         if (update("UPDATE tk_owner SET zone_id=?,version=? WHERE id=? AND version=?",zone,version+1,owner(),version)!=1) throw new ApiFailure(412,"STALE_VERSION");
+        if(updateLocale) {
+            if(locale==null) update("DELETE FROM tk_locale WHERE owner_id=?",owner());
+            else if(update("UPDATE tk_locale SET locale=? WHERE owner_id=?",locale,owner())==0) update("INSERT INTO tk_locale(owner_id,locale) VALUES(?,?)",owner(),locale);
+        }
         change("PROFILE","UPDATED",owner()); return profile();
     }
     public Optional<JsonNode> find(String type, UUID id) {

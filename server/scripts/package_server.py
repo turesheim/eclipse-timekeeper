@@ -46,7 +46,7 @@ def package(output, tag, commit):
     output.mkdir(parents=True, exist_ok=True)
     archive = output / 'timekeeper-server.zip'
     manifest = {'format': 1, 'kind': 'candidate' if tag is None else 'release', 'tag': tag, 'commit': commit, 'java': 21,
-                'quarkus': '3.40.1', 'h2': '2.5.250', 'apiMajor': 1, 'serverSchema': 5}
+                'quarkus': '3.40.1', 'h2': '2.5.250', 'apiMajor': 1, 'serverSchema': 6}
     files = [(p, 'timekeeper-server/' + p.relative_to(app).as_posix()) for p in sorted(app.rglob('*')) if p.is_file()]
     guides = {'docs/operations/SERVER.md': 'README.md',
               'docs/architecture/API-V1.md': 'API-POLICY.md',
@@ -58,6 +58,8 @@ def package(output, tag, commit):
               'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
               'docs/development/WEB-CLIENT.md': 'WEB-CLIENT.md'}
     illustrations = {
+        'docs/assets/screenshots/locale-norwegian-account.png': 'images/locale-norwegian-account.png',
+        'docs/assets/screenshots/locale-norwegian-administration.png': 'images/locale-norwegian-administration.png',
         'docs/assets/screenshots/activities-mobile.png': 'images/activities-mobile.png',
         'docs/assets/screenshots/project-icon-picker.png': 'images/project-icon-picker.png',
         'docs/assets/screenshots/track-project-icons.png': 'images/track-project-icons.png',

@@ -8,8 +8,9 @@ async function api(request,method,path,data,headers={}) {
   expect(response.ok(),method+' '+path).toBe(true);return response;
 }
 async function signIn(page,credential=token) {
-  await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(credential);
-  await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+  await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(credential);
+  await page.locator('#login-form button[type=submit]').click();
+  await expect(page.locator('#status')).toHaveText((await page.locator('html').getAttribute('lang'))==='nb-NO'?'Oppdatert':'Up to date');
 }
 test('Track is the default month overview with exact client session hours, local dates and independent activities',async({browser,request})=> {
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,timezoneId:'America/Los_Angeles',locale:'en-GB',ignoreHTTPSErrors:true}),page=await context.newPage();
@@ -92,24 +93,24 @@ test('Track month picker supports year selection, keyboard dismissal and a cente
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,locale:'nb-NO',viewport:{width:1280,height:900},ignoreHTTPSErrors:true}),page=await context.newPage();
   try {
     await signIn(page);
-    const month=page.getByLabel('Month',{exact:true}),choose=page.getByRole('button',{name:'Choose month and year',exact:true}),popup=page.getByRole('dialog',{name:'Choose month and year',exact:true});
+    const month=page.getByLabel('Måned',{exact:true}),choose=page.getByRole('button',{name:'Velg måned og år',exact:true}),popup=page.getByRole('dialog',{name:'Velg måned og år',exact:true});
     await month.fill('2025-10');await expect(page.locator('#track-title')).toHaveText('Oktober 2025');
     const toolbar=await page.locator('.track-toolbar').boundingBox(),heading=await page.locator('.track-heading').boundingBox(),controls=await page.locator('.track-controls').boundingBox();
     expect(Math.abs(heading.x+heading.width/2-toolbar.x-toolbar.width/2)).toBeLessThan(1);expect(controls.x+controls.width).toBeLessThanOrEqual(heading.x);
     await choose.focus();await choose.press('Enter');await expect(popup).toBeVisible();await expect(choose).toHaveAttribute('aria-expanded','true');
-    await expect(popup.getByLabel('Year',{exact:true})).toHaveValue('2025');await expect(popup.getByRole('button',{name:'oktober',exact:true})).toHaveAttribute('aria-pressed','true');
+    await expect(popup.getByLabel('År',{exact:true})).toHaveValue('2025');await expect(popup.getByRole('button',{name:'oktober',exact:true})).toHaveAttribute('aria-pressed','true');
     await expect(popup.getByRole('button',{name:'oktober',exact:true})).toBeFocused();
     expect(await popup.getByRole('button',{name:'oktober',exact:true}).evaluate(value=>getComputedStyle(value).outlineStyle)).toBe('none');
     expect(await popup.getByRole('button',{name:'oktober',exact:true}).evaluate(value=>getComputedStyle(value).boxShadow)).not.toBe('none');
     const audit=await new AxeBuilder({page}).include('#track-month-picker').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
     await page.screenshot({path:'test-results/track-month-picker-desktop.png',fullPage:true});
     await page.keyboard.press('Escape');await expect(popup).not.toBeVisible();await expect(choose).toBeFocused();await expect(month).toHaveValue('2025-10');
-    await choose.click();await popup.getByRole('button',{name:'Next year',exact:true}).click();await expect(popup.getByLabel('Year',{exact:true})).toHaveValue('2026');
-    await popup.getByRole('button',{name:'Previous year',exact:true}).click();await popup.getByLabel('Year',{exact:true}).fill('2024');
+    await choose.click();await popup.getByRole('button',{name:'Neste år',exact:true}).click();await expect(popup.getByLabel('År',{exact:true})).toHaveValue('2026');
+    await popup.getByRole('button',{name:'Forrige år',exact:true}).click();await popup.getByLabel('År',{exact:true}).fill('2024');
     await popup.getByRole('button',{name:'februar',exact:true}).click();await expect(popup).not.toBeVisible();await expect(month).toHaveValue('2024-02');await expect(page.locator('#track-title')).toHaveText('Februar 2024');await expect(choose).toBeFocused();
-    await choose.click();await popup.getByLabel('Year',{exact:true}).fill('0');await expect(popup.getByRole('button',{name:'januar',exact:true})).toBeDisabled();
-    await popup.getByLabel('Year',{exact:true}).fill('1');await expect(popup.getByRole('button',{name:'Previous year',exact:true})).toBeDisabled();
-    await popup.getByLabel('Year',{exact:true}).fill('9998');await expect(popup.getByRole('button',{name:'Next year',exact:true})).toBeDisabled();
+    await choose.click();await popup.getByLabel('År',{exact:true}).fill('0');await expect(popup.getByRole('button',{name:'januar',exact:true})).toBeDisabled();
+    await popup.getByLabel('År',{exact:true}).fill('1');await expect(popup.getByRole('button',{name:'Forrige år',exact:true})).toBeDisabled();
+    await popup.getByLabel('År',{exact:true}).fill('9998');await expect(popup.getByRole('button',{name:'Neste år',exact:true})).toBeDisabled();
     await page.keyboard.press('Escape');await expect(month).toHaveValue('2024-02');
     await page.setViewportSize({width:390,height:844});await choose.click();await expect(popup).toBeVisible();
     await expect.poll(()=>popup.evaluate(value=>{const rect=value.getBoundingClientRect();return rect.left>=0&&rect.right<=innerWidth&&rect.bottom<=innerHeight;})).toBe(true);
@@ -117,9 +118,9 @@ test('Track month picker supports year selection, keyboard dismissal and a cente
     const mobile=await new AxeBuilder({page}).include('#track-panel').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(mobile.violations).toEqual([]);
     await page.screenshot({path:'test-results/track-month-picker-mobile.png',fullPage:true});
     await page.locator('[data-tab=week]').click();await expect(popup).not.toBeVisible();await page.locator('[data-tab=track]').click();await expect(month).toHaveValue('2024-02');
-    await choose.click();await popup.getByRole('button',{name:'desember',exact:true}).click();await page.getByRole('button',{name:'Next month',exact:true}).click();await expect(month).toHaveValue('2025-01');
-    await page.getByRole('button',{name:'Current month',exact:true}).click();await expect(month).not.toHaveValue('2025-01');
-    await choose.click();await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(popup).not.toBeVisible();
+    await choose.click();await popup.getByRole('button',{name:'desember',exact:true}).click();await page.getByRole('button',{name:'Neste måned',exact:true}).click();await expect(month).toHaveValue('2025-01');
+    await page.getByRole('button',{name:'Gjeldende måned',exact:true}).click();await expect(month).not.toHaveValue('2025-01');
+    await choose.click();await page.locator('#account-menu > summary').click();await page.getByRole('button',{name:'Logg ut',exact:true}).click();await expect(popup).not.toBeVisible();
   } finally {await context.close();}
 });
 test('Track updates running session hours without stealing focus and reconciles peer edits',async({page,request})=> {
