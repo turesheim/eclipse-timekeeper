@@ -1,19 +1,22 @@
-// Font Awesome Free 7.3.1, bundled under assets/fontawesome with its upstream license.
+// Bootstrap Icons, bundled locally with the upstream MIT license.
 import {projectCatalog} from './project-icons.js';
+import {legacyProjectIcons} from './legacy-project-icons.js';
 const normalize = value => value.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/[-_]/g, ' ');
-const projectEntries = projectCatalog.map(([id,label,glyph,terms]) => ({id,label,glyph,search:normalize(`${id} ${label} ${terms}`)}));
+const projectEntries = projectCatalog.map(([id,label,terms]) => ({id,label,search:normalize(`${id} ${label} ${terms}`)}));
 const projectsByIcon = new Map(projectEntries.map(entry => [entry.id,entry]));
+for(const [id,name] of Object.entries(legacyProjectIcons))if(!projectsByIcon.has(id))projectsByIcon.set(id,{id,name,label:id.split('-').map(word=>word[0].toUpperCase()+word.slice(1)).join(' ')});
 export const isProjectIcon = id => projectsByIcon.has(id);
 export const projectIconLabel = id => projectsByIcon.get(id)?.label;
 export function searchProjectIcons(query = '') {
   const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
   return terms.length ? projectEntries.filter(entry => terms.every(term => entry.search.includes(term))) : projectEntries;
 }
-const glyphs = {...Object.fromEntries(projectCatalog.map(([id,,glyph])=>[id,glyph])),close:'\uf00d',add:'\uf067', link:'\uf0c1', unlink:'\uf127', left:'\uf053', right:'\uf054', down:'\uf078', clock:'\uf017', calendar:'\uf133', more:'\uf141', start:'\uf04b', stop:'\uf04d', edit:'\uf044', delete:'\uf1f8', refresh:'\uf021', check:'\uf058', warning:'\uf071', error:'\uf06a', collapse:'\uf102', expand:'\uf103',copy:'\uf0c5',paste:'\uf0ea'};
-export function icon(name) {
-  const node = document.createElement('span'); node.className = 'icon';
-  node.setAttribute('aria-hidden', 'true'); node.textContent = glyphs[name]; return node;
+const actions = {close:'x-lg',add:'plus-lg',link:'link-45deg',unlink:'link',left:'chevron-left',right:'chevron-right',down:'chevron-down',clock:'clock',calendar:'calendar3',more:'three-dots',start:'play-fill',stop:'stop-fill',edit:'pencil-square',delete:'trash',refresh:'arrow-repeat',check:'check-circle-fill',warning:'exclamation-triangle-fill',error:'exclamation-circle-fill',collapse:'chevron-double-up',expand:'chevron-double-down',copy:'copy',paste:'clipboard'};
+function bootstrapIcon(name) {
+  const node = document.createElement('span'); node.className = `icon bi bi-${name}`;
+  node.setAttribute('aria-hidden', 'true'); return node;
 }
+export const icon = name => bootstrapIcon(actions[name] || projectsByIcon.get(name)?.name || (projectsByIcon.has(name) ? name : 'question-circle'));
 export function iconButton(node, name, label) {
   node.replaceChildren(icon(name)); node.classList.add('btn', 'icon-button');
   if (![...node.classList].some(value => /^btn-(primary|danger|outline-)/.test(value))) node.classList.add('btn-outline-secondary');
@@ -23,5 +26,5 @@ export function iconButton(node, name, label) {
 
 export function projectIcon(project) {
   const entry=projectsByIcon.get(project?.icon);if(!entry)return null;
-  const node=icon(entry.id);node.textContent=entry.glyph;node.dataset.projectIcon=entry.id;node.title=project.name;return node;
+  const node=bootstrapIcon(entry.name || entry.id);node.dataset.projectIcon=entry.id;node.title=project.name;return node;
 }

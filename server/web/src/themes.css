@@ -60,7 +60,7 @@
   & :is(a,button,input,select,summary,[tabindex]):focus-visible { box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--accent) 30%, transparent); }
   & :is(.form-control,.form-select):focus { border-color: var(--accent); box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--accent) 25%, transparent); }
   & #status[data-state=error] { color: var(--bs-danger-text-emphasis); }
-  & .workspace-nav { --bs-nav-link-color: var(--bs-body-color); --bs-nav-link-hover-color: var(--accent); }
+  & .workspace-nav { --bs-navbar-color: var(--bs-body-color); --bs-navbar-hover-color: var(--accent); }
   & .workspace-nav .nav-link:not(.active):hover { background: var(--theme-group); }
   & .workspace-nav .nav-link[aria-current], & #account-navigation .nav-link.active, & .track-today { color: var(--theme-on-accent); background: var(--accent); }
   & .table { --bs-table-color: var(--bs-body-color); --bs-table-hover-color: var(--bs-body-color); --bs-table-hover-bg: var(--theme-soft); }

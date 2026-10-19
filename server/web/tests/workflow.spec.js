@@ -339,8 +339,8 @@ test('workweek groups linked tasks under projects with seven day columns and con
   await signIn(page); await page.getByLabel('Week containing').fill('2025-10-26');
   await expect(page.locator('#zone-caption')).toContainText('2025-10-20');
   expect(await page.evaluate(async () => {
-    await document.fonts.load('900 18px "Font Awesome 7 Free"');
-    return [...document.fonts].some(font => font.family.includes('Font Awesome 7 Free') && font.status === 'loaded');
+    await document.fonts.load('18px "bootstrap-icons"');
+    return [...document.fonts].some(font => font.family.includes('bootstrap-icons') && font.status === 'loaded');
   })).toBeTruthy();
   const iconAction = page.locator('#activities tr[data-kind=task]').first().getByRole('button', {name:'Edit task', exact:true});
   await expect(iconAction).toHaveAttribute('title', 'Edit task');

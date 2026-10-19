@@ -75,7 +75,7 @@ class ContractTest(unittest.TestCase):
                     self.assertFalse(validator(name).is_valid(missing))
 
     def test_optional_project_icons_are_bounded_metadata(self):
-        for icon in ('code', 'globe', 'gavel', 'rocket', None):
+        for icon in ('code', 'globe', 'gavel', 'rocket', 'airplane-engines', 'calendar3', 'mobile', None):
             validator('ProjectInput').validate({'name': 'Project', 'icon': icon})
             validator('TransferProject').validate({'id': ID, 'name': 'Project', 'icon': icon})
         validator('ProjectInput').validate({'name': 'Earlier client'})

@@ -156,6 +156,34 @@ test('project icon picker searches the full catalog with bounded rendering and p
   }
 });
 
+test('legacy project icons render with Bootstrap and survive editing until explicitly replaced',async({page,request})=>{
+  const client=await(await api(request,'POST','/clients',{name:'Legacy icons '+randomUUID().slice(0,6),color:'#176653'})).json(),projects=[];
+  try {
+    for(const [icon,target] of [['mobile','phone'],['gavel','hammer'],['dragon','question-circle']]) {
+      const project=await(await api(request,'POST','/projects',{name:'Legacy '+icon,clientId:client.id,icon})).json();projects.push({...project,target});
+    }
+    await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+    await page.getByRole('button',{name:'Projects',exact:true}).click();
+    for(const project of projects) {
+      const row=page.locator(`#projects [data-project-id="${project.id}"]`);
+      await expect(row.locator(`[data-project-icon="${project.icon}"]`)).toHaveClass(new RegExp('bi-'+project.target+'(?: |$)'));
+      await row.getByRole('button',{name:'Edit',exact:true}).click();
+      await expect(page.locator('.project-icon-picker [name=icon]:checked')).toHaveValue(project.icon);
+      await save(page);expect((await(await api(request,'GET','/projects/'+project.id)).json()).icon).toBe(project.icon);
+    }
+    const row=page.locator(`#projects [data-project-id="${projects[0].id}"]`);
+    await row.getByRole('button',{name:'Edit',exact:true}).click();
+    await page.getByRole('searchbox',{name:'Search project icons',exact:true}).fill('airplane-engines');
+    await page.getByRole('radio',{name:'Airplane Engines',exact:true}).check();await save(page);
+    expect((await(await api(request,'GET','/projects/'+projects[0].id)).json()).icon).toBe('airplane-engines');
+    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Projects',exact:true}).click();
+    await expect(row.locator('[data-project-icon="airplane-engines"]')).toHaveClass(/bi-airplane-engines/);
+  } finally {
+    for(const project of projects){const current=await api(request,'GET','/projects/'+project.id);await api(request,'DELETE','/projects/'+project.id,undefined,{'If-Match':current.headers().etag});}
+    const current=await api(request,'GET','/clients/'+client.id);await api(request,'DELETE','/clients/'+client.id,undefined,{'If-Match':current.headers().etag});
+  }
+});
+
 test('optional project icons persist and Track shows distinct icons to the right of daily durations',async({page,request})=>{
   const prefix='Icon '+randomUUID().slice(0,6),records=[],previous=await (await api(request,'GET','/me')).json();
   async function create(collection,data){const value=await (await api(request,'POST','/'+collection,data)).json();records.unshift([collection,value.id]);return value;}
@@ -166,7 +194,7 @@ test('optional project icons persist and Track shows distinct icons to the right
     await page.getByRole('button',{name:'Projects',exact:true}).click();await page.getByRole('button',{name:'New project',exact:true}).click();
     await page.getByLabel('Name',{exact:true}).fill(prefix+' Website');await page.getByLabel('Client',{exact:true}).selectOption(client.id);
     await expect(page.getByRole('radio',{name:'None',exact:true})).toBeChecked();await page.getByRole('radio',{name:'Code',exact:true}).check();
-    const search=page.getByRole('searchbox',{name:'Search project icons',exact:true});await search.fill('gavel');await page.getByRole('radio',{name:'Gavel',exact:true}).check();await search.fill('rocket');expect(await page.locator('[name=icon]:checked').inputValue()).toBe('gavel');await search.fill('');await page.getByRole('radio',{name:'Code',exact:true}).check();
+    const search=page.getByRole('searchbox',{name:'Search project icons',exact:true});await search.fill('gavel');await page.getByRole('radio',{name:'Hammer',exact:true}).check();await search.fill('rocket');expect(await page.locator('[name=icon]:checked').inputValue()).toBe('hammer');await search.fill('');await page.getByRole('radio',{name:'Code',exact:true}).check();
     expect((await new AxeBuilder({page}).include('#editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await page.setViewportSize({width:1280,height:900});await page.locator('#editor').screenshot({path:'test-results/project-icon-picker.png'});await save(page);await page.setViewportSize({width:1280,height:720});
     const project=(await (await api(request,'GET','/projects?clientId='+client.id)).json()).items[0];records.unshift(['projects',project.id]);expect(project.icon).toBe('code');

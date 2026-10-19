@@ -40,9 +40,18 @@ recovery, hostname changes and protected backup behavior.
 
 ![Passkey management on a narrow screen](../assets/screenshots/passkeys-mobile.png)
 
-Font Awesome Free 7.3.1 supplies locally bundled icon fonts for larger tree
-controls and action buttons. Buttons retain accessible names and hover titles;
-fonts and their upstream license are included in the server distribution.
+Bootstrap Icons 1.13.2 supplies locally bundled icons for navigation, tree
+controls, action buttons and projects. Buttons retain accessible names and hover
+titles; CSS, fonts and the MIT license are included in the server distribution.
+Run `npm run vendor:icons` in `server/web` to regenerate the pinned assets,
+project catalog and API allow-list. `npm run check:assets` verifies them.
+
+Workspace views use a Bootstrap `navbar fixed-bottom` with `navbar-nav` and
+`nav-link` controls. All eight views remain available without a collapsed menu.
+The active view has `aria-current="page"`; compact screens show icons with
+accessible names, and wide screens also show labels. Safe-area padding keeps the
+bar and page content clear of each other. Standard action buttons use Bootstrap
+`btn` variants, including the manual status refresh and calendar actions.
 
 ## Track month view
 
@@ -473,10 +482,17 @@ select an optional icon from the bundled picker, or choose **None** to remove it
 Icons also appear beside project names in Workweek and beside daily durations
 in Track. They are retained in account downloads and JSON/CSV transfers.
 
-The project icon picker offers over 1,400 bundled Font Awesome icons. Search by
+The project icon picker offers 2,078 bundled Bootstrap Icons. Search by
 name or keyword across the entire catalog, including icons not yet shown, or
 choose **More icons** to browse. Filtering preserves the
 current selection; **None** removes an icon. Icons work offline.
+
+Previously stored project icon identifiers remain valid in the API, downloads
+and transfers. Legacy names render with a corresponding Bootstrap icon or a
+related icon from the same family. Where no equivalent is available, a neutral
+question-circle is shown. Editing a project preserves its stored identifier
+until the user explicitly selects another icon or **None**; new selections use
+Bootstrap icon names.
 
 ![Optional project icon picker](../assets/screenshots/project-icon-picker.png)
 

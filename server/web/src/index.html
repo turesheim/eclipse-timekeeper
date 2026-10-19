@@ -9,15 +9,16 @@
   <link rel="apple-touch-icon" sizes="256x256" href="./apple-touch-icon.png">
   <meta name="apple-mobile-web-app-title" content="Timekeeper">
   <link rel="stylesheet" href="./assets/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="./assets/bootstrap-icons/bootstrap-icons.min.css">
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./calendar.css">
   <link rel="stylesheet" href="./themes.css">
-  <link rel="preload" href="./assets/fontawesome/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="./assets/bootstrap-icons/fonts/bootstrap-icons.woff2?e34853135f9e39acf64315236852cd5a" as="font" type="font/woff2" crossorigin>
   <script type="module" src="./app.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
-  <header class="app-header"><a class="brand" href="./">Timekeeper <small>2.0</small></a><div id="session" hidden><span id="owner"></span><details id="account-menu" class="account-menu"><summary class="btn btn-outline-secondary" role="button" aria-expanded="false" aria-controls="account-menu-items" aria-label="Account menu" title="Account menu"><span class="icon" aria-hidden="true">&#xf0c9;</span></summary><nav id="account-menu-items" class="account-menu-items" aria-label="Account"><a class="btn btn-link" id="account" tabindex="0" href="#account/profile">My Account</a><a class="btn btn-link" id="users-link" tabindex="0" href="/admin/" hidden>Administration</a><button class="btn btn-link" id="about-open" type="button">About</button><div class="theme-choice"><label for="theme">Theme</label><select class="form-select" id="theme"></select></div><button class="btn btn-link" id="sign-out" type="button">Sign out</button></nav></details></div></header>
+  <header class="app-header"><a class="brand" href="./">Timekeeper <small>2.0</small></a><div id="session" hidden><span id="owner"></span><details id="account-menu" class="account-menu"><summary class="btn btn-outline-secondary" role="button" aria-expanded="false" aria-controls="account-menu-items" aria-label="Account menu" title="Account menu"><span class="icon bi bi-list" aria-hidden="true"></span></summary><nav id="account-menu-items" class="account-menu-items" aria-label="Account"><a class="btn btn-link" id="account" tabindex="0" href="#account/profile">My Account</a><a class="btn btn-link" id="users-link" tabindex="0" href="/admin/" hidden>Administration</a><button class="btn btn-link" id="about-open" type="button">About</button><div class="theme-choice"><label for="theme">Theme</label><select class="form-select" id="theme"></select></div><button class="btn btn-link" id="sign-out" type="button">Sign out</button></nav></details></div></header>
   <main id="main-content" tabindex="-1">
     <section id="login" class="card login">
       <p class="eyebrow">YOUR WORK, RECORDED</p><h1>Make time count.</h1>
@@ -52,7 +53,7 @@
       <div class="account-layout"><nav id="account-navigation" class="nav nav-pills" aria-label="Account settings"></nav><div><p id="account-error" class="alert alert-danger" role="alert"></p><div id="account-content"></div></div></div>
     </section>
     <div id="workspace" data-view="track" hidden>
-      <div class="status-line"><button class="status-refresh" id="refresh" type="button" data-state="working" aria-label="Refresh" title="Refresh"><span id="status-icon" aria-hidden="true"></span><span id="status" data-state="working" role="status" aria-live="polite"></span></button></div>
+      <div class="status-line"><button class="btn btn-link status-refresh" id="refresh" type="button" data-state="working" aria-label="Refresh" title="Refresh"><span id="status-icon" aria-hidden="true"></span><span id="status" data-state="working" role="status" aria-live="polite"></span></button></div>
       <p id="remember-notice" class="hint" role="status"></p>
       <section id="work-session" class="card work-session" aria-label="Work session">
         <div class="work-session-heading"><div><p class="eyebrow">WORK SESSION</p><div class="session-title"><h2 id="work-session-title">Your work session</h2><span id="work-session-state" class="badge rounded-pill text-bg-secondary">Stopped</span></div><p id="work-session-current" class="hint"></p><div id="work-session-labels" class="d-flex flex-wrap gap-1" aria-label="Work session labels" hidden></div></div>
@@ -63,15 +64,17 @@
           </div></div>
       </section>
       <section class="card tracking"><div><p class="eyebrow">IN PROGRESS</p><h2 id="active-title">Ready when you are</h2><p id="active-details" class="hint">Choose a task below to start tracking.</p></div><button class="btn btn-primary" id="stop" hidden>Stop tracking</button></section>
-      <nav id="workspace-navigation" class="nav nav-pills workspace-nav" aria-label="Time tracking views" tabindex="-1">
-        <button class="nav-link active" data-tab="track" aria-current="page" aria-label="Track" title="Track"><span class="icon" aria-hidden="true">&#xf080;</span><span class="nav-label">Track</span></button>
-        <button class="nav-link" data-tab="week" aria-label="Workweek" title="Workweek"><span class="icon" aria-hidden="true">&#xf00a;</span><span class="nav-label">Workweek</span></button>
-        <button class="nav-link" data-tab="activities" aria-label="Activities" title="Activities"><span class="icon" aria-hidden="true">&#xf2f2;</span><span class="nav-label">Activities</span></button>
-        <button class="nav-link" data-tab="calendar" aria-label="Calendar" title="Calendar"><span class="icon" aria-hidden="true">&#xf133;</span><span class="nav-label">Calendar</span></button>
-        <button class="nav-link" data-tab="tasks" aria-label="Tasks" title="Tasks"><span class="icon" aria-hidden="true">&#xf0ae;</span><span class="nav-label">Tasks</span></button>
-        <button class="nav-link" data-tab="clients" aria-label="Clients" title="Clients"><span class="icon" aria-hidden="true">&#xf1ad;</span><span class="nav-label">Clients</span></button>
-        <button class="nav-link" data-tab="projects" aria-label="Projects" title="Projects"><span class="icon" aria-hidden="true">&#xf07b;</span><span class="nav-label">Projects</span></button>
-        <button class="nav-link" data-tab="labels" aria-label="Labels" title="Labels"><span class="icon" aria-hidden="true">&#xf02c;</span><span class="nav-label">Labels</span></button>
+      <nav id="workspace-navigation" class="navbar fixed-bottom bg-body border-top workspace-nav" aria-label="Time tracking views" tabindex="-1">
+        <div class="container-fluid px-0"><div class="navbar-nav">
+        <button class="nav-link active" data-tab="track" aria-current="page" aria-label="Track" title="Track"><span class="icon bi bi-bar-chart" aria-hidden="true"></span><span class="nav-label">Track</span></button>
+        <button class="nav-link" data-tab="week" aria-label="Workweek" title="Workweek"><span class="icon bi bi-calendar-week" aria-hidden="true"></span><span class="nav-label">Workweek</span></button>
+        <button class="nav-link" data-tab="activities" aria-label="Activities" title="Activities"><span class="icon bi bi-hourglass-split" aria-hidden="true"></span><span class="nav-label">Activities</span></button>
+        <button class="nav-link" data-tab="calendar" aria-label="Calendar" title="Calendar"><span class="icon bi bi-calendar3" aria-hidden="true"></span><span class="nav-label">Calendar</span></button>
+        <button class="nav-link" data-tab="tasks" aria-label="Tasks" title="Tasks"><span class="icon bi bi-list-check" aria-hidden="true"></span><span class="nav-label">Tasks</span></button>
+        <button class="nav-link" data-tab="clients" aria-label="Clients" title="Clients"><span class="icon bi bi-buildings" aria-hidden="true"></span><span class="nav-label">Clients</span></button>
+        <button class="nav-link" data-tab="projects" aria-label="Projects" title="Projects"><span class="icon bi bi-folder" aria-hidden="true"></span><span class="nav-label">Projects</span></button>
+        <button class="nav-link" data-tab="labels" aria-label="Labels" title="Labels"><span class="icon bi bi-tags" aria-hidden="true"></span><span class="nav-label">Labels</span></button>
+        </div></div>
       </nav>
       <p id="period-announcement" class="visually-hidden" role="status" aria-live="polite"></p>
       <section id="track-panel" aria-labelledby="track-title">
