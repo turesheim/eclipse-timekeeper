@@ -5,8 +5,8 @@
     "version": "1.0.0",
     "description": "Owner-scoped Timekeeper API for Eclipse and web clients. API major version 1 is independent of Timekeeper product version 2.0. See api/README.md for normative ownership, concurrency, retry and compatibility policies.",
     "license": {
-      "name": "Eclipse Public License 1.0",
-      "url": "https://www.eclipse.org/legal/epl-v10.html"
+      "name": "Eclipse Public License 2.0",
+      "url": "https://www.eclipse.org/legal/epl-2.0/"
     }
   },
   "servers": [

@@ -1,6 +1,14 @@
 // Font Awesome Free 7.3.1, bundled under assets/fontawesome with its upstream license.
 import {projectCatalog} from './project-icons.js';
-export const projectIcons = projectCatalog.map(([id,label])=>[id,label]);
+const normalize = value => value.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/[-_]/g, ' ');
+const projectEntries = projectCatalog.map(([id,label,glyph,terms]) => ({id,label,glyph,search:normalize(`${id} ${label} ${terms}`)}));
+const projectsByIcon = new Map(projectEntries.map(entry => [entry.id,entry]));
+export const isProjectIcon = id => projectsByIcon.has(id);
+export const projectIconLabel = id => projectsByIcon.get(id)?.label;
+export function searchProjectIcons(query = '') {
+  const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
+  return terms.length ? projectEntries.filter(entry => terms.every(term => entry.search.includes(term))) : projectEntries;
+}
 const glyphs = {...Object.fromEntries(projectCatalog.map(([id,,glyph])=>[id,glyph])),close:'\uf00d',add:'\uf067', link:'\uf0c1', unlink:'\uf127', left:'\uf053', right:'\uf054', down:'\uf078', clock:'\uf017', calendar:'\uf133', more:'\uf141', start:'\uf04b', stop:'\uf04d', edit:'\uf044', delete:'\uf1f8', refresh:'\uf021', check:'\uf058', warning:'\uf071', error:'\uf06a', collapse:'\uf102', expand:'\uf103',copy:'\uf0c5',paste:'\uf0ea'};
 export function icon(name) {
   const node = document.createElement('span'); node.className = 'icon';
@@ -14,6 +22,6 @@ export function iconButton(node, name, label) {
 }
 
 export function projectIcon(project) {
-  if(!projectIcons.some(([id])=>id===project?.icon))return null;
-  const node=icon(project.icon);node.textContent=projectCatalog.find(([id])=>id===project.icon)[2];node.dataset.projectIcon=project.icon;node.title=project.name;return node;
+  const entry=projectsByIcon.get(project?.icon);if(!entry)return null;
+  const node=icon(entry.id);node.textContent=entry.glyph;node.dataset.projectIcon=entry.id;node.title=project.name;return node;
 }

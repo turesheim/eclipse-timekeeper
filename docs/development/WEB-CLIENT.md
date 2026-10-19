@@ -474,7 +474,8 @@ Icons also appear beside project names in Workweek and beside daily durations
 in Track. They are retained in account downloads and JSON/CSV transfers.
 
 The project icon picker offers over 1,400 bundled Font Awesome icons. Search by
-name or keyword, or choose **More icons** to browse. Filtering preserves the
+name or keyword across the entire catalog, including icons not yet shown, or
+choose **More icons** to browse. Filtering preserves the
 current selection; **None** removes an icon. Icons work offline.
 
 ![Optional project icon picker](../assets/screenshots/project-icon-picker.png)
@@ -567,8 +568,10 @@ the [acceptance report](../verification/ACCOUNT-DATA.md) for validation.
 
 ## Undo work-session changes
 
-After editing or deleting a work session, choose **Undo** in the notification
-within ten minutes. This includes calendar moves/resizes and Workweek time-cell
+After editing or deleting a work session, choose **Undo** in the notification.
+It fades after ten seconds; hovering over it or focusing its buttons keeps it
+visible, up to the ten-minute Undo limit. Pending or unconfirmed Undo requests
+stay visible until resolved. This includes calendar moves/resizes and Workweek time-cell
 edits. Undo restores exact times, client, project, labels and summary; activities
 remain independent. Only the latest acknowledged change is offered in the current
 browser session. Creation, timer start/stop and other record types are outside

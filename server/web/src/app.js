@@ -6,7 +6,7 @@ import {WeekCalendar} from './calendar.js';
 import {sameSession} from './calendar-model.js';
 import {MonthTrack} from './track.js';
 import {WorkweekSessions} from './workweek-sessions.js';
-import {projectCatalog} from './project-icons.js';
+import {createProjectIconPicker} from './project-icon-picker.js';
 import {UndoNotice} from './undo.js';
 import {accountMenu} from './account-menu.js';
 import {periodSwipe} from './period-swipe.js';
@@ -365,25 +365,6 @@ function renderWorkweek(s, zone) {
   table('activities', ['Activity', ...headings, 'Weekly total', 'Labels', 'Actions'], rows);
   $('activities').querySelector('table')?.classList.add('workweek-table');
 }
-function projectIconField(selected) {
-  const group=element('fieldset',undefined,'project-icon-picker'),choices=element('div',undefined,'project-icon-choices');
-  group.append(element('legend','Icon (optional)'));
-  const search=element('input',undefined,'form-control');search.type='search';search.setAttribute('aria-label','Search project icons');search.placeholder='Search icons';search.autocomplete='off';
-  const more=button('More icons',()=>{limit+=60;filter();}),status=element('p','','hint');status.setAttribute('role','status');
-  const options=[];let limit=60;
-  for(const [id,text,,terms] of [['','None','',''],...projectCatalog]) {
-    const label=element('label',undefined,'project-icon-option'),input=element('input');input.type='radio';input.name='icon';input.value=id;input.checked=id===(selected||'');input.className='form-check-input';
-    label.append(input);if(id)label.append(projectIcon({icon:id,name:text}));label.append(element('span',text));choices.append(label);options.push({id,label,input,search:(id+' '+text+' '+terms).toLocaleLowerCase()});
-  }
-  function filter() {
-    const query=search.value.trim().toLocaleLowerCase(),matches=options.filter(option=>option.id&&query.split(/\s+/).every(term=>option.search.includes(term)));
-    const visible=new Set(matches.slice(0,limit));
-    for(const option of options)option.label.hidden=!!option.id&&!visible.has(option)&&!(option.input.checked&&!query);
-    status.textContent=matches.length ? `${Math.min(limit,matches.length)} of ${matches.length} icons`:'No matching icons.';more.hidden=limit>=matches.length;
-  }
-  search.addEventListener('input',()=>{limit=60;choices.scrollTop=0;filter();});filter();
-  group.append(search,choices,status,more);$('fields').append(group);
-}
 function field(labelText, key, value = '', options = {}) {
   const label = element('label', labelText), input = element(options.choices ? 'select' : options.multiline ? 'textarea':'input'); input.name = key;
   input.id = `field-${key}`; label.htmlFor = input.id; input.setAttribute('aria-label', labelText);
@@ -467,7 +448,7 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
   if (!begin(caption || `${id ? 'Edit' : 'New'} ${titles[collection]}`, {collection, id, etag: loaded.etag})) return;
   if (['clients','projects','labels'].includes(collection)) field('Name', 'name', value.name, {required: true, max: 1000});
   if (collection === 'clients') field('Color','color',value.color || '#2563eb',{type:'color',required:true});
-  if (collection === 'projects') {clientField(value.clientId);projectIconField(value.icon);}
+  if (collection === 'projects') {clientField(value.clientId);$('fields').append(createProjectIconPicker(value.icon));}
   if (collection === 'labels') field('Color (optional)', 'color', value.color, {hint: 'Hex color, for example #176653.'});
   if (collection === 'tasks') {
     field('Summary', 'summary', value.summary, {required: true, max: 1000});

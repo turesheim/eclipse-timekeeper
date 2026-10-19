@@ -1,6 +1,6 @@
 import {dateInZone,instantNanos,instantText} from './model.js';
 import {monthCalendar,monthSessions,shiftMonth} from './month-model.js';
-import {iconButton,projectIcon,projectIcons} from './icons.js';
+import {iconButton,projectIcon,isProjectIcon} from './icons.js';
 import {MonthPicker} from './month-picker.js';
 
 const node=(tag,text,className)=> {const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
@@ -128,6 +128,7 @@ export class MonthTrack {
       }
       head.append(row);table.append(head,body);this.grid.append(table);
       const clientsById=new Map(this.snapshot.clients.map(client=>[client.id,client]));
+      const projectsById=new Map(this.snapshot.projects.map(project=>[project.id,project]));
       let week;
       for(const [index,day] of result.days.entries()) {
         if(index%7===0){week=node('tr');body.append(week);}
@@ -151,8 +152,8 @@ export class MonthTrack {
           this.dailyTimes.set(day.date+'/'+entry.clientId,{duration,short,summary,name:client?.name || 'Client',details:this.details(day.date,entry.clientId)});
           const line=node('span',undefined,'track-client-day-total'),icons=node('span',undefined,'track-project-icons'),projects=new Map();
           for(const session of this.sessions(day.date,entry.clientId)) {
-            const project=this.snapshot.projects.find(project=>project.id===session.projectId);
-            if(projectIcons.some(([id])=>id===project?.icon)) {const names=projects.get(project.icon)||new Set();names.add(project.name);projects.set(project.icon,names);}
+            const project=projectsById.get(session.projectId);
+            if(isProjectIcon(project?.icon)) {const names=projects.get(project.icon)||new Set();names.add(project.name);projects.set(project.icon,names);}
           }
           for(const [id,names] of projects)icons.append(projectIcon({icon:id,name:[...names].join(', ')}));
           icons.setAttribute('aria-hidden','true');line.append(duration,short,icons);summary.append(node('strong',client?.name || 'Client'),' ',line);

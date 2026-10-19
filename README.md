@@ -27,7 +27,7 @@ overlap provides context.
 - **Workweek** groups sessions by client and project, with editable start/end
   times in daily cells. **Calendar** supports creating, moving, resizing and
   copying sessions. Dates and times use your account's time zone. Work-session
-  edits and deletions offer **Undo** for ten minutes.
+  edits and deletions show a temporary **Undo** notification.
 - **Activities** contains the project/task/activity table and its daily and weekly
   totals. Start a task timer or record time manually, including taskless work.
 - **Clients and projects** organize your work with client colors and searchable
@@ -130,3 +130,7 @@ The root Maven build runs Eclipse UI tests and needs a graphical session or Xvfb
 on Linux. Use `mvnw.cmd` on Windows. See the [repository guide](docs/development/REPOSITORY.md)
 for focused and installed-client checks, [API v1](docs/architecture/API-V1.md) for
 the contract, and [release instructions](docs/development/RELEASING.md) for packaging.
+
+## License
+
+Timekeeper is licensed under the [Eclipse Public License 2.0](LICENSE).

@@ -4,6 +4,7 @@ Bundle-Name: Timekeeper database
 Bundle-SymbolicName: net.resheim.eclipse.timekeeper.db;singleton:=true
 Automatic-Module-Name: net.resheim.eclipse.timekeeper.db
 Bundle-Version: 2.0.0.qualifier
+Bundle-License: EPL-2.0;link="https://www.eclipse.org/legal/epl-2.0/"
 Export-Package: net.resheim.eclipse.timekeeper.db,
  net.resheim.eclipse.timekeeper.db.adapter,
  net.resheim.eclipse.timekeeper.db.converters,
