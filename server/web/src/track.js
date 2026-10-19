@@ -3,6 +3,7 @@ import { t as i18nText } from "./i18n.js";import { dateInZone, instantNanos, ins
 import { monthCalendar, monthSessions, shiftMonth } from './month-model.js';
 import { iconButton, projectIcon, isProjectIcon } from './icons.js';
 import { MonthPicker } from './month-picker.js';
+import {TrackHolidays} from './track-holidays.js';
 
 const node = (tag, text, className) => {const value = document.createElement(tag);if (text !== undefined) value.textContent = text;if (className) value.className = className;return value;};
 function compactTime(value) {
@@ -14,6 +15,7 @@ export class MonthTrack {
     this.callbacks = callbacks;
     this.root = root;this.input = root.querySelector('#track-month');
     this.grid = root.querySelector('#track-calendar');this.totals = root.querySelector('#track-clients');
+    this.holidays=new TrackHolidays(root,this.grid,this.input);
     this.monthPicker = new MonthPicker(root, () => this.currentMonth(), (month) => this.select(month));
     for (const [id, glyph, label, offset] of [['track-previous', 'left', i18nText("ui.previous_month"), -1], ['track-next', 'right', i18nText("ui.next_month"), 1]]) {
       const button = root.querySelector('#' + id);iconButton(button, glyph, label);
@@ -42,16 +44,16 @@ export class MonthTrack {
   }
   currentDate() {return dateInZone(Number(this.asOf / 1000000n), this.snapshot.profile.data.zoneId);}
   currentMonth() {return this.month || this.currentDate().slice(0, 7);}
-  select(month) {this.closePicker();this.monthPicker.close();this.month = month;this.input.setCustomValidity('');this.paint(true);}
+  select(month) {this.closePicker();this.holidays.hide();this.monthPicker.close();this.month = month;this.input.setCustomValidity('');this.paint(true);}
   update(snapshot, asOf, format, writable) {
     this.snapshot = snapshot;this.sessionsById = new Map(snapshot.workSessions.map((session) => [session.id, session]));this.asOf = asOf;this.format = format;this.setWritable(writable);this.paint(true);
   }
   setWritable(writable) {
     this.writable = writable;
-    for (const button of this.grid.querySelectorAll('button')) button.disabled = !writable;
+    for (const button of this.grid.querySelectorAll('button[data-track-daily-client]')) button.disabled = !writable;
     if (!writable) this.closePicker();
   }
-  hide() {this.closePicker();this.monthPicker.close();}
+  hide() {this.closePicker();this.holidays.hide();this.monthPicker.close();}
   closePicker() {this.picking = null;if (this.picker.open) this.picker.close();this.choices.replaceChildren();}
   sessions(date, clientId) {
     const ids = new Set(this.days?.find((day) => day.date === date)?.clients.get(clientId)?.sessionIds || []);
@@ -96,6 +98,7 @@ export class MonthTrack {
     if (focused) ([...this.choices.children].find((choice) => choice.dataset.trackSessionChoice === focused) || this.choices.firstElementChild)?.focus();
   }
   reset() {
+    this.holidays.reset();
     this.monthPicker.close();
     this.closePicker();this.days = null;this.sessionsById?.clear();this.writable = false;this.pickerOrigin = null;this.pickerContext.textContent = '';
     this.snapshot = null;this.month = null;this.calendar = null;this.layout = null;this.grid.replaceChildren();this.totals.replaceChildren();
@@ -116,11 +119,13 @@ export class MonthTrack {
     const layout = month + '|' + zone + '|' + today + '|' + [...result.clients.keys()].sort().join(',') + '|' + result.days.map((day) => [...day.clients.keys()].sort().join(',')).join(';');
     if (force || this.layout !== layout) {
       const active = document.activeElement,focused = active?.dataset.trackDailyClient && this.grid.contains(active) ? { date: active.closest('[data-track-date]').dataset.trackDate, client: active.dataset.trackDailyClient } : null;
+      const holidayFocused=this.grid.contains(active)?active?.dataset.trackHolidayDate:null;
       this.layout = layout;this.date = today;this.input.value = month;
       const title = new Intl.DateTimeFormat(getLocale(), { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(month + '-15T12:00:00Z'));
       this.root.querySelector('#track-title').textContent = title.charAt(0).toLocaleUpperCase(getLocale()) + title.slice(1);
       this.root.querySelector('#track-zone').textContent = zone;
       this.grid.replaceChildren();this.totals.replaceChildren();this.dailyTimes = new Map();this.clientTimes = new Map();
+      const holidayCells=new Map();
       const table = node('table', undefined, 'track-month'),head = node('thead'),row = node('tr'),body = node('tbody');
       table.setAttribute('aria-label', i18nText("ui.work_hours_by_client_and_day"));
       for (let index = 0; index < 7; index++) {
@@ -134,6 +139,7 @@ export class MonthTrack {
       for (const [index, day] of result.days.entries()) {
         if (index % 7 === 0) {week = node('tr');body.append(week);}
         const cell = node('td', undefined, day.inMonth ? 'track-day' : "track-day track-outside");cell.dataset.trackDate = day.date;
+        holidayCells.set(day.date,cell);
         const date = node('time', String(Number(day.date.slice(-2))), 'track-date');date.dateTime = day.date;
         date.title = new Intl.DateTimeFormat(getLocale(), { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(day.date + 'T12:00:00Z'));
         if (day.date === today) {date.classList.add('track-today');date.setAttribute('aria-current', 'date');}
@@ -170,6 +176,7 @@ export class MonthTrack {
       }
       if (!clients.length) this.totals.append(node('p', i18nText("ui.no_work_sessions_this_month"), 'hint'));
       if (focused) this.dailyTimes.get(focused.date + '/' + focused.client)?.summary.focus();
+      this.holidays.update(this.calendar,holidayCells,holidayFocused);
       this.paintPicker();
     }
     this.root.querySelector('#track-total').textContent = this.format(result.total);

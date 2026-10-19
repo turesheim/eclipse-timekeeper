@@ -18,6 +18,12 @@ regenerates the native-module resources. `npm run check:assets` verifies them.
 See the language and region section of the development guide for the account
 preference and browser fallback behavior.
 
+date-holidays 3.37.0 is bundled as a lazy native-module engine with its national
+country catalog, upstream data attribution and dependency licenses. It runs
+locally when Track needs public holidays for the selected locale. Run
+`npm run vendor:holidays` after an intentional dependency update;
+`npm run check:assets` also verifies these generated assets.
+
 Browser acceptance defaults to Chromium. For WebKit, install its browser with
 `npx playwright install --with-deps webkit` from this directory. After building
 and packaging the server, run from the repository root:

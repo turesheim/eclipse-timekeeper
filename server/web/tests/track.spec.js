@@ -80,7 +80,7 @@ test('Track is the default month overview with exact client session hours, local
     await expect(page.locator('.track-month thead th')).toHaveCount(7);await page.screenshot({path:'test-results/track-mobile.png',fullPage:true});
     await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#track-clients')).toBeEmpty();await expect(page.locator('#track-total')).toBeEmpty();
     await signIn(page,process.env.TIMEKEEPER_WEB_READ_TOKEN);await page.getByLabel('Month',{exact:true}).fill('2025-10');
-    await expect(page.locator('#track-calendar button')).toHaveCount(0);await expect(page.locator(`[data-track-date="2025-10-01"] [data-track-daily-client="${a.id}"]`)).toContainText('1h 0m');
+    await expect(page.locator('#track-calendar button[data-track-daily-client]')).toHaveCount(0);await expect(page.locator(`[data-track-date="2025-10-01"] [data-track-daily-client="${a.id}"]`)).toContainText('1h 0m');
     await expect(page.locator(`[data-track-date="2025-10-01"] [data-track-daily-client="${a.id}"]`)).toHaveAttribute('title',/Edited boundary\n\nPreserved notes/);
     await expect(page.locator(`#track-clients [data-track-client="${a.id}"]`)).toContainText('27h 0m');
   } finally {

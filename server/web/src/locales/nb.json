@@ -809,5 +809,15 @@
   "import.state.UNDONE": "ANGRET",
   "import.state.UNDONE_PARTIAL": "DELVIS ANGRET",
   "import.state.IMPORTED": "IMPORTERT",
-  "import.state.BLOCKED": "BLOKKERT"
+  "import.state.BLOCKED": "BLOKKERT",
+  "holidays.title": "Helligdager",
+  "holidays.license": "Data og lisens for date-holidays",
+  "holidays.data": "Data:",
+  "holidays.on_date": "Helligdager · {{date}}",
+  "holidays.country": "Nasjonale helligdager · {{country}}",
+  "holidays.details": "Helligdager {{date}}: {{names}}",
+  "holidays.loading": "Laster helligdager…",
+  "holidays.unsupported_region": "Helligdager er ikke tilgjengelige for dette språket og denne regionen.",
+  "holidays.unsupported_year": "Helligdager er ikke tilgjengelige før år 0100.",
+  "holidays.unavailable": "Helligdagene kunne ikke lastes. Den registrerte tiden din er fortsatt tilgjengelig."
 }
