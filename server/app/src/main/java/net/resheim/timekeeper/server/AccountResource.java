@@ -95,6 +95,10 @@ public class AccountResource {
         return Response.status(201).entity(accounts.createToken(identity.principal(),text(value,"name",400),permissions,expires)).header("Cache-Control","no-store").build();
     }
     @DELETE @Path("/tokens/{id}") public Response revoke(@PathParam("id") String id) {
-        origin();ContractInputs.queries(uri.getQueryParameters());accounts.revokeToken(identity.principal(),ContractInputs.pathId(id));return Response.noContent().header("Cache-Control","no-store").build();
+        origin();var query=uri.getQueryParameters();ContractInputs.queries(query,"remove");String remove=query.getFirst("remove");
+        if(remove!=null && !Set.of("true","false").contains(remove)) throw ApiFailure.badRequest();
+        if("true".equals(remove)) accounts.deleteToken(identity.principal(),ContractInputs.pathId(id));
+        else accounts.revokeToken(identity.principal(),ContractInputs.pathId(id));
+        return Response.noContent().header("Cache-Control","no-store").build();
     }
 }

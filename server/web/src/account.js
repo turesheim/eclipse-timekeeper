@@ -81,6 +81,7 @@ async function renderTokens(view, zone) {
     const rows = data.items.map(token => {
       const actions = node('div', undefined, 'token-actions');
       const expired = token.expiresAt && Date.parse(token.expiresAt) <= Date.now();
+      const controls = [];
       if (!token.revoked) {
         const revoke = button('Revoke', () => {
           actions.replaceChildren(node('p', `Revoke “${token.name}”? Clients and browser sessions using this token will lose access. Your password sign-in sessions remain valid.`));
@@ -89,9 +90,21 @@ async function renderTokens(view, zone) {
             await view.session.request(`/auth/tokens/${token.id}`, {method: 'DELETE'}); if (!view.valid()) return;
             feedback.textContent = 'Token revoked.'; actions.replaceChildren(feedback); await refreshList(feedback, 'Token revoked.');
           }, {submit: confirm, feedback, write: true}), 'btn btn-danger');
-          actions.append(confirm, button('Cancel', () => {actions.replaceChildren(revoke);}), feedback);
-        }); revoke.disabled = !view.canWrite; actions.append(revoke);
+          actions.append(confirm, button('Cancel', () => {actions.replaceChildren(...controls);}), feedback);
+        }); revoke.disabled = !view.canWrite; controls.push(revoke);
       }
+      if (token.source === 'MANAGED') {
+        const remove = button('Delete', () => {
+          actions.replaceChildren(node('p', `Delete “${token.name}”? This removes the token permanently. Clients and browser sessions using it will lose access. Your password sign-in sessions remain valid.`));
+          const feedback = node('p', '', 'form-feedback'); feedback.setAttribute('role', 'status');
+          const confirm = button('Delete token', () => void view.run(async () => {
+            await view.session.request(`/auth/tokens/${token.id}?remove=true`, {method: 'DELETE'}); if (!view.valid()) return;
+            feedback.textContent = 'Token deleted.'; actions.replaceChildren(feedback); await refreshList(feedback, 'Token deleted.');
+          }, {submit: confirm, feedback, write: true}), 'btn btn-danger');
+          actions.append(confirm, button('Cancel', () => {actions.replaceChildren(...controls);}), feedback);
+        }, 'btn btn-outline-danger'); remove.disabled = !view.canWrite; controls.push(remove);
+      }
+      actions.append(...controls);
       return [token.name, token.permissions.includes('write') ? 'Read/write' : 'Read-only', token.expiresAt ? instantText(token.expiresAt, zone) : 'No expiry', token.lastUsedAt ? instantText(token.lastUsedAt, zone) : 'Never used', token.revoked ? 'Revoked' : expired ? 'Expired' : 'Active', actions];
     });
     list.append(table(['Name', 'Access', 'Expiry', 'Last used', 'Status', 'Actions'], rows));

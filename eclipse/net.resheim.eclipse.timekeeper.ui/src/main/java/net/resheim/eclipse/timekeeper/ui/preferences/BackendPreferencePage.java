@@ -66,8 +66,10 @@ public final class BackendPreferencePage extends PreferencePage implements IWork
                     // stored credentials or any server records.
                     try(var client=new HttpTimekeeperService(endpoint,()->secret,Duration.ofSeconds(5))) {
                         var profile=client.profile();result="Connected to "+profile.owner().value()+" ("+profile.zone()+").";
-                    } catch(RemoteFailure failure) {result=failure.getMessage();}
-                    catch(RuntimeException failure) {result="The server did not return a valid Timekeeper profile.";}
+                    } catch(RemoteFailure failure) {
+                        result=failure.connectionMessage(endpoint);
+                    }
+                    catch(RuntimeException failure) {result="The server at "+endpoint+" did not return a valid Timekeeper profile. Check the Server URL and reverse proxy configuration.";}
                     final String message=result;
                     if(!display.isDisposed()) display.asyncExec(()->{
                         if(test.isDisposed() || generation!=testGeneration) return;

@@ -50,6 +50,8 @@ public final class HttpTimekeeperService implements TimekeeperService,WorkSessio
     }
     private Result request(String method,String path,JsonElement body,Map<String,String> headers) {
         String credential=token.get();if(credential==null || credential.isBlank()) throw new RemoteFailure(RemoteFailure.Kind.AUTHENTICATION,"UNAUTHENTICATED");
+        credential=credential.strip();
+        if(credential.length()>4096 || !credential.matches("[A-Za-z0-9._~+/-]+=*")) throw new RemoteFailure(RemoteFailure.Kind.AUTHENTICATION,"INVALID_TOKEN");
         var builder=HttpRequest.newBuilder(URI.create(base+path)).timeout(timeout).header("Authorization","Bearer "+credential).header("Accept","application/json, application/problem+json");
         var expectedOwner=boundOwner.get();if(expectedOwner!=null) builder.header("X-Timekeeper-Owner",Base64.getUrlEncoder().withoutPadding().encodeToString(expectedOwner.value().getBytes(StandardCharsets.UTF_8)));
         headers.forEach(builder::header);if(body!=null) builder.header("Content-Type","application/json");
@@ -73,7 +75,10 @@ public final class HttpTimekeeperService implements TimekeeperService,WorkSessio
             return new Result(response.statusCode(),value,response.headers().firstValue("ETag").orElse(null));
         } catch(InterruptedException interrupted) {future.cancel(true);Thread.currentThread().interrupt();throw new RemoteFailure(RemoteFailure.Kind.CANCELLED,"CANCELLED");}
         catch(CancellationException error) {throw new RemoteFailure(RemoteFailure.Kind.CANCELLED,"CANCELLED");}
-        catch(ExecutionException error) {if(error.getCause() instanceof HttpTimeoutException) throw new RemoteFailure(RemoteFailure.Kind.TIMEOUT,"TIMEOUT");throw new RemoteFailure(RemoteFailure.Kind.OFFLINE,"OFFLINE");}
+        catch(ExecutionException error) {
+            if(error.getCause() instanceof HttpTimeoutException) throw new RemoteFailure(RemoteFailure.Kind.TIMEOUT,"TIMEOUT");
+            throw new RemoteFailure(RemoteFailure.Kind.OFFLINE,error.getCause() instanceof javax.net.ssl.SSLException ? "TLS_ERROR" : "OFFLINE");
+        }
         catch(JsonParseException | IllegalStateException error) {throw new RemoteFailure(RemoteFailure.Kind.UNAVAILABLE,"INVALID_RESPONSE");}
     }
     private void bindOwner(OwnerId owner) {
@@ -90,7 +95,7 @@ public final class HttpTimekeeperService implements TimekeeperService,WorkSessio
         } catch(IllegalArgumentException | java.nio.charset.CharacterCodingException invalid) {throw new RemoteFailure(RemoteFailure.Kind.UNAVAILABLE,"INVALID_RESPONSE");}
     }
     private static RemoteFailure failure(int status,String code) {
-        return new RemoteFailure(switch(status) {case 401->RemoteFailure.Kind.AUTHENTICATION;case 403->RemoteFailure.Kind.FORBIDDEN;case 404->RemoteFailure.Kind.NOT_FOUND;case 409,412->RemoteFailure.Kind.CONFLICT;case 400,413,422,428->RemoteFailure.Kind.VALIDATION;default->RemoteFailure.Kind.UNAVAILABLE;},code);
+        return new RemoteFailure(switch(status) {case 401->RemoteFailure.Kind.AUTHENTICATION;case 403->RemoteFailure.Kind.FORBIDDEN;case 404->RemoteFailure.Kind.NOT_FOUND;case 409,412->RemoteFailure.Kind.CONFLICT;case 400,413,422,428->RemoteFailure.Kind.VALIDATION;default->RemoteFailure.Kind.UNAVAILABLE;},code,status);
     }
     private Result request(String method,String path,JsonElement body) {return request(method,path,body,Map.of());}
     private JsonObject remember(String path,Result result) {
@@ -130,7 +135,7 @@ public final class HttpTimekeeperService implements TimekeeperService,WorkSessio
         }throw new IllegalStateException();
     }
     public Profile profile() {
-        JsonObject value=get("/me").orElseThrow();profile=new Profile(new OwnerId(value.get("ownerId").getAsString()),ZoneId.of(value.get("zoneId").getAsString()),value.get("version").getAsLong());return profile;
+        JsonObject value=remember("/me",request("GET","/me",null));profile=new Profile(new OwnerId(value.get("ownerId").getAsString()),ZoneId.of(value.get("zoneId").getAsString()),value.get("version").getAsLong());return profile;
     }
     public Metadata metadata() {
         for(int attempt=0;attempt<3;attempt++) {

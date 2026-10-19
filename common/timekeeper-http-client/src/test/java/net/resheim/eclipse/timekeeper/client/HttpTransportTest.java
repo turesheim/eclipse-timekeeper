@@ -58,6 +58,7 @@ class HttpTransportTest {
             var failure = assertThrows(RemoteFailure.class, client::projects);
             assertTrue(received.await(2, TimeUnit.SECONDS));
             assertEquals(RemoteFailure.Kind.TIMEOUT, failure.kind());
+            assertTrue(failure.connectionMessage(server.url()).contains("did not respond in time"));
             assertSafe(failure);
         } finally { release.countDown(); }
     }
@@ -96,6 +97,8 @@ class HttpTransportTest {
                 var client = server.client(Duration.ofSeconds(2))) {
             var failure = assertThrows(RemoteFailure.class, client::projects);
             assertEquals(RemoteFailure.Kind.AUTHENTICATION, failure.kind());
+            assertTrue(failure.connectionMessage(server.url()).contains("HTTP 401"));
+            assertTrue(failure.connectionMessage(server.url()).contains("Server URL matches the browser"));
             assertSafe(failure);
         }
     }
@@ -105,6 +108,7 @@ class HttpTransportTest {
                 var client = server.client(Duration.ofSeconds(2))) {
             var failure = assertThrows(RemoteFailure.class, client::projects);
             assertEquals(RemoteFailure.Kind.UNAVAILABLE, failure.kind());
+            assertTrue(failure.connectionMessage(server.url()).contains("valid Timekeeper response"));
             assertSafe(failure);
         }
     }
@@ -117,8 +121,20 @@ class HttpTransportTest {
                     exchange.getResponseHeaders().add("Location", target.url() + "/other");
                     reply(exchange, 307, "");
                 }); var client = source.client(Duration.ofSeconds(2))) {
-            assertEquals(RemoteFailure.Kind.UNAVAILABLE, assertThrows(RemoteFailure.class, client::projects).kind());
+            var failure=assertThrows(RemoteFailure.class,client::projects);
+            assertEquals(RemoteFailure.Kind.UNAVAILABLE,failure.kind());
+            assertTrue(failure.connectionMessage(source.url()).contains("HTTP 307"));
+            assertTrue(failure.connectionMessage(source.url()).contains("final Timekeeper server URL"));
             assertEquals(0, redirectedRequests.get());
+        }
+    }
+
+    @Test void pastedTokenWhitespaceIsRemovedBeforeBuildingTheAuthorizationHeader() throws Exception {
+        try(Fixture server=new Fixture(exchange->{
+            assertEquals("Bearer "+TOKEN,exchange.getRequestHeaders().getFirst("Authorization"));
+            reply(exchange,200,"{\"ownerId\":\"owner-test\",\"zoneId\":\"Europe/Oslo\",\"version\":0}");
+        });var client=new HttpTimekeeperService(server.url(),()->" \r\n"+TOKEN+"\t\n",Duration.ofSeconds(2))) {
+            assertEquals("owner-test",client.profile().owner().value());
         }
     }
 
@@ -131,13 +147,65 @@ class HttpTransportTest {
         }
     }
 
+    @Test void malformedTokensReportAuthenticationWithoutSendingOrExposingTheCredential() throws Exception {
+        AtomicInteger requests=new AtomicInteger();
+        try(Fixture server=new Fixture(exchange->{requests.incrementAndGet();reply(exchange,200,"{}");})) {
+            for(String token:java.util.List.of(TOKEN+" extra",TOKEN+"\r\nextra",TOKEN+"x".repeat(4096))) {
+                try(var client=new HttpTimekeeperService(server.url(),()->token,Duration.ofSeconds(2))) {
+                    var failure=assertThrows(RemoteFailure.class,client::projects);
+                    assertEquals(RemoteFailure.Kind.AUTHENTICATION,failure.kind());assertEquals("INVALID_TOKEN",failure.code());assertSafe(failure);
+                }
+            }
+            assertEquals(0,requests.get());
+        }
+    }
+
     @Test void refusedConnectionIsSafeAndOffline() throws Exception {
         URI address;
         try (Fixture server = new Fixture(exchange -> reply(exchange, 200, "{}"))) { address = server.url(); }
         try (var client = new HttpTimekeeperService(address, () -> TOKEN, Duration.ofSeconds(2))) {
             var failure = assertThrows(RemoteFailure.class, client::projects);
             assertEquals(RemoteFailure.Kind.OFFLINE, failure.kind());
+            assertTrue(failure.connectionMessage(address).contains(address.toString()));
+            assertTrue(failure.connectionMessage(address).contains("network or VPN"));
             assertSafe(failure);
+        }
+    }
+
+    @Test void connectionDiagnosticsIdentifyTheRejectingEndpointWithoutExposingItsResponse() throws Exception {
+        try(Fixture server=new Fixture(exchange->reply(exchange,401,"{\"code\":\"UNAUTHENTICATED\",\"detail\":\""+TOKEN+"\"}"));
+                var client=server.client(Duration.ofSeconds(2))) {
+            var failure=assertThrows(RemoteFailure.class,client::profile);
+            String message=failure.connectionMessage(server.url());
+            assertTrue(message.startsWith(client.endpoint()+" (HTTP 401):"));
+            assertTrue(message.contains("My Account > API tokens"));
+            assertTrue(message.contains("expired or been revoked"));
+            assertFalse(message.contains(TOKEN));assertSafe(failure);
+        }
+    }
+
+    @Test void tlsHandshakeFailureHasCertificateGuidanceRatherThanAnInvalidTokenMessage() throws Exception {
+        var server=com.sun.net.httpserver.HttpsServer.create(new InetSocketAddress("127.0.0.1",0),0);
+        server.setHttpsConfigurator(new com.sun.net.httpserver.HttpsConfigurator(javax.net.ssl.SSLContext.getDefault()));
+        server.createContext("/",exchange->reply(exchange,200,"{}"));server.start();
+        URI endpoint=URI.create("https://127.0.0.1:"+server.getAddress().getPort());
+        try(var client=new HttpTimekeeperService(endpoint,()->TOKEN,Duration.ofSeconds(2))) {
+            var failure=assertThrows(RemoteFailure.class,client::profile);
+            assertEquals(RemoteFailure.Kind.OFFLINE,failure.kind());assertEquals("TLS_ERROR",failure.code());
+            assertTrue(failure.connectionMessage(endpoint).contains("HTTPS certificate"));assertSafe(failure);
+        } finally {server.stop(0);}
+    }
+
+    @Test void wrongApiPathAndUnavailableProxyHaveDistinctConnectionGuidance() throws Exception {
+        for(int status:new int[]{403,404,503}) {
+            try(Fixture server=new Fixture(exchange->reply(exchange,status,"<html>"+TOKEN+"</html>"));
+                    var client=server.client(Duration.ofSeconds(2))) {
+                var failure=assertThrows(RemoteFailure.class,client::profile);
+                String message=failure.connectionMessage(server.url());
+                assertTrue(message.contains("HTTP "+status));
+                assertTrue(message.contains(switch(status) {case 403->"read permission";case 404->"port and path";default->"server is unavailable";}));
+                assertFalse(message.contains(TOKEN));assertSafe(failure);
+            }
         }
     }
 

@@ -107,7 +107,7 @@ test('Users page protects the last administrator, keeps stale drafts and confirm
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   const result = await new AxeBuilder({page}).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze(); expect(result.violations).toEqual([]);
 });
-test('personal tokens copy once, clear on navigation and require named revocation confirmation', async ({page, request}) => {
+test('personal tokens copy distinct secrets and support confirmed revocation and deletion', async ({page, request}) => {
   const user = await fresh(request); await login(page, user, '#account/tokens'); await ready(page);
   let failList = false;
   page.on('response', response => {if (response.request().method() === 'POST' && response.url().endsWith('/auth/tokens')) failList = true;});
@@ -123,12 +123,50 @@ test('personal tokens copy once, clear on navigation and require named revocatio
   const row = page.locator('#account-content tr').filter({hasText: 'Eclipse laptop'}); await expect(row).toContainText('Read-only'); await expect(row).toContainText('Never used');
   await page.getByRole('link', {name: 'Profile', exact: true}).click(); await ready(page); await expect(page.getByLabel('New API token', {exact: true})).toHaveCount(0);
   await page.getByRole('link', {name: 'API tokens', exact: true}).click(); await ready(page);
+  await page.getByLabel('Token name', {exact: true}).fill('Eclipse desktop');
+  await page.getByRole('button', {name: 'Create token', exact: true}).click();
+  await expect(page.locator('#account-content')).toContainText('Token created. Unable to refresh');
+  const secondSecret = await page.getByLabel('New API token', {exact: true}).inputValue(); expect(secondSecret).not.toBe(secret);
+  await page.getByRole('button', {name: 'Refresh token list', exact: true}).click(); await ready(page);
+  await page.getByRole('button', {name: 'Copy token', exact: true}).click(); expect(await page.evaluate(() => window.testCopiedToken)).toBe(secondSecret);
+  expect((await request.get('/api/v1/me', {headers: {Authorization: `Bearer ${secondSecret}`}})).status()).toBe(200);
+  await page.getByRole('button', {name: 'Done', exact: true}).click();
+  await page.setViewportSize({width: 390, height: 844});
+  const secondRow = page.locator('#account-content tr').filter({hasText: 'Eclipse desktop'});
+  await secondRow.getByRole('button', {name: 'Delete', exact: true}).click(); await expect(secondRow).toContainText('Delete “Eclipse desktop”?');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  const accessibility = await new AxeBuilder({page}).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze(); expect(accessibility.violations).toEqual([]);
+  await page.screenshot({path: 'test-results/personal-token-delete-mobile.png', fullPage: true});
+  await secondRow.getByRole('button', {name: 'Cancel', exact: true}).click(); await expect(secondRow.getByRole('button', {name: 'Revoke', exact: true})).toBeVisible();
   await row.getByRole('button', {name: 'Revoke', exact: true}).click(); await expect(row).toContainText('Revoke “Eclipse laptop”?');
   await row.getByRole('button', {name: 'Cancel', exact: true}).click();
   expect((await request.get('/api/v1/me', {headers: {Authorization: `Bearer ${secret}`}})).status()).toBe(200);
   await row.getByRole('button', {name: 'Revoke', exact: true}).click(); await row.getByRole('button', {name: 'Revoke token', exact: true}).click(); await expect(row).toContainText('Revoked');
   expect((await request.get('/api/v1/me', {headers: {Authorization: `Bearer ${secret}`}})).status()).toBe(401);
+  expect((await request.get('/api/v1/me', {headers: {Authorization: `Bearer ${secondSecret}`}})).status()).toBe(200);
+  await row.getByRole('button', {name: 'Delete', exact: true}).click(); await row.getByRole('button', {name: 'Delete token', exact: true}).click(); await expect(row).toHaveCount(0);
+  await secondRow.getByRole('button', {name: 'Delete', exact: true}).click(); await secondRow.getByRole('button', {name: 'Delete token', exact: true}).click(); await expect(secondRow).toHaveCount(0);
+  await expect(page.locator('#account-content')).toContainText('No API tokens yet.');
+  expect((await request.get('/api/v1/me', {headers: {Authorization: `Bearer ${secondSecret}`}})).status()).toBe(401);
   expect(await page.evaluate(() => ({local: localStorage.length, session: sessionStorage.length}))).toEqual({local: 0, session: 0});
+});
+
+test('token sign-in accepts surrounding pasted whitespace and reports malformed tokens as authentication failures', async ({page, request}) => {
+  const user = await fresh(request); await login(page, user, '#account/tokens'); await ready(page);
+  await page.getByLabel('Token name', {exact: true}).fill('Browser sign-in');
+  await page.getByRole('button', {name: 'Create token', exact: true}).click();
+  const secret = await page.getByLabel('New API token', {exact: true}).inputValue();
+  await page.getByRole('button', {name: 'Done', exact: true}).click();
+  await openAccountMenu(page); await page.getByRole('button', {name: 'Sign out', exact: true}).click();
+  await expect(page.locator('#login')).toBeVisible();
+  await page.locator('#auth-mode').selectOption('token'); await page.getByLabel('Access token', {exact: true}).fill('  '+secret+'  ');
+  await page.getByRole('button', {name: 'Sign in', exact: true}).click(); await expect(page.locator('#owner')).toHaveText(user.displayName);
+  await openAccountMenu(page); await page.getByRole('button', {name: 'Sign out', exact: true}).click();
+  await expect(page.locator('#login')).toBeVisible();
+  await page.locator('#auth-mode').selectOption('token'); await page.getByLabel('Access token', {exact: true}).fill(secret+' extra');
+  await page.getByRole('button', {name: 'Sign in', exact: true}).click();
+  await expect(page.locator('#login-error')).toContainText('token contains invalid characters');
+  await expect(page.locator('#login-error')).not.toContainText('could not be reached');
 });
 test('password validation preserves drafts and a successful change revokes only this account credentials', async ({page, request}) => {
   const user = await fresh(request); await login(page, user, '#account/password'); await ready(page);

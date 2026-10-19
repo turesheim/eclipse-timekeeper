@@ -300,6 +300,18 @@ public class AccountStore {
         requireWrite(principal);tx(c->{lock(c);guard(c,principal);
             if(execute(c,"UPDATE tk_api_token SET revoked=TRUE,version=version+1 WHERE owner_id=? AND id=?",principal.owner(),id)!=1) throw ApiFailure.notFound();return null;});
     }
+    void deleteToken(TokenRegistry.Principal principal,UUID id) {
+        requireWrite(principal);tx(c->{lock(c);guard(c,principal);
+            String digest;
+            try(var statement=query(c,"SELECT digest,source FROM tk_api_token WHERE owner_id=? AND id=? FOR UPDATE",principal.owner(),id);var rows=statement.executeQuery()) {
+                if(!rows.next()) throw ApiFailure.notFound();
+                // Legacy registry entries need their revocation tombstone to prevent reimport.
+                if(!rows.getString(2).equals("MANAGED")) throw ApiFailure.conflict();
+                digest=rows.getString(1);
+            }catch(SQLException failure) {throw databaseFailure(failure);}
+            execute(c,"DELETE FROM tk_auth_session WHERE owner_id=? AND parent_digest=?",principal.owner(),digest);
+            execute(c,"DELETE FROM tk_api_token WHERE owner_id=? AND id=?",principal.owner(),id);return null;});
+    }
     void requireAdministration(TokenRegistry.Principal principal) {tx(c->{guard(c,principal);requireAdmin(c,principal);return null;});}
     JsonNode users(TokenRegistry.Principal principal) {
         return tx(c->{guard(c,principal);requireAdmin(c,principal);var items=array();

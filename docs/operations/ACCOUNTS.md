@@ -382,9 +382,21 @@ back. The **Copy token** button copies only the newly issued secret; **Done** or
 navigating away clears it. Lists expose the token's name, scope, expiry,
 revocation and last-use time, displayed in the account's configured time zone.
 Revocation asks for confirmation using the token's name and explains which
-connections lose access.
+connections lose access. **Delete** permanently removes a personal token from
+the list and invalidates its client connections and derived browser sessions.
+Active, expired and revoked personal tokens can be deleted. Imported registry
+tokens retain their revocation entries so the registry cannot recreate access.
 Paste it into Eclipse's Timekeeper backend preferences, where Eclipse secure
-storage retains it. No CLIENT or WORK_SESSION UI is required in Eclipse.
+storage retains it. Surrounding whitespace from a pasted token is ignored by
+Eclipse and browser sign-in; whitespace inside a token is rejected as an invalid
+credential. No CLIENT or WORK_SESSION UI is required in Eclipse.
+
+Eclipse's **Test connection** reports the API address and HTTP status when a
+server rejects a request. If a token is rejected, verify that the Server URL
+matches the server where it was created. Tokens belong to that server; another
+Timekeeper installation will not recognize them. Connection failures also give
+guidance for network/VPN problems, HTTPS certificates, redirects and incorrect
+API paths, without displaying credentials or server response bodies.
 
 To rotate, create a replacement, configure the client, then revoke the old token.
 Revocation is independent per token and applies to pending polls and command
