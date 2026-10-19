@@ -55,7 +55,7 @@ test('public holiday highlights stay subtle and consistent in Track and Calendar
     const column=page.locator('.calendar-day[data-date="2026-05-17"]'),header=page.locator('.calendar-heading[data-date="2026-05-17"]');
     for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']) {
       await page.locator('[data-tab=track]').click();await expect(track).toHaveClass(/track-public-holiday/);
-      await page.locator('#account-menu > summary').click();await page.locator('#theme').selectOption(theme);await page.locator('#account-menu > summary').click();
+      await setTheme(page,theme);
       const tint=await track.evaluate(node=>getComputedStyle(node).backgroundColor);
       expect(tint).not.toBe(await ordinary.evaluate(node=>getComputedStyle(node).backgroundColor));
       await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill('2026-05-17');
