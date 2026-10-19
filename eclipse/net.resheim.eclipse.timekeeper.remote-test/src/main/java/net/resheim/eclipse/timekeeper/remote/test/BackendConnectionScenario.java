@@ -29,8 +29,12 @@ final class BackendConnectionScenario {
             controls.textWithId("backend-url").setText(RemoteBootstrap.serverUrl.toString());
             controls.button("Test connection").click();
             RemoteTestSupport.waitFor(()->controls.labelWithId("backend-test-status").getText().contains("valid token"),"Invalid token was not reported by the connection test");
+            assertTrue(controls.labelWithId("backend-test-status").getText().contains(RemoteBootstrap.serverUrl.toString()));
+            assertTrue(controls.labelWithId("backend-test-status").getText().contains("expired or been revoked"));
+            assertTrue(controls.labelWithId("backend-test-status").getText().contains("HTTP 401"));
+            assertTrue(controls.labelWithId("backend-test-status").getText().contains("Server URL matches the browser"));
             assertTrue(controls.button("Test connection").isEnabled());
-            controls.textWithId("backend-token").setText(RemoteBootstrap.observerBToken());controls.button("Test connection").click();
+            controls.textWithId("backend-token").setText("  "+RemoteBootstrap.observerBToken()+"  ");controls.button("Test connection").click();
             RemoteTestSupport.waitFor(()->controls.labelWithId("backend-test-status").getText().startsWith("Connected to remote-owner-b ("),"Unsaved read-only account did not pass the connection test");
             assertEquals(identity,TimekeeperUiPlugin.getDefault().backendIdentity());assertEquals(before,api.metadata());
             assertEquals(mode,preferences.get("backend-mode",""));assertEquals(url,preferences.get("backend-url",""));

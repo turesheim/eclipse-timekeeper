@@ -4555,7 +4555,7 @@
     "/auth/tokens/{id}": {
       "delete": {
         "operationId": "revokePersonalToken",
-        "summary": "revokePersonalToken",
+        "summary": "Revoke a token or permanently remove a personal token",
         "tags": [
           "Accounts"
         ],
@@ -4606,9 +4606,20 @@
           },
           {
             "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "remove",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Permanently remove a managed personal token instead of retaining a revoked entry."
           }
         ],
-        "x-required-permission": "write"
+        "x-required-permission": "write",
+        "description": "By default, revokes the token and retains its entry. With remove=true, permanently removes a managed personal token and its derived browser sessions. Other tokens and password sessions remain valid. Legacy registry tokens cannot be removed because their revocation entries prevent reimport; attempting removal returns 409."
       },
       "parameters": [
         {

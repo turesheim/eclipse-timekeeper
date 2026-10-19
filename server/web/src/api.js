@@ -1,6 +1,7 @@
 const nameOrder = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
 const sortedNames = values => [...values].sort((a,b) => nameOrder.compare(a.name,b.name) || a.id.localeCompare(b.id));
 const messages = {
+  INVALID_TOKEN: 'The token contains invalid characters or is too long. Copy the complete API token and try again.',
   UNDO_CONFLICT: 'This work session or its references changed. Undo cannot replace the current records.',
   UNDO_EXPIRED: 'The time to undo this change has expired.',
   UNAUTHENTICATED: 'Your session is no longer authorized. Sign in again with your account.',
@@ -46,11 +47,12 @@ function decodeOwner(value) {
 }
 export class Api {
   #token; #csrf; #owner = null; #requests = new Set(); #closed = false;
-  constructor(token = null, fetcher = (...args) => globalThis.fetch(...args), context = {}) { this.#token = token; this.#csrf = context.csrf; this.#owner = context.ownerId ?? null; this.fetcher = fetcher; }
+  constructor(token = null, fetcher = (...args) => globalThis.fetch(...args), context = {}) { this.#token = token?.trim() ?? null; this.#csrf = context.csrf; this.#owner = context.ownerId ?? null; this.fetcher = fetcher; }
   get owner() { return this.#owner; }
   close() { this.#closed = true; this.#token = ''; this.#csrf = null; for (const request of this.#requests) request.abort(); }
   async request(path, {method = 'GET', body, etag, key, timeout = 15000, binary = false, undo = false} = {}) {
     if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);
+    if (this.#token && (this.#token.length > 4096 || !/^[A-Za-z0-9._~+/-]+=*$/.test(this.#token))) throw new ApiError('INVALID_TOKEN', 401);
     const controller = new AbortController(); this.#requests.add(controller);
     const timer = setTimeout(() => controller.abort(), timeout);
     try {

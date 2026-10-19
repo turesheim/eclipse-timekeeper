@@ -94,6 +94,47 @@ class AccountHttpTest {
         String tokenId=node(token.asString()).get("id").asText();assertEquals(204,call(second,"DELETE","/auth/tokens/"+tokenId,null,true).statusCode());
         assertEquals(401,given().header("Authorization","Bearer "+raw).get("/api/v1/me").statusCode());assertEquals(200,call(second,"GET","/me",null,false).statusCode());
     }
+    @Test void separatelyIssuedTokensAuthenticateIndependentlyThroughEclipseAndBrowserExchange() throws Exception {
+        var admin=setup();var secrets=new ArrayList<String>();
+        for(int index=0;index<3;index++) {
+            var created=call(admin,"POST","/auth/tokens",node("{\"name\":\"Installation "+index+"\",\"permissions\":[\"read\",\"write\"],\"expiresAt\":null}"),true);
+            assertEquals(201,created.statusCode());secrets.add(node(created.asString()).path("token").asText());
+        }
+        assertEquals(3,new HashSet<>(secrets).size());
+        for(var secret:secrets) {
+            assertEquals(401,given().header("Authorization","Bearer  "+secret).get("/api/v1/me").statusCode(),"A leading pasted space is rejected by the server");
+            try(var client=new net.resheim.eclipse.timekeeper.client.HttpTimekeeperService(java.net.URI.create(io.restassured.RestAssured.baseURI+":"+io.restassured.RestAssured.port),()->"  "+secret+"  ",Duration.ofSeconds(5))) {
+                assertEquals(admin.owner(),client.profile().owner().value());assertNotNull(client.projects());
+            }
+            var exchanged=browser(given().header("Authorization","Bearer "+secret).post("/api/v1/auth/token-login"));
+            assertEquals(admin.owner(),exchanged.owner());assertEquals(200,call(exchanged,"GET","/me",null,false).statusCode());
+        }
+        for(var secret:secrets) assertEquals(200,given().header("Authorization","Bearer "+secret).get("/api/v1/me").statusCode());
+    }
+    @Test void deletingPersonalTokensRemovesOnlyOwnedCredentialsAndTheirDerivedSessions() throws Exception {
+        var admin=setup();var created=call(admin,"POST","/auth/tokens",node("{\"name\":\"Delete this installation\",\"permissions\":[\"read\",\"write\"],\"expiresAt\":null}"),true);
+        assertEquals(201,created.statusCode());var token=node(created.asString());String id=token.path("id").asText(),secret=token.path("token").asText();
+        var derived=browser(given().header("Authorization","Bearer "+secret).post("/api/v1/auth/token-login"));
+        var spare=call(admin,"POST","/auth/tokens",node("{\"name\":\"Keep this installation\",\"permissions\":[\"read\"],\"expiresAt\":null}"),true);
+        assertEquals(201,spare.statusCode());String spareSecret=node(spare.asString()).path("token").asText();
+        var foreign=registry.authenticate("Bearer test-a");
+        assertEquals(404,assertThrows(ApiFailure.class,()->accounts.deleteToken(foreign,UUID.fromString(id))).status);
+        assertEquals(403,given().header("Authorization","Bearer "+spareSecret).delete("/api/v1/auth/tokens/"+id+"?remove=true").statusCode());
+        assertEquals(403,call(admin,"DELETE","/auth/tokens/"+id+"?remove=true",null,false).statusCode());
+        assertEquals(400,call(admin,"DELETE","/auth/tokens/"+id+"?remove=maybe",null,true).statusCode());
+        assertEquals(400,call(admin,"DELETE","/auth/tokens/"+id+"?remove=true&remove=false",null,true).statusCode());
+        assertEquals(200,given().header("Authorization","Bearer "+secret).get("/api/v1/me").statusCode());
+        assertEquals(204,call(admin,"DELETE","/auth/tokens/"+id+"?remove=true",null,true).statusCode());
+        assertEquals(404,call(admin,"DELETE","/auth/tokens/"+id+"?remove=true",null,true).statusCode());
+        assertEquals(401,given().header("Authorization","Bearer "+secret).get("/api/v1/me").statusCode());
+        assertEquals(401,call(derived,"GET","/me",null,false).statusCode());
+        assertEquals(200,call(admin,"GET","/me",null,false).statusCode());
+        assertEquals(200,given().header("Authorization","Bearer "+spareSecret).get("/api/v1/me").statusCode());
+        for(var listed:node(call(admin,"GET","/auth/tokens",null,false).asString()).path("items")) assertNotEquals(id,listed.path("id").asText());
+        UUID legacy=UUID.fromString(accounts.tokens(foreign).path("items").get(0).path("id").asText());
+        assertEquals(409,assertThrows(ApiFailure.class,()->accounts.deleteToken(foreign,legacy)).status);
+        accounts.revokeToken(foreign,legacy);assertThrows(ApiFailure.class,()->registry.authenticate("Bearer test-a"));
+    }
     @Test void administratorCannotReadOtherBusinessDataAndDisableTerminatesOutstandingPolls() throws Exception {
         var admin=setup();var user=call(admin,"POST","/admin/users",node("{\"username\":\"other\",\"password\":\""+PASSWORD+"\",\"displayName\":\"Other\",\"email\":\"other@example.org\",\"administrator\":false}"),true);
         assertEquals(201,user.statusCode());String owner=node(user.asString()).get("user").get("ownerId").asText();

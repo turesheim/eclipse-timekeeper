@@ -2,6 +2,15 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Api} from '../src/api.js';
 const reply = (body, owner = 'b3duZXItYQ', status = 200) => new Response(body === null ? null : JSON.stringify(body), {status, headers: {'X-Timekeeper-Owner': owner, ETag: '"opaque"'}});
+test('pasted bearer tokens trim surrounding whitespace and reject malformed credentials before sending', async()=>{
+  let requests=0;
+  const fetcher=async(url,options)=>{requests++;assert.equal(options.headers.Authorization,'Bearer tkp_fixture-token');return reply({ownerId:'owner-a'});};
+  await new Api(' \r\ntkp_fixture-token\t\n',fetcher).request('/me');assert.equal(requests,1);
+  for(const token of ['tkp_fixture token','tkp_fixture\r\ntoken','tkp_'+ 'x'.repeat(4096)]) {
+    await assert.rejects(new Api(token,fetcher).request('/me'),error=>error.code==='INVALID_TOKEN'&&!error.message.includes(token));
+  }
+  assert.equal(requests,1);
+});
 test('private binary downloads retain cookie/owner checks and reject late or foreign files', async()=>{
   const zip=(owner='b3duZXItYQ')=>new Response('synthetic archive',{headers:{'Content-Type':'application/zip','X-Timekeeper-Owner':owner}});
   const api=new Api(null,async(url,options)=>{assert.equal(options.headers.Accept,'application/zip');assert.equal(options.credentials,'same-origin');return zip();},{ownerId:'owner-a'});
