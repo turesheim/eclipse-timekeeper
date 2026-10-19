@@ -809,5 +809,15 @@
   "import.state.UNDONE": "UNDONE",
   "import.state.UNDONE_PARTIAL": "UNDONE_PARTIAL",
   "import.state.IMPORTED": "IMPORTED",
-  "import.state.BLOCKED": "BLOCKED"
+  "import.state.BLOCKED": "BLOCKED",
+  "holidays.title": "Public holidays",
+  "holidays.license": "date-holidays data and license",
+  "holidays.data": "Data:",
+  "holidays.on_date": "Public holidays · {{date}}",
+  "holidays.country": "National public holidays · {{country}}",
+  "holidays.details": "Public holidays on {{date}}: {{names}}",
+  "holidays.loading": "Loading public holidays…",
+  "holidays.unsupported_region": "Public holidays are unavailable for this language and region.",
+  "holidays.unsupported_year": "Public holidays are unavailable before year 0100.",
+  "holidays.unavailable": "Public holidays could not be loaded. Your recorded time is still available."
 }
