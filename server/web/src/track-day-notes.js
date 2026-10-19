@@ -37,6 +37,7 @@ export class TrackDayNotes {
     document.addEventListener('pointerdown',event=>{if(!this.menu.contains(event.target))this.closeMenu();},true);
     document.addEventListener('keydown',event=>{if(event.key==='Escape'&&this.menu.matches(':popover-open')){event.preventDefault();this.closeMenu();this.focusDate(this.menuDate);}});
     this.menu.addEventListener('contextmenu',event=>event.preventDefault());
+    this.menu.addEventListener('pointerdown',()=>{this.suppressClickUntil=0;},{passive:true});
     this.menuItem.addEventListener('click',()=>{const date=this.menuDate;this.closeMenu();void this.open(date);});
     this.menu.addEventListener('keydown',event=>{
       if(event.key==='Tab'){this.closeMenu();this.focusDate(this.menuDate);}
@@ -66,8 +67,10 @@ export class TrackDayNotes {
     document.addEventListener('scroll',()=>this.cancelHold(),true);
     document.addEventListener('wheel',()=>this.closeMenu(),{passive:true});
     window.addEventListener('resize',()=>{this.cancelHold();this.closeMenu();});
-    // A completed long press must not also activate the date's normal click action.
-    this.grid.addEventListener('click',event=>{if(event.detail&&performance.now()<this.suppressClickUntil){event.preventDefault();event.stopImmediatePropagation();this.suppressClickUntil=0;}},true);
+    // Release can synthesize a click on the date or the newly opened menu.
+    // A fresh menu press clears this guard so the next deliberate tap works.
+    const suppressHeldClick=event=>{if(event.detail&&performance.now()<this.suppressClickUntil){event.preventDefault();event.stopImmediatePropagation();this.suppressClickUntil=0;}};
+    this.grid.addEventListener('click',suppressHeldClick,true);this.menu.addEventListener('click',suppressHeldClick,true);
   }
   cancelHold(){clearTimeout(this.holdTimer);this.hold=null;}
   showMenu(date,x,y,focus=true){

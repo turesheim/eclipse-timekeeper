@@ -4,13 +4,13 @@ import {chromium, expect} from '@playwright/test';
 import {createInterface} from 'node:readline';
 import {writeFile} from 'node:fs/promises';
 import {durationText} from '../src/model.js';
-import {setTimeZone} from './navigation.js';
+import {setTimeZone,openTaskManagement} from './navigation.js';
 
 const browser = await chromium.launch();
 const page = await browser.newPage({baseURL: process.env.TIMEKEEPER_WEB_URL});
 page.setDefaultTimeout(15000);
 const record = {};
-async function tab(name) { await page.getByRole('button', {name, exact:true}).click(); }
+async function tab(name) { if(name==='Tasks'){await openTaskManagement(page);return;}await page.getByRole('button', {name, exact:true}).click(); }
 async function signIn() {
   await page.goto('/web/');
   await expect.poll(async () => await page.locator('#workspace').isVisible() || await page.locator('#login-form button[type="submit"]').isEnabled()).toBe(true);
