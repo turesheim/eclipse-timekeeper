@@ -3,6 +3,7 @@ Bundle-ManifestVersion: 2
 Bundle-Name: Timekeeper
 Bundle-SymbolicName: net.resheim.eclipse.timekeeper.ui;singleton:=true
 Bundle-Version: 2.0.0.qualifier
+Bundle-License: EPL-2.0;link="https://www.eclipse.org/legal/epl-2.0/"
 Bundle-Activator: net.resheim.eclipse.timekeeper.ui.TimekeeperUiPlugin
 Require-Bundle: net.resheim.eclipse.timekeeper.http;bundle-version="[2.0.0,3.0.0)",
  org.eclipse.equinox.security, org.eclipse.ui;bundle-version="3.109.100",

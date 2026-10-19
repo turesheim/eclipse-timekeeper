@@ -3,6 +3,7 @@ Bundle-ManifestVersion: 2
 Bundle-Name: Timekeeper HTTP client
 Bundle-SymbolicName: net.resheim.eclipse.timekeeper.http
 Bundle-Version: 2.0.0.qualifier
+Bundle-License: EPL-2.0;link="https://www.eclipse.org/legal/epl-2.0/"
 Bundle-Vendor: Torkild U. Resheim
 Bundle-RequiredExecutionEnvironment: JavaSE-21
 Require-Bundle: net.resheim.eclipse.timekeeper.domain;bundle-version="[2.0.0,3.0.0)",
