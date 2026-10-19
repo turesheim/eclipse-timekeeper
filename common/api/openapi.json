@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Timekeeper REST API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Owner-scoped Timekeeper API for Eclipse and web clients. API major version 1 is independent of Timekeeper product version 2.0. See api/README.md for normative ownership, concurrency, retry and compatibility policies.",
     "license": {
       "name": "Eclipse Public License 2.0",
@@ -8099,6 +8099,704 @@
           }
         }
       }
+    },
+    "/calendar-subscriptions": {
+      "get": {
+        "operationId": "listCalendarSubscriptions",
+        "summary": "List owned calendar subscriptions and refresh outcomes",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSubscriptionList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCalendarSubscription",
+        "summary": "Subscribe to a client-associated read-only iCalendar feed",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSubscription"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarSubscriptionCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calendar-subscriptions/{id}": {
+      "get": {
+        "operationId": "getCalendarSubscription",
+        "summary": "Read one owned subscription without disclosing its secret URL",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSubscription"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateCalendarSubscription",
+        "summary": "Edit a calendar subscription or its visibility",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSubscription"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarSubscriptionUpdate"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteCalendarSubscription",
+        "summary": "Remove a subscription and cached events, preserving all converted activities",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        }
+      }
+    },
+    "/calendar-subscriptions/{id}/refresh": {
+      "post": {
+        "operationId": "refreshCalendarSubscription",
+        "summary": "Refresh a subscription now; retain the last successful feed on error",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSubscription"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Opaque current resource ETag."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSubscription"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "description": "At most four network requests per server and one refresh per subscription at a time across replicas. Repeated manual attempts within 30 seconds return 429 CALENDAR_REFRESH_LIMIT. Refresh failures are saved as stable lastError codes, without URLs or remote response bodies. A concurrent refresh returns 202. Authentication is rechecked before committing the outcome."
+      }
+    },
+    "/calendar-events": {
+      "get": {
+        "operationId": "listCalendarEvents",
+        "summary": "Expand visible subscribed occurrences and identify converted activities",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "name": "fromDate",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "toDate",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarEvents"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "description": "Account time zone; exclusive toDate, maximum 31 civil days. Supports RRULE/RDATE/EXDATE/EXRULE, moved/cancelled overrides and THISANDFUTURE revisions. Per-calendar parse/expansion errors do not hide unrelated calendars or recorded activities. No fetch is performed during this read."
+      }
+    },
+    "/calendar-subscriptions/{id}/events/{key}/activity": {
+      "post": {
+        "operationId": "convertCalendarEvent",
+        "summary": "Create reviewed recorded activity from one current calendar occurrence",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarConversionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarEventConversion"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -15338,6 +16036,403 @@
         "required": [
           "session",
           "revision"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarSubscription": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "lastAttempt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "lastSuccess": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "lastError": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nextRefresh": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "origin": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "version",
+          "name",
+          "clientId",
+          "visible",
+          "createdAt",
+          "lastAttempt",
+          "lastSuccess",
+          "lastError",
+          "nextRefresh",
+          "origin"
+        ],
+        "additionalProperties": false,
+        "description": "Owned read-only iCalendar subscription. Feed URLs are bearer credentials and are never returned. Automatic refresh runs approximately every 15 minutes, including hidden subscriptions. Failed refreshes retain the last successful feed. Configuration changes use the current ETag; refresh-status changes can also invalidate an edit ETag."
+      },
+      "CalendarSubscriptionCreate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192
+          }
+        },
+        "required": [
+          "name",
+          "clientId",
+          "visible",
+          "url"
+        ],
+        "additionalProperties": false,
+        "description": "Public HTTPS or webcal feed URL. No embedded username/password or fragment. Internal/HTTP origins require an exact server-operator allowlist entry. At most 20 subscriptions per owner. A new subscription refreshes asynchronously."
+      },
+      "CalendarSubscriptionUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 8192
+          }
+        },
+        "required": [
+          "name",
+          "clientId",
+          "visible"
+        ],
+        "additionalProperties": false,
+        "description": "Omit url or leave it blank to preserve the secret feed URL. Replacing the URL discards the old cached feed; conversion history is retained."
+      },
+      "CalendarSubscriptionList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarSubscription"
+            },
+            "maxItems": 20
+          },
+          "refreshMinutes": {
+            "type": "integer",
+            "const": 15
+          }
+        },
+        "required": [
+          "items",
+          "refreshMinutes"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarEvent": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "uid": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "recurrenceId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "start": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "end": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "allDay": {
+            "type": "boolean"
+          },
+          "firstDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "endDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "subscriptionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "calendarName": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "clientName": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "color": {
+            "$ref": "#/components/schemas/Color"
+          },
+          "eventVersion": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "activityIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "key",
+          "uid",
+          "recurrenceId",
+          "title",
+          "description",
+          "location",
+          "start",
+          "end",
+          "allDay",
+          "firstDate",
+          "endDate",
+          "subscriptionId",
+          "calendarName",
+          "clientId",
+          "clientName",
+          "color",
+          "eventVersion",
+          "activityIds"
+        ],
+        "additionalProperties": false,
+        "description": "A planned occurrence in the account time zone, excluded from recorded totals. All-day dates have an exclusive endDate. key remains stable for a moved recurrence override or a rescheduled standalone UID. eventVersion fences title/time/client changes before conversion."
+      },
+      "CalendarActivitySource": {
+        "type": "object",
+        "properties": {
+          "uid": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "recurrenceId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "start": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "end": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "allDay": {
+            "type": "boolean"
+          },
+          "firstDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "endDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "subscriptionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "calendarName": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "clientId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "clientName": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "color": {
+            "$ref": "#/components/schemas/Color"
+          },
+          "eventKey": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "required": [
+          "uid",
+          "recurrenceId",
+          "title",
+          "description",
+          "location",
+          "start",
+          "end",
+          "allDay",
+          "firstDate",
+          "endDate",
+          "subscriptionId",
+          "calendarName",
+          "clientId",
+          "clientName",
+          "color",
+          "eventKey"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarEvents": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarEvent"
+            },
+            "maxItems": 5000
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "activitySources": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CalendarActivitySource"
+            }
+          }
+        },
+        "required": [
+          "items",
+          "errors",
+          "activitySources"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarEventConversion": {
+        "type": "object",
+        "properties": {
+          "fromDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "eventVersion": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "activity": {
+            "$ref": "#/components/schemas/ActivityInput"
+          }
+        },
+        "required": [
+          "fromDate",
+          "toDate",
+          "eventVersion",
+          "activity"
+        ],
+        "additionalProperties": false,
+        "description": "Explicit reviewed conversion of one occurrence from a window of at most 31 civil days (exclusive toDate). A completed interval is required; all-day events require a manually chosen actual interval. Existing activity start validation applies, including rejection of future starts. The chosen project/task must agree with the subscription client. The activity and permanent source identity commit atomically; retries reuse the same Idempotency-Key. A second command for the same subscription/occurrence returns 409 CALENDAR_ALREADY_CONVERTED, even after activity deletion. Later changes/cancellations never mutate recorded activities."
+      },
+      "CalendarConversionResult": {
+        "type": "object",
+        "properties": {
+          "activityIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "minItems": 1,
+            "maxItems": 400,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "activityIds"
         ],
         "additionalProperties": false
       }

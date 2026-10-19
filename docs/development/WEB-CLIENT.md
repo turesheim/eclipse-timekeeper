@@ -522,19 +522,75 @@ the signed-in browser session and is cleared on sign-out. A running source keeps
 its blank end in the copy; finish the copy's interval if another session is
 still running. Starts in the future remain invalid.
 
-Task cards use the task's title and issue link and list its activities. Separate
-gaps remain visible. Taskless activity cards and overlapping intervals are also
-shown. Tasks without recorded time remain available in the Tasks tab.
-Activity times and task/project assignments remain unchanged when a work
-session is moved, resized or copied. The activity editor warns when a new
-interval extends beyond its selected session; the API report retains exact
-tracked, covered and unallocated totals.
+Each recorded activity has its own card at its actual start/end time, including
+activities recorded without a work session. Cards retain task issue links and
+show which work sessions overlap their interval. Recorded activities remain
+independent when a work session is moved, resized or copied.
 
 Repeated clock times have separate rows; shaded slots do not occur on a given
 day. A drag retains the original session snapshot and saves with its opaque
 version precondition. Peer edits, rejected changes and unknown save outcomes
 preserve the proposed interval for review instead of silently overwriting data
 or repeating an ordinary write.
+
+### Calendar subscriptions
+
+Expand **Calendars** in Calendar to manage read-only iCalendar subscriptions.
+Choose **Add calendar**, enter a descriptive name and subscription URL, and select
+its client. HTTPS and `webcal://` subscription links are supported; provider login
+and two-way calendar editing are outside this first version. The saved URL is
+kept private: editing shows an empty replacement field, and leaving it blank
+preserves the existing link. Expand the list to see the last successful refresh
+and any specific refresh error. Each account may have up to 20 subscriptions.
+
+Calendars refresh automatically about every 15 minutes. **Refresh calendar**
+requests an update immediately, with a 30-second cooldown between attempts.
+Failed refreshes keep the last successful events and explain whether the problem
+is the address, connection, certificate, provider access or file contents.
+Changing a name, client or visibility reuses the cached feed. Replacing a URL
+clears its old cache and starts a new refresh. Hidden calendars continue refreshing;
+removing a subscription removes its external events and leaves recorded activities
+and their source history intact. Clients with subscriptions cannot be deleted
+until those subscriptions are removed or reassigned.
+
+Planned events use the client's color with a dashed outline and a **Planned**
+label; the client and calendar name remain available in their text and accessible
+name. They appear beside recorded work without contributing to reports. Select
+an event with the pointer, touch or keyboard to see its full interval, source,
+location and plain-text description. Read-only sessions can view details.
+All-day plans appear above the time grid, with their exclusive iCalendar end date
+shown as an inclusive human-readable range. Timed events without an end are
+shown as zero-duration markers. All presentation follows the account time zone;
+floating calendar times use that zone. Recurrences retain local wall-clock times
+across DST, including moved/cancelled occurrences and THISANDFUTURE changes.
+
+**Create activity** opens a review editor with the event title/description and
+interval. Choose an optional project/task belonging to the subscription's client.
+All-day plans require explicitly chosen actual start/end times; they never create
+24 hours of work automatically. Future plans are visible, but saving a future
+activity start is rejected and preserves the draft. A completed interval is
+required. Summaries are limited to 2,000 characters; if shortened, the editor
+explains that full details remain in the source history.
+
+Nothing is recorded before confirmation. The activity, any local-day fragments,
+source reference and retry receipt commit together. An uncertain save retries
+its exact original command. Repeated refreshes or new conversion commands cannot
+silently create a second activity for the same subscription/occurrence, even
+when the first activity has been deleted. Later source changes never overwrite
+recorded work. Activity edits retain the source reference, including newly split
+daily fragments. Private account archives include source history as inert audit
+records in the existing archive format; feed URLs and cached feeds are excluded.
+Subscriptions must be configured separately after importing an account archive.
+
+The engine is the pinned [iCal4j 4.4.0](https://github.com/ical4j/ical4j/tree/ical4j-4.4.0).
+Its BSD license is included in the server JAR. Calendar downloads and recurrence
+expansion are bounded; no attachment or timezone-definition URLs are fetched.
+Feeds are limited to 2 MiB, 5,000 VEVENT revisions and 2,000 visible occurrences
+per calendar. The API accepts windows of at most 31 civil days.
+
+![Planned and recorded time in Calendar](../assets/screenshots/calendar-subscriptions-desktop.png)
+
+![All-day calendar details on mobile](../assets/screenshots/calendar-subscriptions-details-mobile.png)
 
 ## Clients, projects and work sessions
 

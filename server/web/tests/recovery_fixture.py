@@ -13,9 +13,13 @@ import threading
 
 
 class RecoveryFixture:
-    def __init__(self, directory, backend, *, https=False, mail=False, hostname='127.0.0.1'):
+    def __init__(self, directory, backend, *, https=False, mail=False, hostname='127.0.0.1', calendars=False):
         if hostname not in ('127.0.0.1','localhost'):raise ValueError('Fixture must stay on loopback')
         self.servers=[];self.environment={};self.messages=[];self.events=[];self.lock=threading.Lock()
+        self.calendars=None
+        if calendars:
+            from calendar_fixture import CalendarFixture
+            self.calendars=CalendarFixture();self.environment.update(self.calendars.environment)
         self.base=f'http://127.0.0.1:{backend}'
         fixture=self
         if https:
@@ -101,5 +105,6 @@ class RecoveryFixture:
         self.servers.append(server);threading.Thread(target=server.serve_forever,daemon=True).start()
 
     def close(self):
+        if self.calendars:self.calendars.close()
         for server in reversed(self.servers):server.shutdown();server.server_close()
         self.messages.clear()

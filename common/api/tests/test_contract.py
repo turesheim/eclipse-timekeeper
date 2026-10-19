@@ -205,6 +205,8 @@ class ContractTest(unittest.TestCase):
             'getAccountArchiveUpload', 'writeAccountArchiveChunk', 'discardAccountArchiveUpload',
             'previewAccountArchive', 'restoreAccountArchive', 'listAccountArchiveRestores',
             'createClient', 'updateClient', 'deleteClient', 'getClient', 'listClients',
+            'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
+            'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'convertCalendarEvent',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTask', 'updateTask', 'deleteTask', 'getTask', 'listTasks',
             'linkExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',

@@ -210,7 +210,7 @@ test('calendar shows seven days, task links and activity lists beside multi-day 
     await select.focus();await page.keyboard.press('Tab');await expect(handles.first()).toBeFocused();
     await expect(handles.first()).toHaveCSS('opacity','1');
     await page.locator('#calendar-today').focus();await expect(handles.first()).toHaveCSS('opacity','0');
-    await expect(page.locator('.calendar-task').getByRole('link',{name:`#${f.issue}: ${f.task.summary}`,exact:true})).toHaveAttribute('href',f.url);
+    await expect(page.locator('.calendar-task').getByRole('link',{name:`#${f.issue}: ${f.task.summary}`,exact:true}).first()).toHaveAttribute('href',f.url);
     for(const activity of f.activities) await expect(page.locator('.calendar-task').getByRole('button',{name:`Edit activity ${activity.summary}`,exact:true})).toBeAttached();
     await expect(page.locator(`.calendar-session[data-session-id="${long.id}"]`)).toHaveCount(2);
     await expect(page.locator('#calendar-dst')).toBeVisible();

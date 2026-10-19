@@ -22,7 +22,7 @@ import jakarta.inject.Inject;
 class AccountArchive {
     static final String FORMAT="timekeeper-account-v1";
     static final Map<String,String> WORK=DomainTransfer.TYPES;
-    private static final List<String> HISTORY=List.of("IMPORT_JOB","IMPORT_BATCH","IMPORT_ITEM","IMPORT_MAP","IMPORT_KEY","IMPORT_ORIGIN","IMPORT_UNDO","IMPORT_USE","ARCHIVE_AUDIT","ARCHIVE_IMPORT");
+    private static final List<String> HISTORY=List.of("IMPORT_JOB","IMPORT_BATCH","IMPORT_ITEM","IMPORT_MAP","IMPORT_KEY","IMPORT_ORIGIN","IMPORT_UNDO","IMPORT_USE","ARCHIVE_AUDIT","ARCHIVE_IMPORT","CAL_LINK");
     @Inject AgroalDataSource datasource;
     @Inject AccountStore accounts;
     @Inject TokenRegistry tokens;
@@ -106,7 +106,9 @@ class AccountArchive {
             json.writeEndObject();json.writeArrayFieldStart("importHistory");
             for(String type:HISTORY) records(c,owner,type,value->{
                 var copy=value.deepCopy();copy.remove("ownerId");
-                json.writeStartObject();json.writeStringField("entityType",type);json.writeObjectField("data",copy);json.writeEndObject();
+                ObjectNode audit=copy;
+                if(type.equals("CAL_LINK")){audit=object().put("kind","CALENDAR_ACTIVITY_SOURCE");audit.set("source",copy);}
+                json.writeStartObject();json.writeStringField("entityType",type.equals("CAL_LINK")?"ARCHIVE_AUDIT":type);json.writeObjectField("data",audit);json.writeEndObject();
             });
             json.writeEndArray();json.writeEndObject();json.close();zip.closeEntry();
             entry(zip,"manifest.json");zip.write(MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(manifest));zip.closeEntry();

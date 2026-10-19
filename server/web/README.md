@@ -24,6 +24,12 @@ locally when Track needs public holidays for the selected locale. Run
 `npm run vendor:holidays` after an intentional dependency update;
 `npm run check:assets` also verifies these generated assets.
 
+Calendar subscriptions use the server's pinned iCal4j engine and native browser
+modules. The acceptance runner starts a loopback iCalendar provider as well as
+its optional HTTPS/SMTP fixtures. Tests exercise actual server fetching, refresh,
+recurrence, reviewed conversion, retries and private account boundaries; no live
+calendar provider or external account is required.
+
 Browser acceptance defaults to Chromium. For WebKit, install its browser with
 `npx playwright install --with-deps webkit` from this directory. After building
 and packaging the server, run from the repository root:

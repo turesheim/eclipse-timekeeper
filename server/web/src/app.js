@@ -30,6 +30,9 @@ const displayNanos = (value) => decimalHours ? decimalHoursText(value) : nanosTe
 const displayDuration = (value) => decimalHours ? decimalHoursText(durationNanos(value)) : durationText(value);
 const calendar = new WeekCalendar($('calendar-panel'), {
   taskLabel,
+  canWrite:()=>canWrite,
+  onUnauthorized:error=>auth.clear(errorText(error)),
+  onConvertEvent:(event,range)=>void openCalendarActivity(event,range).catch(error=>setStatus(errorText(error))),
   onDate: selectWeek,
   onEditActivity: (id) => void openRecord('activities', id).catch((error) => setStatus(errorText(error))),
   onEditSession: (id) => void openRecord('work-sessions', id).catch((error) => setStatus(errorText(error))),
@@ -460,14 +463,29 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
   }
   if (collection === 'activities') {
     const task = field(i18nText("ui.task"), 'taskId', value.taskId, { choices: [['', i18nText("ui.no_task")], ...snapshot.tasks.map((v) => [v.id, taskPresentation(v).title])] });task.disabled = !!id;
-    if (!id) {field(i18nText("ui.project_without_task"), 'projectId', '', { choices: [['', i18nText("ui.no_project")], ...snapshot.projects.map((v) => [v.id, v.name])] });}
-    field(i18nText("ui.summary"), 'summary', value.summary, { max: 2000 });
+    if (!id) {field(i18nText("ui.project_without_task"), 'projectId', value.projectId, { choices: [['', i18nText("ui.no_project")], ...snapshot.projects.map((v) => [v.id, v.name])] });}
+    field(i18nText("ui.summary"), 'summary', value.summary, { max: 2000, multiline:true });
     timeFields(value, 'tracking');labelFields(value.labelIds);
+    const source=id?calendar.subscriptions.sources[id]:null;if(source)$('fields').prepend(element('p',i18nText('calendar.recorded_source',{title:source.title,calendar:source.calendarName,client:source.clientName}),'hint'));
   }
   if (collection === 'work-sessions') {
     sessionFields(value);timeFields(value, 'running');
   }
   showEditor();
+}
+async function openCalendarActivity(event,range) {
+  const session=api;if(!connected||!canWrite||editor||$('editor').open)return;
+  const summary=[event.title,event.description].filter(Boolean).join('\n\n');
+  await openRecord('activities',null,{summary:summary.slice(0,2000),start:event.start,end:event.end},i18nText('calendar.create_activity'));
+  if(session!==api||editor?.collection!=='activities'||editor.id!==null)return;
+  editor.command='calendar-convert';editor.key=crypto.randomUUID();editor.calendarSource={event,...range};
+  $('editor-notice').textContent=i18nText(event.allDay?'calendar.choose_interval':'calendar.review_interval')+(summary.length>2000?' '+i18nText('calendar.summary_shortened'):'');
+  $('fields').prepend(element('p',i18nText('calendar.recorded_source',{title:event.title,calendar:event.calendarName,client:event.clientName}),'hint'));
+  const project=$('field-projectId'),task=$('field-taskId');
+  for(const option of [...project.options])if(option.value&&!snapshot.projects.some(value=>value.id===option.value&&value.clientId===event.clientId))option.remove();
+  for(const option of [...task.options])if(option.value){const value=snapshot.tasks.find(value=>value.id===option.value),project=snapshot.projects.find(project=>project.id===value?.projectId);if(project&&project.clientId!==event.clientId)option.remove();}
+  if(event.allDay){$('field-start').value='';$('field-end').value='';}
+  const end=$('field-end');end.required=true;end.setAttribute('aria-label',i18nText('calendar.actual_end'));end.closest('label').firstChild.textContent=i18nText('calendar.actual_end');
 }
 function timeFields(value, ongoing) {
   if (editor.collection === 'work-sessions') {sessionTimeFields(value, ongoing);return;}
@@ -563,9 +581,9 @@ async function saveEditor(event) {
   if (!current || current.busy || current.loading || current.reviewRequired || current.session !== api) return;
   current.busy = true;$('save').disabled = true;$('cancel').disabled = true;$('editor-error').textContent = '';
   try {
-    const body = current.uncertain ? current.payload : values();
+    const body = current.uncertain ? current.payload : current.calendarSource?{fromDate:current.calendarSource.fromDate,toDate:current.calendarSource.toDate,eventVersion:current.calendarSource.event.eventVersion,activity:values()}:values();
     current.payload = body;freeze(true);
-    const path = current.command === 'session-start' ? '/work-sessions/start' : current.command === 'session-stop' ? `/work-sessions/${current.id}/stop` : current.command === 'start' ? '/activities/start' : current.command === 'stop' ? `/activities/${current.id}/stop` : `/${current.collection}${current.id ? '/' + current.id : ''}`;
+    const path = current.calendarSource?`/calendar-subscriptions/${current.calendarSource.event.subscriptionId}/events/${current.calendarSource.event.key}/activity`:current.command === 'session-start' ? '/work-sessions/start' : current.command === 'session-stop' ? `/work-sessions/${current.id}/stop` : current.command === 'start' ? '/activities/start' : current.command === 'stop' ? `/activities/${current.id}/stop` : `/${current.collection}${current.id ? '/' + current.id : ''}`;
     const method = current.command ? 'POST' : current.remove ? 'DELETE' : current.id !== null ? 'PUT' : 'POST';
     const saved = await current.session.request(path, { method, body, etag: current.etag, key: current.key, undo: current.collection === 'work-sessions' && (method === 'PUT' || method === 'DELETE') });
     if (current.session !== api || current !== editor) return;

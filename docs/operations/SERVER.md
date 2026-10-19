@@ -89,6 +89,30 @@ initialization and H2 database-administration rights. Permitted URL settings are
 persistent JDBC settings are rejected before opening storage. Named memory
 storage is suitable for tests; production uses durable file/server storage.
 
+## Calendar feed access
+
+Calendar subscriptions fetch public HTTPS iCalendar feeds on the server. URLs
+may contain private access tokens and are never returned through subscription
+responses or included in account archives. Database backups include the private
+configuration and cached data, as they do other owned server storage.
+
+By default, private, loopback, link-local, reserved and metadata destinations are
+blocked. DNS answers are validated and pinned for each connection; redirects
+are limited and revalidated. TLS hostname/certificate verification stays enabled.
+No Timekeeper bearer token, browser cookie or recovery credential is forwarded.
+A request has a bounded lifetime, a 2 MiB body limit, and no automatic HTTP retries.
+At most four downloads run per server, with database leases coordinating replicas.
+
+For a trusted internal calendar server, set
+`TIMEKEEPER_CALENDAR_TRUSTED_ORIGINS` to a comma-separated list of exact origins,
+for example `https://calendar.internal.example:8443`. Only those specific origins
+may resolve to internal addresses. An explicitly listed `http://` origin may use
+HTTP; HTTPS-to-HTTP redirects remain rejected. This is operator configuration,
+not a setting calendar users can override. The supplied Compose file forwards
+this variable. An empty value keeps the public-HTTPS-only policy.
+`TIMEKEEPER_CALENDAR_AUTOMATIC=false` disables scheduled refresh; manual refresh
+remains available. No database schema upgrade is required for subscriptions.
+
 ## Data and operational behavior
 
 `GET /api/v1/openapi.json` serves the canonical public contract. All data routes

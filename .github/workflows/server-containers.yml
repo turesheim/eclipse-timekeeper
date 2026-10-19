@@ -109,6 +109,7 @@ jobs:
           TIMEKEEPER_TEST_PG_URL: jdbc:postgresql://127.0.0.1:55432/postgres
           TIMEKEEPER_TEST_RECOVERY_DB_URL: jdbc:postgresql://127.0.0.1:55432/timekeeper_recovery
           TIMEKEEPER_TEST_PASSKEY_DB_URL: jdbc:postgresql://127.0.0.1:55432/timekeeper_passkeys
+          TIMEKEEPER_TEST_CALENDAR_DB_URL: jdbc:postgresql://127.0.0.1:55432/timekeeper_calendars
           TIMEKEEPER_TEST_SETTINGS_DB_URL: jdbc:postgresql://127.0.0.1:55432/timekeeper_settings
           TIMEKEEPER_TEST_ARCHIVE_DB_URL: jdbc:postgresql://127.0.0.1:55432/timekeeper_archive
           TIMEKEEPER_TEST_PG_USER: postgres
@@ -120,8 +121,8 @@ jobs:
             echo "Waiting for isolated PostgreSQL (attempt $attempt)"
             sleep 1
           done
-          docker exec timekeeper-pg-test psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE timekeeper_recovery' -c 'CREATE DATABASE timekeeper_passkeys' -c 'CREATE DATABASE timekeeper_settings' -c 'CREATE DATABASE timekeeper_archive_export' -c 'CREATE DATABASE timekeeper_archive_import' -c 'CREATE DATABASE timekeeper_archive_http' -c 'CREATE DATABASE timekeeper_archive_upload'
-          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest,AccountArchiveTest,AccountArchiveImportTest,AccountArchiveHttpTest,AccountUploadsTest -Dsurefire.failIfNoSpecifiedTests=false
+          docker exec timekeeper-pg-test psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE timekeeper_recovery' -c 'CREATE DATABASE timekeeper_passkeys' -c 'CREATE DATABASE timekeeper_settings' -c 'CREATE DATABASE timekeeper_archive_export' -c 'CREATE DATABASE timekeeper_archive_import' -c 'CREATE DATABASE timekeeper_archive_http' -c 'CREATE DATABASE timekeeper_archive_upload' -c 'CREATE DATABASE timekeeper_calendars'
+          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest,AccountArchiveTest,AccountArchiveImportTest,AccountArchiveHttpTest,AccountUploadsTest,CalendarHttpTest -Dsurefire.failIfNoSpecifiedTests=false
           docker rm -f timekeeper-pg-test
       - name: Verify HTTP contracts, rolling updates, backups and durable restart
         run: |
@@ -200,6 +201,7 @@ jobs:
           TIMEKEEPER_TEST_PG_URL: jdbc:postgresql://127.0.0.1:55433/postgres
           TIMEKEEPER_TEST_RECOVERY_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_recovery
           TIMEKEEPER_TEST_PASSKEY_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_passkeys
+          TIMEKEEPER_TEST_CALENDAR_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_calendars
           TIMEKEEPER_TEST_SETTINGS_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_settings
           TIMEKEEPER_TEST_ARCHIVE_DB_URL: jdbc:postgresql://127.0.0.1:55433/timekeeper_archive
           TIMEKEEPER_TEST_PG_USER: postgres
@@ -211,8 +213,8 @@ jobs:
             echo "Waiting for isolated PostgreSQL 17 (attempt $attempt)"
             sleep 1
           done
-          docker exec timekeeper-pg17-test psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE timekeeper_recovery' -c 'CREATE DATABASE timekeeper_passkeys' -c 'CREATE DATABASE timekeeper_settings' -c 'CREATE DATABASE timekeeper_archive_export' -c 'CREATE DATABASE timekeeper_archive_import' -c 'CREATE DATABASE timekeeper_archive_http' -c 'CREATE DATABASE timekeeper_archive_upload'
-          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest,AccountArchiveTest,AccountArchiveImportTest,AccountArchiveHttpTest,AccountUploadsTest -Dsurefire.failIfNoSpecifiedTests=false
+          docker exec timekeeper-pg17-test psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE timekeeper_recovery' -c 'CREATE DATABASE timekeeper_passkeys' -c 'CREATE DATABASE timekeeper_settings' -c 'CREATE DATABASE timekeeper_archive_export' -c 'CREATE DATABASE timekeeper_archive_import' -c 'CREATE DATABASE timekeeper_archive_http' -c 'CREATE DATABASE timekeeper_archive_upload' -c 'CREATE DATABASE timekeeper_calendars'
+          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest,AccountArchiveTest,AccountArchiveImportTest,AccountArchiveHttpTest,AccountUploadsTest,CalendarHttpTest -Dsurefire.failIfNoSpecifiedTests=false
           docker rm -f -v timekeeper-pg17-test
       - name: Verify real API, backup, recovery and rolling updates with PostgreSQL 17
         run: |

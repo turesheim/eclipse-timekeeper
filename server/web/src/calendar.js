@@ -1,7 +1,8 @@
 import { getLocale } from './i18n.js';
 import { t as i18nText } from "./i18n.js";import { addDays, dateInZone, instantNanos, instantText, nanosInstant, localDateTime, nanosText } from './model.js';
-import { calendarWeek, calendarPieces, calendarAnchor, calendarRange, calendarLanes, calendarTaskBlocks, shiftSession, shiftSessionDays, pasteSession, clientColors, CALENDAR_STEP } from './calendar-model.js';
-import { iconButton } from './icons.js';
+import { calendarWeek, calendarPieces, calendarAnchor, calendarRange, calendarLanes, shiftSession, shiftSessionDays, pasteSession, clientColors, CALENDAR_STEP } from './calendar-model.js';
+import { icon, iconButton } from './icons.js';
+import {CalendarSubscriptions} from './calendar-subscriptions.js';
 
 const ROW_HEIGHT = 16;
 function node(tag, text, className) {
@@ -33,8 +34,13 @@ export class WeekCalendar {
     this.setRangeMode(false);
     root.querySelector('#calendar-date').addEventListener('change', (event) => callbacks.onDate(event.target.value));
     root.addEventListener('keydown', (event) => this.key(event));
+    this.subscriptions=new CalendarSubscriptions(root,{
+      canWrite:()=>callbacks.canWrite(),onUnauthorized:callbacks.onUnauthorized,onConvert:callbacks.onConvertEvent,
+      onEvents:plans=>{this.plans=plans;if(this.data&&!root.hidden&&!this.drag&&!this.busy)this.render();}
+    });
   }
   reset() {
+    this.subscriptions?.reset();this.plans={items:[],sources:{}};
     this.cancelDrag();this.scope = null;this.data = null;this.calendar = null;this.calendarKey = null;this.scrollWeek = null;this.selectedId = null;
     this.selection = null;this.clipboard = null;this.lastClientId = null;this.busy = false;this.grid.replaceChildren();
     this.message.textContent = '';this.setConnected(false);
@@ -42,11 +48,12 @@ export class WeekCalendar {
   update(data, connected, scope) {
     if (this.scope !== scope) {this.reset();this.scope = scope;}
     this.data = data;this.connected = connected;
+    this.subscriptions.update(data,connected,scope);
     if (!this.root.hidden && !this.drag && !this.busy) this.render();else this.buttons();
   }
-  show() {if (this.data && !this.drag && !this.busy) this.render();}
-  hide() {this.cancelDrag();this.setRangeMode(false);}
-  setConnected(value) {this.connected = value;if (!value) {this.cancelDrag();this.setRangeMode(false);}this.buttons();}
+  show() {this.subscriptions.show();if (this.data && !this.drag && !this.busy) this.render();}
+  hide() {this.subscriptions.hide();this.cancelDrag();this.setRangeMode(false);}
+  setConnected(value) {this.connected = value;this.subscriptions?.setConnected(value);if (!value) {this.cancelDrag();this.setRangeMode(false);}this.buttons();}
   setRangeMode(value) {
     this.rangeMode = value;this.root.classList.toggle('calendar-range-mode', value);
     this.controls.range.setAttribute('aria-pressed', String(value));this.controls.range.classList.toggle('active', value);
@@ -73,7 +80,7 @@ export class WeekCalendar {
   render() {
     const data = this.data,zone = data.profile.data.zoneId,key = `${data.dates.first}/${zone}`;
     const active = document.activeElement;
-    const focus = this.root.contains(active) ? { session: active.dataset.sessionId, edge: active.dataset.edge, day: active.dataset.date, activity: active.dataset.activityId, select: active.classList.contains('calendar-session-select') } : null;
+    const focus = this.root.contains(active) ? { session: active.dataset.sessionId, edge: active.dataset.edge, day: active.dataset.date, activity: active.dataset.activityId, planned:active.dataset.calendarEventKey, subscription:active.dataset.calendarSubscriptionId, select: active.classList.contains('calendar-session-select') } : null;
     if (this.calendarKey !== key) {
       this.calendarKey = key;this.calendar = calendarWeek(data.dates.first, zone);this.selection = null;
     }
@@ -130,10 +137,14 @@ export class WeekCalendar {
     for (const day of calendar.days) for (const piece of calendarLanes(sessions.filter((value) => value.date === day.date), 1.25))
     this.dayNodes.get(day.date).append(this.sessionNode(piece));
     const blocks = [];
-    for (const block of calendarTaskBlocks(data.activities, data.report.generatedAt))
-    for (const piece of calendarPieces(nanosInstant(block.start), nanosInstant(block.end), calendar)) blocks.push({ ...piece, block });
+    for (const activity of data.activities) {
+      const block={taskId:activity.taskId,start:instantNanos(activity.start),end:instantNanos(activity.end||data.report.generatedAt),activities:[activity]};
+      for (const piece of calendarPieces(nanosInstant(block.start), nanosInstant(block.end===block.start?block.end+1n:block.end), calendar)) blocks.push({ ...piece, block });
+    }
+    for(const event of this.plans?.items||[])if(!event.allDay)
+      for(const piece of calendarPieces(event.start,instantNanos(event.end)===instantNanos(event.start)?nanosInstant(instantNanos(event.end)+1n):event.end,calendar))blocks.push({...piece,planned:event});
     for (const day of calendar.days) for (const piece of calendarLanes(blocks.filter((value) => value.date === day.date), 3))
-    this.dayNodes.get(day.date).append(this.taskNode(piece));
+    this.dayNodes.get(day.date).append(piece.planned?this.plannedNode(piece):this.taskNode(piece));
     if (!sessions.some((value) => value.session.id === this.selectedId)) this.selectedId = null;
     if (!this.selection || !calendar.days.some((day) => day.date === this.selection.date)) {
       const day = calendar.days.find((day) => day.date === today && !day.skipped) || calendar.days.find((day) => !day.skipped);
@@ -144,7 +155,8 @@ export class WeekCalendar {
       this.scrollWeek = key;this.scroll.scrollTop = Math.max(0, calendar.rows.indexOf('07:00/0') * ROW_HEIGHT);
     }
     if (focus) {
-      const target = [...this.grid.querySelectorAll('[data-session-id],[data-activity-id],.calendar-day')].find((value) =>
+      const target = [...this.grid.querySelectorAll('[data-session-id],button[data-activity-id],[data-calendar-event-key],.calendar-day')].find((value) =>
+      focus.planned?value.dataset.calendarEventKey===focus.planned&&value.dataset.calendarSubscriptionId===focus.subscription:
       focus.session ? value.dataset.sessionId === focus.session && value.dataset.edge === focus.edge && value.dataset.date === focus.day && value.classList.contains('calendar-session-select') === focus.select : focus.activity ? value.dataset.activityId === focus.activity : focus.day && value.classList.contains('calendar-day') && value.dataset.date === focus.day);
       const fallback = focus.session ? [...this.grid.querySelectorAll('[data-session-id]')].find((value) => value.dataset.sessionId === focus.session && value.dataset.edge === focus.edge && value.classList.contains('calendar-session-select') === focus.select) : null;
       (target || fallback)?.focus({ preventScroll: true });
@@ -194,18 +206,26 @@ export class WeekCalendar {
     }return bar;
   }
   taskNode(piece) {
-    const block = piece.block,task = this.data.tasks.find((value) => value.id === block.taskId),card = node('article', undefined, 'calendar-event calendar-task');
-    this.bounds(card, piece, 'task');card.dataset.taskId = block.taskId || '';card.dataset.date = piece.date;
-    const title = node('h3');title.append(task ? this.callbacks.taskLabel(task) : node('span', block.activities[0].summary || i18nText("ui.unassigned_activity")));title.title = title.textContent;card.append(title);
-    const list = node('ul');
-    for (const activity of block.activities.filter((value) => instantNanos(value.start) < piece.end && (instantNanos(value.end || this.data.report.generatedAt) > piece.start || value.start === value.end && instantNanos(value.start) >= piece.start))) {
-      const item = node('li'),edit = button(activity.summary || i18nText("ui.activity"), () => this.callbacks.onEditActivity(activity.id));
-      item.title = `${activity.summary || i18nText("ui.activity")} · ${instantText(activity.start, this.calendar.zone)} → ${instantText(activity.end, this.calendar.zone)}`;
-      edit.dataset.activityId = activity.id;edit.disabled = !this.connected;
-      edit.setAttribute('aria-label', i18nText("ui.edit_activity", { value0: activity.summary || i18nText("ui.activity") }));
-      item.append(edit, node('small', `${this.clock(activity.start)} – ${activity.end ? this.clock(activity.end) : i18nText("ui.running")}`));list.append(item);
-    }
-    card.append(list);return card;
+    const activity=piece.block.activities[0],task=this.data.tasks.find(value=>value.id===activity.taskId),source=this.plans?.sources?.[activity.id];
+    const card=node('article',undefined,'calendar-event calendar-task');this.bounds(card,piece,'task');card.dataset.taskId=activity.taskId||'';card.dataset.date=piece.date;card.dataset.calendarActivityId=activity.id;
+    if(task){card.classList.add('has-task');const heading=node('h3',undefined,'calendar-activity-task');heading.append(this.callbacks.taskLabel(task));card.append(heading);}
+    const edit=button('',()=>this.callbacks.onEditActivity(activity.id),'btn btn-link calendar-activity-select');edit.dataset.activityId=activity.id;edit.disabled=!this.connected;
+    edit.setAttribute('aria-label',i18nText('ui.edit_activity',{value0:activity.summary||i18nText('ui.activity')}));
+    edit.append(node('small',i18nText('calendar.recorded'),'calendar-recorded-marker'),node('strong',activity.summary||i18nText('ui.unassigned_activity')),node('small',`${this.clock(activity.start)} – ${activity.end?this.clock(activity.end):i18nText('ui.running')}`));
+    const start=instantNanos(activity.start),end=instantNanos(activity.end||this.data.report.generatedAt);
+    const overlapping=this.data.workSessions.filter(session=>instantNanos(session.start)<end&&instantNanos(session.end||this.data.report.generatedAt)>start);
+    const context=overlapping.length?i18nText('calendar.overlaps',{sessions:overlapping.map(session=>session.summary||this.data.clients.find(client=>client.id===session.clientId)?.name||i18nText('ui.work_session')).join(' · ')}):i18nText('calendar.independent');
+    if(source)edit.append(node('small',i18nText('calendar.from_source',{calendar:source.calendarName}),'calendar-activity-source'));
+    edit.append(node('small',context,'calendar-activity-context'));
+    const description=[activity.summary,instantText(activity.start,this.calendar.zone),instantText(activity.end,this.calendar.zone),source?.clientName,source?.calendarName,context].filter(Boolean).join(' · ');
+    const accessible=node('span',description,'visually-hidden');accessible.id=`calendar-activity-description-${activity.id}-${piece.date}`;edit.setAttribute('aria-describedby',accessible.id);edit.title=description;card.title=description;card.append(edit,accessible);return card;
+  }
+  plannedNode(piece) {
+    const event=piece.planned,value=button('',()=>this.subscriptions.openEvent(event,piece.date),'btn calendar-event calendar-planned');this.bounds(value,piece,'task');
+    value.dataset.calendarEventKey=event.key;value.dataset.calendarSubscriptionId=event.subscriptionId;value.dataset.date=piece.date;
+    const colors=clientColors(event.color);value.style.backgroundColor=colors.background;value.style.color=colors.foreground;value.style.borderColor=colors.foreground;
+    value.setAttribute('aria-haspopup','dialog');value.setAttribute('aria-label',i18nText('calendar.event_label',{title:event.title||i18nText('calendar.untitled'),calendar:event.calendarName,client:event.clientName,interval:this.subscriptions.eventDate(event)}));
+    value.title=value.getAttribute('aria-label');value.append(icon('calendar-event'),node('small',i18nText('calendar.planned')),node('strong',event.title||i18nText('calendar.untitled')),node('span',event.clientName+' · '+event.calendarName));return value;
   }
   select(date, row) {this.selection = { date, row };this.paintSelection();this.buttons();}
   selectSession(session, date, row) {this.selectedId = session.id;this.select(date, row);this.text('');}
@@ -254,7 +274,7 @@ export class WeekCalendar {
   }
   key(event) {
     if (event.key === "Escape" && this.drag) {event.preventDefault();this.cancelDrag();this.setRangeMode(false);this.text(i18nText("ui.time_selection_cancelled"));return;}
-    if (!this.data || event.target.closest('input,select,textarea,a') || document.querySelector('#editor').open) return;
+    if (!this.data || event.target.closest('input,select,textarea,a,[data-calendar-event-key],button[data-activity-id],.calendar-subscriptions') || document.querySelector('dialog[open]')) return;
     const command = event.ctrlKey || event.metaKey;
     if (command && event.key.toLowerCase() === 'c' && !window.getSelection()?.toString() && this.selected()) {event.preventDefault();this.copy();return;}
     if (command && event.key.toLowerCase() === 'v' && this.clipboard) {event.preventDefault();this.paste();return;}

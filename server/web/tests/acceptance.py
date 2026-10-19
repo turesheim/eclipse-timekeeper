@@ -54,7 +54,7 @@ def main():
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0)); port = sock.getsockname()[1]
         backend = f'http://127.0.0.1:{port}'
-        fixture = RecoveryFixture(data,port,https=args.https,mail=args.mail,hostname='localhost' if args.passkeys else '127.0.0.1')
+        fixture = RecoveryFixture(data,port,https=args.https,mail=args.mail,hostname='localhost' if args.passkeys else '127.0.0.1',calendars=True)
         base = fixture.base
         environment = {**os.environ, 'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:' + str(data / 'database'), 'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry), 'TIMEKEEPER_SERVER_SETUP_FILE':str(data / 'setup.json'),
                        'TIMEKEEPER_PUBLIC_ORIGIN':base if args.https else 'NONE', 'TIMEKEEPER_DEPLOYED_AT':'2026-10-13T08:30:00Z', 'TIMEKEEPER_WEB_BUILD_COMMIT':manifest['commit'], 'TIMEKEEPER_SPK_VERSION':'1.99.0-146', **fixture.environment}
