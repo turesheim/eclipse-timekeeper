@@ -205,6 +205,7 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .track-date-row { display: flex; align-items: center; gap: .2rem; min-width: 0; min-height: 2.75rem; margin-bottom: .25rem; }
 .track-date { display: inline-grid; place-items: center; flex: none; width: 1.75rem; height: 1.75rem; font-size: .85rem; }
 .track-today { background: var(--accent); color: white; border-radius: 50%; font-weight: 700; }
+.track-day.track-public-holiday { background: var(--holiday-bg); }
 .track-public-holiday { --track-holiday-color: var(--bs-danger-text-emphasis); }
 :root[data-bs-theme=dark] .track-public-holiday { --track-holiday-color: color-mix(in srgb, var(--bs-danger-text-emphasis) 60%, var(--bs-body-color)); }
 .track-public-holiday .track-date { color: var(--track-holiday-color); font-weight: 700; }

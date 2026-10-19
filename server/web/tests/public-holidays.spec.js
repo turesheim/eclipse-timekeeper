@@ -45,6 +45,65 @@ async function seed(api) {
 }
 const holiday=(page,date)=>page.locator(`[data-track-holiday-date="${date}"]`);
 
+test('public holiday highlights stay subtle and consistent in Track and Calendar in every theme',async({browser,request})=>{
+  test.setTimeout(90000);
+  const user=await fresh(request),session=await context(browser),page=await session.newPage();
+  try {
+    await signIn(page,user);const api=await ownApi(page),record=await seed(api);
+    await page.reload();await trackingReady(page);await page.locator('#track-month').fill('2026-05');
+    const track=page.locator('[data-track-date="2026-05-17"]'),ordinary=page.locator('[data-track-date="2026-05-18"]');
+    const column=page.locator('.calendar-day[data-date="2026-05-17"]'),header=page.locator('.calendar-heading[data-date="2026-05-17"]');
+    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']) {
+      await page.locator('[data-tab=track]').click();await expect(track).toHaveClass(/track-public-holiday/);
+      await page.locator('#account-menu > summary').click();await page.locator('#theme').selectOption(theme);await page.locator('#account-menu > summary').click();
+      const tint=await track.evaluate(node=>getComputedStyle(node).backgroundColor);
+      expect(tint).not.toBe(await ordinary.evaluate(node=>getComputedStyle(node).backgroundColor));
+      await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill('2026-05-17');
+      await expect(column).toHaveClass(/public-holiday/);await expect(header).toContainText('Grunnlovsdagen');
+      await expect.poll(()=>header.evaluate(node=>{
+        const label=node.querySelector('.calendar-holiday-name');if(!node.isConnected||!label)return false;
+        const text=label.getBoundingClientRect(),heading=node.getBoundingClientRect();return text.y>=heading.y&&text.bottom<=heading.bottom;
+      })).toBe(true);
+      await expect(column).toHaveAttribute('aria-label',/Grunnlovsdagen/);await expect(header).toHaveAttribute('title','Grunnlovsdagen');
+      await expect.poll(()=>column.evaluate(node=>getComputedStyle(node).backgroundColor)).toBe(tint);
+      await expect.poll(()=>header.evaluate(node=>getComputedStyle(node).backgroundColor)).toBe(tint);
+      expect(await page.locator('.calendar-day[data-date="2026-05-16"]').evaluate(node=>getComputedStyle(node).backgroundColor)).not.toBe(tint);
+      const audit=await new AxeBuilder({page}).include('#calendar-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>({id:value.id,nodes:value.nodes.map(node=>node.target)}))).toEqual([]);
+      if(theme==='solarized-dark'||theme==='timekeeper') {
+        await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:`test-results/holiday-calendar-${theme}.png`,fullPage:true});
+        await page.locator('[data-tab=track]').click();await page.screenshot({path:`test-results/holiday-track-${theme}.png`,fullPage:true});
+      }
+    }
+    await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill('2026-05-04');
+    await expect(page.locator('.calendar-day.public-holiday')).toHaveCount(0);
+    await page.locator('#calendar-date').fill('2026-05-17');await expect(column).toHaveClass(/public-holiday/);
+    await page.locator('#calendar-date').fill('2025-12-29');await expect(page.locator('.calendar-heading[data-date="2026-01-01"]')).toContainText('Første nyttårsdag');
+    expect((await(await api('GET','/work-sessions/'+record.id)).json())).toEqual(record);
+    await page.locator('#account-menu > summary').click();await page.locator('#sign-out').click();
+    await expect(page.locator('#calendar-grid')).toBeEmpty();await expect(page.locator('.calendar-day.public-holiday')).toHaveCount(0);
+  } finally {await session.close();}
+});
+
+test('Calendar respects a separate holiday country, browser default and disabled holidays',async({browser,request})=>{
+  const user=await fresh(request),session=await context(browser),page=await session.newPage();let country='NO';
+  try {
+    await signIn(page,user);const api=await ownApi(page),work=await seed(api);await preference(api,{locale:'en-US'});
+    // Exercise the additive profile field from #380 without requiring its API
+    // changes in this independent highlighting PR.
+    await page.route('**/api/v1/me',async route=>{
+      if(route.request().method()!=='GET'){await route.continue();return;}
+      const response=await route.fetch();await route.fulfill({response,json:{...await response.json(),holidayCountry:country}});
+    });
+    await page.reload();await trackingReady(page);await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill('2026-05-17');
+    const header=page.locator('.calendar-heading[data-date="2026-05-17"]');await expect(header).toContainText('Constitution Day');await expect(page.locator('html')).toHaveAttribute('lang','en-US');
+    country='US';await page.locator('#refresh').click();await trackingReady(page);await expect(header).not.toHaveClass(/public-holiday/);
+    await page.locator('#calendar-date').fill('2026-07-04');await expect(page.locator('.calendar-heading[data-date="2026-07-04"]')).toContainText('Independence Day');
+    country='none';await page.locator('#refresh').click();await trackingReady(page);await expect(page.locator('.calendar-day.public-holiday')).toHaveCount(0);await expect(page.locator('.calendar-holiday-name')).toHaveCount(0);
+    country=null;await page.locator('#refresh').click();await trackingReady(page);await page.locator('#calendar-date').fill('2026-05-17');await expect(header).toContainText('Constitution Day');
+    expect(await(await api('GET','/work-sessions/'+work.id)).json()).toEqual(work);
+  } finally {await session.close();}
+});
+
 test('public holidays follow Norway civil dates and keep recorded work editable and unchanged',async({browser,request})=>{
   const user=await fresh(request),session=await context(browser);const page=await session.newPage();
   let releaseEngine=()=>{};await page.addInitScript(()=>{window.holidayPolicyViolations=[];document.addEventListener('securitypolicyviolation',event=>window.holidayPolicyViolations.push({directive:event.violatedDirective,source:event.sourceFile,line:event.lineNumber,sample:event.sample,blocked:event.blockedURI}));});

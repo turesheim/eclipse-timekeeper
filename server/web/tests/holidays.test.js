@@ -2,9 +2,16 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {holidayRegion,publicHolidayCalendar,selectedHolidayCountry} from '../src/holidays.js';
 import {monthCalendar,monthSessions} from '../src/month-model.js';
+import {calendarWeek} from '../src/calendar-model.js';
 
 const holidays=(month,locale,zone='UTC')=>publicHolidayCalendar(monthCalendar(month,zone),locale);
 
+test('weekly calendars highlight only visible civil dates across month and year boundaries',async()=>{
+  const calendar=calendarWeek('2025-12-29','America/Los_Angeles');
+  const result=await publicHolidayCalendar({month:calendar.first.slice(0,7),days:calendar.days},'nb-NO');
+  assert.deepEqual([...result.days.keys()],['2026-01-01']);
+  assert.equal(result.days.get('2026-01-01')[0].name,'Første nyttårsdag');
+});
 test('holiday country follows the locale region, including browser regions outside the saved choices',()=>{
   for(const [locale,country] of [['nb-NO','NO'],['nn-NO','NO'],['en-NO','NO'],['en-GB','GB'],['en-US','US'],['en-AU','AU'],['en','US']])assert.equal(holidayRegion(locale),country);
   assert.equal(holidayRegion('en-001'),null);assert.equal(holidayRegion('en-ZZ'),null);assert.equal(holidayRegion('invalid_locale'),null);
