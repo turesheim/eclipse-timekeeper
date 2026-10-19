@@ -11,6 +11,12 @@ permissions:
   contents: read
   actions: read
 
+# PR updates supersede the whole run. Main jobs cancel only when replacement
+# code validation starts, so docs-only pushes leave in-flight code builds intact.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   Changes:
     name: Select validation jobs
@@ -43,6 +49,9 @@ jobs:
   Server:
     needs: Changes
     if: needs.Changes.outputs.code == 'true'
+    concurrency:
+      group: build-server-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref || github.run_id }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -85,6 +94,9 @@ jobs:
 
   Web:
     needs: Server
+    concurrency:
+      group: build-web-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref || github.run_id }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -125,6 +137,9 @@ jobs:
   Remote-Eclipse:
     name: Installed client tests
     needs: Server
+    concurrency:
+      group: build-installed-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref || github.run_id }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -236,6 +251,9 @@ jobs:
   Build:
     needs: Changes
     if: needs.Changes.outputs.code == 'true'
+    concurrency:
+      group: build-platform-${{ matrix.os }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref || github.run_id }}
+      cancel-in-progress: true
     strategy:
       fail-fast: false
       matrix:
