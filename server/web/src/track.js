@@ -143,7 +143,7 @@ export class MonthTrack {
         const date = node('time', String(Number(day.date.slice(-2))), 'track-date');date.dateTime = day.date;
         date.title = new Intl.DateTimeFormat(getLocale(), { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(day.date + 'T12:00:00Z'));
         if (day.date === today) {date.classList.add('track-today');date.setAttribute('aria-current', 'date');}
-        cell.append(date);week.append(cell);
+        const heading=node('div',undefined,'track-date-row');heading.append(date);cell.append(heading);week.append(cell);
         const entries = [...day.clients.values()].sort((a, b) => {
           const name = (id) => clientsById.get(id)?.name || i18nText("ui.client");
           return name(a.clientId).localeCompare(name(b.clientId),getLocale()) || a.clientId.localeCompare(b.clientId);

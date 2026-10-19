@@ -202,13 +202,17 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .track-month th { text-align: center; padding: .65rem .25rem; color: var(--muted); font-size: .85rem; }
 .track-day { height: 8rem; vertical-align: top; border: 1px solid var(--line); padding: .35rem; }
 .track-outside { background: var(--bs-tertiary-bg); color: var(--muted); }
-.track-date { display: inline-grid; place-items: center; width: 1.75rem; height: 1.75rem; font-size: .85rem; margin-bottom: .25rem; }
+.track-date-row { display: flex; align-items: center; gap: .2rem; min-width: 0; min-height: 2.75rem; margin-bottom: .25rem; }
+.track-date { display: inline-grid; place-items: center; flex: none; width: 1.75rem; height: 1.75rem; font-size: .85rem; }
 .track-today { background: var(--accent); color: white; border-radius: 50%; font-weight: 700; }
 .track-day.track-public-holiday { background: var(--holiday-bg); }
-.track-public-holiday > .track-date:not(.track-today) { color: var(--holiday-color); font-weight: 700; border-bottom: 2px solid currentColor; }
-.track-holiday-label { --bs-link-color: var(--holiday-color); --bs-link-hover-color: var(--holiday-color); display: flex; align-items: center; gap: .2rem; width: 100%; min-width: 0; max-width: 100%; margin-bottom: .25rem; padding: .1rem 0; text-align: left; color: var(--holiday-color); font-size: .72rem; }
+.track-public-holiday { --track-holiday-color: var(--bs-danger-text-emphasis); }
+:root[data-bs-theme=dark] .track-public-holiday { --track-holiday-color: color-mix(in srgb, var(--bs-danger-text-emphasis) 60%, var(--bs-body-color)); }
+.track-public-holiday .track-date { color: var(--track-holiday-color); font-weight: 700; }
+.track-public-holiday .track-today { background: var(--bs-danger-bg-subtle); }
+.track-holiday-label { display: flex; align-items: center; gap: .2rem; flex: 1; min-width: 0; max-width: 100%; padding: .1rem 0; border: 0; text-align: left; color: var(--track-holiday-color); font-size: .72rem; font-weight: 600; text-decoration: none; }
+.track-holiday-label:is(:hover,:active,:focus-visible) { color: var(--track-holiday-color); text-decoration: none; }
 .track-holiday-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.track-holiday-label .icon { flex: none; }
 .track-holiday-status { margin-top: .75rem; }
 .track-holiday-status a { color: var(--accent); }
 .track-client-day { display: flex; flex-direction: column; width: 100%; min-height: 2.75rem; text-align: left; padding: .3rem .4rem; margin-bottom: .3rem; border: 1px solid var(--line); border-inline-start: 4px solid var(--client-color, var(--accent)); border-radius: .3rem; background: var(--bs-body-bg); color: var(--bs-body-color); font-size: .8rem; }

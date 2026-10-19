@@ -3,7 +3,7 @@ import { t as i18nText } from "./i18n.js";import { addDays, dateInZone, instantN
 import { calendarWeek, calendarPieces, calendarAnchor, calendarRange, calendarLanes, shiftSession, shiftSessionDays, pasteSession, clientColors, CALENDAR_STEP } from './calendar-model.js';
 import { icon, iconButton } from './icons.js';
 import {CalendarSubscriptions} from './calendar-subscriptions.js';
-import {publicHolidayCalendar} from './holidays.js';
+import {publicHolidayCalendar,holidayRegion,selectedHolidayCountry} from './holidays.js';
 
 const ROW_HEIGHT = 16;
 function node(tag, text, className) {
@@ -166,11 +166,14 @@ export class WeekCalendar {
     }
   }
   paintHolidays() {
-    const key=this.calendar.first+'|'+getLocale();
+    // Older servers omit the setting; null explicitly follows the browser region.
+    const preference=this.data.profile.data.holidayCountry;
+    const country=preference===undefined?holidayRegion(getLocale()):selectedHolidayCountry(preference);
+    const key=this.calendar.first+'|'+getLocale()+'|'+country;
     if(this.holidayKey!==key) {
       this.holidayKey=key;this.holidayData=null;
       const generation=this.holidayGeneration=(this.holidayGeneration||0)+1;
-      void publicHolidayCalendar({month:this.calendar.first.slice(0,7),days:this.calendar.days},getLocale()).then(data=>{
+      void publicHolidayCalendar({month:this.calendar.first.slice(0,7),days:this.calendar.days},getLocale(),country).then(data=>{
         if(generation!==this.holidayGeneration||!this.data)return;
         this.holidayData=data;if(!this.root.hidden)this.applyHolidays();
       }).catch(()=>{if(generation===this.holidayGeneration)this.holidayKey=null;});

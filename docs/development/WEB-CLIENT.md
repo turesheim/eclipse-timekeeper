@@ -122,24 +122,26 @@ Los Angeles time while the account uses Oslo time.
 
 ## Public holidays
 
-Track and Calendar mark national public holidays for the country in the selected
-language and region. With the browser default, the browser locale supplies the country;
+Track marks national public holidays for the country in the selected language
+and region. With the browser default, the browser locale supplies the country;
 otherwise the language saved in My Account takes precedence. For example,
 Norwegian Bokmål shows Norway, English (United Kingdom) shows the UK and English
 (United States) shows US holidays. The account time zone still controls recorded
-work; it never moves a holiday to a different civil date. Holiday dates have a faint
-red background in every theme, including weekend holidays. Calendar also shows the
-holiday name in the day header; today's marker remains visible.
+work; it never moves a holiday to a different civil date.
 
-In Track, select a holiday name or its calendar icon to read the full date and all names
+Holiday names appear directly beside the date, with both highlighted in red and
+no icon or underline. Select the date or holiday name to read the full date and all names
 for that day. This also works with read-only access. On narrow screens the names
 are shortened visually; the dialog, hover title and accessible name retain them.
 Holiday information does not change sessions, totals or editing permissions.
+Holiday dates have a faint red background in Track and Calendar in every theme,
+including weekend holidays. Calendar headers show the holiday name and preserve
+today’s marker.
 
 The locally bundled [date-holidays](https://github.com/commenthol/date-holidays)
 3.37.0 dataset (2026-09-20) supplies national defaults. Regional and municipal
 holidays can differ; subdivision calendars, optional holidays and observances are
-not included. Track shows an explicit message for unsupported regions and years before 0100.
+not included. Unsupported regions and years before 0100 show an explicit message.
 The engine loads when either view needs it, without requesting an external calendar.
 A failed load offers Retry and preserves open session drafts. Data attribution
 and the complete upstream license are available through the link below the grid.
