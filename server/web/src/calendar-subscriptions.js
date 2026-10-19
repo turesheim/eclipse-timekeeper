@@ -78,7 +78,7 @@ export class CalendarSubscriptions {
       const error=value.lastError||this.errors?.[value.id];if(error)status.append(node('span',calendarFailure(error),'error'));
       else if(value.lastAttempt&&(!value.lastSuccess||Date.parse(value.lastAttempt)>Date.parse(value.lastSuccess))&&Date.now()-Date.parse(value.lastAttempt)<90000)status.append(node('span',t('calendar.refreshing')));
       const actions=node('div',undefined,'calendar-subscription-actions');
-      for(const [action,glyph,key,operation]of [['refresh','arrow-clockwise','calendar.refresh_name',()=>this.refresh(value)],['edit','pencil-square','calendar.edit_name',()=>this.edit(value.id)],['delete','trash','calendar.remove_name',()=>this.edit(value.id,true)]]) {
+      for(const [action,glyph,key,operation]of [['refresh','refresh','calendar.refresh_name',()=>this.refresh(value)],['edit','edit','calendar.edit_name',()=>this.edit(value.id)],['delete','trash','calendar.remove_name',()=>this.edit(value.id,true)]]) {
         const control=button('',()=>this.run(operation),action==='delete'?'btn btn-outline-danger':'btn btn-outline-secondary');iconButton(control,glyph,t(key,{name:value.name}));control.disabled=!this.writable||this.busy.has(value.id);control.dataset.calendarAction=action+':'+value.id;actions.append(control);
       }
       row.append(label,status,actions);this.list.append(row);
@@ -143,7 +143,7 @@ export class CalendarSubscriptions {
   paintAllDay() {
     const active=document.activeElement,key=this.allDay.contains(active)?active.dataset.calendarEventKey:null,values=this.events.filter(value=>value.allDay);this.allDay.replaceChildren();this.allDay.hidden=!values.length;
     if(!values.length)return;const title=node('h3',t('calendar.all_day_plans'));title.id='calendar-all-day-title';this.allDay.append(title);
-    for(const value of values){const pick=button('',()=>this.openEvent(value),'btn btn-outline-secondary calendar-all-day-event');pick.dataset.calendarEventKey=value.key;pick.dataset.calendarSubscriptionId=value.subscriptionId;pick.style.borderLeftColor=value.color;pick.append(icon('calendar-event'),node('strong',value.title||t('calendar.untitled')),node('span',this.eventDate(value)),node('small',value.clientName+' · '+value.calendarName));this.allDay.append(pick);}
+    for(const value of values){const pick=button('',()=>this.openEvent(value),'btn btn-outline-secondary calendar-all-day-event');pick.dataset.calendarEventKey=value.key;pick.dataset.calendarSubscriptionId=value.subscriptionId;pick.style.borderLeftColor=value.color;pick.append(icon('calendar-day'),node('strong',value.title||t('calendar.untitled')),node('span',this.eventDate(value)),node('small',value.clientName+' · '+value.calendarName));this.allDay.append(pick);}
     if(key&&document.activeElement===document.body)this.allDay.querySelector(`[data-calendar-event-key="${key}"]`)?.focus();
   }
   openEvent(event,date=null) {

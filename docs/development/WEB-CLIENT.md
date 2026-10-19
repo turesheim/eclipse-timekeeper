@@ -73,9 +73,9 @@ recovery, hostname changes and protected backup behavior.
 
 ![Passkey management on a narrow screen](../assets/screenshots/passkeys-mobile.png)
 
-Bootstrap Icons 1.13.2 supplies locally bundled icons for navigation, tree
+Font Awesome Free 7.3.1 supplies locally bundled solid icons for navigation, tree
 controls, action buttons and projects. Buttons retain accessible names and hover
-titles; CSS, fonts and the MIT license are included in the server distribution.
+titles; the font and upstream licenses are included in the server distribution.
 Run `npm run vendor:icons` in `server/web` to regenerate the pinned assets,
 project catalog and API allow-list. `npm run check:assets` verifies them.
 
@@ -601,10 +601,11 @@ select an optional icon from the bundled picker, or choose **None** to remove it
 Icons also appear beside project names in Workweek and beside daily durations
 in Track. They are retained in account downloads and JSON/CSV transfers.
 
-The project icon picker offers 2,078 bundled Bootstrap Icons. Search by
+The project icon picker offers 1,424 bundled Font Awesome Free solid icons. Search by
 name or keyword across the entire catalog, including icons not yet shown, or
 choose **More icons** to browse. Filtering preserves the
-current selection; **None** removes an icon. Icons work offline.
+current selection; **None** removes an icon. Sports symbols include basketball,
+football/soccer, baseball, volleyball, golf and table tennis. Icons work offline.
 
 ![Optional project icon picker](../assets/screenshots/project-icon-picker.png)
 

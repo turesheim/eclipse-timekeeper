@@ -84,11 +84,11 @@ class ContractTest(unittest.TestCase):
             self.assertNotIn('locale', CONTRACT['components']['schemas'][schema].get('required', []))
 
     def test_optional_project_icons_are_bounded_metadata(self):
-        for icon in ('code', 'globe', 'hammer', 'rocket', 'airplane-engines', 'calendar3', 'phone', None):
+        for icon in ('code', 'globe', 'hammer', 'rocket', 'basketball', 'futbol', 'baseball', 'volleyball', 'football', 'golf-ball-tee', 'table-tennis-paddle-ball', 'gavel', 'dragon', 'phone', None):
             validator('ProjectInput').validate({'name': 'Project', 'icon': icon})
             validator('TransferProject').validate({'id': ID, 'name': 'Project', 'icon': icon})
         validator('ProjectInput').validate({'name': 'Earlier client'})
-        for icon in ('', 'unknown', 'gavel', 'mobile', 'chart', 'dragon', '<svg onload=alert(1)>', 'https://example.invalid/icon.svg', 1, {}, []):
+        for icon in ('', 'unknown', 'airplane-engines', 'calendar3', '<svg onload=alert(1)>', 'https://example.invalid/icon.svg', 1, {}, []):
             self.assertFalse(validator('ProjectInput').is_valid({'name': 'Project', 'icon': icon}))
 
     def test_atomic_provider_linking_is_available_at_task_creation(self):

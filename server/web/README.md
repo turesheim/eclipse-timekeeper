@@ -4,11 +4,11 @@
 `tests/` contains unit, browser and installed-Eclipse peer tests.
 Production uses native browser modules and requires no separate Node service.
 
-Bootstrap CSS and Bootstrap Icons are pinned and bundled under `src/assets`.
+Bootstrap CSS and Font Awesome Free solid icons are pinned and bundled under `src/assets`.
 `npm run check:assets` verifies their generated files against the lockfile;
 `npm run vendor:bootstrap` and `npm run vendor:icons` regenerate them after an
 intentional dependency update. The icon command also updates the project catalog
-and API allow-list from Bootstrap icon names.
+and API allow-list from Font Awesome metadata.
 No Bootstrap JavaScript or third-party runtime asset requests are needed.
 
 i18next 26.5.2 and its license are also bundled locally. English and Norwegian

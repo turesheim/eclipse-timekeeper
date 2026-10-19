@@ -225,7 +225,7 @@ export class WeekCalendar {
     value.dataset.calendarEventKey=event.key;value.dataset.calendarSubscriptionId=event.subscriptionId;value.dataset.date=piece.date;
     const colors=clientColors(event.color);value.style.backgroundColor=colors.background;value.style.color=colors.foreground;value.style.borderColor=colors.foreground;
     value.setAttribute('aria-haspopup','dialog');value.setAttribute('aria-label',i18nText('calendar.event_label',{title:event.title||i18nText('calendar.untitled'),calendar:event.calendarName,client:event.clientName,interval:this.subscriptions.eventDate(event)}));
-    value.title=value.getAttribute('aria-label');value.append(icon('calendar-event'),node('small',i18nText('calendar.planned')),node('strong',event.title||i18nText('calendar.untitled')),node('span',event.clientName+' · '+event.calendarName));return value;
+    value.title=value.getAttribute('aria-label');value.append(icon('calendar-day'),node('small',i18nText('calendar.planned')),node('strong',event.title||i18nText('calendar.untitled')),node('span',event.clientName+' · '+event.calendarName));return value;
   }
   select(date, row) {this.selection = { date, row };this.paintSelection();this.buttons();}
   selectSession(session, date, row) {this.selectedId = session.id;this.select(date, row);this.text('');}
