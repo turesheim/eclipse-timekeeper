@@ -3,6 +3,7 @@ Bundle-ManifestVersion: 2
 Bundle-Name: Timekeeper installed remote acceptance tests
 Bundle-SymbolicName: net.resheim.eclipse.timekeeper.remote-test;singleton:=true
 Bundle-Version: 2.0.0.qualifier
+Bundle-License: EPL-2.0;link="https://www.eclipse.org/legal/epl-2.0/"
 Bundle-RequiredExecutionEnvironment: JavaSE-21
 Bundle-ActivationPolicy: lazy
 Require-Bundle: org.eclipse.swtbot.go,

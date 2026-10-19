@@ -130,3 +130,7 @@ The root Maven build runs Eclipse UI tests and needs a graphical session or Xvfb
 on Linux. Use `mvnw.cmd` on Windows. See the [repository guide](docs/development/REPOSITORY.md)
 for focused and installed-client checks, [API v1](docs/architecture/API-V1.md) for
 the contract, and [release instructions](docs/development/RELEASING.md) for packaging.
+
+## License
+
+Timekeeper is licensed under the [Eclipse Public License 2.0](LICENSE).

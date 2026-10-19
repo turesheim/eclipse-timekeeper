@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <feature id="net.resheim.eclipse.timekeeper.mylyn.feature" label="Timekeeper Mylyn integration" version="2.0.0.qualifier" provider-name="Torkild U. Resheim">
  <description>Optional Mylyn task activation, metadata and Task List integration for Timekeeper.</description>
- <license url="https://www.eclipse.org/legal/epl-v10.html">Eclipse Public License v1.0</license>
+ <license url="https://www.eclipse.org/legal/epl-2.0/">Eclipse Public License v2.0</license>
  <requires>
   <import feature="net.resheim.eclipse.timekeeper" version="2.0.0" match="compatible"/>
   <import feature="org.eclipse.mylyn.tasks.feature" version="4.12.0" match="compatible"/>
