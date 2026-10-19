@@ -6,7 +6,7 @@ const base=()=>process.env.TIMEKEEPER_WEB_URL;
 async function fresh(request,administrator=false) {
   const username='locale-'+randomUUID().slice(0,8),password='Independent locale preference passphrase';
   const response=await request.post('/api/v1/admin/users',{headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},data:{username,password,displayName:'Locale tester',email:username+'@example.org',administrator}});
-  expect(response.status()).toBe(201);return {username,password};
+  expect(response.status()).toBe(201);return {...(await response.json()).user,password};
 }
 async function context(browser,locale) {return browser.newContext({baseURL:base(),ignoreHTTPSErrors:true,locale});}
 async function login(page,user) {
@@ -81,7 +81,11 @@ test('Norwegian administration and workspace navigation retain accessible narrow
       await expect(page.locator('#workspace')).not.toContainText(/\b(?:ui\.|count\.|record\.)[a-z_]+/);
     }
     await page.goto('/admin/');await expect(page.getByRole('heading',{name:'Generelle innstillinger',exact:true})).toBeVisible();
-    await expect(page.locator('#account-content')).toContainText('Lagrede innstillinger er aktive.');
+    const settings=await browserRequest(page).get('/api/v1/admin/settings');expect(settings.status()).toBe(200);
+    const status=(await settings.json()).restartRequired
+      ? 'Endringene er lagret. Start Timekeeper på nytt på alle serverinstanser for å ta dem i bruk. Nettleserøkter logges ut.'
+      : 'Lagrede innstillinger er aktive.';
+    await expect(page.locator('#account-content [role=status]').first()).toHaveText(status);
     await page.setViewportSize({width:390,height:844});
     for(const name of ['Brukere','Generelle innstillinger']) {
       await page.getByRole('link',{name,exact:true}).click();await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');
@@ -89,7 +93,16 @@ test('Norwegian administration and workspace navigation retain accessible narrow
       const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
     }
     await page.screenshot({path:'test-results/locale-norwegian-administration.png',fullPage:true});
-  } finally {await session.close();}
+  } finally {
+    await session.close();
+    // Other scenarios exercise the last-administrator guard. Retire this
+    // temporary administrator even if an assertion above fails.
+    const path='/api/v1/admin/users/'+Buffer.from(user.ownerId).toString('base64url');
+    const headers={Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`};
+    const loaded=await request.get(path,{headers});expect(loaded.status()).toBe(200);
+    const retired=await request.put(path,{headers:{...headers,'If-Match':loaded.headers().etag},data:{username:user.username,displayName:user.displayName,enabled:false,administrator:false}});
+    expect(retired.status()).toBe(200);
+  }
 });
 test('a stale language save preserves the choice and reports the conflict in the current language',async({browser,request})=>{
   const user=await fresh(request),session=await context(browser,'nb-NO');
