@@ -487,13 +487,6 @@ name or keyword across the entire catalog, including icons not yet shown, or
 choose **More icons** to browse. Filtering preserves the
 current selection; **None** removes an icon. Icons work offline.
 
-Previously stored project icon identifiers remain valid in the API, downloads
-and transfers. Legacy names render with a corresponding Bootstrap icon or a
-related icon from the same family. Where no equivalent is available, a neutral
-question-circle is shown. Editing a project preserves its stored identifier
-until the user explicitly selects another icon or **None**; new selections use
-Bootstrap icon names.
-
 ![Optional project icon picker](../assets/screenshots/project-icon-picker.png)
 
 ![Project icons beside Track durations](../assets/screenshots/track-project-icons.png)
