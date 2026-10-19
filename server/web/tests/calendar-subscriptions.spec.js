@@ -1,3 +1,4 @@
+import {setTheme} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -160,12 +161,12 @@ test('calendar subscriptions and event dialogs fit narrow screens and remain acc
     await calendar(page);const feed=await provider(request,[meeting,'UID:all-day-layout\nDTSTART;VALUE=DATE:20260504\nDTEND;VALUE=DATE:20260506\nSUMMARY:Conference']),subscription=await subscribe(page,client,feed);await expect(planned(page,subscription)).toHaveCount(1);
     const profile=await api('GET','/me');await api('PUT','/me',{zoneId:'Europe/Oslo',locale:'nb-NO'},{'If-Match':profile.headers().etag});await page.reload();await ready(page);await calendar(page);await expect(planned(page,subscription)).toContainText('Planlagt');await page.setViewportSize({width:390,height:844});await expand(page);
     for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-      await page.locator('#account-menu > summary').click();await page.locator('#theme').selectOption(theme);await page.locator('#account-menu > summary').click();
+      await setTheme(page,theme);
       const month=await new AxeBuilder({page}).include('#calendar-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(month.violations.map(value=>({id:value.id,nodes:value.nodes.map(node=>node.target)}))).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
       await planned(page,subscription).click();const event=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(event.violations.map(value=>({id:value.id,nodes:value.nodes.map(node=>node.target)}))).toEqual([]);await page.keyboard.press('Escape');
       await page.locator(`[data-calendar-action="edit:${subscription.id}"]`).click();await expect(page.locator('#calendar-subscription-editor input[name=url]')).toHaveValue('');const edit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(edit.violations.map(value=>({id:value.id,nodes:value.nodes.map(node=>node.target)}))).toEqual([]);await page.locator('#calendar-subscription-editor button[type=button]').click();
     }
-    await page.locator('#account-menu > summary').click();await page.locator('#theme').selectOption('timekeeper');await page.locator('#account-menu > summary').click();await page.screenshot({path:'test-results/calendar-subscriptions-mobile.png',fullPage:true});await page.locator('.calendar-all-day-event').click();await expect(page.locator('#calendar-event-details')).toContainText('Hele dagen');await page.screenshot({path:'test-results/calendar-subscriptions-details-mobile.png',fullPage:false});
+    await setTheme(page,'timekeeper');await page.screenshot({path:'test-results/calendar-subscriptions-mobile.png',fullPage:true});await page.locator('.calendar-all-day-event').click();await expect(page.locator('#calendar-event-details')).toContainText('Hele dagen');await page.screenshot({path:'test-results/calendar-subscriptions-details-mobile.png',fullPage:false});
   }finally{await context.close();}
 });
 

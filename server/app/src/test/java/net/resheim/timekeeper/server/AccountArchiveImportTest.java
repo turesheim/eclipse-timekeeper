@@ -66,6 +66,25 @@ class AccountArchiveImportTest {
         });
     }
     private ObjectNode work() {return store.transaction("b",()->{var value=object();for(var entry:DomainTransfer.TYPES.entrySet()) {var items=value.putArray(entry.getKey());store.list(entry.getValue()).forEach(items::add);}value.set("profile",store.profile());return value;});}
+    @Test void dayNotesRoundTripWithoutWorkAndNeverOverwriteAnExistingDate() throws Exception {
+        source();
+        store.transaction("a",()->{var notes=new DayNotes(store);var date=DayNotes.date("2026-05-17");notes.save(date,etag(notes.get(date)),"Ferie");return null;});
+        ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=AccountArchiveInput.read(file.file(),"application/zip");}
+        assertEquals(object().put("date","2026-05-17").put("text","Ferie"),archive.path("dayNotes").get(0));
+        assertEquals(1,archive.path("dayNotes").size());inputs.validate("AccountArchiveSnapshot",archive);
+        // A note-only archive remains useful when there are no timed records.
+        for(String name:DomainTransfer.TYPES.keySet())((ObjectNode)archive.path("work")).putArray(name);
+        UUID id=stage(archive);var review=store.transaction("b",()->importer().preview(id,false));
+        assertTrue(review.body().path("canImport").asBoolean());assertEquals(1,review.body().path("counts").path("dayNotes").asInt());
+        store.transaction("b",()->{assertTrue(store.list(DayNotes.TYPE).isEmpty());return null;});
+        store.transaction("b",()->importer().apply(id,false,review.etag()));
+        store.transaction("b",()->{assertEquals("Ferie",new DayNotes(store).get(DayNotes.date("2026-05-17")).path("text").asText());assertTrue(store.list("WORK_SESSION").isEmpty());return null;});
+        var conflicting=archive.deepCopy().put("archiveId",UUID.randomUUID().toString());((ObjectNode)conflicting.path("dayNotes").get(0)).put("text","Avspasering");
+        UUID conflictId=stage(conflicting);var rejected=store.transaction("b",()->importer().preview(conflictId,false));assertFalse(rejected.body().path("canImport").asBoolean());
+        store.transaction("b",()->{assertEquals("Ferie",new DayNotes(store).get(DayNotes.date("2026-05-17")).path("text").asText());return null;});
+        var duplicate=archive.deepCopy().put("archiveId",UUID.randomUUID().toString());((com.fasterxml.jackson.databind.node.ArrayNode)duplicate.path("dayNotes")).add(duplicate.path("dayNotes").get(0).deepCopy());UUID duplicateId=stage(duplicate);
+        assertEquals(422,assertThrows(ApiFailure.class,()->store.transaction("b",()->importer().preview(duplicateId,false))).status);
+    }
     @Test void reviewedRoundTripRemapsTheWholeGraphAndNeverRestoresIdentityOrImportAuthority() throws Exception {
         var archive=source();UUID id=stage(archive);var before=work();
         var identity=store.transaction("b",()->AccountStore.account(store.current().connection(),store.owner(),false));

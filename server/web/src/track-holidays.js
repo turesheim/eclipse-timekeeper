@@ -12,9 +12,7 @@ export class TrackHolidays {
     this.holidayMessage=node('span');
     this.holidayRetry=node('button',i18nText('ui.retry'),'btn btn-link btn-sm');this.holidayRetry.type='button';this.holidayRetry.hidden=true;
     this.holidayRetry.addEventListener('click',()=>{if(!this.active)return;this.holidayKey=null;this.paintHolidays();});
-    this.holidayCredit=node('a','date-holidays');this.holidayCredit.href='/web/assets/date-holidays/LICENSE';this.holidayCredit.target='_blank';this.holidayCredit.rel='noopener noreferrer';this.holidayCredit.title=i18nText('holidays.license');this.holidayCredit.setAttribute('aria-label',i18nText('holidays.license'));
-    this.holidaySource=node('span');this.holidaySource.append(' · ',i18nText('holidays.data'), ' ',this.holidayCredit);
-    this.holidayStatus.append(this.holidayMessage,' ',this.holidayRetry,this.holidaySource);this.grid.after(this.holidayStatus);
+    this.holidayStatus.append(this.holidayMessage,' ',this.holidayRetry);this.grid.after(this.holidayStatus);
     this.holidayDialog=node('dialog',undefined,'app-dialog shadow-lg');this.holidayDialog.id='track-holiday-details';this.holidayDialog.setAttribute('aria-labelledby','track-holiday-title');
     this.holidayTitle=node('h2',i18nText('holidays.title'));this.holidayTitle.id='track-holiday-title';this.holidayContext=node('p',undefined,'hint');this.holidayList=node('ul');
     const holidayActions=node('div',undefined,'dialog-actions');this.holidayClose=node('button',i18nText('ui.close'),'btn btn-outline-secondary');this.holidayClose.type='button';this.holidayClose.addEventListener('click',()=>this.closeHoliday());holidayActions.append(this.holidayClose);
@@ -30,7 +28,7 @@ export class TrackHolidays {
   hide() {this.closeHoliday();}
   reset() {
     this.active=false;++this.holidayGeneration;this.holidayKey=null;this.holidayData=null;this.holidayOrigin=null;this.calendar=null;this.holidayCells=null;
-    this.closeHoliday();this.holidayList.replaceChildren();this.holidayContext.textContent='';this.holidayTitle.textContent=i18nText('holidays.title');this.holidayStatus.hidden=true;this.holidayMessage.textContent='';this.holidayRetry.hidden=true;this.holidaySource.hidden=true;
+    this.closeHoliday();this.holidayList.replaceChildren();this.holidayContext.textContent='';this.holidayTitle.textContent=i18nText('holidays.title');this.holidayStatus.hidden=true;this.holidayMessage.textContent='';this.holidayRetry.hidden=true;
   }
   closeHoliday() {if(this.holidayDialog.open)this.holidayDialog.close();}
   openHoliday(date) {
@@ -50,8 +48,8 @@ export class TrackHolidays {
   applyHolidays(data,focused) {
     const retryFocused=document.activeElement===this.holidayRetry;
     this.holidayRetry.hidden=true;this.holidayRetry.disabled=false;
-    this.holidaySource.hidden=data.state!=='ready';
-    this.holidayMessage.textContent=data.state==='ready'?this.holidayCountry():i18nText(data.state==='unsupported-year'?'holidays.unsupported_year':'holidays.unsupported_region');
+    this.holidayStatus.hidden=data.state==='ready';
+    this.holidayMessage.textContent=data.state==='ready'?'':i18nText(data.state==='unsupported-year'?'holidays.unsupported_year':'holidays.unsupported_region');
     for(const [date,holidays] of data.days) {
       const cell=this.holidayCells.get(date);if(!cell)continue;
       cell.classList.add('track-public-holiday');
@@ -59,10 +57,11 @@ export class TrackHolidays {
       const fullDate=new Intl.DateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
       button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-label',i18nText('holidays.details',{date:fullDate,names}));button.title=names;
       button.append(cell.querySelector('.track-date'),node('span',names,'track-holiday-name'));button.addEventListener('click',()=>this.openHoliday(date));
-      cell.querySelector('.track-date-row').replaceChildren(button);
+      const heading=cell.querySelector('.track-date-row'),note=heading.querySelector('.track-day-note');
+      heading.replaceChildren(button);if(note)heading.append(note);
     }
     if(focused&&document.activeElement===document.body)this.grid.querySelector(`[data-track-holiday-date="${focused}"]`)?.focus();
-    else if(retryFocused)this.holidayStatus.focus();
+    else if(retryFocused)this.input.focus();
   }
   paintHolidays(focused) {
     if(!this.active||!this.calendar)return;
@@ -70,7 +69,7 @@ export class TrackHolidays {
     if(this.holidayKey===key) {if(this.holidayData)this.applyHolidays(this.holidayData,focused);return;}
     const generation=++this.holidayGeneration;this.holidayKey=key;this.holidayData=null;
     if(this.preference==='none') {this.holidayStatus.hidden=true;return;}
-    this.holidayStatus.hidden=false;this.holidayMessage.textContent=i18nText('holidays.loading');this.holidaySource.hidden=true;this.holidayRetry.disabled=true;
+    this.holidayStatus.hidden=false;this.holidayMessage.textContent=i18nText('holidays.loading');this.holidayRetry.disabled=true;
     void publicHolidayCalendar(this.calendar,getLocale(),country).then(data=>{
       if(generation!==this.holidayGeneration||!this.active)return;
       this.holidayData=data;this.applyHolidays(data,focused);

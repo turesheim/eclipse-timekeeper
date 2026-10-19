@@ -1,9 +1,10 @@
+import {setTheme} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
-import {openAbout,openAccountMenu} from './navigation.js';
+import {openAbout} from './navigation.js';
 
 async function signIn(page,request) {
   const username='notices-'+randomUUID().slice(0,8),password='Independent notices browser password';
@@ -17,7 +18,11 @@ async function signIn(page,request) {
 test('About identifies the project and bundled libraries with complete local licenses',async({page,request})=>{
   await signIn(page,request);const outside=[];
   page.on('request',request=>{if(new URL(request.url()).origin!==new URL(process.env.TIMEKEEPER_WEB_URL).origin)outside.push(request.url());});
-  await openAbout(page);const dialog=page.locator('#server-info');
+  const api=browserRequest(page),identity=await(await api.get('/api/v1/auth/session')).json(),profile=await api.get('/api/v1/me');
+  expect((await api.put('/api/v1/me',{data:{zoneId:(await profile.json()).zoneId,holidayCountry:'GB'},headers:{'If-Match':profile.headers().etag,'X-CSRF-Token':identity.csrf}})).status()).toBe(200);
+  await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');
+  await expect(page.locator('#track-zone')).toHaveCount(0);await expect(page.locator('#account-menu #theme')).toHaveCount(0);await expect(page.locator('#account-menu-items > :last-child')).toHaveAttribute('id','about-open');
+  await openAbout(page);const dialog=page.locator('#server-info');await expect(page.locator('#about-holidays')).toContainText('United Kingdom');await expect(dialog.getByRole('link',{name:'date-holidays data and license',exact:true})).toHaveAttribute('href','/web/assets/date-holidays/LICENSE');
   await expect(page.locator('#about-title')).toBeFocused();
   await expect(dialog).toContainText('Copyright © 2014–2026 Torkild U. Resheim');
   await expect(dialog.getByRole('link',{name:'Source code',exact:true})).toHaveAttribute('href','https://github.com/turesheim/eclipse-timekeeper');
@@ -49,7 +54,7 @@ test('About follows the saved Norwegian language and remains accessible in every
   expect((await api.put('/api/v1/me',{data:{zoneId:(await profile.json()).zoneId,locale:'nb-NO'},headers:{'If-Match':profile.headers().etag,'X-CSRF-Token':identity.csrf}})).status()).toBe(200);
   await page.reload();await expect(page.locator('#status')).toHaveText('Oppdatert');await page.setViewportSize({width:390,height:844});
   for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']) {
-    await page.locator('#account-menu summary').click();await page.locator('#theme').selectOption(theme);
+    await setTheme(page,theme);await page.locator('#account-menu > summary').click();
     await page.locator('#about-open').click();const dialog=page.locator('#server-info');
     await expect(dialog.getByRole('heading',{name:'Om Timekeeper',exact:true})).toBeVisible();
     await expect(dialog.getByRole('link',{name:'Kildekode',exact:true})).toBeVisible();

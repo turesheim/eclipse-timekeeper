@@ -30,7 +30,7 @@ test('Track is the default month overview with exact client session hours, local
     await expect(page.locator('[data-tab]').first()).toHaveAccessibleName('Track');await expect(page.locator('[data-tab=track]')).toHaveAttribute('aria-current','page');
     await expect(page.locator('#track-panel')).toBeVisible();await expect(page.locator('#week-panel')).not.toBeVisible();
     await page.getByLabel('Month',{exact:true}).fill('2025-10');
-    await expect(page.locator('#track-title')).toContainText('2025');await expect(page.locator('#track-zone')).toHaveText('Europe/Oslo');
+    await expect(page.locator('#track-title')).toContainText('2025');await expect(page.locator('#track-zone')).toHaveCount(0);
     await expect(page.locator(`#track-clients [data-track-client="${a.id}"]`)).toContainText('27h 0m');
     await expect(page.locator(`#track-clients [data-track-client="${b.id}"]`)).toContainText('3h 0m');
     await expect(page.locator('#track-clients [data-track-client]')).toHaveCount(2);
@@ -43,7 +43,7 @@ test('Track is the default month overview with exact client session hours, local
     await expect(tooltip).toHaveAttribute('title',/2 work sessions/);await expect(tooltip).toHaveAttribute('title',/Clock change/);await expect(tooltip).toHaveAttribute('title',/Another session for the same client/);await expect(tooltip).toHaveAttribute('title',/13:00:00/);await expect(tooltip).toHaveAttribute('title',new RegExp(project.name));await expect(tooltip).not.toHaveAttribute('title',/Other client session|Month boundary/);
     const audit=await new AxeBuilder({page}).include('#workspace').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
     await page.screenshot({path:'test-results/track-desktop.png',fullPage:true});
-    await expect(day.locator('button')).toHaveCount(2);await expect(page.locator('[data-track-session]')).toHaveCount(0);
+    await expect(day.locator('button[data-track-daily-client]')).toHaveCount(2);await expect(page.locator('[data-track-session]')).toHaveCount(0);
     const single=page.locator(`[data-track-date="2025-10-01"] [data-track-daily-client="${a.id}"]`);
     await single.click();await expect(page.getByRole('dialog',{name:'Edit work session',exact:true})).toBeVisible();
     await expect(page.getByLabel('Title',{exact:true})).toHaveCount(0);await expect(page.getByLabel('Summary',{exact:true})).toHaveValue('Month boundary');

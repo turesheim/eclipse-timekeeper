@@ -16,7 +16,7 @@ import {openAbout} from './about.js';
 
 const $ = (id) => document.getElementById(id);
 accountMenu($('account-menu'));
-$('about-open').addEventListener('click', () => openAbout($('server-info')));
+$('about-open').addEventListener('click', () => openAbout($('server-info'),snapshot?.profile.data.holidayCountry));
 $('about-close').addEventListener('click', () => $('server-info').close());
 $('server-info').addEventListener('close', () => {if (!$('session').hidden) $('account-menu').querySelector('summary').focus();});
 let api = null,snapshot = null,connected = false,refreshing = null,reloadAgain = false;
@@ -41,7 +41,7 @@ const calendar = new WeekCalendar($('calendar-panel'), {
   onPaste: (input) => void openRecord('work-sessions', null, input, i18nText("ui.paste_work_session")).catch((error) => setStatus(errorText(error))),
   onChange: changeCalendarSession
 });
-const track = new MonthTrack($('track-panel'), { onEditSession: (id) => void openRecord('work-sessions', id).catch((error) => setStatus(errorText(error))) });
+const track = new MonthTrack($('track-panel'), { onUnauthorized:error=>auth.clear(errorText(error)), onChanged:()=>void refresh().catch(()=>{}), onEditSession: (id) => void openRecord('work-sessions', id).catch((error) => setStatus(errorText(error))) });
 const undoNotice = new UndoNotice($('undo-notice'), {
   available: (session) => session === api && connected && canWrite && !editor && (!weekSessions.draft || !weekSessions.draft.busy && !weekSessions.draft.review && !Object.keys(weekSessions.draft.edits).length),
   changed: async (session) => {if (session === api) {if (weekSessions.draft && !weekSessions.draft.busy && !weekSessions.draft.review && !Object.keys(weekSessions.draft.edits).length) weekSessions.cancel();connected = false;readOnlyWhileDisconnected();await refresh().catch(() => {});}},
@@ -321,7 +321,7 @@ function render() {
   $('activities-heading').textContent = selectedDay ? i18nText("ui.activities_a05abe", { value0: selectedDay }) : i18nText("ui.activities");
   renderWorkweek(s, zone);
   calendar.update(s, connected, api);
-  track.update(s, activeAsOf, displayNanos, connected && canWrite);
+  track.update(s, activeAsOf, displayNanos, connected && canWrite, api);
 }
 function renderWorkweek(s, zone) {
   const dates = Array.from({ length: 7 }, (_, index) => addDays(s.dates.first, index));

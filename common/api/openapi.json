@@ -8797,6 +8797,237 @@
           }
         }
       }
+    },
+    "/day-notes": {
+      "get": {
+        "operationId": "listDayNotes",
+        "summary": "Read web-only day notes",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Visible notes in the inclusive date range.",
+            "headers": {},
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayNoteList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "name": "fromDate",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Inclusive range boundary; ranges contain at most 62 dates."
+          },
+          {
+            "name": "toDate",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Inclusive range boundary; ranges contain at most 62 dates."
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      }
+    },
+    "/day-notes/{date}": {
+      "parameters": [
+        {
+          "name": "date",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getDayNote",
+        "summary": "Read web-only day notes",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "The day note, including an empty version-zero note for an untouched date.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayNote"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      },
+      "put": {
+        "operationId": "saveDayNote",
+        "summary": "Save a web-only day note; empty text removes its label",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "The day note, including an empty version-zero note for an untouched date.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayNote"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DayNoteInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -13369,6 +13600,32 @@
               "$ref": "#/components/schemas/ArchiveAuditRecord"
             },
             "maxItems": 1000000
+          },
+          "dayNotes": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "date",
+                "text"
+              ],
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "text": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]*$",
+                  "description": "A single-line label. Empty text removes the visible label.",
+                  "minLength": 1
+                }
+              }
+            },
+            "description": "Optional web-only labels attached to civil dates, independently of timed work."
           }
         },
         "required": [
@@ -13471,6 +13728,11 @@
           "importAuditRecords": {
             "type": "integer",
             "minimum": 0
+          },
+          "dayNotes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 250000
           }
         },
         "required": [
@@ -16662,6 +16924,71 @@
           }
         ],
         "description": "Independent national public-holiday calendar. ISO country code selects a country, none hides holidays, and null uses the browser region. Omission preserves the preference."
+      },
+      "DayNoteInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 80,
+            "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]*$",
+            "description": "A single-line label. Empty text removes the visible label."
+          }
+        }
+      },
+      "DayNote": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ownerId",
+          "date",
+          "text",
+          "version"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        }
+      },
+      "DayNoteList": {
+        "type": "object",
+        "required": [
+          "items",
+          "revision"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 62,
+            "items": {
+              "$ref": "#/components/schemas/DayNote"
+            }
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "additionalProperties": false
       }
     },
     "parameters": {

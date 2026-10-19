@@ -85,6 +85,8 @@ class AccountArchive {
         String archiveId=UUID.randomUUID().toString(),generatedAt=Instant.now().toString();
         ObjectNode counts=object();for(var entry:WORK.entrySet()) counts.put(entry.getKey(),count(c,owner,entry.getValue()));
         long auditCount=0;for(var type:HISTORY) auditCount+=count(c,owner,type);counts.put("importAuditRecords",auditCount);
+        var notes=object().putArray("items");records(c,owner,DayNotes.TYPE,value->{if(!value.path("text").asText().isEmpty())notes.add(object().put("date",value.path("date").asText()).put("text",value.path("text").asText()));});
+        if(!notes.isEmpty())counts.put("dayNotes",notes.size());
         var profile=profile(c,owner);var metadata=metadata(c,owner);
         var manifest=object().put("format",FORMAT).put("archiveId",archiveId).put("generatedAt",generatedAt);
         manifest.set("counts",counts);var files=manifest.putObject("files");
@@ -96,6 +98,7 @@ class AccountArchive {
             // Closing the JSON writer must not close the surrounding ZIP stream.
             var json=MAPPER.getFactory().createGenerator(zip).disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
             json.writeStartObject();json.writeStringField("format",FORMAT);json.writeStringField("archiveId",archiveId);json.writeStringField("generatedAt",generatedAt);
+            if(!notes.isEmpty())json.writeObjectField("dayNotes",notes);
             json.writeObjectField("account",metadata);json.writeObjectField("preferences",profile);
             json.writeFieldName("work");json.writeStartObject();json.writeStringField("format","timekeeper-domain-v3");json.writeStringField("zoneId",profile.path("zoneId").asText());
             for(String name:new TreeSet<>(WORK.keySet())) {
@@ -124,6 +127,7 @@ class AccountArchive {
             }
             entry(zip,"README.txt");zip.write(("Timekeeper private account archive\n\n"
                 +"archive.json is the authoritative, versioned JSON snapshot for account import. manifest.json lists record counts and files.\n"
+                +"Optional dayNotes in archive.json contain web-only date labels, including days without recorded work.\n"
                 +"All records belong to the signed-in account. Administrator access does not include another account's data.\n"
                 +"Account identity, recovery addresses and credential-management metadata are informational and are not restored.\n"
                 +"Import history is an audit copy; it cannot replay an import or authorize Undo in another account.\n"

@@ -1,7 +1,7 @@
 # Timekeeper web client
 
-The account menu's **About** dialog reads `/api/v1/server` to identify the running server
-version and commit. Its details distinguish immutable build time, explicitly
+The **About** item at the bottom of the account menu opens a dialog that reads
+`/api/v1/server` to identify the running server version and commit. Its details distinguish immutable build time, explicitly
 recorded deployment time and process-start time. Information refreshes after
 long polls and manual refreshes, including during rolling updates. Missing
 deployment metadata is shown as **Not recorded**. The Docker/Synology deployment
@@ -98,6 +98,25 @@ On mobile, swipe left across the month to go forward or right to go back.
 Workweek, Activities and Calendar also support swiping between weeks on their
 headings or other non-scrolling areas. Wide tables and the calendar grid keep
 their normal scrolling and editing gestures. Date controls remain available.
+Right-click a day or **press and hold** it on a touch screen, then choose
+**Add day note** / **Edit day note**. A short label such as “Ferie” or “Avspasering”
+appears beside the date in blue, distinct from red national holidays. Select the
+label to edit it, or use the small **+** beside an empty date. Keyboard users can
+focus that button and press **Shift+F10** for the same menu. Movement cancels a
+long press, preserving scrolling and month swipes.
+
+Notes accept up to 80 characters. Clear the text and save to remove a label;
+Cancel leaves the saved note unchanged. Each note belongs to its calendar date
+and account, including days without work. It follows the account across web
+sessions and devices, and remains on the same date after time-zone changes.
+Narrow screens wrap the label when needed. Day notes never affect timed work,
+reports or the Eclipse UI. Read-only sessions can see saved labels. Concurrent
+edits retain the draft for review rather than overwriting a newer note.
+
+![Day notes beside dates and holidays](../assets/screenshots/day-notes-desktop.png)
+
+![Editing a day note](../assets/screenshots/day-notes-editor.png)
+
 Hover over a daily client total to see its sessions, summaries, projects, labels,
 local start/end times and durations in a tooltip. These details are also available
 when viewing the account with read-only access.
@@ -151,7 +170,7 @@ holidays can differ; subdivision calendars, optional holidays and observances ar
 not included. Unsupported regions and years before 0100 show an explicit message.
 The engine loads when Track needs it, without requesting an external calendar.
 A failed load offers Retry and preserves open session drafts. Data attribution
-and the complete upstream license are available through the link below the grid.
+and the complete upstream license are available in **About**.
 Run `npm run vendor:holidays` in `server/web` to regenerate the pinned engine,
 country list and licenses; `npm run check:assets` verifies every generated file.
 
@@ -161,9 +180,13 @@ These previews use a Norwegian account with a browser in Pacific/Kiritimati:
 
 ![Public holiday details on mobile](../assets/screenshots/public-holidays-details-mobile.png)
 
+The monthly view omits its time-zone caption and normal holiday attribution
+footer. **About** shows the selected holiday country and the local date-holidays
+data license; loading failures and Retry remain available in the monthly view.
+
 ## Themes
 
-Choose **Theme** in the account menu to switch between Timekeeper (the default),
+Choose **Theme** under **My Account → Profile** to switch between Timekeeper (the default),
 Timekeeper Dark, Solarized Light, Solarized Dark, Nord and Dracula. The selection
 is saved on this browser and shared with other open Timekeeper tabs, including
 Administration. A saved theme also applies to sign-in and loads before the
