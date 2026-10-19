@@ -90,7 +90,7 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 #workspace { padding-block-end: calc(var(--workspace-nav-height) + 1rem); }
 .workspace-nav { --bs-navbar-color: #3f554c; --bs-navbar-hover-color: #104e3f; height: var(--workspace-nav-height); padding: .35rem max(env(safe-area-inset-left, 0px), .25rem) calc(.35rem + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -.25rem 1rem #233b380d; }
 .workspace-nav .container-fluid { max-width: 1332px; }
-.workspace-nav .navbar-nav { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); width: 100%; }
+.workspace-nav .navbar-nav { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; }
 /* Switching text and background colors together must not pass through low contrast. */
 .workspace-nav .nav-link { display: flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.75rem; min-width: 0; padding: .5rem .25rem; border-radius: var(--bs-border-radius); font-weight: 600; transition: none; }
 .workspace-nav .nav-link:not(.active):hover { background: #e4ede7; }
@@ -344,3 +344,13 @@ button.track-client-day:disabled { opacity: .65; }
 .undo-notice.is-fading { opacity: 0; }
 @media(prefers-reduced-motion: reduce) { .undo-notice { transition: none; } }
 
+
+.activity-tasks { margin-top: 1rem; padding: .75rem; }
+.activity-tasks > summary { cursor: pointer; font-weight: 600; }
+.activity-tasks[open] > summary { margin-bottom: .75rem; }
+
+.app-header .status-line { margin: 0; min-width: 0; flex: 0 1 auto; }
+.app-header #session { margin-inline-start: auto; flex: 0 1 auto; min-width: 2.75rem; max-width: 40%; }
+.app-header .status-refresh { min-width: 0; }
+.app-header #status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 575px) { .app-header #owner { display: none; } }

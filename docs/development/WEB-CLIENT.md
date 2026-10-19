@@ -80,11 +80,14 @@ Run `npm run vendor:icons` in `server/web` to regenerate the pinned assets,
 project catalog and API allow-list. `npm run check:assets` verifies them.
 
 Workspace views use a Bootstrap `navbar fixed-bottom` with `navbar-nav` and
-`nav-link` controls. All eight views remain available without a collapsed menu.
+`nav-link` controls. The seven views appear in this order: Track, Workweek, Calendar, Activities,
+Clients, Projects and Labels.
 The active view has `aria-current="page"`; compact screens show icons with
 accessible names, and wide screens also show labels. Safe-area padding keeps the
 bar and page content clear of each other. Standard action buttons use Bootstrap
-`btn` variants, including the manual status refresh and calendar actions.
+`btn` variants, including the manual status refresh and calendar actions. The
+clickable sync indicator sits immediately beside the Timekeeper title in the
+header, remains available in My Account and is hidden when signed out.
 
 ## Track month view
 
@@ -432,7 +435,7 @@ or activity list; historical records and detailed reports remain in Workweek,
 Activities and Calendar.
 
 A work session is an independent interval for one client. Its tools are **Edit**
-and **Delete**. Create or edit activities in Activities or Calendar; task timers
+and **Delete**. Create or edit activities in Activities; task timers
 run independently. There are no session selectors or manual activity links.
 
 Work sessions may have several labels selected in the start, record and edit
@@ -582,10 +585,10 @@ the signed-in browser session and is cleared on sign-out. A running source keeps
 its blank end in the copy; finish the copy's interval if another session is
 still running. Starts in the future remain invalid.
 
-Each recorded activity has its own card at its actual start/end time, including
-activities recorded without a work session. Cards retain task issue links and
-show which work sessions overlap their interval. Recorded activities remain
-independent when a work session is moved, resized or copied.
+Calendar shows work sessions and subscribed calendar plans. Recorded activities
+appear in **Activities**, keeping the Calendar display focused. Editing a work
+session never changes its activities. There is no separate Tasks view; expand
+**Manage tasks** in Activities to create, edit, start or remove task records.
 
 Repeated clock times have separate rows; shaded slots do not occur on a given
 day. A drag retains the original session snapshot and saves with its opaque

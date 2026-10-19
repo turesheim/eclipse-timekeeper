@@ -93,7 +93,7 @@ test('Norwegian administration and workspace navigation retain accessible narrow
   const user=await fresh(request,true),session=await context(browser,'nb-NO');
   try {
     const page=await session.newPage();await login(page,user);
-    for(const tab of ['track','week','activities','calendar','tasks','clients','projects','labels']) {
+    for(const tab of ['track','week','calendar','activities','clients','projects','labels']) {
       await page.locator(`[data-tab=${tab}]`).click();
       await expect(page.locator(`[data-tab=${tab}]`)).toHaveAttribute('aria-current','page');
       await expect(page.locator('#workspace')).not.toContainText(/\b(?:ui\.|count\.|record\.)[a-z_]+/);

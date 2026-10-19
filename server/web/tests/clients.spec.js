@@ -1,3 +1,4 @@
+import {openTaskManagement} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -21,7 +22,7 @@ test('client and project lists and choices sort names after create, rename and r
     }
     await page.getByRole('button',{name:'New project',exact:true}).click();
     await expect(page.getByLabel('Client',{exact:true}).locator('option').filter({hasText:prefix})).toHaveText(expected);await page.locator('#cancel').click();
-    await page.getByRole('button',{name:'Tasks',exact:true}).click();await page.getByRole('button',{name:'New task',exact:true}).click();
+    await openTaskManagement(page);await page.getByRole('button',{name:'New task',exact:true}).click();
     await expect(page.getByLabel('Project',{exact:true}).locator('option').filter({hasText:prefix})).toHaveText(expected);await page.locator('#cancel').click();
     for(const [collection,record] of [['clients',clients[0]],['projects',projects[0]]]) {
       const loaded=await api(request,'GET',`/${collection}/${record.id}`);

@@ -918,5 +918,6 @@
   "day_notes.menu_edit": "Rediger dagsnotat",
   "day_notes.actions": "Handlinger for dagen",
   "day_notes.view": "Notat for {{date}}: {{text}}",
-  "theme.device": "Brukes med en gang og lagres i denne nettleseren."
+  "theme.device": "Brukes med en gang og lagres i denne nettleseren.",
+  "tasks.manage": "Administrer oppgaver"
 }

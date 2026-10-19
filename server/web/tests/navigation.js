@@ -28,3 +28,8 @@ export async function openThemeSettings(page){
 export async function setTheme(page,value){
   await openThemeSettings(page);await page.locator('#theme').selectOption(value);await page.locator('#account-page a[href="#tracking"]').click();await expect(page.locator('#workspace')).toBeVisible();
 }
+
+export async function openTaskManagement(page){
+  await page.locator('[data-tab=activities]').click();const panel=page.locator('#activity-tasks');
+  if(await panel.getAttribute('open')===null)await panel.locator('summary').click();await expect(panel.locator('#tasks')).toBeVisible();
+}

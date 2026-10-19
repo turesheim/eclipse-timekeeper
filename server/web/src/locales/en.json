@@ -918,5 +918,6 @@
   "day_notes.menu_edit": "Edit day note",
   "day_notes.actions": "Day actions",
   "day_notes.view": "Note for {{date}}: {{text}}",
-  "theme.device": "Applies immediately and is saved in this browser."
+  "theme.device": "Applies immediately and is saved in this browser.",
+  "tasks.manage": "Manage tasks"
 }

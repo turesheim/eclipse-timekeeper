@@ -30,12 +30,10 @@ let decimalHours = false,activitiesCollapsed = false;
 const displayNanos = (value) => decimalHours ? decimalHoursText(value) : nanosText(value);
 const displayDuration = (value) => decimalHours ? decimalHoursText(durationNanos(value)) : durationText(value);
 const calendar = new WeekCalendar($('calendar-panel'), {
-  taskLabel,
   canWrite:()=>canWrite,
   onUnauthorized:error=>auth.clear(errorText(error)),
   onConvertEvent:(event,range)=>void openCalendarActivity(event,range).catch(error=>setStatus(errorText(error))),
   onDate: selectWeek,
-  onEditActivity: (id) => void openRecord('activities', id).catch((error) => setStatus(errorText(error))),
   onEditSession: (id) => void openRecord('work-sessions', id).catch((error) => setStatus(errorText(error))),
   onNew: (input) => void openRecord('work-sessions', null, input).catch((error) => setStatus(errorText(error))),
   onPaste: (input) => void openRecord('work-sessions', null, input, i18nText("ui.paste_work_session")).catch((error) => setStatus(errorText(error))),
@@ -124,7 +122,7 @@ function readOnlyWhileDisconnected() {
   updateSessionActions();
 }
 function tab(name) {
-  for (const item of ['track', 'week', 'activities', 'calendar', 'tasks', 'clients', 'projects', 'labels']) $(`${item}-panel`).hidden = item !== name;
+  for (const item of ['track', 'week', 'calendar', 'activities', 'clients', 'projects', 'labels']) $(`${item}-panel`).hidden = item !== name;
   $('week-toolbar').hidden = !['week', 'activities'].includes(name);$('week-report-title').textContent = name === 'activities' ? i18nText("ui.your_activities") : i18nText("ui.your_workweek");$('add-activity').hidden = name !== 'activities';
   $('workspace').dataset.view = name;if (name === 'calendar') calendar.show();else calendar.hide();
   if (name !== 'track') track.hide();
@@ -143,7 +141,7 @@ const auth = authentication({
     if (session !== api) return;
     if (localeForPreference(profile.locale) !== getLocale()) {location.reload();return false;}
     $('week-date').value = dateInZone(Date.now(), profile.zoneId);
-    $('startup').hidden = true;$('login').hidden = true;$('workspace').hidden = false;$('session').hidden = false;
+    $('startup').hidden = true;$('login').hidden = true;$('workspace').hidden = false;$('session').hidden = false;$('sync-status').hidden = false;
     await refresh();startWatch(session);
   },
   updateAccount(account) {accountName = account.displayName;},
@@ -158,12 +156,12 @@ const auth = authentication({
     refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
-    calendar.reset();track.reset();collapsed.clear();collapsedClients.clear();canWrite = false;
+    calendar.reset();track.reset();$('activity-tasks').open = false;collapsed.clear();collapsedClients.clear();canWrite = false;
     $('period-announcement').textContent = '';
     deleteCandidate = null;$('editor-delete-confirm').close();$('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
     for (const id of ['clients', 'projects', 'tasks', 'labels', 'activities', 'days']) $(id).replaceChildren();
     for (const id of ['owner', 'status', 'active-title', 'active-details', 'work-session-current', 'work-session-state', 'work-session-elapsed', 'zone-caption', 'week-total']) $(id).textContent = '';
-    $('startup').hidden = !restoring;$('login').hidden = restoring;$('workspace').hidden = true;$('session').hidden = true;$('account-menu').open = false;$('remember-notice').textContent = '';
+    $('startup').hidden = !restoring;$('login').hidden = restoring;$('workspace').hidden = true;$('session').hidden = true;$('sync-status').hidden = true;$('account-menu').open = false;$('remember-notice').textContent = '';
     tab('track');
   }
 });
@@ -455,6 +453,14 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
   const loaded = id ? await session.request(`/${collection}/${id}`) : { data: initial, etag: null };
   if (session !== api || !connected) return;
   const value = loaded.data;
+  let activitySource=collection==='activities'&&id?calendar.subscriptions.sources[id]:null;
+  if(collection==='activities'&&id&&!activitySource){
+    // Activities remain editable independently of whether Calendar was opened.
+    const date=dateInZone(value.start,snapshot.profile.data.zoneId);
+    try {const reply=await session.request('/calendar-events?'+new URLSearchParams({fromDate:date,toDate:addDays(date,1)}));activitySource=reply.data.activitySources[id];}
+    catch(error){if(error.status===401)throw error;}
+    if(session!==api||!connected)return;
+  }
   if (!begin(caption || i18nText(`record.${id?'edit':'new'}.${collection}`), { collection, id, etag: loaded.etag, deletionLabel: value.summary })) return;
   if (['clients', 'projects', 'labels'].includes(collection)) field(i18nText("ui.name"), 'name', value.name, { required: true, max: 1000 });
   if (collection === 'clients') field(i18nText("ui.color"), 'color', value.color || '#2563eb', { type: 'color', required: true });
@@ -471,7 +477,7 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
     if (!id) {field(i18nText("ui.project_without_task"), 'projectId', value.projectId, { choices: [['', i18nText("ui.no_project")], ...snapshot.projects.map((v) => [v.id, v.name])] });}
     field(i18nText("ui.summary"), 'summary', value.summary, { max: 2000, multiline:true });
     timeFields(value, 'tracking');labelFields(value.labelIds);
-    const source=id?calendar.subscriptions.sources[id]:null;if(source)$('fields').prepend(element('p',i18nText('calendar.recorded_source',{title:source.title,calendar:source.calendarName,client:source.clientName}),'hint'));
+    const source=activitySource;if(source)$('fields').prepend(element('p',i18nText('calendar.recorded_source',{title:source.title,calendar:source.calendarName,client:source.clientName}),'hint'));
   }
   if (collection === 'work-sessions') {
     sessionFields(value);timeFields(value, 'running');

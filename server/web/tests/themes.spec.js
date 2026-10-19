@@ -32,7 +32,7 @@ test('themes cover tracking, records, editors and account settings with accessib
       await page.setViewportSize({width:1440,height:1000});await setTheme(page,id);
       await expect(page.locator('html')).toHaveAttribute('data-theme',id);await audit(page);
       await page.locator('[data-tab=track]').click();await page.screenshot({path:`test-results/theme-${id}-desktop.png`,fullPage:false});
-      for(const view of ['track','week','activities','calendar','tasks','clients','projects','labels']) {
+      for(const view of ['track','week','calendar','activities','clients','projects','labels']) {
         await page.locator(`[data-tab=${view}]`).click();
         if(view==='activities') {
           const activity=page.locator('#activities tr[data-kind=activity]').first();
