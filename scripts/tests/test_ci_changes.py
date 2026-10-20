@@ -25,6 +25,31 @@ class ChangesTest(unittest.TestCase):
             with self.subTest(path=path):
                 self.check_paths(["README.md", path], True)
 
+    def test_server_and_web_changes_skip_eclipse_only(self):
+        for paths in (["server/app/src/main/java/Example.java"],
+                      ["server/web/src/app.js", "docs/README.md"],
+                      ["server/web/tests/acceptance.py", "scripts/ci_changes.py", ".github/workflows/build.yml"],
+                      ["scripts/synology_release.py", "scripts/tests/test_synology_release.py"]):
+            with self.subTest(paths=paths):
+                diff = subprocess.CompletedProcess([], 0, "\0".join(paths).encode() + b"\0", b"")
+                with patch.object(ci.subprocess, "run", return_value=diff):
+                    self.assertEqual({"code": True, "eclipse": False}, ci.select_jobs({"before": "abc"}, "push", "refs/heads/main", "def"))
+
+    def test_shared_eclipse_build_and_unknown_changes_keep_all_validation(self):
+        for path in ("eclipse/default.target", "common/api/openapi.json", "common/timekeeper-http-client/Example.java",
+                     "pom.xml", "mvnw", ".mvn/wrapper/maven-wrapper.properties", "scripts/p2_release.py", "new-product/file"):
+            with self.subTest(path=path):
+                diff = subprocess.CompletedProcess([], 0, ("server/web/src/app.js\0" + path + "\0").encode(), b"")
+                with patch.object(ci.subprocess, "run", return_value=diff):
+                    self.assertEqual({"code": True, "eclipse": True}, ci.select_jobs({"before": "abc"}, "push", "refs/heads/main", "def"))
+
+    def test_documentation_skips_both_and_unknown_history_keeps_both(self):
+        with patch.object(ci.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, b"README.md\0docs/image.png\0", b"")):
+            self.assertEqual({"code": False, "eclipse": False}, ci.select_jobs({"before": "abc"}, "push", "refs/heads/main", "def"))
+        for result in (subprocess.CompletedProcess([], 128, b"", b""), subprocess.CompletedProcess([], 0, b"", b"")):
+            with patch.object(ci.subprocess, "run", return_value=result):
+                self.assertEqual({"code": True, "eclipse": True}, ci.select_jobs({"before": "abc"}, "push", "refs/heads/main", "def"))
+
     def test_removed_or_renamed_code_and_empty_diff_are_built(self):
         self.check_paths(["common/Example.java", "docs/Example.java"], True)
         self.check_paths([], True)

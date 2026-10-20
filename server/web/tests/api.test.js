@@ -118,3 +118,45 @@ test('work-session Undo metadata is opt-in and validated after owner binding',as
   const foreign=new Api('token',async()=>{const response=reply(null,'b3duZXItYg',204);response.headers.set('X-Timekeeper-Undo-Id',id);response.headers.set('X-Timekeeper-Undo-Seconds','600');return response;},{ownerId:'owner-a'});
   await assert.rejects(foreign.request('/work-sessions/'+id,{method:'DELETE',undo:true}),error=>error.code==='OWNER_CHANGED');
 });
+
+const snapshotDates=()=>({first:'2026-05-04',from:'2026-05-04T00:00:00Z',to:'2026-05-11T00:00:00Z'});
+function snapshotReply(url,reportRevision=1){
+  const path=new URL(url,'http://localhost').pathname;
+  if(path==='/api/v1/me')return reply({ownerId:'owner-a',zoneId:'UTC',version:1});
+  if(path.endsWith('/active'))return reply(null,undefined,204);
+  if(path==='/api/v1/reports/activities')return reply({revision:reportRevision,total:'PT0S',days:[],generatedAt:'2026-05-04T12:00:00Z'});
+  if(path.endsWith('/report'))return reply({revision:1,session:{id:'session-a'}});
+  return reply({items:path==='/api/v1/work-sessions'?[{id:'session-a',start:'2026-05-04T08:00:00Z'}]:[],revision:1,nextCursor:null});
+}
+test('snapshot reads overlap after owner binding and still confirm revisions and the selected session',async()=>{
+  let release;const gate=new Promise(resolve=>{release=resolve;}),paths=new Set();let ready=false;
+  const api=new Api('token',async(url,options)=>{
+    const path=new URL(url,'http://localhost').pathname;
+    if(!ready&&path!=='/api/v1/me'){
+      assert.equal(options.headers['X-Timekeeper-Owner'],'b3duZXItYQ');paths.add(path);
+      if(paths.size===9){ready=true;release();}
+      await new Promise((resolve,reject)=>{gate.then(resolve);options.signal.addEventListener('abort',()=>reject(new Error('aborted')),{once:true});});
+    }
+    return snapshotReply(url);
+  });
+  const snapshot=await api.snapshot(snapshotDates,'session-a',{timeout:500});
+  assert.equal(paths.size,9);assert.equal(snapshot.revision,1);assert.equal(snapshot.workSessionReport.session.id,'session-a');
+});
+test('parallel snapshots retry mixed revisions and never publish inconsistent data',async()=>{
+  let profiles=0;
+  const api=new Api('token',async url=>{if(new URL(url,'http://localhost').pathname==='/api/v1/me')profiles++;return snapshotReply(url,profiles<3?2:1);});
+  const snapshot=await api.snapshot(snapshotDates);assert.equal(snapshot.report.revision,1);assert.equal(profiles,4);
+});
+test('the snapshot deadline aborts outstanding reads together without signing out the session',async()=>{
+  const signals=[];let stalled=true;
+  const api=new Api('token',async(url,options)=>{
+    if(stalled&&new URL(url,'http://localhost').pathname!=='/api/v1/me'){
+      signals.push(options.signal);
+      await new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new Error('aborted')),{once:true}));
+    }
+    return snapshotReply(url);
+  });
+  await assert.rejects(api.snapshot(snapshotDates,null,{timeout:30}),error=>error.code==='UNAVAILABLE');
+  assert.equal(signals.length,9);assert.ok(signals.every(signal=>signal.aborted));stalled=false;
+  assert.equal((await api.snapshot(snapshotDates)).revision,1);
+});
