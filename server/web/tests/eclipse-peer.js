@@ -1,7 +1,7 @@
 import {captureScreenshot} from './screenshots.js';
 // A real browser controlled by the installed Eclipse acceptance JVM.
 // The line protocol carries synthetic record names/times, never credentials.
-import {chromium, expect} from '@playwright/test';
+import {chromium, expect, request} from '@playwright/test';
 import {createInterface} from 'node:readline';
 import {writeFile} from 'node:fs/promises';
 import {durationText} from '../src/model.js';
@@ -12,14 +12,15 @@ const browser = await chromium.launch();
 const page = await browser.newPage({baseURL: process.env.TIMEKEEPER_WEB_URL});
 page.setDefaultTimeout(15000);
 const record = {};
+const apiRequest=await request.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true});
 async function tab(name) { await page.getByRole('button', {name, exact:true}).click(); }
 async function api(method,path,data,headers={}) {
-  const reply=await page.request.fetch('/api/v1'+path,{method,data,headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`,...headers}});
+  const reply=await apiRequest.fetch('/api/v1'+path,{method,data,headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`,...headers}});
   expect(reply.ok()).toBe(true);return reply;
 }
 async function taskHistory() {
   if(!record.taskId)record.taskId=(await (await api('GET','/tasks')).json()).items.find(task=>task.summary===record.task).id;
-  return openTaskHistory(page,{id:record.taskId});
+  return openTaskHistory(page,{id:record.taskId},apiRequest);
 }
 async function signIn() {
   await page.goto('/web/');
@@ -123,7 +124,7 @@ async function command(input) {
         await rows.first().getByRole('button', {name:'Delete', exact:true}).click(); await save('Delete');
         await expect(rows).toHaveCount(before - 1);
       }
-      await clearTaskHistory(page.request);
+      await clearTaskHistory(apiRequest);
       const taskRead=await api('GET','/tasks/'+record.taskId);await api('DELETE','/tasks/'+record.taskId,undefined,{'If-Match':taskRead.headers().etag});
       for (const [tabName, container, name] of [['Projects','projects',record.project], ['Labels','labels',record.label]]) {
         await tab(tabName); await page.locator(`#${container} tr`).filter({hasText:name}).getByRole('button', {name:'Delete', exact:true}).click(); await save('Delete');
@@ -152,4 +153,4 @@ try {
       process.stdout.write(JSON.stringify({ok:false, message}) + '\n'); process.exitCode = 1; break;
     }
   }
-} finally { lines.close(); process.stdin.destroy(); await browser.close(); }
+} finally { lines.close(); process.stdin.destroy(); await apiRequest.dispose();await browser.close(); }

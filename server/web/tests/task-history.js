@@ -4,13 +4,12 @@ import {dateInZone} from '../src/model.js';
 const fixtures=new Set();
 async function api(request,method,path,data,headers={}) {
   const reply=await request.fetch('/api/v1'+path,{method,data,headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`,...headers}});
-  expect(reply.ok()).toBe(true);return reply;
+  expect(reply.ok(),`${method} ${path}: ${reply.status()}`).toBe(true);return reply;
 }
 export function taskHistoryRow(page,taskId) {
   return page.locator('#activities tr[data-kind=task]').filter({has:page.locator(`.task-title[data-task-id="${taskId}"]`)});
 }
-export async function openTaskHistory(page,task) {
-  const request=page.request;
+export async function openTaskHistory(page,task,request) {
   const history=await (await api(request,'GET',`/activities?from=1990-01-01T00:00:00Z&to=2100-01-01T00:00:00Z&taskId=${task.id}`)).json();
   let activity=history.items[0];
   if(!activity) {
