@@ -195,7 +195,7 @@ export class WeekCalendar {
     const session = piece.session,bar = node('div', undefined, `calendar-event calendar-session${preview ? ' preview' : ''}`);
     bar.dataset.sessionId = session.id;bar.dataset.date = piece.date;bar.dataset.version = String(session.version);this.bounds(bar, piece, 'session');
     const client = this.data.clients.find((client) => client.id === session.clientId),colors = clientColors(client?.color);
-    bar.style.backgroundColor = colors.background;bar.style.color = colors.foreground;bar.style.borderColor = colors.foreground;
+    bar.style.setProperty('--client-color', colors.background);
     const elapsed = instantNanos(session.end || this.data.report.generatedAt) - instantNanos(session.start);
     const duration = nanosText(elapsed > 0n ? elapsed : 0n);
     const labels = (session.labelIds || []).map((id) => this.data.labels.find((label) => label.id === id)?.name).filter(Boolean).join(', ');

@@ -191,11 +191,14 @@ test('calendar shows seven days and editable work sessions while keeping activit
     await calendar(page);
     await expect(page.locator('[data-tab=calendar]')).toHaveAttribute('aria-current','page');
     await expect(bar(page,f.session.id)).toBeAttached();
-    await expect(bar(page,f.session.id)).toHaveCSS('background-color','rgb(255, 221, 136)');
-    await expect(bar(page,f.session.id)).toHaveCSS('color','rgb(0, 0, 0)');
+    const appearance=await page.evaluate(color=>{
+      const reference=document.createElement('div');reference.className='calendar-event calendar-planned';reference.dataset.imported='true';reference.style.setProperty('--client-color',color);document.body.append(reference);
+      const style=getComputedStyle(reference),values=Object.fromEntries(['background-color','color','border-top-style','border-top-color','border-inline-start-color','border-inline-start-width','border-radius'].map(property=>[property,style.getPropertyValue(property)]));reference.remove();return values;
+    },f.client.color);
+    for(const [property,value] of Object.entries(appearance))await expect(bar(page,f.session.id)).toHaveCSS(property,value);
     await expect(bar(page,f.session.id).locator('.calendar-session-title')).toHaveText(f.session.summary);
     await expect(bar(page,f.session.id).locator('.calendar-session-duration')).toHaveText('8h 0m');
-    await expect(bar(page,f.session.id)).toHaveCSS('border-radius','6px');
+    await expect(bar(page,f.session.id).locator('.calendar-session-label')).toHaveCSS('writing-mode','vertical-rl');
     const handles=bar(page,f.session.id).locator('.calendar-resize');
     await position(page,bar(page,f.session.id));await page.locator('#calendar-today').hover();
     await expect(handles.first()).toHaveCSS('opacity','0');

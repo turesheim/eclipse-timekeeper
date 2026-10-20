@@ -229,11 +229,11 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 }
 .track-holiday-status { margin-top: .75rem; }
 .track-holiday-status a { color: var(--accent); }
-.track-client-day, .calendar-planned, .calendar-all-day-event { border: 1px solid var(--line); border-inline-start: 4px solid var(--client-color, var(--accent)); border-radius: .3rem; background: var(--bs-body-bg); color: var(--bs-body-color); }
+.track-client-day, .calendar-session, .calendar-planned, .calendar-all-day-event { border: 1px solid var(--line); border-inline-start: 4px solid var(--client-color, var(--accent)); border-radius: .3rem; background: var(--bs-body-bg); color: var(--bs-body-color); }
 .track-client-day { display: flex; flex-direction: column; width: 100%; min-height: 2.75rem; text-align: left; padding: .3rem .4rem; margin-bottom: .3rem; font-size: .8rem; }
 .track-client-day > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .track-client-day-time { font-variant-numeric: tabular-nums; }
-button.track-client-day:hover, .calendar-planned:hover, .calendar-all-day-event:hover { background: var(--bs-tertiary-bg); color: var(--bs-body-color); border-color: var(--line); border-inline-start-color: var(--client-color, var(--accent)); }
+button.track-client-day:hover, .calendar-session:hover, .calendar-planned:hover, .calendar-all-day-event:hover { background: var(--bs-tertiary-bg); color: var(--bs-body-color); border-color: var(--line); border-inline-start-color: var(--client-color, var(--accent)); }
 button.track-client-day:disabled { opacity: .65; }
 .track-client-day-time-short { display: none; font-variant-numeric: tabular-nums; }
 @media(max-width: 767px) {
@@ -245,7 +245,7 @@ button.track-client-day:disabled { opacity: .65; }
   .track-day { height: 6rem; padding: .1rem; }
   .track-date { width: 1.5rem; height: 1.5rem; }
   .track-client-day { padding: .25rem .15rem; font-size: .75rem; }
-  .track-client-day, .calendar-planned, .calendar-all-day-event { border-inline-start-width: 3px; }
+  .track-client-day, .calendar-session, .calendar-planned, .calendar-all-day-event { border-inline-start-width: 3px; }
   .track-month th { font-size: .75rem; }
   .track-client-day-time { display: none; }
   .track-client-day-time-short { display: block; }
