@@ -1,5 +1,5 @@
 import {captureScreenshot} from './screenshots.js';
-import {openTaskManagement} from './navigation.js';
+import {openTaskHistory,clearTaskHistory} from './task-history.js';
 import {workSessionAction} from './workweek-session-actions.js';
 import {browserRequest} from './browser-request.js';
 import {openAccountMenu, openAbout, setTimeZone, setDurationFormat} from './navigation.js';
@@ -10,6 +10,7 @@ import {readFile, writeFile, rename} from 'node:fs/promises';
 const token = process.env.TIMEKEEPER_WEB_TOKEN;
 const readToken = process.env.TIMEKEEPER_WEB_READ_TOKEN;
 test.beforeAll(async({request})=>{const clients=(await (await api(request,'GET','/clients')).json()).items;if(!clients.length) await api(request,'POST','/clients',{name:'Browser client',color:'#2563eb'});});
+test.afterEach(async({request})=>{await clearTaskHistory(request);});
 async function signIn(page, credential = token) {
   await page.goto('/web/'); await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(credential); await page.getByRole('button', {name:'Sign in', exact:true}).click();
   await expect(page.locator('#status')).toHaveText('Up to date');
@@ -136,9 +137,9 @@ test('server build and deployment details describe the actual packaged server af
 test('core browser workflow manages records, tracks time, and preserves exact reports', async ({page, request}) => {
   const suffix = randomUUID().slice(0,8), project = 'Project ' + suffix, task = 'Task ' + suffix, label = 'Label ' + suffix;
   await signIn(page); await newNamed(page, 'Projects', 'project', project); await newNamed(page, 'Labels', 'label', label);
-  await openTaskManagement(page); await page.getByRole('button', {name:'New task', exact:true}).click();
-  await page.getByLabel('Summary', {exact:true}).fill(task); await page.getByLabel('Project', {exact:true}).selectOption({label:project}); await save(page);
-  let taskRow = page.locator('#tasks tr').filter({hasText:task}); await taskRow.getByRole('button', {name:'Start', exact:true}).click();
+  const projectRecord=(await (await api(request,'GET','/projects')).json()).items.find(value=>value.name===project);
+  const taskRecord=await (await api(request,'POST','/tasks',{summary:task,projectId:projectRecord.id,parentTaskId:null,url:null})).json();
+  const taskRow=await openTaskHistory(page,taskRecord,request); await taskRow.getByRole('button', {name:'Start', exact:true}).click();
   await page.locator('#editor').getByLabel(label, {exact:true}).check(); await page.locator('#editor').getByRole('button', {name:'Start', exact:true}).click();
   await expect(page.locator('#editor')).not.toBeVisible(); await expect(page.locator('#active-title')).toHaveText(task);
   await page.getByRole('button', {name:'Stop tracking', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Stop', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible();
@@ -167,7 +168,8 @@ test('core browser workflow manages records, tracks time, and preserves exact re
   const id = tasks.items.find(v => v.summary === task).id;
   const activities = await (await api(request,'GET',`/activities?from=2000-01-01T00:00:00Z&to=2100-01-01T00:00:00Z&taskId=${id}`)).json();
   for (const value of activities.items) { const read = await api(request,'GET',`/activities/${value.id}`); await api(request,'DELETE',`/activities/${value.id}`,undefined,{'If-Match':read.headers().etag}); }
-  await openTaskManagement(page); await taskRow.getByRole('button', {name:'Delete', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Delete', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible();
+  await clearTaskHistory(request);
+  const taskRead=await api(request,'GET',`/tasks/${id}`);await api(request,'DELETE',`/tasks/${id}`,undefined,{'If-Match':taskRead.headers().etag});
   for (const [tabName, container, value] of [['Projects','projects',project], ['Labels','labels',label]]) { await page.getByRole('button', {name:tabName, exact:true}).click(); await page.locator(`#${container} tr`).filter({hasText:value}).getByRole('button', {name:'Delete', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Delete', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible(); }
 });
 test('manual intervals spanning midnight create editable daily records with exact DST time and labels', async ({page, request}) => {
@@ -212,11 +214,11 @@ test('manual intervals spanning midnight create editable daily records with exac
   await api(request, 'DELETE', `/tasks/${task.id}`, undefined, {'If-Match':response.headers().etag});
 });
 test('live peer changes preserve a draft and a stale save cannot overwrite them', async ({page, request, browser}) => {
-  const task = await createTask(request); await signIn(page); await openTaskManagement(page);
-  await page.locator('#tasks tr').filter({hasText:task.summary}).getByRole('button', {name:'Edit', exact:true}).click(); await page.getByLabel('Summary', {exact:true}).fill('My unsaved draft');
-  const peer = await browser.newPage({baseURL:process.env.TIMEKEEPER_WEB_URL}); await signIn(peer); await openTaskManagement(peer);
-  await peer.locator('#tasks tr').filter({hasText:task.summary}).getByRole('button', {name:'Edit', exact:true}).click(); await peer.getByLabel('Summary', {exact:true}).fill('Peer edit ' + task.id); await save(peer);
-  await expect(page.locator('#tasks')).toContainText('Peer edit ' + task.id); await expect(page.getByLabel('Summary', {exact:true})).toHaveValue('My unsaved draft');
+  const task = await createTask(request); await signIn(page); await openTaskHistory(page,task,request);
+  await page.locator('#activities tr[data-kind=task]').filter({hasText:task.summary}).getByRole('button', {name:'Edit task', exact:true}).click(); await page.getByLabel('Summary', {exact:true}).fill('My unsaved draft');
+  const peer = await browser.newPage({baseURL:process.env.TIMEKEEPER_WEB_URL}); await signIn(peer); await openTaskHistory(peer,task,request);
+  await peer.locator('#activities tr[data-kind=task]').filter({hasText:task.summary}).getByRole('button', {name:'Edit task', exact:true}).click(); await peer.getByLabel('Summary', {exact:true}).fill('Peer edit ' + task.id); await save(peer);
+  await expect(page.locator('#activities')).toContainText('Peer edit ' + task.id); await expect(page.getByLabel('Summary', {exact:true})).toHaveValue('My unsaved draft');
   await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click(); await expect(page.locator('#editor-error')).toContainText('This record changed'); await expect(page.getByLabel('Summary', {exact:true})).toHaveValue('My unsaved draft'); await expect(page.getByLabel('Summary', {exact:true})).toBeEnabled();
   const record = await (await api(request, 'GET', '/tasks/' + task.id)).json(); expect(record.summary).toBe('Peer edit ' + task.id); await peer.close();
 });
@@ -228,10 +230,10 @@ test('read-only authorization and validation remain visible with the draft intac
   page.once('dialog',dialog=>dialog.accept());await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
 });
 test('lost start/stop replies retry the exact durable command only once', async ({page, request}) => {
-  const task = await createTask(request); await signIn(page); await openTaskManagement(page);
+  const task = await createTask(request); await signIn(page); await openTaskHistory(page,task,request);
   const keys = [];
   await page.route('**/api/v1/activities/start', async route => { keys.push(route.request().headers()['idempotency-key']); const response = await route.fetch(); expect(response.status()).toBe(201); await route.abort('failed'); }, {times:1});
-  await page.locator('#tasks tr').filter({hasText:task.summary}).getByRole('button', {name:'Start', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Start', exact:true}).click();
+  await page.locator('#activities tr[data-kind=task]').filter({hasText:task.summary}).getByRole('button', {name:'Start', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Start', exact:true}).click();
   await expect(page.locator('#editor-notice')).toContainText('outcome is unknown'); await expect(page.getByLabel('Summary', {exact:true})).toBeDisabled();
   page.on('request', request => { if (request.url().endsWith('/activities/start')) keys.push(request.headers()['idempotency-key']); });
   await page.getByRole('button', {name:'Retry same command', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible(); expect(new Set(keys).size).toBe(1);
@@ -270,7 +272,7 @@ test('reload restores the HttpOnly session and sign-out removes it', async ({pag
   expect(await page.evaluate(() => ({keys:Object.keys(localStorage), session:sessionStorage.length}))).toEqual({keys:[], session:0});
   await page.reload(); await expect(page.locator('#workspace')).toBeVisible(); await expect(page.locator('#status')).toHaveText('Up to date');
   await expect(page.locator('#login')).not.toBeVisible(); expect(await page.locator('#token').inputValue()).toBe('');
-  await openAccountMenu(page);await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#tasks')).toBeEmpty();
+  await openAccountMenu(page);await page.getByRole('button', {name:'Sign out', exact:true}).click(); await expect(page.locator('#activities')).toBeEmpty();
   expect(await page.evaluate(() => localStorage.getItem('timekeeper.access-token'))).toBeNull();
   await page.reload(); await expect(page.locator('#login')).toBeVisible(); await expect(page.locator('#workspace')).not.toBeVisible();
 });
@@ -316,14 +318,14 @@ test('future starts are rejected without losing browser drafts or changing recor
   await api(request, 'DELETE', '/tasks/' + task.id, undefined, {'If-Match':taskRead.headers().etag});
 });
 test('offline reconnect catches missed peer writes without replacing an open draft', async ({page, request}) => {
-  const task = await createTask(request); await signIn(page); await openTaskManagement(page);
-  await page.locator('#tasks tr').filter({hasText:task.summary}).getByRole('button', {name:'Edit', exact:true}).click(); await page.getByLabel('Summary', {exact:true}).fill('Offline draft');
+  const task = await createTask(request); await signIn(page); await openTaskHistory(page,task,request);
+  await page.locator('#activities tr[data-kind=task]').filter({hasText:task.summary}).getByRole('button', {name:'Edit task', exact:true}).click(); await page.getByLabel('Summary', {exact:true}).fill('Offline draft');
   await page.route('**/api/v1/**', route => route.abort('failed'));
   await expect(page.locator('#status')).toContainText('Reconnecting');
   const read = await api(request, 'GET', '/tasks/' + task.id);
   await api(request, 'PUT', '/tasks/' + task.id, {summary:'Missed peer ' + task.id, projectId:null, parentTaskId:null, url:null}, {'If-Match':read.headers().etag});
   await expect(page.getByLabel('Summary', {exact:true})).toHaveValue('Offline draft');
-  await page.unroute('**/api/v1/**'); await expect(page.locator('#status')).toHaveText('Up to date'); await expect(page.locator('#tasks')).toContainText('Missed peer ' + task.id);
+  await page.unroute('**/api/v1/**'); await expect(page.locator('#status')).toHaveText('Up to date'); await expect(page.locator('#activities')).toContainText('Missed peer ' + task.id);
   await expect(page.getByLabel('Summary', {exact:true})).toHaveValue('Offline draft');
   await page.locator('#editor').getByRole('button', {name:'Save', exact:true}).click(); await expect(page.locator('#editor-error')).toContainText('This record changed');
 });
@@ -346,7 +348,9 @@ test('workweek groups linked tasks under projects with seven day columns and con
   })).toBeTruthy();
   const iconAction = page.locator('#activities tr[data-kind=task]').first().getByRole('button', {name:'Edit task', exact:true});
   await expect(iconAction).toHaveAttribute('title', 'Edit task');
-  await expect(iconAction.locator('.icon')).toHaveAttribute('aria-hidden', 'true');
+  await expect(iconAction.locator('.bi-pencil-square')).toHaveAttribute('aria-hidden', 'true');
+  await expect(page.locator('#activity-tasks,#tasks,#add-task')).toHaveCount(0);
+  for(const selector of ['.actions .bi-play-fill','.actions .bi-trash','.tree-toggle .bi-chevron-down','.activity-icon .bi-clock'])await expect(page.locator('#activities '+selector).first()).toBeVisible();
   expect(await iconAction.evaluate(node => !node.textContent.includes('Edit task') && node.getBoundingClientRect().width >= 32)).toBeTruthy();
   expect(await page.locator('.tree-toggle').first().evaluate(node => node.getBoundingClientRect().height >= 32)).toBeTruthy();
   const table = page.locator('#activities table');
@@ -385,9 +389,8 @@ test('workweek groups linked tasks under projects with seven day columns and con
   await captureScreenshot(page,{path:'test-results/workweek-hierarchy-mobile.png',fullPage:true});
   const report = await (await api(request,'GET','/reports/activities?from=2025-10-19T22:00:00Z&to=2025-10-26T23:00:00Z&zoneId=Europe%2FOslo')).json();
   expect(report.total).toBe('PT24H59M59.876543211S');
-  await openTaskManagement(page);
-  await expect(page.locator('#tasks').getByRole('link',{name:'PLATFORM-3396: Clean registry '+suffix,exact:true})).toHaveAttribute('href',jiraUrl);
-  await page.locator('#tasks tr').filter({hasText:'#17: Check registry '+suffix}).getByRole('button',{name:'Start',exact:true}).click();
+  await expect(page.locator('#activities').getByRole('link',{name:'PLATFORM-3396: Clean registry '+suffix,exact:true})).toHaveAttribute('href',jiraUrl);
+  await page.locator('#activities tr[data-kind=task]').filter({hasText:'#17: Check registry '+suffix}).getByRole('button',{name:'Start',exact:true}).click();
   await expect(page.getByLabel('Task',{exact:true})).toHaveValue(child.id);
   await expect(page.getByLabel('Task',{exact:true}).locator('option:checked')).toHaveText('#17: Check registry '+suffix);
   await page.locator('#editor').getByRole('button',{name:'Start',exact:true}).click();
@@ -402,8 +405,8 @@ test('workweek groups linked tasks under projects with seven day columns and con
 test('live label changes update an open tracking draft without dropping selected references', async ({page, request}) => {
   const suffix = randomUUID().slice(0,8), task = await createTask(request);
   const original = await (await api(request,'POST','/labels',{name:'Original '+suffix,color:'#123456'})).json();
-  await signIn(page); await openTaskManagement(page);
-  await page.locator('#tasks tr').filter({hasText:task.summary}).getByRole('button',{name:'Start',exact:true}).click();
+  await signIn(page); await openTaskHistory(page,task,request);
+  await page.locator('#activities tr[data-kind=task]').filter({hasText:task.summary}).getByRole('button',{name:'Start',exact:true}).click();
   await page.getByLabel('Summary',{exact:true}).fill('Keep my tracking draft');
   await page.getByLabel(original.name,{exact:true}).check();
   const added = await (await api(request,'POST','/labels',{name:'Peer addition '+suffix,color:'#abcdef'})).json();
@@ -424,6 +427,7 @@ test('live label changes update an open tracking draft without dropping selected
   expect((await (await api(request,'GET','/activities?from=2000-01-01T00:00:00Z&to=2100-01-01T00:00:00Z&taskId='+task.id)).json()).items).toHaveLength(0);
   await page.getByRole('button',{name:'Cancel',exact:true}).click();
   const extra = await api(request,'GET','/labels/'+added.id);await api(request,'DELETE','/labels/'+added.id,undefined,{'If-Match':extra.headers().etag});
+  await clearTaskHistory(request);
   const final = await api(request,'GET','/tasks/'+task.id);await api(request,'DELETE','/tasks/'+task.id,undefined,{'If-Match':final.headers().etag});
 });
 
@@ -438,8 +442,8 @@ test('work session controls start once and stop independently of a task activity
   await page.getByRole('button',{name:'Start work session',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill('Browser work session');await page.getByLabel('Client',{exact:true}).selectOption({index:1});await page.locator('#save').click();
   await expect(page.locator('#work-session-state')).toHaveText('Running');await expect(page.locator('#editor')).not.toBeVisible();
   const first = await (await api(request,'GET','/work-sessions/active')).json();
-  await openTaskManagement(page);
-  await page.locator('#tasks tr').filter({hasText:task.summary}).getByRole('button',{name:'Start',exact:true}).click();
+  await openTaskHistory(page,task,request);
+  await page.locator('#activities tr[data-kind=task]').filter({hasText:task.summary}).getByRole('button',{name:'Start',exact:true}).click();
   await expect(page.locator('#editor').getByLabel('Work session',{exact:true})).toHaveCount(0);
   await page.locator('#editor').getByRole('button',{name:'Start',exact:true}).click();await expect(page.locator('#editor')).not.toBeVisible();
   const active = await (await api(request,'GET','/activities/active')).json();expect(active.workSessionId).toBeUndefined();
@@ -482,6 +486,7 @@ test('work session controls start once and stop independently of a task activity
   await page.getByRole('button',{name:'Stop work session',exact:true}).click();await expect(page.locator('#work-session-state')).toHaveText('Stopped');
   await removeSessionFixture(request,[first.id,second.id,history.id]);
   const timer = await api(request,'GET',`/activities/${active.id}`);await api(request,'DELETE',`/activities/${active.id}`,undefined,{'If-Match':timer.headers().etag});
+  await clearTaskHistory(request);
   const read = await api(request,'GET',`/tasks/${task.id}`);await api(request,'DELETE',`/tasks/${task.id}`,undefined,{'If-Match':read.headers().etag});
 });
 test('session toolbar targets the displayed session and preserves historical tools and read-only access', async ({page,request,browser}) => {

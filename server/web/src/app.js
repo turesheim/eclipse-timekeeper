@@ -113,7 +113,7 @@ async function refreshServerInfo(session) {
   }
 }
 function readOnlyWhileDisconnected() {
-  for (const id of ['add-client', 'add-task', 'add-project', 'add-label', 'add-activity', 'stop', 'session-start', 'session-stop', 'session-new', 'session-edit', 'session-delete']) $(id).disabled = !connected;
+  for (const id of ['add-client', 'add-project', 'add-label', 'add-activity', 'stop', 'session-start', 'session-stop', 'session-new', 'session-edit', 'session-delete']) $(id).disabled = !connected;
   for (const action of document.querySelectorAll('td.actions button')) action.disabled = !connected;
   calendar.setConnected(connected);
   track.setWritable(connected && canWrite);
@@ -158,10 +158,10 @@ const auth = authentication({
     refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
-    calendar.reset();track.reset();$('activity-tasks').open = false;collapsed.clear();collapsedClients.clear();canWrite = false;
+    calendar.reset();track.reset();collapsed.clear();collapsedClients.clear();canWrite = false;
     $('period-announcement').textContent = '';
     deleteCandidate = null;$('editor-delete-confirm').close();$('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
-    for (const id of ['clients', 'projects', 'tasks', 'labels', 'activities', 'days']) $(id).replaceChildren();
+    for (const id of ['clients', 'projects', 'labels', 'activities', 'days']) $(id).replaceChildren();
     for (const id of ['owner', 'status', 'active-title', 'active-details', 'work-session-current', 'work-session-state', 'work-session-elapsed', 'zone-caption', 'week-total']) $(id).textContent = '';
     $('startup').hidden = !restoring;$('login').hidden = restoring;$('workspace').hidden = true;$('session').hidden = true;$('sync-status').hidden = true;$('account-menu').open = false;$('remember-notice').textContent = '';
     tab('track');
@@ -229,7 +229,6 @@ function table(container, headings, rows) {
     const [title, hint] = {
       clients: [i18nText("ui.no_clients_yet"), i18nText("ui.add_a_client_to_organize_projects_and_work_sessions")],
       projects: [i18nText("ui.no_projects_yet"), i18nText("ui.create_a_project_and_choose_its_client")],
-      tasks: [i18nText("ui.no_tasks_yet"), i18nText("ui.create_a_task_to_start_tracking_your_work")],
       labels: [i18nText("ui.no_labels_yet"), i18nText("ui.add_labels_to_categorize_your_activities")],
       activities: [i18nText("ui.no_activities_this_week"), i18nText("ui.choose_another_week_start_a_task_or_add_time")]
     }[container];
@@ -306,7 +305,6 @@ function render() {
   $('stop').hidden = !active;readOnlyWhileDisconnected();
   table('clients', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.clients.map((value) => row([value.name, colorSwatch(value.color)], [action(i18nText("ui.edit"), () => openRecord('clients', value.id)), action(i18nText("ui.delete"), () => openDelete('clients', value.id))])));
   renderProjects(s);
-  table('tasks', [i18nText("ui.task"), i18nText("ui.project"), i18nText("ui.parent"), i18nText("ui.actions")], s.tasks.map((value) => row([taskLabel(value), name(s.projects, value.projectId), value.parentTaskId ? name(s.tasks, value.parentTaskId, 'summary') : '—'], [action(i18nText("ui.start"), () => openStart(value.id)), action(i18nText("ui.edit"), () => openRecord('tasks', value.id)), action(i18nText("ui.delete"), () => openDelete('tasks', value.id))])));
   table('labels', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.labels.map((value) => row([value.name, /^#[0-9a-f]{6}$/i.test(value.color) ? colorSwatch(value.color) : value.color || '—'], [action(i18nText("ui.edit"), () => openRecord('labels', value.id)), action(i18nText("ui.delete"), () => openDelete('labels', value.id))])));
   refreshLabelFields();refreshClientChoices();renderSession();
   $('week-total').textContent = displayDuration(s.report.total);$('days').replaceChildren();
@@ -571,7 +569,7 @@ $('stop').addEventListener('click', () => {
   if (!active.data || !begin(i18nText("ui.stop_tracking"), { command: 'stop', id: active.data.id, etag: active.etag, key: crypto.randomUUID() })) return;
   $('fields').append(element('p', i18nText("ui.stop_tracking_1e5b16", { value0: name(snapshot.tasks, active.data.taskId, 'summary') })));$('save').textContent = i18nText("ui.stop");showEditor();
 });
-for (const [id, collection] of [['add-client', 'clients'], ['add-project', 'projects'], ['add-task', 'tasks'], ['add-label', 'labels'], ['add-activity', 'activities']]) $(id).addEventListener('click', () => {void openRecord(collection).catch((error) => setStatus(errorText(error)));});
+for (const [id, collection] of [['add-client', 'clients'], ['add-project', 'projects'], ['add-label', 'labels'], ['add-activity', 'activities']]) $(id).addEventListener('click', () => {void openRecord(collection).catch((error) => setStatus(errorText(error)));});
 function values() {
   const get = (key) => $('fields').querySelector(`[name="${key}"]`)?.value;
   const time = (key) => editor.timeValue ? editor.timeValue(key) : get(key);

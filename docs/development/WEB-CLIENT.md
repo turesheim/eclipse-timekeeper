@@ -90,7 +90,7 @@ Run `npm run vendor:icons` in `server/web` to regenerate the pinned assets,
 project catalog and API allow-list. `npm run check:assets` verifies them.
 
 Workspace views use a Bootstrap `navbar fixed-bottom` with `navbar-nav` and
-`nav-link` controls. The seven views appear in this order: Calendar, Workweek, Week, Activities,
+`nav-link` controls. The seven views appear in this order: Calendar, Week, Workweek, Activities,
 Clients, Projects and Labels.
 The active view has `aria-current="page"`; compact screens show icons with
 accessible names, and wide screens also show labels. Safe-area padding keeps the
@@ -616,8 +616,8 @@ still running. Starts in the future remain invalid.
 
 Week shows work sessions and subscribed calendar plans. Recorded activities
 appear in **Activities**, keeping the Week display focused. Editing a work
-session never changes its activities. There is no separate Tasks view; expand
-**Manage tasks** in Activities to create, edit, start or remove task records.
+session never changes its activities. Task rows in Activities offer **Start**
+and **Edit task**. There is no separate task-management section.
 
 Repeated clock times have separate rows; shaded slots do not occur on a given
 day. A drag retains the original session snapshot and saves with its opaque
