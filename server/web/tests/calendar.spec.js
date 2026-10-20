@@ -18,7 +18,7 @@ async function put(request,collection,value,changes) {
 async function save(page) {await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');}
 async function calendar(page,credential=token,date='2025-10-20') {
   await page.goto('/web/');await expect(page.locator('#login-form button[type=submit]')).toBeEnabled();await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(credential);await page.getByRole('button',{name:'Sign in',exact:true}).click();
-  await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Calendar',exact:true}).click();
+  await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Week',exact:true}).click();
   await page.getByLabel('Calendar date',{exact:true}).fill(date);
   await expect(page.locator('#calendar-zone')).toContainText(monday(date));await expect(page.locator('.calendar-day')).toHaveCount(7);
 }
@@ -191,11 +191,14 @@ test('calendar shows seven days and editable work sessions while keeping activit
     await calendar(page);
     await expect(page.locator('[data-tab=calendar]')).toHaveAttribute('aria-current','page');
     await expect(bar(page,f.session.id)).toBeAttached();
-    await expect(bar(page,f.session.id)).toHaveCSS('background-color','rgb(255, 221, 136)');
-    await expect(bar(page,f.session.id)).toHaveCSS('color','rgb(0, 0, 0)');
+    const appearance=await page.evaluate(color=>{
+      const reference=document.createElement('div');reference.className='calendar-event calendar-planned';reference.dataset.imported='true';reference.style.setProperty('--client-color',color);document.body.append(reference);
+      const style=getComputedStyle(reference),values=Object.fromEntries(['background-color','color','border-top-style','border-top-color','border-inline-start-color','border-inline-start-width','border-radius'].map(property=>[property,style.getPropertyValue(property)]));reference.remove();return values;
+    },f.client.color);
+    for(const [property,value] of Object.entries(appearance))await expect(bar(page,f.session.id)).toHaveCSS(property,value);
     await expect(bar(page,f.session.id).locator('.calendar-session-title')).toHaveText(f.session.summary);
     await expect(bar(page,f.session.id).locator('.calendar-session-duration')).toHaveText('8h 0m');
-    await expect(bar(page,f.session.id)).toHaveCSS('border-radius','6px');
+    await expect(bar(page,f.session.id).locator('.calendar-session-label')).toHaveCSS('writing-mode','vertical-rl');
     const handles=bar(page,f.session.id).locator('.calendar-resize');
     await position(page,bar(page,f.session.id));await page.locator('#calendar-today').hover();
     await expect(handles.first()).toHaveCSS('opacity','0');
@@ -339,7 +342,7 @@ test('calendar copy and paste create only a new session and clear the clipboard 
     expect(await read(request,'work-sessions',f.session.id)).toEqual(f.session);await unchangedActivities(request,f);
     await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();
     await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
-    await page.getByRole('button',{name:'Calendar',exact:true}).click();await expect(page.locator('#calendar-paste')).toBeDisabled();
+    await page.getByRole('button',{name:'Week',exact:true}).click();await expect(page.locator('#calendar-paste')).toBeDisabled();
   } finally {await f.close();}
 });
 

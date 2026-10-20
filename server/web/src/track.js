@@ -1,3 +1,4 @@
+import {dateTimeFormat} from './formatters.js';
 import { getLocale } from './i18n.js';
 import { t as i18nText } from "./i18n.js";import { dateInZone, instantNanos, instantText } from './model.js';
 import { monthCalendar, monthSessions, shiftMonth } from './month-model.js';
@@ -126,15 +127,15 @@ export class MonthTrack {
       const noteFocused=this.grid.contains(active)?active?.dataset.trackNoteDate:null;
       const holidayFocused=this.grid.contains(active)?active?.dataset.trackHolidayDate:null;
       this.layout = layout;this.date = today;this.input.value = month;
-      const title = new Intl.DateTimeFormat(getLocale(), { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(month + '-15T12:00:00Z'));
+      const title = dateTimeFormat(getLocale(), { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(month + '-15T12:00:00Z'));
       this.root.querySelector('#track-title').textContent = title.charAt(0).toLocaleUpperCase(getLocale()) + title.slice(1);
       this.grid.replaceChildren();this.totals.replaceChildren();this.dailyTimes = new Map();this.clientTimes = new Map();
       const holidayCells=new Map();
       const table = node('table', undefined, 'track-month'),head = node('thead'),row = node('tr'),body = node('tbody');
       table.setAttribute('aria-label', i18nText("ui.work_hours_by_client_and_day"));
       for (let index = 0; index < 7; index++) {
-        const date = new Date(Date.UTC(2024, 0, 1 + index)),th = node('th', new Intl.DateTimeFormat(getLocale(), { weekday: 'short', timeZone: 'UTC' }).format(date));
-        th.scope = 'col';th.title = new Intl.DateTimeFormat(getLocale(), { weekday: 'long', timeZone: 'UTC' }).format(date);row.append(th);
+        const date = new Date(Date.UTC(2024, 0, 1 + index)),th = node('th', dateTimeFormat(getLocale(), { weekday: 'short', timeZone: 'UTC' }).format(date));
+        th.scope = 'col';th.title = dateTimeFormat(getLocale(), { weekday: 'long', timeZone: 'UTC' }).format(date);row.append(th);
       }
       head.append(row);table.append(head, body);this.grid.append(table);
       const clientsById = new Map(this.snapshot.clients.map((client) => [client.id, client]));
@@ -145,7 +146,7 @@ export class MonthTrack {
         const cell = node('td', undefined, day.inMonth ? 'track-day' : "track-day track-outside");cell.dataset.trackDate = day.date;
         holidayCells.set(day.date,cell);
         const date = node('time', String(Number(day.date.slice(-2))), 'track-date');date.dateTime = day.date;
-        date.title = new Intl.DateTimeFormat(getLocale(), { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(day.date + 'T12:00:00Z'));
+        date.title = dateTimeFormat(getLocale(), { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(day.date + 'T12:00:00Z'));
         if (day.date === today) {date.classList.add('track-today');date.setAttribute('aria-current', 'date');}
         const heading=node('div',undefined,'track-date-row');heading.append(date);cell.append(heading);week.append(cell);
         const entries = [...day.clients.values()].sort((a, b) => {

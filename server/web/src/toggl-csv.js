@@ -1,3 +1,4 @@
+import {dateTimeFormat} from './formatters.js';
 import { t as i18nText } from "./i18n.js";import { instantNanos, localDateTimeToInstant } from './model.js';
 
 const MAX_ROWS = 100000,MAX_BYTES = 20 * 1024 * 1024;
@@ -49,7 +50,7 @@ function date(value, format) {
 /** Preview only: this module never writes records or infers work sessions. */
 export function parseTogglDetailedCsv(text, { zone, dateFormat = 'ISO', now = new Date().toISOString() } = {}) {
   if (!zone) throw new Error(i18nText("ui.choose_the_source_iana_time_zone"));
-  try {new Intl.DateTimeFormat('en', { timeZone: zone });}
+  try {dateTimeFormat('en', { timeZone: zone });}
   catch {throw new Error(i18nText("ui.choose_the_source_iana_time_zone"));}
   const records = csvRecords(text),header = records.shift()?.fields.map((value) => value.trim());
   if (!header?.length || new Set(header).size !== header.length || header.some((value) => !value))

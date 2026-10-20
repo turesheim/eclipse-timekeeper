@@ -1,3 +1,4 @@
+import {dateTimeFormat} from './formatters.js';
 import {getLocale,t as i18nText} from './i18n.js';
 import {publicHolidayCalendar,selectedHolidayCountry} from './holidays.js';
 
@@ -34,7 +35,7 @@ export class TrackHolidays {
   openHoliday(date) {
     const holidays=this.holidayData?.days.get(date);if(!holidays?.length)return;
     this.holidayOrigin=date;
-    const fullDate=new Intl.DateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
+    const fullDate=dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
     this.holidayTitle.textContent=i18nText('holidays.on_date',{date:fullDate});this.holidayContext.textContent=this.holidayCountry();
     this.holidayList.replaceChildren(...holidays.map(value=>node('li',value.name)));
     if(!this.holidayDialog.open)this.holidayDialog.showModal();this.holidayClose.focus();
@@ -54,7 +55,7 @@ export class TrackHolidays {
       const cell=this.holidayCells.get(date);if(!cell)continue;
       cell.classList.add('track-public-holiday');
       const names=holidays.map(value=>value.name).join(' · '),button=node('button',undefined,'btn btn-link btn-sm track-holiday-label');button.type='button';button.dataset.trackHolidayDate=date;
-      const fullDate=new Intl.DateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
+      const fullDate=dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
       button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-label',i18nText('holidays.details',{date:fullDate,names}));button.title=names;
       button.append(cell.querySelector('.track-date'),node('span',names,'track-holiday-name'));button.addEventListener('click',()=>this.openHoliday(date));
       const heading=cell.querySelector('.track-date-row'),note=heading.querySelector('.track-day-note');

@@ -1,5 +1,5 @@
 import {captureScreenshot} from './screenshots.js';
-import {openAccountMenu} from './navigation.js';
+import {openAccountMenu,setDurationFormat} from './navigation.js';
 import {workSessionAction,workSessionDetails} from './workweek-session-actions.js';
 import {test, expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -69,7 +69,7 @@ test('Workweek groups local session times by client/project with exact DST total
     await expect(client.locator('td').nth(5)).toHaveText('0h 30m');await expect(client.locator('td').nth(6)).toHaveText('25h 0m');await expect(row.locator('td').last()).toHaveText('25h 30m');
     await expect(page.locator(`#week-sessions [data-work-session-id="${outside.id}"]`)).toHaveCount(0);
     await expect(page.locator('#week-total')).toHaveText(nanosText(activityTotal));
-    await page.getByLabel('Duration format', {exact: true}).selectOption('decimal'); await expect(row.locator('td').last()).toHaveText('25.50h'); await expect(page.locator('#week-total')).toHaveText(decimalHoursText(activityTotal));
+    await setDurationFormat(page,'decimal'); await expect(row.locator('td').last()).toHaveText('25.50h'); await expect(page.locator('#week-total')).toHaveText(decimalHoursText(activityTotal));
     await expect(page.locator('#activities-panel')).not.toBeVisible();await page.locator('[data-tab=activities]').click();
     await expect(page.locator('#activities')).toBeVisible();await expect(page.locator('#days')).toBeVisible();await expect(page.locator('#week-sessions-section')).not.toBeVisible();
     await expect(page.getByLabel('Duration format',{exact:true})).toHaveValue('decimal');await expect(page.getByLabel('Week containing',{exact:true})).toHaveValue('2025-10-26');

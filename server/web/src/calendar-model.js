@@ -1,3 +1,4 @@
+import {dateTimeFormat} from './formatters.js';
 import { t as i18nText } from "./i18n.js";import { addDays, dayStart, instantNanos, nanosInstant, localDateTime, localDateTimeToInstant, dateInZone } from './model.js';
 
 export const CALENDAR_STEP = 15n * 60n * 1000000000n;
@@ -5,7 +6,7 @@ const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 
 /** Shared wall-clock rows, with extra rows for repeated times and gaps on affected days. */
 export function calendarWeek(first, zone) {
-  const clock = new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const clock = dateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
   const days = Array.from({ length: 7 }, (_, index) => {
     const date = addDays(first, index),slots = [];
     let start;

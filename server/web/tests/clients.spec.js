@@ -62,12 +62,12 @@ test('clients maintain names and colors, own projects and color work-session sum
     await captureScreenshot(page,{path:'test-results/work-session-date-picker-narrow.png',fullPage:true});await page.setViewportSize({width:1280,height:720});
     await page.getByLabel('Summary',{exact:true}).fill('A separate description');await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-20T08:00');await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2025-10-20T16:00');await save(page);
     session=(await (await api(request,'GET','/work-sessions?clientId='+client.id)).json()).items[0];expect(session.summary).toBe('A separate description');
-    await page.getByRole('button',{name:'Calendar',exact:true}).click();await page.getByLabel('Calendar date',{exact:true}).fill('2025-10-20');
-    const bar=page.locator(`.calendar-session[data-session-id="${session.id}"]`).first();await expect(bar).toHaveCSS('background-color','rgb(255, 238, 0)');await expect(bar).toHaveAttribute('title',new RegExp(prefix));
+    await page.getByRole('button',{name:'Week',exact:true}).click();await page.getByLabel('Calendar date',{exact:true}).fill('2025-10-20');
+    const bar=page.locator(`.calendar-session[data-session-id="${session.id}"]`).first();await expect(bar).toHaveCSS('border-inline-start-color','rgb(255, 238, 0)');await expect(bar).toHaveAttribute('title',new RegExp(prefix));
     await page.getByRole('button',{name:'Clients',exact:true}).click();let row=page.locator('#clients tr').filter({hasText:prefix});await row.getByRole('button',{name:'Edit',exact:true}).click();
     await page.getByLabel('Name',{exact:true}).fill(prefix+' renamed');await page.getByLabel('Color',{exact:true}).fill('#102030');await save(page);
-    await page.getByRole('button',{name:'Calendar',exact:true}).click();await expect(bar).toHaveCSS('background-color','rgb(16, 32, 48)');await expect(bar).toHaveCSS('color','rgb(255, 255, 255)');
-    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Calendar',exact:true}).click();await page.getByLabel('Calendar date',{exact:true}).fill('2025-10-20');await expect(bar).toHaveCSS('background-color','rgb(16, 32, 48)');await expect(bar).toHaveAttribute('title',new RegExp(prefix+' renamed'));
+    await page.getByRole('button',{name:'Week',exact:true}).click();await expect(bar).toHaveCSS('border-inline-start-color','rgb(16, 32, 48)');await expect(bar).toHaveCSS('color',await page.locator('body').evaluate(node=>getComputedStyle(node).color));
+    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Week',exact:true}).click();await page.getByLabel('Calendar date',{exact:true}).fill('2025-10-20');await expect(bar).toHaveCSS('border-inline-start-color','rgb(16, 32, 48)');await expect(bar).toHaveAttribute('title',new RegExp(prefix+' renamed'));
     await captureScreenshot(page,{path:'test-results/client-calendar.png',fullPage:true});
     await page.getByRole('button',{name:'Clients',exact:true}).click();row=page.locator('#clients tr').filter({hasText:prefix});await row.getByRole('button',{name:'Delete',exact:true}).click();await page.locator('#save').click();await expect(page.locator('#editor-error')).toContainText('conflicts');await page.locator('#cancel').click();
     for(const [collection,values] of [['work-sessions',[session]],['projects',projects]]) for(const value of values) {const current=await api(request,'GET',`/${collection}/${value.id}`);await api(request,'DELETE',`/${collection}/${value.id}`,undefined,{'If-Match':current.headers().etag});}
@@ -142,6 +142,16 @@ test('project icon picker searches the full catalog with bounded rendering and p
     const code=await page.getByRole('radio',{name:'Code',exact:true}).elementHandle();
     await page.getByRole('button',{name:'More icons',exact:true}).click();await expect(choices.locator('input')).toHaveCount(121);
     expect(await code.evaluate(node=>node.isConnected)).toBe(true);
+    const category=picker.getByRole('combobox',{name:'Category',exact:true}),style=picker.getByRole('combobox',{name:'Icon style',exact:true});
+    await category.selectOption('communications');await expect(choices.locator('input')).toHaveCount(61);await expect(picker.getByRole('status')).toContainText('143');
+    await search.fill('bell');await style.selectOption('filled');await expect(choices.locator('input')).toHaveCount(3);await expect(page.getByRole('radio',{name:'Bell',exact:true})).toHaveCount(0);
+    await page.getByRole('radio',{name:'Bell Fill',exact:true}).check();
+    await style.selectOption('unfilled');await expect(page.getByRole('radio',{name:'Bell',exact:true})).toBeVisible();await expect(page.getByRole('radio',{name:'Bell Fill',exact:true})).toHaveCount(0);await expect(picker.locator('[name=icon]:checked')).toHaveValue('bell-fill');
+    await category.selectOption('weather');await expect(picker.getByRole('status')).toContainText('No matching icons.');await expect(picker.locator('[name=icon]:checked')).toHaveValue('bell-fill');
+    await search.fill('cloud');await expect(page.getByRole('radio',{name:'Cloud',exact:true})).toBeVisible();
+    await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(category).toBeVisible();await expect(style).toBeVisible();
+    await page.setViewportSize({width:1280,height:720});
+    await category.selectOption('all');await style.selectOption('all');
     await search.fill('yin-yang');await expect(page.getByRole('radio',{name:'Yin Yang',exact:true})).toBeVisible();await expect(choices.locator('input')).toHaveCount(2);
     await page.getByRole('radio',{name:'Yin Yang',exact:true}).check();
     await search.fill('rocket');await expect(page.getByRole('radio',{name:'Rocket',exact:true})).toBeVisible();await expect(picker.locator('[name=icon]:checked')).toHaveValue('yin-yang');
@@ -198,7 +208,7 @@ test('optional project icons persist and Track shows distinct icons to the right
     const row=page.locator(`#projects [data-project-id="${project.id}"]`);await expect(row.locator('[data-project-icon=code]')).toBeVisible();await row.getByRole('button',{name:'Edit',exact:true}).click();await expect(page.getByRole('radio',{name:'Code',exact:true})).toBeChecked();
     await page.getByLabel('Name',{exact:true}).fill(prefix+' Website renamed');await save(page);
     await page.getByRole('button',{name:'Workweek',exact:true}).click();await page.getByLabel('Week containing',{exact:true}).fill('2025-10-20');await expect(page.locator(`#week-sessions [data-week-project="${project.id}"] [data-project-icon=code]`)).toBeVisible();
-    await page.getByRole('button',{name:'Track',exact:true}).click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
+    await page.getByRole('button',{name:'Calendar',exact:true}).click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
     const entry=page.locator(`[data-track-date="2025-10-20"] [data-track-daily-client="${client.id}"]`),icons=entry.locator('.track-project-icons [data-project-icon]');
     await expect(entry.locator('.track-client-day-time')).toHaveText('5h 0m');await expect(icons).toHaveCount(2);await expect(entry.locator('[data-project-icon=code]')).toHaveAttribute('title',new RegExp(other.name));await expect(entry).toHaveAttribute('title',new RegExp(globe.name));
     async function iconsFollow(duration){const clock=await duration.boundingBox();for(const icon of await icons.all()){const box=await icon.boundingBox();expect(box.x).toBeGreaterThanOrEqual(clock.x+clock.width-.5);}}
@@ -209,7 +219,7 @@ test('optional project icons persist and Track shows distinct icons to the right
     await page.getByRole('button',{name:'Projects',exact:true}).click();await row.getByRole('button',{name:'Edit',exact:true}).click();await page.getByRole('radio',{name:'None',exact:true}).check();await save(page);await expect(row.locator('[data-project-icon]')).toHaveCount(0);
     expect((await (await api(request,'GET','/projects/'+project.id)).json()).icon).toBeNull();
     const current=await api(request,'GET','/projects/'+other.id);await api(request,'PUT','/projects/'+other.id,{name:other.name,icon:null},{'If-Match':current.headers().etag});
-    await page.getByRole('button',{name:'Track',exact:true}).click();await expect(icons).toHaveCount(1);await expect(entry.locator('[data-project-icon=globe]')).toBeVisible();await expect(entry.locator('.track-client-day-time-short')).toHaveText('5h');
+    await page.getByRole('button',{name:'Calendar',exact:true}).click();await expect(icons).toHaveCount(1);await expect(entry.locator('[data-project-icon=globe]')).toBeVisible();await expect(entry.locator('.track-client-day-time-short')).toHaveText('5h');
   } finally {
     for(const [collection,id] of records){const current=await api(request,'GET',`/${collection}/${id}`);await api(request,'DELETE',`/${collection}/${id}`,undefined,{'If-Match':current.headers().etag});}
     const profile=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:previous.zoneId},{'If-Match':profile.headers().etag});

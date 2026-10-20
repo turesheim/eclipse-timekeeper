@@ -1,5 +1,5 @@
 import { getLocale } from './i18n.js';
-import { t as i18nText } from "./i18n.js";import { isProjectIcon, projectIcon, projectIconLabel, searchProjectIcons } from './icons.js';
+import { t as i18nText } from "./i18n.js";import { isProjectIcon, projectIcon, projectIconCategories, projectIconLabel, searchProjectIcons } from './icons.js';
 
 const pageSize = 60;
 const element = (tag, text, className) => {
@@ -16,11 +16,22 @@ export function createProjectIconPicker(initial) {
   const search = element('input', undefined, 'form-control');
   search.type = 'search';search.setAttribute('aria-label', i18nText("ui.search_project_icons"));
   search.placeholder = i18nText("ui.search_all_icons", { value0: searchProjectIcons().length.toLocaleString(getLocale()) });search.autocomplete = 'off';
+  const filters=element('div',undefined,'project-icon-filters');
+  function select(label,options){
+    const field=element('label',i18nText(label),'form-label'),input=element('select',undefined,'form-select');
+    for(const [value,text] of options){const option=element('option',text);option.value=value;input.append(option);}
+    field.append(input);filters.append(field);return input;
+  }
+  const category=select('icons.category',[
+    ['all',i18nText('icons.all')+' ('+searchProjectIcons().length.toLocaleString(getLocale())+')'],
+    ...projectIconCategories.map(value=>[value.id,i18nText('icons.category.'+value.id)+' ('+value.count.toLocaleString(getLocale())+')'])
+  ]);
+  const style=select('icons.style',['all','filled','unfilled'].map(value=>[value,i18nText('icons.style.'+value)]));
   const status = element('p', undefined, 'hint d-flex flex-wrap justify-content-between gap-2');status.setAttribute('role', 'status');
   const count = element('span'),selection = element('span');status.append(count, selection);
   const retained = element('input');retained.type = 'radio';retained.name = 'icon';retained.hidden = true;
   const more = element('button', i18nText("ui.more_icons"), 'btn btn-outline-secondary');more.type = 'button';
-  group.append(element('legend', i18nText("ui.icon_optional")), search, choices, status, more);
+  group.append(element('legend', i18nText("ui.icon_optional")), search, filters, choices, status, more);
 
   function updateSelection() {
     const visible = [...choices.querySelectorAll('input')].find((input) => input.value === selected);
@@ -46,10 +57,11 @@ export function createProjectIconPicker(initial) {
     more.hidden = shown >= matches.length;return first;
   }
   function filter() {
-    matches = searchProjectIcons(search.value);shown = 0;
+    matches = searchProjectIcons(search.value,{category:category.value,style:style.value});shown = 0;
     choices.replaceChildren(choice({ id: '', label: i18nText("ui.none") }));appendPage();choices.scrollTop = 0;
   }
   search.addEventListener('input', () => {if (!search.disabled) filter();});
+  for(const input of [category,style])input.addEventListener('change',()=>{if(!input.disabled)filter();});
   more.addEventListener('click', () => {
     if (search.disabled) return;
     const first = appendPage();

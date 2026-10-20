@@ -90,7 +90,7 @@ Run `npm run vendor:icons` in `server/web` to regenerate the pinned assets,
 project catalog and API allow-list. `npm run check:assets` verifies them.
 
 Workspace views use a Bootstrap `navbar fixed-bottom` with `navbar-nav` and
-`nav-link` controls. The seven views appear in this order: Track, Workweek, Calendar, Activities,
+`nav-link` controls. The seven views appear in this order: Calendar, Workweek, Week, Activities,
 Clients, Projects and Labels.
 The active view has `aria-current="page"`; compact screens show icons with
 accessible names, and wide screens also show labels. Safe-area padding keeps the
@@ -99,22 +99,24 @@ bar and page content clear of each other. Standard action buttons use Bootstrap
 clickable sync indicator sits immediately beside the Timekeeper title in the
 header, remains available in My Account and is hidden when signed out.
 
-## Track month view
+## Calendar month view
 
-**Track** is the default workspace tab. Its Monday-to-Sunday month grid shows
+**Calendar** is the default workspace tab. Its Monday-to-Sunday month grid shows
 one client-coloured summary per client and day, with recorded session hours per
 client above it. Only clients with logged time in the selected month are shown.
 Multiple sessions for the same client are combined. Use the controls on the left
 to move between months or return to the current month. The calendar button inside
 the Month selector opens a month/year picker; a month can also be entered as `YYYY-MM`.
 On mobile, swipe left across the month to go forward or right to go back.
-Workweek, Activities and Calendar also support swiping between weeks on their
+Workweek, Activities and Week also support swiping between weeks on their
 headings or other non-scrolling areas. Wide tables and the calendar grid keep
 their normal scrolling and editing gestures. Date controls remain available.
 Right-click a day or **press and hold** it on a touch screen, then choose
 **Add day note** / **Edit day note**. A short label such as “Ferie” or “Avspasering”
 appears beside the date in blue, distinct from red national holidays. Select the
-label to edit it, or use the small note icon beside an empty date. Keyboard users can
+label to edit it, or use the small note icon shown on hover or keyboard focus beside
+an empty date. Empty-day icons are hidden by default on touch screens;
+press and hold a day to create its note. Keyboard users can
 focus that button and press **Shift+F10** for the same menu. Movement cancels a
 long press, preserving scrolling and month swipes.
 
@@ -140,21 +142,21 @@ contribute to the total, choose one by its summary, project and local times.
 Optional project icons appear to the right of each daily duration. The same icon
 is shown once when several contributing projects use it; hover details retain
 all project names. Sessions without an icon add no placeholder.
-The same editor is available in Calendar and Workweek. Daily summaries remain
+The same editor is available in Week and Workweek. Daily summaries remain
 readable in read-only sessions, where editing is unavailable.
 
 These views use synthetic records from `tests/track.spec.js`; the browser uses
 Los Angeles time while the account uses Oslo time.
 
-![Track month view on desktop](../assets/screenshots/track-month-desktop.png)
+![Calendar month view on desktop](../assets/screenshots/track-month-desktop.png)
 
-![Track month view on a narrow screen](../assets/screenshots/track-month-narrow.png)
+![Calendar month view on a narrow screen](../assets/screenshots/track-month-narrow.png)
 
-![Track month and year picker](../assets/screenshots/track-month-picker.png)
+![Calendar month and year picker](../assets/screenshots/track-month-picker.png)
 
 ## Public holidays
 
-Track marks national public holidays for the country selected under
+Calendar marks national public holidays for the country selected under
 **My Account → Profile → National holidays**. This choice is independent of
 **Language and region**: Norwegian holidays can use an English interface.
 The default uses the browser region; choose a country explicitly to share it
@@ -176,8 +178,8 @@ no icon or underline. Select the date or holiday name to read the full date and 
 for that day. This also works with read-only access. On narrow screens the names
 are shortened visually; the dialog, hover title and accessible name retain them.
 Holiday information does not change sessions, totals or editing permissions.
-Holiday dates have a faint red background in Track and Calendar in every theme,
-including weekend holidays. Calendar headers show the holiday name and preserve
+Holiday dates have a faint red background in Calendar and Week in every theme,
+including weekend holidays. Week headers show the holiday name and preserve
 today’s marker.
 
 The locally bundled [date-holidays](https://github.com/commenthol/date-holidays)
@@ -192,7 +194,7 @@ country list and licenses; `npm run check:assets` verifies every generated file.
 
 These previews use a Norwegian account with a browser in Pacific/Kiritimati:
 
-![National public holidays in Track](../assets/screenshots/public-holidays-desktop.png)
+![National public holidays in Calendar](../assets/screenshots/public-holidays-desktop.png)
 
 ![Public holiday details on mobile](../assets/screenshots/public-holidays-details-mobile.png)
 
@@ -260,12 +262,12 @@ The small application theme in `style.css` defines the green palette, typography
 spacing and visible keyboard focus. The work-session card establishes the baseline:
 a client-color accent, summary, explicit running/stopped status, local times,
 duration and consistently sized icon actions. Historical records and detailed
-totals are available in Workweek, Activities and Calendar. Client color is always accompanied
+totals are available in Workweek, Activities and Week. Client color is always accompanied
 by text.
 The same controls apply to sign-in/setup/recovery, account management, activities,
 clients, projects, tasks and labels. Record tables become labelled cards on narrow
-screens so actions stay in view; Workweek, Activities and Calendar retain their specialized
-scrollable layouts. Calendar geometry is isolated in `calendar.css`.
+screens so actions stay in view; Workweek, Activities and Week retain their specialized
+scrollable layouts. Week geometry is isolated in `calendar.css`.
 
 These screenshots use synthetic records from `tests/design.spec.js` at 1440 and
 390 pixels wide. The design tests also capture all workspace views and account,
@@ -351,7 +353,7 @@ like the Eclipse view. Its daily and weekly summaries report activity time.
 Workweek and Activities share the selected week and duration format. Selecting
 a day filters Activities without hiding work sessions in Workweek. Task totals include their subtasks. **Hide activities**
 keeps the project/task outline visible; **Show activities** restores its rows.
-**Duration format** chooses conventional time or decimal hours for this browser
+**Duration format** in **My Account → Profile** chooses conventional time or decimal hours for this browser
 session. Decimal hours use two places, rounded from each exact aggregate rather
 than adding rounded daily cells. Display options do not change recorded times.
 Daily and weekly summaries show whole seconds; stored times and calculations
@@ -440,12 +442,12 @@ local times and duration. Its timing/recording buttons sit beside the session
 tools, separated by a divider; on narrow screens the tools wrap below a horizontal
 divider. Tools target the session shown in the card and are disabled when no
 session exists or access is read-only. Workweek provides historical edit/delete
-actions, and Calendar provides historical editing. Opening a historical editor
+actions, and Week provides historical editing. Opening a historical editor
 does not change the shared panel's target. Start/stop controls remain independent
 of activity timers. Counters use server timestamps and elapsed browser time;
 when offline they freeze. The card contains no history selector, duplicate totals
 or activity list; historical records and detailed reports remain in Workweek,
-Activities and Calendar.
+Activities and Week.
 
 A work session is an independent interval for one client. Its tools are **Edit**
 and **Delete**. Create or edit activities in Activities; task timers
@@ -453,7 +455,7 @@ run independently. There are no session selectors or manual activity links.
 
 Work sessions may have several labels selected in the start, record and edit
 forms. The compact card shows their names; Workweek tooltips and the session
-details menu include them. Calendar strips include them in their accessible
+details menu include them. Week strips include them in their accessible
 description without changing the client's color.
 Moving, resizing, stopping and copying a session preserve its labels without
 changing any activity labels. JSON and CSV transfers remap labels into the
@@ -499,6 +501,13 @@ session cookies work. Run from the repository root after packaging the server:
 cd server/web && npx playwright install --with-deps webkit && cd ../..
 python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --browser webkit --https
 ```
+
+Calendar boundary searches and timer displays reuse native date/number formatters
+through caches bounded to 32 entries each, keyed by locale and formatting options.
+The running-calendar regression advances a minute of timer updates without
+repeated formatter allocation, checks that My Account stops hidden timer paints,
+and verifies that returning to the workspace catches up the displayed elapsed time.
+Timer paints also stop while the browser document is hidden.
 
 The HTTPS fixture requires `openssl` on `PATH` to create a temporary test
 certificate. It uses a loopback reverse proxy and accepts that certificate only
@@ -556,9 +565,9 @@ also launches a real browser peer against its installed runtime's server;
 [WEB-ECLIPSE.md](../verification/WEB-ECLIPSE.md) records that bidirectional verification.
 Final release installation remains a separate gate.
 
-## Calendar
+## Week
 
-The **Calendar** tab shows all seven days. Calendar, Workweek and Activities share the
+The **Week** tab shows all seven days. Week, Workweek and Activities share the
 chosen week and the account's time zone. Use the arrows, **Today**, or the date
 field to navigate. On smaller screens, scroll inside the calendar to see the
 remaining days and hours.
@@ -577,7 +586,7 @@ separate instants, and shaded/nonexistent endpoint times cannot create a session
 
 On touchscreens, enable **Select time range** before dragging empty space. This
 explicit mode leaves ordinary touch scrolling available when it is off. It turns
-off when the range opens for review, when leaving Calendar, on disconnect and at
+off when the range opens for review, when leaving Week, on disconnect and at
 sign-out. Existing work-session move/resize gestures continue to work. Keyboard
 users can select a day/time with the arrow keys and press Enter, or use **Record
 work session**, then enter the desired end time in the editor.
@@ -605,8 +614,8 @@ the signed-in browser session and is cleared on sign-out. A running source keeps
 its blank end in the copy; finish the copy's interval if another session is
 still running. Starts in the future remain invalid.
 
-Calendar shows work sessions and subscribed calendar plans. Recorded activities
-appear in **Activities**, keeping the Calendar display focused. Editing a work
+Week shows work sessions and subscribed calendar plans. Recorded activities
+appear in **Activities**, keeping the Week display focused. Editing a work
 session never changes its activities. There is no separate Tasks view; expand
 **Manage tasks** in Activities to create, edit, start or remove task records.
 
@@ -618,8 +627,8 @@ or repeating an ordinary write.
 
 ### Calendar subscriptions
 
-Open **My Account → Calendars** to manage read-only iCalendar subscriptions.
-Planned events remain visible in Calendar.
+Open **My Account → Weeks** to manage read-only iWeek subscriptions.
+Planned events remain visible in Week.
 Choose **Add calendar**, enter a descriptive name and subscription URL, and select
 its client. HTTPS and `webcal://` subscription links are supported; provider login
 and two-way calendar editing are outside this first version. The saved URL is
@@ -627,7 +636,7 @@ kept private: editing shows an empty replacement field, and leaving it blank
 preserves the existing link. The list shows the last successful refresh
 and any specific refresh error. Each account may have up to 20 subscriptions.
 
-Calendars refresh automatically about every 15 minutes. **Refresh calendar**
+Weeks refresh automatically about every 15 minutes. **Refresh calendar**
 requests an update immediately, with a 30-second cooldown between attempts.
 Failed refreshes keep the last successful events and explain whether the problem
 is the address, connection, certificate, provider access or file contents.
@@ -638,14 +647,14 @@ and their source history intact. Clients with subscriptions cannot be deleted
 until those subscriptions are removed or reassigned.
 
 Calendar events use neutral backgrounds and the same narrow, solid client-coloured
-indicator on the left as monthly Track entries. Events awaiting import use a
+indicator on the left as monthly Calendar entries. Events awaiting import use a
 dotted outline and a **Planned** label; imported events use a solid outline and a
 **Recorded** label. Event cards have no icons; the client and
 calendar name remain available in their text and accessible name. They appear
 beside recorded work without contributing to reports. Select
 an event with the pointer, touch or keyboard to see its full interval, source,
 location and plain-text description. Read-only sessions can view details.
-All-day plans appear above the time grid, with their exclusive iCalendar end date
+All-day plans appear above the time grid, with their exclusive iWeek end date
 shown as an inclusive human-readable range. Timed events without an end are
 shown as zero-duration markers. All presentation follows the account time zone;
 floating calendar times use that zone. Recurrences retain local wall-clock times
@@ -675,7 +684,7 @@ expansion are bounded; no attachment or timezone-definition URLs are fetched.
 Feeds are limited to 2 MiB, 5,000 VEVENT revisions and 2,000 visible occurrences
 per calendar. The API accepts windows of at most 31 civil days.
 
-![Planned and recorded time in Calendar](../assets/screenshots/calendar-subscriptions-desktop.png)
+![Planned and recorded time in Week](../assets/screenshots/calendar-subscriptions-desktop.png)
 
 ![All-day calendar details on mobile](../assets/screenshots/calendar-subscriptions-details-mobile.png)
 
@@ -686,18 +695,21 @@ project count. Use the client chevron to expand or collapse its projects.
 Collapse choices survive refreshes and tab changes. Create or edit a project to
 select an optional icon from the bundled picker, or choose **None** to remove it.
 Icons also appear beside project names in Workweek and beside daily durations
-in Track. They are retained in account downloads and JSON/CSV transfers.
+in Calendar. They are retained in account downloads and JSON/CSV transfers.
 
-The project icon picker offers 2,078 bundled Bootstrap Icons. Search by
-name or keyword across the entire catalog, including icons not yet shown, or
-choose **More icons** to browse. Filtering preserves the
+The project icon picker offers 2,078 bundled Bootstrap Icons. Choose one of
+Bootstrap's 29 categories, such as **Communications**, **Files & Folders** or
+**Weather**, and filter by **Filled** or **Unfilled** style. Search by name,
+keyword or category across the entire catalog, including icons not yet shown,
+or choose **More icons** to browse. Category counts cover the full bundled set;
+the results count reflects the combined filters. Filtering preserves the
 current selection; **None** removes an icon. Icons work offline.
 
 ![Optional project icon picker](../assets/screenshots/project-icon-picker.png)
 
-![Project icons beside Track durations](../assets/screenshots/track-project-icons.png)
+![Project icons beside Calendar durations](../assets/screenshots/track-project-icons.png)
 
-![Project icons in Track on a narrow screen](../assets/screenshots/track-project-icons-mobile.png)
+![Project icons in Calendar on a narrow screen](../assets/screenshots/track-project-icons-mobile.png)
 
 ![Projects grouped by client](../assets/screenshots/projects-grouped-mobile.png)
 
@@ -739,7 +751,7 @@ before importing.
 Each CSV row defaults to one continuous work session with a reviewed client and
 optional description in Summary. Activity import is an explicit alternative. Both modes
 share durable progress, duplicate review and whole-job Undo; sessions create no
-companion task/activity records and contribute to Track’s client totals.
+companion task/activity records and contribute to Calendar’s client totals.
 Source tags become reviewed work-session labels. Resuming an older import keeps
 its original mappings, and repeat imports preserve existing session edits.
 
@@ -755,7 +767,7 @@ Undo with explicit edited-record decisions. See the
 
 Work sessions support an optional project in start, record and edit dialogs.
 Selecting a project selects its client; changing to a different client clears the
-project. Calendar movement, resizing and copying retain the project. Toggl work-session imports review projects under their client without creating task activities.
+project. Week movement, resizing and copying retain the project. Toggl work-session imports review projects under their client without creating task activities.
 
 Service administration uses `/admin/` and `/api/v1/admin/`. General settings show
 saved versus effective configuration; versioned saves require a real account

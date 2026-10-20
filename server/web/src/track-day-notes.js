@@ -1,3 +1,4 @@
+import {dateTimeFormat} from './formatters.js';
 import {getLocale,t} from './i18n.js';
 import {icon} from './icons.js';
 
@@ -82,7 +83,7 @@ export class TrackDayNotes {
   }
   closeMenu(){if(this.menu.matches(':popover-open'))this.menu.hidePopover();}
   focusDate(date){if(!this.root.hidden)(this.grid.querySelector(`button[data-track-note-date="${date}"]`)||this.monthInput).focus();}
-  dateLabel(date){return new Intl.DateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));}
+  dateLabel(date){return dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));}
   update(calendar,cells,session,revision,writable,focused){
     if(session!==this.session){this.reset();this.session=session;}
     Object.assign(this,{calendar,cells,revision,writable});

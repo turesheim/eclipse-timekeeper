@@ -1,3 +1,4 @@
+import {dateTimeFormat} from './formatters.js';
 import {getLocale} from './i18n.js';
 import { t as i18nText } from "./i18n.js";const nameOrder = new Intl.Collator(getLocale(), { numeric: true, sensitivity: 'base' });
 const sortedNames = (values) => [...values].sort((a, b) => nameOrder.compare(a.name, b.name) || a.id.localeCompare(b.id));
@@ -126,7 +127,7 @@ export class Api {
     // Version zero is the untouched server default. An explicitly selected UTC
     // zone has a newer version and must be kept, just like any other choice.
     if (profile.data.version !== 0 || profile.data.zoneId !== 'UTC' || !zone || zone === 'UTC' || !profile.etag) return profile;
-    try {new Intl.DateTimeFormat(getLocale(), { timeZone: zone });} catch {return profile;}
+    try {dateTimeFormat(getLocale(), { timeZone: zone });} catch {return profile;}
     try {return await this.request('/me', { method: 'PUT', body: { zoneId: zone }, etag: profile.etag });}
     catch (error) {
       // A peer's selection wins. Read-only clients can still sign in, and a

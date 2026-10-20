@@ -1,3 +1,4 @@
+import {dateTimeFormat} from './formatters.js';
 import { getLocale, localeForPreference } from './i18n.js';
 import { t as i18nText } from "./i18n.js";import { Api, ApiError } from './api.js';
 import { addDays, dateInZone, dayStart, durationText, durationNanos, instantText, instantNanos, weekRange, taskPresentation, activityDayNanos, nanosText, decimalHoursText, workweekGroups, sessionTimeNanos, localDateTime, localDateTimeToInstant, localDateTimeOffsets } from './model.js';
@@ -66,7 +67,7 @@ periodSwipe($('workspace'), {
       $('period-announcement').textContent = $('track-title').textContent;
     } else {
       const date = addDays(weekRange($('week-date').value, snapshot.profile.data.zoneId).first, direction * 7);selectWeek(date);
-      $('period-announcement').textContent = i18nText("ui.week_of") + new Intl.DateTimeFormat(getLocale(), { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(date + 'T12:00:00Z'));
+      $('period-announcement').textContent = i18nText("ui.week_of") + dateTimeFormat(getLocale(), { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(date + 'T12:00:00Z'));
     }
   }
 });
@@ -314,7 +315,7 @@ function render() {
     const card = element('div', undefined, `day${date === selectedDay ? ' selected' : ''}`);
     const pick = button('', () => {selectedDay = selectedDay === date ? null : date;render();});
     pick.setAttribute('aria-pressed', String(selectedDay === date));
-    pick.append(element('span', new Intl.DateTimeFormat(getLocale(), { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`))), element('span', date), element('strong', displayDuration(day?.total || 'PT0S')));
+    pick.append(element('span', dateTimeFormat(getLocale(), { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`))), element('span', date), element('strong', displayDuration(day?.total || 'PT0S')));
     card.append(pick);$('days').append(card);
   }
   $('activities-heading').textContent = selectedDay ? i18nText("ui.activities_a05abe", { value0: selectedDay }) : i18nText("ui.activities");
@@ -324,7 +325,7 @@ function render() {
 }
 function renderWorkweek(s, zone) {
   const dates = Array.from({ length: 7 }, (_, index) => addDays(s.dates.first, index));
-  const headings = dates.map((date) => new Intl.DateTimeFormat(getLocale(), { weekday: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`)));
+  const headings = dates.map((date) => dateTimeFormat(getLocale(), { weekday: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`)));
   const visible = (value) => !selectedDay || instantNanos(value.start) < instantNanos(dayStart(addDays(selectedDay, 1), zone)) && (!value.end || instantNanos(value.end) > instantNanos(dayStart(selectedDay, zone)));
   const allActivities = (node) => [...node.activities, ...node.children.flatMap(allActivities)];
   const totals = (activities) => {
@@ -660,7 +661,7 @@ function renderSession() {
   renderSessionTime();
 }
 function renderSessionTime() {
-  if (!snapshot) return;
+  if (!snapshot || document.hidden || $('workspace').hidden) return;
   const elapsed = connected ? BigInt(Math.max(0, Math.floor(performance.now() - snapshotAt))) * 1000000n : 0n;
   const session = displayedSession();
   if (connected) activeAsOf = instantNanos(snapshot.report.generatedAt) + elapsed;

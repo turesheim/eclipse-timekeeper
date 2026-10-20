@@ -1,3 +1,4 @@
+import {dateTimeFormat} from './formatters.js';
 import { getLocale } from './i18n.js';
 import { t as i18nText } from "./i18n.js";import { addDays, dateInZone, instantNanos, instantText, nanosInstant, localDateTime, nanosText } from './model.js';
 import { calendarWeek, calendarPieces, calendarAnchor, calendarRange, calendarLanes, shiftSession, shiftSessionDays, pasteSession, clientColors, CALENDAR_STEP } from './calendar-model.js';
@@ -86,7 +87,7 @@ export class WeekCalendar {
       this.calendarKey = key;this.calendar = calendarWeek(data.dates.first, zone);this.selection = null;
     }
     const calendar = this.calendar;
-    const month = new Intl.DateTimeFormat(getLocale(), { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    const month = dateTimeFormat(getLocale(), { month: 'long', year: 'numeric', timeZone: 'UTC' });
     const firstMonth = month.format(new Date(`${calendar.first}T12:00:00Z`)),lastMonth = month.format(new Date(`${addDays(calendar.first, 6)}T12:00:00Z`));
     this.root.querySelector('#calendar-title').textContent = firstMonth === lastMonth ? firstMonth : `${firstMonth} – ${lastMonth}`;
     this.root.querySelector('#calendar-date').value = data.dates.first;
@@ -99,7 +100,7 @@ export class WeekCalendar {
     for (const day of calendar.days) {
       const heading = node('div', undefined, `calendar-heading${day.date === today ? ' today' : ''}`);
       heading.dataset.date=day.date;
-      const title = new Intl.DateTimeFormat(getLocale(), { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${day.date}T12:00:00Z`));
+      const title = dateTimeFormat(getLocale(), { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${day.date}T12:00:00Z`));
       const pick = button(title, () => {
         pick.focus({ preventScroll: true });
         const source = this.clipboard || this.selected();
@@ -195,7 +196,7 @@ export class WeekCalendar {
     const session = piece.session,bar = node('div', undefined, `calendar-event calendar-session${preview ? ' preview' : ''}`);
     bar.dataset.sessionId = session.id;bar.dataset.date = piece.date;bar.dataset.version = String(session.version);this.bounds(bar, piece, 'session');
     const client = this.data.clients.find((client) => client.id === session.clientId),colors = clientColors(client?.color);
-    bar.style.backgroundColor = colors.background;bar.style.color = colors.foreground;bar.style.borderColor = colors.foreground;
+    bar.style.setProperty('--client-color', colors.background);
     const elapsed = instantNanos(session.end || this.data.report.generatedAt) - instantNanos(session.start);
     const duration = nanosText(elapsed > 0n ? elapsed : 0n);
     const labels = (session.labelIds || []).map((id) => this.data.labels.find((label) => label.id === id)?.name).filter(Boolean).join(', ');
