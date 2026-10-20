@@ -73,11 +73,13 @@ export class Api {
   constructor(token = null, fetcher = (...args) => globalThis.fetch(...args), context = {}) {this.#token = token?.trim() ?? null;this.#csrf = context.csrf;this.#owner = context.ownerId ?? null;this.fetcher = fetcher;}
   get owner() {return this.#owner;}
   close() {this.#closed = true;this.#token = '';this.#csrf = null;for (const request of this.#requests) request.abort();}
-  async request(path, { method = 'GET', body, etag, key, timeout = 15000, binary = false, undo = false } = {}) {
+  async request(path, { method = 'GET', body, etag, key, timeout = 15000, binary = false, undo = false, signal } = {}) {
     if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);
     if (this.#token && (this.#token.length > 4096 || !/^[A-Za-z0-9._~+/-]+=*$/.test(this.#token))) throw new ApiError('INVALID_TOKEN', 401);
     const controller = new AbortController();this.#requests.add(controller);
-    const timer = setTimeout(() => controller.abort(), timeout);
+    const abort=()=>controller.abort();
+    if(signal?.aborted)abort();else signal?.addEventListener('abort',abort,{once:true});
+    const timer = setTimeout(abort, timeout);
     try {
       const headers = { Accept: binary ? 'application/zip' : 'application/json' };
       if (this.#token) headers.Authorization = `Bearer ${this.#token}`;else
@@ -104,13 +106,13 @@ export class Api {
       if (error instanceof ApiError) throw error;
       // Never expose response bodies, URLs, tokens or fetch exception details.
       throw new ApiError('UNAVAILABLE');
-    } finally {clearTimeout(timer);this.#requests.delete(controller);}
+    } finally {clearTimeout(timer);signal?.removeEventListener('abort',abort);this.#requests.delete(controller);}
   }
-  async page(path, parameters = {}) {
+  async page(path, parameters = {}, options = {}) {
     let cursor = null,revision = null;const items = [],seen = new Set();
     do {
       const query = new URLSearchParams({ ...parameters, limit: 500, ...(cursor ? { cursor } : {}) });
-      const { data } = await this.request(`${path}?${query}`);
+      const { data } = await this.request(`${path}?${query}`,options);
       if (!Array.isArray(data.items) || !Number.isSafeInteger(data.revision) || revision !== null && revision !== data.revision) throw new ApiError('BUSY');
       revision = data.revision;items.push(...data.items);
       cursor = data.nextCursor;
@@ -133,24 +135,35 @@ export class Api {
       return this.request('/me');
     }
   }
-  async snapshot(range, selectedSession = null) {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const profile = await this.request('/me');
-        const dates = range(profile.data.zoneId);
-        const clients = await this.page('/clients');
-        const projects = await this.page('/projects'),tasks = await this.page('/tasks'),labels = await this.page('/labels');
-        const workSessions = await this.page('/work-sessions');
-        const activeWorkSession = await this.request('/work-sessions/active');
-        const chosen = workSessions.items.find((value) => value.id === selectedSession) || activeWorkSession.data || [...workSessions.items].sort((a, b) => b.start.localeCompare(a.start))[0];
-        const workSessionReport = chosen ? (await this.request(`/work-sessions/${chosen.id}/report`)).data : null;
-        const activities = await this.page('/activities', { from: dates.from, to: dates.to });
-        const active = await this.request('/activities/active');
-        const report = await this.request(`/reports/activities?${new URLSearchParams({ from: dates.from, to: dates.to, zoneId: profile.data.zoneId })}`);
-        const confirmed = await this.request('/me'),head = await this.page('/projects');
-        if ([clients, tasks, labels, activities, workSessions, head, report.data, ...(workSessionReport ? [workSessionReport] : [])].some((v) => v.revision !== projects.revision) || profile.data.version !== confirmed.data.version) throw new ApiError('BUSY');
-        return { profile, dates, clients: sortedNames(clients.items), projects: sortedNames(projects.items), tasks: tasks.items, labels: labels.items, activities: activities.items, active, workSessions: workSessions.items, activeWorkSession, workSessionReport, report: report.data, revision: projects.revision };
-      } catch (error) {if (!['BUSY', 'CURSOR_EXPIRED'].includes(error.code) || attempt === 2) throw error;}
+  async snapshot(range, selectedSession = null, {timeout = 30000} = {}) {
+    const started=performance.now();let attempts=0;
+    try {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const remaining=timeout-(performance.now()-started);if(remaining<=0)throw new ApiError('UNAVAILABLE');
+        const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),remaining),options={signal:controller.signal};++attempts;
+        try {
+          // Bind the owner before issuing parallel reads, including empty pages.
+          const profile = await this.request('/me',options);
+          const dates = range(profile.data.zoneId);
+          const [clients,projects,tasks,labels,workSessions,activeWorkSession,activities,active,report] = await Promise.all([
+            this.page('/clients',{},options),this.page('/projects',{},options),this.page('/tasks',{},options),this.page('/labels',{},options),
+            this.page('/work-sessions',{},options),this.request('/work-sessions/active',options),
+            this.page('/activities',{from:dates.from,to:dates.to},options),this.request('/activities/active',options),
+            this.request(`/reports/activities?${new URLSearchParams({from:dates.from,to:dates.to,zoneId:profile.data.zoneId})}`,options)
+          ]);
+          const chosen = workSessions.items.find((value) => value.id === selectedSession) || activeWorkSession.data || [...workSessions.items].sort((a, b) => b.start.localeCompare(a.start))[0];
+          const [sessionReport,confirmed,head] = await Promise.all([
+            chosen?this.request(`/work-sessions/${chosen.id}/report`,options):null,this.request('/me',options),this.page('/projects',{},options)
+          ]);
+          const workSessionReport=sessionReport?.data??null;
+          if ([clients, tasks, labels, activities, workSessions, head, report.data, ...(workSessionReport ? [workSessionReport] : [])].some((v) => v.revision !== projects.revision) || profile.data.version !== confirmed.data.version) throw new ApiError('BUSY');
+          return { profile, dates, clients: sortedNames(clients.items), projects: sortedNames(projects.items), tasks: tasks.items, labels: labels.items, activities: activities.items, active, workSessions: workSessions.items, activeWorkSession, workSessionReport, report: report.data, revision: projects.revision };
+        } catch (error) {if (!['BUSY', 'CURSOR_EXPIRED'].includes(error.code) || attempt === 2) throw error;}
+        finally {clearTimeout(timer);controller.abort();}
+      }
+    } finally {
+      const durationMs=Math.round(performance.now()-started);
+      if(durationMs>=5000)console.warn('Timekeeper synchronization slow',{durationMs,attempts});
     }
   }
   async changes(after) {

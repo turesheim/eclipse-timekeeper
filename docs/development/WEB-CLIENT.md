@@ -20,6 +20,16 @@ as hashes on the server. New credentials never enter browser storage. Existing
 saved tokens are exchanged for a parent-bound cookie and then removed. Sign out
 revokes the cookie session and clears records, drafts, requests and clipboard.
 
+## Synchronization
+
+Refresh binds the account first, then loads independent collections and reports
+in parallel. Profile and revision checks still reject mixed snapshots and retry
+up to three times. A 30-second overall deadline covers all pages and attempts;
+failed or superseded attempts abort their outstanding reads. Browser console
+warnings report refreshes lasting at least five seconds without exposing records.
+See [Synology synchronization diagnostics](../operations/SYNOLOGY-PACKAGE.md#synchronization-diagnostics)
+for request and database timings in the container logs.
+
 ## Language and region
 
 The client uses locally bundled **i18next 26.5.2** with complete English and

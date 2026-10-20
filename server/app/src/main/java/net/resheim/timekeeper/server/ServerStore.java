@@ -38,6 +38,8 @@ public class ServerStore {
     private final java.util.concurrent.ConcurrentMap<String,String> partitionDates=new java.util.concurrent.ConcurrentHashMap<>();
     private java.util.concurrent.ScheduledExecutorService maintenance;
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="quarkus.datasource.jdbc.url") String jdbcUrl;
+    @org.eclipse.microprofile.config.inject.ConfigProperty(name="timekeeper.diagnostics.slow-transaction-ms",defaultValue="1000") long slowTransactionMillis;
+    private static final org.jboss.logging.Logger TIMINGS=org.jboss.logging.Logger.getLogger(ServerStore.class);
     private final ThreadLocal<Context> context = new ThreadLocal<>();
     private final ThreadLocal<UUID> creationClient = new ThreadLocal<>();
     record Context(String owner, Connection connection, Instant now) { }
@@ -109,7 +111,9 @@ public class ServerStore {
             if (!existing.owner().equals(owner)) throw new IllegalStateException("Cross-owner nested transaction");
             return work.get();
         }
+        long started=System.nanoTime(),acquired=0,locked=0,worked=0;String phase="pool",outcome="failed";
         try (var connection = datasource.getConnection()) {
+            acquired=System.nanoTime();phase="owner-lock";
             connection.setAutoCommit(false);
             try {
                 // Provision a configured token owner without overwriting existing preferences.
@@ -123,6 +127,7 @@ public class ServerStore {
                 try (var lock = connection.prepareStatement("SELECT revision FROM tk_owner WHERE id=? FOR UPDATE")) {
                     lock.setString(1,owner); try (var rows = lock.executeQuery()) { if (!rows.next()) throw new SQLException("Missing owner"); }
                 }
+                locked=System.nanoTime();phase="work";
                 context.set(new Context(owner,connection,clock.now()));
                 AccountStore.ensureAccount(connection,owner);
                 try(var initialized=statement("SELECT initialized FROM tk_account WHERE owner_id=?",owner);var rows=initialized.executeQuery()) {
@@ -131,18 +136,31 @@ public class ServerStore {
                 }
                 String date=partitionDate(profile().get("zoneId").asText(),now());
                 if(!date.equals(partitionDates.get(owner))) service().rolloverActivities(new OwnerId(owner));
-                T result = work.get(); connection.commit(); partitionDates.put(owner,date);return result;
+                T result = work.get();worked=System.nanoTime();phase="commit";
+                connection.commit();outcome="committed";partitionDates.put(owner,date);return result;
             } catch (Throwable e) {
+                if(e instanceof ApiFailure failure && failure.status>=500)outcome="server-error";
                 try { connection.rollback(); } catch (SQLException rollback) { e.addSuppressed(rollback); }
                 throw e;
             } finally { context.remove(); }
-        } catch (SQLException e) { throw databaseFailure(e); }
+        } catch (SQLException e) {outcome="database-error";throw databaseFailure(e);}
+        finally {
+            long ended=System.nanoTime(),elapsed=(ended-started)/1_000_000;
+            if(elapsed>=Math.max(0,slowTransactionMillis) || outcome.endsWith("error")) {
+                long poolEnd=acquired==0?ended:acquired,lockEnd=locked==0?ended:locked,workEnd=worked==0?ended:worked;
+                TIMINGS.warnf("Database transaction outcome=%s phase=%s elapsed_ms=%d pool_ms=%d owner_lock_ms=%d work_ms=%d commit_ms=%d",
+                        outcome,phase,elapsed,(poolEnd-started)/1_000_000,acquired==0?0:(lockEnd-acquired)/1_000_000,
+                        locked==0?0:(workEnd-locked)/1_000_000,worked==0?0:(ended-worked)/1_000_000);
+            }
+        }
     }
     public <T> T authenticated(RequestIdentity identity,Supplier<T> work) {
         return transaction(identity.owner(),()->{identity.guard(current().connection());return work.get();});
     }
     private RuntimeException databaseFailure(SQLException e) {
         if ("23505".equals(e.getSQLState()) || "23503".equals(e.getSQLState()) || "23506".equals(e.getSQLState())) return ApiFailure.conflict();
+        String state=e.getSQLState();
+        TIMINGS.warnf("Database operation failed sql_state=%s",state!=null&&state.matches("[A-Z0-9]{5}")?state:"unknown");
         return new ApiFailure(503,"UNAVAILABLE");
     }
     Context current() { Context value = context.get(); if (value == null) throw new IllegalStateException("No owner transaction"); return value; }

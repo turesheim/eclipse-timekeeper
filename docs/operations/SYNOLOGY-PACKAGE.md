@@ -75,6 +75,33 @@ needs neither database credentials nor install-time environment substitution.
 Stopped status uses DSM exit code 3. See Synology's [resource timing](https://help.synology.com/developer-guide/resource_acquisition/timing.html)
 and [script lifecycle](https://help.synology.com/developer-guide/synology_package/scripts.html).
 
+### Synchronization diagnostics
+
+Server diagnostics appear in **Container Manager → timekeeper-server → Log**, or
+through SSH with `sudo docker logs --since 30m timekeeper-server`.
+API calls taking at least one second produce `API request completed` warnings
+with a generated `request_id`, route template, HTTP status and `elapsed_ms`.
+A request still running after five seconds produces an earlier warning. Normal
+`/changes` long polling receives its requested wait allowance before either
+threshold applies. HTTP 5xx responses are logged even when fast.
+
+Slow database transactions report `pool_ms`, `owner_lock_ms`, `work_ms` and
+`commit_ms`, separating connection acquisition, account locking, application work
+and commit time. Database errors also report a SQL-state code, without the
+underlying statement or exception message. These diagnostics exclude
+credentials, query strings, record IDs, account IDs, SQL and request contents.
+The `X-Timekeeper-Request-Id` response header links a browser Network entry to its
+server log line. Server timings measure REST handling; network latency and proxy
+or HTTP-worker queuing before REST handling can add further time.
+
+The defaults are controlled by `timekeeper.diagnostics.slow-request-ms` and
+`timekeeper.diagnostics.slow-transaction-ms` (both `1000`). Setting a threshold to
+`0` temporarily logs every completed request or transaction; restore the default
+after diagnosis. The web browser console additionally reports refreshes taking
+five seconds or more as `Timekeeper synchronization slow`, with duration and
+attempt count. Each browser snapshot has a 30-second deadline, including
+pagination and consistency retries, and discards unfinished reads on failure.
+
 ### Optional Tailscale integration
 
 Install Tailscale separately and sign the NAS into your tailnet. Enable MagicDNS
