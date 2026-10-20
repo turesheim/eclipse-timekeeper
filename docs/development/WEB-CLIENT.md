@@ -104,7 +104,7 @@ their normal scrolling and editing gestures. Date controls remain available.
 Right-click a day or **press and hold** it on a touch screen, then choose
 **Add day note** / **Edit day note**. A short label such as “Ferie” or “Avspasering”
 appears beside the date in blue, distinct from red national holidays. Select the
-label to edit it, or use the small **+** beside an empty date. Keyboard users can
+label to edit it, or use the small note icon beside an empty date. Keyboard users can
 focus that button and press **Shift+F10** for the same menu. Movement cancels a
 long press, preserving scrolling and month swipes.
 
