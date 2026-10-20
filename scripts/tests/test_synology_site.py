@@ -65,7 +65,7 @@ class SynologySiteTest(unittest.TestCase):
         self.fixture.artifact['expired'] = False
         with patch.object(site, 'ancestor', return_value=False):
             self.assertFalse(self.build(True)['preview']['available'])
-        self.fixture.matrix_jobs.remove('Installed client tests')
+        self.fixture.matrix_jobs.remove('Web')
         self.assertFalse(self.build(True)['preview']['available'])
 
     def test_corrupt_preview_fails_instead_of_publishing_or_falling_back(self):

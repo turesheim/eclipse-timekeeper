@@ -125,6 +125,17 @@ class SynologyReleaseTest(unittest.TestCase):
         self.assertEqual(1, len(self.uploads))
         self.assertNotIn('--clobber', self.uploads[0])
 
+    def test_server_only_and_full_main_builds_can_validate_the_nas_candidate(self):
+        native = {'Build (ubuntu-latest)', 'Build (macos-latest)',
+                  'Build (windows-latest)', 'Installed client tests'}
+        for jobs in (release.MATRIX_JOBS, release.MATRIX_JOBS | native):
+            with self.subTest(jobs=jobs):
+                self.matrix_jobs = set(jobs)
+                self.assertEqual(124, release.matrix_run(REPO, 'main', COMMIT))
+                self.matrix_jobs.remove('Server')
+                with self.assertRaisesRegex(ValueError, 'Server'):
+                    release.matrix_run(REPO, 'main', COMMIT)
+
     def test_installer_artifact_rename_preserves_old_runs_and_refuses_ambiguity(self):
         for name, prefix in (('synology-installer', ''), ('synology-preview-candidate', 'server/target/synology/')):
             self.artifact['name'] = name
@@ -151,8 +162,8 @@ class SynologyReleaseTest(unittest.TestCase):
                 self.prepare()
             self.assertFalse(self.output.exists())
         self.run = original
-        self.matrix_jobs.remove('Build (windows-latest)')
-        with self.assertRaisesRegex(ValueError, 'windows'):
+        self.matrix_jobs.remove('Web')
+        with self.assertRaisesRegex(ValueError, 'Web'):
             self.prepare()
         self.matrix_jobs = set(release.MATRIX_JOBS)
         self.remote['draft'] = True

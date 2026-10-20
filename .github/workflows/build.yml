@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.changes.outputs.code }}
+      eclipse: ${{ steps.changes.outputs.eclipse }}
     steps:
     - uses: actions/checkout@v7.0.1
       with:
@@ -136,7 +137,8 @@ jobs:
 
   Remote-Eclipse:
     name: Installed client tests
-    needs: Server
+    needs: [Changes, Server]
+    if: needs.Changes.outputs.eclipse == 'true'
     concurrency:
       group: build-installed-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref || github.run_id }}
       cancel-in-progress: true
@@ -209,9 +211,10 @@ jobs:
       !cancelled() && needs.Changes.result == 'success' &&
       needs.Publication-tooling.result == 'success' &&
       (needs.Changes.outputs.code == 'false' ||
-       (needs.Build.result == 'success' && needs.API-contract.result == 'success' &&
+       (needs.API-contract.result == 'success' &&
         needs.Server.result == 'success' && needs.Web.result == 'success' &&
-        needs.Remote-Eclipse.result == 'success'))
+        (needs.Changes.outputs.eclipse == 'false' ||
+         (needs.Build.result == 'success' && needs.Remote-Eclipse.result == 'success'))))
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7.0.1
@@ -221,7 +224,7 @@ jobs:
         source: ./
         destination: ./_site
     - name: Add verified current-matrix update site and release channels
-      if: needs.Changes.outputs.code == 'true'
+      if: needs.Changes.outputs.eclipse == 'true'
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
@@ -232,8 +235,8 @@ jobs:
         test -f _site/index.html
         test -f _site/updates/compositeContent.xml
         test -f _site/updates/testing/compositeContent.xml
-    - name: Add existing tested update site to changed documentation
-      if: needs.Changes.outputs.code == 'false'
+    - name: Add existing tested Eclipse update site
+      if: needs.Changes.outputs.eclipse == 'false'
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
@@ -250,7 +253,7 @@ jobs:
 
   Build:
     needs: Changes
-    if: needs.Changes.outputs.code == 'true'
+    if: needs.Changes.outputs.eclipse == 'true'
     concurrency:
       group: build-platform-${{ matrix.os }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref || github.run_id }}
       cancel-in-progress: true
