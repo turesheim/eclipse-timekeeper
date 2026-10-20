@@ -1,56 +1,76 @@
 import {getLocale,t} from './i18n.js';
 import {addDays,instantText} from './model.js';
 import {icon,iconButton} from './icons.js';
+import {clientColors} from './calendar-model.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 const button=(label,action,classes='btn btn-outline-secondary')=>{const value=node('button',label,classes);value.type='button';value.addEventListener('click',action);return value;};
 const errorText=error=>error?.message||t('calendar.error.CALENDAR_CONNECTION_FAILED');
 export const calendarFailure=code=>t('calendar.error.'+code);
 
+export function styleCalendarEvent(element,event) {
+  const imported=!!event.activityIds?.length,colors=clientColors(event.color);
+  element.dataset.imported=String(imported);
+  element.style.setProperty('--client-color',colors.background);
+}
+
 /** Authenticated calendar loading and dialogs never replace an open activity draft. */
 export class CalendarSubscriptions {
   constructor(root,callbacks) {
-    this.root=root;this.callbacks=callbacks;this.generation=0;this.rows=[];this.events=[];this.sources={};this.expanded=null;this.busy=new Set();
-    this.panel=node('section',undefined,'card calendar-subscriptions');this.panel.setAttribute('aria-labelledby','calendar-subscriptions-title');
-    const heading=node('div',undefined,'calendar-subscriptions-heading'),title=node('h3');title.id='calendar-subscriptions-title';
-    this.toggle=button(t('calendar.subscriptions'),()=>{this.expanded=!(this.expanded??!this.rows.length);this.paint();},'btn btn-link');this.toggle.id='calendar-subscriptions-toggle';this.toggle.setAttribute('aria-controls','calendar-subscriptions-content');title.append(this.toggle);
+    this.root=root;this.callbacks=callbacks;this.generation=0;this.rows=[];this.events=[];this.sources={};this.managementGeneration=0;this.busy=new Set();
+    this.panel=node('section',undefined,'card account-card calendar-subscriptions');this.panel.setAttribute('aria-labelledby','calendar-subscriptions-title');
+    const heading=node('div',undefined,'calendar-subscriptions-heading');this.title=node('h2',t('calendar.subscriptions'));this.title.id='calendar-subscriptions-title';
     this.add=button(t('calendar.add'),()=>this.run(()=>this.edit()),'btn btn-primary');this.add.id='calendar-subscription-add';this.add.dataset.calendarAction='add';this.add.prepend(icon('calendar-plus'),' ');
-    heading.append(title,this.add);this.list=node('ul',undefined,'calendar-subscription-list');this.list.id='calendar-subscription-list';
+    heading.append(this.title,this.add);this.list=node('ul',undefined,'calendar-subscription-list');this.list.id='calendar-subscription-list';
     this.message=node('p',undefined,'hint');this.message.id='calendar-subscriptions-message';this.message.setAttribute('role','status');
     this.content=node('div',undefined,'calendar-subscriptions-content');this.content.id='calendar-subscriptions-content';this.content.append(node('p',t('calendar.explanation'),'hint'),this.list);this.panel.append(heading,this.content,this.message);
     this.allDay=node('section',undefined,'calendar-all-day-plans');this.allDay.hidden=true;this.allDay.setAttribute('aria-labelledby','calendar-all-day-title');
-    root.querySelector('.calendar-scroll').before(this.panel,this.allDay);
+    root.querySelector('.calendar-scroll').before(this.allDay);
     this.dialog=node('dialog',undefined,'app-dialog shadow-lg');this.dialog.id='calendar-subscription-editor';this.dialog.setAttribute('aria-labelledby','calendar-subscription-editor-title');
-    this.form=node('form');this.form.addEventListener('submit',event=>{event.preventDefault();void this.save();});
+    this.form=node('form');
+    for(const event of ['input','change'])this.form.addEventListener(event,()=>this.managementView?.dirty.add(this.form));
+    this.form.addEventListener('submit',event=>{event.preventDefault();void this.save();});
     this.formTitle=node('h2');this.formTitle.id='calendar-subscription-editor-title';this.fields=node('div');
     this.formError=node('p',undefined,'error');this.formError.setAttribute('role','alert');this.formHint=node('p',undefined,'hint');
     this.submit=node('button',t('ui.save'),'btn btn-primary');this.submit.type='submit';this.submit.id='calendar-subscription-save';
     this.cancel=button(t('ui.cancel'),()=>this.cancelEditor());const actions=node('div',undefined,'dialog-actions');actions.append(this.cancel,this.submit);
-    this.form.append(this.formTitle,this.fields,this.formHint,this.formError,actions);this.dialog.append(this.form);root.append(this.dialog);
+    this.form.append(this.formTitle,this.fields,this.formHint,this.formError,actions);this.dialog.append(this.form);
     this.dialog.addEventListener('cancel',event=>{event.preventDefault();this.cancelEditor();});
-    this.dialog.addEventListener('close',()=>{const origin=this.draft?.origin;this.draft=null;this.fields.replaceChildren();this.formError.textContent='';this.formHint.textContent='';if(origin&&!root.hidden)this.findAction(origin)?.focus();});
+    this.dialog.addEventListener('close',()=>{const origin=this.draft?.origin;this.draft=null;this.managementView?.clean(this.form);this.fields.replaceChildren();this.formError.textContent='';this.formHint.textContent='';if(origin&&this.managementView?.valid())this.findAction(origin)?.focus();});
     this.details=node('dialog',undefined,'app-dialog shadow-lg calendar-event-details');this.details.id='calendar-event-details';this.details.setAttribute('aria-labelledby','calendar-event-title');root.append(this.details);
     this.details.addEventListener('close',()=>{if(this.details.open)return;const event=this.selected,date=this.originDate;this.selected=null;this.originDate=null;this.details.replaceChildren();if(event&&!root.hidden&&!document.querySelector('dialog[open]'))(root.querySelector(`[data-calendar-event-key="${event.key}"][data-calendar-subscription-id="${event.subscriptionId}"]${date?`[data-date="${date}"]`:''}`)||root.querySelector('#calendar-date'))?.focus();});
     window.addEventListener('beforeunload',event=>{if(this.dirty()){event.preventDefault();event.returnValue='';}});
   }
+  mount(view) {
+    this.managementView=view;++this.managementGeneration;
+    view.root.append(this.panel,this.dialog);this.paint();this.show();
+    view.cleanup.add(()=>{
+      this.managementView=null;++this.managementGeneration;
+      this.draft=null;this.dialog.close();this.fields.replaceChildren();
+      this.panel.remove();this.dialog.remove();
+      queueMicrotask(()=>{if(this.calendarVisible())this.show();else if(!this.managementView)this.hide();});
+    });
+  }
+  calendarVisible(){return !this.root.closest('[hidden]');}
+  visible(){return !!this.managementView?.valid()||this.calendarVisible();}
   findAction(origin){return [...this.panel.querySelectorAll('[data-calendar-action]')].find(value=>value.dataset.calendarAction===origin);}
   run(operation){const session=this.scope;void Promise.resolve().then(()=>{if(session===this.scope)return operation();}).catch(error=>{if(session===this.scope)this.failure(error);});}
   update(data,connected,scope) {
     if(this.scope!==scope){this.reset();this.scope=scope;}
     this.data=data;this.connected=connected;this.writable=connected&&this.callbacks.canWrite();
     const key=data.dates.first+'|'+data.profile.data.zoneId+'|'+data.revision,changed=key!==this.key;this.key=key;
-    this.paint();if(!this.root.hidden){this.poll();if(changed)void this.load();}
+    this.paint();if(this.visible()){this.poll();if(changed)void this.load();}
   }
   setConnected(value){this.connected=value;this.writable=value&&this.callbacks.canWrite();this.paint();}
   poll(){if(!this.timer&&this.scope&&this.data)this.timer=setInterval(()=>void this.load(),30000);}
   show(){if(!this.scope||!this.data)return;this.poll();void this.load();}
-  hide(){clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);this.details.close();}
+  hide(){if(!this.managementView){clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);}this.details.close();}
   reset(){
-    ++this.generation;clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);this.scope=null;this.data=null;this.key=null;this.rows=[];this.events=[];this.sources={};this.expanded=null;this.busy.clear();this.draft=null;this.selected=null;
+    ++this.generation;clearInterval(this.timer);this.timer=null;clearTimeout(this.burst);this.scope=null;this.data=null;this.key=null;this.rows=[];this.events=[];this.sources={};this.busy.clear();this.draft=null;this.selected=null;
     this.dialog.close();this.details.close();this.fields.replaceChildren();this.details.replaceChildren();this.list.replaceChildren();this.allDay.replaceChildren();this.allDay.hidden=true;this.message.textContent='';
   }
   async load() {
-    if(!this.scope||!this.data||this.root.hidden)return;
+    if(!this.scope||!this.data||!this.visible())return;
     const session=this.scope,generation=++this.generation,from=this.data.dates.first,to=addDays(from,7),key=this.key;
     if(!this.rows.length)this.message.textContent=t('calendar.loading');
     try {
@@ -66,7 +86,7 @@ export class CalendarSubscriptions {
   date(value){return value?new Intl.DateTimeFormat(getLocale(),{dateStyle:'medium',timeStyle:'short',timeZone:this.data.profile.data.zoneId}).format(new Date(value)):t('calendar.never');}
   paint() {
     if(!this.data)return;
-    this.content.hidden=!(this.expanded??!this.rows.length);this.toggle.setAttribute('aria-expanded',String(!this.content.hidden));this.toggle.replaceChildren(icon(this.content.hidden?'chevron-right':'chevron-down'),' ',this.rows.length?t('calendar.subscriptions_count',{count:this.rows.length}):t('calendar.subscriptions'));
+    this.title.textContent=this.rows.length?t('calendar.subscriptions_count',{count:this.rows.length}):t('calendar.subscriptions');
     const active=document.activeElement,focus=this.panel.contains(active)?active.dataset.calendarAction:null;
     this.add.disabled=!this.writable||!this.data.clients.length;this.list.replaceChildren();
     if(!this.rows.length)this.list.append(node('li',this.data.clients.length?t('calendar.none'):t('calendar.client_required'),'hint'));
@@ -103,9 +123,9 @@ export class CalendarSubscriptions {
     const wrap=node('label',undefined,'form-label');wrap.append(node('span',label));const input=node('input',undefined,'form-control');input.id='calendar-subscription-'+name;input.name=name;input.type=type;input.value=value||'';input.required=required;input.maxLength=name==='url'?8192:1000;input.autocomplete='off';input.spellcheck=false;wrap.append(input);this.fields.append(wrap);return input;
   }
   async edit(id=null,remove=false) {
-    if(!this.writable||this.dialog.open)return;const session=this.scope;
+    if(!this.writable||!this.managementView?.valid()||this.dialog.open)return;const session=this.scope,generation=this.managementGeneration;
     const loaded=id?await session.request('/calendar-subscriptions/'+id):{data:{name:'',clientId:this.data.clients[0]?.id,visible:true},etag:null};
-    if(session!==this.scope||!this.writable||this.dialog.open)return;
+    if(session!==this.scope||generation!==this.managementGeneration||!this.managementView?.valid()||!this.writable||this.dialog.open)return;
     const value=loaded.data;this.fields.replaceChildren();this.formError.textContent='';this.formHint.textContent=remove?t('calendar.remove_explanation'):t('calendar.url_hint');
     this.draft={session,id,remove,etag:loaded.etag,original:value,key:!id?crypto.randomUUID():null,origin:id?(remove?'delete:':'edit:')+id:'add'};
     this.formTitle.textContent=t(remove?'calendar.remove_title':id?'calendar.edit':'calendar.add');
@@ -123,17 +143,17 @@ export class CalendarSubscriptions {
   cancelEditor(){if(this.draft?.busy)return;if(this.dirty()&&!window.confirm(t('calendar.discard')))return;this.dialog.close();void this.load();}
   async save() {
     const draft=this.draft;if(!draft||draft.busy||draft.session!==this.scope||!this.writable||!this.form.reportValidity())return;
-    draft.busy=true;this.submit.disabled=true;this.cancel.disabled=true;this.formError.textContent='';
+    const view=this.managementView;view.busy=true;draft.busy=true;this.submit.disabled=true;this.cancel.disabled=true;this.formError.textContent='';
     const payload=draft.uncertain?draft.payload:this.formValue();draft.payload=payload;for(const input of this.fields.querySelectorAll('input,select'))input.disabled=true;
     try {
       await draft.session.request('/calendar-subscriptions'+(draft.id?'/'+draft.id:''),{method:draft.remove?'DELETE':draft.id?'PUT':'POST',body:draft.remove?undefined:payload,etag:draft.etag,key:draft.key});
-      if(draft!==this.draft||draft.session!==this.scope)return;draft.busy=false;this.dialog.close();await this.load();
+      if(draft!==this.draft||draft.session!==this.scope)return;view.clean(this.form);view.busy=false;draft.busy=false;this.dialog.close();await this.load();
     }catch(error){
       if(draft!==this.draft||draft.session!==this.scope)return;if(error.status===401){this.failure(error);return;}
       this.formError.textContent=errorText(error);draft.uncertain=error.uncertain===true;
       if(draft.uncertain){this.formHint.textContent=t(draft.key?'calendar.retry_exact':'calendar.review_unknown');this.submit.textContent=t('ui.retry_same_command');}
       else for(const input of this.fields.querySelectorAll('input,select'))input.disabled=false;
-    }finally{if(draft===this.draft){draft.busy=false;this.submit.disabled=!this.writable||draft.uncertain&&!draft.key;this.cancel.disabled=false;}}
+    }finally{view.busy=false;if(draft===this.draft){draft.busy=false;this.submit.disabled=!this.writable||draft.uncertain&&!draft.key;this.cancel.disabled=false;}}
   }
   eventDate(event) {
     if(!event.allDay)return instantText(event.start,this.data.profile.data.zoneId)+' → '+instantText(event.end,this.data.profile.data.zoneId);
@@ -143,7 +163,7 @@ export class CalendarSubscriptions {
   paintAllDay() {
     const active=document.activeElement,key=this.allDay.contains(active)?active.dataset.calendarEventKey:null,values=this.events.filter(value=>value.allDay);this.allDay.replaceChildren();this.allDay.hidden=!values.length;
     if(!values.length)return;const title=node('h3',t('calendar.all_day_plans'));title.id='calendar-all-day-title';this.allDay.append(title);
-    for(const value of values){const pick=button('',()=>this.openEvent(value),'btn btn-outline-secondary calendar-all-day-event');pick.dataset.calendarEventKey=value.key;pick.dataset.calendarSubscriptionId=value.subscriptionId;pick.style.borderLeftColor=value.color;pick.append(icon('calendar-event'),node('strong',value.title||t('calendar.untitled')),node('span',this.eventDate(value)),node('small',value.clientName+' · '+value.calendarName));this.allDay.append(pick);}
+    for(const value of values){const pick=button('',()=>this.openEvent(value),'btn btn-outline-secondary calendar-all-day-event');pick.dataset.calendarEventKey=value.key;pick.dataset.calendarSubscriptionId=value.subscriptionId;styleCalendarEvent(pick,value);pick.append(node('strong',value.title||t('calendar.untitled')),node('span',this.eventDate(value)),node('small',value.clientName+' · '+value.calendarName));this.allDay.append(pick);}
     if(key&&document.activeElement===document.body)this.allDay.querySelector(`[data-calendar-event-key="${key}"]`)?.focus();
   }
   openEvent(event,date=null) {

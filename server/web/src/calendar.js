@@ -1,8 +1,8 @@
 import { getLocale } from './i18n.js';
 import { t as i18nText } from "./i18n.js";import { addDays, dateInZone, instantNanos, instantText, nanosInstant, localDateTime, nanosText } from './model.js';
 import { calendarWeek, calendarPieces, calendarAnchor, calendarRange, calendarLanes, shiftSession, shiftSessionDays, pasteSession, clientColors, CALENDAR_STEP } from './calendar-model.js';
-import { icon, iconButton } from './icons.js';
-import {CalendarSubscriptions} from './calendar-subscriptions.js';
+import { iconButton } from './icons.js';
+import {CalendarSubscriptions,styleCalendarEvent} from './calendar-subscriptions.js';
 import {publicHolidayCalendar,holidayRegion,selectedHolidayCountry} from './holidays.js';
 
 const ROW_HEIGHT = 16;
@@ -229,9 +229,9 @@ export class WeekCalendar {
   plannedNode(piece) {
     const event=piece.planned,value=button('',()=>this.subscriptions.openEvent(event,piece.date),'btn calendar-event calendar-planned');this.bounds(value,piece,'planned');
     value.dataset.calendarEventKey=event.key;value.dataset.calendarSubscriptionId=event.subscriptionId;value.dataset.date=piece.date;
-    const colors=clientColors(event.color);value.style.backgroundColor=colors.background;value.style.color=colors.foreground;value.style.borderColor=colors.foreground;
+    styleCalendarEvent(value,event);
     value.setAttribute('aria-haspopup','dialog');value.setAttribute('aria-label',i18nText('calendar.event_label',{title:event.title||i18nText('calendar.untitled'),calendar:event.calendarName,client:event.clientName,interval:this.subscriptions.eventDate(event)}));
-    value.title=value.getAttribute('aria-label');value.append(icon('calendar-event'),node('small',i18nText('calendar.planned')),node('strong',event.title||i18nText('calendar.untitled')),node('span',event.clientName+' · '+event.calendarName));return value;
+    value.title=value.getAttribute('aria-label');value.append(node('small',i18nText(event.activityIds?.length?'calendar.recorded':'calendar.planned')),node('strong',event.title||i18nText('calendar.untitled')),node('span',event.clientName+' · '+event.calendarName));return value;
   }
   select(date, row) {this.selection = { date, row };this.paintSelection();this.buttons();}
   selectSession(session, date, row) {this.selectedId = session.id;this.select(date, row);this.text('');}

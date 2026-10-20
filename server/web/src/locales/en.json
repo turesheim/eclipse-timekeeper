@@ -885,7 +885,7 @@
   "calendar.error.CALENDAR_CLIENT_MISMATCH": "Choose a project or task belonging to the calendar’s client.",
   "calendar.error.CALENDAR_DUPLICATE_SUBSCRIPTION": "This calendar URL is already subscribed to on your account. Edit the existing subscription instead.",
   "calendar.subscriptions_count": "Calendars ({{count}})",
-  "calendar.refresh_errors": "Some calendars could not refresh. Expand subscriptions for details; the last successful data is kept.",
+  "calendar.refresh_errors": "Some calendars could not refresh. See each calendar for details; the last successful data is kept.",
   "calendar.error.CALENDAR_FUTURE_ACTIVITY": "An activity cannot start in the future. Review the actual interval before saving.",
   "about.project_references": "Project references",
   "about.website": "Project website",

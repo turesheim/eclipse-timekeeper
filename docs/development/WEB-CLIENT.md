@@ -608,12 +608,13 @@ or repeating an ordinary write.
 
 ### Calendar subscriptions
 
-Expand **Calendars** in Calendar to manage read-only iCalendar subscriptions.
+Open **My Account → Calendars** to manage read-only iCalendar subscriptions.
+Planned events remain visible in Calendar.
 Choose **Add calendar**, enter a descriptive name and subscription URL, and select
 its client. HTTPS and `webcal://` subscription links are supported; provider login
 and two-way calendar editing are outside this first version. The saved URL is
 kept private: editing shows an empty replacement field, and leaving it blank
-preserves the existing link. Expand the list to see the last successful refresh
+preserves the existing link. The list shows the last successful refresh
 and any specific refresh error. Each account may have up to 20 subscriptions.
 
 Calendars refresh automatically about every 15 minutes. **Refresh calendar**
@@ -626,9 +627,12 @@ removing a subscription removes its external events and leaves recorded activiti
 and their source history intact. Clients with subscriptions cannot be deleted
 until those subscriptions are removed or reassigned.
 
-Planned events use the client's color with a dashed outline and a **Planned**
-label; the client and calendar name remain available in their text and accessible
-name. They appear beside recorded work without contributing to reports. Select
+Calendar events use neutral backgrounds and the same narrow, solid client-coloured
+indicator on the left as monthly Track entries. Events awaiting import use a
+dotted outline and a **Planned** label; imported events use a solid outline and a
+**Recorded** label. Event cards have no icons; the client and
+calendar name remain available in their text and accessible name. They appear
+beside recorded work without contributing to reports. Select
 an event with the pointer, touch or keyboard to see its full interval, source,
 location and plain-text description. Read-only sessions can view details.
 All-day plans appear above the time grid, with their exclusive iCalendar end date

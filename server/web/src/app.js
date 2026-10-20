@@ -135,6 +135,7 @@ function tab(name) {
 for (const node of document.querySelectorAll('[data-tab]')) node.addEventListener('click', () => tab(node.dataset.tab));
 
 const auth = authentication({
+  renderCalendars:view=>calendar.subscriptions.mount(view),
   async connect(session, account) {
     api = session;accountName = account.displayName;canWrite = account.permissions.includes('write');
     const { data: profile } = await session.initializeTimeZone();
