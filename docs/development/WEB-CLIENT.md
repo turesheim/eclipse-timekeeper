@@ -114,7 +114,9 @@ their normal scrolling and editing gestures. Date controls remain available.
 Right-click a day or **press and hold** it on a touch screen, then choose
 **Add day note** / **Edit day note**. A short label such as “Ferie” or “Avspasering”
 appears beside the date in blue, distinct from red national holidays. Select the
-label to edit it, or use the small note icon beside an empty date. Keyboard users can
+label to edit it, or use the small note icon shown on hover or keyboard focus beside
+an empty date. Empty-day icons are hidden by default on touch screens;
+press and hold a day to create its note. Keyboard users can
 focus that button and press **Shift+F10** for the same menu. Movement cancels a
 long press, preserving scrolling and month swipes.
 
@@ -688,9 +690,12 @@ select an optional icon from the bundled picker, or choose **None** to remove it
 Icons also appear beside project names in Workweek and beside daily durations
 in Track. They are retained in account downloads and JSON/CSV transfers.
 
-The project icon picker offers 2,078 bundled Bootstrap Icons. Search by
-name or keyword across the entire catalog, including icons not yet shown, or
-choose **More icons** to browse. Filtering preserves the
+The project icon picker offers 2,078 bundled Bootstrap Icons. Choose one of
+Bootstrap's 29 categories, such as **Communications**, **Files & Folders** or
+**Weather**, and filter by **Filled** or **Unfilled** style. Search by name,
+keyword or category across the entire catalog, including icons not yet shown,
+or choose **More icons** to browse. Category counts cover the full bundled set;
+the results count reflects the combined filters. Filtering preserves the
 current selection; **None** removes an icon. Icons work offline.
 
 ![Optional project icon picker](../assets/screenshots/project-icon-picker.png)

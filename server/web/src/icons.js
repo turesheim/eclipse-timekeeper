@@ -1,13 +1,17 @@
 // Bootstrap Icons, bundled locally with the upstream MIT license.
-import {projectCatalog} from './project-icons.js';
+import {projectCatalog,projectCategories} from './project-icons.js';
 const normalize = value => value.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/[-_]/g, ' ');
-const projectEntries = projectCatalog.map(([id,label,terms]) => ({id,label,search:normalize(`${id} ${label} ${terms}`)}));
+export const projectIconCategories = projectCategories.map(([id,name,count])=>({id,name,count}));
+const categoryNames = new Map(projectCategories.map(([id,name])=>[id,name]));
+const projectEntries = projectCatalog.map(([id,label,terms,category]) => ({id,label,category,filled:/(?:^|-)fill(?:-|$)/.test(id),search:normalize(`${id} ${label} ${terms} ${categoryNames.get(category)}`)}));
 const projectsByIcon = new Map(projectEntries.map(entry => [entry.id,entry]));
 export const isProjectIcon = id => projectsByIcon.has(id);
 export const projectIconLabel = id => projectsByIcon.get(id)?.label;
-export function searchProjectIcons(query = '') {
+export function searchProjectIcons(query = '', {category='all',style='all'} = {}) {
   const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
-  return terms.length ? projectEntries.filter(entry => terms.every(term => entry.search.includes(term))) : projectEntries;
+  return projectEntries.filter(entry => (category==='all'||entry.category===category)
+    && (style!=='filled'||entry.filled) && (style!=='unfilled'||!entry.filled)
+    && terms.every(term => entry.search.includes(term)));
 }
 const actions = {close:'x-lg',add:'plus-lg',link:'link-45deg',unlink:'link',left:'chevron-left',right:'chevron-right',down:'chevron-down',clock:'clock',calendar:'calendar3',more:'three-dots',start:'play-fill',stop:'stop-fill',edit:'pencil-square',delete:'trash',refresh:'arrow-repeat',check:'check-circle-fill',warning:'exclamation-triangle-fill',error:'exclamation-circle-fill',collapse:'chevron-double-up',expand:'chevron-double-down',copy:'copy',paste:'clipboard'};
 function bootstrapIcon(name) {

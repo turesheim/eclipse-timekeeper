@@ -142,6 +142,16 @@ test('project icon picker searches the full catalog with bounded rendering and p
     const code=await page.getByRole('radio',{name:'Code',exact:true}).elementHandle();
     await page.getByRole('button',{name:'More icons',exact:true}).click();await expect(choices.locator('input')).toHaveCount(121);
     expect(await code.evaluate(node=>node.isConnected)).toBe(true);
+    const category=picker.getByRole('combobox',{name:'Category',exact:true}),style=picker.getByRole('combobox',{name:'Icon style',exact:true});
+    await category.selectOption('communications');await expect(choices.locator('input')).toHaveCount(61);await expect(picker.getByRole('status')).toContainText('143');
+    await search.fill('bell');await style.selectOption('filled');await expect(choices.locator('input')).toHaveCount(3);await expect(page.getByRole('radio',{name:'Bell',exact:true})).toHaveCount(0);
+    await page.getByRole('radio',{name:'Bell Fill',exact:true}).check();
+    await style.selectOption('unfilled');await expect(page.getByRole('radio',{name:'Bell',exact:true})).toBeVisible();await expect(page.getByRole('radio',{name:'Bell Fill',exact:true})).toHaveCount(0);await expect(picker.locator('[name=icon]:checked')).toHaveValue('bell-fill');
+    await category.selectOption('weather');await expect(picker.getByRole('status')).toContainText('No matching icons.');await expect(picker.locator('[name=icon]:checked')).toHaveValue('bell-fill');
+    await search.fill('cloud');await expect(page.getByRole('radio',{name:'Cloud',exact:true})).toBeVisible();
+    await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(category).toBeVisible();await expect(style).toBeVisible();
+    await page.setViewportSize({width:1280,height:720});
+    await category.selectOption('all');await style.selectOption('all');
     await search.fill('yin-yang');await expect(page.getByRole('radio',{name:'Yin Yang',exact:true})).toBeVisible();await expect(choices.locator('input')).toHaveCount(2);
     await page.getByRole('radio',{name:'Yin Yang',exact:true}).check();
     await search.fill('rocket');await expect(page.getByRole('radio',{name:'Rocket',exact:true})).toBeVisible();await expect(picker.locator('[name=icon]:checked')).toHaveValue('yin-yang');
