@@ -885,7 +885,7 @@
   "calendar.error.CALENDAR_CLIENT_MISMATCH": "Velg et prosjekt eller en oppgave som tilhører kalenderens kunde.",
   "calendar.error.CALENDAR_DUPLICATE_SUBSCRIPTION": "Kontoen abonnerer allerede på denne kalenderadressen. Rediger det eksisterende abonnementet.",
   "calendar.subscriptions_count": "Kalendere ({{count}})",
-  "calendar.refresh_errors": "Noen kalendere kunne ikke oppdateres. Utvid abonnementene for detaljer. Sist oppdaterte data beholdes.",
+  "calendar.refresh_errors": "Noen kalendere kunne ikke oppdateres. Se hver kalender for detaljer. Sist oppdaterte data beholdes.",
   "calendar.error.CALENDAR_FUTURE_ACTIVITY": "En aktivitet kan ikke starte i fremtiden. Kontroller det faktiske tidsrommet før du lagrer.",
   "about.project_references": "Prosjektreferanser",
   "about.website": "Prosjektets nettsted",

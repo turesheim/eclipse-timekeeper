@@ -124,7 +124,7 @@ export class TrackDayNotes {
       const value=node(this.writable?'button':'span',undefined,'track-day-note'+(text?'':' is-empty'));value.dataset.trackNoteDate=date;
       if(this.writable){value.type='button';value.classList.add('btn','btn-link','btn-sm');value.disabled=!this.loaded;value.setAttribute('aria-haspopup','dialog');value.addEventListener('click',()=>void this.open(date));}
       value.title=text||t('day_notes.add',{date:this.dateLabel(date)});value.setAttribute('aria-label',t(text?(this.writable?'day_notes.edit':'day_notes.view'):'day_notes.add',{date:this.dateLabel(date),text}));
-      if(text)value.append(node('span',text,'badge rounded-pill bg-info-subtle text-info-emphasis'));else value.append(icon('add'));
+      if(text)value.append(node('span',text,'badge rounded-pill bg-info-subtle text-info-emphasis'));else value.append(icon('sticky'));
       if(previous)previous.replaceWith(value);else heading.append(value);
     }
     if(focused&&!this.root.hidden)this.grid.querySelector(`button[data-track-note-date="${focused}"]`)?.focus({preventScroll:true});
