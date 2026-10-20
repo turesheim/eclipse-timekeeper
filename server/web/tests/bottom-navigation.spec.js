@@ -15,7 +15,7 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
   })).toBe(true);
   await expect(page.locator('#refresh')).toHaveClass(/\bbtn\b/);
   const views=[['track','Calendar'],['calendar','Week'],['week','Workweek'],['activities','Activities'],['clients','Clients'],['projects','Projects'],['labels','Labels']];
-  await expect(page.locator('[data-tab=tasks],#tasks-panel')).toHaveCount(0);
+  await expect(page.locator('[data-tab=tasks],#tasks-panel,#activity-tasks,#tasks,#add-task')).toHaveCount(0);
   expect(await bar.locator('button').evaluateAll(nodes=>nodes.map(node=>node.dataset.tab))).toEqual(views.map(([id])=>id));
   for(const width of [320,390,768,1440]) {
     await page.setViewportSize({width,height:844});

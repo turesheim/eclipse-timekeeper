@@ -616,8 +616,8 @@ still running. Starts in the future remain invalid.
 
 Week shows work sessions and subscribed calendar plans. Recorded activities
 appear in **Activities**, keeping the Week display focused. Editing a work
-session never changes its activities. There is no separate Tasks view; expand
-**Manage tasks** in Activities to create, edit, start or remove task records.
+session never changes its activities. Task rows in Activities offer **Start**
+and **Edit task**. There is no separate task-management section.
 
 Repeated clock times have separate rows; shaded slots do not occur on a given
 day. A drag retains the original session snapshot and saves with its opaque

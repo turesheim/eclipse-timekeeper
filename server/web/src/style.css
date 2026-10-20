@@ -350,11 +350,6 @@ button.track-client-day:disabled { opacity: .65; }
 .undo-notice.is-fading { opacity: 0; }
 @media(prefers-reduced-motion: reduce) { .undo-notice { transition: none; } }
 
-
-.activity-tasks { margin-top: 1rem; padding: .75rem; }
-.activity-tasks > summary { cursor: pointer; font-weight: 600; }
-.activity-tasks[open] > summary { margin-bottom: .75rem; }
-
 .app-header .status-line { margin: 0; min-width: 0; flex: 0 1 auto; }
 .app-header #session { margin-inline-start: auto; flex: 0 1 auto; min-width: 2.75rem; max-width: 40%; }
 .app-header .status-refresh { min-width: 0; }
