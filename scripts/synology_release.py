@@ -19,9 +19,9 @@ ACCEPTANCE = 'timekeeper-dsm-acceptance.json'
 EVIDENCE = 'timekeeper-dsm-release.json'
 # Preserve access to already-tested installers from before the artifact rename.
 INSTALLER_ARTIFACT_NAMES = {'synology-installer', 'synology-preview-candidate'}
-MATRIX_JOBS = {'API-contract', 'Server', 'Web', 'Build (ubuntu-latest)',
-               'Build (macos-latest)', 'Build (windows-latest)',
-               'Installed client tests', 'Packaging and channel tests',
+# A server-only main build deliberately skips the Eclipse platform matrix.
+# NAS promotion still requires every server, web, packaging and publication gate.
+MATRIX_JOBS = {'API-contract', 'Server', 'Web', 'Packaging and channel tests',
                'Build website and update site'}
 
 
