@@ -90,7 +90,7 @@ Run `npm run vendor:icons` in `server/web` to regenerate the pinned assets,
 project catalog and API allow-list. `npm run check:assets` verifies them.
 
 Workspace views use a Bootstrap `navbar fixed-bottom` with `navbar-nav` and
-`nav-link` controls. The seven views appear in this order: Calendar, Workweek, Week, Activities,
+`nav-link` controls. The seven views appear in this order: Calendar, Week, Workweek, Activities,
 Clients, Projects and Labels.
 The active view has `aria-current="page"`; compact screens show icons with
 accessible names, and wide screens also show labels. Safe-area padding keeps the
