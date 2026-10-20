@@ -903,5 +903,21 @@
   "holidays.browser": "Use browser region ({{country}})",
   "holidays.unsupported_country": "no supported country",
   "holidays.none": "Do not show national holidays",
-  "holidays.independent": "Choose the country whose national holidays you want to see. This is independent of language, regional formatting and time zone."
+  "holidays.independent": "Choose the country whose national holidays you want to see. This is independent of language, regional formatting and time zone.",
+  "day_notes.title": "Day note · {{date}}",
+  "day_notes.text": "Short text",
+  "day_notes.hint": "Up to 80 characters, for example “Vacation” or “Time off”. Clear the text and save to remove the label.",
+  "day_notes.loading": "Loading day notes…",
+  "day_notes.help": "Right-click or long-press a day to add or edit its note. You can also use + or select a blue label.",
+  "day_notes.unavailable": "Day notes could not be loaded. Recorded work is still available.",
+  "day_notes.add": "Add a note for {{date}}",
+  "day_notes.edit": "Edit note for {{date}}: {{text}}",
+  "day_notes.uncertain": "The save could not be confirmed. Your draft is kept. Cancel and reopen this date to check the saved note before editing again.",
+  "day_notes.count": "Day notes",
+  "day_notes.menu_add": "Add day note",
+  "day_notes.menu_edit": "Edit day note",
+  "day_notes.actions": "Day actions",
+  "day_notes.view": "Note for {{date}}: {{text}}",
+  "theme.device": "Applies immediately and is saved in this browser.",
+  "tasks.manage": "Manage tasks"
 }

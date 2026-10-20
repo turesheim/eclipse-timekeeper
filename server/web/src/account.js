@@ -40,6 +40,8 @@ export async function renderAccount(view, part) {
     const display = field(identity.value, i18nText("ui.display_name_optional"), account.displayName === account.username ? '' : account.displayName, { required: false, autocomplete: 'nickname', maxLength: 200 });
     identity.value.append(node('p', i18nText("ui.leave_display_name_blank_to_use_your_username_renaming_your_account_preserves_your_pr"), 'hint'));identity.finish();
   }
+  const themeCard=section(view,i18nText('ui.theme')),themeHome=document.getElementById('theme-settings'),themeChoice=themeHome.querySelector('.theme-choice');
+  themeCard.append(themeChoice,node('p',i18nText('theme.device'),'hint'));view.cleanup.add(()=>themeHome.append(themeChoice));
   const localePreferences = form(view, i18nText('locale.language'), i18nText('locale.save'), async () => {
     const otherDrafts = [...view.dirty].filter((value) => value !== localePreferences.value);
     if (otherDrafts.length && !window.confirm(i18nText('locale.discard'))) return;

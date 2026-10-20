@@ -201,6 +201,7 @@ class ContractTest(unittest.TestCase):
 
     def test_every_reference_and_relation_workflow_is_present(self):
         expected = {
+            'listDayNotes', 'getDayNote', 'saveDayNote',
             'downloadAccountArchive', 'createAccountArchiveUpload', 'listPendingAccountArchives',
             'getAccountArchiveUpload', 'writeAccountArchiveChunk', 'discardAccountArchiveUpload',
             'previewAccountArchive', 'restoreAccountArchive', 'listAccountArchiveRestores',

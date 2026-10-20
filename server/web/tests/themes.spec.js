@@ -1,3 +1,5 @@
+import {captureScreenshot} from './screenshots.js';
+import {setTheme,openThemeSettings} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {randomUUID} from 'node:crypto';
@@ -28,10 +30,10 @@ test('themes cover tracking, records, editors and account settings with accessib
     await page.locator('[data-tab=week]').click();await page.locator('#week-date').fill('2025-10-20');await expect(page.locator('#zone-caption')).toContainText('2025-10-20');
     await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2025-10');
     for(const id of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']) {
-      await page.setViewportSize({width:1440,height:1000});await openAccountMenu(page);await page.getByLabel('Theme',{exact:true}).selectOption(id);
+      await page.setViewportSize({width:1440,height:1000});await setTheme(page,id);
       await expect(page.locator('html')).toHaveAttribute('data-theme',id);await audit(page);
-      await page.locator('[data-tab=track]').click();await page.screenshot({path:`test-results/theme-${id}-desktop.png`,fullPage:false});
-      for(const view of ['track','week','activities','calendar','tasks','clients','projects','labels']) {
+      await page.locator('[data-tab=track]').click();await captureScreenshot(page,{path:`test-results/theme-${id}-desktop.png`,fullPage:false});
+      for(const view of ['track','week','calendar','activities','clients','projects','labels']) {
         await page.locator(`[data-tab=${view}]`).click();
         if(view==='activities') {
           const activity=page.locator('#activities tr[data-kind=activity]').first();
@@ -43,7 +45,7 @@ test('themes cover tracking, records, editors and account settings with accessib
       await page.locator('[data-tab=projects]').click();await page.getByRole('button',{name:'New project',exact:true}).click();await page.getByRole('radio',{name:'Code',exact:true}).check();await audit(page);await page.locator('#cancel').click();
       await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');await audit(page);
       await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await page.locator('[data-tab=track]').click();
-      await page.setViewportSize({width:390,height:844});await audit(page);await page.screenshot({path:`test-results/theme-${id}-mobile.png`,fullPage:false});
+      await page.setViewportSize({width:390,height:844});await audit(page);await captureScreenshot(page,{path:`test-results/theme-${id}-mobile.png`,fullPage:false});
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     }
     violations.push(...await page.evaluate(()=>window.themePolicyViolations || []));expect(external).toEqual([]);
@@ -54,14 +56,14 @@ test('themes cover tracking, records, editors and account settings with accessib
 });
 
 test('theme choice persists before rendering, follows other tabs and tolerates unavailable browser storage',async({page,context})=>{
-  await signIn(page);await openAccountMenu(page);await page.getByLabel('Theme',{exact:true}).selectOption('solarized-dark');
+  await signIn(page);await setTheme(page,'solarized-dark');
   await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','solarized-dark');
-  await expect(page.locator('html')).toHaveAttribute('data-bs-theme','dark');await openAccountMenu(page);await expect(page.getByLabel('Theme',{exact:true})).toHaveValue('solarized-dark');
+  await expect(page.locator('html')).toHaveAttribute('data-bs-theme','dark');await openThemeSettings(page);await expect(page.getByLabel('Theme',{exact:true})).toHaveValue('solarized-dark');
   const other=await context.newPage();await other.goto('/admin/');await expect(other.locator('html')).toHaveAttribute('data-theme','solarized-dark');
   await page.getByLabel('Theme',{exact:true}).selectOption('nord');await expect(other.locator('html')).toHaveAttribute('data-theme','nord');
   await page.evaluate(()=>localStorage.removeItem('timekeeper.theme'));await expect(other.locator('html')).toHaveAttribute('data-theme','timekeeper');await other.close();
   await page.evaluate(()=>localStorage.setItem('timekeeper.theme','invalid-theme'));await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','timekeeper');
   await page.addInitScript(()=>{Storage.prototype.getItem=()=>{throw new DOMException('Storage unavailable','SecurityError');};Storage.prototype.setItem=()=>{throw new DOMException('Storage unavailable','SecurityError');};});
-  await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','timekeeper');await openAccountMenu(page);await page.getByLabel('Theme',{exact:true}).selectOption('dracula');
+  await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','timekeeper');await setTheme(page,'dracula');
   await expect(page.locator('html')).toHaveAttribute('data-theme','dracula');await expect(page.locator('#status')).toHaveText('Up to date');
 });

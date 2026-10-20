@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -86,14 +87,14 @@ test('account language persists across devices and can return to browser default
     await page.reload();await expect(page.locator('html')).toHaveAttribute('lang','nb-NO');await expect(page.locator('#account-heading')).toHaveText('Min konto');
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
-    await page.screenshot({path:'test-results/locale-norwegian-account.png',fullPage:true});
+    await captureScreenshot(page,{path:'test-results/locale-norwegian-account.png',fullPage:true});
   } finally {await first.close();await second.close();}
 });
 test('Norwegian administration and workspace navigation retain accessible narrow layouts',async({browser,request})=>{
   const user=await fresh(request,true),session=await context(browser,'nb-NO');
   try {
     const page=await session.newPage();await login(page,user);
-    for(const tab of ['track','week','activities','calendar','tasks','clients','projects','labels']) {
+    for(const tab of ['track','week','calendar','activities','clients','projects','labels']) {
       await page.locator(`[data-tab=${tab}]`).click();
       await expect(page.locator(`[data-tab=${tab}]`)).toHaveAttribute('aria-current','page');
       await expect(page.locator('#workspace')).not.toContainText(/\b(?:ui\.|count\.|record\.)[a-z_]+/);
@@ -110,7 +111,7 @@ test('Norwegian administration and workspace navigation retain accessible narrow
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
       const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
     }
-    await page.screenshot({path:'test-results/locale-norwegian-administration.png',fullPage:true});
+    await captureScreenshot(page,{path:'test-results/locale-norwegian-administration.png',fullPage:true});
   } finally {
     await session.close();
     // Other scenarios exercise the last-administrator guard. Retire this

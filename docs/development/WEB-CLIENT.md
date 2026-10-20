@@ -1,7 +1,7 @@
 # Timekeeper web client
 
-The account menu's **About** dialog reads `/api/v1/server` to identify the running server
-version and commit. Its details distinguish immutable build time, explicitly
+The **About** item at the bottom of the account menu opens a dialog that reads
+`/api/v1/server` to identify the running server version and commit. Its details distinguish immutable build time, explicitly
 recorded deployment time and process-start time. Information refreshes after
 long polls and manual refreshes, including during rolling updates. Missing
 deployment metadata is shown as **Not recorded**. The Docker/Synology deployment
@@ -80,11 +80,14 @@ Run `npm run vendor:icons` in `server/web` to regenerate the pinned assets,
 project catalog and API allow-list. `npm run check:assets` verifies them.
 
 Workspace views use a Bootstrap `navbar fixed-bottom` with `navbar-nav` and
-`nav-link` controls. All eight views remain available without a collapsed menu.
+`nav-link` controls. The seven views appear in this order: Track, Workweek, Calendar, Activities,
+Clients, Projects and Labels.
 The active view has `aria-current="page"`; compact screens show icons with
 accessible names, and wide screens also show labels. Safe-area padding keeps the
 bar and page content clear of each other. Standard action buttons use Bootstrap
-`btn` variants, including the manual status refresh and calendar actions.
+`btn` variants, including the manual status refresh and calendar actions. The
+clickable sync indicator sits immediately beside the Timekeeper title in the
+header, remains available in My Account and is hidden when signed out.
 
 ## Track month view
 
@@ -98,6 +101,25 @@ On mobile, swipe left across the month to go forward or right to go back.
 Workweek, Activities and Calendar also support swiping between weeks on their
 headings or other non-scrolling areas. Wide tables and the calendar grid keep
 their normal scrolling and editing gestures. Date controls remain available.
+Right-click a day or **press and hold** it on a touch screen, then choose
+**Add day note** / **Edit day note**. A short label such as “Ferie” or “Avspasering”
+appears beside the date in blue, distinct from red national holidays. Select the
+label to edit it, or use the small **+** beside an empty date. Keyboard users can
+focus that button and press **Shift+F10** for the same menu. Movement cancels a
+long press, preserving scrolling and month swipes.
+
+Notes accept up to 80 characters. Clear the text and save to remove a label;
+Cancel leaves the saved note unchanged. Each note belongs to its calendar date
+and account, including days without work. It follows the account across web
+sessions and devices, and remains on the same date after time-zone changes.
+Narrow screens wrap the label when needed. Day notes never affect timed work,
+reports or the Eclipse UI. Read-only sessions can see saved labels. Concurrent
+edits retain the draft for review rather than overwriting a newer note.
+
+![Day notes beside dates and holidays](../assets/screenshots/day-notes-desktop.png)
+
+![Editing a day note](../assets/screenshots/day-notes-editor.png)
+
 Hover over a daily client total to see its sessions, summaries, projects, labels,
 local start/end times and durations in a tooltip. These details are also available
 when viewing the account with read-only access.
@@ -154,7 +176,7 @@ holidays can differ; subdivision calendars, optional holidays and observances ar
 not included. Unsupported regions and years before 0100 show an explicit message.
 The engine loads when either view needs it, without requesting an external calendar.
 A failed load offers Retry and preserves open session drafts. Data attribution
-and the complete upstream license are available through the link below the grid.
+and the complete upstream license are available in **About**.
 Run `npm run vendor:holidays` in `server/web` to regenerate the pinned engine,
 country list and licenses; `npm run check:assets` verifies every generated file.
 
@@ -164,9 +186,13 @@ These previews use a Norwegian account with a browser in Pacific/Kiritimati:
 
 ![Public holiday details on mobile](../assets/screenshots/public-holidays-details-mobile.png)
 
+The monthly view omits its time-zone caption and normal holiday attribution
+footer. **About** shows the selected holiday country and the local date-holidays
+data license; loading failures and Retry remain available in the monthly view.
+
 ## Themes
 
-Choose **Theme** in the account menu to switch between Timekeeper (the default),
+Choose **Theme** under **My Account → Profile** to switch between Timekeeper (the default),
 Timekeeper Dark, Solarized Light, Solarized Dark, Nord and Dracula. The selection
 is saved on this browser and shared with other open Timekeeper tabs, including
 Administration. A saved theme also applies to sign-in and loads before the
@@ -412,7 +438,7 @@ or activity list; historical records and detailed reports remain in Workweek,
 Activities and Calendar.
 
 A work session is an independent interval for one client. Its tools are **Edit**
-and **Delete**. Create or edit activities in Activities or Calendar; task timers
+and **Delete**. Create or edit activities in Activities; task timers
 run independently. There are no session selectors or manual activity links.
 
 Work sessions may have several labels selected in the start, record and edit
@@ -505,6 +531,13 @@ provenance go under `server/web/test-results`. Traces/videos are off because the
 retain authorization headers. CI's Web job uses the same Server artifact as
 Remote-Eclipse.
 
+Use `captureScreenshot` from `server/web/tests/screenshots.js` for browser
+screenshots. When the bottom navigation is visible, it captures the viewport so
+the bar stays at the bottom of the image. A full-page capture includes content
+below the viewport but leaves fixed navigation at its original viewport position,
+which makes the resulting image misleading. Pages without the workspace bar can
+still use full-page captures.
+
 Browser tests cover core tracking, authorization/validation, peer synchronization,
 stale drafts, lost committed replies, exact nanoseconds, autumn DST, mobile
 layout, expandable project/task hierarchy, external issue links and remembered
@@ -562,10 +595,10 @@ the signed-in browser session and is cleared on sign-out. A running source keeps
 its blank end in the copy; finish the copy's interval if another session is
 still running. Starts in the future remain invalid.
 
-Each recorded activity has its own card at its actual start/end time, including
-activities recorded without a work session. Cards retain task issue links and
-show which work sessions overlap their interval. Recorded activities remain
-independent when a work session is moved, resized or copied.
+Calendar shows work sessions and subscribed calendar plans. Recorded activities
+appear in **Activities**, keeping the Calendar display focused. Editing a work
+session never changes its activities. There is no separate Tasks view; expand
+**Manage tasks** in Activities to create, edit, start or remove task records.
 
 Repeated clock times have separate rows; shaded slots do not occur on a given
 day. A drag retains the original session snapshot and saves with its opaque

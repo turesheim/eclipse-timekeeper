@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -43,7 +44,7 @@ test('portability: private download, accessible review, stale review and duplica
   for(const width of [1440,390,320]) {
     await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>value.id)).toEqual([]);
-    await page.screenshot({path:`test-results/account-data-review-${width}.png`,fullPage:true});
+    await captureScreenshot(page,{path:`test-results/account-data-review-${width}.png`,fullPage:true});
   }
   expect((await own(page,'POST','/clients',{name:'Peer edit retained',color:'#334455'})).status()).toBe(201);
   await page.getByRole('button',{name:'Import reviewed records',exact:true}).click();await expect(page.getByText('Your work changed after review. Select Review archive to review the current records again.',{exact:true})).toBeVisible();expect((await snapshot(page)).workSessions).toHaveLength(1);

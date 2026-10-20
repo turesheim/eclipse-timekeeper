@@ -1,3 +1,4 @@
+import {captureScreenshot} from './screenshots.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -47,7 +48,7 @@ test('Undo restores inline edits and deletions exactly; lost replies retry witho
     const end=page.locator(`#week-sessions [data-work-session-id="${original.id}"] [data-endpoint=end]`),notice=page.locator('#undo-notice');
     await end.fill('17:00');await end.press('Enter');await expect(notice).toContainText('Work session updated');await expect(end).toHaveValue('17:00');
     expect((await new AxeBuilder({page}).include('#undo-notice').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
-    await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:'test-results/work-session-undo-mobile.png',fullPage:true});
+    await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:'test-results/work-session-undo-mobile.png',fullPage:true});
     await notice.getByRole('button',{name:'Undo',exact:true}).click();await expect(notice).toContainText('change undone');await expect(end).toHaveValue('16:00');
     let saved=await(await api(request,'GET',path)).json();expect(saved.start).toBe(original.start);expect(saved.end).toBe(original.end);expect(saved.version).toBe(2);
     await workSessionAction(page,original.id,'Delete');await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();await expect(notice).toContainText('Work session deleted');

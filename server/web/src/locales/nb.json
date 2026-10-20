@@ -903,5 +903,21 @@
   "holidays.browser": "Bruk nettleserens region ({{country}})",
   "holidays.unsupported_country": "intet støttet land",
   "holidays.none": "Ikke vis nasjonale helligdager",
-  "holidays.independent": "Velg landet du vil se nasjonale helligdager for. Dette valget er uavhengig av språk, regional formatering og tidssone."
+  "holidays.independent": "Velg landet du vil se nasjonale helligdager for. Dette valget er uavhengig av språk, regional formatering og tidssone.",
+  "day_notes.title": "Dagsnotat · {{date}}",
+  "day_notes.text": "Kort tekst",
+  "day_notes.hint": "Inntil 80 tegn, for eksempel «Ferie» eller «Avspasering». Tøm teksten og lagre for å fjerne etiketten.",
+  "day_notes.loading": "Laster dagsnotater…",
+  "day_notes.help": "Høyreklikk eller trykk og hold på en dag for å legge til eller redigere et notat. Du kan også bruke + eller velge en blå etikett.",
+  "day_notes.unavailable": "Dagsnotatene kunne ikke lastes. Registrert arbeid er fortsatt tilgjengelig.",
+  "day_notes.add": "Legg til notat for {{date}}",
+  "day_notes.edit": "Rediger notat for {{date}}: {{text}}",
+  "day_notes.uncertain": "Lagringen kunne ikke bekreftes. Utkastet er beholdt. Avbryt og åpne datoen på nytt for å kontrollere det lagrede notatet før du redigerer videre.",
+  "day_notes.count": "Dagsnotater",
+  "day_notes.menu_add": "Legg til dagsnotat",
+  "day_notes.menu_edit": "Rediger dagsnotat",
+  "day_notes.actions": "Handlinger for dagen",
+  "day_notes.view": "Notat for {{date}}: {{text}}",
+  "theme.device": "Brukes med en gang og lagres i denne nettleseren.",
+  "tasks.manage": "Administrer oppgaver"
 }

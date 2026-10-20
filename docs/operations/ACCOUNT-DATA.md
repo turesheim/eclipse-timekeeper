@@ -14,7 +14,8 @@ signed-in account. Administrator access does not include anyone else's records.
 
 The snapshot includes all work records, project/client links, task relationships,
 labels, descriptions, external references, exact timestamps, running intervals,
-time-zone preferences and import audit history. It also includes your account
+time-zone preferences and import audit history. Web day notes are included as
+optional `dayNotes` in `archive.json`, including dates with no timed work. It also includes your account
 identity, recovery addresses and credential-management metadata for reference.
 Passwords and hashes, API/session token material, passkey keys/credential IDs,
 recovery codes/links and deployment settings or SMTP secrets are excluded.
@@ -38,6 +39,10 @@ together. Existing work remains. Your username, role, recovery addresses and
 sign-in credentials remain under this account's control; the source account's
 metadata is informational. Imported history is an audit copy and cannot authorize
 old import jobs or Undo operations.
+
+Day notes retain their calendar dates. Matching notes can be restored again; a
+different existing note on the same date is reported as a conflict during review
+and is never overwritten. Archives created before day notes remain supported.
 
 Closed intervals retain exact instants and nanoseconds. A source running activity
 or work session can be restored when the corresponding timer is available in this

@@ -20,3 +20,16 @@ export async function setTimeZone(page, zone) {
   await expect(page.locator('#account-content')).toContainText('Time zone saved.');
   await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
 }
+
+export async function openThemeSettings(page){
+  if(await page.locator('#account-content #theme').isVisible())return;
+  if(await page.locator('#account-menu').getAttribute('open')===null)await page.locator('#account-menu > summary').click();await page.locator('#account').click();await expect(page.locator('#account-content #theme')).toBeVisible();
+}
+export async function setTheme(page,value){
+  await openThemeSettings(page);await page.locator('#theme').selectOption(value);await page.locator('#account-page a[href="#tracking"]').click();await expect(page.locator('#workspace')).toBeVisible();
+}
+
+export async function openTaskManagement(page){
+  await page.locator('[data-tab=activities]').click();const panel=page.locator('#activity-tasks');
+  if(await panel.getAttribute('open')===null)await panel.locator('summary').click();await expect(panel.locator('#tasks')).toBeVisible();
+}

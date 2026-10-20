@@ -97,6 +97,7 @@
 :root[data-bs-theme=dark] .form-check-input[type=checkbox]:checked { background-image: url('./assets/check-dark.svg'); }
 :root[data-bs-theme=dark] .form-check-input[type=radio]:checked { background-image: url('./assets/radio-dark.svg'); }
 .theme-choice { display: block; padding: .5rem .75rem; margin: 0; font-size: .875rem; font-weight: 600; }
+.account-card .theme-choice { padding: 0; }
 .theme-choice .form-select { margin-top: .25rem; font-weight: 400; }
 /* Text and its surface must change together when switching between light/dark. */
 .btn, .nav-link { transition: none; }

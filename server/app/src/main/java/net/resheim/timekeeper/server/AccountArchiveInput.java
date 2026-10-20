@@ -57,7 +57,7 @@ final class AccountArchiveInput {
     }
     private static ObjectNode document(InputStream input) throws IOException {
         JsonNode value=json(input,AccountUploads.MAX_BYTES);
-        if(!value.isObject() || !names(value).equals(FIELDS) || !value.path("format").asText().equals(AccountArchive.FORMAT)) throw ApiFailure.validation();
+        if(!value.isObject() || !fields(value).equals(FIELDS) || !value.path("format").asText().equals(AccountArchive.FORMAT)) throw ApiFailure.validation();
         try {ContractInputs.pathId(value.path("archiveId").asText());Instant.parse(value.path("generatedAt").asText());}
         catch(RuntimeException invalid) {throw ApiFailure.validation();}
         if(!value.path("account").isObject() || !value.path("preferences").isObject() || !value.path("work").isObject() || !value.path("importHistory").isArray()) throw ApiFailure.validation();
@@ -68,11 +68,12 @@ final class AccountArchiveInput {
         // before preview or commit; this layer only establishes safe framing.
         return (ObjectNode)value;
     }
+    private static Set<String> fields(JsonNode value) {var fields=names(value);fields.remove("dayNotes");return fields;}
     static ObjectNode counts(JsonNode archive) {
         var result=object();for(String name:AccountArchive.WORK.keySet()) {
             if(!archive.path("work").path(name).isArray()) throw ApiFailure.validation();result.put(name,archive.path("work").path(name).size());
         }
-        result.put("importAuditRecords",archive.path("importHistory").size());return result;
+        result.put("importAuditRecords",archive.path("importHistory").size());if(archive.has("dayNotes"))result.put("dayNotes",archive.path("dayNotes").size());return result;
     }
     static ObjectNode relationships(JsonNode archive) {
         var result=object();var work=archive.path("work");

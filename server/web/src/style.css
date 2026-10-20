@@ -90,7 +90,7 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 #workspace { padding-block-end: calc(var(--workspace-nav-height) + 1rem); }
 .workspace-nav { --bs-navbar-color: #3f554c; --bs-navbar-hover-color: #104e3f; height: var(--workspace-nav-height); padding: .35rem max(env(safe-area-inset-left, 0px), .25rem) calc(.35rem + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -.25rem 1rem #233b380d; }
 .workspace-nav .container-fluid { max-width: 1332px; }
-.workspace-nav .navbar-nav { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); width: 100%; }
+.workspace-nav .navbar-nav { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; }
 /* Switching text and background colors together must not pass through low contrast. */
 .workspace-nav .nav-link { display: flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.75rem; min-width: 0; padding: .5rem .25rem; border-radius: var(--bs-border-radius); font-weight: 600; transition: none; }
 .workspace-nav .nav-link:not(.active):hover { background: #e4ede7; }
@@ -213,6 +213,20 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .track-holiday-label { display: flex; align-items: center; gap: .2rem; flex: 1; min-width: 0; max-width: 100%; padding: .1rem 0; border: 0; text-align: left; color: var(--track-holiday-color); font-size: .72rem; font-weight: 600; text-decoration: none; }
 .track-holiday-label:is(:hover,:active,:focus-visible) { color: var(--track-holiday-color); text-decoration: none; }
 .track-holiday-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.track-day-note { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; min-height: 2.75rem; flex: 0 1 auto; padding: 0 .1rem; text-decoration: none; border: 0; }
+.track-day-note:is(:hover,:active,:focus-visible) { text-decoration: none; }
+.track-day-note .badge { overflow: hidden; text-overflow: ellipsis; font-size: .72rem; }
+.track-day-note.is-empty { margin-inline-start: auto; flex: none; opacity: 0; color: var(--accent); }
+.track-day:is(:hover,:focus-within) .track-day-note.is-empty, .track-day-note.is-empty:focus-visible { opacity: 1; }
+.track-day:has(button.track-day-note) { -webkit-touch-callout: none; user-select: none; }
+.track-note-menu { inset: auto; margin: 0; padding: .25rem; min-width: 11rem; max-width: calc(100vw - 1rem); }
+.track-note-menu:popover-open { display: block; }
+.track-note-status { margin-top: .75rem; }
+@media (hover: none) { .track-day-note.is-empty { opacity: 1; } }
+@media (max-width: 767px) {
+  .track-date-row:has(.track-day-note:not(.is-empty)) { flex-wrap: wrap; }
+  .track-day-note:not(.is-empty) { flex-basis: 100%; min-height: 1.75rem; }
+}
 .track-holiday-status { margin-top: .75rem; }
 .track-holiday-status a { color: var(--accent); }
 .track-client-day { display: flex; flex-direction: column; width: 100%; min-height: 2.75rem; text-align: left; padding: .3rem .4rem; margin-bottom: .3rem; border: 1px solid var(--line); border-inline-start: 4px solid var(--client-color, var(--accent)); border-radius: .3rem; background: var(--bs-body-bg); color: var(--bs-body-color); font-size: .8rem; }
@@ -331,3 +345,13 @@ button.track-client-day:disabled { opacity: .65; }
 .undo-notice.is-fading { opacity: 0; }
 @media(prefers-reduced-motion: reduce) { .undo-notice { transition: none; } }
 
+
+.activity-tasks { margin-top: 1rem; padding: .75rem; }
+.activity-tasks > summary { cursor: pointer; font-weight: 600; }
+.activity-tasks[open] > summary { margin-bottom: .75rem; }
+
+.app-header .status-line { margin: 0; min-width: 0; flex: 0 1 auto; }
+.app-header #session { margin-inline-start: auto; flex: 0 1 auto; min-width: 2.75rem; max-width: 40%; }
+.app-header .status-refresh { min-width: 0; }
+.app-header #status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 575px) { .app-header #owner { display: none; } }
