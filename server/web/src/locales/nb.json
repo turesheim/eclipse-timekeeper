@@ -711,9 +711,9 @@
   "ui.work_session_tools": "Verktøy for arbeidsøkt",
   "ui.in_progress_6a506b": "PÅGÅR",
   "ui.time_tracking_views": "Visninger for tidsregistrering",
-  "ui.track": "Oversikt",
+  "ui.track": "Kalender",
   "ui.workweek": "Arbeidsuke",
-  "ui.calendar": "Kalender",
+  "ui.calendar": "Uke",
   "ui.month": "Måned",
   "ui.yyyy_mm": "ÅÅÅÅ-MM",
   "ui.0h_0m": "0t 0m",
@@ -954,5 +954,6 @@
   "icons.category.travel": "Reise",
   "icons.category.typography": "Typografi",
   "icons.category.ui-and-keyboard": "Grensesnitt og tastatur",
-  "icons.category.weather": "Vær"
+  "icons.category.weather": "Vær",
+  "duration.presentation": "Brukes med en gang i visningen av varighet. Registrerte tidspunkter endres ikke."
 }

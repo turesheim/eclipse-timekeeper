@@ -1,3 +1,4 @@
+import {dateTimeFormat} from './formatters.js';
 import { getLocale } from './i18n.js';
 import { t as i18nText } from "./i18n.js";import { ApiError } from './api.js';
 import { instantText } from './model.js';
@@ -59,7 +60,7 @@ export class WorkweekSessions {
     if (!this.model.clients.length) {this.close();return;}
     const table = node('table', undefined, 'table align-middle mb-0 week-session-table');table.setAttribute('aria-label', i18nText("ui.work_sessions_by_client_and_project"));
     const head = node('thead'),header = node('tr');
-    for (const caption of [i18nText("ui.client_project"), ...this.model.days.map((day) => new Intl.DateTimeFormat(getLocale(), { weekday: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(day.date + 'T12:00:00Z'))), i18nText("ui.weekly_total")]) {
+    for (const caption of [i18nText("ui.client_project"), ...this.model.days.map((day) => dateTimeFormat(getLocale(), { weekday: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(day.date + 'T12:00:00Z'))), i18nText("ui.weekly_total")]) {
       const th = node('th', caption);th.scope = 'col';header.append(th);
     }
     head.append(header);table.append(head);

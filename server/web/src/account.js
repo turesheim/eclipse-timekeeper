@@ -1,3 +1,4 @@
+import {dateTimeFormat} from './formatters.js';
 import { getLocale } from './i18n.js';
 import {countries,selectedHolidayCountry} from './holidays.js';
 import { t as i18nText } from "./i18n.js";import { instantText, localDateTimeToInstant } from './model.js';
@@ -42,6 +43,8 @@ export async function renderAccount(view, part) {
   }
   const themeCard=section(view,i18nText('ui.theme')),themeHome=document.getElementById('theme-settings'),themeChoice=themeHome.querySelector('.theme-choice');
   themeCard.append(themeChoice,node('p',i18nText('theme.device'),'hint'));view.cleanup.add(()=>themeHome.append(themeChoice));
+  const durationCard=section(view,i18nText('ui.duration_format')),durationHome=document.getElementById('duration-settings'),durationChoice=durationHome.querySelector('.duration-choice');
+  durationCard.append(durationChoice,node('p',i18nText('duration.presentation'),'hint'));view.cleanup.add(()=>durationHome.append(durationChoice));
   const localePreferences = form(view, i18nText('locale.language'), i18nText('locale.save'), async () => {
     const otherDrafts = [...view.dirty].filter((value) => value !== localePreferences.value);
     if (otherDrafts.length && !window.confirm(i18nText('locale.discard'))) return;
@@ -69,7 +72,7 @@ export async function renderAccount(view, part) {
   ]});
   holidayPreferences.value.append(node('p',i18nText('holidays.independent'),'hint'));holidayPreferences.finish();
   const preferences = form(view, i18nText("ui.time_zone_b9fe14"), i18nText("ui.save_time_zone"), async () => {
-    try {new Intl.DateTimeFormat(getLocale(), { timeZone: input.value.trim() });} catch {throw new Error(i18nText("ui.enter_a_valid_time_zone_for_example_europe_oslo"));}
+    try {dateTimeFormat(getLocale(), { timeZone: input.value.trim() });} catch {throw new Error(i18nText("ui.enter_a_valid_time_zone_for_example_europe_oslo"));}
     const reply = await view.session.request('/me', { method: 'PUT', etag: profile.etag, body: { zoneId: input.value.trim() } });
     if (!view.valid()) return;profile.etag = reply.etag;profile.data = reply.data;view.clean(preferences.value);preferences.feedback.textContent = i18nText("ui.time_zone_saved_stored_activity_times_are_unchanged");
     // The preference write is confirmed. Refreshing hidden tracking reports

@@ -1,6 +1,26 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {dateTimeFormat,numberFormat} from '../src/formatters.js';
+import {monthCalendar} from '../src/month-model.js';
 import {dayStart, weekRange, durationNanos, durationText, dateInZone, instantNanos, taskPresentation, activityDayNanos, workweekGroups, decimalHoursText, sessionTimeNanos, localDateTime, localDateTimeToInstant, localDateTimeOffsets, instantText} from '../src/model.js';
+test('calendar boundary searches and timer labels reuse native date formatters',()=>{
+  let created=0;const native=Intl.DateTimeFormat;
+  Intl.DateTimeFormat=new Proxy(native,{construct(target,args){created++;return Reflect.construct(target,args);}});
+  try {
+    for(let i=0;i<2;i++)monthCalendar('2026-10','Europe/Oslo');
+    for(let i=0;i<60;i++){dateInZone(Date.now(),'Europe/Oslo');instantText('2026-10-20T10:00:00Z','Europe/Oslo');}
+    assert.ok(created<=2,`Allocated ${created} native formatters for the same locale/zone`);
+  } finally {Intl.DateTimeFormat=native;}
+});
+test('formatter reuse preserves locale/options, evicts old entries and rejects invalid zones',()=>{
+  const first=dateTimeFormat('en-US',{timeZone:'UTC',year:'numeric'});
+  assert.equal(first,dateTimeFormat('en-US',{year:'numeric',timeZone:'UTC'}));
+  assert.notEqual(first,dateTimeFormat('en-US',{year:'numeric',timeZone:'Europe/Oslo'}));
+  assert.equal(numberFormat('en-US').format(1.5),'1.5');assert.equal(numberFormat('nb-NO').format(1.5),'1,5');
+  assert.throws(()=>dateTimeFormat('en-US',{timeZone:'not/a-zone'}),RangeError);
+  for(let i=0;i<40;i++)dateTimeFormat('en-US-x-cache-'+i,{timeZone:'UTC',year:'numeric'});
+  assert.notEqual(first,dateTimeFormat('en-US',{timeZone:'UTC',year:'numeric'}));
+});
 test('local date/time pickers distinguish repeated times and reject missing clock times', () => {
   assert.deepEqual(localDateTimeOffsets('2026-10-25T02:30','Europe/Oslo'),['+02:00','+01:00']);
   assert.deepEqual(localDateTimeOffsets('2026-03-29T02:30','Europe/Oslo'),[]);

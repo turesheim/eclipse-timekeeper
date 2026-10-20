@@ -1,3 +1,4 @@
+import {dateTimeFormat} from './formatters.js';
 import { getLocale } from './i18n.js';
 import { t as i18nText } from "./i18n.js";import { addDays, dateInZone, instantNanos, instantText, nanosInstant, localDateTime, nanosText } from './model.js';
 import { calendarWeek, calendarPieces, calendarAnchor, calendarRange, calendarLanes, shiftSession, shiftSessionDays, pasteSession, clientColors, CALENDAR_STEP } from './calendar-model.js';
@@ -86,7 +87,7 @@ export class WeekCalendar {
       this.calendarKey = key;this.calendar = calendarWeek(data.dates.first, zone);this.selection = null;
     }
     const calendar = this.calendar;
-    const month = new Intl.DateTimeFormat(getLocale(), { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    const month = dateTimeFormat(getLocale(), { month: 'long', year: 'numeric', timeZone: 'UTC' });
     const firstMonth = month.format(new Date(`${calendar.first}T12:00:00Z`)),lastMonth = month.format(new Date(`${addDays(calendar.first, 6)}T12:00:00Z`));
     this.root.querySelector('#calendar-title').textContent = firstMonth === lastMonth ? firstMonth : `${firstMonth} – ${lastMonth}`;
     this.root.querySelector('#calendar-date').value = data.dates.first;
@@ -99,7 +100,7 @@ export class WeekCalendar {
     for (const day of calendar.days) {
       const heading = node('div', undefined, `calendar-heading${day.date === today ? ' today' : ''}`);
       heading.dataset.date=day.date;
-      const title = new Intl.DateTimeFormat(getLocale(), { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${day.date}T12:00:00Z`));
+      const title = dateTimeFormat(getLocale(), { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${day.date}T12:00:00Z`));
       const pick = button(title, () => {
         pick.focus({ preventScroll: true });
         const source = this.clipboard || this.selected();

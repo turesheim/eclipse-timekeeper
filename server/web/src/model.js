@@ -1,7 +1,8 @@
+import {dateTimeFormat,numberFormat} from './formatters.js';
 import { getLocale } from './i18n.js';
 import { t as i18nText } from "./i18n.js"; // Dates and report totals are independent of the browser's local time zone.
 export function dateInZone(instant, zone) {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(instant));
+  const parts = dateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(instant));
   const part = (type) => parts.find((p) => p.type === type).value;
   return `${part('year')}-${part('month')}-${part('day')}`;
 }
@@ -48,21 +49,20 @@ export function nanosText(total) {
 export function decimalHoursText(total) {
   // Round the exact aggregate, never its individual activities or daily cells.
   const hundredths = (total * 100n + 1800000000000n) / 3600000000000n;
-  const separator = new Intl.NumberFormat(getLocale()).formatToParts(1.1).find((part) => part.type === 'decimal').value;
+  const separator = numberFormat(getLocale()).formatToParts(1.1).find((part) => part.type === 'decimal').value;
   return i18nText('duration.decimal_hours', { hours: `${hundredths / 100n}${separator}${(hundredths % 100n).toString().padStart(2, '0')}` });
 }
 export function instantText(instant, zone) {
   if (!instant) return i18nText("ui.in_progress");
-  return new Intl.DateTimeFormat(getLocale(), { timeZone: zone, year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' }).format(new Date(instant));
+  return dateTimeFormat(getLocale(), { timeZone: zone, year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' }).format(new Date(instant));
 }
 
-const inputFormats = new Map();
 function civilTime(milliseconds, zone) {
-  if (!inputFormats.has(zone)) inputFormats.set(zone, new Intl.DateTimeFormat('en-CA', {
+  const format=dateTimeFormat('en-CA', {
     timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
-  }));
-  const parts = inputFormats.get(zone).formatToParts(new Date(milliseconds));
+  });
+  const parts = format.formatToParts(new Date(milliseconds));
   const part = (type) => parts.find((value) => value.type === type).value;
   return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}:${part('second')}`;
 }

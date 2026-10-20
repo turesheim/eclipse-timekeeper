@@ -711,9 +711,9 @@
   "ui.work_session_tools": "Work session tools",
   "ui.in_progress_6a506b": "IN PROGRESS",
   "ui.time_tracking_views": "Time tracking views",
-  "ui.track": "Track",
+  "ui.track": "Calendar",
   "ui.workweek": "Workweek",
-  "ui.calendar": "Calendar",
+  "ui.calendar": "Week",
   "ui.month": "Month",
   "ui.yyyy_mm": "YYYY-MM",
   "ui.0h_0m": "0h 0m",
@@ -954,5 +954,6 @@
   "icons.category.travel": "Travel",
   "icons.category.typography": "Typography",
   "icons.category.ui-and-keyboard": "UI & Keyboard",
-  "icons.category.weather": "Weather"
+  "icons.category.weather": "Weather",
+  "duration.presentation": "Applied immediately to duration displays. Recorded times stay unchanged."
 }

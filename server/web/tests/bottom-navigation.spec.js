@@ -14,7 +14,7 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
     return [...document.fonts].some(font=>font.family.includes('bootstrap-icons') && font.status==='loaded');
   })).toBe(true);
   await expect(page.locator('#refresh')).toHaveClass(/\bbtn\b/);
-  const views=[['track','Track'],['week','Workweek'],['calendar','Calendar'],['activities','Activities'],['clients','Clients'],['projects','Projects'],['labels','Labels']];
+  const views=[['track','Calendar'],['week','Workweek'],['calendar','Week'],['activities','Activities'],['clients','Clients'],['projects','Projects'],['labels','Labels']];
   await expect(page.locator('[data-tab=tasks],#tasks-panel')).toHaveCount(0);
   expect(await bar.locator('button').evaluateAll(nodes=>nodes.map(node=>node.dataset.tab))).toEqual(views.map(([id])=>id));
   for(const width of [320,390,768,1440]) {

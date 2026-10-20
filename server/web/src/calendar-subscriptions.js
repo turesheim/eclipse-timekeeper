@@ -1,3 +1,4 @@
+import {dateTimeFormat} from './formatters.js';
 import {getLocale,t} from './i18n.js';
 import {addDays,instantText} from './model.js';
 import {icon,iconButton} from './icons.js';
@@ -83,7 +84,7 @@ export class CalendarSubscriptions {
     }catch(error){if(session===this.scope&&generation===this.generation)this.failure(error);}
   }
   failure(error){if(error?.status===401){this.callbacks.onUnauthorized(error);return;}this.message.textContent=errorText(error);}
-  date(value){return value?new Intl.DateTimeFormat(getLocale(),{dateStyle:'medium',timeStyle:'short',timeZone:this.data.profile.data.zoneId}).format(new Date(value)):t('calendar.never');}
+  date(value){return value?dateTimeFormat(getLocale(),{dateStyle:'medium',timeStyle:'short',timeZone:this.data.profile.data.zoneId}).format(new Date(value)):t('calendar.never');}
   paint() {
     if(!this.data)return;
     this.title.textContent=this.rows.length?t('calendar.subscriptions_count',{count:this.rows.length}):t('calendar.subscriptions');
@@ -157,7 +158,7 @@ export class CalendarSubscriptions {
   }
   eventDate(event) {
     if(!event.allDay)return instantText(event.start,this.data.profile.data.zoneId)+' → '+instantText(event.end,this.data.profile.data.zoneId);
-    const format=date=>new Intl.DateTimeFormat(getLocale(),{dateStyle:'medium',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
+    const format=date=>dateTimeFormat(getLocale(),{dateStyle:'medium',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
     const last=addDays(event.endDate,-1);return t('calendar.all_day')+' · '+format(event.firstDate)+(last!==event.firstDate?' – '+format(last):'');
   }
   paintAllDay() {
