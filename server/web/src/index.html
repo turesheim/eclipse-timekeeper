@@ -87,12 +87,18 @@
         <div id="track-clients" class="track-clients" aria-label="Client hours this month" data-i18n-aria-label="ui.client_hours_this_month"></div>
         <div id="track-calendar" class="card"></div>
       </section>
-        <div class="toolbar" id="week-toolbar" hidden=""><div><h2 id="week-report-title"><span data-i18n="ui.your_workweek">Your workweek</span></h2><p id="zone-caption" class="hint"></p></div><label class="form-label"><span data-i18n="ui.week_containing">Week containing</span><input class="form-control" id="week-date" type="date" required=""></label><button class="btn btn-outline-secondary" id="add-activity"><span data-i18n="ui.add_time">Add time</span></button></div>
+      <div class="toolbar calendar-toolbar" id="week-toolbar" hidden="">
+        <div class="calendar-controls">
+          <label class="form-label"><span data-i18n="ui.week_containing">Week containing</span><input class="form-control" id="week-date" type="date" required=""></label>
+          <div class="calendar-navigation"><button class="btn btn-outline-secondary" id="week-previous" type="button"><span data-i18n="ui.previous_week">Previous week</span></button><button class="btn btn-outline-secondary" id="week-today" type="button"><span data-i18n="ui.today">Today</span></button><button class="btn btn-outline-secondary" id="week-next" type="button"><span data-i18n="ui.next_week">Next week</span></button></div>
+        </div>
+        <div class="calendar-toolbar-heading"><h2 id="week-report-title"><span data-i18n="ui.your_workweek">Your workweek</span></h2><p id="zone-caption" class="hint"></p></div>
+        <div class="calendar-tools" id="week-actions" hidden=""><button class="btn btn-outline-secondary" id="add-activity"><span data-i18n="ui.add_time">Add time</span></button><button class="btn btn-outline-secondary" id="collapse-activities"><span data-i18n="ui.hide_activities">Hide activities</span></button><button class="btn btn-outline-secondary" id="expand-activities"><span data-i18n="ui.show_activities">Show activities</span></button></div>
+      </div>
       <section id="week-panel" hidden="">
         <section id="week-sessions-section" hidden="" aria-labelledby="week-sessions-heading"><h2 id="week-sessions-heading"><span data-i18n="ui.work_sessions">Work sessions</span></h2><div id="week-sessions" class="card table-wrap"></div></section>
       </section>
       <section id="activities-panel" hidden="" aria-labelledby="activities-heading">
-        <div class="outline-actions"><button class="btn btn-outline-secondary" id="collapse-activities"><span data-i18n="ui.hide_activities">Hide activities</span></button><button class="btn btn-outline-secondary" id="expand-activities"><span data-i18n="ui.show_activities">Show activities</span></button></div>
         <h2 id="activities-heading"><span data-i18n="ui.activities">Activities</span></h2><div id="activities" class="card table-wrap"></div>
         <div class="card report"><div class="report-heading"><p><span data-i18n="ui.daily_totals">Daily totals</span></p><span><span data-i18n="ui.week_total">Week total</span> <strong id="week-total">—</strong></span></div><div id="days" class="days"></div></div>
       </section>

@@ -322,6 +322,11 @@ successful when a subsequent refresh fails.
 
 ## Workweek and Activities
 
+Both views share Week's toolbar layout: date and previous/Today/next navigation
+on the left, the view title and week details centered, and Activities' Add time,
+Hide activities and Show activities icon actions on the right. On narrow screens,
+the centered title sits above the controls.
+
 Reports use the account's IANA time zone and the server's exact daily/weekly
 totals. At sign-in, an untouched UTC profile (version zero) adopts the browser's
 local IANA time zone. This is saved to the account so work sessions, activities,
