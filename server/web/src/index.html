@@ -97,9 +97,12 @@
         <div class="card report"><div class="report-heading"><p><span data-i18n="ui.daily_totals">Daily totals</span></p><span><span data-i18n="ui.week_total">Week total</span> <strong id="week-total">—</strong></span></div><div id="days" class="days"></div></div>
       </section>
       <section id="calendar-panel" hidden="" aria-labelledby="calendar-title">
-        <div class="toolbar calendar-toolbar"><div><h2 id="calendar-title"><span data-i18n="ui.your_calendar">Your calendar</span></h2><p id="calendar-zone" class="hint"></p></div>
-          <div class="calendar-navigation"><button class="btn btn-outline-secondary" id="calendar-previous"><span data-i18n="ui.previous_week">Previous week</span></button><button class="btn btn-outline-secondary" id="calendar-today"><span data-i18n="ui.today">Today</span></button><button class="btn btn-outline-secondary" id="calendar-next"><span data-i18n="ui.next_week">Next week</span></button></div>
-          <label class="form-label"><span data-i18n="ui.calendar_date">Calendar date</span><input class="form-control" id="calendar-date" type="date" required=""></label>
+        <div class="toolbar calendar-toolbar">
+          <div class="calendar-controls">
+            <label class="form-label"><span data-i18n="ui.calendar_date">Calendar date</span><input class="form-control" id="calendar-date" type="date" required=""></label>
+            <div class="calendar-navigation"><button class="btn btn-outline-secondary" id="calendar-previous"><span data-i18n="ui.previous_week">Previous week</span></button><button class="btn btn-outline-secondary" id="calendar-today"><span data-i18n="ui.today">Today</span></button><button class="btn btn-outline-secondary" id="calendar-next"><span data-i18n="ui.next_week">Next week</span></button></div>
+          </div>
+          <div class="calendar-toolbar-heading"><h2 id="calendar-title"><span data-i18n="ui.your_calendar">Your calendar</span></h2><p id="calendar-zone" class="hint"></p></div>
           <div class="calendar-tools"><button class="btn btn-outline-secondary" id="calendar-range" aria-pressed="false"><span data-i18n="ui.select_time_range">Select time range</span></button><button class="btn btn-outline-secondary" id="calendar-new"><span data-i18n="ui.record_work_session_at_selected_time">Record work session at selected time</span></button><button class="btn btn-outline-secondary" id="calendar-edit"><span data-i18n="ui.edit_selected_work_session">Edit selected work session</span></button><button class="btn btn-outline-secondary" id="calendar-copy"><span data-i18n="ui.copy_work_session">Copy work session</span></button><button class="btn btn-outline-secondary" id="calendar-paste"><span data-i18n="ui.paste_work_session">Paste work session</span></button></div>
         </div>
         <p id="calendar-dst" class="hint" hidden=""><span data-i18n="ui.the_clocks_change_this_week_repeated_times_have_an_extra_row_shaded_slots_do_not_occu">The clocks change this week. Repeated times have an extra row; shaded slots do not occur on that day.</span></p>

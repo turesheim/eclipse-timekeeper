@@ -567,6 +567,10 @@ Final release installation remains a separate gate.
 
 ## Week
 
+Week follows Calendar's toolbar layout: date and navigation controls on the
+left, the month title and week details centered, and work-session actions on
+the right. On narrow screens, the centered title sits above the controls.
+
 The **Week** tab shows all seven days. Week, Workweek and Activities share the
 chosen week and the account's time zone. Use the arrows, **Today**, or the date
 field to navigate. On smaller screens, scroll inside the calendar to see the
