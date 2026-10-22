@@ -115,6 +115,7 @@ test('a long press opens the day note menu while movement, release and multiple 
     await start();await cell.dispatchEvent('pointermove',{...point,clientX:point.clientX+20,pointerType:'touch',pointerId:7,bubbles:true});await page.waitForTimeout(650);await expect(page.getByRole('menu')).not.toBeVisible();
     await start();await cell.dispatchEvent('pointerup',{pointerType:'touch',pointerId:7,bubbles:true});await page.waitForTimeout(650);await expect(page.getByRole('menu')).not.toBeVisible();
     await start();await cell.evaluate(node=>{const event=new Event('touchstart',{bubbles:true});Object.assign(event,{touches:[{},{}]});node.dispatchEvent(event);});await page.waitForTimeout(650);await expect(page.getByRole('menu')).not.toBeVisible();
+    await start();await page.waitForTimeout(500);await cell.dispatchEvent('pointerup',{pointerType:'touch',pointerId:7,bubbles:true});await expect(page.getByRole('menuitem')).toBeVisible();await page.keyboard.press('Escape');
     await start();await expect(page.getByRole('menuitem')).toBeVisible();await cell.dispatchEvent('pointerup',{pointerType:'touch',pointerId:7,bubbles:true});await expect(page.locator('#track-month')).toHaveValue('2026-05');await expect(dialog(page)).not.toBeVisible();await page.getByRole('menuitem').tap();await expect(dialog(page)).toBeVisible();await expect(page.locator('#track-note-text')).toBeEnabled();await save(page,'Ferie');await expect(note(page,'2026-05-10')).toHaveText('Ferie');
     await expect(note(page,'2026-05-10')).toHaveCSS('opacity','1');
     if(browserName==='chromium'){

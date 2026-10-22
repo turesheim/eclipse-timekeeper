@@ -60,7 +60,7 @@ export class TrackDayNotes {
       if(!event.isPrimary||!['touch','pen'].includes(event.pointerType)||!this.writable||!this.loaded)return;
       const cell=event.target.closest('[data-track-date]');if(!cell||!getSelection().isCollapsed)return;
       const hold={id:event.pointerId,date:cell.dataset.trackDate,x:event.clientX,y:event.clientY};this.hold=hold;
-      this.holdTimer=setTimeout(()=>{if(this.hold!==hold)return;this.hold=null;this.suppressClickUntil=Infinity;this.showMenu(hold.date,hold.x,hold.y,false);},550);
+      this.holdTimer=setTimeout(()=>{if(this.hold!==hold)return;this.hold=null;this.suppressClickUntil=Infinity;this.showMenu(hold.date,hold.x,hold.y,false);},450);
     },{passive:true});
     this.grid.addEventListener('pointermove',event=>{if(this.hold&&(Math.hypot(event.clientX-this.hold.x,event.clientY-this.hold.y)>10||event.pointerId!==this.hold.id))this.cancelHold();},{passive:true});
     this.grid.addEventListener('touchstart',event=>{if(event.touches.length!==1)this.cancelHold();},{passive:true});
