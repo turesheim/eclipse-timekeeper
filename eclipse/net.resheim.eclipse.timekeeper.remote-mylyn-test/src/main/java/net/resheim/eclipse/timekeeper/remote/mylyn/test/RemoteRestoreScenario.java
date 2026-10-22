@@ -63,6 +63,7 @@ final class RemoteRestoreScenario {
                 tree.getTreeItem(project.name()).getNode(current.summary()).contextMenu("Edit task...").click();var reviewed=bot.shell("Edit task");
                 assertEquals(current.summary(),reviewed.bot().textWithLabel("Summary").getText());reviewed.bot().textWithLabel("Summary").setText(prefix+" reviewed");reviewed.bot().button("OK").click();
                 RemoteTestSupport.waitFor(()->peer.task(current.id()).filter(t->t.summary().equals(prefix+" reviewed") && t.version()==current.version()+1).isPresent(),"Explicitly reviewed restored record was not saved once");RemoteTestSupport.waitFor(()->!reviewed.isOpen(),"Reviewed restore editor did not close");
+                browser.command(Map.of("action","clear-history"));
                 var accepted=peer.task(current.id()).orElseThrow();peer.deleteTask(new DeleteTask(accepted.id(),accepted.version()));
                 RemoteTestSupport.waitFor(()->{try {return RemoteTestSupport.onUi(()->TimekeeperUiPlugin.getDefault().getTimekeeperService().task(accepted.id()).isEmpty());}catch(Exception pending) {return false;}},"Restore test task did not clear from installed cache");
                 for(String part:List.of("cold-file","history-reset","native-draft","web-draft","reviewed-save")) RemoteBootstrap.receipt().setProperty("phase.restore."+part,"passed");RemoteBootstrap.writeProof();

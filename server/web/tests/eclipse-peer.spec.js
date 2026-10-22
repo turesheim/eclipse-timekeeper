@@ -42,6 +42,16 @@ test('installed Eclipse browser peer creates, reports and cleans up time through
     const cleaned=await(await api('GET','/data/export')).json();
     for(const collection of ['activities','tasks','projects'])expect(cleaned[collection]).toEqual([]);
     expect(cleaned.labels.some(label=>label.name===prefix+' label')).toBe(false);expect(cleaned.zoneId).toBe('UTC');
+    const baseline=await(await api('POST','/tasks',{summary:prefix+' restore baseline',projectId:null,parentTaskId:null,url:null})).json();
+    await command({action:'attach',project:'',summary:baseline.summary});
+    // The restore backup is taken immediately after attach. It must already
+    // contain the history row used by the browser's later stale-draft checks.
+    const backup=await(await api('GET','/data/export')).json();
+    expect(backup.activities).toHaveLength(1);expect(backup.activities[0].taskId).toBe(baseline.id);
+    await command({action:'clear-history'});
+    expect((await(await api('GET','/data/export')).json()).activities).toEqual([]);
+    const version=await api('GET','/tasks/'+baseline.id);
+    await api('DELETE','/tasks/'+baseline.id,undefined,{'If-Match':version.headers().etag});
     peer.stdin.end('{"action":"quit"}\n');const [code]=await once(peer,'exit');expect(code,stderr).toBe(0);
   } finally {
     if(peer&&peer.exitCode===null)peer.kill();

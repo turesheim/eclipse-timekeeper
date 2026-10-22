@@ -48,6 +48,12 @@ async function command(input) {
     case 'attach':
       record.project = input.project; record.task = input.summary;record.taskId=null;
       await signIn();
+      // Attach before the restore fixture takes its backup, so the later task
+      // draft still has its Activities row after that backup is restored.
+      await taskHistory();
+      break;
+    case 'clear-history':
+      await clearTaskHistory(apiRequest);
       break;
     case 'offline-draft':
       await expect(page.locator('#status')).toContainText('Reconnecting', {timeout:15000});
