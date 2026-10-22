@@ -908,7 +908,6 @@
   "day_notes.text": "Kort tekst",
   "day_notes.hint": "Inntil 80 tegn, for eksempel «Ferie» eller «Avspasering». Tøm teksten og lagre for å fjerne etiketten.",
   "day_notes.loading": "Laster dagsnotater…",
-  "day_notes.help": "Høyreklikk eller trykk og hold på en dag for å legge til eller redigere et notat. Du kan også velge en eksisterende notatetikett eller bruke notatikonet når det vises.",
   "day_notes.unavailable": "Dagsnotatene kunne ikke lastes. Registrert arbeid er fortsatt tilgjengelig.",
   "day_notes.add": "Legg til notat for {{date}}",
   "day_notes.edit": "Rediger notat for {{date}}: {{text}}",

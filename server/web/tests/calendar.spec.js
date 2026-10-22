@@ -265,6 +265,29 @@ test('calendar pointer moves and both resize handles preserve nanoseconds and ac
   } finally {await f.close();}
 });
 
+test('calendar session blocks stay narrow and rapid dragging drops at the final pointer position',async({page,request})=>{
+  const f=await fixture(request);
+  try {
+    await calendar(page);const source=bar(page,f.session.id),rect=await position(page,source),day=await page.locator('.calendar-day[data-date="2025-10-20"]').boundingBox(),target=await page.locator('.calendar-day[data-date="2025-10-21"]').boundingBox();
+    expect(rect.width/day.width).toBeLessThan(.22);
+    await page.evaluate(()=>document.addEventListener('pointerdown',event=>{window.calendarTestPointer=event.pointerId;},{once:true,capture:true}));
+    await page.mouse.move(rect.x+rect.width/2,rect.y+30);await page.mouse.down();
+    const point={x:target.x+target.width*.1,y:rect.y+30};await page.mouse.move(point.x,point.y+16);await expect(page.locator('.calendar-session.preview')).toHaveCount(1);
+    const previews=await source.evaluate((node,{x,y})=>{
+      const grid=document.querySelector('#calendar-grid'),observer=new MutationObserver(()=>{});observer.observe(grid,{childList:true,subtree:true});
+      const fire=(type,clientY)=>node.dispatchEvent(new PointerEvent(type,{pointerId:window.calendarTestPointer,pointerType:'mouse',isPrimary:true,bubbles:true,clientX:x,clientY,button:0,buttons:type==='pointerup'?0:1}));
+      // A burst of moves and the release can all arrive before the next frame.
+      for(let i=0;i<20;i++)fire('pointermove',y+i%2*16);
+      fire('pointerup',y+48);
+      const added=observer.takeRecords().flatMap(record=>[...record.addedNodes]).filter(node=>node.nodeType===Node.ELEMENT_NODE&&node.matches('.calendar-session.preview')).length;observer.disconnect();return added;
+    },point);
+    await page.mouse.up();expect(previews).toBe(1);
+    await expect.poll(async()=>(await read(request,'work-sessions',f.session.id)).start).toBe('2025-10-21T06:48:00.123456789Z');
+    const saved=await read(request,'work-sessions',f.session.id);expect(saved.end).toBe('2025-10-21T14:48:00.987654321Z');expect(saved.version).toBe(f.session.version+1);await unchangedActivities(request,f);
+    await expect(page.locator('.calendar-session.preview')).toHaveCount(0);await expect(page.locator('#editor')).not.toBeVisible();
+  }finally{await f.close();}
+});
+
 test('calendar lost paste replies cannot create duplicates and future pastes remain rejected',async({page,request})=>{
   const f=await fixture(request);let creates=0;
   try {
