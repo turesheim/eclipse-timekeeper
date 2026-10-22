@@ -6,6 +6,13 @@ import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
 
 const base=()=>process.env.TIMEKEEPER_WEB_URL;
+test.beforeAll(async({request})=>{
+  const headers={Origin:new URL(base()).origin},status=await request.get('/api/v1/auth/status',{headers});
+  if((await status.json()).setupRequired){
+    const reply=await request.post('/api/v1/auth/setup',{headers,data:{code:process.env.TIMEKEEPER_WEB_SETUP_CODE,username:'browser-admin',password:process.env.TIMEKEEPER_WEB_PASSWORD,displayName:'browser-admin',email:'browser-admin@example.invalid'}});
+    expect(reply.status()).toBe(200);await request.post('/api/v1/auth/logout',{headers:{...headers,'X-CSRF-Token':(await reply.json()).csrf}});
+  }
+});
 async function fresh(request){
   const username='day-notes-'+randomUUID().slice(0,8),password='Independent day note password';
   const reply=await request.post('/api/v1/admin/users',{headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},data:{username,password,displayName:username,email:username+'@example.invalid',administrator:false}});
