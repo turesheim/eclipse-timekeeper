@@ -188,7 +188,7 @@ export class WeekCalendar {
   defaultRow(day) {return day.byRow.has(this.calendar.rows.indexOf('09:00/0')) ? this.calendar.rows.indexOf('09:00/0') : day.slots[0]?.row || 0;}
   bounds(value, piece, band) {
     value.style.top = `${piece.top * ROW_HEIGHT}px`;value.style.height = `${(piece.bottom - piece.top) * ROW_HEIGHT}px`;
-    const width = band === 'session' ? 26 : 74,base = band === 'session' ? 0 : 26;
+    const width = band === 'session' ? 22 : 78,base = band === 'session' ? 0 : 22;
     value.style.left = `calc(${base + piece.lane * width / piece.lanes}% + 2px)`;
     value.style.width = `calc(${width / piece.lanes}% - 4px)`;
   }
@@ -337,10 +337,12 @@ export class WeekCalendar {
   captureDrag(event) {
     const bar = this.drag.bar;
     bar.setPointerCapture(event.pointerId);
-    const move = (value) => {if (this.drag?.pointer === value.pointerId) {this.drag.lastX = value.clientX;this.drag.lastY = value.clientY;this.moveDrag();}};
+    const move = (value) => {if (this.drag?.pointer === value.pointerId) {this.drag.lastX = value.clientX;this.drag.lastY = value.clientY;this.drag.dirty = true;}};
     const finish = (value) => {
       if (this.drag?.pointer !== value.pointerId) return;
-      const state = this.drag;this.cancelDrag();
+      // A release can arrive before the next animation frame. Commit its actual position.
+      this.drag.lastX = value.clientX;this.drag.lastY = value.clientY;this.moveDrag();
+      const state = this.drag;if (!state) return;this.cancelDrag();
       if (state.scope !== this.scope || this.root.hidden || !this.connected || !state.moved || !state.proposal) return;
       if (state.mode === 'create') {
         this.setRangeMode(false);this.selectedId = null;
@@ -355,7 +357,8 @@ export class WeekCalendar {
       const rect = this.scroll.getBoundingClientRect(),state = this.drag;
       const vertical = state.lastY < rect.top + 45 ? -14 : state.lastY > rect.bottom - 45 ? 14 : 0;
       const horizontal = state.lastX < rect.left + 35 ? -14 : state.lastX > rect.right - 35 ? 14 : 0;
-      if (state.moved && (vertical || horizontal)) {this.scroll.scrollBy(horizontal, vertical);this.moveDrag();}
+      if (state.moved && (vertical || horizontal)) {this.scroll.scrollBy(horizontal, vertical);state.dirty = true;}
+      if (state.dirty) {state.dirty = false;this.moveDrag();}
       this.animation = requestAnimationFrame(tick);
     };this.animation = requestAnimationFrame(tick);this.buttons();
   }
@@ -371,7 +374,9 @@ export class WeekCalendar {
     const row = Math.max(0, Math.min(this.calendar.rows.length, state.originRow + deltaRows));
     try {
       const delta = calendarAnchor(this.calendar, target.dataset.date, row) - calendarAnchor(this.calendar, state.piece.date, state.originRow);
-      const proposal = shiftSession(state.session, delta, state.mode, this.data.report.generatedAt);state.proposal = proposal;
+      const proposal = shiftSession(state.session, delta, state.mode, this.data.report.generatedAt);
+      if (state.proposal?.start === proposal.start && state.proposal?.end === proposal.end) return;
+      state.proposal = proposal;
       for (const old of this.grid.querySelectorAll('.preview')) old.remove();
       for (const original of this.grid.querySelectorAll('.calendar-session:not(.preview)')) original.classList.toggle('drag-source', original.dataset.sessionId === state.session.id);
       for (const piece of calendarPieces(proposal.start, proposal.end || this.data.report.generatedAt, this.calendar))
