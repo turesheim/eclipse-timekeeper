@@ -62,7 +62,7 @@ drain() {
 
 replace() {
   drain "$1" || return 1
-  TIMEKEEPER_SERVER_IMAGE="$2" TIMEKEEPER_DEPLOYED_AT="${3-$deployment_time}" docker compose up -d --no-deps "$1" || return 1
+  TIMEKEEPER_SERVER_IMAGE="$2" TIMEKEEPER_DEPLOYED_AT="${3-$deployment_time}" docker compose up -d --no-deps --pull never "$1" || return 1
   wait_ready "$1" || return 1
   gateway_command "set server api/$1 state ready" || return 1
   wait_routed "$1" || return 1
@@ -73,8 +73,17 @@ wait_ready api-1
 wait_ready api-2
 wait_routed api-1
 wait_routed api-2
-old_1=$(docker inspect --format '{{.Image}}' "$(docker compose ps -q api-1)")
-old_2=$(docker inspect --format '{{.Image}}' "$(docker compose ps -q api-2)")
+old_id_1=$(docker inspect --format '{{.Image}}' "$(docker compose ps -q api-1)")
+old_id_2=$(docker inspect --format '{{.Image}}' "$(docker compose ps -q api-2)")
+# A running container alone does not retain an addressable image in every
+# Docker image store. Keep immutable local tags before a pull moves edge.
+retain_image() {
+  retained="timekeeper-deployed:${1#sha256:}"
+  docker image tag "$1" "$retained" || return 1
+  printf '%s\n' "$retained"
+}
+old_1=$(retain_image "$old_id_1")
+old_2=$(retain_image "$old_id_2")
 deployment_date() {
   docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$(docker compose ps -q "$1")" |
     awk '/^TIMEKEEPER_DEPLOYED_AT=/ {sub(/^TIMEKEEPER_DEPLOYED_AT=/, ""); print; exit}'
@@ -83,8 +92,9 @@ old_date_1=$(deployment_date api-1)
 old_date_2=$(deployment_date api-2)
 docker compose pull api-1 api-2
 image_ref=${TIMEKEEPER_SERVER_IMAGE:-ghcr.io/turesheim/eclipse-timekeeper-server:edge}
-new_image=$(docker image inspect --format '{{.Id}}' "$image_ref")
-if [ "$old_1" = "$new_image" ] && [ "$old_2" = "$new_image" ]; then echo 'Server image is current.'; exit 0; fi
+new_id=$(docker image inspect --format '{{.Id}}' "$image_ref")
+if [ "$old_id_1" = "$new_id" ] && [ "$old_id_2" = "$new_id" ]; then echo 'Server image is current.'; exit 0; fi
+new_image=$(retain_image "$new_id")
 sh ./backup.sh
 deployment_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 rollback() {

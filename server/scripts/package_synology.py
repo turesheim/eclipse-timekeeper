@@ -80,7 +80,7 @@ def build(output, commit, image, revision, channel):
     epoch = int(subprocess.check_output(['git','show','-s','--format=%ct',commit], cwd=ROOT, text=True))
     with tempfile.TemporaryDirectory(prefix='timekeeper-spk-') as temporary:
         directory = Path(temporary)
-        image_id = verify_image(image, commit, directory)
+        verify_image(image, commit, directory)
         payload, outer = directory/'payload', directory/'spk'
         payload.mkdir();outer.mkdir()
         package = ROOT/'server/synology'
@@ -147,13 +147,15 @@ def build(output, commit, image, revision, channel):
         name='timekeeper-'+version+'-r1000.spk'
         destination=output/name
         archive_tree(outer,destination,epoch)
-        digest=hashlib.sha256(destination.read_bytes()).hexdigest()
+        # Docker's containerd store reports a manifest ID from image inspect;
+        # the saved image's configuration digest is stable across image stores.
+        checked=validate(destination)
+        digest=checked['sha256']
         destination.with_suffix('.spk.sha256').write_text(digest+'  '+name+'\n')
         manifest={'format':1,'channel':channel,'package':'timekeeper','version':version,'commit':commit,
-                  'architecture':'r1000','image':image,'imageId':image_id,'sha256':digest,
+                  'architecture':'r1000','image':image,'imageId':checked['imageId'],'sha256':digest,
                   'serverSchema':6,'nativePostgreSQLMajor':17,'realDsmAcceptance':'required'}
         destination.with_suffix('.json').write_text(json.dumps(manifest,indent=2)+'\n')
-        validate(destination)
         return destination
 
 

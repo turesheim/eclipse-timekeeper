@@ -8,6 +8,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import MagicMock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]/'server/scripts'))
 from validate_synology import REQUIRED, MIGRATION_FILES, validate
 
@@ -74,6 +75,29 @@ class SynologyPackageTest(unittest.TestCase):
         receipt=self.check(self.candidate())
         self.assertEqual(COMMIT,receipt['sourceCommit'])
         self.assertEqual('required',receipt['realDsmAcceptance'])
+
+    def test_candidate_provenance_uses_saved_config_digest_instead_of_daemon_manifest_id(self):
+        from package_synology import build
+        from synology_catalog import build as catalog
+        config=json.dumps({'architecture':'amd64','os':'linux'}).encode()
+        saved=archive({'manifest.json':json.dumps([{'RepoTags':[IMAGE],'Config':'config.json','Layers':[]}]).encode(),
+                       'config.json':config})
+        process=MagicMock(stdout=io.BytesIO(saved))
+        process.wait.return_value=0
+        def compile_helper(command, **options):
+            helper=bytearray(64);helper[:5]=b'\x7fELF\x02';struct.pack_into('<H',helper,18,62)
+            Path(command[command.index('-o')+1]).write_bytes(helper)
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch('package_synology.check_source'), \
+                patch('package_synology.verify_image',return_value='sha256:'+'b'*64), \
+                patch('package_synology.subprocess.check_output',return_value='1'), \
+                patch('package_synology.subprocess.run',side_effect=compile_helper), \
+                patch('package_synology.subprocess.Popen',return_value=process):
+            package=build(Path(temporary),COMMIT,IMAGE,1,'preview')
+            provenance=json.loads(package.with_suffix('.json').read_text())
+            self.assertEqual('sha256:'+hashlib.sha256(config).hexdigest(),provenance['imageId'])
+            self.assertEqual(validate(package)['imageId'],provenance['imageId'])
+            self.assertTrue(catalog(package,'https://example.invalid/synology/preview/r1000/').is_file())
 
     def test_wrong_image_tag_or_cpu_is_rejected(self):
         for overrides in ({'image_tag':'timekeeper:latest'},{'architecture':'arm64'}):

@@ -69,6 +69,18 @@ test('Workweek groups local session times by client/project with exact DST total
     await expect(client.locator('td').nth(5)).toHaveText('0h 30m');await expect(client.locator('td').nth(6)).toHaveText('25h 0m');await expect(row.locator('td').last()).toHaveText('25h 30m');
     await expect(page.locator(`#week-sessions [data-work-session-id="${outside.id}"]`)).toHaveCount(0);
     await expect(page.locator('#week-total')).toHaveText(nanosText(activityTotal));
+    await expect(page.locator('#week-actions')).not.toBeVisible();
+    await page.getByLabel('Week containing', {exact: true}).fill('2025-12-31');
+    await page.locator('#week-next').click();await expect(page.locator('#zone-caption')).toContainText('2026-01-05');
+    await page.locator('#week-previous').click();await expect(page.locator('#zone-caption')).toContainText('2025-12-29');
+    await page.locator('[data-tab=activities]').click();await expect(page.locator('#week-report-title')).toHaveText('Your activities');
+    await expect(page.locator('#week-actions')).toBeVisible();
+    for(const label of ['Add time','Hide activities','Show activities'])await expect(page.locator('#week-actions').getByRole('button',{name:label,exact:true})).toBeVisible();
+    await page.locator('#week-previous').click();await expect(page.locator('#zone-caption')).toContainText('2025-12-22');
+    await page.locator('#week-today').click();await expect(page.getByLabel('Week containing',{exact:true})).toHaveValue(dateInZone(baseline.generatedAt,'Europe/Oslo'));
+    await page.locator('[data-tab=week]').click();await expect(page.locator('#week-report-title')).toHaveText('Your workweek');
+    await expect(page.locator('#week-actions')).not.toBeVisible();
+    await page.getByLabel('Week containing',{exact:true}).fill('2025-10-26');await expect(row.locator('td').last()).toHaveText('25h 30m');
     await setDurationFormat(page,'decimal'); await expect(row.locator('td').last()).toHaveText('25.50h'); await expect(page.locator('#week-total')).toHaveText(decimalHoursText(activityTotal));
     await expect(page.locator('#activities-panel')).not.toBeVisible();await page.locator('[data-tab=activities]').click();
     await expect(page.locator('#activities')).toBeVisible();await expect(page.locator('#days')).toBeVisible();await expect(page.locator('#week-sessions-section')).not.toBeVisible();

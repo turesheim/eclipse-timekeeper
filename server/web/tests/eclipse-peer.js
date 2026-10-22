@@ -48,6 +48,12 @@ async function command(input) {
     case 'attach':
       record.project = input.project; record.task = input.summary;record.taskId=null;
       await signIn();
+      // Attach before the restore fixture takes its backup, so the later task
+      // draft still has its Activities row after that backup is restored.
+      await taskHistory();
+      break;
+    case 'clear-history':
+      await clearTaskHistory(apiRequest);
       break;
     case 'offline-draft':
       await expect(page.locator('#status')).toContainText('Reconnecting', {timeout:15000});
@@ -60,7 +66,12 @@ async function command(input) {
       await zone(input.zone); await named('Projects', 'project', record.project); await named('Labels', 'label', record.label);
       const project=(await (await api('GET','/projects')).json()).items.find(value=>value.name===record.project);
       record.taskId=(await (await api('POST','/tasks',{summary:record.task,projectId:project.id,parentTaskId:null,url:null})).json()).id;
-      await tab('Activities'); await page.getByLabel('Week containing').fill(input.date); await page.getByRole('button', {name:'Add time', exact:true}).click();
+      await tab('Activities'); await page.getByLabel('Week containing').fill(input.date);
+      // The task was created outside this browser. Finish a fresh snapshot
+      // before opening an editor whose task choices come from that snapshot.
+      await page.locator('#refresh').click();
+      await expect(page.locator('#workspace')).toHaveAttribute('aria-busy', 'false');
+      await page.getByRole('button', {name:'Add time', exact:true}).click();
       await page.getByLabel('Task', {exact:true}).selectOption({label:record.task}); await page.getByLabel('Summary', {exact:true}).fill(input.prefix + ' precise interval');
       await page.getByLabel('Start (local time)', {exact:true}).fill(input.start); await page.getByLabel('End (local time, blank while tracking)', {exact:true}).fill(input.end);
       await page.getByLabel(record.label, {exact:true}).check(); await save();

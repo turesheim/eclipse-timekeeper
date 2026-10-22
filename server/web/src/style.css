@@ -156,7 +156,6 @@ a.task-title { color: var(--accent); text-decoration: underline; text-underline-
 .day strong, .day span { display: block; margin: .15rem 0; font-size: .85rem; }
 .day span { color: var(--muted); font-size: .75rem; }
 .day strong { font-variant-numeric: tabular-nums; }
-.outline-actions { display: flex; gap: .5rem; justify-content: flex-end; margin-block: .5rem; }
 .app-dialog { margin: auto; border: 1px solid var(--line); border-radius: var(--bs-border-radius-lg); padding: 1.5rem; width: min(540px, calc(100vw - 2rem)); max-height: 90dvh; overflow: auto; color: var(--bs-body-color); background: var(--bs-body-bg); }
 .app-dialog::backdrop { background: #132d2366; }
 .app-dialog h2 { margin-bottom: 1rem; }

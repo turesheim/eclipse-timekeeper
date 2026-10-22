@@ -322,6 +322,11 @@ successful when a subsequent refresh fails.
 
 ## Workweek and Activities
 
+Both views share Week's toolbar layout: date and previous/Today/next navigation
+on the left, the view title and week details centered, and Activities' Add time,
+Hide activities and Show activities icon actions on the right. On narrow screens,
+the centered title sits above the controls.
+
 Reports use the account's IANA time zone and the server's exact daily/weekly
 totals. At sign-in, an untouched UTC profile (version zero) adopts the browser's
 local IANA time zone. This is saved to the account so work sessions, activities,
@@ -566,6 +571,10 @@ also launches a real browser peer against its installed runtime's server;
 Final release installation remains a separate gate.
 
 ## Week
+
+Week follows Calendar's toolbar layout: date and navigation controls on the
+left, the month title and week details centered, and work-session actions on
+the right. On narrow screens, the centered title sits above the controls.
 
 The **Week** tab shows all seven days. Week, Workweek and Activities share the
 chosen week and the account's time zone. Use the arrows, **Today**, or the date

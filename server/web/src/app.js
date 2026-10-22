@@ -124,7 +124,7 @@ function readOnlyWhileDisconnected() {
 }
 function tab(name) {
   for (const item of ['track', 'week', 'calendar', 'activities', 'clients', 'projects', 'labels']) $(`${item}-panel`).hidden = item !== name;
-  $('week-toolbar').hidden = !['week', 'activities'].includes(name);$('week-report-title').textContent = name === 'activities' ? i18nText("ui.your_activities") : i18nText("ui.your_workweek");$('add-activity').hidden = name !== 'activities';
+  $('week-toolbar').hidden = !['week', 'activities'].includes(name);$('week-report-title').textContent = name === 'activities' ? i18nText("ui.your_activities") : i18nText("ui.your_workweek");$('week-actions').hidden = name !== 'activities';
   $('workspace').dataset.view = name;if (name === 'calendar') calendar.show();else calendar.hide();
   if (name !== 'track') track.hide();
   if (name !== 'week') weekSessions.hide();
@@ -169,6 +169,10 @@ const auth = authentication({
 });
 $('refresh').addEventListener('click', () => {const session = api;setStatus(i18nText("ui.refreshing"), 'working');void refresh().then(() => {if (session === api) startWatch(session);}).catch(() => {});});
 $('week-date').addEventListener('change', () => {selectedDay = null;void refresh().catch(() => {});});
+for (const [id, days] of [['week-previous', -7], ['week-next', 7]]) $(id).addEventListener('click', () => {
+  if (snapshot) selectWeek(addDays(weekRange($('week-date').value || snapshot.dates.first, snapshot.profile.data.zoneId).first, days));
+});
+$('week-today').addEventListener('click', () => {if (snapshot) selectWeek(dateInZone(snapshot.report.generatedAt, snapshot.profile.data.zoneId));});
 $('duration-format').addEventListener('change', () => {decimalHours = $('duration-format').value === 'decimal';if (snapshot) render();});
 $('collapse-activities').addEventListener('click', () => {activitiesCollapsed = true;collapsed.clear();if (snapshot) render();});
 $('expand-activities').addEventListener('click', () => {activitiesCollapsed = false;collapsed.clear();if (snapshot) render();});
@@ -683,5 +687,6 @@ window.addEventListener('pageshow', (event) => {if (event.persisted) void auth.i
 $('status-icon').append(icon('refresh'));
 iconButton($('collapse-activities'), 'collapse', i18nText("ui.hide_activities"));
 iconButton($('expand-activities'), 'expand', i18nText("ui.show_activities"));
+for (const [id, glyph, label] of [['week-previous', 'left', i18nText("ui.previous_week")], ['week-next', 'right', i18nText("ui.next_week")], ['add-activity', 'add', i18nText("ui.add_time")]]) iconButton($(id), glyph, label);
 $('stop').prepend(icon('stop'));
 void auth.initialize();
