@@ -25,6 +25,7 @@ import org.eclipse.jface.dialogs.TitleAreaDialog;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swtbot.eclipse.finder.SWTWorkbenchBot;
+import org.eclipse.swtbot.swt.finder.utils.SWTBotPreferences;
 
 /** Real HTTP and Eclipse Jobs; the fixture models a restored server revision. */
 public class RemoteChangeJobTest {
@@ -66,6 +67,7 @@ public class RemoteChangeJobTest {
             try {return field.get(plugin)!=null;}catch(IllegalAccessException error) {throw new AssertionError(error);}
         },"Original isolated UI backend");
         var original=(EclipseBackend)field.get(plugin);AtomicReference<TitleAreaDialog> dialog=new AtomicReference<>();
+        await(original::ready,"Original isolated UI backend ready");
         AtomicBoolean workweekWasOpen=new AtomicBoolean();
         onUi(display,()->{
             var page=PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
@@ -134,7 +136,10 @@ public class RemoteChangeJobTest {
 
     private static boolean onUi(Display display,BooleanSupplier action) {
         FutureTask<Boolean> task=new FutureTask<>(action::getAsBoolean);display.asyncExec(task);
-        try {return task.get(3,TimeUnit.SECONDS);}catch(Exception error) {throw new AssertionError(error);}
+        // Workbench startup and dialog creation share SWTBot's configured UI deadline.
+        try {return task.get(SWTBotPreferences.TIMEOUT,TimeUnit.MILLISECONDS);}
+        catch(InterruptedException error) {task.cancel(false);Thread.currentThread().interrupt();throw new AssertionError(error);}
+        catch(ExecutionException | TimeoutException error) {task.cancel(false);throw new AssertionError(error);}
     }
     private static void await(BooleanSupplier condition,String description) throws Exception {
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
