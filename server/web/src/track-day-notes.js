@@ -109,7 +109,7 @@ export class TrackDayNotes {
     const generation=++this.generation,session=this.session;
     void session.request('/day-notes?'+new URLSearchParams({fromDate:first,toDate:last})).then(reply=>{
       if(generation!==this.generation||session!==this.session)return;
-      this.notes=new Map(reply.data.items.map(note=>[note.date,note.text]));this.loaded=true;this.paint(document.activeElement===document.body?this.loadingFocus:null);this.loadingFocus=null;this.message.textContent=t('day_notes.help');
+      this.notes=new Map(reply.data.items.map(note=>[note.date,note.text]));this.loaded=true;this.paint(document.activeElement===document.body?this.loadingFocus:null);this.loadingFocus=null;this.message.textContent='';this.status.hidden=true;
     }).catch(error=>{
       if(generation!==this.generation||session!==this.session)return;
       if(error.status===401){this.callbacks.onUnauthorized(error);return;}

@@ -908,7 +908,6 @@
   "day_notes.text": "Short text",
   "day_notes.hint": "Up to 80 characters, for example “Vacation” or “Time off”. Clear the text and save to remove the label.",
   "day_notes.loading": "Loading day notes…",
-  "day_notes.help": "Right-click or long-press a day to add or edit its note. You can also select an existing note label or use the note icon when it appears.",
   "day_notes.unavailable": "Day notes could not be loaded. Recorded work is still available.",
   "day_notes.add": "Add a note for {{date}}",
   "day_notes.edit": "Edit note for {{date}}: {{text}}",
