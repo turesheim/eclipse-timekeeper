@@ -252,6 +252,7 @@ test('lost create reply requires record review before another submission', async
 test('same-token owner reassignment cannot switch a live browser session', async ({page, request}) => {
   const file = process.env.TIMEKEEPER_WEB_REGISTRY, original = await readFile(file, 'utf8');
   await signIn(page); await page.getByRole('button', {name:'Projects', exact:true}).click(); await page.getByRole('button', {name:'New project', exact:true}).click(); await page.getByLabel('Name', {exact:true}).fill('Keep in original account');
+  await page.getByLabel('Client',{exact:true}).selectOption({index:1});
   try {
     // Change the owner only after the write is in flight, so a background watch
     // cannot clear the editor before the test has clicked Save.

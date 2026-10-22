@@ -77,14 +77,15 @@ test('clients maintain names and colors, own projects and color work-session sum
   }
 });
 
-test('optional work-session projects select their client and survive start, stop, manual edits and reload',async({page,request})=>{
+test('optional work-session projects follow the selected client through start, stop, manual edits and reload',async({page,request})=>{
   const prefix='Session project '+randomUUID().slice(0,6),clients=[],sessions=[];let project;
   try {
     for(const name of ['Delivery','Direct']) clients.push(await (await api(request,'POST','/clients',{name:prefix+' '+name,color:'#176653'})).json());
     project=await (await api(request,'POST','/projects',{name:prefix+' project',clientId:clients[0].id})).json();
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
     await page.getByRole('button',{name:'Start work session',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill(prefix+' running');
-    await page.getByLabel('Client',{exact:true}).selectOption(clients[1].id);await page.getByLabel('Project (optional)',{exact:true}).selectOption(project.id);
+    await page.getByLabel('Client',{exact:true}).selectOption(clients[1].id);await expect(page.getByLabel('Project (optional)',{exact:true}).locator(`option[value="${project.id}"]`)).toHaveCount(0);
+    await page.getByLabel('Client',{exact:true}).selectOption(clients[0].id);await page.getByLabel('Project (optional)',{exact:true}).selectOption(project.id);
     await expect(page.getByLabel('Client',{exact:true})).toHaveValue(clients[0].id);await save(page);
     const started=await (await api(request,'GET','/work-sessions/active')).json();sessions.push(started);expect(started.projectId).toBe(project.id);expect(started.clientId).toBe(clients[0].id);
     await expect(page.locator('#work-session-current')).toContainText(project.name);
@@ -94,6 +95,8 @@ test('optional work-session projects select their client and survive start, stop
     await page.getByLabel('Client',{exact:true}).selectOption(clients[1].id);await expect(page.getByLabel('Project (optional)',{exact:true})).toHaveValue('');await save(page);
     const direct=await (await api(request,'GET','/work-sessions/'+started.id)).json();expect(direct.projectId).toBeNull();expect(direct.clientId).toBe(clients[1].id);
     await page.getByRole('button',{name:'Record work session',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill(prefix+' manual');
+    await expect(page.getByLabel('Client',{exact:true})).toHaveValue(clients[1].id);await expect(page.getByLabel('Project (optional)',{exact:true}).locator(`option[value="${project.id}"]`)).toHaveCount(0);
+    await page.getByLabel('Client',{exact:true}).selectOption(clients[0].id);
     await page.getByLabel('Project (optional)',{exact:true}).selectOption(project.id);await page.getByLabel('Start (local time)',{exact:true}).fill('2025-10-20T08:00');await page.getByLabel('End (local time, blank while running)',{exact:true}).fill('2025-10-20T16:00');
     await page.setViewportSize({width:390,height:844});await page.getByLabel('Project (optional)',{exact:true}).scrollIntoViewIfNeeded();
     const projectBox=await page.getByLabel('Project (optional)',{exact:true}).boundingBox();expect(projectBox.x).toBeGreaterThanOrEqual(0);expect(projectBox.x+projectBox.width).toBeLessThanOrEqual(390);
