@@ -437,6 +437,32 @@ async function removeSessionFixture(request, sessionIds) {
     await api(request,'DELETE',`/work-sessions/${id}`,undefined,{'If-Match':read.headers().etag});
   }
 }
+test('work session projects follow the selected client when starting, editing and refreshing',async({page,request})=>{
+  const records=[],suffix=randomUUID().slice(0,8);
+  const create=async(collection,data)=>{const value=await(await api(request,'POST','/'+collection,data)).json();records.unshift([collection,value.id]);return value;};
+  const choices=project=>project.locator('option').evaluateAll(options=>options.map(option=>option.value).sort());
+  try{
+    const first=await create('clients',{name:'First session client '+suffix,color:'#176653'}),second=await create('clients',{name:'Second session client '+suffix,color:'#6750a4'}),empty=await create('clients',{name:'No projects '+suffix,color:'#2563eb'});
+    const alpha=await create('projects',{name:'Alpha '+suffix,clientId:first.id}),beta=await create('projects',{name:'Beta '+suffix,clientId:first.id}),other=await create('projects',{name:'Other '+suffix,clientId:second.id});
+    await signIn(page);await page.locator('#session-start').click();
+    const client=page.getByLabel('Client',{exact:true}),project=page.getByLabel('Project (optional)',{exact:true});
+    await client.selectOption('');await project.selectOption(other.id);await expect(client).toHaveValue(second.id);
+    expect(await choices(project)).toEqual(['',other.id].sort());
+    await client.selectOption(first.id);await expect(project).toHaveValue('');expect(await choices(project)).toEqual(['',alpha.id,beta.id].sort());
+    await project.selectOption(beta.id);await client.selectOption(second.id);await expect(project).toHaveValue('');expect(await choices(project)).toEqual(['',other.id].sort());
+    await client.selectOption(empty.id);await expect(project).toHaveValue('');expect(await choices(project)).toEqual(['']);
+    await client.selectOption(first.id);await project.selectOption(alpha.id);await page.getByLabel('Summary',{exact:true}).fill('Filtered project session '+suffix);
+    const added=await create('projects',{name:'Added during editing '+suffix,clientId:first.id});await create('projects',{name:'Other added project '+suffix,clientId:second.id});
+    await expect.poll(()=>choices(project)).toEqual(['',alpha.id,beta.id,added.id].sort());await expect(project).toHaveValue(alpha.id);await expect(client).toHaveValue(first.id);
+    await page.locator('#save').click();await expect(page.locator('#editor')).toBeHidden();await expect(page.locator('#work-session-state')).toHaveText('Running');
+    const started=await(await api(request,'GET','/work-sessions/active')).json();records.unshift(['work-sessions',started.id]);expect(started).toMatchObject({clientId:first.id,projectId:alpha.id,summary:'Filtered project session '+suffix});
+    await page.locator('#session-edit').click();await expect(project).toHaveValue(alpha.id);expect(await choices(project)).toEqual(['',alpha.id,beta.id,added.id].sort());await page.locator('#cancel').click();
+    await page.locator('#session-new').click();await expect(client).toHaveValue(first.id);expect(await choices(project)).toEqual(['',alpha.id,beta.id,added.id].sort());await page.locator('#cancel').click();
+    await page.locator('#session-stop').click();await expect(page.locator('#work-session-state')).toHaveText('Stopped');
+  }finally{
+    for(const [collection,id] of records){const current=await api(request,'GET','/'+collection+'/'+id);await api(request,'DELETE','/'+collection+'/'+id,undefined,{'If-Match':current.headers().etag});}
+  }
+});
 test('work session controls start once and stop independently of a task activity', async ({page,request}) => {
   const task = await createTask(request,'Session browser task '+randomUUID());await signIn(page);
   await page.getByRole('button',{name:'Start work session',exact:true}).click();await page.getByLabel('Summary',{exact:true}).fill('Browser work session');await page.getByLabel('Client',{exact:true}).selectOption({index:1});await page.locator('#save').click();
