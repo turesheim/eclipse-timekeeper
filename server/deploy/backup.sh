@@ -16,6 +16,12 @@ mv "$backup_dir/database.dump.tmp" "$backup_dir/database.dump"
 cp "$state_dir/config/tokens.json" "$backup_dir/tokens.json"
 cp "$state_dir/config/mail.properties" "$backup_dir/mail.properties"
 cp "$state_dir/secrets/timekeeper_smtp_password" "$backup_dir/smtp_password"
-docker compose images > "$backup_dir/images.txt"
+# Read deployed identities from containers: after a mutable tag is replaced,
+# Compose's image listing may fail to inspect the old image by its ID.
+containers=$(docker compose ps --all --quiet)
+printf 'CONTAINER IMAGE IMAGE_ID\n' > "$backup_dir/images.txt"
+for container in $containers; do
+  docker inspect --type container --format '{{.Name}} {{.Config.Image}} {{.Image}}' "$container" >> "$backup_dir/images.txt"
+done
 chmod 600 "$backup_dir"/*
 printf '%s\n' "$backup_dir"
