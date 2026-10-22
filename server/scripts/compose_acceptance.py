@@ -281,7 +281,7 @@ def main():
         update_environment = {**environment, 'COMPOSE_PROJECT_NAME': project, 'TIMEKEEPER_UPDATE_ATTEMPTS': '15'}
         database_container = compose('ps', '-q', 'postgres').strip()
 
-        def update_with_requests():
+        def update_with_requests(label):
             finished = Event()
             polling = Event()
             head, _ = client.call('GET', '/projects')
@@ -313,6 +313,7 @@ def main():
                 try:
                     update = subprocess.run(['sh', str(deployment / 'update.sh')], cwd=deployment,
                                             env=update_environment, capture_output=True, text=True)
+                    (output / f'update-{label}.log').write_text(update.stdout + update.stderr)
                 finally:
                     finished.set()
                 requests = pending.result()
@@ -322,7 +323,7 @@ def main():
             client.assertEqual(database_container, compose('ps', '-q', 'postgres').strip())
             return update, requests, polls
 
-        updated, receipt['requestsDuringUpdate'], receipt['longPollsDuringUpdate'] = update_with_requests()
+        updated, receipt['requestsDuringUpdate'], receipt['longPollsDuringUpdate'] = update_with_requests('success')
         if updated.returncode:
             raise AssertionError('Rolling update failed: ' + updated.stderr + updated.stdout)
         replacement_id = subprocess.check_output(['docker', 'image', 'inspect', '--format', '{{.Id}}', image], text=True).strip()
@@ -335,18 +336,19 @@ def main():
         client.assertEqual(deployment_time, deployed_information['api-2']['deployedAt'])
         client.assertIn('TIMEKEEPER_DEPLOYED_AT=' + deployment_time, env_file.read_text())
         publish_replacement(broken=True)
-        failed, receipt['requestsDuringRollback'], receipt['longPollsDuringRollback'] = update_with_requests()
+        failed, receipt['requestsDuringRollback'], receipt['longPollsDuringRollback'] = update_with_requests('first-rollback')
         client.assertNotEqual(0, failed.returncode)
-        client.assertEqual(replacement_id, deployed_image('api-1'))
-        client.assertEqual(replacement_id, deployed_image('api-2'))
+        client.assertIn('First replica failed replacement', failed.stderr, failed.stdout + failed.stderr)
+        client.assertEqual(replacement_id, deployed_image('api-1'), failed.stdout + failed.stderr)
+        client.assertEqual(replacement_id, deployed_image('api-2'), failed.stdout + failed.stderr)
         wait_ready()
         receipt['failedUpdateRollback'] = True
         for member in ('api-1', 'api-2'):
             client.assertEqual(deployment_time, server_information(member)['deployedAt'])
         publish_replacement(broken_second=True)
-        failed_second, receipt['requestsDuringSecondRollback'], receipt['longPollsDuringSecondRollback'] = update_with_requests()
+        failed_second, receipt['requestsDuringSecondRollback'], receipt['longPollsDuringSecondRollback'] = update_with_requests('second-rollback')
         client.assertNotEqual(0, failed_second.returncode)
-        client.assertIn('Second replica failed replacement', failed_second.stderr)
+        client.assertIn('Second replica failed replacement', failed_second.stderr, failed_second.stdout + failed_second.stderr)
         client.assertEqual(replacement_id, deployed_image('api-1'))
         client.assertEqual(replacement_id, deployed_image('api-2'))
         wait_ready()

@@ -172,7 +172,10 @@ The updater checks both replicas and their gateway routing, pulls the API image,
 skips unchanged images and creates a logical backup. It tells HAProxy to drain
 `api-1`, waits for existing requests to finish, replaces the container, and waits
 for both application readiness and healthy gateway routing before touching
-`api-2`. A failed replacement restores the previous image IDs one at a time.
+`api-2`. A failed replacement restores the previous images one at a time.
+Original and replacement images receive immutable local
+`timekeeper-deployed:<digest>` tags, retained for rollback even when a release
+tag moves. Replacement and rollback use these local images without pulling.
 It does not delete images or data, or restart/update PostgreSQL. Retain the
 previous images for rollback and enable task failure notifications.
 The `edge` channel is for tested development builds; choose a
