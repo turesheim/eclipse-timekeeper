@@ -197,7 +197,7 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .track-client { container-type: inline-size; padding: .75rem 1rem; min-width: 10rem; flex: 1 1 12rem; gap: .5rem; }
 .track-client strong { font-size: min(1.1rem, 11cqi); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .track-client .client-color { min-width: 0; overflow-wrap: anywhere; }
-.track-month { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.track-month { width: 100%; table-layout: fixed; border-collapse: collapse; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .track-month th { text-align: center; padding: .65rem .25rem; color: var(--muted); font-size: .85rem; }
 .track-day { height: 8rem; vertical-align: top; border: 1px solid var(--line); padding: .35rem; }
 .track-outside { background: var(--bs-tertiary-bg); color: var(--muted); }
@@ -217,8 +217,8 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .track-day-note .badge { overflow: hidden; text-overflow: ellipsis; font-size: .72rem; }
 .track-day-note.is-empty { margin-inline-start: auto; flex: none; opacity: 0; color: var(--accent); }
 .track-day:focus-within .track-day-note.is-empty, .track-day-note.is-empty:focus-visible { opacity: 1; }
-.track-day:has(button.track-day-note) { -webkit-touch-callout: none; user-select: none; }
-.track-note-menu { inset: auto; margin: 0; padding: .25rem; min-width: 11rem; max-width: calc(100vw - 1rem); }
+/* Menu coordinates come from the press's viewport position, including after scrolling. */
+.track-note-menu { position: fixed; inset: auto; margin: 0; padding: .25rem; min-width: 11rem; max-width: calc(100vw - 1rem); }
 .track-note-menu:popover-open { display: block; }
 .track-note-status { margin-top: .75rem; }
 @media (hover: hover) { .track-day:hover .track-day-note.is-empty { opacity: 1; } }

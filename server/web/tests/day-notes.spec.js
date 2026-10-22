@@ -6,6 +6,13 @@ import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
 
 const base=()=>process.env.TIMEKEEPER_WEB_URL;
+test.beforeAll(async({request})=>{
+  const headers={Origin:new URL(base()).origin},status=await request.get('/api/v1/auth/status',{headers});
+  if((await status.json()).setupRequired){
+    const reply=await request.post('/api/v1/auth/setup',{headers,data:{code:process.env.TIMEKEEPER_WEB_SETUP_CODE,username:'browser-admin',password:process.env.TIMEKEEPER_WEB_PASSWORD,displayName:'browser-admin',email:'browser-admin@example.invalid'}});
+    expect(reply.status()).toBe(200);await request.post('/api/v1/auth/logout',{headers:{...headers,'X-CSRF-Token':(await reply.json()).csrf}});
+  }
+});
 async function fresh(request){
   const username='day-notes-'+randomUUID().slice(0,8),password='Independent day note password';
   const reply=await request.post('/api/v1/admin/users',{headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},data:{username,password,displayName:username,email:username+'@example.invalid',administrator:false}});
@@ -34,6 +41,39 @@ async function menu(page,date='2026-05-17'){
   await page.getByRole('menuitem').click();await expect(dialog(page)).toBeVisible();await expect(page.locator('#track-note-text')).toBeEnabled();
 }
 async function put(api,date,text){const current=await api('GET','/day-notes/'+date);return api('PUT','/day-notes/'+date,{text},{'If-Match':current.headers().etag});}
+async function expectMenuAt(page,{x,y}){
+  const menu=page.getByRole('menu');await expect(menu).toBeVisible();const box=await menu.boundingBox(),viewport=page.viewportSize();
+  expect(Math.abs(box.x-Math.max(8,Math.min(x,viewport.width-box.width-8)))).toBeLessThan(1);
+  expect(Math.abs(box.y-Math.max(8,Math.min(y,viewport.height-box.height-8)))).toBeLessThan(1);
+}
+
+test('day note menus stay beside the press after scrolling and fit the viewport edges',async({browser,request})=>{
+  const owner=await context(browser,{viewport:{width:1000,height:740}}),page=await owner.newPage();
+  try{
+    await signIn(page,await fresh(request));await month(page);
+    for(const date of ['2026-05-11','2026-05-31']){
+      const cell=day(page,date);await cell.evaluate(node=>node.scrollIntoView({block:'end',behavior:'instant'}));
+      const point=await cell.evaluate(node=>{const r=node.getBoundingClientRect();return{x:r.right-8,y:r.bottom-8};});
+      expect(await page.evaluate(()=>scrollY)).toBeGreaterThan(0);
+      await page.mouse.click(point.x,point.y,{button:'right'});await expectMenuAt(page,point);await page.keyboard.press('Escape');
+    }
+  }finally{await owner.close();}
+});
+
+test('pressing and dragging calendar text leaves it unselected while day notes remain editable',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage();
+  try{
+    await signIn(page,await fresh(request));await month(page);
+    const headers=page.locator('.track-month th');await headers.first().dblclick();expect(await page.evaluate(()=>getSelection().toString())).toBe('');
+    const first=await headers.first().boundingBox(),last=await headers.last().boundingBox();
+    await page.mouse.move(first.x+first.width/2,first.y+first.height/2);await page.mouse.down();
+    await page.mouse.move(last.x+last.width/2,last.y+last.height/2,{steps:20});await page.mouse.up();
+    expect(await page.evaluate(()=>getSelection().toString())).toBe('');
+    await day(page).locator('.track-date').dblclick();expect(await page.evaluate(()=>getSelection().toString())).toBe('');
+    await menu(page);const text=page.locator('#track-note-text');await text.fill('Editable note text');await text.dblclick();
+    expect(await text.evaluate(node=>node.value.slice(node.selectionStart,node.selectionEnd))).not.toBe('');
+  }finally{await owner.close();}
+});
 
 test('day notes can be added from the day menu, edited, canceled and removed without changing work',async({browser,request})=>{
   const owner=await context(browser,{viewport:{width:1440,height:1000}}),page=await owner.newPage();
@@ -74,6 +114,7 @@ test('day notes are private, persist across sessions and remain viewable without
     const page=await owner.newPage();await signIn(page,user);const api=await apiFor(page);await put(api,'2026-05-17','Ferie');
     const token=await(await api('POST','/auth/tokens',{name:'Day notes viewer',permissions:['read'],expiresAt:null})).json();
     const read=await viewer.newPage();await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#workspace')).toBeVisible();await expect(read.locator('#status')).toHaveText('Up to date');await read.locator('#track-month').fill('2026-05');await expect(note(read)).toHaveText('Ferie');expect(await note(read).evaluate(node=>node.tagName)).toBe('SPAN');expect(await read.locator('button[data-track-note-date]').count()).toBe(0);
+    await note(read).dblclick();expect(await read.evaluate(()=>getSelection().toString())).toBe('');
     await day(read).dispatchEvent('contextmenu',{bubbles:true,cancelable:true,clientX:100,clientY:100});await expect(read.getByRole('menu')).not.toBeVisible();
     const isolated=await other.newPage();await signIn(isolated,await fresh(request));await month(isolated);await expect(note(isolated)).toHaveClass(/is-empty/);
     const second=await owner.newPage();await second.goto('/web/');await month(second);await expect(note(second)).toHaveText('Ferie');await put(api,'2026-05-18','Avspasering');await expect(note(second,'2026-05-18')).toHaveText('Avspasering');await expect(note(read,'2026-05-18')).toHaveText('Avspasering');
@@ -108,11 +149,12 @@ test('a long press opens the day note menu while movement, release and multiple 
     await start();await cell.dispatchEvent('pointermove',{...point,clientX:point.clientX+20,pointerType:'touch',pointerId:7,bubbles:true});await page.waitForTimeout(650);await expect(page.getByRole('menu')).not.toBeVisible();
     await start();await cell.dispatchEvent('pointerup',{pointerType:'touch',pointerId:7,bubbles:true});await page.waitForTimeout(650);await expect(page.getByRole('menu')).not.toBeVisible();
     await start();await cell.evaluate(node=>{const event=new Event('touchstart',{bubbles:true});Object.assign(event,{touches:[{},{}]});node.dispatchEvent(event);});await page.waitForTimeout(650);await expect(page.getByRole('menu')).not.toBeVisible();
+    await start();await page.waitForTimeout(500);await cell.dispatchEvent('pointerup',{pointerType:'touch',pointerId:7,bubbles:true});await expectMenuAt(page,{x:point.clientX,y:point.clientY});expect(await page.evaluate(()=>getSelection().toString())).toBe('');await page.keyboard.press('Escape');
     await start();await expect(page.getByRole('menuitem')).toBeVisible();await cell.dispatchEvent('pointerup',{pointerType:'touch',pointerId:7,bubbles:true});await expect(page.locator('#track-month')).toHaveValue('2026-05');await expect(dialog(page)).not.toBeVisible();await page.getByRole('menuitem').tap();await expect(dialog(page)).toBeVisible();await expect(page.locator('#track-note-text')).toBeEnabled();await save(page,'Ferie');await expect(note(page,'2026-05-10')).toHaveText('Ferie');
     await expect(note(page,'2026-05-10')).toHaveCSS('opacity','1');
     if(browserName==='chromium'){
-      await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await expect(note(page,'2026-05-11')).toBeEnabled();const target=day(page,'2026-05-11');await target.evaluate(node=>node.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const point=await target.evaluate(node=>{const r=node.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+55};});const cdp=await owner.newCDPSession(page);
-      await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point]});await expect(page.getByRole('menuitem')).toBeVisible();await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await expect(page.getByRole('menuitem')).toBeVisible();await expect(dialog(page)).not.toBeVisible();await page.getByRole('menuitem').tap();await expect(page.locator('#track-note-text')).toBeEnabled();await save(page,'Avspasering');await expect(note(page,'2026-05-11')).toHaveText('Avspasering');await cdp.detach();
+      await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await expect(note(page,'2026-05-11')).toBeEnabled();const target=day(page,'2026-05-11');await target.evaluate(node=>node.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const point=await target.locator('.track-date').evaluate(node=>{const r=node.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2};});const cdp=await owner.newCDPSession(page);
+      await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point]});await expectMenuAt(page,point);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await expectMenuAt(page,point);expect(await page.evaluate(()=>getSelection().toString())).toBe('');await expect(dialog(page)).not.toBeVisible();await captureScreenshot(page,{path:'test-results/day-notes-touch-menu.png'});await page.getByRole('menuitem').tap();await expect(page.locator('#track-note-text')).toBeEnabled();await save(page,'Avspasering');await expect(note(page,'2026-05-11')).toHaveText('Avspasering');await cdp.detach();
     }
   }finally{await owner.close();}
 });
