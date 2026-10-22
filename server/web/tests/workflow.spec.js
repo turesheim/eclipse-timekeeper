@@ -454,10 +454,13 @@ test('work session projects follow the selected client when starting, editing an
     await client.selectOption(first.id);await project.selectOption(alpha.id);await page.getByLabel('Summary',{exact:true}).fill('Filtered project session '+suffix);
     const added=await create('projects',{name:'Added during editing '+suffix,clientId:first.id});await create('projects',{name:'Other added project '+suffix,clientId:second.id});
     await expect.poll(()=>choices(project)).toEqual(['',alpha.id,beta.id,added.id].sort());await expect(project).toHaveValue(alpha.id);await expect(client).toHaveValue(first.id);
+    const current=await api(request,'GET','/projects/'+alpha.id);await api(request,'PUT','/projects/'+alpha.id,{name:alpha.name,clientId:second.id,icon:null},{'If-Match':current.headers().etag});
+    const unavailable=project.locator(`option[value="${alpha.id}"]`);await expect(unavailable).toHaveJSProperty('disabled',true);await expect(unavailable).toContainText('choose another');await expect(project).toHaveValue(alpha.id);
+    await project.selectOption(beta.id);expect(await choices(project)).toEqual(['',beta.id,added.id].sort());
     await page.locator('#save').click();await expect(page.locator('#editor')).toBeHidden();await expect(page.locator('#work-session-state')).toHaveText('Running');
-    const started=await(await api(request,'GET','/work-sessions/active')).json();records.unshift(['work-sessions',started.id]);expect(started).toMatchObject({clientId:first.id,projectId:alpha.id,summary:'Filtered project session '+suffix});
-    await page.locator('#session-edit').click();await expect(project).toHaveValue(alpha.id);expect(await choices(project)).toEqual(['',alpha.id,beta.id,added.id].sort());await page.locator('#cancel').click();
-    await page.locator('#session-new').click();await expect(client).toHaveValue(first.id);expect(await choices(project)).toEqual(['',alpha.id,beta.id,added.id].sort());await page.locator('#cancel').click();
+    const started=await(await api(request,'GET','/work-sessions/active')).json();records.unshift(['work-sessions',started.id]);expect(started).toMatchObject({clientId:first.id,projectId:beta.id,summary:'Filtered project session '+suffix});
+    await page.locator('#session-edit').click();await expect(project).toHaveValue(beta.id);expect(await choices(project)).toEqual(['',beta.id,added.id].sort());await page.locator('#cancel').click();
+    await page.locator('#session-new').click();await expect(client).toHaveValue(first.id);expect(await choices(project)).toEqual(['',beta.id,added.id].sort());await page.locator('#cancel').click();
     await page.locator('#session-stop').click();await expect(page.locator('#work-session-state')).toHaveText('Stopped');
   }finally{
     for(const [collection,id] of records){const current=await api(request,'GET','/'+collection+'/'+id);await api(request,'DELETE','/'+collection+'/'+id,undefined,{'If-Match':current.headers().etag});}

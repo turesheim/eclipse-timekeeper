@@ -429,16 +429,16 @@ function refreshClientChoices() {
   if (editor?.collection === 'work-sessions' || editor?.command === 'session-start') refreshSessionProjectChoices();
 }
 function sessionProjectChoices(clientId) {return [['', i18nText("ui.no_project")], ...snapshot.projects.filter((project) => !clientId || project.clientId === clientId).map((project) => [project.id, `${project.name} · ${name(snapshot.clients, project.clientId)}`])];}
-function refreshSessionProjectChoices() {
+function refreshSessionProjectChoices(selected = $('field-projectId')?.value || '') {
   const project = $('field-projectId'),client = $('field-clientId');if (!project || !client || editor?.busy || editor?.uncertain) return;
-  const selected = project.value;project.replaceChildren();
+  project.replaceChildren();
   for (const [id, label] of sessionProjectChoices(client.value)) {const option = element('option', label);option.value = id;project.append(option);}
-  if (selected && !snapshot.projects.some((value) => value.id === selected)) {const option = element('option', i18nText("ui.removed_project_choose_another"));option.value = selected;project.append(option);}
-  project.value = [...project.options].some((option) => option.value === selected) ? selected : '';
+  if (selected && ![...project.options].some((option) => option.value === selected)) {const option = element('option', i18nText("ui.removed_project_choose_another"));option.value = selected;option.disabled = true;project.append(option);}
+  project.value = selected;
 }
 function sessionFields(value) {
   const client = clientField(value.clientId || calendar.preferredClient());
-  const project = field(i18nText("ui.project_optional"), 'projectId', value.projectId, { choices: sessionProjectChoices(client.value) });
+  const project = field(i18nText("ui.project_optional"), 'projectId', '', { choices: [] });refreshSessionProjectChoices(value.projectId || '');
   project.addEventListener('change', () => {const selected = snapshot.projects.find((value) => value.id === project.value);if (selected) client.value = selected.clientId;refreshSessionProjectChoices();});
   client.addEventListener('change', () => {const selected = snapshot.projects.find((value) => value.id === project.value);if (!selected || selected.clientId !== client.value) project.value = '';refreshSessionProjectChoices();});
   field(i18nText("ui.summary"), 'summary', value.summary || '', { max: 4000, multiline: true });
