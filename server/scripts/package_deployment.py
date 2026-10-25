@@ -17,6 +17,8 @@ GUIDES = {'docs/operations/DEPLOYMENT.md': 'README.md',
               'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
           'docs/operations/ACCOUNT-DATA.md': 'ACCOUNT-DATA.md',
           'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
+          'docs/operations/JOURNAL-SYNC.md': 'JOURNAL-SYNC.md',
+          'docs/operations/JOURNAL-STORAGE.md': 'JOURNAL-STORAGE.md',
           'docs/operations/SYNOLOGY-PACKAGE.md': 'SYNOLOGY-PACKAGE.md',
           'docs/operations/SERVER.md': 'SERVER.md',
           'docs/architecture/API-V1.md': 'API-POLICY.md'}

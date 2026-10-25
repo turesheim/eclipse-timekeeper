@@ -30,6 +30,11 @@ def fail(message):
     raise Failure(message)
 
 
+def require(condition):
+    # Profile validation must also run when Python optimization is enabled.
+    if not condition:raise ValueError('Invalid configuration')
+
+
 def read_json(path,private=False):
     if private:private_file(path)
     with path.open('rb') as source:
@@ -67,18 +72,18 @@ def atomic(path,data):
 def profile(path):
     data=read_json(path)
     try:
-        assert data['format']==1 and data['mechanism']=='RSYNC_SSH' and data['direction']=='CLIENT_TO_SERVER'
-        assert data['minimumRsyncVersion']=='3.5.1'
-        assert re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]{0,252}',data['hostname']) and '..' not in data['hostname']
-        assert type(data['port']) is int and 1<=data['port']<=65535
-        assert re.fullmatch(r'[a-z_][a-z0-9_-]{0,31}',data['username']) and data['remotePath']=='.'
-        assert str(uuid.UUID(data['deviceId']))==data['deviceId']
-        assert re.fullmatch(r'timekeeper-journal-[a-f0-9]{24}',data['hostAlias'])
+        require(data['format']==1 and data['mechanism']=='RSYNC_SSH' and data['direction']=='CLIENT_TO_SERVER')
+        require(data['minimumRsyncVersion']=='3.5.1')
+        require(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]{0,252}',data['hostname']) and '..' not in data['hostname'])
+        require(type(data['port']) is int and 1<=data['port']<=65535)
+        require(re.fullmatch(r'[a-z_][a-z0-9_-]{0,31}',data['username']) and data['remotePath']=='.')
+        require(str(uuid.UUID(data['deviceId']))==data['deviceId'])
+        require(re.fullmatch(r'timekeeper-journal-[a-f0-9]{24}',data['hostAlias']))
         kind,encoded=data['hostKey'].split(' ');raw=base64.b64decode(encoded,validate=True)
-        assert kind=='ssh-ed25519' and raw[:19]==bytes.fromhex('0000000b7373682d6564323535313900000020') and len(raw)==51
+        require(kind=='ssh-ed25519' and raw[:19]==bytes.fromhex('0000000b7373682d6564323535313900000020') and len(raw)==51)
         fingerprint='SHA256:'+base64.b64encode(hashlib.sha256(raw).digest()).decode().rstrip('=')
-        assert data['hostKeyFingerprint']==fingerprint
-        assert data['knownHostsEntry']==data['hostAlias']+' '+data['hostKey']
+        require(data['hostKeyFingerprint']==fingerprint)
+        require(data['knownHostsEntry']==data['hostAlias']+' '+data['hostKey'])
     except (KeyError,ValueError,TypeError,AssertionError):fail('Invalid public journal profile. Download it again from My account over HTTPS.')
     return data
 
@@ -88,7 +93,7 @@ def paths(profile_path):
 
 
 def configure(args):
-    data=profile(args.profile);local,state=paths(args.profile)
+    data=profile(args.profile);local,state=paths(args.profile);private_directory(args.profile.parent)
     folder=Path(args.folder or input('Local daily-note folder: ')).expanduser().resolve(strict=True)
     identity=Path(args.identity or input('Local private-key filename: ')).expanduser().absolute()
     if not folder.is_dir():fail('Select an existing daily-note directory.')
@@ -98,7 +103,7 @@ def configure(args):
 
 
 def trust(args):
-    data=profile(args.profile);_,state=paths(args.profile);private_directory(state)
+    data=profile(args.profile);_,state=paths(args.profile);private_directory(args.profile.parent);private_directory(state)
     if args.fingerprint!=data['hostKeyFingerprint']:fail('Fingerprint does not match the downloaded HTTPS profile. Stop and verify it with the operator.')
     known=state/'known_hosts';entry=(data['knownHostsEntry']+'\n').encode()
     if known.exists():
@@ -108,12 +113,12 @@ def trust(args):
 
 
 def local_config(args):
-    data=profile(args.profile);local,state=paths(args.profile);private_directory(state)
+    data=profile(args.profile);local,state=paths(args.profile);private_directory(args.profile.parent);private_directory(state)
     values=read_json(local,private=True)
     try:
         folder=Path(values['folder']);identity=Path(values['identity'])
-        assert values['format']==1 and folder.is_absolute() and identity.is_absolute()
-        assert not any(ord(char)<32 for char in str(identity)+str(state))
+        require(values['format']==1 and folder.is_absolute() and identity.is_absolute())
+        require(not any(ord(char)<32 for char in str(identity)+str(state)))
     except (KeyError,ValueError,TypeError,AssertionError):fail('Run configure again to select local paths.')
     private_file(identity);known=state/'known_hosts';private_file(known)
     if known.read_bytes()!=(data['knownHostsEntry']+'\n').encode():fail('The profile differs from the pinned key. Verify its HTTPS fingerprint before replacing trust.')
@@ -134,7 +139,7 @@ def verify(args):
     result=subprocess.run(ssh_arguments(data,identity,state)+['-l',data['username'],data['hostname'],'timekeeper-journal-test'],capture_output=True,timeout=30)
     if result.returncode:fail('SSH verification failed. Check the pinned host key, unlocked local agent, network endpoint and device status in My account.')
     try:
-        reply=json.loads(result.stdout);assert reply['status']=='READY' and reply['direction']=='CLIENT_TO_SERVER'
+        reply=json.loads(result.stdout);require(reply['status']=='READY' and reply['direction']=='CLIENT_TO_SERVER')
     except (ValueError,KeyError,AssertionError):fail('The endpoint did not return the restricted journal verification response.')
     print('Restricted SSH identity verified. Direction: client to Timekeeper.')
 
@@ -201,13 +206,13 @@ def schedule(args):
     agent=os.environ.get('SSH_AUTH_SOCK')
     if not agent:fail('Load the key into a local SSH agent and export SSH_AUTH_SOCK before creating the schedule.')
     if args.platform=='macos' or args.platform=='auto' and sys.platform=='darwin':
-        values={'Label':label,'ProgramArguments':command,'StartInterval':args.interval,'RunAtLoad':False,'EnvironmentVariables':{'SSH_AUTH_SOCK':agent}}
+        values={'Label':label,'ProgramArguments':command,'StartInterval':args.interval,'RunAtLoad':False,'EnvironmentVariables':{'SSH_AUTH_SOCK':agent,'PATH':os.environ.get('PATH',os.defpath)}}
         path=destination/(label+'.plist');atomic(path,plistlib.dumps(values))
         print('Install this private launchd plist with launchctl bootstrap gui/$(id -u). It refers only to local paths and the existing agent.')
     else:
         # systemd performs its own token expansion even inside quoted ExecStart arguments.
         quote=lambda text:'"'+text.replace('%','%%').replace('\\','\\\\').replace('"','\\"').replace('\n','\\n')+'"'
-        unit='[Unit]\nDescription=Timekeeper daily journal synchronization\n[Service]\nType=oneshot\nExecStart='+ ' '.join(quote(value.replace('$','$$')) for value in command)+'\nEnvironment='+quote('SSH_AUTH_SOCK='+agent)+'\nUMask=0077\n'
+        unit='[Unit]\nDescription=Timekeeper daily journal synchronization\n[Service]\nType=oneshot\nExecStart='+ ' '.join(quote(value.replace('$','$$')) for value in command)+'\nEnvironment='+quote('SSH_AUTH_SOCK='+agent)+' '+quote('PATH='+os.environ.get('PATH',os.defpath))+'\nUMask=0077\n'
         atomic(destination/(label+'.service'),unit.encode())
         atomic(destination/(label+'.timer'),('[Unit]\nDescription=Timekeeper journal timer\n[Timer]\nOnBootSec=2min\nOnUnitActiveSec='+str(args.interval)+'s\n[Install]\nWantedBy=timers.target\n').encode())
         print('Install the private .service and .timer in ~/.config/systemd/user, then run systemctl --user daemon-reload and systemctl --user enable --now '+label+'.timer.')

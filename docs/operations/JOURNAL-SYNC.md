@@ -47,7 +47,8 @@ owned with mode 600:
 }
 ```
 
-Use the trusted HTTPS hostname and normal CA validation. A private CA may be
+Use the configured public HTTPS hostname (the application's Host policy also
+applies to the broker) and normal CA validation. A private CA may be
 mounted as a public certificate and selected with `"caFile":"/run/secrets/ca.pem"`.
 The broker must be reachable from the gateway; route `/internal/journal/` to the
 application without adding browser cookies or an Origin header. HTTP is allowed
@@ -92,6 +93,15 @@ configuration invalidates existing transfers. Rotate a broker credential in
 both protected configurations during a maintenance window and restart the
 gateway. No application restart is needed to reload the trusted mapping.
 
+For the two-instance compose deployment, configure the journal file in both
+API services, and mount the same encrypted incoming filesystem read/write at
+the same `incomingRoot`, with the same service UID and mode 700. Config remains
+read-only and mode 600. Database owner locks serialize handoff/import across
+instances. Separate, unrelated incoming mounts behind round-robin routing do
+not work: a later upload must see the directory created by its begin request.
+Alternatively, route the entire internal broker path to one configured API
+instance. The gateway's HTTPS hostname must still pass the public Host policy.
+
 For Synology Container Manager, run this as a separate project/container; do not
 use the NAS administrator's SSH service. Map the encrypted shared-folder state
 and root-owned configuration with the same numeric permissions. Publish only
@@ -124,7 +134,9 @@ cat ~/.ssh/timekeeper_journal.pub
 Sign in directly to your account over HTTPS. In **My account → Journal**, enable
 sync, then enroll the public `.pub` text with a recognizable device label and
 your current account password. Download that device's public JSON profile and
-the client script. Put both in a private local directory; the script is called
+the client script. Put both in a private, user-owned mode 700 local directory
+(`chmod 700`); the client checks this boundary. Keep the vault and private sync
+state on encrypted local storage and encrypt their backups. The script is called
 `timekeeper-journal.py` below. Use the actual profile filename in these commands:
 
 ```sh

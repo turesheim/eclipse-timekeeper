@@ -207,6 +207,15 @@ require reviewing current records before another submission. Sign-out or an
 account change clears the page, drafts, displayed token secrets and pending
 results. No shared workspace, membership or invitation model is introduced.
 
+## Journal devices
+
+**My account → Journal** manages one-way daily Markdown import, separate device
+public keys, rotation, revocation, health and incoming conflicts. Credential and
+settings changes require direct account sign-in, your current password and CSRF
+protection. API tokens and token-based browser sessions cannot manage devices.
+Private SSH keys stay on the local device. See the
+[operator and client guide](JOURNAL-SYNC.md) before enabling synchronization.
+
 ## Recovery email addresses
 
 New accounts require a primary email address. Existing accounts can add one in

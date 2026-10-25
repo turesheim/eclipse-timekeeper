@@ -68,17 +68,13 @@ vault. Only actual label/body changes generate calendar invalidations.
 
 ## Acceptance matrix
 
-All rows are required before #396 is complete. This matrix is a work record,
-not a statement that the unfinished transport or UI is available.
-
-The first implementation supplies internal Markdown parsing, private import
-state, conflict resolution, device-state operations and trusted deployment
-configuration validation. It adds no HTTP routes, worker or user-facing setup:
-the transport must authenticate and validate a completed batch before it can
-call the importer. The eventual account routes must enforce direct account
-sign-in, fresh reauthentication and CSRF before credential/settings mutations.
-The eventual worker must revalidate account/device/configuration epochs before
-each import. The transport and account delivery remain required work in #396.
+All rows are release requirements. The foundation in PR #402 supplies parsing,
+private durable state, conflict resolution, device operations and trusted
+configuration validation. The transport delivery adds account/internal routes,
+the worker, Journal settings, the local client and the dedicated gateway image.
+Account routes enforce direct sign-in, fresh password proof and CSRF for
+credential/settings mutations. The worker revalidates account, device and
+configuration epochs inside each owner-locked import transaction.
 
 | Area | Required implementation and evidence |
 | --- | --- |
@@ -93,6 +89,32 @@ each import. The transport and account delivery remain required work in #396.
 | Client | Safe path handling, supported tool installation, folder selection, private-key permissions/passphrase/agent, first transfer/calendar verification, macOS/Linux/WSL scheduling, disconnect and host-key replacement instructions. |
 | End to end | Clean supported client: enroll, pin host, transfer/import, status, rotate/revoke; cross-account, symlink/traversal, shell/forwarding, mismatch, disabled sync/account and interrupted transfer denial. |
 | Release | Full Java/API/HTTP/browser/operator-helper tests, packaged documentation, actual transport acceptance, all hosted build/container jobs green. |
+
+Run the actual transport gate with:
+
+```sh
+python3 -m unittest discover -s server/journal -v
+python3 server/scripts/journal_gateway_acceptance.py --distribution server/target/distribution/timekeeper-server.zip
+```
+
+It uses disposable Docker volumes, a clean Linux client with generated local
+keys, actual OpenSSH and rsync/rrsync 3.5.1, and the checksum-verified packaged
+JVM over certificate-verified HTTPS. It tests exact bytes, quoted paths, no-op
+and account isolation, shell/forwarding/pull/path/symlink/mismatch denial,
+501-file admission pressure, independent errors, empty/missing files, conflict
+recovery after forced restart, and rotation/revocation/disable while a throttled
+receiver has an open private temporary file. Files and directories are checked
+as 600/700 during that transfer, even with an over-permissive sender. Known test
+secrets and note sentinels are forbidden in logs; diagnostic artifacts are
+private. The receipt binds the test to its exact distribution hash and commit.
+
+The HTTPS browser gate exercises all six themes, narrow layouts, public-only
+enrollment/rotation/profiles/revocation, read-only and missing prerequisites,
+dirty navigation, original downloads and stale conflict decisions. These tests
+use a broker fixture for UI state; only the Docker gate proves actual SSH.
+
+Both the standalone and deployment archives include the
+[operator/client guide](../operations/JOURNAL-SYNC.md) and storage policy.
 
 ## Protection at rest
 

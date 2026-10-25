@@ -100,6 +100,16 @@ class JournalSynchronizationTest {
         store.transaction("a",()->{var state=new JournalState(store);state.update(JOURNAL_LEASE,state.required(JOURNAL_LEASE,first).put("expiresAt","2000-01-01T00:00:00Z"));return null;});
         assertEquals(409,assertThrows(ApiFailure.class,()->complete(first,manifest(Map.of()))).status);begin();
     }
+    @Test void failedReceiversReleaseTheirSlotWithoutAdmittingOrCancellingCompletedNotes()throws Exception{
+        UUID id=uuid(begin().get("id"));upload(id,NAME,"unacknowledged");
+        assertEquals(404,assertThrows(ApiFailure.class,()->synchronization.gateway("journal_b","JournalTransport "+OTHER_TOKEN,gateway->synchronization.abort(gateway,id))).status);
+        for(int retry=0;retry<2;retry++)assertEquals("ABORTED",synchronization.gateway("journal_a","JournalTransport "+TOKEN,gateway->synchronization.abort(gateway,id)).path("status").asText());
+        assertFalse(Files.exists(incoming.resolve(hash("a")).resolve(id.toString())));
+        assertEquals(409,assertThrows(ApiFailure.class,()->complete(id,manifest(Map.of(NAME,"unacknowledged")))).status);assertEquals("",body());
+        UUID completed=uuid(begin().get("id"));upload(completed,NAME,"accepted");complete(completed,manifest(Map.of(NAME,"accepted")));
+        assertEquals("COMPLETED",synchronization.gateway("journal_a","JournalTransport "+TOKEN,gateway->synchronization.abort(gateway,completed)).path("status").asText());
+        synchronization.rescan("a");assertEquals("accepted",body());
+    }
     @Test void internalHttpProtocolRejectsBrowserCredentialsOwnerInjectionAndUserApiTokens(){
         String base="/internal/journal/journal_a",credential="JournalTransport "+TOKEN;
         var input=object().put("deviceId",device.toString());

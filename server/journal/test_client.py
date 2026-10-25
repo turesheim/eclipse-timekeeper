@@ -36,7 +36,7 @@ class ClientTest(unittest.TestCase):
         self.configure();local,state=client.paths(self.profile);self.assertEqual(0o600,local.stat().st_mode&0o777);self.assertEqual(0o700,state.stat().st_mode&0o777)
         self.args.output_directory=None;self.args.interval=300;self.args.platform='macos'
         with patch.dict(os.environ,{'SSH_AUTH_SOCK':str(self.root/'agent.sock')}):client.schedule(self.args)
-        plist=next((state/'schedule').glob('*.plist'));values=plistlib.loads(plist.read_bytes());self.assertEqual(str(self.profile),values['ProgramArguments'][-1]);self.assertNotIn('PRIVATE_KEY_SENTINEL',plist.read_text())
+        plist=next((state/'schedule').glob('*.plist'));values=plistlib.loads(plist.read_bytes());self.assertEqual(str(self.profile),values['ProgramArguments'][-1]);self.assertNotIn('PRIVATE_KEY_SENTINEL',plist.read_text());self.assertEqual(os.environ.get('PATH',os.defpath),values['EnvironmentVariables']['PATH'])
         self.args.platform='linux'
         with patch.dict(os.environ,{'SSH_AUTH_SOCK':str(self.root/'agent.sock')}):client.schedule(self.args)
         self.assertNotIn('PRIVATE_KEY_SENTINEL',next((state/'schedule').glob('*.service')).read_text())
@@ -46,6 +46,12 @@ class ClientTest(unittest.TestCase):
         with self.assertRaises(client.Failure):client.configure(self.args)
         self.identity.chmod(0o600);alias=self.root/'alias';alias.symlink_to(self.identity);self.args.identity=str(alias)
         with self.assertRaises(client.Failure):client.configure(self.args)
+    def test_systemd_schedule_escapes_exec_expansion_but_keeps_the_agent_environment_literal(self):
+        self.profile=self.root/'$PROFILE%name.json';self.write_profile();self.args.profile=self.profile;self.configure()
+        self.args.output_directory=None;self.args.interval=300;self.args.platform='linux'
+        with patch.dict(os.environ,{'SSH_AUTH_SOCK':str(self.root/'$AGENT%socket')}):client.schedule(self.args)
+        service=next((client.paths(self.profile)[1]/'schedule').glob('*.service')).read_text()
+        self.assertIn('$$PROFILE%%name.json',service);self.assertIn('$AGENT%%socket',service);self.assertNotIn('$$AGENT',service)
     def test_ssh_arguments_keep_paths_quoted_and_host_verification_mandatory(self):
         self.configure();data,_,identity,state=client.local_config(self.args);arguments=client.ssh_arguments(data,identity,state)
         self.assertIn('StrictHostKeyChecking=yes',arguments);self.assertIn('ClearAllForwardings=yes',arguments);self.assertIn('BatchMode=yes',arguments);self.assertIn(str(self.identity),arguments)
