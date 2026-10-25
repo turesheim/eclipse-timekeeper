@@ -36,3 +36,7 @@ export async function openThemeSettings(page){
 export async function setTheme(page,value){
   await openThemeSettings(page);await page.locator('#theme').selectOption(value);await page.locator('#account-page a[href="#tracking"]').click();await expect(page.locator('#workspace')).toBeVisible();
 }
+export async function expandProjectClient(page,clientId) {
+  const toggle=page.locator(`#projects tbody[data-client-id="${clientId}"] .projects-client-toggle`);
+  if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();
+}

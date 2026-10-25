@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="project_report.title">Project session report · Timekeeper</title>
+  <script src="./theme.js"></script>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./assets/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="./assets/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./themes.css">
+  <script type="module" src="./bootstrap.js" data-timekeeper-entry="/web/project-report.js"></script>
+</head><body class="project-report-page">
+  <a class="skip-link" href="#main-content" data-i18n="ui.skip_to_main_content">Skip to main content</a>
+  <header class="app-header"><a class="brand" href="./">Timekeeper <small>2.0</small></a></header>
+  <main id="main-content" tabindex="-1">
+    <div class="project-report-heading"><div><p class="eyebrow" data-i18n="project_report.heading">PROJECT SESSION REPORT</p><h1 id="report-title" data-i18n="ui.work_sessions">Work sessions</h1><p id="report-context" class="hint"></p></div>
+      <div class="project-report-actions"><button type="button" id="report-refresh" class="btn btn-outline-secondary" data-i18n="ui.refresh_0e9161">Refresh</button><button type="button" id="report-print" class="btn btn-outline-secondary" disabled data-i18n="project_report.print">Print</button></div>
+    </div>
+    <p id="report-status" role="status" aria-live="polite" data-i18n="project_report.loading">Loading project sessions…</p>
+    <p id="report-error" class="alert alert-danger" role="alert"></p>
+    <a id="report-sign-in" class="btn btn-primary" href="./" target="_blank" rel="noopener noreferrer" hidden data-i18n="ui.sign_in">Sign in</a>
+    <section id="report-content" aria-label="Work sessions" data-i18n-aria-label="ui.work_sessions" hidden>
+      <p id="report-summary"></p><p id="report-empty" class="hint" hidden data-i18n="project_report.empty">No work sessions belong to this project.</p>
+      <div id="report-table" class="card table-wrap"><table class="table align-middle mb-0 project-report-table"><thead><tr><th scope="col" data-i18n="ui.start">Start</th><th scope="col" data-i18n="ui.end">End</th><th scope="col" data-i18n="ui.summary">Summary</th><th scope="col" data-i18n="ui.client">Client</th><th scope="col" data-i18n="ui.duration">Duration</th></tr></thead><tbody id="report-sessions"></tbody><tfoot><tr><th scope="row" colspan="4" data-i18n="ui.total">Total</th><td id="report-total"></td></tr></tfoot></table></div>
+      <p id="report-as-of" class="hint"></p>
+    </section>
+  </main>
+</body></html>

@@ -330,7 +330,21 @@ button.track-client-day:disabled { opacity: .65; }
 .projects-client-toggle { display: flex; align-items: center; gap: .6rem; min-height: 2.75rem; text-align: start; width: 100%; }
 .projects-client-toggle .badge { margin-inline-start: auto; }
 .projects-table .projects-project-name { padding-inline-start: 3.5rem; overflow-wrap: anywhere; }
-.projects-table .actions { width: 7rem; white-space: nowrap; }
+.projects-table .actions { width: 10.5rem; white-space: nowrap; }
+
+.project-report-heading { display:flex;justify-content:space-between;align-items:start;gap:1rem;flex-wrap:wrap;margin-bottom:1rem; }
+.project-report-heading h1 { overflow-wrap:anywhere; }
+.project-report-actions { display:flex;gap:.5rem; }
+.project-report-table { min-width:48rem; }
+.project-report-table :is(td,th):last-child { text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums; }
+.project-report-table td { overflow-wrap:anywhere; }
+.project-report-table tfoot { font-weight:650; }
+@media print {
+  .project-report-page .app-header,.project-report-actions,.project-report-page .skip-link { display:none; }
+  .project-report-page main { max-width:none;padding:0; }
+  .project-report-page .table-wrap { overflow:visible; }
+  .project-report-table { min-width:0; }
+}
 
 .project-caption { display: inline-flex; align-items: center; gap: .45rem; }
 .project-caption .icon { font-size: 1rem; color: var(--muted); }

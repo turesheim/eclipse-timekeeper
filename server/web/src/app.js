@@ -26,7 +26,7 @@ let watchSession = null;
 let accountName = '',canWrite = false;
 let serverInfoRequest = 0;
 let snapshotAt = 0,activeAsOf = 0n;
-const collapsed = new Set(),collapsedClients = new Set();
+const collapsed = new Set(),expandedClients = new Set();
 let decimalHours = false,activitiesCollapsed = false;
 const displayNanos = (value) => decimalHours ? decimalHoursText(value) : nanosText(value);
 const displayDuration = (value) => decimalHours ? decimalHoursText(durationNanos(value)) : durationText(value);
@@ -158,7 +158,7 @@ const auth = authentication({
     refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
-    calendar.reset();track.reset();collapsed.clear();collapsedClients.clear();canWrite = false;
+    calendar.reset();track.reset();collapsed.clear();expandedClients.clear();canWrite = false;
     $('period-announcement').textContent = '';
     deleteCandidate = null;$('editor-delete-confirm').close();$('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
     for (const id of ['clients', 'projects', 'labels', 'activities', 'days']) $(id).replaceChildren();
@@ -275,7 +275,7 @@ function renderProjects(s) {
     const body = element('tbody'),group = element('tr', undefined, 'projects-client'),label = element('th');
     body.dataset.clientId = client.id;label.colSpan = 2;label.scope = 'rowgroup';
     const toggle = button('', () => {
-      if (collapsedClients.has(client.id)) collapsedClients.delete(client.id);else collapsedClients.add(client.id);
+      if (expandedClients.has(client.id)) expandedClients.delete(client.id);else expandedClients.add(client.id);
       updateToggle();
     });
     toggle.className = 'btn projects-client-toggle';
@@ -285,11 +285,13 @@ function renderProjects(s) {
     label.append(toggle);group.append(label);body.append(group);
     for (const project of projects) {
       const caption = element('span', undefined, 'project-caption'),glyph = projectIcon(project);if (glyph) caption.append(glyph);caption.append(element('span', project.name));
-      const record = row([caption], [action(i18nText("ui.edit"), () => openRecord('projects', project.id)), action(i18nText("ui.delete"), () => openDelete('projects', project.id))]);
+      const report = element('a');report.href = './project-report.html?' + new URLSearchParams({projectId:project.id});report.target = '_blank';report.rel = 'noopener noreferrer';
+      iconButton(report, 'file-earmark-text', i18nText('project_report.open', {project:project.name}));
+      const record = row([caption], [action(i18nText("ui.edit"), () => openRecord('projects', project.id)), report, action(i18nText("ui.delete"), () => openDelete('projects', project.id))]);
       record.dataset.projectId = project.id;record.firstElementChild.className = 'projects-project-name';body.append(record);
     }
     function updateToggle() {
-      const expanded = !collapsedClients.has(client.id);
+      const expanded = expandedClients.has(client.id);
       toggle.replaceChildren(icon(expanded ? 'down' : 'right'), name, count);
       toggle.setAttribute('aria-expanded', String(expanded));toggle.setAttribute('aria-label', `${expanded ? i18nText("ui.collapse") : i18nText("ui.expand")} ${client.name}`);
       for (const row of body.querySelectorAll('[data-project-id]')) row.hidden = !expanded;

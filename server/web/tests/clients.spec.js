@@ -1,4 +1,5 @@
 import {captureScreenshot} from './screenshots.js';
+import {expandProjectClient} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
@@ -118,15 +119,20 @@ test('Projects groups clients with keyboard collapsible headings and retains gro
     await page.getByRole('button',{name:'Projects',exact:true}).click();
     const beta=page.locator(`#projects tbody[data-client-id="${clients[0].id}"]`),alpha=page.locator(`#projects tbody[data-client-id="${clients[1].id}"]`);
     await expect(beta.locator('[data-project-id]')).toHaveCount(2);await expect(alpha.locator('[data-project-id]')).toHaveCount(1);
-    const toggle=beta.getByRole('button',{name:'Collapse '+clients[0].name,exact:true});await toggle.focus();await page.keyboard.press('Enter');
-    await expect(beta.getByRole('button',{name:'Expand '+clients[0].name,exact:true})).toBeFocused();await expect(beta.locator('[data-project-id]').first()).not.toBeVisible();await expect(alpha.locator('[data-project-id]')).toBeVisible();
+    await expect(beta.locator('[data-project-id]').first()).not.toBeVisible();await expect(alpha.locator('[data-project-id]')).not.toBeVisible();
+    const toggle=beta.getByRole('button',{name:'Expand '+clients[0].name,exact:true});await toggle.focus();await page.keyboard.press('Enter');
+    await expect(beta.getByRole('button',{name:'Collapse '+clients[0].name,exact:true})).toBeFocused();await expect(beta.locator('[data-project-id]').first()).toBeVisible();
+    await beta.getByRole('button',{name:'Collapse '+clients[0].name,exact:true}).press('Enter');
     await page.getByRole('button',{name:/^Refresh: /}).click();await expect(beta.getByRole('button',{name:'Expand '+clients[0].name,exact:true})).toHaveAttribute('aria-expanded','false');
     await beta.getByRole('button',{name:'Expand '+clients[0].name,exact:true}).press('Space');await expect(beta.locator('[data-project-id]').first()).toBeVisible();
+    await expandProjectClient(page,clients[1].id);
     await beta.locator(`[data-project-id="${projects[0].id}"]`).getByRole('button',{name:'Edit',exact:true}).click();await page.getByLabel('Client',{exact:true}).selectOption(clients[1].id);await save(page);
     await expect(beta.locator('[data-project-id]')).toHaveCount(1);await expect(alpha.locator('[data-project-id]')).toHaveCount(2);
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.locator('#projects').screenshot({path:'test-results/projects-grouped-mobile.png'});
     await alpha.getByRole('button',{name:'Collapse '+clients[1].name,exact:true}).click();await expect(alpha.locator('[data-project-id]').first()).not.toBeVisible();
+    await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Projects',exact:true}).click();
+    await expect(beta.locator('.projects-client-toggle')).toHaveAttribute('aria-expanded','false');await expect(alpha.locator('.projects-client-toggle')).toHaveAttribute('aria-expanded','false');
   } finally {
     for(const [collection,records] of [['projects',projects],['clients',clients]])for(const record of records){const current=await api(request,'GET',`/${collection}/${record.id}`);await api(request,'DELETE',`/${collection}/${record.id}`,undefined,{'If-Match':current.headers().etag});}
   }
@@ -159,7 +165,7 @@ test('project icon picker searches the full catalog with bounded rendering and p
     await search.fill('rocket');await expect(page.getByRole('radio',{name:'Rocket',exact:true})).toBeVisible();await expect(picker.locator('[name=icon]:checked')).toHaveValue('yin-yang');
     await search.fill('no such icon qzqzqz');await expect(picker.getByRole('status')).toContainText('No matching icons.');await expect(picker.getByRole('status')).toContainText('Selected:');await expect(choices.locator('input')).toHaveCount(1);
     await save(page);project=(await(await api(request,'GET','/projects?clientId='+client.id)).json()).items[0];expect(project.icon).toBe('yin-yang');
-    await page.locator(`#projects [data-project-id="${project.id}"]`).getByRole('button',{name:'Edit',exact:true}).click();
+    await expandProjectClient(page,client.id);await page.locator(`#projects [data-project-id="${project.id}"]`).getByRole('button',{name:'Edit',exact:true}).click();
     await expect(picker.locator('[name=icon]:checked')).toHaveValue('yin-yang');await expect(choices.locator('input')).toHaveCount(61);
     await search.fill('balance harmony');await expect(page.getByRole('radio',{name:'Yin Yang',exact:true})).toBeChecked();
     await search.fill('  YÍN_yang  ');await expect(page.getByRole('radio',{name:'Yin Yang',exact:true})).toBeChecked();
@@ -177,12 +183,14 @@ test('Bootstrap project icons persist after selection and reload',async({page,re
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.getByLabel('Access token').fill(token);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
     await page.getByRole('button',{name:'Projects',exact:true}).click();
     const row=page.locator(`#projects [data-project-id="${project.id}"]`);
+    await expandProjectClient(page,client.id);
     await expect(row.locator('[data-project-icon="phone"]')).toHaveClass(/bi-phone/);
     await row.getByRole('button',{name:'Edit',exact:true}).click();
     await page.getByRole('searchbox',{name:'Search project icons',exact:true}).fill('airplane-engines');
     await page.getByRole('radio',{name:'Airplane Engines',exact:true}).check();await save(page);
     expect((await(await api(request,'GET','/projects/'+project.id)).json()).icon).toBe('airplane-engines');
     await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Projects',exact:true}).click();
+    await expandProjectClient(page,client.id);
     await expect(row.locator('[data-project-icon="airplane-engines"]')).toHaveClass(/bi-airplane-engines/);
   } finally {
     if(project){const current=await api(request,'GET','/projects/'+project.id);await api(request,'DELETE','/projects/'+project.id,undefined,{'If-Match':current.headers().etag});}
@@ -207,7 +215,7 @@ test('optional project icons persist and Track shows distinct icons to the right
     const other=await create('projects',{name:prefix+' Backend',clientId:client.id,icon:'code'}),globe=await create('projects',{name:prefix+' Research',clientId:client.id,icon:'globe'});
     for(const [index,projectId] of [project.id,project.id,other.id,globe.id,null].entries())await create('work-sessions',{clientId:client.id,projectId,summary:prefix+' session '+index,start:`2025-10-20T${String(6+index).padStart(2,'0')}:00:00Z`,end:`2025-10-20T${String(7+index).padStart(2,'0')}:00:00Z`});
     await page.reload();await expect(page.locator('#status')).toHaveText('Up to date');await page.getByRole('button',{name:'Projects',exact:true}).click();
-    const row=page.locator(`#projects [data-project-id="${project.id}"]`);await expect(row.locator('[data-project-icon=code]')).toBeVisible();await row.getByRole('button',{name:'Edit',exact:true}).click();await expect(page.getByRole('radio',{name:'Code',exact:true})).toBeChecked();
+    await expandProjectClient(page,client.id);const row=page.locator(`#projects [data-project-id="${project.id}"]`);await expect(row.locator('[data-project-icon=code]')).toBeVisible();await row.getByRole('button',{name:'Edit',exact:true}).click();await expect(page.getByRole('radio',{name:'Code',exact:true})).toBeChecked();
     await page.getByLabel('Name',{exact:true}).fill(prefix+' Website renamed');await save(page);
     await page.getByRole('button',{name:'Workweek',exact:true}).click();await page.getByLabel('Week containing',{exact:true}).fill('2025-10-20');await expect(page.locator(`#week-sessions [data-week-project="${project.id}"] [data-project-icon=code]`)).toBeVisible();
     await page.getByRole('button',{name:'Calendar',exact:true}).click();await page.getByLabel('Month',{exact:true}).fill('2025-10');

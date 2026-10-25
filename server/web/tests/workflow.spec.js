@@ -2,7 +2,7 @@ import {captureScreenshot} from './screenshots.js';
 import {openTaskHistory,clearTaskHistory} from './task-history.js';
 import {workSessionAction} from './workweek-session-actions.js';
 import {browserRequest} from './browser-request.js';
-import {openAccountMenu, openAbout, setTimeZone, setDurationFormat} from './navigation.js';
+import {openAccountMenu, openAbout, setTimeZone, setDurationFormat, expandProjectClient} from './navigation.js';
 import {localDateTime} from '../src/model.js';
 import {test, expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
@@ -160,7 +160,7 @@ test('core browser workflow manages records, tracks time, and preserves exact re
   await page.setViewportSize({width:390, height:844}); await captureScreenshot(page,{path:'test-results/workweek-mobile.png', fullPage:true});
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   // Dependency rejection keeps the delete confirmation and does not cascade.
-  await page.getByRole('button', {name:'Projects', exact:true}).click(); await page.locator('#projects tr').filter({hasText:project}).getByRole('button', {name:'Delete', exact:true}).click();
+  await page.getByRole('button', {name:'Projects', exact:true}).click();await expandProjectClient(page,projectRecord.clientId);await page.locator('#projects tr').filter({hasText:project}).getByRole('button', {name:'Delete', exact:true}).click();
   await page.locator('#editor').getByRole('button', {name:'Delete', exact:true}).click(); await expect(page.locator('#editor-error')).toContainText('conflicts'); await page.getByRole('button', {name:'Cancel', exact:true}).click();
   await page.getByRole('button', {name:'Activities', exact:true}).click(); await page.locator('#activities tr').filter({hasText:'One nanosecond'}).getByRole('button', {name:'Delete', exact:true}).click(); await page.locator('#editor').getByRole('button', {name:'Delete', exact:true}).click(); await expect(page.locator('#editor')).not.toBeVisible();
   const tasks = await (await api(request, 'GET', '/tasks')).json(); expect(tasks.items.find(v => v.summary === task)).toBeTruthy();
