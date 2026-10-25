@@ -163,6 +163,8 @@ and logout clears both editor modes and their private content.
 
 ![Editing a day note](../assets/screenshots/day-notes-editor.png)
 
+![Formatted journal on a narrow screen](../assets/screenshots/journal-editor-mobile.png)
+
 Hover over a daily client total to see its sessions, summaries, projects, labels,
 local start/end times and durations in a tooltip. These details are also available
 when viewing the account with read-only access.
