@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {randomUUID,generateKeyPairSync} from 'node:crypto';
+import {randomUUID,generateKeyPairSync,createHash} from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
 import {captureScreenshot} from './screenshots.js';
@@ -59,4 +59,26 @@ test('journal synchronization reports missing prerequisites and keeps credential
     await enroll(page).getByLabel('Device name').fill('Draft laptop');let pending=page.waitForEvent('dialog'),click=page.locator('#account-navigation').getByRole('link',{name:'Profile',exact:true}).click();await(await pending).dismiss();await click;await expect(page).toHaveURL(/#account\/journal$/);await expect(enroll(page).getByLabel('Device name')).toHaveValue('Draft laptop');
     pending=page.waitForEvent('dialog');click=page.locator('#account-navigation').getByRole('link',{name:'Profile',exact:true}).click();await(await pending).accept();await click;await expect(page.getByRole('heading',{name:'Journal',exact:true})).not.toBeVisible();
   }finally{await context.close();}
+});
+
+test('journal synchronization reviews both conflict copies, preserves originals and rejects stale Calendar decisions',async({browser,request,playwright})=>{
+  const context=await browser.newContext({baseURL:base(),ignoreHTTPSErrors:true,locale:'en-GB'}),page=await context.newPage(),machine=await playwright.request.newContext({baseURL:base(),ignoreHTTPSErrors:true});
+  try{
+    const user=await fresh(request);await signIn(page,user);
+    await settings(page).getByLabel('Enable synchronization').check();await settings(page).getByLabel('Current password',{exact:true}).fill(user.password);await settings(page).getByRole('button',{name:'Save synchronization settings'}).click();await expect(settings(page)).toContainText('Synchronization settings saved.');
+    await enroll(page).getByLabel('Device name').fill('Conflict laptop');await enroll(page).getByLabel('Public SSH key (.pub)',{exact:true}).fill(key());await enroll(page).getByLabel('Current password',{exact:true}).fill(user.password);await enroll(page).getByRole('button',{name:'Register public key'}).click();await expect(enroll(page)).toContainText('Public key registered.');
+    const api=browserRequest(page),identity=await(await api.get('/api/v1/auth/session')).json(),device=(await(await api.get('/api/v1/journal')).json()).devices[0],date='/api/v1/day-notes/2026-10-25';
+    let current=await api.get(date);await api.put(date,{headers:{'X-CSRF-Token':identity.csrf,'If-Match':current.headers().etag},data:{body:'Calendar original'}});
+    const gateway='/internal/journal/'+user.transport.username,headers={Authorization:'JournalTransport '+user.transport.token};
+    const started=await machine.post(gateway+'/transfers',{headers,data:{deviceId:device.id}});expect(started.status()).toBe(200);const id=(await started.json()).id;
+    const original='---\r\ntimekeeper-label: Planning\r\nunknown: keep me\r\n---\r\n\r\n# Incoming Søndag  \r\n',bytes=Buffer.from(original);
+    expect((await machine.put(`${gateway}/transfers/${id}/files/2026-10-25.md`,{headers,data:{data:bytes.toString('base64')}})).status()).toBe(200);
+    expect((await machine.post(`${gateway}/transfers/${id}/complete`,{headers,data:{format:1,completed:true,files:[{name:'2026-10-25.md',bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}]}})).status()).toBe(200);
+    await expect.poll(async()=>(await(await api.get('/api/v1/journal')).json()).health.conflicts).toBe(1);await page.getByRole('button',{name:'Refresh status',exact:true}).click();await expect(page.getByRole('button',{name:'Review conflict',exact:true})).toBeVisible();
+    const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download original copy',exact:true}).click();const stream=await(await download).createReadStream(),chunks=[];for await(const chunk of stream)chunks.push(chunk);expect(Buffer.concat(chunks).toString('utf8')).toBe(original);
+    await page.getByRole('button',{name:'Review conflict',exact:true}).click();await expect(page.locator('.journal-sync-preview').first()).toContainText('Calendar original');await expect(page.locator('.journal-sync-preview').last()).toContainText('Incoming Søndag');
+    current=await api.get(date);expect((await api.put(date,{headers:{'X-CSRF-Token':identity.csrf,'If-Match':current.headers().etag},data:{body:'Calendar peer edit'}})).status()).toBe(200);
+    await page.getByRole('button',{name:'Use incoming copy',exact:true}).click();await expect(page.locator('.form-feedback').filter({hasText:'These records changed or conflict with this change. Your draft is kept. Review current values before saving again.'})).toBeVisible();expect((await(await api.get(date)).json()).body).toBe('Calendar peer edit');
+    await page.getByRole('button',{name:'Review conflict',exact:true}).click();await expect(page.locator('.journal-sync-preview').first()).toContainText('Calendar peer edit');await page.getByRole('button',{name:'Use incoming copy',exact:true}).click();await expect(page.getByRole('button',{name:'Review conflict',exact:true})).toHaveCount(0);expect((await(await api.get(date)).json()).body).toBe('\r\n# Incoming Søndag  \r\n');
+  }finally{await machine.dispose();await context.close();}
 });
