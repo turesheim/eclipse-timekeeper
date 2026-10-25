@@ -15,7 +15,8 @@ signed-in account. Administrator access does not include anyone else's records.
 The snapshot includes all work records, project/client links, task relationships,
 labels, descriptions, external references, exact timestamps, running intervals,
 time-zone preferences and import audit history. Web day notes are included as
-optional `dayNotes` in `archive.json`, including dates with no timed work. It also includes your account
+optional `dayNotes` in `archive.json`, including labels and exact Markdown bodies
+on dates with no timed work. It also includes your account
 identity, recovery addresses and credential-management metadata for reference.
 Passwords and hashes, API/session token material, passkey keys/credential IDs,
 recovery codes/links and deployment settings or SMTP secrets are excluded.
@@ -23,7 +24,9 @@ recovery codes/links and deployment settings or SMTP secrets are excluded.
 One consistent snapshot supplies every file. Ordinary list pagination and the
 older transfer endpoint's 10,000-record/20 MiB limits do not truncate this download.
 CSV cells are quoted and potential spreadsheet formulas receive an apostrophe;
-JSON retains the original values. Keep the archive private.
+JSON retains the original values. The ZIP is unencrypted; keep it on private
+encrypted storage and protect its backups. See [journal storage and key
+management](JOURNAL-STORAGE.md) for database, temporary-file and backup protection.
 
 ## Review and restore
 
@@ -42,7 +45,8 @@ old import jobs or Undo operations.
 
 Day notes retain their calendar dates. Matching notes can be restored again; a
 different existing note on the same date is reported as a conflict during review
-and is never overwritten. Archives created before day notes remain supported.
+and is never overwritten. Legacy label-only notes and archives created before day notes remain supported.
+An omitted legacy body never erases the Markdown of an existing matching note.
 
 Closed intervals retain exact instants and nanoseconds. A source running activity
 or work session can be restored when the corresponding timer is available in this

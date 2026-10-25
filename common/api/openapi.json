@@ -8801,11 +8801,11 @@
     "/day-notes": {
       "get": {
         "operationId": "listDayNotes",
-        "summary": "Read web-only day notes",
+        "summary": "Read private calendar note summaries without Markdown bodies",
         "x-required-permission": "read",
         "responses": {
           "200": {
-            "description": "Visible notes in the inclusive date range.",
+            "description": "Nonempty label-only, body-only or combined notes in the inclusive date range. Never includes body text.",
             "headers": {},
             "content": {
               "application/json": {
@@ -8890,7 +8890,7 @@
       ],
       "get": {
         "operationId": "getDayNote",
-        "summary": "Read web-only day notes",
+        "summary": "Read a private day note with its complete Markdown body",
         "x-required-permission": "read",
         "responses": {
           "200": {
@@ -8952,7 +8952,7 @@
       },
       "put": {
         "operationId": "saveDayNote",
-        "summary": "Save a web-only day note; empty text removes its label",
+        "summary": "Conditionally update a private day note; omitted fields are preserved",
         "x-required-permission": "write",
         "responses": {
           "200": {
@@ -9027,6 +9027,67 @@
             }
           }
         }
+      },
+      "delete": {
+        "operationId": "deleteDayNote",
+        "summary": "Clear both label and body, retaining the version tombstone",
+        "x-required-permission": "write",
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "204": {
+            "description": "The note is empty. Its retained ETag prevents stale recreation; an already empty note is unchanged.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ]
       }
     }
   },
@@ -13605,27 +13666,9 @@
             "type": "array",
             "maxItems": 250000,
             "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "date",
-                "text"
-              ],
-              "properties": {
-                "date": {
-                  "type": "string",
-                  "format": "date"
-                },
-                "text": {
-                  "type": "string",
-                  "maxLength": 80,
-                  "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]*$",
-                  "description": "A single-line label. Empty text removes the visible label.",
-                  "minLength": 1
-                }
-              }
+              "$ref": "#/components/schemas/ArchiveDayNote"
             },
-            "description": "Optional web-only labels attached to civil dates, independently of timed work."
+            "description": "Optional private civil-date labels and Markdown bodies, independent of timed work. Body is optional for legacy label-only archives. Empty tombstones are not exported."
           }
         },
         "required": [
@@ -16928,17 +16971,21 @@
       "DayNoteInput": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "text"
-        ],
         "properties": {
           "text": {
             "type": "string",
             "maxLength": 80,
             "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]*$",
-            "description": "A single-line label. Empty text removes the visible label."
+            "description": "Single-line label of at most 80 characters. Empty string clears only the label; omission preserves it."
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 200000,
+            "x-max-utf8-bytes": 200000,
+            "description": "Exact UTF-8 Markdown, limited to 200,000 encoded bytes. Whitespace and line endings are preserved. Empty string clears only the body; omission preserves it. Null and invalid Unicode are rejected."
           }
-        }
+        },
+        "minProperties": 1
       },
       "DayNote": {
         "type": "object",
@@ -16948,7 +16995,9 @@
           "ownerId",
           "date",
           "text",
-          "version"
+          "version",
+          "body",
+          "hasBody"
         ],
         "properties": {
           "id": {
@@ -16967,6 +17016,16 @@
           },
           "version": {
             "$ref": "#/components/schemas/Version"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 200000,
+            "x-max-utf8-bytes": 200000,
+            "description": "Exact UTF-8 Markdown, limited to 200,000 encoded bytes. Whitespace and line endings are preserved. Empty string clears only the body; omission preserves it. Null and invalid Unicode are rejected."
+          },
+          "hasBody": {
+            "type": "boolean",
+            "description": "Whether the Markdown body contains any bytes, including whitespace."
           }
         }
       },
@@ -16981,7 +17040,7 @@
             "type": "array",
             "maxItems": 62,
             "items": {
-              "$ref": "#/components/schemas/DayNote"
+              "$ref": "#/components/schemas/DayNoteSummary"
             }
           },
           "revision": {
@@ -16989,6 +17048,87 @@
           }
         },
         "additionalProperties": false
+      },
+      "DayNoteSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ownerId",
+          "date",
+          "text",
+          "version",
+          "hasBody"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "hasBody": {
+            "type": "boolean",
+            "description": "Whether the Markdown body contains any bytes, including whitespace."
+          }
+        },
+        "description": "Private calendar metadata only. Fetch /day-notes/{date} with its ETag to read or change the complete note."
+      },
+      "ArchiveDayNote": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "date",
+          "text"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 80,
+            "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]*$",
+            "description": "Single-line label of at most 80 characters. Empty string clears only the label; omission preserves it."
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 200000,
+            "x-max-utf8-bytes": 200000,
+            "description": "Exact UTF-8 Markdown, limited to 200,000 encoded bytes. Whitespace and line endings are preserved. Empty string clears only the body; omission preserves it. Null and invalid Unicode are rejected."
+          }
+        },
+        "anyOf": [
+          {
+            "properties": {
+              "text": {
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "required": [
+              "body"
+            ],
+            "properties": {
+              "body": {
+                "minLength": 1
+              }
+            }
+          }
+        ]
       }
     },
     "parameters": {
