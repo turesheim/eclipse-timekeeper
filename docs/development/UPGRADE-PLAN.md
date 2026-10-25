@@ -16,7 +16,10 @@ children are now complete; [CLIENT-SERVER-ACCEPTANCE.md](../verification/CLIENT-
 records their merged evidence. Final release artifacts and public installation
 remain separate acceptance work.
 
-Work-session update: the current embedded baseline is H2 2.5.250 / schema 3.
+Work-session update: the current embedded baseline is H2 2.4.240 / schema 3.
+The October 25 durability follow-up supersedes the earlier H2 2.5.250 selection
+because of its crash-recovery data-loss regression; see
+[H2 crash durability](../verification/H2-CRASH-DURABILITY.md).
 Known, correctly stamped schema-2 databases receive an additive upgrade only
 after a verified private backup. This does not enable historical migrations.
 See [database recovery](../operations/DATABASE-RECOVERY.md) for the current policy.

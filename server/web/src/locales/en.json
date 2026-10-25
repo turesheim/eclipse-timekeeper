@@ -997,5 +997,6 @@
   "markdown.replace": "Replace the current draft with this file? Download first if you want to keep the draft.",
   "markdown.imported": "Opened locally. Frontmatter stays separate; the day label is unchanged.",
   "markdown.downloaded": "Markdown download started. The separate day label is not part of the Markdown document.",
-  "markdown.open": "Try the Markdown editor prototype"
+  "markdown.open": "Try the Markdown editor prototype",
+  "day_notes.body_present": "Markdown note"
 }

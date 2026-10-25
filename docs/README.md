@@ -80,7 +80,7 @@ your home directory; restart after changing the location. See the
 for the user workflow. Database instances use H2 mixed mode; service writes
 are serialized and stale record versions are rejected. See [multi-instance acceptance](verification/CONCURRENT-INSTANCES.md).
 
-The Eclipse 2026-09 upgrade uses **H2 2.5.250 with schema version 3** as its
+The Eclipse 2026-09 upgrade uses **H2 2.4.240 with schema version 3** as its
 supported database baseline. Start with new storage; historical H2 files,
 unversioned databases and old Mylyn attribute records are not imported.
 Schema versioning and guarded migration-target infrastructure are retained for

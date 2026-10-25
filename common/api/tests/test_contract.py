@@ -199,9 +199,25 @@ class ContractTest(unittest.TestCase):
         older['format'] = 'timekeeper-domain-v2'
         self.assertFalse(validator('TransferSnapshot').is_valid(older))
 
+    def test_journal_bodies_are_optional_writes_and_excluded_from_summaries(self):
+        for value in [{'text': 'Planning'}, {'body': '\r\n# Notes\r\n\t'}, {'text': '', 'body': ''}]:
+            validator('DayNoteInput').validate(value)
+        for value in [{}, {'body': None}, {'body': 'private', 'ownerId': 'another'}]:
+            self.assertFalse(validator('DayNoteInput').is_valid(value))
+        note = {'id': ID, 'ownerId': 'a', 'version': 1, 'date': '2026-10-25',
+                'text': '', 'body': '# Private body\n', 'hasBody': True}
+        validator('DayNote').validate(note)
+        summary = {key: value for key, value in note.items() if key != 'body'}
+        validator('DayNoteList').validate({'items': [summary], 'revision': 1})
+        self.assertFalse(validator('DayNoteSummary').is_valid(note))
+        for value in [{'date': '2026-10-25', 'text': 'Old label'},
+                      {'date': '2026-10-25', 'text': '', 'body': '\n\t'}]:
+            validator('ArchiveDayNote').validate(value)
+        self.assertFalse(validator('ArchiveDayNote').is_valid({'date': '2026-10-25', 'text': '', 'body': ''}))
+
     def test_every_reference_and_relation_workflow_is_present(self):
         expected = {
-            'listDayNotes', 'getDayNote', 'saveDayNote',
+            'listDayNotes', 'getDayNote', 'saveDayNote', 'deleteDayNote',
             'downloadAccountArchive', 'createAccountArchiveUpload', 'listPendingAccountArchives',
             'getAccountArchiveUpload', 'writeAccountArchiveChunk', 'discardAccountArchiveUpload',
             'previewAccountArchive', 'restoreAccountArchive', 'listAccountArchiveRestores',
