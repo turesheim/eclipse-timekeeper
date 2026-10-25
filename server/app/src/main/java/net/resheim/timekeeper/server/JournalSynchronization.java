@@ -69,7 +69,7 @@ class JournalSynchronization {
             return object().put("deviceId",device.path("id").asText()).put("publicKey",canonical.publicKey());
         throw ApiFailure.unauthorized(false);
     }
-    ObjectNode verify(Gateway gateway,UUID device){new JournalDevices(store).authorize(device);return object().put("status","READY").put("direction","CLIENT_TO_SERVER");}
+    ObjectNode verify(Gateway gateway,UUID device){var value=new JournalDevices(store).authorize(device);new JournalState(store).update(JOURNAL_DEVICE,value.put("lastVerifiedAt",store.now().toString()));return object().put("status","READY").put("direction","CLIENT_TO_SERVER");}
     ObjectNode begin(Gateway gateway,UUID device){
         var devices=new JournalDevices(store);var credential=devices.authorize(device);var state=new JournalState(store);
         new JournalRetention(store).cleanup(gateway.deployment());
@@ -124,6 +124,10 @@ class JournalSynchronization {
     ObjectNode complete(Gateway gateway,UUID id,JsonNode manifest){
         var lease=lease(gateway,id,true);var state=new JournalState(store);
         var entries=manifest.path("files");if(!manifest.path("format").isIntegralNumber()||manifest.path("format").asLong()!=1||!manifest.path("completed").isBoolean()||!manifest.path("completed").asBoolean()||!entries.isArray()||entries.size()>JournalImport.BATCH_FILES)throw ApiFailure.validation();
+        var errors=manifest.has("errors")?manifest.path("errors"):array();
+        if(!errors.isArray()||entries.size()+errors.size()>JournalImport.BATCH_FILES)throw ApiFailure.validation();
+        var errorNames=new HashSet<String>();
+        for(var error:errors){String name=error.path("name").asText();if(!name.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}\\.md")||!errorNames.add(name)||!Set.of("FILE_TOO_LARGE","UNSAFE_LOCAL_FILE","FILE_CHANGED","LOCAL_FILE_UNREADABLE").contains(error.path("code").asText()))throw ApiFailure.validation();}
         String manifestHash=hash(canonical(manifest).toString());
         if(lease.path("state").asText().equals("COMPLETED")){
             if(!lease.path("manifestHash").asText().equals(manifestHash))throw new ApiFailure(409,"IDEMPOTENCY_KEY_REUSED");
@@ -133,13 +137,14 @@ class JournalSynchronization {
         try{
             for(var entry:entries){
                 String name=entry.path("name").asText(),digest=entry.path("sha256").asText();var size=entry.path("bytes");
-                if(!name.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}\\.md")||!digest.matches("[a-f0-9]{64}")||!size.isIntegralNumber()||size.asLong()<0||size.asLong()>JournalMarkdown.FILE_BYTES||files.containsKey(name))throw ApiFailure.validation();
+                if(!name.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}\\.md")||!digest.matches("[a-f0-9]{64}")||!size.isIntegralNumber()||size.asLong()<0||size.asLong()>JournalMarkdown.FILE_BYTES||files.containsKey(name)||errorNames.contains(name))throw ApiFailure.validation();
                 var bytes=read(folder.resolve(name));if(bytes.length!=size.asLong()||!JournalMarkdown.hash(bytes).equals(digest))throw new ApiFailure(409,"JOURNAL_INCOMPLETE_TRANSFER");files.put(name,bytes);
             }
             try(var staged=Files.list(folder)){if(!staged.map(path->path.getFileName().toString()).sorted().toList().equals(new ArrayList<>(files.keySet())))throw new ApiFailure(409,"JOURNAL_INCOMPLETE_TRANSFER");}
         }catch(IOException unsafe){throw new ApiFailure(409,"JOURNAL_INCOMPLETE_TRANSFER");}
         // Idempotent handoff is fingerprinted by the importer even after a lost response.
         var batch=new JournalImport(store).seal(id,uuid(lease.get("deviceId")),lease.path("sequence").asLong(),files);
+        new JournalImport(store).localErrors(id,uuid(lease.get("deviceId")),lease.path("sequence").asLong(),errors);
         for(String field:List.of("syncEpoch","configurationEpoch","accountVersion"))batch.set(field,lease.get(field));state.update(JOURNAL_BATCH,batch);
         state.update(JOURNAL_LEASE,lease.put("state","COMPLETED").put("manifestHash",manifestHash).put("completedAt",store.now().toString()));
         var device=state.required(JOURNAL_DEVICE,uuid(lease.get("deviceId")));state.update(JOURNAL_DEVICE,device.put("lastTransferAt",store.now().toString()));
@@ -166,6 +171,16 @@ class JournalSynchronization {
     }
     void authorizeCandidate(UUID id){
         var state=new JournalState(store);var item=state.required(JOURNAL_ITEM,id);var batch=state.required(JOURNAL_BATCH,uuid(item.get("batchId")));valid(configuration.load(),batch);
+    }
+    ObjectNode settle(String username,String authorization,UUID id){
+        String owner=gateway(username,authorization,gateway->{var value=lease(gateway,id,true);if(!value.path("state").asText().equals("COMPLETED"))throw ApiFailure.conflict();return gateway.account().owner();});
+        rescan(owner);
+        return gateway(username,authorization,gateway->{
+            lease(gateway,id,true);var result=object().put("pending",0).put("conflicts",0).put("errors",0);
+            for(var item:new JournalState(store).list(JOURNAL_ITEM))if(item.path("batchId").asText().equals(id.toString())){
+                String field=switch(item.path("state").asText()){case "PENDING"->"pending";case "CONFLICT"->"conflicts";case "ERROR","ABORTED"->"errors";default->null;};if(field!=null)result.put(field,result.path(field).asInt()+1);
+            }return result;
+        });
     }
     private Path folder(JournalConfiguration.Deployment deployment,UUID id,boolean create){
         try{

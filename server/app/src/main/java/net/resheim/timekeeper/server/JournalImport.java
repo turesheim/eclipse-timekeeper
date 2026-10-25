@@ -48,6 +48,7 @@ final class JournalImport {
         var item=state.required(JOURNAL_ITEM,id);if(!item.path("state").asText().equals("PENDING"))return summary(item);
         UUID device=uuid(item.get("deviceId"));String filename=item.path("filename").asText();long sequence=item.path("sequence").asLong();
         var baseline=state.find(JOURNAL_FILE,baselineId(device,filename)).orElse(null);
+        if(state.list(JOURNAL_ITEM).stream().anyMatch(other->other.path("deviceId").asText().equals(device.toString())&&other.path("filename").asText().equals(filename)&&other.path("sequence").asLong()>sequence))return finish(item,"SUPERSEDED",null,true);
         if(baseline!=null&&sequence<=baseline.path("sequence").asLong())return finish(item,"SUPERSEDED",null,true);
         final JournalMarkdown.Note note;
         try{note=JournalMarkdown.parse(filename,source(item));}
@@ -70,6 +71,10 @@ final class JournalImport {
         var value=baseline==null?object().put("deviceId",device.toString()).put("filename",filename):baseline;
         value.put("sequence",sequence).put("hash",hash).put("noteVersion",noteVersion);
         if(baseline==null)state.insert(JOURNAL_FILE,baselineId(device,filename),value);else state.update(JOURNAL_FILE,value);
+    }
+    void localErrors(UUID batch,UUID device,long sequence,com.fasterxml.jackson.databind.JsonNode errors){
+        for(var error:errors)state.insert(JOURNAL_ITEM,itemId(batch,error.path("name").asText()),object().put("batchId",batch.toString()).put("deviceId",device.toString())
+                .put("sequence",sequence).put("filename",error.path("name").asText()).put("state","ERROR").put("error",error.path("code").asText()).put("processedAt",store.now().toString()));
     }
     ObjectNode candidate(UUID id){
         var item=state.required(JOURNAL_ITEM,id);if(!item.path("state").asText().equals("CONFLICT"))throw ApiFailure.conflict();

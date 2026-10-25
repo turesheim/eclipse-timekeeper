@@ -22,7 +22,7 @@ final class JournalAccount {
         }catch(JournalConfiguration.Unavailable unavailable){deployment.put("code",unavailable.code);}
         var credentials=result.putArray("devices");devices.list().forEach(credentials::add);
         var health=result.putObject("health");for(String count:List.of("pending","conflicts","errors","aborted","receiving"))health.put(count,0);
-        for(var device:devices.list())for(String timestamp:List.of("lastTransferAt","lastImportAt"))if(device.has(timestamp)&&device.path(timestamp).asText().compareTo(health.path(timestamp).asText())>0)health.set(timestamp,device.get(timestamp));
+        for(var device:devices.list())for(String timestamp:List.of("lastVerifiedAt","lastTransferAt","lastImportAt"))if(device.has(timestamp)&&(!health.has(timestamp)||java.time.Instant.parse(device.path(timestamp).asText()).isAfter(java.time.Instant.parse(health.path(timestamp).asText()))))health.set(timestamp,device.get(timestamp));
         var items=state.list(JOURNAL_ITEM);var latest=new HashMap<String,ObjectNode>();
         for(var item:items){String key=item.path("deviceId").asText()+"/"+item.path("filename").asText();var prior=latest.get(key);if(prior==null||prior.path("sequence").asLong()<item.path("sequence").asLong())latest.put(key,item);}
         var visible=result.putArray("items");

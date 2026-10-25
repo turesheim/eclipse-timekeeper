@@ -1140,5 +1140,9 @@
   "journal.sync.error.FRONTMATTER_TOO_LARGE": "Frontmatter må være innenfor 20 000 UTF-8-byte inkludert markørene.",
   "journal.sync.error.BODY_TOO_LARGE": "Markdown-teksten overskrider 200 000 UTF-8-byte. Forkort originalen før overføring.",
   "journal.sync.error.RATE_LIMITED": "For mange forsøk. Vent noen minutter før du prøver igjen.",
-  "journal.sync.setup_steps": "Lag nøkkel, sett opp lokalt og planlegg kjøringer"
+  "journal.sync.setup_steps": "Lag nøkkel, sett opp lokalt og planlegg kjøringer",
+  "journal.sync.last_verified": "Siste bekreftede SSH-tilkobling",
+  "journal.sync.error.UNSAFE_LOCAL_FILE": "Erstatt den symbolske eller harde lenken med et vanlig dagsnotat.",
+  "journal.sync.error.FILE_CHANGED": "Filen ble endret under kopieringen. Prøv synkronisering på nytt.",
+  "journal.sync.error.LOCAL_FILE_UNREADABLE": "Kontroller lokale filrettigheter og prøv synkronisering på nytt."
 }

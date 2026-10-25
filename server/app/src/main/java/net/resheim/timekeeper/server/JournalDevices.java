@@ -45,5 +45,5 @@ final class JournalDevices {
         var device=state.required(JOURNAL_DEVICE,id);if(device.path("revoked").asBoolean())throw new ApiFailure(403,"JOURNAL_DEVICE_REVOKED");return device;
     }
     List<ObjectNode> list(){return state.list(JOURNAL_DEVICE).stream().map(JournalDevices::management).toList();}
-    static ObjectNode management(ObjectNode device){var result=object();for(String field:List.of("id","version","label","fingerprint","revoked","createdAt","revokedAt","lastTransferAt","lastImportAt"))if(device.has(field))result.set(field,device.get(field));return result;}
+    static ObjectNode management(ObjectNode device){var result=object();for(String field:List.of("id","version","label","fingerprint","revoked","createdAt","revokedAt","lastVerifiedAt","lastTransferAt","lastImportAt"))if(device.has(field))result.set(field,device.get(field));return result;}
 }

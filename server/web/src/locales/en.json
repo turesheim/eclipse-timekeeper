@@ -1140,5 +1140,9 @@
   "journal.sync.error.FRONTMATTER_TOO_LARGE": "Frontmatter must fit within 20,000 UTF-8 bytes including its delimiters.",
   "journal.sync.error.BODY_TOO_LARGE": "The Markdown body exceeds 200,000 UTF-8 bytes. Shorten the original before transferring.",
   "journal.sync.error.RATE_LIMITED": "Too many attempts. Wait a few minutes before trying again.",
-  "journal.sync.setup_steps": "Key generation, local setup and scheduling"
+  "journal.sync.setup_steps": "Key generation, local setup and scheduling",
+  "journal.sync.last_verified": "Last verified SSH connection",
+  "journal.sync.error.UNSAFE_LOCAL_FILE": "Replace the symlink or hard link with a regular daily note.",
+  "journal.sync.error.FILE_CHANGED": "The file changed during the snapshot. Retry synchronization.",
+  "journal.sync.error.LOCAL_FILE_UNREADABLE": "Check local file permissions and retry synchronization."
 }

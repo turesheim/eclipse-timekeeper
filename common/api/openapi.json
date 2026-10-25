@@ -17990,6 +17990,10 @@
             "type": "string",
             "format": "date-time"
           },
+          "lastVerifiedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "lastTransferAt": {
             "type": "string",
             "format": "date-time"
@@ -18344,6 +18348,10 @@
               "receiving": {
                 "type": "integer",
                 "minimum": 0
+              },
+              "lastVerifiedAt": {
+                "type": "string",
+                "format": "date-time"
               },
               "lastTransferAt": {
                 "type": "string",

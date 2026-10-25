@@ -168,4 +168,10 @@ class JournalSynchronizationTest {
             assertEquals(201,state.list(JOURNAL_ITEM).size());assertEquals(1,state.list(JOURNAL_SOURCE).size());assertEquals(1,new JournalImport(store).pending().size());return null;
         });synchronization.rescan("a");assertEquals("retained source",body());
     }
+    @Test void localFileErrorsDoNotBlockIndependentNotesAndSettlingDrainsTheBatch(){
+        UUID id=uuid(begin().get("id"));upload(id,NAME,"INDEPENDENT_NOTE_BODY_MARKER");var manifest=manifest(Map.of(NAME,"INDEPENDENT_NOTE_BODY_MARKER"));
+        manifest.putArray("errors").add(object().put("name","2026-10-26.md").put("code","FILE_TOO_LARGE"));complete(id,manifest);
+        var result=synchronization.settle("journal_a","JournalTransport "+TOKEN,id);assertEquals(0,result.path("pending").asInt());assertEquals(1,result.path("errors").asInt());assertEquals("INDEPENDENT_NOTE_BODY_MARKER",body());
+        var status=given().header("Authorization","Bearer test-a").get("/api/v1/journal").then().statusCode(200).extract().response();assertEquals(1,status.jsonPath().getInt("health.errors"));assertFalse(status.asString().contains("INDEPENDENT_NOTE_BODY_MARKER"));
+    }
 }

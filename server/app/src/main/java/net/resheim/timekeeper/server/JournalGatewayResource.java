@@ -16,13 +16,16 @@ public class JournalGatewayResource {
     @Context UriInfo uri;
     @Context HttpHeaders headers;
     @Context io.vertx.core.http.HttpServerRequest request;
-    private Response call(String username,Function<JournalSynchronization.Gateway,ObjectNode> operation){
+    private String authorization(){
         ContractInputs.queries(uri.getQueryParameters());
         if(headers.getHeaderString("Cookie")!=null||headers.getHeaderString("Origin")!=null)throw ApiFailure.badRequest();
         String peer=request.connection().remoteAddress().hostAddress();
         if(!uri.getRequestUri().getScheme().equals("https")&&!Set.of("127.0.0.1","::1").contains(peer))throw new ApiFailure(403,"JOURNAL_ENCRYPTED_BROKER_REQUIRED");
         var authorization=headers.getRequestHeader("Authorization");if(authorization==null||authorization.size()!=1)throw ApiFailure.unauthorized(false);
-        var result=synchronization.gateway(username,authorization.getFirst(),operation);
+        return authorization.getFirst();
+    }
+    private Response call(String username,Function<JournalSynchronization.Gateway,ObjectNode> operation){
+        var result=synchronization.gateway(username,authorization(),operation);
         return Response.ok(result).header("Cache-Control","private, no-store").build();
     }
     static void fields(JsonNode value,String... allowed){
@@ -46,8 +49,12 @@ public class JournalGatewayResource {
         fields(input,"data");String data=text(input,"data",4*((JournalMarkdown.FILE_BYTES+2)/3));var transfer=ContractInputs.pathId(id);return call(username,gateway->synchronization.upload(gateway,transfer,filename,data));
     }
     @POST @Path("/transfers/{id}/complete") public Response complete(@PathParam("username")String username,@PathParam("id")String id,JsonNode input){
-        fields(input,"format","completed","files");if(!input.path("files").isArray()||input.path("files").size()>JournalImport.BATCH_FILES)throw ApiFailure.validation();
+        fields(input,"format","completed","files","errors");if(!input.path("files").isArray()||input.path("files").size()>JournalImport.BATCH_FILES)throw ApiFailure.validation();
+        if(input.has("errors")){if(!input.path("errors").isArray()||input.path("errors").size()>JournalImport.BATCH_FILES)throw ApiFailure.validation();for(var error:input.path("errors"))fields(error,"name","code");}
         for(var file:input.path("files"))fields(file,"name","bytes","sha256");var transfer=ContractInputs.pathId(id);
         return call(username,gateway->synchronization.complete(gateway,transfer,input));
+    }
+    @POST @Path("/transfers/{id}/settle") public Response settle(@PathParam("username")String username,@PathParam("id")String id,JsonNode input){
+        fields(input);return Response.ok(synchronization.settle(username,authorization(),ContractInputs.pathId(id))).header("Cache-Control","private, no-store").build();
     }
 }
