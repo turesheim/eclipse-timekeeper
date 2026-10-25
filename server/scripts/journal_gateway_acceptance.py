@@ -55,6 +55,7 @@ def main():
     if archive.with_suffix('.zip.sha256').read_text().split()[0]!=digest:raise ValueError('Distribution checksum mismatch')
     if not args.skip_image_build:command('docker','build','-t',GATEWAY_IMAGE,'-f',str(ROOT/'server/journal/Dockerfile'),str(ROOT))
     suffix=secrets.token_hex(5);network='journal-'+suffix;containers=[];volumes=[]
+    output=ROOT/'server/target/journal-gateway-acceptance';output.mkdir(parents=True,exist_ok=True);output.chmod(0o700)
     with tempfile.TemporaryDirectory(prefix='timekeeper-journal-ssh-') as temporary:
         directory=Path(temporary).resolve();directory.chmod(0o700)
         def docker(*arguments,**kwargs):return command('docker',*arguments,**kwargs)
@@ -72,7 +73,9 @@ def main():
             for label in ['app','gateway','secret','client']:
                 volume='journal-'+label+'-'+suffix;docker('volume','create',volume);volumes.append(volume)
             app_volume,gateway_volume,secret_volume,client_volume=volumes
-            with zipfile.ZipFile(archive) as package:package.extractall(directory/'unpacked')
+            with zipfile.ZipFile(archive) as package:
+                if any(not name.startswith('timekeeper-server/') or '..' in Path(name).parts or Path(name).is_absolute() for name in package.namelist()):raise ValueError('Invalid distribution paths')
+                package.extractall(directory/'unpacked');manifest=json.loads(package.read('timekeeper-server/timekeeper-release.json'))
             command('openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(directory/'tls.key'),'-out',str(directory/'tls.crt'),'-days','1','-subj','/CN=web.test','-addext','subjectAltName=DNS:web.test,IP:127.0.0.1')
             code,_=create_challenge(directory/'setup.json',owner='journal-admin-owner')
             admin_token=secrets.token_urlsafe(32);(directory/'tokens.json').write_text(json.dumps([{'ownerId':'journal-admin-owner','sha256':hashlib.sha256(admin_token.encode()).hexdigest(),'permissions':['read','write']}]))
@@ -139,8 +142,12 @@ def main():
             status,_=actors[0][1].call('GET','/journal');assert status['health']['lastVerifiedAt'] and status['health']['lastImportAt'] and status['health']['pending']==0
             assert 'UNRELATED_VAULT' not in json.dumps(status)
             print('Real clean-client SSH enrollment, HTTPS host pin, quoted paths, transfer/import, no-op and account isolation: PASS')
+            (output/'acceptance.json').write_text(json.dumps({'passed':True,'distributionSha256':digest,'sourceCommit':manifest['commit'],'rsync':'3.5.1','realSsh':True,'realHttps':True})+'\n')
             # Additional adversarial and recovery checks are appended below as the transport evolves.
         finally:
+            for container in containers:
+                logs=docker('logs',container,check=False);log=logs.stdout+logs.stderr
+                path=output/(container.split('-'+suffix)[0]+'.log');path.write_bytes(log);path.chmod(0o600)
             for container in reversed(containers):docker('rm','-f',container,check=False)
             for volume in reversed(volumes):docker('volume','rm',volume,check=False)
             docker('network','rm',network,check=False)
