@@ -26,7 +26,7 @@ GATEWAY_IMAGE='timekeeper-journal-gateway:acceptance'
 
 
 def command(*args,input=None,check=True):
-    result=subprocess.run(args,input=input,capture_output=True)
+    result=subprocess.run(args,input=input,capture_output=True,timeout=1200)
     if check and result.returncode:raise RuntimeError('Disposable journal command failed: '+args[0])
     return result
 

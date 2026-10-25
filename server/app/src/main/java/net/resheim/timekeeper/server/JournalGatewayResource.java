@@ -17,7 +17,7 @@ public class JournalGatewayResource {
     @Context HttpHeaders headers;
     @Context io.vertx.core.http.HttpServerRequest request;
     private String authorization(){
-        ContractInputs.queries(uri.getQueryParameters());
+        if(!uri.getQueryParameters().isEmpty())throw new ApiFailure(400,"JOURNAL_QUERY_DENIED");
         if(headers.getHeaderString("Cookie")!=null||headers.getHeaderString("Origin")!=null)throw new ApiFailure(400,"JOURNAL_BROWSER_CREDENTIALS_DENIED");
         String peer=request.connection().remoteAddress().hostAddress();
         if(!uri.getRequestUri().getScheme().equals("https")&&!Set.of("127.0.0.1","::1").contains(peer))throw new ApiFailure(403,"JOURNAL_ENCRYPTED_BROKER_REQUIRED");
@@ -29,8 +29,8 @@ public class JournalGatewayResource {
         return Response.ok(result).header("Cache-Control","private, no-store").build();
     }
     static void fields(JsonNode value,String... allowed){
-        if(value==null||!value.isObject())throw ApiFailure.badRequest();var names=Set.of(allowed);
-        value.fieldNames().forEachRemaining(name->{if(!names.contains(name))throw ApiFailure.badRequest();});
+        if(value==null||!value.isObject())throw new ApiFailure(400,"JOURNAL_OBJECT_REQUIRED");var names=Set.of(allowed);
+        value.fieldNames().forEachRemaining(name->{if(!names.contains(name))throw new ApiFailure(400,"JOURNAL_UNKNOWN_FIELD");});
     }
     static String text(JsonNode value,String field,int limit){var property=value.path(field);if(!property.isTextual()||property.asText().length()>limit)throw ApiFailure.validation();return property.asText();}
     @POST @Path("/keys") public Response key(@PathParam("username")String username,JsonNode input){
