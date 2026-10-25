@@ -1,0 +1,49 @@
+package net.resheim.timekeeper.server;
+
+import static net.resheim.timekeeper.server.JsonValues.*;
+import static net.resheim.timekeeper.server.JournalState.Kind.*;
+import java.util.*;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+/** Owner-locked journal settings and public credentials; never stores private keys. */
+final class JournalDevices {
+    private static final UUID SETTINGS=UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private final ServerStore store;
+    private final JournalState state;
+    JournalDevices(ServerStore store){this.store=store;state=new JournalState(store);}
+    ObjectNode settings(){return state.find(JOURNAL_CFG,SETTINGS).orElseGet(()->object().put("enabled",false).put("epoch",0).put("version",0));}
+    ObjectNode enabled(boolean enabled){
+        var current=settings();if(current.path("enabled").asBoolean()==enabled)return current;
+        current.put("enabled",enabled).put("epoch",Math.addExact(current.path("epoch").asLong(),1));
+        var saved=state.find(JOURNAL_CFG,SETTINGS).isPresent()?state.update(JOURNAL_CFG,current):state.insert(JOURNAL_CFG,SETTINGS,current);
+        if(!enabled)abort(null);state.audit(enabled?"SYNC_ENABLED":"SYNC_DISABLED",null);return saved;
+    }
+    ObjectNode enroll(String label,String publicKey,UUID rotate){
+        if(label==null||label.isBlank()||label.codePointCount(0,label.length())>80||label.codePoints().anyMatch(Character::isISOControl))throw ApiFailure.validation();
+        var key=JournalKey.parse(publicKey);var devices=state.list(JOURNAL_DEVICE);
+        if(devices.stream().filter(device->!device.path("revoked").asBoolean()).count()>=20&&rotate==null)throw new ApiFailure(409,"JOURNAL_DEVICE_LIMIT");
+        if(devices.stream().anyMatch(device->!device.path("revoked").asBoolean()&&device.path("publicKey").asText().equals(key.publicKey())))throw new ApiFailure(409,"JOURNAL_KEY_ALREADY_ENROLLED");
+        if(rotate!=null)revoke(rotate);
+        var value=state.insert(JOURNAL_DEVICE,UUID.randomUUID(),object().put("label",label.strip()).put("publicKey",key.publicKey()).put("fingerprint",key.fingerprint())
+                .put("revoked",false).put("createdAt",store.now().toString()).put("nextSequence",1));
+        state.audit(rotate==null?"DEVICE_ENROLLED":"DEVICE_ROTATED",uuid(value.get("id")));return management(value);
+    }
+    ObjectNode revoke(UUID device){
+        var value=state.required(JOURNAL_DEVICE,device);if(!value.path("revoked").asBoolean()){
+            value=state.update(JOURNAL_DEVICE,value.put("revoked",true).put("revokedAt",store.now().toString()));abort(device);state.audit("DEVICE_REVOKED",device);
+        }return management(value);
+    }
+    private void abort(UUID device){
+        for(var lease:state.list(JOURNAL_LEASE))if((device==null||lease.path("deviceId").asText().equals(device.toString()))&&lease.path("state").asText().equals("RECEIVING"))state.update(JOURNAL_LEASE,lease.put("state","ABORTED"));
+        for(var item:state.list(JOURNAL_ITEM))if((device==null||item.path("deviceId").asText().equals(device.toString()))&&item.path("state").asText().equals("PENDING")){
+            item.put("state","ABORTED").put("error","JOURNAL_AUTHORIZATION_WITHDRAWN");state.update(JOURNAL_ITEM,item);
+        }
+    }
+    ObjectNode authorize(UUID id){
+        if(!settings().path("enabled").asBoolean())throw new ApiFailure(403,"JOURNAL_DISABLED");
+        var account=AccountStore.account(store.current().connection(),store.owner(),true);if(!account.path("state").asText().equals("ENABLED"))throw new ApiFailure(403,"JOURNAL_ACCOUNT_DISABLED");
+        var device=state.required(JOURNAL_DEVICE,id);if(device.path("revoked").asBoolean())throw new ApiFailure(403,"JOURNAL_DEVICE_REVOKED");return device;
+    }
+    List<ObjectNode> list(){return state.list(JOURNAL_DEVICE).stream().map(JournalDevices::management).toList();}
+    static ObjectNode management(ObjectNode device){var result=object();for(String field:List.of("id","version","label","fingerprint","revoked","createdAt","revokedAt","lastTransferAt","lastImportAt"))if(device.has(field))result.set(field,device.get(field));return result;}
+}
