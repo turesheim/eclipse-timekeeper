@@ -22,9 +22,9 @@ export class TrackDayNotes {
     this.clearBody=button(t('journal.clear_body'),'btn btn-outline-secondary');this.clearBody.addEventListener('click',()=>{if(!this.markdown.readOnly){this.markdown.setValue('');this.changed();void this.markdown.showFormatted();}});
     this.download=button(t('markdown.download'),'btn btn-outline-secondary');this.download.addEventListener('click',()=>this.downloadDraft());
     this.reload=button(t('journal.reload'),'btn btn-outline-secondary');this.reload.addEventListener('click',()=>void this.reloadEditor());
-    const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.cancel,this.save);
-    const recovery=node('div',undefined,'journal-recovery');recovery.append(this.clearBody,this.download,this.reload);
-    this.form.append(this.title,label,this.text,markdown,this.savedStatus,this.error,recovery,actions);this.dialog.append(this.form);root.append(this.dialog);
+    const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.savedStatus,this.cancel,this.save);
+    this.recovery=node('div',undefined,'journal-recovery');this.recovery.append(this.clearBody,this.download,this.reload);
+    this.form.append(this.title,label,this.text,this.error,markdown,this.recovery,actions);this.dialog.append(this.form);root.append(this.dialog);
     this.text.addEventListener('input',()=>this.changed());
     this.cancel.addEventListener('click',()=>this.requestClose());
     // Focus returns before the native close event is delivered. Release editor
@@ -113,6 +113,10 @@ export class TrackDayNotes {
     this.save.disabled=editor.loading||editor.busy||this.markdown?.loading||editor.uncertain||editor.stale||!editor.etag||!this.writable;
     this.cancel.disabled=editor.busy;
     if(this.reload){this.reload.hidden=!(editor.failedRead||editor.stale||editor.uncertain);this.reload.disabled=editor.loading||editor.busy||this.markdown.loading;this.reload.textContent=t(editor.uncertain?'journal.check_result':'journal.reload');}
+    if(this.recovery){
+      if(editor.failedRead||editor.stale||editor.uncertain){if(this.markdown.root.previousSibling!==this.recovery)this.markdown.root.before(this.recovery);}
+      else if(this.markdown.root.nextSibling!==this.recovery)this.markdown.root.after(this.recovery);
+    }
     if(this.download)this.download.disabled=!editor.etag||editor.loading||editor.busy||this.markdown.loading;
     if(this.clearBody)this.clearBody.disabled=readOnly||!editor.etag||this.markdown.loading;
   }
@@ -167,7 +171,7 @@ export class TrackDayNotes {
       this.markdown.setValue(reply.data.body);this.error.textContent='';this.savedStatus.textContent=t(this.writable?'journal.saved':'journal.read_only');this.controls();this.text.focus();void this.markdown.showFormatted(false);
     }catch(error){
       if(this.editor!==editor||editor.session!==this.session)return;
-      editor.loading=false;editor.failedRead=true;this.error.textContent=error.message;this.savedStatus.textContent='';this.controls();if(error.status===401)this.callbacks.onUnauthorized(error);
+      editor.loading=false;editor.failedRead=true;this.error.textContent=error.message;this.savedStatus.textContent='';this.controls();this.error.scrollIntoView({block:'nearest'});if(error.status===401)this.callbacks.onUnauthorized(error);
     }
   }
   downloadDraft(){
@@ -183,7 +187,7 @@ export class TrackDayNotes {
         if(reply.data.text===editor.sent.text&&reply.data.body===editor.sent.body){this.acceptSaved(reply,editor);return;}
         editor.uncertain=false;editor.stale=true;this.error.textContent=t('journal.review_saved');
       }catch(error){if(this.editor===editor){this.error.textContent=error.message;if(error.status===401)this.callbacks.onUnauthorized(error);}}
-      finally{if(this.editor===editor){editor.loading=false;this.controls();}}
+      finally{if(this.editor===editor){editor.loading=false;this.controls();if(this.error.textContent)this.error.scrollIntoView({block:'nearest'});}}
       return;
     }
     if(this.dirty()&&!confirm(t('journal.reload_confirm')))return;
@@ -198,7 +202,7 @@ export class TrackDayNotes {
   async commit(){
     const editor=this.editor;if(!editor||editor.busy||editor.loading||editor.uncertain||editor.stale||!editor.etag||!this.writable||editor.session!==this.session)return;
     if(this.markdown.loading)return;
-    const body=this.markdown.value();if(new TextEncoder().encode(body).length>200000){this.error.textContent=t('journal.too_large');return;}
+    const body=this.markdown.value();if(new TextEncoder().encode(body).length>200000){this.error.textContent=t('journal.too_large');this.error.scrollIntoView({block:'nearest'});return;}
     editor.sent={text:this.text.value.trim(),body};editor.busy=true;this.error.textContent='';this.savedStatus.textContent=t('journal.saving');this.controls();
     try{
       const reply=await editor.session.request('/day-notes/'+editor.date,{method:'PUT',etag:editor.etag,body:editor.sent});
@@ -208,6 +212,6 @@ export class TrackDayNotes {
       if(this.editor!==editor||editor.session!==this.session)return;
       if(error.status===401){this.callbacks.onUnauthorized(error);return;}
       editor.uncertain=error.uncertain;editor.stale=error.status===412;this.error.textContent=error.uncertain?t('day_notes.uncertain'):error.message;this.savedStatus.textContent=t('journal.unsaved');
-    }finally{if(this.editor===editor){editor.busy=false;this.controls();}}
+    }finally{if(this.editor===editor){editor.busy=false;this.controls();if(this.error.textContent)this.error.scrollIntoView({block:'nearest'});}}
   }
 }

@@ -39,4 +39,6 @@
 .journal-dialog textarea { font-family: var(--bs-font-monospace); resize: vertical; }
 .journal-recovery { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .5rem; }
 .journal-dialog details pre { max-height: 10rem; overflow: auto; }
-.journal-dialog .dialog-actions { position: sticky; bottom: -.75rem; background: var(--bs-body-bg); padding-block: .75rem; margin-bottom: -.5rem; }
+.journal-dialog .dialog-actions { position: sticky; bottom: -.75rem; flex-wrap: wrap; background: var(--bs-body-bg); padding-block: .75rem; margin-bottom: -.5rem; }
+.journal-dialog .dialog-actions [role="status"] { margin-inline-end: auto; text-align: start; }
+@media(max-width: 480px) { .journal-dialog .dialog-actions [role="status"] { flex-basis: 100%; margin: 0; } }
