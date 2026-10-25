@@ -1009,5 +1009,6 @@
   "journal.discard": "Discard the unsaved day label and note changes?",
   "journal.reload_confirm": "Replace this draft with the saved note? Download Markdown first to keep the current body.",
   "journal.review_saved": "The saved note differs from this draft. Download your draft before reloading the saved note.",
-  "journal.too_large": "Keep the note body within 200,000 UTF-8 bytes, including frontmatter."
+  "journal.too_large": "Keep the note body within 200,000 UTF-8 bytes, including frontmatter.",
+  "journal.help": "Editing help"
 }

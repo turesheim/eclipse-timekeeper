@@ -1009,5 +1009,6 @@
   "journal.discard": "Forkast de ulagrede endringene i dagsetiketten og notatet?",
   "journal.reload_confirm": "Erstatt utkastet med det lagrede notatet? Last ned Markdown først for å beholde notatteksten.",
   "journal.review_saved": "Det lagrede notatet er forskjellig fra utkastet. Last ned utkastet før du laster inn det lagrede notatet.",
-  "journal.too_large": "Notatteksten, inkludert frontmatter, kan være maksimalt 200 000 UTF-8-byte."
+  "journal.too_large": "Notatteksten, inkludert frontmatter, kan være maksimalt 200 000 UTF-8-byte.",
+  "journal.help": "Hjelp til redigering"
 }

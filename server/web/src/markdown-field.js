@@ -21,6 +21,7 @@ export class MarkdownField {
     this.formatted=button(t('markdown.formatted'));this.source=button(t('markdown.source'));this.modes.append(this.formatted,this.source);
     this.status=node('p','','hint');this.status.setAttribute('role','status');
     this.help=node('p',t('markdown.help'),'hint');this.help.id='journal-markdown-help';
+    this.helpDetails=node('details',undefined,'markdown-help');this.helpDetails.append(node('summary',t('journal.help')),node('p',t('markdown.normalization'),'hint'),this.help);
     this.metadata=node('details');this.metadata.hidden=true;this.frontmatterView=node('pre');this.metadata.append(node('summary',t('markdown.metadata')),this.frontmatterView);
     this.tools=node('div',undefined,'markdown-tools');this.tools.setAttribute('role','group');this.tools.setAttribute('aria-label',t('markdown.formatting'));
     for(const name of ['heading','bold','italic','list','quote','table','undo','redo']){
@@ -31,7 +32,7 @@ export class MarkdownField {
     this.plain=node('div',undefined,'journal-source');const label=node('label',t('markdown.body'),'form-label');label.htmlFor='journal-body';
     this.text=node('textarea',undefined,'form-control');this.text.id='journal-body';this.text.rows=14;this.text.spellcheck=false;this.text.setAttribute('aria-describedby',this.help.id);this.plain.append(label,this.text);
     this.formatted.setAttribute('aria-controls',this.rich.id);this.source.setAttribute('aria-controls',this.text.id);
-    root.append(this.metadata,this.modes,this.status,this.help,this.tools,this.rich,this.plain);
+    root.append(this.metadata,this.modes,this.status,this.helpDetails,this.tools,this.rich,this.plain);
     this.source.addEventListener('click',()=>void this.showSource());this.formatted.addEventListener('click',()=>void this.showFormatted());
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();});this.clear();
   }
@@ -42,6 +43,7 @@ export class MarkdownField {
   controls(){
     this.text.readOnly=this.readOnly||this.loading;
     for(const action of this.tools.children)action.disabled=this.readOnly||this.loading;
+    this.tools.hidden=this.rich.hidden||this.readOnly;
     this.formatted.disabled=this.loading;this.source.disabled=this.loading;this.onState?.();
   }
   mode(formatted){
@@ -77,7 +79,7 @@ export class MarkdownField {
       if(current!==this.generation){await created?.destroy();return;}
       this.editor=created;
       if(!created){this.rich.replaceChildren();this.status.textContent=t('markdown.source_only');return;}
-      this.mode(true);this.status.textContent=t('markdown.normalization');if(focus)created.focus();
+      this.mode(true);this.status.textContent='';if(focus)created.focus();
     }catch{if(current===this.generation){this.rich.replaceChildren();this.mode(false);this.status.textContent=t('markdown.failed');}}
     finally{if(current===this.generation){this.loading=false;this.controls();}}
   }

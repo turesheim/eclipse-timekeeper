@@ -214,7 +214,7 @@ test('journal saves formatted bodies independently from labels and updates separ
     await save(page,'Planning');await expect(note(page).locator('.badge')).toHaveText('Planning');await expect(note(page).locator('.bi-journal-text')).toBeVisible();
     const first=await(await api('GET','/day-notes/2026-05-17')).json();expect(first.body).toContain('**Daily body**');
     await page.mouse.move(0,0);await page.locator('#track-month').focus();await expect(note(page)).toHaveCSS('opacity','1');expect(await note(page).locator('.badge .bi-journal-text').count()).toBe(0);
-    await menu(page);await expect(rich.locator('strong')).toHaveText('Daily body');await save(page,'');await expect(note(page).locator('.badge')).toHaveCount(0);await expect(note(page).locator('.bi-journal-text')).toBeVisible();
+    await menu(page);await expect(rich.locator('strong')).toHaveText('Daily body');await captureScreenshot(page,{path:'test-results/day-notes-editor.png'});await save(page,'');await expect(note(page).locator('.badge')).toHaveCount(0);await expect(note(page).locator('.bi-journal-text')).toBeVisible();
     expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe(first.body);
     await menu(page);await dialog(page).getByRole('button',{name:'Clear note body',exact:true}).click();await save(page,'');await expect(note(page)).toHaveClass(/is-empty/);await expect(note(page).locator('.bi-journal-plus')).toHaveCount(1);
     await menu(page);await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('# Body on an empty day\n\n- [ ] Follow up\n');await save(page,'Label stays');
@@ -308,7 +308,7 @@ test('journal clears a private source before a delayed editor bundle can finish 
 test('journal controls use the account language and reject oversized UTF-8 drafts without losing them',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage();
   try{
-    await signIn(page,await fresh(request));const api=await apiFor(page),profile=await api('GET','/me');await api('PUT','/me',{locale:'nb'},{'If-Match':profile.headers().etag});await page.reload();await expect(page.locator('#workspace')).toBeVisible();await page.locator('#track-month').fill('2026-05');await expect(note(page)).toBeEnabled();await note(page).click();
+    await signIn(page,await fresh(request));const api=await apiFor(page),profile=await api('GET','/me');await api('PUT','/me',{zoneId:(await profile.json()).zoneId,locale:'nb-NO'},{'If-Match':profile.headers().etag});await page.reload();await expect(page.locator('#workspace')).toBeVisible();await page.locator('#track-month').fill('2026-05');await expect(note(page)).toBeEnabled();await note(page).click();
     await expect(page.locator('#journal-formatted .ProseMirror')).toBeVisible();await expect(dialog(page).getByRole('button',{name:'Tøm notatteksten',exact:true})).toBeVisible();await expect(dialog(page).getByRole('button',{name:'Last ned Markdown',exact:true})).toBeVisible();
     await dialog(page).getByRole('button',{name:'Markdown-kilde',exact:true}).click();const value='ø'.repeat(100001);await page.locator('#journal-body').fill(value);await dialog(page).getByRole('button',{name:'Lagre',exact:true}).click();await expect(dialog(page).getByRole('alert')).toContainText('200 000');await expect(page.locator('#journal-body')).toHaveValue(value);
     const saved=await api('GET','/day-notes/2026-05-17');expect((await saved.json()).version).toBe(0);

@@ -131,14 +131,33 @@ long press, preserving scrolling and month swipes.
 Labels accept up to 80 characters. The API independently stores a Markdown body
 (up to 200,000 UTF-8 bytes), with a lightweight body-presence marker in calendar
 summaries. Label-only edits preserve that body, and clearing a label leaves a
-body-only note discoverable. The full formatted editor is a separate integration.
+body-only note discoverable. The expanded day-note dialog edits the short label
+and Markdown body independently. **Formatted** provides headings, bold, italic,
+lists, quotations, tables, task checkboxes and undo/redo. **Markdown source**
+retains unsupported syntax, including Obsidian extensions. Opaque YAML
+frontmatter is shown separately and preserved in saves and downloads. Formatting
+normalization and keyboard guidance are available under **Editing help**.
+The [layout evaluation](JOURNAL-EDITOR.md) records why this keeps the existing
+Calendar navigation rather than introducing a separate Journal tab.
 Clear the text and save to remove a label;
 Cancel leaves the saved note unchanged. Each note belongs to its calendar date
 and account, including days without work. It follows the account across web
 sessions and devices, and remains on the same date after time-zone changes.
 Narrow screens wrap the label when needed. Day notes never affect timed work,
-reports or the Eclipse UI. Read-only sessions can see saved labels. Concurrent
-edits retain the draft for review rather than overwriting a newer note.
+reports or the Eclipse UI. A separate `journal-text` icon is always visible for
+populated bodies, including body-only notes; `journal-plus` offers creation when
+there is no body. Clearing only the label retains the body indicator; clearing
+the body retains an existing badge. Empty-day add actions keep the existing
+hover/keyboard/long-press behavior. Read-only sessions can open saved bodies,
+switch modes and download Markdown; editing and task toggles remain disabled.
+
+Dirty dismissal asks before discarding either field. Failed saves keep the
+draft. A stale version disables Save and offers **Download Markdown** and
+**Reload saved note**, with confirmation before replacing the draft. An
+unconfirmed write offers **Check saved result**: it reads the server and accepts
+a matching saved value without issuing another write. A differing saved value
+requires explicit reload/review. No source or draft is stored in browser storage,
+and logout clears both editor modes and their private content.
 
 ![Day notes beside dates and holidays](../assets/screenshots/day-notes-desktop.png)
 

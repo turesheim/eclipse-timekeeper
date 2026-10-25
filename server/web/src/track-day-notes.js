@@ -18,12 +18,13 @@ export class TrackDayNotes {
     const hint=node('p',t('day_notes.hint'),'hint');hint.id='track-note-hint';this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');
     this.savedStatus=node('p','','hint');this.savedStatus.setAttribute('role','status');
     const markdown=node('div');this.markdown=new MarkdownField(markdown,()=>this.changed(),()=>this.controls());
+    this.markdown.helpDetails.append(hint);
     this.clearBody=button(t('journal.clear_body'),'btn btn-outline-secondary');this.clearBody.addEventListener('click',()=>{if(!this.markdown.readOnly){this.markdown.setValue('');this.changed();void this.markdown.showFormatted();}});
     this.download=button(t('markdown.download'),'btn btn-outline-secondary');this.download.addEventListener('click',()=>this.downloadDraft());
     this.reload=button(t('journal.reload'),'btn btn-outline-secondary');this.reload.addEventListener('click',()=>void this.reloadEditor());
     const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.cancel,this.save);
     const recovery=node('div',undefined,'journal-recovery');recovery.append(this.clearBody,this.download,this.reload);
-    this.form.append(this.title,label,this.text,hint,markdown,this.savedStatus,this.error,recovery,actions);this.dialog.append(this.form);root.append(this.dialog);
+    this.form.append(this.title,label,this.text,markdown,this.savedStatus,this.error,recovery,actions);this.dialog.append(this.form);root.append(this.dialog);
     this.text.addEventListener('input',()=>this.changed());
     this.cancel.addEventListener('click',()=>this.requestClose());
     // Focus returns before the native close event is delivered. Release editor

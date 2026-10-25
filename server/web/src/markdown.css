@@ -24,7 +24,12 @@
 
 .journal-dialog { width: min(68rem, calc(100vw - 1rem)); max-height: 94dvh; padding: clamp(.75rem, 2vw, 1.5rem); }
 .journal-dialog form { display: flex; flex-direction: column; gap: .25rem; }
-.journal-dialog h2 { font-size: 1.3rem; }
+.journal-dialog h2 { font-size: 1.3rem; margin-bottom: .5rem; }
+.journal-dialog label.form-label { margin: .25rem 0 0; }
+.journal-dialog .markdown-modes { gap: .3rem; }
+.journal-dialog .markdown-modes button { padding-inline: .5rem; font-size: .9rem; }
+.markdown-editor > p:empty { display: none; }
+.markdown-help { margin-bottom: .5rem; }
 .journal-dialog #track-note-text { max-width: 36rem; }
 .journal-dialog .hint { margin-bottom: .25rem; }
 .journal-dialog .markdown-tools { flex-wrap: nowrap; overflow-x: auto; padding: .2rem; }
