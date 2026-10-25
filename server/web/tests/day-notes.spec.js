@@ -96,6 +96,24 @@ test('day notes can be added from the day menu, edited, canceled and removed wit
   }finally{await owner.close();}
 });
 
+test('Escape immediately releases the day-note editor before its queued close event',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage();
+  try{
+    // Native dialog focus restoration precedes the queued close event. Hold that
+    // event to exercise keyboard input during this real lifecycle boundary.
+    await page.addInitScript(()=>{
+      window.holdDayNoteClose=true;
+      document.addEventListener('close',event=>{if(window.holdDayNoteClose&&event.target.id==='track-note-editor')event.stopImmediatePropagation();},true);
+    });
+    await signIn(page,await fresh(request));await month(page);await menu(page);await page.locator('#track-note-text').fill('Canceled draft');
+    await page.keyboard.press('Escape');await expect(dialog(page)).toBeHidden();await expect(note(page)).toBeFocused();
+    await page.keyboard.press('Shift+F10');await expect(page.getByRole('menuitem')).toHaveText('Add day note');
+    await page.getByRole('menuitem').click();await expect(dialog(page)).toBeVisible();await expect(page.locator('#track-note-text')).toHaveValue('');
+    await page.evaluate(()=>{window.holdDayNoteClose=false;document.getElementById('track-note-editor').dispatchEvent(new Event('close'));});
+    await expect(page.locator('#track-note-text')).toBeFocused();await expect(dialog(page)).toBeVisible();
+  }finally{await owner.close();}
+});
+
 test('day notes keep a stale draft and require review after an unconfirmed save',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage();
   try{

@@ -1,0 +1,23 @@
+.markdown-lab-page main { max-width: 60rem; padding-bottom: 2rem; }
+.markdown-lab-page #day-label { max-width: 32rem; }
+.markdown-file-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin-block: 1rem; }
+.markdown-file-actions input { width: min(100%, 22rem); }
+.markdown-modes, .markdown-tools { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
+.markdown-modes [aria-pressed="true"] { font-weight: 750; border: 2px solid currentColor; }
+.markdown-lab-page pre, .markdown-lab-page textarea { tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
+.markdown-lab-page textarea { font-family: var(--bs-font-monospace); min-height: 24rem; }
+.markdown-lab-page #markdown-formatted { border: 1px solid var(--bs-border-color); border-radius: .5rem; background: var(--bs-body-bg); color: var(--bs-body-color); }
+.markdown-lab-page .ProseMirror { padding: 1rem; min-height: 24rem; overflow-x: auto; overflow-wrap: anywhere; }
+.markdown-lab-page .ProseMirror:focus-visible { outline: 2px solid var(--bs-primary); outline-offset: 2px; }
+.markdown-lab-page .ProseMirror :is(h1,h2,h3,h4,h5,h6) { margin-block: 1rem .5rem; }
+.markdown-lab-page .ProseMirror h1 { font-size: 1.7rem; }
+.markdown-lab-page .ProseMirror h2 { font-size: 1.4rem; }
+.markdown-lab-page .ProseMirror h3 { font-size: 1.2rem; }
+.markdown-lab-page .ProseMirror blockquote { border-inline-start: .25rem solid var(--bs-primary); padding-inline-start: 1rem; }
+.markdown-lab-page .ProseMirror pre { padding: 1rem; background: var(--bs-tertiary-bg); border-radius: .25rem; }
+.markdown-lab-page .ProseMirror table { width: 100%; }
+.markdown-lab-page .ProseMirror :is(th,td) { border: 1px solid var(--bs-border-color); padding: .5rem; }
+.markdown-lab-page .ProseMirror li[data-task="true"] { display: flex; align-items: baseline; gap: .75rem; list-style: none; }
+.markdown-lab-page .ProseMirror li > div { min-width: 0; }
+.markdown-lab-page .ProseMirror input[type="checkbox"] { min-width: 1.25rem; min-height: 1.25rem; accent-color: var(--bs-primary); }
+.markdown-lab-page #markdown-status { min-height: 1.5em; }

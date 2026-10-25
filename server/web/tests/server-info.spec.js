@@ -33,17 +33,19 @@ test('About identifies the project and bundled libraries with complete local lic
   await expect(page.locator('#server-version')).toHaveText(server.version);
   await page.locator('#about-notices summary').click();
   const manifest=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
-  for(const [name,pkg] of [['Bootstrap','bootstrap'],['Bootstrap Icons','bootstrap-icons'],['i18next','i18next'],['date-holidays','date-holidays']]) {
+  for(const [name,pkg,directory=pkg] of [['Milkdown','@milkdown/kit','milkdown'],['Bootstrap','bootstrap'],['Bootstrap Icons','bootstrap-icons'],['i18next','i18next'],['date-holidays','date-holidays']]) {
     const row=page.locator('#about-components li').filter({has:page.getByRole('link',{name,exact:true})});
     await expect(row).toContainText(manifest.devDependencies[pkg]);await expect(row).toContainText('Copyright');
     const response=await request.get(await row.getByRole('link',{name:new RegExp('^'+name+' license:','i')}).getAttribute('href'));
     expect(response.status()).toBe(200);expect(response.headers()['content-type']).toMatch(/^text\/plain/);
-    expect(await response.text()).toBe(await readFile(new URL('../src/assets/'+pkg+'/LICENSE',import.meta.url),'utf8'));
+    expect(await response.text()).toBe(await readFile(new URL('../src/assets/'+directory+'/LICENSE',import.meta.url),'utf8'));
   }
   const projectLicense=await request.get(await dialog.getByRole('link',{name:'Eclipse Public License 2.0',exact:true}).getAttribute('href'));
   expect(projectLicense.status()).toBe(200);expect(await projectLicense.text()).toBe(await readFile(new URL('../../../LICENSE',import.meta.url),'utf8'));
-  const dependencies=await request.get(await dialog.getByRole('link',{name:'Dependency licenses and notices',exact:true}).getAttribute('href'));
-  expect(dependencies.status()).toBe(200);expect(await dependencies.text()).toContain('MIT');
+  for(const link of await dialog.getByRole('link',{name:'Dependency licenses and notices',exact:true}).all()){
+    const dependencies=await request.get(await link.getAttribute('href'));
+    expect(dependencies.status()).toBe(200);expect(await dependencies.text()).toContain('MIT');
+  }
   for(const link of await dialog.locator('a').all()) {await expect(link).toHaveAttribute('target','_blank');await expect(link).toHaveAttribute('rel','noopener noreferrer');}
   expect(outside).toEqual([]);
   await page.setViewportSize({width:1440,height:1400});await captureScreenshot(page,{path:'test-results/about-references-desktop.png',fullPage:true});

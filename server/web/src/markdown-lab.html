@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="markdown.title">Markdown editor prototype · Timekeeper</title>
+  <script src="./theme.js"></script><link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./assets/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./themes.css"><link rel="stylesheet" href="./markdown.css">
+  <script type="module" src="./bootstrap.js" data-timekeeper-entry="/web/markdown-lab.js"></script>
+</head><body class="markdown-lab-page">
+  <a class="skip-link" href="#main-content" data-i18n="ui.skip_to_main_content">Skip to main content</a>
+  <header class="app-header"><a class="brand" href="./">Timekeeper <small>2.0</small></a></header>
+  <main id="main-content" tabindex="-1">
+    <h1 data-i18n="markdown.heading">Markdown editor prototype</h1>
+    <p class="hint" data-i18n="markdown.prototype">Try formatted daily notes here. This prototype keeps drafts in this tab only and does not save calendar data. Download Markdown before leaving to keep your work.</p>
+    <label class="form-label" for="day-label" data-i18n="markdown.day_label">Day label (separate from the note)</label><input id="day-label" class="form-control" maxlength="80" autocomplete="off">
+    <div class="markdown-file-actions">
+      <label class="form-label" for="markdown-file" data-i18n="markdown.import">Open a Markdown file</label><input id="markdown-file" class="form-control" type="file" accept=".md,.markdown,text/markdown,text/plain">
+      <button id="markdown-download" class="btn btn-outline-secondary" type="button" data-i18n="markdown.download">Download Markdown</button>
+    </div>
+    <details id="markdown-metadata" hidden><summary data-i18n="markdown.metadata">YAML frontmatter (preserved separately)</summary><pre id="markdown-frontmatter"></pre></details>
+    <div class="markdown-modes" role="group" aria-label="Editing mode" data-i18n-aria-label="markdown.mode">
+      <button id="markdown-rich" class="btn btn-outline-secondary" type="button" aria-pressed="false" aria-controls="markdown-formatted" data-i18n="markdown.formatted">Formatted</button>
+      <button id="markdown-source" class="btn btn-outline-secondary" type="button" aria-pressed="true" aria-controls="markdown-body" data-i18n="markdown.source">Markdown source</button>
+    </div>
+    <p id="markdown-status" role="status" aria-live="polite"></p>
+    <p id="markdown-help" class="hint" data-i18n="markdown.help">Use Markdown syntax or the formatting buttons. Escape leaves the formatted editor; Tab moves between controls. In a table, Tab moves between cells. Source mode preserves unsupported syntax.</p>
+    <div id="markdown-toolbar" class="markdown-tools" role="group" aria-label="Formatting" data-i18n-aria-label="markdown.formatting" hidden></div>
+    <div id="markdown-formatted" hidden></div>
+    <div id="markdown-source-panel"><label class="form-label" for="markdown-body" data-i18n="markdown.body">Note body</label><textarea id="markdown-body" class="form-control" rows="18" aria-describedby="markdown-help" spellcheck="false"></textarea></div>
+  </main>
+</body></html>

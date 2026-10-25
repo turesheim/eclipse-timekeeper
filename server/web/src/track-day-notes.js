@@ -18,7 +18,9 @@ export class TrackDayNotes {
     const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.cancel,this.save);
     this.form.append(this.title,label,this.text,hint,this.error,actions);this.dialog.append(this.form);root.append(this.dialog);
     this.cancel.addEventListener('click',()=>{if(!this.editor?.busy)this.closeEditor();});
-    this.dialog.addEventListener('cancel',event=>{if(this.editor?.busy)event.preventDefault();});
+    // Focus returns before the native close event is delivered. Release editor
+    // state synchronously so the next keyboard action can open the day menu.
+    this.dialog.addEventListener('cancel',event=>{event.preventDefault();if(!this.editor?.busy)this.closeEditor();});
     this.dialog.addEventListener('close',()=>this.finishEditor());
     this.form.addEventListener('submit',event=>{event.preventDefault();void this.commit();});
     this.buildMenu();

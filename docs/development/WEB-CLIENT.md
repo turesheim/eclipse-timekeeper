@@ -99,6 +99,14 @@ bar and page content clear of each other. Standard action buttons use Bootstrap
 clickable sync indicator sits immediately beside the Timekeeper title in the
 header, remains available in My Account and is hidden when signed out.
 
+## Daily-note Markdown prototype
+
+About links to a local, lazy-loaded Milkdown editor prototype with formatted and
+source modes, separate day labels, protected YAML frontmatter and source-only
+editing for unsupported Obsidian syntax. It does not save calendar notes. See
+the [evaluation and preservation contract](MARKDOWN-EDITOR.md) for the editor
+choice, dependency licenses, bundle measurements, tests and integration limits.
+
 ## Calendar month view
 
 **Calendar** is the default workspace tab. Its Monday-to-Sunday month grid shows
