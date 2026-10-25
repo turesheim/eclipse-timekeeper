@@ -13,14 +13,14 @@ test.beforeAll(async({request})=>{
 async function fresh(request,provision=true){
   const username='journal-'+randomUUID().slice(0,8),password='Independent journal password';
   const reply=await request.post('/api/v1/admin/users',{headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`},data:{username,password,displayName:username,email:username+'@example.invalid',administrator:false}});expect(reply.status()).toBe(201);
-  const account=await reply.json();let transport=null;
+  const {user:account}=await reply.json();let transport=null;
   if(provision){expect(fixture()).toBeTruthy();const binding=await request.post(fixture()+'/accounts',{data:{ownerId:account.ownerId}});expect(binding.status()).toBe(201);transport=await binding.json();}
   return {username,password,transport};
 }
 async function signIn(page,user){await page.goto('/web/');await page.locator('#auth-mode').selectOption('login');await page.locator('#username').fill(user.username);await page.locator('#password').fill(user.password);await page.locator('#login-form button[type=submit]').click();await expect(page.locator('#workspace')).toBeVisible();await page.evaluate(()=>location.hash='#account/journal');await expect(page.getByRole('heading',{name:'Journal',exact:true})).toBeVisible();}
 const settings=page=>page.locator('.account-card').filter({has:page.getByRole('heading',{name:'Synchronization settings',exact:true})});
 const enroll=page=>page.locator('.account-card').filter({has:page.getByRole('heading',{name:'Register or rotate a device key',exact:true})});
-function key(){const der=generateKeyPairSync('ed25519').publicKey.export({type:'spki',format:'der'});return 'ssh-ed25519 '+Buffer.concat([Buffer.from('0000000b7373682d6564323535313900000020','hex'),der.subarray(-32)]).toString('base64');}
+function key(){const der=generateKeyPairSync('ed25519').publicKey.export({type:'spki',format:'der'});return 'ssh-ed25519 '+Buffer.concat([Buffer.from('0000000b7373682d6564323535313900000020','hex'),der.subarray(-32)]).toString('base64')+' timekeeper-journal';}
 
 test('journal synchronization account setup enrolls public keys, downloads actual endpoint profiles and revokes them',async({browser,request})=>{
   const context=await browser.newContext({baseURL:base(),ignoreHTTPSErrors:true,locale:'en-GB'}),page=await context.newPage();
@@ -54,7 +54,7 @@ test('journal synchronization reports missing prerequisites and keeps credential
   try{
     const user=await fresh(request,false);await signIn(page,user);await expect(page.getByText('Ask the operator to bind a restricted SSH identity and private incoming directory to this account.')).toBeVisible();await expect(enroll(page).getByRole('button',{name:'Register public key'})).toBeDisabled();
     await request.post(fixture()+'/accounts',{data:{ownerId:(await(await browserRequest(page).get('/api/v1/auth/session')).json()).ownerId}});await page.getByRole('button',{name:'Refresh status',exact:true}).click();await expect(enroll(page).getByRole('button',{name:'Register public key'})).toBeEnabled();
-    await enroll(page).getByLabel('Device name').fill('Draft laptop');page.once('dialog',d=>d.dismiss());await page.locator('#account-navigation').getByRole('link',{name:'Profile',exact:true}).click();await expect(page.getByRole('heading',{name:'Journal',exact:true})).toBeVisible();await expect(enroll(page).getByLabel('Device name')).toHaveValue('Draft laptop');
-    page.once('dialog',d=>d.accept());await page.locator('#account-navigation').getByRole('link',{name:'Profile',exact:true}).click();await expect(page.getByRole('heading',{name:'Journal',exact:true})).not.toBeVisible();
+    await enroll(page).getByLabel('Device name').fill('Draft laptop');let pending=page.waitForEvent('dialog'),click=page.locator('#account-navigation').getByRole('link',{name:'Profile',exact:true}).click();await(await pending).dismiss();await click;await expect(page).toHaveURL(/#account\/journal$/);await expect(enroll(page).getByLabel('Device name')).toHaveValue('Draft laptop');
+    pending=page.waitForEvent('dialog');click=page.locator('#account-navigation').getByRole('link',{name:'Profile',exact:true}).click();await(await pending).accept();await click;await expect(page.getByRole('heading',{name:'Journal',exact:true})).not.toBeVisible();
   }finally{await context.close();}
 });

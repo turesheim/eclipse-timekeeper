@@ -32,7 +32,7 @@ export async function renderJournal(view,zone){
     await view.session.request('/journal/devices',{method:'POST',key:crypto.randomUUID(),body});if(!view.valid())return;
     view.clean(enrollment.value);label.value='';publicKey.value='';rotation.value='';enrollment.feedback.textContent=t('journal.sync.enrolled');await refresh();
   },{canSubmit:()=>data.canManage&&data.deployment.ready});
-  const label=field(enrollment.value,t('journal.sync.device_label'),'',{maxLength:80}),rotation=field(enrollment.value,t('journal.sync.rotation'),'',{choices:[['',t('journal.sync.new_device')]]});
+  const label=field(enrollment.value,t('journal.sync.device_label'),'',{maxLength:80}),rotation=field(enrollment.value,t('journal.sync.rotation'),'',{required:false,choices:[['',t('journal.sync.new_device')]]});
   const publicLabel=node('label',t('journal.sync.public_key'),'form-label'),publicKey=node('textarea');publicKey.className='form-control';publicKey.id='journal-public-key';publicKey.maxLength=4096;publicKey.required=true;publicKey.rows=3;publicKey.spellcheck=false;publicLabel.htmlFor=publicKey.id;
   publicKey.addEventListener('input',()=>{if(/PRIVATE KEY/.test(publicKey.value)){publicKey.value='';enrollment.feedback.textContent=t('journal.sync.public_only');}});
   enrollment.value.append(publicLabel,publicKey,node('p',t('journal.sync.rotation_help'),'hint'));const enrollPassword=secret(enrollment.value);enrollment.finish();
