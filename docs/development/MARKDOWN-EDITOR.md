@@ -46,8 +46,11 @@ not a claim about the server's HTTP compression configuration.
 | Default Crepe 7.22.3 | 2,781,408 / 925,123 | 78,756 / 11,767 | 60 KaTeX fonts, 1,076,572 bytes | More features than daily notes need |
 | CodeMirror source baseline | 506,628 / 175,030 | Runtime-generated | None | Does not include custom live preview |
 
-The chosen bundle's exact current measurements are generated in
-`server/web/src/assets/milkdown/sizes.json`. Add `markdown.css` for Timekeeper's
+The chosen bundle's exact uncompressed sizes are generated in
+`server/web/src/assets/milkdown/sizes.json`. The generation log also reports gzip
+estimates; the table above used Node 26.12.1 and zlib 1.2.12. Gzip sizes can vary
+with zlib, so those estimates are not part of the reproducibility check.
+Add `markdown.css` for Timekeeper's
 small application styles. Complete license texts add approximately 96 kB;
 those are static downloadable attribution, never part of the editor import.
 Changing editor code can change the figures; regenerate rather than editing

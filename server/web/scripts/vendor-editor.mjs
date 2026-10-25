@@ -31,7 +31,9 @@ for(const pkg of [...packages.values()].sort((a,b)=>a.name.localeCompare(b.name,
 const target=join(root,'src/assets/milkdown');
 files.push([join(target,'LICENSE'),await readFile(join(root,'node_modules/@milkdown/kit/LICENSE'))],[join(target,'THIRD-PARTY-LICENSES.txt'),notices],[join(target,'dependencies.json'),JSON.stringify(inventory,null,2)+'\n']);
 const sizes=result.outputFiles.map(file=>({file:file.path.split('/').at(-1),bytes:file.contents.length,gzipBytes:gzipSync(file.contents).length}));
-files.push([join(target,'sizes.json'),JSON.stringify(sizes,null,2)+'\n']);
+// Gzip estimates vary across zlib versions. Only deterministic raw sizes belong
+// in the checked artifact; retain the local gzip measurements in the build log.
+files.push([join(target,'sizes.json'),JSON.stringify(sizes.map(({file,bytes})=>({file,bytes})),null,2)+'\n']);
 for(const [path,content] of files){
   if(check){if(!Buffer.from(await readFile(path)).equals(Buffer.from(content)))throw new Error('Regenerate Markdown editor: '+path);}
   else{await mkdir(dirname(path),{recursive:true});await writeFile(path,content);}

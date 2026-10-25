@@ -1,12 +1,10 @@
 [
   {
     "file": "milkdown.js",
-    "bytes": 460840,
-    "gzipBytes": 141343
+    "bytes": 460840
   },
   {
     "file": "milkdown.css",
-    "bytes": 1561,
-    "gzipBytes": 618
+    "bytes": 1561
   }
 ]
