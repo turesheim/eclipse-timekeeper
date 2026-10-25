@@ -5,6 +5,7 @@ import {node,button,field,passwordField,section,form,table} from './account-ui.j
 /** Private account setup. Only public connection profiles and explicit original copies are downloaded. */
 export async function renderJournal(view,zone){
   let data=(await view.session.request('/journal')).data;if(!view.valid())return;
+  view.root.classList.add('journal-account');view.cleanup.add(()=>view.root.classList.remove('journal-account'));
   let generation=0,actionGeneration=0,actionForm=null,settingsTag=data.settings.etag;
   const urls=new Set(),secrets=new Set(),feedback=node('p','','form-feedback');feedback.setAttribute('role','status');
   const title=section(view,t('journal.sync.title')),health=node('div'),devices=node('div'),items=node('div'),actionHome=node('div');
@@ -12,7 +13,7 @@ export async function renderJournal(view,zone){
   const refreshButton=button(t('journal.sync.refresh'),()=>void view.run(refresh,{submit:refreshButton,feedback}));
   const rescan=button(t('journal.sync.rescan'),()=>void view.run(async()=>{await view.session.request('/journal/rescan',{method:'POST'});await refresh();},{submit:rescan,feedback,write:true,canSubmit:()=>data.deployment.ready&&data.settings.enabled}));
   title.append(refreshButton,rescan,feedback,health);
-  const setup=section(view,t('journal.sync.setup')),setupStatus=node('div'),connection=node('div');setup.append(setupStatus,connection);
+  const setupCard=section(view,t('journal.sync.setup')),setupStatus=node('div'),connection=node('div'),setup=node('details');setup.append(node('summary',t('journal.sync.setup_steps')));setupCard.append(setupStatus,connection,setup);
   setup.append(node('p',t('journal.sync.key_local')));
   command(setup,'ssh-keygen -t ed25519 -f ~/.ssh/timekeeper_journal -C timekeeper-journal');
   setup.append(node('p',t('journal.sync.key_permissions')));command(setup,'chmod 600 ~/.ssh/timekeeper_journal\nssh-add ~/.ssh/timekeeper_journal\ncat ~/.ssh/timekeeper_journal.pub');
@@ -43,6 +44,7 @@ export async function renderJournal(view,zone){
   function secret(target){const input=passwordField(target,t('ui.current_password'),true);input.maxLength=1024;input.disabled=!data.canManage;secrets.add(input);return input;}
   function takePassword(input){const value=input.value;input.value='';return value;}
   function command(target,text,copyKey='journal.sync.copy'){const pre=node('pre'),code=node('code',text);pre.className='journal-sync-command';pre.append(code);const copy=button(t(copyKey),()=>void view.run(async()=>{await navigator.clipboard.writeText(text);feedback.textContent=t('journal.sync.copied');},{submit:copy,feedback}));target.append(pre,copy);}
+  function facts(entries){const list=node('dl',undefined,'journal-sync-facts');for(const [label,value] of entries){const detail=node('dd');detail.append(value instanceof Node?value:document.createTextNode(value));list.append(node('dt',label),detail);}return list;}
   function download(blob,filename){if(!view.valid())return;const url=URL.createObjectURL(blob);urls.add(url);const anchor=node('a');anchor.href=url;anchor.download=filename;anchor.click();}
   async function refresh(){const current=++generation,reply=await view.session.request('/journal');if(!view.valid()||current!==generation)return;data=reply.data;if(!view.dirty.has(settings.value)){enabled.checked=data.settings.enabled;settingsTag=data.settings.etag;}paint();}
   function closeAction(){if(view.busy)return false;if(actionForm&&view.dirty.has(actionForm)&&!window.confirm(t('ui.discard_unsaved_account_changes')))return false;++actionGeneration;if(actionForm){view.clean(actionForm);for(const input of actionForm.querySelectorAll('input[type="password"]'))input.value='';}actionForm=null;actionHome.replaceChildren();return true;}
@@ -53,8 +55,8 @@ export async function renderJournal(view,zone){
     enabled.disabled=!data.canManage;settingsPassword.disabled=!data.canManage;enrollPassword.disabled=!data.canManage;
     setupStatus.replaceChildren(node('p',data.deployment.ready?t('journal.sync.ready'):errorText(data.deployment.code),data.deployment.ready?'hint':'alert alert-info'));
     if(!data.canManage)setupStatus.append(node('p',t('journal.sync.account_sign_in'),'alert alert-info'));
-    connection.replaceChildren();if(data.deployment.ready){const c=data.deployment;connection.append(table([t('journal.sync.connection'),t('journal.sync.value')],[[t('journal.sync.host'),c.hostname+':'+c.port],[t('journal.sync.user'),c.username],[t('journal.sync.remote'),c.remotePath],[t('journal.sync.fingerprint'),node('code',c.hostKeyFingerprint)]]),node('p',t('journal.sync.known_hosts')));command(connection,c.knownHostsEntry,'journal.sync.copy_host_key');}
-    const h=data.health;health.replaceChildren(table([t('journal.sync.status'),t('journal.sync.value')],[[t('journal.sync.last_transfer'),h.lastTransferAt?instantText(h.lastTransferAt,zone):t('journal.sync.never')],[t('journal.sync.last_import'),h.lastImportAt?instantText(h.lastImportAt,zone):t('journal.sync.never')],[t('journal.sync.pending'),String(h.pending)],[t('journal.sync.conflicts'),String(h.conflicts)],[t('journal.sync.errors'),String(h.errors)],[t('journal.sync.aborted'),String(h.aborted)],[t('journal.sync.receiving'),String(h.receiving)]]));
+    connection.replaceChildren();if(data.deployment.ready){const c=data.deployment;connection.append(facts([[t('journal.sync.host'),c.hostname+':'+c.port],[t('journal.sync.user'),c.username],[t('journal.sync.remote'),c.remotePath],[t('journal.sync.fingerprint'),node('code',c.hostKeyFingerprint)]]),node('p',t('journal.sync.known_hosts')));command(connection,c.knownHostsEntry,'journal.sync.copy_host_key');}
+    const h=data.health;health.replaceChildren(facts([[t('journal.sync.last_transfer'),h.lastTransferAt?instantText(h.lastTransferAt,zone):t('journal.sync.never')],[t('journal.sync.last_import'),h.lastImportAt?instantText(h.lastImportAt,zone):t('journal.sync.never')],[t('journal.sync.pending'),String(h.pending)],[t('journal.sync.conflicts'),String(h.conflicts)],[t('journal.sync.errors'),String(h.errors)],[t('journal.sync.aborted'),String(h.aborted)],[t('journal.sync.receiving'),String(h.receiving)]]));
     if(!view.dirty.has(enrollment.value)){rotation.replaceChildren();for(const [id,name] of [['',t('journal.sync.new_device')],...data.devices.filter(d=>!d.revoked).map(d=>[d.id,d.label])]){const option=node('option',name);option.value=id;rotation.append(option);}}
     const rows=data.devices.map(device=>{
       const actions=node('div',undefined,'token-actions'),profile=button(t('journal.sync.profile'),()=>void view.run(async()=>{const reply=await view.session.request(`/journal/devices/${device.id}/profile`);download(new Blob([JSON.stringify(reply.data,null,2)+'\n'],{type:'application/json'}),`timekeeper-journal-${device.id}.json`);},{submit:profile,feedback,canSubmit:()=>!device.revoked&&data.settings.enabled&&data.deployment.ready}));profile.disabled=device.revoked||!data.settings.enabled||!data.deployment.ready;

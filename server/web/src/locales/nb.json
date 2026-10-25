@@ -1139,5 +1139,6 @@
   "journal.sync.error.FILE_TOO_LARGE": "Hele filen overskrider 220 000 UTF-8-byte. Forkort originalen før overføring.",
   "journal.sync.error.FRONTMATTER_TOO_LARGE": "Frontmatter må være innenfor 20 000 UTF-8-byte inkludert markørene.",
   "journal.sync.error.BODY_TOO_LARGE": "Markdown-teksten overskrider 200 000 UTF-8-byte. Forkort originalen før overføring.",
-  "journal.sync.error.RATE_LIMITED": "For mange forsøk. Vent noen minutter før du prøver igjen."
+  "journal.sync.error.RATE_LIMITED": "For mange forsøk. Vent noen minutter før du prøver igjen.",
+  "journal.sync.setup_steps": "Lag nøkkel, sett opp lokalt og planlegg kjøringer"
 }
