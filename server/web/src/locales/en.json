@@ -905,7 +905,7 @@
   "holidays.none": "Do not show national holidays",
   "holidays.independent": "Choose the country whose national holidays you want to see. This is independent of language, regional formatting and time zone.",
   "day_notes.title": "Day note · {{date}}",
-  "day_notes.text": "Short text",
+  "day_notes.text": "Day label",
   "day_notes.hint": "Up to 80 characters, for example “Vacation” or “Time off”. Clear the text and save to remove the label.",
   "day_notes.loading": "Loading day notes…",
   "day_notes.unavailable": "Day notes could not be loaded. Recorded work is still available.",
@@ -998,5 +998,16 @@
   "markdown.imported": "Opened locally. Frontmatter stays separate; the day label is unchanged.",
   "markdown.downloaded": "Markdown download started. The separate day label is not part of the Markdown document.",
   "markdown.open": "Try the Markdown editor prototype",
-  "day_notes.body_present": "Markdown note"
+  "day_notes.body_present": "Markdown note",
+  "journal.clear_body": "Clear note body",
+  "journal.reload": "Reload saved note",
+  "journal.check_result": "Check saved result",
+  "journal.unsaved": "Unsaved changes",
+  "journal.saved": "Saved",
+  "journal.saving": "Saving…",
+  "journal.read_only": "Read-only journal. You can view and download this note.",
+  "journal.discard": "Discard the unsaved day label and note changes?",
+  "journal.reload_confirm": "Replace this draft with the saved note? Download Markdown first to keep the current body.",
+  "journal.review_saved": "The saved note differs from this draft. Download your draft before reloading the saved note.",
+  "journal.too_large": "Keep the note body within 200,000 UTF-8 bytes, including frontmatter."
 }

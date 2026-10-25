@@ -4,20 +4,34 @@
 .markdown-file-actions input { width: min(100%, 22rem); }
 .markdown-modes, .markdown-tools { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
 .markdown-modes [aria-pressed="true"] { font-weight: 750; border: 2px solid currentColor; }
-.markdown-lab-page pre, .markdown-lab-page textarea { tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
+:is(.markdown-lab-page,.markdown-editor) pre, :is(.markdown-lab-page,.markdown-editor) textarea { tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
 .markdown-lab-page textarea { font-family: var(--bs-font-monospace); min-height: 24rem; }
 .markdown-lab-page #markdown-formatted { border: 1px solid var(--bs-border-color); border-radius: .5rem; background: var(--bs-body-bg); color: var(--bs-body-color); }
-.markdown-lab-page .ProseMirror { padding: 1rem; min-height: 24rem; overflow-x: auto; overflow-wrap: anywhere; }
-.markdown-lab-page .ProseMirror:focus-visible { outline: 2px solid var(--bs-primary); outline-offset: 2px; }
-.markdown-lab-page .ProseMirror :is(h1,h2,h3,h4,h5,h6) { margin-block: 1rem .5rem; }
-.markdown-lab-page .ProseMirror h1 { font-size: 1.7rem; }
-.markdown-lab-page .ProseMirror h2 { font-size: 1.4rem; }
-.markdown-lab-page .ProseMirror h3 { font-size: 1.2rem; }
-.markdown-lab-page .ProseMirror blockquote { border-inline-start: .25rem solid var(--bs-primary); padding-inline-start: 1rem; }
-.markdown-lab-page .ProseMirror pre { padding: 1rem; background: var(--bs-tertiary-bg); border-radius: .25rem; }
-.markdown-lab-page .ProseMirror table { width: 100%; }
-.markdown-lab-page .ProseMirror :is(th,td) { border: 1px solid var(--bs-border-color); padding: .5rem; }
-.markdown-lab-page .ProseMirror li[data-task="true"] { display: flex; align-items: baseline; gap: .75rem; list-style: none; }
-.markdown-lab-page .ProseMirror li > div { min-width: 0; }
-.markdown-lab-page .ProseMirror input[type="checkbox"] { min-width: 1.25rem; min-height: 1.25rem; accent-color: var(--bs-primary); }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror { padding: 1rem; min-height: 24rem; overflow-x: auto; overflow-wrap: anywhere; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror:focus-visible { outline: 2px solid var(--bs-primary); outline-offset: 2px; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror :is(h1,h2,h3,h4,h5,h6) { margin-block: 1rem .5rem; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror h1 { font-size: 1.7rem; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror h2 { font-size: 1.4rem; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror h3 { font-size: 1.2rem; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror blockquote { border-inline-start: .25rem solid var(--bs-primary); padding-inline-start: 1rem; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror pre { padding: 1rem; background: var(--bs-tertiary-bg); border-radius: .25rem; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror table { width: 100%; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror :is(th,td) { border: 1px solid var(--bs-border-color); padding: .5rem; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror li[data-task="true"] { display: flex; align-items: baseline; gap: .75rem; list-style: none; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror li > div { min-width: 0; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror input[type="checkbox"] { min-width: 1.25rem; min-height: 1.25rem; accent-color: var(--bs-primary); }
 .markdown-lab-page #markdown-status { min-height: 1.5em; }
+
+.journal-dialog { width: min(68rem, calc(100vw - 1rem)); max-height: 94dvh; padding: clamp(.75rem, 2vw, 1.5rem); }
+.journal-dialog form { display: flex; flex-direction: column; gap: .25rem; }
+.journal-dialog h2 { font-size: 1.3rem; }
+.journal-dialog #track-note-text { max-width: 36rem; }
+.journal-dialog .hint { margin-bottom: .25rem; }
+.journal-dialog .markdown-tools { flex-wrap: nowrap; overflow-x: auto; padding: .2rem; }
+.journal-dialog .markdown-tools button { flex: none; min-height: 2.75rem; }
+.journal-dialog .journal-formatted { border: 1px solid var(--bs-border-color); border-radius: .5rem; background: var(--bs-body-bg); color: var(--bs-body-color); }
+.journal-dialog .ProseMirror, .journal-dialog textarea { min-height: clamp(16rem, 43dvh, 36rem); }
+.journal-dialog textarea { font-family: var(--bs-font-monospace); resize: vertical; }
+.journal-recovery { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .5rem; }
+.journal-dialog details pre { max-height: 10rem; overflow: auto; }
+.journal-dialog .dialog-actions { position: sticky; bottom: -.75rem; background: var(--bs-body-bg); padding-block: .75rem; margin-bottom: -.5rem; }

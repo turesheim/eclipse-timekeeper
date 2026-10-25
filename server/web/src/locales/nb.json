@@ -905,7 +905,7 @@
   "holidays.none": "Ikke vis nasjonale helligdager",
   "holidays.independent": "Velg landet du vil se nasjonale helligdager for. Dette valget er uavhengig av språk, regional formatering og tidssone.",
   "day_notes.title": "Dagsnotat · {{date}}",
-  "day_notes.text": "Kort tekst",
+  "day_notes.text": "Dagsetikett",
   "day_notes.hint": "Inntil 80 tegn, for eksempel «Ferie» eller «Avspasering». Tøm teksten og lagre for å fjerne etiketten.",
   "day_notes.loading": "Laster dagsnotater…",
   "day_notes.unavailable": "Dagsnotatene kunne ikke lastes. Registrert arbeid er fortsatt tilgjengelig.",
@@ -998,5 +998,16 @@
   "markdown.imported": "Åpnet lokalt. Frontmatter holdes separat, og dagsetiketten er uendret.",
   "markdown.downloaded": "Markdown-nedlasting startet. Den separate dagsetiketten er ikke en del av Markdown-dokumentet.",
   "markdown.open": "Prøv prototypen for Markdown-redigering",
-  "day_notes.body_present": "Markdown-notat"
+  "day_notes.body_present": "Markdown-notat",
+  "journal.clear_body": "Tøm notatteksten",
+  "journal.reload": "Last inn lagret notat",
+  "journal.check_result": "Kontroller lagringen",
+  "journal.unsaved": "Ulagrede endringer",
+  "journal.saved": "Lagret",
+  "journal.saving": "Lagrer…",
+  "journal.read_only": "Journalen er skrivebeskyttet. Du kan lese og laste ned dette notatet.",
+  "journal.discard": "Forkast de ulagrede endringene i dagsetiketten og notatet?",
+  "journal.reload_confirm": "Erstatt utkastet med det lagrede notatet? Last ned Markdown først for å beholde notatteksten.",
+  "journal.review_saved": "Det lagrede notatet er forskjellig fra utkastet. Last ned utkastet før du laster inn det lagrede notatet.",
+  "journal.too_large": "Notatteksten, inkludert frontmatter, kan være maksimalt 200 000 UTF-8-byte."
 }
