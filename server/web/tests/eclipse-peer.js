@@ -5,7 +5,7 @@ import {chromium, expect, request} from '@playwright/test';
 import {createInterface} from 'node:readline';
 import {writeFile} from 'node:fs/promises';
 import {durationText} from '../src/model.js';
-import {setTimeZone} from './navigation.js';
+import {setTimeZone,expandProjectClient} from './navigation.js';
 import {openTaskHistory,clearTaskHistory} from './task-history.js';
 
 const browser = await chromium.launch();
@@ -38,6 +38,10 @@ async function save(name = 'Save') {
 async function named(tabName, kind, name) {
   await tab(tabName); await page.getByRole('button', {name:'New ' + kind, exact:true}).click();
   await page.getByLabel('Name', {exact:true}).fill(name); await save();
+  if(kind==='project') {
+    const project=(await(await api('GET','/projects')).json()).items.find(value=>value.name===name);
+    await expandProjectClient(page,project.clientId);
+  }
   await expect(page.locator(`#${tabName.toLowerCase()} tr`).filter({hasText:name})).toBeVisible();
 }
 async function zone(value) {
@@ -138,7 +142,12 @@ async function command(input) {
       await clearTaskHistory(apiRequest);
       const taskRead=await api('GET','/tasks/'+record.taskId);await api('DELETE','/tasks/'+record.taskId,undefined,{'If-Match':taskRead.headers().etag});
       for (const [tabName, container, name] of [['Projects','projects',record.project], ['Labels','labels',record.label]]) {
-        await tab(tabName); await page.locator(`#${container} tr`).filter({hasText:name}).getByRole('button', {name:'Delete', exact:true}).click(); await save('Delete');
+        await tab(tabName);
+        if(container==='projects') {
+          const project=(await(await api('GET','/projects')).json()).items.find(value=>value.name===name);
+          await expandProjectClient(page,project.clientId);
+        }
+        await page.locator(`#${container} tr`).filter({hasText:name}).getByRole('button', {name:'Delete', exact:true}).click(); await save('Delete');
       }
       await zone(input.zone); break;
     default: throw new Error('Unknown browser peer action');
