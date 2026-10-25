@@ -27,8 +27,9 @@ and a protected minimal login shell. See [sshd](https://man.openbsd.org/sshd)
 and [ssh-keygen](https://man.openbsd.org/ssh-keygen). Merely choosing a destination
 directory or adding client filters is insufficient confinement.
 
-Unison is not offered for this delivery. Its two-replica reconciliation and
-private synchronization archives would introduce a second decision maker beside
+Unison is not offered for this delivery. Its [manual](https://github.com/bcpierce00/unison/blob/master/doc/unison-manual.tex)
+describes two-replica synchronization and separate archive files. That would
+introduce a second reconciliation authority beside
 the database importer. Forcing one direction would still require the same
 restricted server process, completed-batch protocol, account mapping, key
 enrollment and database conflict checks. It offers no benefit for this one-way
