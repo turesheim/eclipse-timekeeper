@@ -18,7 +18,9 @@ export async function renderJournal(view,zone){
   command(setup,'ssh-keygen -t ed25519 -f ~/.ssh/timekeeper_journal -C timekeeper-journal');
   setup.append(node('p',t('journal.sync.key_permissions')));command(setup,'chmod 600 ~/.ssh/timekeeper_journal\nssh-add ~/.ssh/timekeeper_journal\ncat ~/.ssh/timekeeper_journal.pub');
   setup.append(node('p',t('journal.sync.naming')),node('p',t('journal.sync.tools')),node('p',t('journal.sync.install')));
-  const runner=node('a',t('journal.sync.runner'),'btn btn-outline-secondary');runner.href='/web/journal-client.py';runner.download='timekeeper-journal.py';setup.append(runner,node('p',t('journal.sync.configure')),node('p',t('journal.sync.pin')),node('p',t('journal.sync.schedule')),node('p',t('journal.sync.storage'),'hint'));
+  const runner=node('a',t('journal.sync.runner'),'btn btn-outline-secondary');runner.href='/web/journal-client.py';runner.download='timekeeper-journal.py';
+  const clientCommands=node('div'),guide=node('a',t('journal.sync.guide'));guide.href='https://github.com/turesheim/eclipse-timekeeper/blob/main/docs/operations/JOURNAL-SYNC.md';guide.target='_blank';guide.rel='noopener noreferrer';
+  setup.append(runner,node('p',t('journal.sync.configure')),node('p',t('journal.sync.pin')),clientCommands,node('p',t('journal.sync.schedule')),guide,node('p',t('journal.sync.storage'),'hint'));
   let enabled;
   const settings=form(view,t('journal.sync.settings'),t('journal.sync.save_settings'),async()=>{
     const currentPassword=takePassword(settingsPassword);
@@ -56,6 +58,7 @@ export async function renderJournal(view,zone){
     setupStatus.replaceChildren(node('p',data.deployment.ready?t('journal.sync.ready'):errorText(data.deployment.code),data.deployment.ready?'hint':'alert alert-info'));
     if(!data.canManage)setupStatus.append(node('p',t('journal.sync.account_sign_in'),'alert alert-info'));
     connection.replaceChildren();if(data.deployment.ready){const c=data.deployment;connection.append(facts([[t('journal.sync.host'),c.hostname+':'+c.port],[t('journal.sync.user'),c.username],[t('journal.sync.remote'),c.remotePath],[t('journal.sync.fingerprint'),node('code',c.hostKeyFingerprint)]]),node('p',t('journal.sync.known_hosts')));command(connection,c.knownHostsEntry,'journal.sync.copy_host_key');}
+    clientCommands.replaceChildren();if(data.deployment.ready){const prefix='python3 timekeeper-journal.py ';command(clientCommands,prefix+'configure --profile profile.json\n'+prefix+'trust --profile profile.json --fingerprint '+"'"+data.deployment.hostKeyFingerprint+"'"+'\n'+prefix+'verify --profile profile.json\n'+prefix+'sync --profile profile.json\n'+prefix+'schedule --profile profile.json');}
     const h=data.health;health.replaceChildren(facts([[t('journal.sync.last_verified'),h.lastVerifiedAt?instantText(h.lastVerifiedAt,zone):t('journal.sync.never')],[t('journal.sync.last_transfer'),h.lastTransferAt?instantText(h.lastTransferAt,zone):t('journal.sync.never')],[t('journal.sync.last_import'),h.lastImportAt?instantText(h.lastImportAt,zone):t('journal.sync.never')],[t('journal.sync.pending'),String(h.pending)],[t('journal.sync.conflicts'),String(h.conflicts)],[t('journal.sync.errors'),String(h.errors)],[t('journal.sync.aborted'),String(h.aborted)],[t('journal.sync.receiving'),String(h.receiving)]]));
     if(!view.dirty.has(enrollment.value)){rotation.replaceChildren();for(const [id,name] of [['',t('journal.sync.new_device')],...data.devices.filter(d=>!d.revoked).map(d=>[d.id,d.label])]){const option=node('option',name);option.value=id;rotation.append(option);}}
     const rows=data.devices.map(device=>{

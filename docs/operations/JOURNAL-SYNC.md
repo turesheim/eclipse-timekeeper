@@ -121,6 +121,16 @@ OpenSSH and rsync 3.5.1+. macOS's bundled rsync is too old. Install using Homebr
 `ppa:rsyncproject/rsync`, then install `python3 openssh-client rsync`. Check
 `python3 --version` and `rsync --version` in the terminal that will run the job.
 
+On supported Ubuntu releases, the installation commands are:
+
+```sh
+sudo apt-get update
+sudo apt-get install software-properties-common
+sudo add-apt-repository ppa:rsyncproject/rsync
+sudo apt-get update
+sudo apt-get install python3 openssh-client rsync
+```
+
 Generate a different Ed25519 key on each device, choose a passphrase, and load
 it in your local agent. Never upload its private half or passphrase:
 
