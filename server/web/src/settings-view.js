@@ -25,7 +25,7 @@ export function settingsView({ root, session, account, valid, feedback, changed,
           target.append(' ', button(i18nText("ui.reload_current_values"), () => {if (valid()) reload();}));
         }
       } finally {
-        if (valid()) {if (write) this.busy = false;--this.pending;this.root.setAttribute('aria-busy', String(this.pending > 0));if (submit) submit.disabled = !this.canWrite || this.uncertain || !canSubmit();}
+        if (valid()) {if (write) this.busy = false;--this.pending;this.root.setAttribute('aria-busy', String(this.pending > 0));if (submit) submit.disabled = write && (!this.canWrite || this.uncertain) || !canSubmit();}
       }
     }
   };

@@ -375,3 +375,6 @@ button.track-client-day:disabled { opacity: .65; }
 .app-header .status-refresh { min-width: 0; }
 .app-header #status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 575px) { .app-header #owner { display: none; } }
+/* Local journal setup and private, inert conflict previews. */
+.journal-sync-command { white-space: pre-wrap; overflow-wrap: anywhere; }
+.journal-sync-preview { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 18rem; overflow: auto; }

@@ -23,7 +23,7 @@ final class JournalDevices {
         var key=JournalKey.parse(publicKey);var devices=state.list(JOURNAL_DEVICE);
         if(devices.stream().filter(device->!device.path("revoked").asBoolean()).count()>=20&&rotate==null)throw new ApiFailure(409,"JOURNAL_DEVICE_LIMIT");
         if(devices.stream().anyMatch(device->!device.path("revoked").asBoolean()&&device.path("publicKey").asText().equals(key.publicKey())))throw new ApiFailure(409,"JOURNAL_KEY_ALREADY_ENROLLED");
-        if(rotate!=null)revoke(rotate);
+        if(rotate!=null){if(state.required(JOURNAL_DEVICE,rotate).path("revoked").asBoolean())throw ApiFailure.conflict();revoke(rotate);}
         var value=state.insert(JOURNAL_DEVICE,UUID.randomUUID(),object().put("label",label.strip()).put("publicKey",key.publicKey()).put("fingerprint",key.fingerprint())
                 .put("revoked",false).put("createdAt",store.now().toString()).put("nextSequence",1));
         state.audit(rotate==null?"DEVICE_ENROLLED":"DEVICE_ROTATED",uuid(value.get("id")));return management(value);

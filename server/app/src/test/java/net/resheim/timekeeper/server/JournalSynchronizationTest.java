@@ -19,6 +19,8 @@ class JournalSynchronizationTest {
     @Inject ServerStore store;
     @Inject JournalSynchronization synchronization;
     @Inject JournalConfiguration configuration;
+    @Inject AccountStore accounts;
+    @Inject ContractInputs inputs;
     @TempDir Path temporary;
     private Path root,file,incoming;
     private UUID device;
@@ -39,6 +41,7 @@ class JournalSynchronizationTest {
             store.update("DELETE FROM tk_resource WHERE owner_id=? AND (entity_type LIKE 'JOURNAL_%' OR entity_type='DAY_NOTE')",owner);
             store.update("UPDATE tk_account SET username=?,password_hash=?,state='ENABLED' WHERE owner_id=?","journal-"+owner,PASSWORD_HASH,owner);new JournalDevices(store).enabled(true);return null;
         });
+        store.transaction("a",()->{store.update("DELETE FROM tk_auth_throttle WHERE id IN (?,?)",hash("journal:proof:a"),hash("journal:proof:global"));return null;});
         String key=JournalKeyTest.publicKey();device=store.transaction("a",()->uuid(new JournalDevices(store).enroll("Laptop",key,null).get("id")));
     }
     @AfterEach void cleanup(){synchronization.stop();io.quarkus.arc.ClientProxy.unwrap(configuration).configurationFile="NONE";}
@@ -52,12 +55,14 @@ class JournalSynchronizationTest {
     private String body(){return store.transaction("a",()->new DayNotes(store).get(DayNotes.date("2026-10-25")).path("body").asText());}
     @Test void onlyExplicitVerifiedCompletionMakesStagedFilesImportable()throws Exception{
         UUID id=uuid(begin().get("id"));String source="\r\n# Private Markdown  \r\n";upload(id,NAME,source);
+        Path copy=incoming.resolve(hash("a")).resolve(id.toString()).resolve(NAME);assertEquals(source,Files.readString(copy));
+        assertEquals(PosixFilePermissions.fromString("rw-------"),Files.getPosixFilePermissions(copy));assertEquals(PosixFilePermissions.fromString("rwx------"),Files.getPosixFilePermissions(copy.getParent()));
         synchronization.rescan("a");assertEquals("",body());
         var receipt=complete(id,manifest(Map.of(NAME,source)));assertEquals("COMPLETED",receipt.path("status").asText());assertEquals("",body());
         synchronization.rescan("a");assertEquals(source,body());long version=store.transaction("a",()->new DayNotes(store).get(DayNotes.date("2026-10-25")).path("version").asLong());
         assertEquals(receipt.toString(),complete(id,manifest(Map.of(NAME,source))).toString());synchronization.rescan("a");assertEquals(version,store.transaction("a",()->new DayNotes(store).get(DayNotes.date("2026-10-25")).path("version").asLong()));
-        Path copy=incoming.resolve(hash("a")).resolve(id.toString()).resolve(NAME);assertEquals(source,Files.readString(copy));
-        assertEquals(PosixFilePermissions.fromString("rw-------"),Files.getPosixFilePermissions(copy));assertEquals(PosixFilePermissions.fromString("rwx------"),Files.getPosixFilePermissions(copy.getParent()));
+        assertFalse(Files.exists(copy.getParent()));
+        assertEquals(409,assertThrows(ApiFailure.class,()->complete(id,manifest(Map.of(NAME,"changed after acceptance")))).status);
     }
     @Test void incompleteOrChangedManifestsCannotPartlyImport(){
         UUID id=uuid(begin().get("id"));upload(id,NAME,"one");var two=manifest(Map.of(NAME,"one","2026-10-26.md","two"));
@@ -112,5 +117,55 @@ class JournalSynchronizationTest {
         assertEquals("",body());
         given().header("Authorization",credential).contentType("application/json").body(manifest(Map.of(NAME,body)).toString()).post(transfer+"/complete").then().statusCode(200).header("Cache-Control","private, no-store");
         synchronization.rescan("a");assertEquals(body,body());
+    }
+    @Test void accountSetupRequiresFreshDirectSignInAndCsrfAndKeepsSecretsOutOfStatusAndReceipts()throws Exception{
+        var status=given().header("Authorization","Bearer test-read").get("/api/v1/journal").then().statusCode(200).header("Cache-Control","private, no-store").extract().response();
+        inputs.validate("JournalStatus",parse(status.asString()));
+        assertFalse(status.jsonPath().getBoolean("canManage"));assertFalse(status.asString().contains(TOKEN));assertFalse(status.asString().contains(incoming.toString()));
+        var session=accounts.login("journal-a","Journal synchronization fixture passphrase",false);
+        var password=object().put("currentPassword","Journal synchronization fixture passphrase");var settings=password.deepCopy().put("enabled",false);
+        given().header("Authorization","Bearer test-a").header("If-Match",status.jsonPath().getString("settings.etag")).contentType("application/json").body(settings.toString()).put("/api/v1/journal/settings").then().statusCode(403);
+        given().cookie(AuthenticationFilter.COOKIE,session.secret()).contentType("application/json").body(settings.toString()).put("/api/v1/journal/settings").then().statusCode(403);
+        var disabled=given().cookie(AuthenticationFilter.COOKIE,session.secret()).header("X-CSRF-Token",session.csrf()).header("If-Match",status.jsonPath().getString("settings.etag")).contentType("application/json").body(settings.toString()).put("/api/v1/journal/settings").then().statusCode(200).extract().response();
+        assertFalse(disabled.jsonPath().getBoolean("settings.enabled"));settings.put("enabled",true);
+        given().cookie(AuthenticationFilter.COOKIE,session.secret()).header("X-CSRF-Token",session.csrf()).header("If-Match",disabled.jsonPath().getString("settings.etag")).contentType("application/json").body(settings.toString()).put("/api/v1/journal/settings").then().statusCode(200);
+        String key=UUID.randomUUID().toString();var enrollment=password.deepCopy().put("label","New laptop").put("publicKey",JournalKeyTest.publicKey());
+        var enrolled=given().cookie(AuthenticationFilter.COOKIE,session.secret()).header("X-CSRF-Token",session.csrf()).header("Idempotency-Key",key).contentType("application/json").body(enrollment.toString()).post("/api/v1/journal/devices").then().statusCode(201).extract().response();
+        var replay=given().cookie(AuthenticationFilter.COOKIE,session.secret()).header("X-CSRF-Token",session.csrf()).header("Idempotency-Key",key).contentType("application/json").body(enrollment.toString()).post("/api/v1/journal/devices").then().statusCode(201).extract().response();assertEquals(enrolled.asString(),replay.asString());
+        String enrolledId=enrolled.jsonPath().getString("id");
+        var profile=given().cookie(AuthenticationFilter.COOKIE,session.secret()).get("/api/v1/journal/devices/"+enrolledId+"/profile").then().statusCode(200).extract().response();assertEquals("ssh.example.invalid",profile.jsonPath().getString("hostname"));assertEquals(2222,profile.jsonPath().getInt("port"));assertFalse(profile.asString().contains(TOKEN));assertFalse(profile.asString().contains("ownerId"));
+        inputs.validate("JournalProfile",parse(profile.asString()));
+        given().header("Authorization","Bearer test-b").get("/api/v1/journal/devices/"+enrolledId+"/profile").then().statusCode(404);
+        store.transaction("a",()->{try(var statement=store.statement("SELECT body FROM tk_receipt WHERE owner_id=? AND command_id=?",store.owner(),UUID.fromString(key));var rows=statement.executeQuery()){assertTrue(rows.next());assertFalse(rows.getString(1).contains("fixture passphrase"));}catch(java.sql.SQLException failure){throw new AssertionError(failure);}return null;});
+        given().cookie(AuthenticationFilter.COOKIE,session.secret()).header("X-CSRF-Token",session.csrf()).contentType("application/json").body(password.toString()).post("/api/v1/journal/devices/"+enrolledId+"/revoke").then().statusCode(200);
+        given().cookie(AuthenticationFilter.COOKIE,session.secret()).get("/api/v1/journal/devices/"+enrolledId+"/profile").then().statusCode(403);
+    }
+    @Test void candidateReviewResolutionAndOriginalDownloadAreOwnedConditionalAndPrivate(){
+        String original="---\nunknown: retained\n---\nprivate incoming";
+        store.transaction("a",()->{var notes=new DayNotes(store);var day=DayNotes.date("2026-10-25");return notes.save(day,etag(notes.get(day)),object().put("body","calendar"));});
+        UUID id=uuid(begin().get("id"));upload(id,NAME,original);complete(id,manifest(Map.of(NAME,original)));synchronization.rescan("a");
+        var status=given().header("Authorization","Bearer test-a").get("/api/v1/journal").then().statusCode(200).extract().response();assertEquals(1,status.jsonPath().getInt("health.conflicts"));assertFalse(status.asString().contains("private incoming"));
+        String item=status.jsonPath().getString("items[0].id"),path="/api/v1/journal/items/"+item;
+        var review=given().header("Authorization","Bearer test-read").get(path).then().statusCode(200).header("Cache-Control","private, no-store").extract().response();assertEquals("private incoming",review.jsonPath().getString("body"));
+        inputs.validate("JournalCandidate",parse(review.asString()));
+        given().header("Authorization","Bearer test-b").get(path).then().statusCode(404);
+        String source=given().header("Authorization","Bearer test-read").get(path+"/source").then().statusCode(200).header("Cache-Control","private, no-store").contentType("application/octet-stream").extract().asString();assertEquals(original,source);
+        var resolution=object().put("action","INCOMING").put("currentEtag",review.jsonPath().getString("currentEtag"));
+        given().header("Authorization","Bearer test-read").header("If-Match",review.jsonPath().getString("candidateEtag")).contentType("application/json").body(resolution.toString()).post(path+"/resolve").then().statusCode(403);
+        given().header("Authorization","Bearer test-a").header("If-Match",review.jsonPath().getString("candidateEtag")).contentType("application/json").body(resolution.toString()).post(path+"/resolve").then().statusCode(200);assertEquals("private incoming",body());
+        given().header("Authorization","Bearer test-a").get(path+"/source").then().statusCode(404);
+    }
+    @Test void completedCopiesAreReleasedWhileDurablePendingInputStillImports(){
+        UUID first=uuid(begin().get("id"));upload(first,NAME,"durable");complete(first,manifest(Map.of(NAME,"durable")));
+        Path folder=incoming.resolve(hash("a")).resolve(first.toString());assertTrue(Files.exists(folder));begin();assertFalse(Files.exists(folder));assertEquals("",body());synchronization.rescan("a");assertEquals("durable",body());
+        assertEquals("COMPLETED",complete(first,manifest(Map.of(NAME,"durable"))).path("status").asText());
+    }
+    @Test void historyPruningNeverDiscardsAnUnresolvedCandidate(){
+        UUID transfer=uuid(begin().get("id"));upload(transfer,NAME,"retained source");complete(transfer,manifest(Map.of(NAME,"retained source")));
+        store.transaction("a",()->{
+            var state=new JournalState(store);for(int index=0;index<205;index++)state.insert(JOURNAL_ITEM,UUID.randomUUID(),object().put("batchId",transfer.toString()).put("deviceId",device.toString()).put("sequence",index+2).put("filename","2026-10-26.md").put("state","UNCHANGED").put("processedAt",store.now().minusSeconds(1000-index).toString()));
+            new JournalRetention(store).cleanup(io.quarkus.arc.ClientProxy.unwrap(configuration).load());
+            assertEquals(201,state.list(JOURNAL_ITEM).size());assertEquals(1,state.list(JOURNAL_SOURCE).size());assertEquals(1,new JournalImport(store).pending().size());return null;
+        });synchronization.rescan("a");assertEquals("retained source",body());
     }
 }

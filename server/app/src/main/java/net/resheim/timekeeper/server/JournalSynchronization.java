@@ -72,6 +72,7 @@ class JournalSynchronization {
     ObjectNode verify(Gateway gateway,UUID device){new JournalDevices(store).authorize(device);return object().put("status","READY").put("direction","CLIENT_TO_SERVER");}
     ObjectNode begin(Gateway gateway,UUID device){
         var devices=new JournalDevices(store);var credential=devices.authorize(device);var state=new JournalState(store);
+        new JournalRetention(store).cleanup(gateway.deployment());
         long active=state.list(JOURNAL_LEASE).stream().filter(lease->lease.path("state").asText().equals("RECEIVING")&&Instant.parse(lease.path("expiresAt").asText()).isAfter(store.now())).count();
         if(active>=2)throw new ApiFailure(429,"JOURNAL_TRANSFER_LIMIT");
         long sequence=credential.path("nextSequence").asLong();if(sequence<1||sequence>=9007199254740990L)throw ApiFailure.conflict();
@@ -123,6 +124,11 @@ class JournalSynchronization {
     ObjectNode complete(Gateway gateway,UUID id,JsonNode manifest){
         var lease=lease(gateway,id,true);var state=new JournalState(store);
         var entries=manifest.path("files");if(!manifest.path("format").isIntegralNumber()||manifest.path("format").asLong()!=1||!manifest.path("completed").isBoolean()||!manifest.path("completed").asBoolean()||!entries.isArray()||entries.size()>JournalImport.BATCH_FILES)throw ApiFailure.validation();
+        String manifestHash=hash(canonical(manifest).toString());
+        if(lease.path("state").asText().equals("COMPLETED")){
+            if(!lease.path("manifestHash").asText().equals(manifestHash))throw new ApiFailure(409,"IDEMPOTENCY_KEY_REUSED");
+            return object().put("status","COMPLETED").put("files",entries.size());
+        }
         var files=new TreeMap<String,byte[]>();Path folder=folder(gateway.deployment(),id,false);
         try{
             for(var entry:entries){
@@ -134,9 +140,8 @@ class JournalSynchronization {
         }catch(IOException unsafe){throw new ApiFailure(409,"JOURNAL_INCOMPLETE_TRANSFER");}
         // Idempotent handoff is fingerprinted by the importer even after a lost response.
         var batch=new JournalImport(store).seal(id,uuid(lease.get("deviceId")),lease.path("sequence").asLong(),files);
-        if(lease.path("state").asText().equals("COMPLETED"))return object().put("status","COMPLETED").put("files",batch.path("files").asInt());
         for(String field:List.of("syncEpoch","configurationEpoch","accountVersion"))batch.set(field,lease.get(field));state.update(JOURNAL_BATCH,batch);
-        state.update(JOURNAL_LEASE,lease.put("state","COMPLETED").put("completedAt",store.now().toString()));
+        state.update(JOURNAL_LEASE,lease.put("state","COMPLETED").put("manifestHash",manifestHash).put("completedAt",store.now().toString()));
         var device=state.required(JOURNAL_DEVICE,uuid(lease.get("deviceId")));state.update(JOURNAL_DEVICE,device.put("lastTransferAt",store.now().toString()));
         return object().put("status","COMPLETED").put("files",files.size());
     }
@@ -157,6 +162,10 @@ class JournalSynchronization {
                 var device=state.required(JOURNAL_DEVICE,uuid(item.get("deviceId")));state.update(JOURNAL_DEVICE,device.put("lastImportAt",store.now().toString()));
             }return null;
         });
+        store.transaction(owner,()->{new JournalRetention(store).cleanup(deployment);return null;});
+    }
+    void authorizeCandidate(UUID id){
+        var state=new JournalState(store);var item=state.required(JOURNAL_ITEM,id);var batch=state.required(JOURNAL_BATCH,uuid(item.get("batchId")));valid(configuration.load(),batch);
     }
     private Path folder(JournalConfiguration.Deployment deployment,UUID id,boolean create){
         try{

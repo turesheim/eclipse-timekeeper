@@ -75,7 +75,7 @@ final class JournalImport {
         var item=state.required(JOURNAL_ITEM,id);if(!item.path("state").asText().equals("CONFLICT"))throw ApiFailure.conflict();
         var note=JournalMarkdown.parse(item.path("filename").asText(),source(item));
         var result=summary(item);result.put("text",note.label()).put("body",note.body());
-        result.set("current",new DayNotes(store).get(note.date()));return result;
+        var current=new DayNotes(store).get(note.date());result.set("current",current);result.put("currentEtag",etag(current));return result;
     }
     /** Explicit resolution is conditional on both the candidate and current calendar version. */
     ObjectNode resolve(UUID id,String candidateMatch,String noteMatch,boolean incoming){
@@ -107,5 +107,7 @@ final class JournalImport {
     static ObjectNode summary(ObjectNode item){
         var result=object().put("candidateEtag",etag(item));for(String field:List.of("id","version","batchId","deviceId","filename","state","error","processedAt"))if(item.has(field))result.set(field,item.get(field));return result;
     }
+    byte[] download(UUID id){var item=state.required(JOURNAL_ITEM,id);if(!item.has("sourceId"))throw ApiFailure.notFound();return source(item);}
+    ObjectNode discard(UUID id,String match){var item=state.required(JOURNAL_ITEM,id);ApiReplies.match(item,match);if(!item.has("sourceId")||item.path("state").asText().equals("PENDING"))throw ApiFailure.conflict();return finish(item,"DISCARDED",null,true);}
     private byte[] source(ObjectNode item){return Base64.getDecoder().decode(state.required(JOURNAL_SOURCE,uuid(item.get("sourceId"))).path("data").asText());}
 }

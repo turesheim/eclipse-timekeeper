@@ -20,6 +20,14 @@ test('private binary downloads retain cookie/owner checks and reject late or for
   let finish;const late=new Api(null,()=>new Promise(resolve=>{finish=resolve;}));const pending=late.request('/data/account/export',{binary:true});late.close();finish(zip());await assert.rejects(pending,error=>error.code==='UNAUTHENTICATED');
   const denied=new Api(null,async()=>reply({code:'FORBIDDEN'},'b3duZXItYQ',403));await assert.rejects(denied.request('/data/account/export',{binary:true}),error=>error.code==='FORBIDDEN');
 });
+test('original journal copies retain exact UTF-8 and require their binary media type and owner',async()=>{
+  const original='---\r\nunknown: retained\r\n---\r\n\r\n# Søndag  \r\n';
+  const file=(owner='b3duZXItYQ',type='application/octet-stream')=>new Response(original,{headers:{'Content-Type':type,'X-Timekeeper-Owner':owner}});
+  const api=new Api(null,async(url,options)=>{assert.equal(options.headers.Accept,'application/octet-stream');assert.equal(options.cache,'no-store');return file();},{ownerId:'owner-a'});
+  assert.equal(await(await api.request('/journal/items/owned/source',{binary:'application/octet-stream'})).data.text(),original);
+  await assert.rejects(new Api(null,async()=>file('b3duZXItYg'),{ownerId:'owner-a'}).request('/journal/items/foreign/source',{binary:'application/octet-stream'}),error=>error.code==='OWNER_CHANGED');
+  await assert.rejects(new Api(null,async()=>file('b3duZXItYQ','text/html')).request('/journal/items/owned/source',{binary:'application/octet-stream'}),error=>error.code==='UNAVAILABLE');
+});
 test('first empty page binds the session and rejects later owner changes', async () => {
   let index = 0;
   const api = new Api('never-display-token', async (url, options) => {

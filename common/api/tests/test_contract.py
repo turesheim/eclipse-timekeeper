@@ -41,7 +41,10 @@ class ContractTest(unittest.TestCase):
                             '/auth/passkeys/login/options', '/auth/passkeys/login/finish', '/auth/passkeys/cancel'):
                     self.assertEqual([], operation['security'])
                     continue
-                self.assertNotIn('security', operation)
+                if path in ('/journal/settings', '/journal/devices') or path.startswith('/journal/devices/') and path.endswith('/revoke'):
+                    self.assertEqual([{'browserSession': []}], operation['security'])
+                else:
+                    self.assertNotIn('security', operation)
                 self.assertEqual(('write' if path.startswith('/admin/') else 'read') if method == 'get' else ('read' if path in ('/auth/logout', '/auth/token-login') else 'write'),
                                  operation['x-required-permission'])
                 self.assertIn('401', operation['responses'])
@@ -239,6 +242,8 @@ class ContractTest(unittest.TestCase):
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
             'getAdministrationSettings', 'updateAdministrationSettings', 'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
+            'journalStatus', 'journalSettings', 'enrollJournalDevice', 'revokeJournalDevice', 'journalDeviceProfile',
+            'rescanJournal', 'journalCandidate', 'journalCandidateSource', 'resolveJournalConflict', 'discardJournalCandidate',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()
                       for key, v in item.items() if key in ('get', 'put', 'post', 'delete')}

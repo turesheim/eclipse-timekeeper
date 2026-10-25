@@ -48,11 +48,12 @@ async function show(hash, ask = true) {
   const currentView = view;
   if (!view.canWrite) view.root.append(node('p', i18nText("ui.this_session_is_read_only_sign_in_with_your_password_to_change_settings"), 'alert alert-info'));
   if (page === 'account') {
-    const part = ['profile', 'password', 'passkeys', 'tokens', 'data', 'import', 'calendars'].includes(hash.split('/')[1]) ? hash.split('/')[1] : 'profile';
+    const part = ['profile', 'password', 'passkeys', 'tokens', 'data', 'import', 'calendars', 'journal'].includes(hash.split('/')[1]) ? hash.split('/')[1] : 'profile';
     for (const [key, title] of [['profile', i18nText("ui.profile")], ['password', i18nText("ui.password")], ['passkeys', i18nText("ui.passkeys")], ['calendars', i18nText('calendar.subscriptions')], ['tokens', i18nText("ui.api_tokens")], ['data', i18nText("ui.your_data")], ['import', i18nText("ui.import")]]) {
       const item = link(title, `#account/${key}`, 'nav-link');if (key === part) {item.classList.add('active');item.setAttribute('aria-current', 'page');}
       $('account-navigation').append(item);
     }
+    const journal=link(i18nText('journal.sync.title'),'#account/journal','nav-link');if(part==='journal'){journal.classList.add('active');journal.setAttribute('aria-current','page');}$('account-navigation').append(journal);
     await view.run(() => part === 'calendars' ? scope.renderCalendars(currentView) : renderAccount(currentView, part));
   }
 }
