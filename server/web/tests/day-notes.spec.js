@@ -277,10 +277,10 @@ test('journal formatted editing fits narrow screens and all themes with accessib
     const rich=page.locator('#journal-formatted .ProseMirror');await expect(rich).toBeVisible();await expect(rich.locator('h1')).toBeInViewport();await rich.getByRole('checkbox').tap();await expect(rich.getByRole('checkbox')).toBeChecked();await save(page,'Touch label');
     for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
       await setTheme(page,theme);await note(page).tap();await expect(rich).toBeVisible();const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>value.id)).toEqual([]);
-      expect(await dialog(page).evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);await dialog(page).getByRole('button',{name:'Cancel',exact:true}).click();
+      expect(await dialog(page).evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);if(theme==='dracula')await captureScreenshot(page,{path:'test-results/journal-editor-mobile.png'});await dialog(page).getByRole('button',{name:'Cancel',exact:true}).click();
     }
     await page.setViewportSize({width:320,height:740});await note(page).tap();await expect(rich).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    await captureScreenshot(page,{path:'test-results/journal-editor-mobile.png'});await save(page,'Touch label');await expect(note(page).locator('.bi-journal-text')).toBeVisible();await expect(note(page)).toHaveCSS('opacity','1');
+    await captureScreenshot(page,{path:'test-results/journal-editor-compact.png'});await save(page,'Touch label');await expect(note(page).locator('.bi-journal-text')).toBeVisible();await expect(note(page)).toHaveCSS('opacity','1');
   }finally{await owner.close();}
 });
 
