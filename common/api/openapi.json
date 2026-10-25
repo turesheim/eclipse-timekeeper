@@ -16981,7 +16981,6 @@
           "body": {
             "type": "string",
             "maxLength": 200000,
-            "x-max-utf8-bytes": 200000,
             "description": "Exact UTF-8 Markdown, limited to 200,000 encoded bytes. Whitespace and line endings are preserved. Empty string clears only the body; omission preserves it. Null and invalid Unicode are rejected."
           }
         },
@@ -17020,7 +17019,6 @@
           "body": {
             "type": "string",
             "maxLength": 200000,
-            "x-max-utf8-bytes": 200000,
             "description": "Exact UTF-8 Markdown, limited to 200,000 encoded bytes. Whitespace and line endings are preserved. Empty string clears only the body; omission preserves it. Null and invalid Unicode are rejected."
           },
           "hasBody": {
@@ -17106,7 +17104,6 @@
           "body": {
             "type": "string",
             "maxLength": 200000,
-            "x-max-utf8-bytes": 200000,
             "description": "Exact UTF-8 Markdown, limited to 200,000 encoded bytes. Whitespace and line endings are preserved. Empty string clears only the body; omission preserves it. Null and invalid Unicode are rejected."
           }
         },

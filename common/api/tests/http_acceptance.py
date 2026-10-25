@@ -120,6 +120,46 @@ class HttpAcceptance(unittest.TestCase):
             self.call('DELETE', f'/{resource}/{identifier}', owner=owner,
                       headers={'If-Match': headers['ETag']}, status=204)
 
+    def test_private_journal_bodies_have_lightweight_summaries_and_conditional_lifecycles(self):
+        date = '2070-02-03'
+        path = '/day-notes/' + date
+        query = '/day-notes?' + urlencode({'fromDate': date, 'toDate': date})
+
+        def cleanup():
+            _, current = self.call('GET', path)
+            self.call('DELETE', path, headers={'If-Match': current['ETag']}, status=204)
+        self.addCleanup(cleanup)
+        initial, headers = self.call('GET', path)
+        self.assertEqual('', initial['body'])
+        markdown = '\r\n# Private journal fixture\r\n- [ ] Øvelse\t\r\n  keep spaces  \r\n'
+        note, saved = self.call('PUT', path, headers={'If-Match': headers['ETag']}, body={'body': markdown})
+        self.assertEqual(markdown, note['body'])
+        self.assertEqual('private, no-store', saved['Cache-Control'])
+        summaries, _ = self.call('GET', query, owner='read')
+        self.assertEqual([date], [row['date'] for row in summaries['items']])
+        self.assertTrue(summaries['items'][0]['hasBody'])
+        self.assertNotIn('body', summaries['items'][0])
+        self.assertNotIn('Private journal fixture', json.dumps(summaries))
+        foreign, _ = self.call('GET', path, owner='b')
+        self.assertEqual('', foreign['body'])
+        self.call('PUT', path, owner='b', headers={'If-Match': saved['ETag']}, body={'body': 'foreign'}, status=412)
+        self.call('PUT', path, owner='read', headers={'If-Match': saved['ETag']}, body={'body': markdown}, status=403)
+        self.call('DELETE', path, owner='read', headers={'If-Match': saved['ETag']}, status=403)
+        self.call('GET', path, owner=None, status=401)
+        self.call('GET', query, owner=None, status=401)
+        labeled, labeled_headers = self.call('PUT', path, headers={'If-Match': saved['ETag']}, body={'text': 'Planning'})
+        self.assertEqual(markdown, labeled['body'])
+        self.call('PUT', path, headers={'If-Match': saved['ETag']}, body={'body': 'stale'}, status=412)
+        self.call('PUT', path, headers={'If-Match': labeled_headers['ETag']}, body={'body': 'ø' * 100001}, status=422)
+        _, deleted = self.call('DELETE', path, headers={'If-Match': labeled_headers['ETag']}, status=204)
+        summaries, _ = self.call('GET', query)
+        self.assertEqual([], summaries['items'])
+        self.call('PUT', path, headers={'If-Match': saved['ETag']}, body={'body': 'stale recreate'}, status=412)
+        recreated, _ = self.call('PUT', path, headers={'If-Match': deleted['ETag']}, body={'body': markdown})
+        self.assertEqual('', recreated['text'])
+        self.assertEqual(markdown, recreated['body'])
+        self.assertGreater(recreated['version'], labeled['version'])
+
     def test_clients_own_projects_and_session_summaries_with_portable_relations(self):
         client = self.create('clients', {'name': self.prefix, 'color': '#ffee00'})
         second = self.create('projects', {'name': self.prefix + ' second', 'clientId': client['id']})
