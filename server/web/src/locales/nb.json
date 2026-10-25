@@ -997,5 +997,6 @@
   "markdown.replace": "Erstatt gjeldende utkast med denne filen? Last ned først hvis du vil beholde utkastet.",
   "markdown.imported": "Åpnet lokalt. Frontmatter holdes separat, og dagsetiketten er uendret.",
   "markdown.downloaded": "Markdown-nedlasting startet. Den separate dagsetiketten er ikke en del av Markdown-dokumentet.",
-  "markdown.open": "Prøv prototypen for Markdown-redigering"
+  "markdown.open": "Prøv prototypen for Markdown-redigering",
+  "day_notes.body_present": "Markdown-notat"
 }

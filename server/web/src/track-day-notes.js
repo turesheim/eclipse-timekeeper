@@ -8,7 +8,7 @@ const button=(text,className)=>{const value=node('button',text,className);value.
 /** Optional web metadata has its own read state and never changes timed work. */
 export class TrackDayNotes {
   constructor(root,grid,monthInput,callbacks){
-    Object.assign(this,{root,grid,monthInput,callbacks,notes:new Map(),generation:0});
+    Object.assign(this,{root,grid,monthInput,callbacks,notes:new Map(),bodyDates:new Set(),generation:0});
     this.status=node('p',undefined,'hint track-note-status');this.status.setAttribute('role','status');this.message=node('span');
     this.retry=button(t('ui.retry'),'btn btn-link btn-sm');this.retry.hidden=true;this.retry.addEventListener('click',()=>{this.key=null;this.load();});this.status.append(this.message,' ',this.retry);grid.after(this.status);this.status.hidden=true;
     this.dialog=node('dialog',undefined,'app-dialog shadow-lg');this.dialog.id='track-note-editor';this.dialog.setAttribute('aria-labelledby','track-note-title');
@@ -99,7 +99,7 @@ export class TrackDayNotes {
     this.cancel.disabled=editor.busy;
   }
   reset(){
-    this.cancelHold();this.closeMenu();++this.generation;this.session=null;this.key=null;this.range=null;this.loaded=false;this.notes.clear();this.loadingFocus=null;this.cells=null;this.calendar=null;this.editor=null;
+    this.cancelHold();this.closeMenu();++this.generation;this.session=null;this.key=null;this.range=null;this.loaded=false;this.notes.clear();this.bodyDates.clear();this.loadingFocus=null;this.cells=null;this.calendar=null;this.editor=null;
     this.closeEditor();this.text.value='';this.error.textContent='';this.status.hidden=true;this.message.textContent='';this.retry.hidden=true;
   }
   hide(){this.cancelHold();this.closeMenu();if(!this.editor?.busy)this.closeEditor();}
@@ -111,7 +111,7 @@ export class TrackDayNotes {
     const generation=++this.generation,session=this.session;
     void session.request('/day-notes?'+new URLSearchParams({fromDate:first,toDate:last})).then(reply=>{
       if(generation!==this.generation||session!==this.session)return;
-      this.notes=new Map(reply.data.items.map(note=>[note.date,note.text]));this.loaded=true;this.paint(document.activeElement===document.body?this.loadingFocus:null);this.loadingFocus=null;this.message.textContent='';this.status.hidden=true;
+      this.notes=new Map(reply.data.items.map(note=>[note.date,note.text]));this.bodyDates=new Set(reply.data.items.filter(note=>note.hasBody).map(note=>note.date));this.loaded=true;this.paint(document.activeElement===document.body?this.loadingFocus:null);this.loadingFocus=null;this.message.textContent='';this.status.hidden=true;
     }).catch(error=>{
       if(generation!==this.generation||session!==this.session)return;
       if(error.status===401){this.callbacks.onUnauthorized(error);return;}
@@ -122,11 +122,11 @@ export class TrackDayNotes {
     if(!this.cells)return;
     focused=focused|| (this.grid.contains(document.activeElement)?document.activeElement?.dataset.trackNoteDate:null);
     for(const [date,cell] of this.cells){
-      const heading=cell.querySelector('.track-date-row'),previous=heading.querySelector('.track-day-note'),text=this.notes.get(date);
-      if(!this.writable&&!text){previous?.remove();continue;}
-      const value=node(this.writable?'button':'span',undefined,'track-day-note'+(text?'':' is-empty'));value.dataset.trackNoteDate=date;
+      const heading=cell.querySelector('.track-date-row'),previous=heading.querySelector('.track-day-note'),text=this.notes.get(date),hasBody=this.bodyDates.has(date);
+      if(!this.writable&&!text&&!hasBody){previous?.remove();continue;}
+      const value=node(this.writable?'button':'span',undefined,'track-day-note'+(text||hasBody?'':' is-empty'));value.dataset.trackNoteDate=date;
       if(this.writable){value.type='button';value.classList.add('btn','btn-link','btn-sm');value.disabled=!this.loaded;value.setAttribute('aria-haspopup','dialog');value.addEventListener('click',()=>void this.open(date));}
-      value.title=text||t('day_notes.add',{date:this.dateLabel(date)});value.setAttribute('aria-label',t(text?(this.writable?'day_notes.edit':'day_notes.view'):'day_notes.add',{date:this.dateLabel(date),text}));
+      value.title=text||(hasBody?t('day_notes.body_present'):t('day_notes.add',{date:this.dateLabel(date)}));value.setAttribute('aria-label',t(text||hasBody?(this.writable?'day_notes.edit':'day_notes.view'):'day_notes.add',{date:this.dateLabel(date),text:text||(hasBody?t('day_notes.body_present'):'')}));
       if(text)value.append(node('span',text,'badge rounded-pill bg-info-subtle text-info-emphasis'));else value.append(icon('sticky'));
       if(previous)previous.replaceWith(value);else heading.append(value);
     }
@@ -152,7 +152,8 @@ export class TrackDayNotes {
       const reply=await editor.session.request('/day-notes/'+editor.date,{method:'PUT',etag:editor.etag,body:{text:this.text.value.trim()}});
       if(this.editor!==editor||editor.session!==this.session)return;
       ++this.generation;this.key=null;
-      if(reply.data.text)this.notes.set(editor.date,reply.data.text);else this.notes.delete(editor.date);
+      if(reply.data.hasBody)this.bodyDates.add(editor.date);else this.bodyDates.delete(editor.date);
+      if(reply.data.text||reply.data.hasBody)this.notes.set(editor.date,reply.data.text);else this.notes.delete(editor.date);
       this.paint();this.closeEditor();this.callbacks.onChanged();
     }catch(error){
       if(this.editor!==editor||editor.session!==this.session)return;

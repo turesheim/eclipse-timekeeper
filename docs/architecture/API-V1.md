@@ -472,3 +472,53 @@ and missing offers return 404. No partial restore is committed. Repeating a
 successful Undo returns its recorded result without writing again. At most 50
 recent offers are retained per account; expired offers are pruned on subsequent
 opt-in mutations. Undo snapshots are omitted from portable account exports.
+
+## Private day labels and Markdown bodies
+
+`/day-notes` is account-scoped web metadata independent of all timed work and
+reports. Dates use real `YYYY-MM-DD` civil dates (years 0001–9999), independent
+of time-zone changes. No owner ID is accepted from request content or queries.
+Existing authentication, read/write permissions, CSRF, revocation, disabled-account
+checks and optional `X-Timekeeper-Owner` binding apply to every operation.
+
+- `GET /day-notes?fromDate=...&toDate=...` returns at most 62 inclusive dates as
+  `{items,revision}`. Items are `DayNoteSummary` records with `id`, `ownerId`,
+  `date`, `version`, `text` and `hasBody`. They never include body text. A label,
+  a body, or both make a note discoverable; empty tombstones are excluded.
+- `GET /day-notes/{date}` returns the complete `DayNote`, including `body` and
+  `hasBody`, with its ETag. Untouched dates return empty strings, `hasBody:false`
+  and version zero. Fetch the full note before a conditional write; the summary
+  is not a substitute for its full-resource ETag.
+- `PUT /day-notes/{date}` requires `If-Match` and at least one of `text` or `body`.
+  An omitted field preserves its stored value. `text` remains an 80-character
+  single-line label and retains its existing trimming/validation. `body` is exact
+  valid UTF-8 Markdown, limited to **200,000 encoded bytes**; CRLF/LF, tabs,
+  leading/trailing spaces and whitespace-only bodies are preserved. Neither
+  field accepts null. `{text:""}` clears only the label, `{body:""}` clears only
+  the body, and supplying both empty clears the note. Identical updates are no-ops.
+- `DELETE /day-notes/{date}` requires `If-Match`, clears both fields and returns
+  204 with the retained ETag. Deletion preserves the version tombstone; stale
+  editors cannot recreate a removed note with an older ETag. All changed writes
+  increment the version atomically. A concurrent label/body write must reload
+  after a 412 rather than silently merging against a stale note.
+
+Legacy stored labels acquire an empty body on read without rewriting their
+label/version or changing the database schema. The existing owner/type/date
+index and owner transaction lock remain in use. New response fields change the
+full-resource ETag, so an editor held across an upgrade must reload after a 412.
+Existing label-only clients remain safe: omitting `body` never erases Markdown.
+The current calendar uses summary presence markers and conditional label updates;
+formatted body editing is provided by the separate editor integration.
+
+Note responses are private/no-store. Profile-style change invalidations remain
+compatible with existing clients and contain no label/body content. Account
+export streams active note records with optional `body`; label-only archives
+remain supported, and omitted legacy bodies preserve an existing matching note's
+body. A differing active note produces a review conflict and is never overwritten.
+Empty deletion tombstones are not portable archive deletion commands.
+
+See [journal storage protection](../operations/JOURNAL-STORAGE.md) for the
+required deployment encryption, temporary/backup storage, key management and
+readable-server trust boundary. The database and private account archive remain
+authoritative; a future Markdown-folder synchronization feature cannot bypass
+these authorization and conditional-write rules.
