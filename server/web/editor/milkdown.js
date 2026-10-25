@@ -1,8 +1,8 @@
 // This build-time entry is bundled to one local native ES module. The application
 // and source-mode fallback do not import Milkdown until rich mode is requested.
 import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx} from '@milkdown/kit/core';
-import {commonmark,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInBlockquoteCommand} from '@milkdown/kit/preset/commonmark';
-import {gfm,insertTableCommand} from '@milkdown/kit/preset/gfm';
+import {commonmark,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand} from '@milkdown/kit/preset/commonmark';
+import {gfm,insertTableCommand,toggleStrikethroughCommand} from '@milkdown/kit/preset/gfm';
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand,$prose} from '@milkdown/kit/utils';
 import {Plugin} from '@milkdown/kit/prose/state';
@@ -10,9 +10,9 @@ import {hasUnsupportedSyntax} from '../src/markdown-document.js';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
 
-const commands={bold:toggleStrongCommand,italic:toggleEmphasisCommand,heading:wrapInHeadingCommand,list:wrapInBulletListCommand,quote:wrapInBlockquoteCommand,table:insertTableCommand,undo:undoCommand,redo:redoCommand};
+const commands={bold:toggleStrongCommand,italic:toggleEmphasisCommand,strike:toggleStrikethroughCommand,inline_code:toggleInlineCodeCommand,code_block:createCodeBlockCommand,paragraph:turnIntoTextCommand,heading:wrapInHeadingCommand,list:wrapInBulletListCommand,ordered:wrapInOrderedListCommand,quote:wrapInBlockquoteCommand,table:insertTableCommand,undo:undoCommand,redo:redoCommand};
 const sourceNodes=new Set(['html','image','imageReference','linkReference','definition','footnoteReference','footnoteDefinition']);
-const safeLink=url=>{try{return ['https:','http:','mailto:'].includes(new URL(url,location.origin).protocol);}catch{return false;}};
+const safeLink=url=>{if(typeof url!=='string'||!url.trim())return false;try{return ['https:','http:','mailto:'].includes(new URL(url,location.origin).protocol);}catch{return false;}};
 const safeDocument=doc=>{
   let safe=true;
   doc.descendants(node=>{if(node.type.name==='image'||node.marks.some(mark=>mark.type.name==='link'&&!safeLink(mark.attrs.href)))safe=false;return safe;});
@@ -64,12 +64,37 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
     const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx),tree=parser.parse(value);return !unsupported(tree)&&JSON.stringify(semantic(tree))===JSON.stringify(semantic(parser.parse(serialized)));});
     if(!safe){await editor.destroy();return null;}
     const setReadOnly=value=>{readOnly=value;view.setProps({editable:()=>!readOnly});for(const checkbox of root.querySelectorAll('input[type=checkbox]'))checkbox.disabled=readOnly;};
+    const command=(name,payload)=>{
+      if(readOnly)return false;
+      if(name==='link'){
+        if(!safeLink(payload))return false;
+        if(!editor.action(callCommand(updateLinkCommand.key,{href:payload}))){
+          const {from,empty}=view.state.selection;
+          if(empty)view.dispatch(view.state.tr.insertText(payload,from).addMark(from,from+payload.length,view.state.schema.marks.link.create({href:payload})));
+          else editor.action(callCommand(toggleLinkCommand.key,{href:payload}));
+        }
+      }else if(name==='tasks'){
+        editor.action(callCommand(wrapInBulletListCommand.key));
+        const {$from}=view.state.selection;
+        for(let depth=$from.depth;depth>0;depth--){
+          const list=$from.node(depth);if(!['bullet_list','ordered_list'].includes(list.type.name))continue;
+          const start=$from.before(depth)+1;let transaction=view.state.tr;
+          list.descendants((node,position)=>{if(node.type.name==='list_item')transaction=transaction.setNodeMarkup(start+position,undefined,{...node.attrs,checked:node.attrs.checked??false});});
+          view.dispatch(transaction);break;
+        }
+      }else{
+        const action=commands[name];if(!action)return false;
+        editor.action(callCommand(action.key,name==='heading'?2:undefined));
+      }
+      view.focus();return true;
+    };
     setReadOnly(readOnly);
     return {
       markdown:()=>view.state.doc.eq(original)?value:editor.action(getMarkdown()),
       focus:()=>view.focus(),
       setReadOnly,
-      command:(name)=>{const command=commands[name];if(command)editor.action(callCommand(command.key,name==='heading'?2:undefined));view.focus();},
+      command,
+      linkHref:()=>view.state.selection.$from.marks().find(mark=>mark.type.name==='link')?.attrs.href||'',
       destroy:()=>editor.destroy()
     };
   }catch(error){await editor.destroy().catch(()=>{});throw error;}

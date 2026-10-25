@@ -316,3 +316,21 @@ test('journal controls use the account language and reject oversized UTF-8 draft
     const saved=await api('GET','/day-notes/2026-05-17');expect((await saved.json()).version).toBe(0);
   }finally{await owner.close();}
 });
+
+test('journal toolbar creates the full evaluated Markdown subset and validates link edits',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage();
+  try{
+    await signIn(page,await fresh(request));await month(page);await menu(page);const rich=page.locator('#journal-formatted .ProseMirror');
+    const action=name=>dialog(page).getByRole('button',{name,exact:true});
+    async function draft(text){await expect(rich).toBeVisible();await action('Markdown source').click();await page.locator('#journal-body').fill(text);await action('Formatted').click();await expect(rich).toBeVisible();await rich.press('ControlOrMeta+A');}
+    await draft('Done');await action('Strikethrough').click();await expect(rich.locator('del')).toHaveText('Done');
+    await draft('value');await action('Inline code').click();await expect(rich.locator('code')).toHaveText('value');
+    await draft('const value = 1;');await action('Code block').click();await expect(rich.locator('pre code')).toHaveText('const value = 1;');
+    await draft('First item');await action('Numbered list').click();await expect(rich.locator('ol li')).toHaveText('First item');
+    await draft('Follow up');await action('Task list').click();await expect(rich.getByRole('checkbox')).not.toBeChecked();await rich.getByRole('checkbox').check();await action('Markdown source').click();await expect(page.locator('#journal-body')).toHaveValue(/\[x\] Follow up/);
+    await action('Formatted').click();await draft('Selected link');page.once('dialog',prompt=>prompt.accept('https://example.com/journal'));await action('Link').click();await expect(rich.locator('a')).toHaveAttribute('href','https://example.com/journal');
+    const address=page.url();await rich.locator('a').click();expect(page.url()).toBe(address);await rich.press('ControlOrMeta+A');page.once('dialog',prompt=>prompt.accept('mailto:journal@example.org'));await action('Link').click();await expect(rich.locator('a')).toHaveAttribute('href','mailto:journal@example.org');
+    await rich.press('ControlOrMeta+A');page.once('dialog',prompt=>prompt.accept('javascript:alert(1)'));await action('Link').click();await expect(dialog(page)).toContainText('Use an HTTP(S)');await expect(rich.locator('a')).toHaveAttribute('href','mailto:journal@example.org');
+    await draft('Plain paragraph');await action('Heading').click();await expect(rich.locator('h2')).toHaveText('Plain paragraph');await action('Paragraph').click();await expect(rich.locator('h2')).toHaveCount(0);await expect(rich.locator('p')).toHaveText('Plain paragraph');
+  }finally{await owner.close();}
+});

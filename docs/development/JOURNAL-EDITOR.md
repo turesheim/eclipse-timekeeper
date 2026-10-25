@@ -48,6 +48,11 @@ inputs and task checkboxes. Both English and Norwegian controls use existing
 theme and accessibility conventions; expandable help keeps the mobile writing
 surface visible.
 
+The toolbar exposes every evaluated format, including numbered/task lists,
+strikethrough, inline and fenced code, and validated link creation/editing.
+Paragraph returns a heading or code block to ordinary text. The formatting row
+scrolls horizontally when needed so mobile controls retain usable sizes.
+
 Stale writes retain both fields and disable Save. Downloading the draft and
 explicitly reloading the saved version provide a recovery path; reload asks
 before replacing a dirty draft. An unknown save result is checked with GET,

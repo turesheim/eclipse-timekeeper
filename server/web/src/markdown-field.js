@@ -24,9 +24,15 @@ export class MarkdownField {
     this.helpDetails=node('details',undefined,'markdown-help');this.helpDetails.append(node('summary',t('journal.help')),node('p',t('markdown.normalization'),'hint'),this.help);
     this.metadata=node('details');this.metadata.hidden=true;this.frontmatterView=node('pre');this.metadata.append(node('summary',t('markdown.metadata')),this.frontmatterView);
     this.tools=node('div',undefined,'markdown-tools');this.tools.setAttribute('role','group');this.tools.setAttribute('aria-label',t('markdown.formatting'));
-    for(const name of ['heading','bold','italic','list','quote','table','undo','redo']){
+    for(const name of ['paragraph','heading','bold','italic','strike','inline_code','code_block','list','ordered','tasks','link','quote','table','undo','redo']){
       const action=button(t('markdown.'+(name==='heading'?'heading_button':name)));
-      action.addEventListener('mousedown',event=>event.preventDefault());action.addEventListener('click',()=>{if(!this.readOnly&&!this.loading)this.editor?.command(name);});this.tools.append(action);
+      action.addEventListener('mousedown',event=>event.preventDefault());action.addEventListener('click',()=>{
+        if(this.readOnly||this.loading||!this.editor)return;
+        if(name==='link'){
+          const value=prompt(t('markdown.link_url'),this.editor.linkHref()||'https://');if(value===null)return;
+          if(!this.editor.command(name,value.trim()))this.status.textContent=t('markdown.invalid_link');else this.status.textContent='';
+        }else this.editor.command(name);
+      });this.tools.append(action);
     }
     this.rich=node('div',undefined,'journal-formatted');this.rich.id='journal-formatted';
     this.plain=node('div',undefined,'journal-source');const label=node('label',t('markdown.body'),'form-label');label.htmlFor='journal-body';

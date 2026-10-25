@@ -1010,5 +1010,14 @@
   "journal.reload_confirm": "Erstatt utkastet med det lagrede notatet? Last ned Markdown først for å beholde notatteksten.",
   "journal.review_saved": "Det lagrede notatet er forskjellig fra utkastet. Last ned utkastet før du laster inn det lagrede notatet.",
   "journal.too_large": "Notatteksten, inkludert frontmatter, kan være maksimalt 200 000 UTF-8-byte.",
-  "journal.help": "Hjelp til redigering"
+  "journal.help": "Hjelp til redigering",
+  "markdown.paragraph": "Avsnitt",
+  "markdown.strike": "Gjennomstreking",
+  "markdown.inline_code": "Kode i tekst",
+  "markdown.code_block": "Kodeblokk",
+  "markdown.ordered": "Nummerert liste",
+  "markdown.tasks": "Oppgaveliste",
+  "markdown.link": "Lenke",
+  "markdown.link_url": "Oppgi en nettadresse, e-postadresse med mailto: eller relativ lenke.",
+  "markdown.invalid_link": "Bruk en HTTP(S)-adresse, mailto: eller relativ lenke."
 }

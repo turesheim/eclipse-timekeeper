@@ -1010,5 +1010,14 @@
   "journal.reload_confirm": "Replace this draft with the saved note? Download Markdown first to keep the current body.",
   "journal.review_saved": "The saved note differs from this draft. Download your draft before reloading the saved note.",
   "journal.too_large": "Keep the note body within 200,000 UTF-8 bytes, including frontmatter.",
-  "journal.help": "Editing help"
+  "journal.help": "Editing help",
+  "markdown.paragraph": "Paragraph",
+  "markdown.strike": "Strikethrough",
+  "markdown.inline_code": "Inline code",
+  "markdown.code_block": "Code block",
+  "markdown.ordered": "Numbered list",
+  "markdown.tasks": "Task list",
+  "markdown.link": "Link",
+  "markdown.link_url": "Enter a web, email (mailto:) or relative link address.",
+  "markdown.invalid_link": "Use an HTTP(S), mailto: or relative link address."
 }

@@ -132,8 +132,10 @@ Labels accept up to 80 characters. The API independently stores a Markdown body
 (up to 200,000 UTF-8 bytes), with a lightweight body-presence marker in calendar
 summaries. Label-only edits preserve that body, and clearing a label leaves a
 body-only note discoverable. The expanded day-note dialog edits the short label
-and Markdown body independently. **Formatted** provides headings, bold, italic,
-lists, quotations, tables, task checkboxes and undo/redo. **Markdown source**
+and Markdown body independently. **Formatted** provides paragraphs, headings,
+bold, italic, strikethrough, inline/fenced code, bulleted/numbered/task lists,
+links, quotations, tables and undo/redo. Link addresses are validated; activating
+a rendered link does not navigate. **Markdown source**
 retains unsupported syntax, including Obsidian extensions. Opaque YAML
 frontmatter is shown separately and preserved in saves and downloads. Formatting
 normalization and keyboard guidance are available under **Editing help**.
