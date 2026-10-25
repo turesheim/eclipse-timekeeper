@@ -9,6 +9,9 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.util.HexFormat;
 import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.Collections;
+import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -21,6 +24,9 @@ final class JournalMarkdown {
         // Records must not accidentally put readable journals into diagnostic logs.
         @Override public String toString(){return "JournalMarkdown.Note[date="+date+"]";}
     }
+    record Document(Note note,Map<String,Object> metadata,boolean frontmatter) {
+        @Override public String toString(){return "JournalMarkdown.Document[date="+note.date()+"]";}
+    }
     static final class Invalid extends RuntimeException {
         final String code;
         Invalid(String code){super(code);this.code=code;}
@@ -32,16 +38,20 @@ final class JournalMarkdown {
         catch(ApiFailure failure){throw invalid("INVALID_DATE");}
     }
     static Note parse(String filename,byte[] bytes){
+        return document(filename,bytes).note();
+    }
+    static Document document(String filename,byte[] bytes){
         LocalDate date=date(filename);
         if(bytes.length>FILE_BYTES)throw invalid("FILE_TOO_LARGE");
         final String source;
         try {source=StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();}
         catch(CharacterCodingException failure){throw invalid("INVALID_UTF8");}
-        String label="",body=source;
+        String label="",body=source;boolean frontmatter=false;var properties=new LinkedHashMap<String,Object>();
         int first=source.startsWith("\ufeff")?1:0;
         int openingEnd=lineEnd(source,first);
         if(line(source,first,openingEnd).equals("---")&&openingEnd<source.length()){
+            frontmatter=true;
             int yamlStart=openingEnd+1,closing=-1,bodyStart=-1;
             for(int start=yamlStart;start<=source.length();){
                 int end=lineEnd(source,start);String delimiter=line(source,start,end);
@@ -61,6 +71,7 @@ final class JournalMarkdown {
             if(metadata!=null&&!(metadata instanceof Map<?,?>))throw invalid("INVALID_FRONTMATTER");
             if(metadata instanceof Map<?,?> map){
                 if(map.keySet().stream().anyMatch(key->!(key instanceof String)))throw invalid("INVALID_FRONTMATTER");
+                map.forEach((key,value)->properties.put((String)key,value));
                 Object value=map.get("timekeeper-label");
                 if(value!=null&&!(value instanceof String))throw invalid("INVALID_LABEL");
                 if(value instanceof String text)label=text.strip();
@@ -69,7 +80,26 @@ final class JournalMarkdown {
         }
         if(label.codePointCount(0,label.length())>80||label.codePoints().anyMatch(Character::isISOControl))throw invalid("INVALID_LABEL");
         if(body.getBytes(StandardCharsets.UTF_8).length>DayNotes.BODY_BYTES)throw invalid("BODY_TOO_LARGE");
-        return new Note(date,label,body,hash(bytes));
+        return new Document(new Note(date,label,body,hash(bytes)),Collections.unmodifiableMap(properties),frontmatter);
+    }
+    static byte[] render(String filename,byte[] original,String label,String body){
+        date(filename);Document prior=original==null?null:document(filename,original);
+        if(prior!=null&&prior.note().label().equals(label)&&prior.note().body().equals(body))return original.clone();
+        var properties=new LinkedHashMap<String,Object>();if(prior!=null)properties.putAll(prior.metadata());
+        if(label.isEmpty())properties.remove("timekeeper-label");else properties.put("timekeeper-label",label);
+        String source=body;
+        int first=body.startsWith("\ufeff")?1:0,end=lineEnd(body,first);
+        boolean ambiguousBody=line(body,first,end).equals("---")&&end<body.length();
+        if(!properties.isEmpty()||(prior!=null&&prior.frontmatter())||ambiguousBody){
+            var options=new DumperOptions();options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);options.setSplitLines(false);
+            final String yaml;
+            try{yaml=new Yaml(options).dump(properties);}
+            catch(RuntimeException failure){throw invalid("INVALID_EXPORT");}
+            source="---\n"+yaml+"---\n"+body;
+        }
+        byte[] bytes=source.getBytes(StandardCharsets.UTF_8);Note exported=parse(filename,bytes);
+        if(!exported.label().equals(label)||!exported.body().equals(body))throw invalid("INVALID_EXPORT");
+        return bytes;
     }
     private static int lineEnd(String text,int start){int end=text.indexOf('\n',start);return end<0?text.length():end;}
     private static String line(String text,int start,int end){return text.substring(start,end>start&&text.charAt(end-1)=='\r'?end-1:end);}

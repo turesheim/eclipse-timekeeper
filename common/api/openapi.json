@@ -9030,7 +9030,7 @@
       },
       "delete": {
         "operationId": "deleteDayNote",
-        "summary": "Clear both label and body, retaining the version tombstone",
+        "summary": "Delete the note, retaining its versioned deletion marker",
         "x-required-permission": "write",
         "responses": {
           "400": {
@@ -9087,7 +9087,8 @@
           {
             "$ref": "#/components/parameters/Csrf"
           }
-        ]
+        ],
+        "description": "Retain a versioned tombstone distinct from clearing content. Repeated deletion with its current ETag is a no-op; a later conditional save deliberately restores the note."
       }
     },
     "/journal": {
@@ -17776,6 +17777,11 @@
           "hasBody": {
             "type": "boolean",
             "description": "Whether the Markdown body contains any bytes, including whitespace."
+          },
+          "deleted": {
+            "type": "boolean",
+            "readOnly": true,
+            "description": "Versioned deletion marker. Clearing label/body leaves this false; DELETE sets it true. A deliberate save restores the note, including an explicitly empty file. Never-seen dates have version zero and deleted false."
           }
         }
       },
@@ -17831,6 +17837,11 @@
           "hasBody": {
             "type": "boolean",
             "description": "Whether the Markdown body contains any bytes, including whitespace."
+          },
+          "deleted": {
+            "type": "boolean",
+            "readOnly": true,
+            "description": "Versioned deletion marker. Clearing label/body leaves this false; DELETE sets it true. A deliberate save restores the note, including an explicitly empty file. Never-seen dates have version zero and deleted false."
           }
         },
         "description": "Private calendar metadata only. Fetch /day-notes/{date} with its ETag to read or change the complete note."
@@ -18001,6 +18012,11 @@
           "lastImportAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "bidirectional": {
+            "type": "boolean",
+            "readOnly": true,
+            "description": "Explicit permission for prepared outbound journal exchanges. Existing write-only devices default to false."
           }
         },
         "required": [

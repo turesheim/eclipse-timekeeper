@@ -23,6 +23,7 @@ final class DayNotes {
     ObjectNode get(LocalDate date){
         var value=store.find(TYPE,id(date)).map(record->((ObjectNode)record).deepCopy()).orElseGet(()->object().put("id",id(date).toString()).put("ownerId",store.owner()).put("version",0).put("date",date.toString()).put("text",""));
         if(!value.has("body"))value.put("body","");
+        if(!value.has("deleted"))value.put("deleted",false);
         return value.put("hasBody",!value.path("body").asText().isEmpty());
     }
     static boolean hasContent(JsonNode note){return !note.path("text").asText().isEmpty()||!note.path("body").asText().isEmpty();}
@@ -38,14 +39,23 @@ final class DayNotes {
         return save(date,match,object().put("text",text));
     }
     ObjectNode save(LocalDate date,String match,JsonNode input){
+        return write(date,match,input,false,false);
+    }
+    ObjectNode present(LocalDate date,String match,JsonNode input){
+        return write(date,match,input,false,true);
+    }
+    ObjectNode delete(LocalDate date,String match){
+        return write(date,match,object().put("text","").put("body",""),true,true);
+    }
+    private ObjectNode write(LocalDate date,String match,JsonNode input,boolean deleted,boolean materialize){
         var previous=get(date);ApiReplies.match(previous,match);
         String text=input.has("text")?input.get("text").asText().strip():previous.path("text").asText();
         String body=input.has("body")?input.get("body").asText():previous.path("body").asText();
         if(text.codePointCount(0,text.length())>80 || text.codePoints().anyMatch(Character::isISOControl))throw ApiFailure.validation();
         if(!StandardCharsets.UTF_8.newEncoder().canEncode(body)||body.getBytes(StandardCharsets.UTF_8).length>BODY_BYTES)throw ApiFailure.validation();
-        if(previous.path("text").asText().equals(text)&&previous.path("body").asText().equals(body))return previous;
+        if(previous.path("text").asText().equals(text)&&previous.path("body").asText().equals(body)&&previous.path("deleted").asBoolean()==deleted&&(!materialize||previous.path("version").asLong()>0))return previous;
         long version=previous.path("version").asLong();if(version>=9007199254740991L)throw ApiFailure.conflict();
-        var value=previous.deepCopy().put("version",version+1).put("text",text).put("body",body).put("hasBody",!body.isEmpty());
+        var value=previous.deepCopy().put("version",version+1).put("text",text).put("body",body).put("hasBody",!body.isEmpty()).put("deleted",deleted);
         var stored=value.deepCopy();stored.remove("hasBody");
         if(version==0)store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,1,?)",store.owner(),TYPE,id(date),stored.toString());
         else if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,stored.toString(),store.owner(),TYPE,id(date),version)!=1)throw new ApiFailure(412,"STALE_VERSION");
