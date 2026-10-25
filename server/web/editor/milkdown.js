@@ -13,6 +13,11 @@ import '@milkdown/kit/prose/tables/style/tables.css';
 const commands={bold:toggleStrongCommand,italic:toggleEmphasisCommand,heading:wrapInHeadingCommand,list:wrapInBulletListCommand,quote:wrapInBlockquoteCommand,table:insertTableCommand,undo:undoCommand,redo:redoCommand};
 const sourceNodes=new Set(['html','image','imageReference','linkReference','definition','footnoteReference','footnoteDefinition']);
 const safeLink=url=>{try{return ['https:','http:','mailto:'].includes(new URL(url,location.origin).protocol);}catch{return false;}};
+const safeDocument=doc=>{
+  let safe=true;
+  doc.descendants(node=>{if(node.type.name==='image'||node.marks.some(mark=>mark.type.name==='link'&&!safeLink(mark.attrs.href)))safe=false;return safe;});
+  return safe;
+};
 const unsupported=node=>!['code','inlineCode'].includes(node.type)&&(sourceNodes.has(node.type)||node.type==='link'&&!safeLink(node.url)||node.type==='text'&&hasUnsupportedSyntax(node.value)||Boolean(node.children?.some(unsupported)));
 // Presentation choices (blank-line spacing, bullet markers) can normalize on an
 // actual rich edit. All semantic fields must survive the initial round trip.
@@ -36,7 +41,7 @@ function taskItem(node,view,getPos,taskLabel){
   return {dom,contentDOM,update(value){if(value.type!==node.type)return false;paint(value);return true;},stopEvent:event=>event.target===checkbox,ignoreMutation:mutation=>mutation.type==='attributes'&&(mutation.target===checkbox||mutation.target===dom)};
 }
 export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,readOnly=false}){
-  const changePlugin=$prose(()=>new Plugin({filterTransaction:transaction=>!readOnly||!transaction.docChanged,view:()=>({update:(view,previous)=>{if(!view.state.doc.eq(previous.doc))changed?.();}})}));
+  const changePlugin=$prose(()=>new Plugin({filterTransaction:transaction=>!transaction.docChanged||!readOnly&&safeDocument(transaction.doc),view:()=>({update:(view,previous)=>{if(!view.state.doc.eq(previous.doc))changed?.();}})}));
   const editor=Editor.make().config(ctx=>{
     ctx.set(rootCtx,root);ctx.set(defaultValueCtx,value);
     ctx.set(editorViewOptionsCtx,{

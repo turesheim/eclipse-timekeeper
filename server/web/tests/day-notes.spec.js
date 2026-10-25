@@ -235,6 +235,7 @@ test('journal preserves unsupported source, opaque frontmatter and exact label-o
     const waiting=page.waitForEvent('download');await dialog(page).getByRole('button',{name:'Download Markdown',exact:true}).click();const download=await waiting;expect(download.suggestedFilename()).toBe('2026-05-17.md');expect(await readFile(await download.path(),'utf8')).toBe(body);
     await save(page,'Separate label');expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe(body);expect(external).toEqual([]);
     await menu(page);await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('[unsafe](javascript:alert(1))');await dialog(page).getByRole('button',{name:'Formatted',exact:true}).click();await expect(dialog(page)).toContainText('cannot safely preserve');await expect(dialog(page).locator('a[href^="javascript:"]')).toHaveCount(0);
+    await dialog(page).getByRole('button',{name:'Clear note body',exact:true}).click();const rich=page.locator('#journal-formatted .ProseMirror');await expect(rich).toBeVisible();await rich.pressSequentially('[unsafe](javascript:alert(1)) ');await expect(rich.locator('a[href^="javascript:"]')).toHaveCount(0);
     expect(await page.evaluate(()=>JSON.stringify({...localStorage,...sessionStorage}))).not.toContain('Daily link');
   }finally{await owner.close();}
 });
