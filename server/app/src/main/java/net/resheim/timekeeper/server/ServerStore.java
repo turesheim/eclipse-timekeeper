@@ -35,6 +35,7 @@ public class ServerStore {
     @Inject RecoveryMail recoveryMail;
     @Inject PasskeyRealm passkeyRealm;
     @Inject ServiceSettings serviceSettings;
+    @Inject JournalSynchronization journalSynchronization;
     private final java.util.concurrent.ConcurrentMap<String,String> partitionDates=new java.util.concurrent.ConcurrentHashMap<>();
     private java.util.concurrent.ScheduledExecutorService maintenance;
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="quarkus.datasource.jdbc.url") String jdbcUrl;
@@ -58,6 +59,7 @@ public class ServerStore {
         passkeyRealm.initialize();
         recoveryMail.initialize();
         initializeConfiguredOwners();
+        journalSynchronization.start();
         maintenance=java.util.concurrent.Executors.newSingleThreadScheduledExecutor(work -> {
             var thread=new Thread(work,"Timekeeper day boundaries");thread.setDaemon(true);return thread;
         });

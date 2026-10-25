@@ -34,7 +34,7 @@ class JournalDevicesTest {
             new JournalDevices(store).enabled(true);new JournalState(store).insert(JOURNAL_LEASE,lease,object().put("deviceId",id.toString()).put("state","RECEIVING"));
             new JournalImport(store).seal(batch,id,1,Map.of("2026-10-25.md",new byte[0]));new JournalDevices(store).revoke(id);
             assertEquals("ABORTED",new JournalState(store).required(JOURNAL_LEASE,lease).path("state").asText());
-            var item=new JournalState(store).list(JOURNAL_ITEM).getFirst();assertEquals("ABORTED",item.path("state").asText());assertTrue(item.has("source"));assertTrue(new JournalImport(store).pending().isEmpty());return null;
+            var item=new JournalState(store).list(JOURNAL_ITEM).getFirst();assertEquals("ABORTED",item.path("state").asText());assertTrue(item.has("sourceId"));assertFalse(item.has("source"));assertTrue(new JournalImport(store).pending().isEmpty());return null;
         });
         assertEquals("JOURNAL_DEVICE_REVOKED",assertThrows(ApiFailure.class,()->store.transaction("a",()->new JournalDevices(store).authorize(id))).code);
         UUID other=uuid(enroll().get("id"));store.transaction("a",()->{var devices=new JournalDevices(store);long epoch=devices.settings().path("epoch").asLong();devices.enabled(false);devices.enabled(true);assertEquals(epoch+2,devices.settings().path("epoch").asLong());return null;});
