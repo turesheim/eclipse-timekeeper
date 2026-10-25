@@ -261,6 +261,7 @@ test('journal read-only viewing prevents body and task writes and clears sensiti
     await api('PUT','/day-notes/2026-05-17',{body:'# Private journal\n\n- [ ] Private task\n'},{'If-Match':initial.headers().etag});const token=await(await api('POST','/auth/tokens',{name:'Journal viewer',permissions:['read'],expiresAt:null})).json();
     await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();await month(read);await note(read).click();
     await expect(read.locator('#journal-formatted .ProseMirror')).toHaveAttribute('contenteditable','false');await expect(dialog(read).getByRole('checkbox')).toBeDisabled();await expect(dialog(read).getByRole('button',{name:'Save',exact:true})).toBeDisabled();
+    const readBody=read.locator('#journal-formatted .ProseMirror'),original=await readBody.textContent();await readBody.focus();await readBody.press('Enter');await readBody.press('ControlOrMeta+B');await readBody.press('x');await expect(readBody).toHaveText(original);
     await dialog(read).getByRole('button',{name:'Markdown source',exact:true}).click();await expect(read.locator('#journal-body')).toHaveJSProperty('readOnly',true);await expect(read.locator('#track-note-text')).toHaveJSProperty('readOnly',true);
     await month(page);await menu(page);await expect(page.locator('#journal-formatted .ProseMirror')).toContainText('Private journal');await api('POST','/auth/logout');
     await expect(page.locator('#workspace')).toBeHidden();await expect(dialog(page)).toBeHidden();await expect(page.locator('#journal-body')).toHaveValue('');expect(await page.locator('#journal-formatted').textContent()).toBe('');
@@ -272,12 +273,44 @@ test('journal formatted editing fits narrow screens and all themes with accessib
   const owner=await context(browser,{viewport:{width:390,height:844},hasTouch:true,isMobile:true}),page=await owner.newPage();
   try{
     await signIn(page,await fresh(request));const api=await apiFor(page),initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body:'# Journal entry\n\n- [ ] Touch task\n\n| Topic | Status |\n| --- | --- |\n| Writing | Ready |\n'},{'If-Match':initial.headers().etag});await month(page);await note(page).tap();
-    const rich=page.locator('#journal-formatted .ProseMirror');await expect(rich).toBeVisible();await rich.getByRole('checkbox').tap();await expect(rich.getByRole('checkbox')).toBeChecked();
+    const rich=page.locator('#journal-formatted .ProseMirror');await expect(rich).toBeVisible();await rich.getByRole('checkbox').tap();await expect(rich.getByRole('checkbox')).toBeChecked();await save(page,'Touch label');
     for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-      await setTheme(page,theme);const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>value.id)).toEqual([]);
-      expect(await dialog(page).evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);
+      await setTheme(page,theme);await note(page).tap();await expect(rich).toBeVisible();const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>value.id)).toEqual([]);
+      expect(await dialog(page).evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);await dialog(page).getByRole('button',{name:'Cancel',exact:true}).click();
     }
-    await page.setViewportSize({width:320,height:740});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.setViewportSize({width:320,height:740});await note(page).tap();await expect(rich).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await captureScreenshot(page,{path:'test-results/journal-editor-mobile.png'});await save(page,'Touch label');await expect(note(page).locator('.bi-journal-text')).toBeVisible();await expect(note(page)).toHaveCSS('opacity','1');
+  }finally{await owner.close();}
+});
+
+test('journal keeps source usable after an editor load failure and protects a draft from account navigation',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage();
+  try{
+    await signIn(page,await fresh(request));const api=await apiFor(page),initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body:'Original source'},{'If-Match':initial.headers().etag});
+    let fail=true,failRead=true;await page.route('**/assets/milkdown/milkdown.js*',route=>fail?route.abort('failed'):route.continue());
+    await page.route('**/api/v1/day-notes/2026-05-17',route=>failRead&&route.request().method()==='GET'?route.fulfill({status:503,contentType:'application/problem+json',body:JSON.stringify({code:'UNAVAILABLE'})}):route.continue());
+    await month(page);await note(page).click();await expect(dialog(page).getByRole('alert')).toBeVisible();await expect(page.locator('#track-note-text')).toBeDisabled();await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeDisabled();failRead=false;
+    await dialog(page).getByRole('button',{name:'Reload saved note',exact:true}).click();await expect(dialog(page)).toContainText('could not be loaded');await expect(page.locator('#journal-body')).toHaveValue('Original source');
+    await page.locator('#journal-body').fill('Retained source draft');await page.evaluate(()=>{location.hash='#account/profile';});await expect.poll(()=>page.evaluate(()=>location.hash)).toBe('');await expect(dialog(page)).toBeVisible();await expect(page.locator('#account-page')).toBeHidden();
+    fail=false;await dialog(page).getByRole('button',{name:'Formatted',exact:true}).click();await expect(page.locator('#journal-formatted .ProseMirror')).toHaveText('Retained source draft');await save(page,'Retry worked');expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe('Retained source draft');
+  }finally{await owner.close();}
+});
+
+test('journal clears a private source before a delayed editor bundle can finish after logout',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage();let release=()=>{};
+  try{
+    await signIn(page,await fresh(request));const api=await apiFor(page),initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body:'Private delayed journal marker'},{'If-Match':initial.headers().etag});
+    let seen=false;const waiting=new Promise(resolve=>{release=resolve;});await page.route('**/assets/milkdown/milkdown.js*',async route=>{seen=true;await waiting;await route.continue().catch(()=>{});});await month(page);await menu(page);await expect.poll(()=>seen).toBe(true);await expect(page.locator('#journal-body')).toHaveValue('Private delayed journal marker');
+    await api('POST','/auth/logout');await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#journal-body')).toHaveValue('');release();await expect(page.locator('#journal-formatted .ProseMirror')).toHaveCount(0);expect(await page.locator('#track-note-editor').textContent()).not.toContain('Private delayed journal marker');
+  }finally{release();await owner.close();}
+});
+
+test('journal controls use the account language and reject oversized UTF-8 drafts without losing them',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage();
+  try{
+    await signIn(page,await fresh(request));const api=await apiFor(page),profile=await api('GET','/me');await api('PUT','/me',{locale:'nb'},{'If-Match':profile.headers().etag});await page.reload();await expect(page.locator('#workspace')).toBeVisible();await page.locator('#track-month').fill('2026-05');await expect(note(page)).toBeEnabled();await note(page).click();
+    await expect(page.locator('#journal-formatted .ProseMirror')).toBeVisible();await expect(dialog(page).getByRole('button',{name:'Tøm notatteksten',exact:true})).toBeVisible();await expect(dialog(page).getByRole('button',{name:'Last ned Markdown',exact:true})).toBeVisible();
+    await dialog(page).getByRole('button',{name:'Markdown-kilde',exact:true}).click();const value='ø'.repeat(100001);await page.locator('#journal-body').fill(value);await dialog(page).getByRole('button',{name:'Lagre',exact:true}).click();await expect(dialog(page).getByRole('alert')).toContainText('200 000');await expect(page.locator('#journal-body')).toHaveValue(value);
+    const saved=await api('GET','/day-notes/2026-05-17');expect((await saved.json()).version).toBe(0);
   }finally{await owner.close();}
 });

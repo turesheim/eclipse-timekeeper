@@ -106,8 +106,8 @@ export class TrackDayNotes {
   setWritable(value){this.writable=value;if(!value){this.cancelHold();this.closeMenu();}this.controls();this.paint();}
   controls(){
     const editor=this.editor;if(!editor)return;
-    this.text.disabled=editor.loading||editor.busy||editor.uncertain;this.text.readOnly=!this.writable;
-    const readOnly=editor.loading||editor.busy||editor.uncertain||!this.writable;
+    this.text.disabled=editor.loading||editor.busy||editor.uncertain||!editor.etag;this.text.readOnly=!this.writable;
+    const readOnly=editor.loading||editor.busy||editor.uncertain||!editor.etag||!this.writable;
     if(this.markdown&&this.markdown.readOnly!==readOnly)this.markdown.setReadOnly(readOnly);
     this.save.disabled=editor.loading||editor.busy||this.markdown?.loading||editor.uncertain||editor.stale||!editor.etag||!this.writable;
     this.cancel.disabled=editor.busy;
