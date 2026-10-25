@@ -45,6 +45,9 @@ public class JournalGatewayResource {
     @POST @Path("/transfers/{id}/heartbeat") public Response heartbeat(@PathParam("username")String username,@PathParam("id")String id,JsonNode input){
         fields(input);var transfer=ContractInputs.pathId(id);return call(username,gateway->synchronization.heartbeat(gateway,transfer));
     }
+    @POST @Path("/transfers/{id}/abort") public Response abort(@PathParam("username")String username,@PathParam("id")String id,JsonNode input){
+        fields(input);var transfer=ContractInputs.pathId(id);return call(username,gateway->synchronization.abort(gateway,transfer));
+    }
     @PUT @Path("/transfers/{id}/files/{filename}") public Response upload(@PathParam("username")String username,@PathParam("id")String id,@PathParam("filename")String filename,JsonNode input){
         fields(input,"data");String data=text(input,"data",4*((JournalMarkdown.FILE_BYTES+2)/3));var transfer=ContractInputs.pathId(id);return call(username,gateway->synchronization.upload(gateway,transfer,filename,data));
     }

@@ -151,7 +151,7 @@ def receive(user,device):
             with contextlib.suppress(ProcessLookupError):os.killpg(process.pid,signal.SIGKILL)
             raise Failure('JOURNAL_TRANSFER_ABORTED')
         signal.signal(signal.SIGTERM,cancel);signal.signal(signal.SIGHUP,cancel);signal.signal(signal.SIGINT,cancel)
-        deadline=time.monotonic()+900
+        deadline=time.monotonic()+900;completed=False
         try:
             while process.poll() is None:
                 if time.monotonic()>deadline:raise Failure('JOURNAL_TRANSFER_EXPIRED')
@@ -164,6 +164,7 @@ def receive(user,device):
             manifest['completed']=True
             # Explicit seal only after rsync exit 0 and all content/manifest checks.
             request(config,'/transfers/'+identifier+'/complete',manifest)
+            completed=True
             while request(config,'/transfers/'+identifier+'/settle',{})['pending']:
                 if time.monotonic()>deadline:raise Failure('JOURNAL_IMPORT_PENDING')
                 time.sleep(1)
@@ -171,6 +172,8 @@ def receive(user,device):
             if process.poll() is None:
                 with contextlib.suppress(ProcessLookupError):os.killpg(process.pid,signal.SIGKILL)
             process.wait(timeout=5)
+            if not completed:
+                with contextlib.suppress(Failure):request(config,'/transfers/'+identifier+'/abort',{})
 
 
 def main():

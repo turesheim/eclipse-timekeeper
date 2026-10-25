@@ -32,10 +32,10 @@ def command(*args,input=None,check=True):
 
 
 class Api:
-    def __init__(self,base,certificate):
-        self.base=base;self.csrf=None;self.opener=build_opener(HTTPCookieProcessor(http.cookiejar.CookieJar()),HTTPSHandler(context=ssl.create_default_context(cafile=certificate)))
+    def __init__(self,base,certificate,origin=None):
+        self.base=base;self.origin=origin or base;self.csrf=None;self.opener=build_opener(HTTPCookieProcessor(http.cookiejar.CookieJar()),HTTPSHandler(context=ssl.create_default_context(cafile=certificate)))
     def call(self,method,path,body=None,match=None,status=200):
-        headers={'Origin':self.base,'Accept':'application/json'}
+        headers={'Origin':self.origin,'Accept':'application/json'}
         if body is not None:headers['Content-Type']='application/json'
         if self.csrf:headers['X-CSRF-Token']=self.csrf
         if match:headers['If-Match']=match
@@ -63,7 +63,7 @@ def main():
             return docker('run','--rm','-i','-v',volume+':/target','-v',str(directory)+':/fixture:ro','--entrypoint','/usr/bin/python3',GATEWAY_IMAGE,'-c',program,input=input)
         def client(*arguments,check=True):
             return docker('exec','--user','30000:30000',client_name,*arguments,check=check)
-        def python(program,input=None):return docker('exec','--user','30000:30000','-i',client_name,'python3','-c',program,input=input)
+        def python(program,input=None,check=True):return docker('exec','--user','30000:30000','-i',client_name,'python3','-c',program,input=input,check=check)
         def tool(action,profile='profile-a.json',*options,check=True):
             return client('python3','/tools/journal-client.py',action,'--profile','/client/'+profile,*options,check=check)
         def copy_client(name,value):
@@ -84,14 +84,14 @@ def main():
             populate(app_volume,"import os,shutil;from pathlib import Path;root=Path('/target');root.chmod(0o700);os.chown(root,10001,10001);p=root/'incoming';p.mkdir(mode=0o700);os.chown(p,10001,10001)\nfor name in ['tls.key','tls.crt','setup.json','tokens.json']:\n p=root/name;shutil.copyfile('/fixture/'+name,p);p.chmod(0o600);os.chown(p,10001,10001)")
             host=populate(gateway_volume,"import subprocess;from pathlib import Path;p=Path('/target/host');p.mkdir(mode=0o700);subprocess.run(['ssh-keygen','-q','-t','ed25519','-N','','-f',str(p/'ssh_host_ed25519_key')],check=True);print((p/'ssh_host_ed25519_key.pub').read_text().split(' ')[0]+' '+(p/'ssh_host_ed25519_key.pub').read_text().split(' ')[1])").stdout.decode().strip()
             with socket.socket() as reserved:reserved.bind(('127.0.0.1',0));port=reserved.getsockname()[1]
-            base='https://127.0.0.1:'+str(port);app_name='journal-app-'+suffix;containers.append(app_name)
+            base='https://127.0.0.1:'+str(port);origin='https://web.test:8443';app_name='journal-app-'+suffix;containers.append(app_name)
             docker('run','-d','--name',app_name,'--network',network,'--network-alias','web.test','--user','10001:10001','-p','127.0.0.1:'+str(port)+':8443',
                    '-v',app_volume+':/data','-v',str(directory/'unpacked/timekeeper-server')+':/app:ro','-w','/app',
                    '-e','TIMEKEEPER_SERVER_DB_URL=jdbc:h2:/data/database','-e','TIMEKEEPER_SERVER_TOKENS_FILE=/data/tokens.json','-e','TIMEKEEPER_SERVER_SETUP_FILE=/data/setup.json',
-                   '-e','TIMEKEEPER_JOURNAL_CONFIGURATION_FILE=/data/journal.json','-e','TIMEKEEPER_PUBLIC_ORIGIN='+base,'-e','TIMEKEEPER_PASSKEYS_ENABLED=false',
+                   '-e','TIMEKEEPER_JOURNAL_CONFIGURATION_FILE=/data/journal.json','-e','TIMEKEEPER_PUBLIC_ORIGIN='+origin,'-e','TIMEKEEPER_PASSKEYS_ENABLED=false',
                    '-e','QUARKUS_HTTP_HOST=0.0.0.0','-e','QUARKUS_HTTP_INSECURE_REQUESTS=disabled','-e','QUARKUS_HTTP_SSL_PORT=8443',
                    '-e','QUARKUS_HTTP_SSL_CERTIFICATE_FILES=/data/tls.crt','-e','QUARKUS_HTTP_SSL_CERTIFICATE_KEY_FILES=/data/tls.key','eclipse-temurin:21-jre-jammy','java','-jar','quarkus-run.jar')
-            admin=Api(base,str(directory/'tls.crt'));deadline=time.monotonic()+60
+            admin=Api(base,str(directory/'tls.crt'),origin);deadline=time.monotonic()+60
             while True:
                 try:admin.call('GET','/auth/status');break
                 except (URLError,ConnectionError):
@@ -102,7 +102,7 @@ def main():
             actors=[]
             for name in ['a','b']:
                 value,_=admin.call('POST','/admin/users',{'username':'journal-'+name,'password':password,'displayName':'Journal '+name,'email':'journal-'+name+'@example.invalid','administrator':False},status=201)
-                api=Api(base,str(directory/'tls.crt'));api.call('GET','/auth/status');api.call('POST','/auth/login',{'username':'journal-'+name,'password':password,'remember':False});actors.append((value['user']['ownerId'],api))
+                api=Api(base,str(directory/'tls.crt'),origin);api.call('GET','/auth/status');api.call('POST','/auth/login',{'username':'journal-'+name,'password':password,'remember':False});actors.append((value['user']['ownerId'],api))
             tokens=[secrets.token_urlsafe(32),secrets.token_urlsafe(32)]
             config={'format':1,'hostname':'gateway.test','port':2222,'hostKey':host,'incomingRoot':'/data/incoming','encryptedStorage':True,'backupKeysSeparated':True,
                     'accounts':[{'ownerId':owner,'username':'journal_'+name,'brokerTokenSha256':hashlib.sha256(token.encode()).hexdigest()} for (owner,api),name,token in zip(actors,['a','b'],tokens)]}
@@ -150,6 +150,38 @@ def main():
             status,_=actors[0][1].call('GET','/journal');assert status['health']['lastVerifiedAt'] and status['health']['lastImportAt'] and status['health']['pending']==0
             assert 'UNRELATED_VAULT' not in json.dumps(status)
             print('Real clean-client SSH enrollment, HTTPS host pin, quoted paths, transfer/import, no-op and account isolation: PASS')
+            def client_module(profile='profile-a.json'):
+                return 'import importlib.util,pathlib,argparse,subprocess,sys,shlex;s=importlib.util.spec_from_file_location("c","/tools/journal-client.py");c=importlib.util.module_from_spec(s);s.loader.exec_module(c);d,f,i,t=c.local_config(argparse.Namespace(profile=pathlib.Path('+repr('/client/'+profile)+')));'
+            def ssh(remote,profile='profile-a.json',username=None,options=(),raw_pin=False):
+                prefix=client_module(profile)
+                if raw_pin:prefix=prefix.split('d,f,i,t=c.local_config')[0]+'p=pathlib.Path('+repr('/client/'+profile)+');d=c.profile(p);local,t=c.paths(p);i=pathlib.Path(c.read_json(local)["identity"]);'
+                # An adversarial client deliberately requests forwarding instead
+                # of using the normal client's ClearAllForwardings safeguard.
+                return python(prefix+'a=c.ssh_arguments(d,i,t);'+('n=a.index("ClearAllForwardings=yes");del a[n-1:n+1];' if options else '')+'r=subprocess.run(a+'+repr(list(options))+'+["-l",'+repr(username)+' or d["username"],d["hostname"],'+repr(remote)+']);sys.exit(r.returncode)',check=False)
+            def raw_sync(folder,options=(),destination='.',profile='profile-a.json'):
+                return python(client_module(profile)+'r=subprocess.run(["rsync","-r","--rsh",shlex.join(c.ssh_arguments(d,i,t))]+'+repr(list(options))+'+['+repr(folder+'/')+',d["username"]+"@"+d["hostname"]+":"+'+repr(destination)+']);sys.exit(r.returncode)',check=False)
+            for remote in ['id','sh','rsync --server --sender -r . .','rsync --daemon','rsync --server -r . ../../escape']:
+                assert ssh(remote).returncode,'Restricted SSH command was accepted'
+            assert ssh('timekeeper-journal-test',username='journal_b').returncode,'Cross-account key was accepted'
+            assert ssh('timekeeper-journal-test',options=['-o','ExitOnForwardFailure=yes','-R','0:127.0.0.1:8443']).returncode,'SSH forwarding was accepted'
+            # Bypass the normal client filters: a completed rsync with an invalid
+            # manifest must still fail its SSH acknowledgement and import nothing.
+            python("from pathlib import Path;import json;p=Path('/client/attack');p.mkdir();(p/'.timekeeper-batch.json').write_text(json.dumps({'format':1,'files':[],'errors':[]}));(p/'2026-10-24.md').write_text('UNACKNOWLEDGED_NOTE_SENTINEL')")
+            assert raw_sync('/client/attack').returncode,'Post-rsync validation failure was not propagated'
+            assert actors[0][1].call('GET','/day-notes/2026-10-24')[0]['version']==0
+            python("from pathlib import Path;p=Path('/client/attack');(p/'2026-10-24.md').unlink();(p/'2026-10-24.md').symlink_to('/etc/passwd')")
+            assert raw_sync('/client/attack',options=['--links']).returncode,'Remote symlink upload was accepted'
+            assert raw_sync('/client/attack',destination='../escape').returncode,'Rsync traversal was accepted'
+            python("from pathlib import Path;import subprocess;p=Path('/client/other-host');subprocess.run(['ssh-keygen','-q','-t','ed25519','-N','','-f',str(p)],check=True)")
+            changed=client('cat','/client/other-host.pub').stdout.decode().split()[:2]
+            # Replace only the local pin with an unrelated real key to exercise
+            # OpenSSH mismatch handling, then restore the authenticated pin.
+            python(client_module()+"p=t/'known_hosts';old=p.read_bytes();(t/'original-pin').write_bytes(old);p.write_text(d['hostAlias']+' '+"+repr(' '.join(changed))+"+'\\n')")
+            mismatch=ssh('timekeeper-journal-test',raw_pin=True)
+            assert mismatch.returncode and b'REMOTE HOST IDENTIFICATION HAS CHANGED' in mismatch.stderr,'Host mismatch was accepted'
+            python(client_module().split('d,f,i,t=c.local_config')[0]+"p=pathlib.Path('/client/profile-a.json');_,t=c.paths(p);(t/'known_hosts').write_bytes((t/'original-pin').read_bytes());(t/'original-pin').unlink()")
+            assert not tool('verify').returncode
+            print('Real SSH command/forwarding/cross-account, malformed handoff, symlink, traversal and host mismatch denial: PASS')
             (output/'acceptance.json').write_text(json.dumps({'passed':True,'distributionSha256':digest,'sourceCommit':manifest['commit'],'rsync':'3.5.1','realSsh':True,'realHttps':True})+'\n')
             # Additional adversarial and recovery checks are appended below as the transport evolves.
         finally:

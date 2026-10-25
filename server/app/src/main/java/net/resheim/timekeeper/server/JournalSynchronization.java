@@ -100,6 +100,14 @@ class JournalSynchronization {
         if(!hardEnd.isAfter(store.now()))throw new ApiFailure(409,"JOURNAL_TRANSFER_EXPIRED");
         value=new JournalState(store).update(JOURNAL_LEASE,value.put("expiresAt",(next.isBefore(hardEnd)?next:hardEnd).toString()));return leaseReply(value);
     }
+    ObjectNode abort(Gateway gateway,UUID id){
+        var state=new JournalState(store);var value=state.required(JOURNAL_LEASE,id);
+        if(value.path("state").asText().equals("RECEIVING")){
+            state.update(JOURNAL_LEASE,value.put("state","ABORTED").put("error","JOURNAL_TRANSFER_ABORTED"));
+            new JournalRetention(store).cleanup(gateway.deployment());
+        }
+        return object().put("status",value.path("state").asText());
+    }
     ObjectNode upload(Gateway gateway,UUID id,String filename,String encoded){
         lease(gateway,id,false);
         if(filename==null||!filename.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}\\.md")||encoded==null||encoded.length()>4*((JournalMarkdown.FILE_BYTES+2)/3))throw ApiFailure.validation();
