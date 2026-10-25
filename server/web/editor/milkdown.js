@@ -40,12 +40,12 @@ function taskItem(node,view,getPos,taskLabel){
   });
   return {dom,contentDOM,update(value){if(value.type!==node.type)return false;paint(value);return true;},stopEvent:event=>event.target===checkbox,ignoreMutation:mutation=>mutation.type==='attributes'&&(mutation.target===checkbox||mutation.target===dom)};
 }
-export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,readOnly=false}){
+export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,description,readOnly=false}){
   const changePlugin=$prose(()=>new Plugin({filterTransaction:transaction=>!transaction.docChanged||!readOnly&&safeDocument(transaction.doc),view:()=>({update:(view,previous)=>{if(!view.state.doc.eq(previous.doc))changed?.();}})}));
   const editor=Editor.make().config(ctx=>{
     ctx.set(rootCtx,root);ctx.set(defaultValueCtx,value);
     ctx.set(editorViewOptionsCtx,{
-      attributes:()=>({role:'textbox','aria-label':label,'aria-multiline':'true','aria-readonly':String(readOnly),tabindex:'0',spellcheck:'true'}),
+      attributes:()=>({role:'textbox','aria-label':label,'aria-multiline':'true','aria-readonly':String(readOnly),...(!readOnly&&description?{'aria-describedby':description}:{}),tabindex:'0',spellcheck:'true'}),
       editable:()=>!readOnly,
       handleKeyDown:(_view,event)=>{if(event.key==='Escape'){escape();return true;}return false;},
       nodeViews:{list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),image:node=>{const dom=document.createElement('span');dom.textContent=node.attrs.alt||'';return {dom};}},

@@ -1019,5 +1019,6 @@
   "markdown.tasks": "Oppgaveliste",
   "markdown.link": "Lenke",
   "markdown.link_url": "Oppgi en nettadresse, e-postadresse med mailto: eller relativ lenke.",
-  "markdown.invalid_link": "Bruk en HTTP(S)-adresse, mailto: eller relativ lenke."
+  "markdown.invalid_link": "Bruk en HTTP(S)-adresse, mailto: eller relativ lenke.",
+  "journal.normalization": "Formatering kan normalisere Markdown."
 }

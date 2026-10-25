@@ -1019,5 +1019,6 @@
   "markdown.tasks": "Task list",
   "markdown.link": "Link",
   "markdown.link_url": "Enter a web, email (mailto:) or relative link address.",
-  "markdown.invalid_link": "Use an HTTP(S), mailto: or relative link address."
+  "markdown.invalid_link": "Use an HTTP(S), mailto: or relative link address.",
+  "journal.normalization": "Formatting may normalize Markdown."
 }
