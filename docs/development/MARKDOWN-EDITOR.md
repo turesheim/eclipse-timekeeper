@@ -152,3 +152,14 @@ remain manual acceptance checks before integrating the editor in the calendar.
 
 This choice is ready for the storage and calendar follow-ups, with explicit
 source fallbacks for unsupported dialects and known prototype limitations.
+
+
+## Calendar integration follow-up
+
+Issue #395 integrates the selected editor into the existing calendar day-note
+modal; [the layout decision and recovery behavior](JOURNAL-EDITOR.md) describe
+that production flow. The separate About prototype remains a local scratchpad.
+The shared engine now also rejects unsafe link schemes and document-changing
+transactions in readonly views. Its current generated size metadata is
+`server/web/src/assets/milkdown/sizes.json`; the original evaluation measurements
+above remain historical comparisons.

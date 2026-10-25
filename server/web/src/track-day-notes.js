@@ -1,6 +1,7 @@
 import {dateTimeFormat} from './formatters.js';
 import {getLocale,t} from './i18n.js';
 import {icon} from './icons.js';
+import {MarkdownField} from './markdown-field.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 const button=(text,className)=>{const value=node('button',text,className);value.type='button';return value;};
@@ -11,24 +12,36 @@ export class TrackDayNotes {
     Object.assign(this,{root,grid,monthInput,callbacks,notes:new Map(),bodyDates:new Set(),generation:0});
     this.status=node('p',undefined,'hint track-note-status');this.status.setAttribute('role','status');this.message=node('span');
     this.retry=button(t('ui.retry'),'btn btn-link btn-sm');this.retry.hidden=true;this.retry.addEventListener('click',()=>{this.key=null;this.load();});this.status.append(this.message,' ',this.retry);grid.after(this.status);this.status.hidden=true;
-    this.dialog=node('dialog',undefined,'app-dialog shadow-lg');this.dialog.id='track-note-editor';this.dialog.setAttribute('aria-labelledby','track-note-title');
+    this.dialog=node('dialog',undefined,'app-dialog journal-dialog shadow-lg');this.dialog.id='track-note-editor';this.dialog.setAttribute('aria-labelledby','track-note-title');
     this.form=node('form');this.title=node('h2');this.title.id='track-note-title';
     const label=node('label',t('day_notes.text'),'form-label');label.htmlFor='track-note-text';this.text=node('input',undefined,'form-control');this.text.id='track-note-text';this.text.maxLength=80;this.text.autocomplete='off';this.text.setAttribute('aria-describedby','track-note-hint');
     const hint=node('p',t('day_notes.hint'),'hint');hint.id='track-note-hint';this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');
-    const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.cancel,this.save);
-    this.form.append(this.title,label,this.text,hint,this.error,actions);this.dialog.append(this.form);root.append(this.dialog);
-    this.cancel.addEventListener('click',()=>{if(!this.editor?.busy)this.closeEditor();});
+    this.savedStatus=node('p','','hint');this.savedStatus.setAttribute('role','status');
+    const markdown=node('div');this.markdown=new MarkdownField(markdown,()=>this.changed(),()=>this.controls());
+    this.markdown.helpDetails.append(hint);
+    this.clearBody=button(t('journal.clear_body'),'btn btn-outline-secondary');this.clearBody.addEventListener('click',()=>{if(!this.markdown.readOnly){this.markdown.setValue('');this.changed();void this.markdown.showFormatted();}});
+    this.download=button(t('markdown.download'),'btn btn-outline-secondary');this.download.addEventListener('click',()=>this.downloadDraft());
+    this.reload=button(t('journal.reload'),'btn btn-outline-secondary');this.reload.addEventListener('click',()=>void this.reloadEditor());
+    const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.savedStatus,this.cancel,this.save);
+    this.recovery=node('div',undefined,'journal-recovery');this.recovery.append(this.clearBody,this.download,this.reload);
+    this.content=node('div',undefined,'journal-content');this.content.append(this.title,label,this.text,this.error,markdown,this.recovery);this.form.append(this.content,actions);this.dialog.append(this.form);root.append(this.dialog);
+    this.text.addEventListener('input',()=>this.changed());
+    this.cancel.addEventListener('click',()=>this.requestClose());
     // Focus returns before the native close event is delivered. Release editor
     // state synchronously so the next keyboard action can open the day menu.
-    this.dialog.addEventListener('cancel',event=>{event.preventDefault();if(!this.editor?.busy)this.closeEditor();});
+    this.dialog.addEventListener('cancel',event=>{event.preventDefault();this.requestClose();});
     this.dialog.addEventListener('close',()=>this.finishEditor());
     this.form.addEventListener('submit',event=>{event.preventDefault();void this.commit();});
+    window.addEventListener('beforeunload',event=>{if(this.editor&&(this.dirty()||this.editor.busy||this.editor.uncertain)){event.preventDefault();event.returnValue='';}});
     this.buildMenu();
   }
+  dirty(){return !!this.editor?.etag&&(this.text.value.trim()!==this.editor.originalText||this.markdown.value()!==this.editor.originalBody);}
+  changed(){if(this.editor)this.savedStatus.textContent=t(this.dirty()?'journal.unsaved':'journal.saved');}
+  requestClose(){if(!this.editor?.busy&&(!this.dirty()||confirm(t('journal.discard'))))this.closeEditor();}
   closeEditor(){this.dialog.close();this.finishEditor();}
   finishEditor(){
     if(this.dialog.open)return;
-    const date=this.editor?.date,uncertain=this.editor?.uncertain;this.editor=null;this.text.value='';this.error.textContent='';
+    const date=this.editor?.date,uncertain=this.editor?.uncertain;this.editor=null;this.text.value='';this.error.textContent='';this.savedStatus.textContent='';this.markdown.clear();
     if(date)this.focusDate(date);
     if(uncertain&&this.session){this.key=null;this.load();}
   }
@@ -94,9 +107,18 @@ export class TrackDayNotes {
   setWritable(value){this.writable=value;if(!value){this.cancelHold();this.closeMenu();}this.controls();this.paint();}
   controls(){
     const editor=this.editor;if(!editor)return;
-    this.text.disabled=editor.loading||editor.busy||editor.uncertain||!this.writable;
-    this.save.disabled=editor.loading||editor.busy||editor.uncertain||editor.stale||!editor.etag||!this.writable;
+    this.text.disabled=editor.loading||editor.busy||editor.uncertain||!editor.etag;this.text.readOnly=!this.writable;
+    const readOnly=editor.loading||editor.busy||editor.uncertain||!editor.etag||!this.writable;
+    if(this.markdown&&this.markdown.readOnly!==readOnly)this.markdown.setReadOnly(readOnly);
+    this.save.disabled=editor.loading||editor.failedRead||editor.busy||this.markdown?.loading||editor.uncertain||editor.stale||!editor.etag||!this.writable;
     this.cancel.disabled=editor.busy;
+    if(this.reload){this.reload.hidden=!(editor.failedRead||editor.stale||editor.uncertain);this.reload.disabled=editor.loading||editor.busy||this.markdown.loading;this.reload.textContent=t(editor.uncertain?'journal.check_result':'journal.reload');}
+    if(this.recovery){
+      if(editor.failedRead||editor.stale||editor.uncertain){if(this.markdown.root.previousSibling!==this.recovery)this.markdown.root.before(this.recovery);}
+      else if(this.markdown.root.nextSibling!==this.recovery)this.markdown.root.after(this.recovery);
+    }
+    if(this.download)this.download.disabled=!editor.etag||editor.loading||editor.busy||this.markdown.loading;
+    if(this.clearBody)this.clearBody.disabled=readOnly||!editor.etag||this.markdown.loading;
   }
   reset(){
     this.cancelHold();this.closeMenu();++this.generation;this.session=null;this.key=null;this.range=null;this.loaded=false;this.notes.clear();this.bodyDates.clear();this.loadingFocus=null;this.cells=null;this.calendar=null;this.editor=null;
@@ -124,41 +146,72 @@ export class TrackDayNotes {
     for(const [date,cell] of this.cells){
       const heading=cell.querySelector('.track-date-row'),previous=heading.querySelector('.track-day-note'),text=this.notes.get(date),hasBody=this.bodyDates.has(date);
       if(!this.writable&&!text&&!hasBody){previous?.remove();continue;}
-      const value=node(this.writable?'button':'span',undefined,'track-day-note'+(text||hasBody?'':' is-empty'));value.dataset.trackNoteDate=date;
-      if(this.writable){value.type='button';value.classList.add('btn','btn-link','btn-sm');value.disabled=!this.loaded;value.setAttribute('aria-haspopup','dialog');value.addEventListener('click',()=>void this.open(date));}
+      const interactive=this.writable||hasBody;
+      const value=node(interactive?'button':'span',undefined,'track-day-note'+(text||hasBody?'':' is-empty'));value.dataset.trackNoteDate=date;
+      if(interactive){value.type='button';value.classList.add('btn','btn-link','btn-sm');value.disabled=!this.loaded;value.setAttribute('aria-haspopup','dialog');value.addEventListener('click',()=>void this.open(date));}
       value.title=text||(hasBody?t('day_notes.body_present'):t('day_notes.add',{date:this.dateLabel(date)}));value.setAttribute('aria-label',t(text||hasBody?(this.writable?'day_notes.edit':'day_notes.view'):'day_notes.add',{date:this.dateLabel(date),text:text||(hasBody?t('day_notes.body_present'):'')}));
-      if(text)value.append(node('span',text,'badge rounded-pill bg-info-subtle text-info-emphasis'));else value.append(icon('sticky'));
+      if(text)value.append(node('span',text,'badge rounded-pill bg-info-subtle text-info-emphasis'));
+      value.append(icon(hasBody?'journal-text':'journal-plus'));value.classList.toggle('has-body',hasBody);
       if(previous)previous.replaceWith(value);else heading.append(value);
     }
     if(focused&&!this.root.hidden)this.grid.querySelector(`button[data-track-note-date="${focused}"]`)?.focus({preventScroll:true});
   }
   async open(date){
-    if(!this.writable||!this.session||this.editor||!this.cells?.has(date))return;
+    if(!this.session||this.editor||!this.cells?.has(date))return;
     const editor={date,session:this.session,loading:true,busy:false,uncertain:false};this.editor=editor;this.error.textContent='';this.text.value=this.notes.get(date)||'';
-    this.title.textContent=t('day_notes.title',{date:this.dateLabel(date)});this.controls();this.dialog.showModal();
+    this.title.textContent=t('day_notes.title',{date:this.dateLabel(date)});this.controls();this.dialog.showModal();this.content.scrollTop=0;
+    await this.loadEditor(editor);
+  }
+  async loadEditor(editor){
+    editor.loading=true;this.controls();this.savedStatus.textContent=t('day_notes.loading');
     try{
-      const reply=await editor.session.request('/day-notes/'+date);
+      const reply=await editor.session.request('/day-notes/'+editor.date);
       if(this.editor!==editor||editor.session!==this.session)return;
-      this.text.value=reply.data.text;editor.etag=reply.etag;editor.loading=false;this.controls();this.text.focus();
+      this.text.value=reply.data.text;editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;editor.loading=false;editor.failedRead=false;editor.stale=false;editor.uncertain=false;
+      this.markdown.setValue(reply.data.body);this.error.textContent='';this.savedStatus.textContent=t(this.writable?'journal.saved':'journal.read_only');this.controls();this.content.scrollTop=0;this.text.focus({preventScroll:true});void this.markdown.showFormatted(false);
     }catch(error){
       if(this.editor!==editor||editor.session!==this.session)return;
-      editor.loading=false;this.error.textContent=error.message;this.controls();if(error.status===401)this.callbacks.onUnauthorized(error);
+      editor.loading=false;editor.failedRead=true;this.error.textContent=error.message;this.savedStatus.textContent='';this.controls();this.error.scrollIntoView({block:'nearest'});if(error.status===401)this.callbacks.onUnauthorized(error);
     }
   }
+  downloadDraft(){
+    if(!this.editor?.etag||this.markdown.loading)return;
+    const url=URL.createObjectURL(new Blob([this.markdown.value()],{type:'text/markdown;charset=utf-8'})),link=node('a');link.href=url;link.download=this.editor.date+'.md';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  async reloadEditor(){
+    const editor=this.editor;if(!editor||editor.loading||editor.busy||this.markdown.loading)return;
+    if(editor.uncertain){
+      editor.loading=true;this.controls();
+      try{
+        const reply=await editor.session.request('/day-notes/'+editor.date);if(this.editor!==editor||editor.session!==this.session)return;
+        if(reply.data.text===editor.sent.text&&reply.data.body===editor.sent.body){this.acceptSaved(reply,editor);return;}
+        editor.uncertain=false;editor.stale=true;this.error.textContent=t('journal.review_saved');
+      }catch(error){if(this.editor===editor){this.error.textContent=error.message;if(error.status===401)this.callbacks.onUnauthorized(error);}}
+      finally{if(this.editor===editor){editor.loading=false;this.controls();if(this.error.textContent)this.error.scrollIntoView({block:'nearest'});}}
+      return;
+    }
+    if(this.dirty()&&!confirm(t('journal.reload_confirm')))return;
+    await this.loadEditor(editor);
+  }
+  acceptSaved(reply,editor){
+    ++this.generation;this.key=null;
+    if(reply.data.hasBody)this.bodyDates.add(editor.date);else this.bodyDates.delete(editor.date);
+    if(reply.data.text||reply.data.hasBody)this.notes.set(editor.date,reply.data.text);else this.notes.delete(editor.date);
+    this.paint();this.closeEditor();this.callbacks.onChanged();
+  }
   async commit(){
-    const editor=this.editor;if(!editor||editor.busy||editor.loading||editor.uncertain||editor.stale||!editor.etag||!this.writable||editor.session!==this.session)return;
-    editor.busy=true;this.error.textContent='';this.controls();
+    const editor=this.editor;if(!editor||editor.busy||editor.loading||editor.failedRead||editor.uncertain||editor.stale||!editor.etag||!this.writable||editor.session!==this.session)return;
+    if(this.markdown.loading)return;
+    const body=this.markdown.value();if(new TextEncoder().encode(body).length>200000){this.error.textContent=t('journal.too_large');this.error.scrollIntoView({block:'nearest'});return;}
+    editor.sent={text:this.text.value.trim(),body};editor.busy=true;this.error.textContent='';this.savedStatus.textContent=t('journal.saving');this.controls();
     try{
-      const reply=await editor.session.request('/day-notes/'+editor.date,{method:'PUT',etag:editor.etag,body:{text:this.text.value.trim()}});
+      const reply=await editor.session.request('/day-notes/'+editor.date,{method:'PUT',etag:editor.etag,body:editor.sent});
       if(this.editor!==editor||editor.session!==this.session)return;
-      ++this.generation;this.key=null;
-      if(reply.data.hasBody)this.bodyDates.add(editor.date);else this.bodyDates.delete(editor.date);
-      if(reply.data.text||reply.data.hasBody)this.notes.set(editor.date,reply.data.text);else this.notes.delete(editor.date);
-      this.paint();this.closeEditor();this.callbacks.onChanged();
+      this.acceptSaved(reply,editor);
     }catch(error){
       if(this.editor!==editor||editor.session!==this.session)return;
       if(error.status===401){this.callbacks.onUnauthorized(error);return;}
-      editor.uncertain=error.uncertain;editor.stale=error.status===412;this.error.textContent=error.uncertain?t('day_notes.uncertain'):error.message;
-    }finally{if(this.editor===editor){editor.busy=false;this.controls();}}
+      editor.uncertain=error.uncertain;editor.stale=error.status===412;this.error.textContent=error.uncertain?t('day_notes.uncertain'):error.message;this.savedStatus.textContent=t('journal.unsaved');
+    }finally{if(this.editor===editor){editor.busy=false;this.controls();if(this.error.textContent)this.error.scrollIntoView({block:'nearest'});}}
   }
 }

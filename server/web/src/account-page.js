@@ -23,7 +23,7 @@ export async function connectAccount(session, account, signOut, updateAccount, r
 async function show(hash, ask = true) {
   if (!context) return;
   if (ask && !canLeave()) {restoreRoute();return;}
-  if ($('editor').open) {restoreRoute();return;}
+  if (document.querySelector('dialog[open]')) {restoreRoute();return;}
   if (hash === '#administration' || hash.startsWith('#users')) {
     const legacy = /^#users(?:\/(?:new|[A-Za-z0-9_-]{1,1100}))?$/.test(hash) ? hash : '';
     location.assign('/admin/' + legacy);return;

@@ -60,6 +60,7 @@ def package(output, tag, commit):
     illustrations = {
         'docs/assets/screenshots/day-notes-desktop.png': 'images/day-notes-desktop.png',
         'docs/assets/screenshots/day-notes-editor.png': 'images/day-notes-editor.png',
+        'docs/assets/screenshots/journal-editor-mobile.png': 'images/journal-editor-mobile.png',
         'docs/assets/screenshots/about-references-desktop.png': 'images/about-references-desktop.png',
         'docs/assets/screenshots/work-session-editor-delete-confirm.png': 'images/work-session-editor-delete-confirm.png',
         'docs/assets/screenshots/holiday-preferences-mobile.png': 'images/holiday-preferences-mobile.png',
