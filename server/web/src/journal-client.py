@@ -207,7 +207,7 @@ def schedule(args):
     else:
         # systemd performs its own token expansion even inside quoted ExecStart arguments.
         quote=lambda text:'"'+text.replace('%','%%').replace('\\','\\\\').replace('"','\\"').replace('\n','\\n')+'"'
-        unit='[Unit]\nDescription=Timekeeper daily journal synchronization\n[Service]\nType=oneshot\nExecStart='+ ' '.join(map(quote,command))+'\nEnvironment='+quote('SSH_AUTH_SOCK='+agent)+'\nUMask=0077\n'
+        unit='[Unit]\nDescription=Timekeeper daily journal synchronization\n[Service]\nType=oneshot\nExecStart='+ ' '.join(quote(value.replace('$','$$')) for value in command)+'\nEnvironment='+quote('SSH_AUTH_SOCK='+agent)+'\nUMask=0077\n'
         atomic(destination/(label+'.service'),unit.encode())
         atomic(destination/(label+'.timer'),('[Unit]\nDescription=Timekeeper journal timer\n[Timer]\nOnBootSec=2min\nOnUnitActiveSec='+str(args.interval)+'s\n[Install]\nWantedBy=timers.target\n').encode())
         print('Install the private .service and .timer in ~/.config/systemd/user, then run systemctl --user daemon-reload and systemctl --user enable --now '+label+'.timer.')

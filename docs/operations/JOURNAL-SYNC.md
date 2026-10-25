@@ -1,0 +1,193 @@
+# Import daily Markdown over SSH
+
+Timekeeper imports daily notes in one direction: your chosen local directory to
+the database. Calendar and account archives read the database. Missing local
+files never delete notes; an explicitly empty daily file clears that date.
+Calendar edits and differing first imports produce recoverable conflicts in
+**My account → Journal**, rather than being overwritten. This is server-readable
+storage, not end-to-end encryption. Follow [storage protection](JOURNAL-STORAGE.md)
+for every database, incoming, conflict, temporary and backup location.
+
+## Operator setup
+
+Use the dedicated gateway container, independently of the web service. Do not
+enable journal logins on an administrator SSH service or give the web service
+root privileges. Each account gets a distinct unprivileged Unix UID, protected
+home and private spool. Public-key lookup and every transfer are authorized by
+the web service; there is no reusable user API token in a downloaded profile.
+
+Build from the exact reviewed source checkout:
+
+```sh
+docker build -f server/journal/Dockerfile -t timekeeper-journal-gateway .
+```
+
+The image builds rsync/rrsync 3.5.1 from the checksum-pinned upstream source,
+and includes its license and complete source archive. Its root entry point only
+provisions the dedicated container's users, configuration and host key before
+starting OpenSSH. Receiver and key lookup processes run without root.
+
+Provision an encrypted, private gateway state mount at
+`/var/lib/timekeeper-journal` and a root-owned secret directory mounted read-only
+at `/run/secrets`. Generate one different high entropy broker secret per account
+with `python3 -c 'import secrets; print(secrets.token_urlsafe(32))'` in a private
+operator terminal. Do not put secrets in compose files, command arguments, git,
+web assets, profiles or logs. Create `/run/secrets/journal-gateway.json`, root
+owned with mode 600:
+
+```json
+{
+  "format": 1,
+  "brokerUrl": "https://timekeeper.example.org/internal/journal",
+  "encryptedStorage": true,
+  "backupKeysSeparated": true,
+  "accounts": [
+    {"username": "journal_alice", "uid": 20001, "token": "REPLACE_WITH_PRIVATE_BROKER_SECRET"}
+  ]
+}
+```
+
+Use the trusted HTTPS hostname and normal CA validation. A private CA may be
+mounted as a public certificate and selected with `"caFile":"/run/secrets/ca.pem"`.
+The broker must be reachable from the gateway; route `/internal/journal/` to the
+application without adding browser cookies or an Origin header. HTTP is allowed
+only on actual loopback, not between containers. Reject redirects. Keep this
+endpoint private to the gateway network where practical; its narrow credential
+never grants normal API access.
+
+Start the gateway with the two mounts and publish its container port 2222 on
+the intended SSH interface. Preserve the gateway host key across upgrades.
+Read its **public** key after startup:
+
+```sh
+docker exec timekeeper-journal-gateway cat /var/lib/timekeeper-journal/host/ssh_host_ed25519_key.pub
+```
+
+Configure the web service with `TIMEKEEPER_JOURNAL_CONFIGURATION_FILE` pointing
+to a service-owned, mode 600 JSON file outside public assets. Its parent and
+`incomingRoot` must be private, canonical directories on encrypted storage.
+Use the existing account owner ID from Administration, the actual reachable SSH
+hostname/port, the complete public host key, and the SHA-256 hex digest of that
+account's broker secret (not the secret itself):
+
+```json
+{
+  "format": 1,
+  "hostname": "journal.example.org",
+  "port": 2222,
+  "hostKey": "ssh-ed25519 REPLACE_WITH_ACTUAL_PUBLIC_HOST_KEY",
+  "incomingRoot": "/private/timekeeper/journal-incoming",
+  "encryptedStorage": true,
+  "backupKeysSeparated": true,
+  "accounts": [
+    {"ownerId": "EXISTING_ACCOUNT_OWNER_ID", "username": "journal_alice", "brokerTokenSha256": "REPLACE_WITH_SECRET_SHA256_HEX"}
+  ]
+}
+```
+
+The two booleans are operator attestations, not encryption performed or verified
+by Timekeeper. Missing prerequisites leave account setup unavailable. Never
+change a UID to reuse another account's spool. Removing a binding or changing
+configuration invalidates existing transfers. Rotate a broker credential in
+both protected configurations during a maintenance window and restart the
+gateway. No application restart is needed to reload the trusted mapping.
+
+For Synology Container Manager, run this as a separate project/container; do not
+use the NAS administrator's SSH service. Map the encrypted shared-folder state
+and root-owned configuration with the same numeric permissions. Publish only
+the chosen SSH port and allow outbound certificate-verified HTTPS to Timekeeper.
+Named Docker volumes and container isolation alone do not provide encryption.
+Unlock and verify encrypted storage before starting either service. Back up the
+gateway host key and mapping, database and recovery material on encrypted
+storage; keep backup encryption keys separately. Test restoration without
+reassigning account UIDs or silently replacing the pinned host key.
+
+## Local client setup
+
+Supported clients are macOS, Linux and Windows through WSL2, with Python 3.11+,
+OpenSSH and rsync 3.5.1+. macOS's bundled rsync is too old. Install using Homebrew
+(`brew install python rsync`). On supported Ubuntu/WSL distributions use the
+[rsync project's stable PPA](https://rsync.samba.org/download.html),
+`ppa:rsyncproject/rsync`, then install `python3 openssh-client rsync`. Check
+`python3 --version` and `rsync --version` in the terminal that will run the job.
+
+Generate a different Ed25519 key on each device, choose a passphrase, and load
+it in your local agent. Never upload its private half or passphrase:
+
+```sh
+ssh-keygen -t ed25519 -f ~/.ssh/timekeeper_journal -C timekeeper-journal
+chmod 600 ~/.ssh/timekeeper_journal
+ssh-add ~/.ssh/timekeeper_journal
+cat ~/.ssh/timekeeper_journal.pub
+```
+
+Sign in directly to your account over HTTPS. In **My account → Journal**, enable
+sync, then enroll the public `.pub` text with a recognizable device label and
+your current account password. Download that device's public JSON profile and
+the client script. Put both in a private local directory; the script is called
+`timekeeper-journal.py` below. Use the actual profile filename in these commands:
+
+```sh
+python3 timekeeper-journal.py configure --profile profile.json
+python3 timekeeper-journal.py trust --profile profile.json --fingerprint 'SHA256:REPLACE_WITH_HTTPS_FINGERPRINT'
+python3 timekeeper-journal.py verify --profile profile.json
+python3 timekeeper-journal.py sync --profile profile.json
+```
+
+Configure asks for the local daily-note folder and private-key filename. Those
+paths stay in a mode 600 local sidecar, never in Timekeeper. Compare the full
+fingerprint with the value displayed over authenticated HTTPS before trusting.
+SSH refuses an unknown or changed host key, shell access, forwarding and pulls.
+For a host-key change, stop schedules and independently confirm the new key
+with the operator, download an updated profile, then deliberately use
+`trust --replace --fingerprint …`. Do not bypass verification or use ssh-keyscan
+as evidence of authenticity.
+
+Only top-level `YYYY-MM-DD.md` files are considered; real dates, strict UTF-8 and
+safe bounded YAML are validated by the server. Optional YAML
+`timekeeper-label: Label` supplies the Calendar label; the exact Markdown body
+follows the frontmatter. Unknown properties, original bytes, unrelated files
+and `.obsidian` are never rewritten. Symlinks and hard links are skipped;
+oversized/changing/unreadable files produce per-file errors while independent
+valid notes continue. Each file is limited to 220,000 input bytes, including at
+most 20,000 frontmatter and 200,000 body bytes. A complete private snapshot and
+manifest must arrive before any note becomes eligible for import.
+
+After the first sync, check the date in Calendar and refresh Journal health.
+Review per-file errors and conflicts there. Download an original candidate
+before discarding it if needed. A conflict decision checks the current Calendar
+version again; refresh and reconsider if somebody edited it. Retry after a
+network interruption; identical files are no-ops. Do not delete a local original
+to resolve a database conflict.
+
+## Scheduling and disconnecting
+
+Run `python3 timekeeper-journal.py schedule --profile profile.json` with the local
+agent loaded. It generates private files under the local profile's
+`.timekeeper-journal-DEVICE_ID/schedule` directory, and prints the unit name.
+Generation does not install a persistent job. Keep the script, profile, sidecar
+and private state at stable paths. No key contents or passphrases are included.
+
+On macOS, copy the generated `.plist` to `~/Library/LaunchAgents/`, mode 600,
+then run `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/NAME.plist`
+using its actual filename. Unload with `launchctl bootout gui/$(id -u)
+~/Library/LaunchAgents/NAME.plist`. On Linux/WSL2 with systemd user services,
+copy the `.service` and `.timer` to `~/.config/systemd/user/`, mode 600, then
+run `systemctl --user daemon-reload` and `systemctl --user enable --now
+NAME.timer`. Stop using `systemctl --user disable --now NAME.timer`.
+
+The generated interval is five minutes (`--interval` accepts 60–86400 seconds).
+Schedules use the local `SSH_AUTH_SOCK` available when generated; a changed agent
+socket requires regeneration. Keep the agent available and unlocked in that
+user session. If it is locked, expired or unavailable, the run fails rather
+than prompting unattended or storing a passphrase. Review launchd/systemd
+status and Journal health after enabling a schedule. WSL2 must be running and
+have systemd enabled for its timer to execute.
+
+To rotate a device, create a fresh local key, enroll its public half with the
+old device selected for replacement, download/configure/pin its new profile,
+verify and sync before rescheduling. Rotation immediately revokes the old key,
+including in-flight work. Revoke a lost device in Journal and remove its local
+schedule when possible. Disabling Journal stops all devices; disabling the
+account also blocks transfers and import. Keep local originals and any wanted
+recovery downloads. Never delete another device's files to disconnect it.

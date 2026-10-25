@@ -89,7 +89,7 @@ LogLevel ERROR
     config+='AllowUsers '+' '.join(sorted(names))+'\n'
     write(Path('/etc/ssh/timekeeper-journal.conf'),config,0o600)
     run('/usr/sbin/sshd','-t','-f','/etc/ssh/timekeeper-journal.conf')
-    os.execv('/usr/sbin/sshd',['sshd','-D','-e','-f','/etc/ssh/timekeeper-journal.conf'])
+    os.execv('/usr/sbin/sshd',['/usr/sbin/sshd','-D','-e','-f','/etc/ssh/timekeeper-journal.conf'])
 
 if __name__=='__main__':
     try:main()

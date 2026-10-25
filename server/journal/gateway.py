@@ -69,7 +69,7 @@ def request(config,path,data,method='POST'):
     except HTTPError as error:
         try:code=json.loads(error.read(4096)).get('code','')
         except (ValueError,UnicodeError):code=''
-        raise Failure(code if re.fullmatch(r'JOURNAL_[A-Z_]{1,80}',code) else 'JOURNAL_BROKER_ACCESS_DENIED') from None
+        raise Failure(code if re.fullmatch(r'JOURNAL_[A-Z_]{1,80}',code) else 'JOURNAL_BROKER_HTTP_'+str(error.code)) from None
     except (URLError,TimeoutError,ValueError):raise Failure('JOURNAL_BROKER_UNAVAILABLE') from None
 
 

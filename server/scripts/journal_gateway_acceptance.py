@@ -69,7 +69,9 @@ def main():
         def copy_client(name,value):
             python('import sys,os;from pathlib import Path;p=Path('+repr('/client/'+name)+');p.write_bytes(sys.stdin.buffer.read());p.chmod(0o600)',input=(json.dumps(value)+'\n').encode())
         try:
-            docker('network','create','--internal',network)
+            # Docker Desktop does not publish container ports on internal networks.
+            # The unique bridge still isolates fixtures; HTTPS is exposed on loopback only.
+            docker('network','create',network)
             for label in ['app','gateway','secret','client']:
                 volume='journal-'+label+'-'+suffix;docker('volume','create',volume);volumes.append(volume)
             app_volume,gateway_volume,secret_volume,client_volume=volumes
@@ -99,7 +101,7 @@ def main():
             admin.call('POST','/auth/setup',{'code':code,'username':'journal-admin','password':password,'displayName':'Journal administrator','email':'journal-admin@example.invalid'})
             actors=[]
             for name in ['a','b']:
-                value,_=admin.call('POST','/admin/users',{'username':'journal-'+name,'password':password,'displayName':'Journal '+name,'email':'journal-'+name+'@example.invalid','administrator':False})
+                value,_=admin.call('POST','/admin/users',{'username':'journal-'+name,'password':password,'displayName':'Journal '+name,'email':'journal-'+name+'@example.invalid','administrator':False},status=201)
                 api=Api(base,str(directory/'tls.crt'));api.call('GET','/auth/status');api.call('POST','/auth/login',{'username':'journal-'+name,'password':password,'remember':False});actors.append((value['user']['ownerId'],api))
             tokens=[secrets.token_urlsafe(32),secrets.token_urlsafe(32)]
             config={'format':1,'hostname':'gateway.test','port':2222,'hostKey':host,'incomingRoot':'/data/incoming','encryptedStorage':True,'backupKeysSeparated':True,
@@ -131,7 +133,13 @@ def main():
             device,public_profile=enroll(0,"/client/identity ' with spaces",'profile-a.json')
             deadline=time.monotonic()+20
             while tool('verify',check=False).returncode:
-                if time.monotonic()>deadline:raise RuntimeError('Real restricted SSH verification failed')
+                if time.monotonic()>deadline:
+                    # Diagnostic contains only a public key and generic broker codes.
+                    public=client('cat',"/client/identity ' with spaces.pub").stdout.decode().split()
+                    diagnostic=docker('exec','--user','journal-auth',gateway_name,'python3','-c',
+                        'import runpy,sys,http.client,ssl,json;g=runpy.run_path("/usr/local/libexec/timekeeper-journal-gateway");c=g["private_json"](g["CONFIG"]);a=c["accounts"][0];h=http.client.HTTPSConnection("web.test",8443,context=ssl.create_default_context(cafile=c["caFile"]));h.request("POST","/internal/journal/"+a["username"]+"/keys",json.dumps({"publicKey":" ".join(sys.argv[2:])}),{"Content-Type":"application/json","Authorization":"JournalTransport "+a["token"]});r=h.getresponse();print(r.status,r.read(4096).decode());g["authorize"](*sys.argv[1:])','journal_a',*public[:2],check=False)
+                    path=output/'authorization.log';path.write_bytes(diagnostic.stdout+diagnostic.stderr);path.chmod(0o600)
+                    raise RuntimeError('Real restricted SSH verification failed')
                 time.sleep(.25)
             source='---\r\ntimekeeper-label: Planning\r\nunknown: retained\r\n---\r\n\r\n# Private daily Markdown  \r\n'
             python("from pathlib import Path;Path(\"/client/vault ' with spaces/Daily/2026-10-25.md\").write_bytes("+repr(source.encode())+")")

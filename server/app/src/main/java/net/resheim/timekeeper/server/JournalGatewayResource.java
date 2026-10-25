@@ -18,7 +18,7 @@ public class JournalGatewayResource {
     @Context io.vertx.core.http.HttpServerRequest request;
     private String authorization(){
         ContractInputs.queries(uri.getQueryParameters());
-        if(headers.getHeaderString("Cookie")!=null||headers.getHeaderString("Origin")!=null)throw ApiFailure.badRequest();
+        if(headers.getHeaderString("Cookie")!=null||headers.getHeaderString("Origin")!=null)throw new ApiFailure(400,"JOURNAL_BROWSER_CREDENTIALS_DENIED");
         String peer=request.connection().remoteAddress().hostAddress();
         if(!uri.getRequestUri().getScheme().equals("https")&&!Set.of("127.0.0.1","::1").contains(peer))throw new ApiFailure(403,"JOURNAL_ENCRYPTED_BROKER_REQUIRED");
         var authorization=headers.getRequestHeader("Authorization");if(authorization==null||authorization.size()!=1)throw ApiFailure.unauthorized(false);
