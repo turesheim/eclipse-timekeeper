@@ -953,5 +953,18 @@
   "icons.category.typography": "Typography",
   "icons.category.ui-and-keyboard": "UI & Keyboard",
   "icons.category.weather": "Weather",
-  "duration.presentation": "Applied immediately to duration displays. Recorded times stay unchanged."
+  "duration.presentation": "Applied immediately to duration displays. Recorded times stay unchanged.",
+  "project_report.title": "Project session report · Timekeeper",
+  "project_report.heading": "PROJECT SESSION REPORT",
+  "project_report.open": "Session report for {{project}} (opens in a new tab)",
+  "project_report.print": "Print",
+  "project_report.loading": "Loading project sessions…",
+  "project_report.empty": "No work sessions belong to this project.",
+  "project_report.sign_in": "Sign in to Timekeeper, then refresh this report.",
+  "project_report.invalid": "Choose a project from the Projects view to open its session report.",
+  "project_report.unavailable": "The project report could not be loaded. Please try again.",
+  "project_report.not_found": "This project is no longer available.",
+  "project_report.summary_one": "{{count}} session · Total {{duration}}",
+  "project_report.summary_other": "{{count}} sessions · Total {{duration}}",
+  "project_report.as_of": "All sessions · Report generated {{time}}"
 }

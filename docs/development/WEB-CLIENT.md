@@ -700,8 +700,15 @@ per calendar. The API accepts windows of at most 31 civil days.
 ## Clients, projects and work sessions
 
 The **Projects** view groups projects beneath their client, with its color and
-project count. Use the client chevron to expand or collapse its projects.
-Collapse choices survive refreshes and tab changes. Create or edit a project to
+project count. Client groups start collapsed. Use the client chevron to expand
+or collapse its projects. Choices survive refreshes and tab changes within the
+current session; reloading the page starts collapsed again. The session-report
+button beside Edit opens all of the project's work sessions in a new browser
+tab, newest first, with exact duration totals, running sessions, the account's
+time zone, and Refresh and Print actions. Reports also work for read-only
+sessions and follow the account language and selected theme.
+
+Create or edit a project to
 select an optional icon from the bundled picker, or choose **None** to remove it.
 Icons also appear beside project names in Workweek and beside daily durations
 in Calendar. They are retained in account downloads and JSON/CSV transfers.

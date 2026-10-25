@@ -953,5 +953,18 @@
   "icons.category.typography": "Typografi",
   "icons.category.ui-and-keyboard": "Grensesnitt og tastatur",
   "icons.category.weather": "Vær",
-  "duration.presentation": "Brukes med en gang i visningen av varighet. Registrerte tidspunkter endres ikke."
+  "duration.presentation": "Brukes med en gang i visningen av varighet. Registrerte tidspunkter endres ikke.",
+  "project_report.title": "Rapport over prosjektøkter · Timekeeper",
+  "project_report.heading": "RAPPORT OVER PROSJEKTØKTER",
+  "project_report.open": "Øktrapport for {{project}} (åpnes i en ny fane)",
+  "project_report.print": "Skriv ut",
+  "project_report.loading": "Laster prosjektøkter…",
+  "project_report.empty": "Ingen arbeidsøkter tilhører dette prosjektet.",
+  "project_report.sign_in": "Logg inn i Timekeeper, og oppdater deretter rapporten.",
+  "project_report.invalid": "Velg et prosjekt i Prosjekter for å åpne øktrapporten.",
+  "project_report.unavailable": "Prosjektrapporten kunne ikke lastes. Prøv igjen.",
+  "project_report.not_found": "Dette prosjektet er ikke lenger tilgjengelig.",
+  "project_report.summary_one": "{{count}} økt · Totalt {{duration}}",
+  "project_report.summary_other": "{{count}} økter · Totalt {{duration}}",
+  "project_report.as_of": "Alle økter · Rapport opprettet {{time}}"
 }
