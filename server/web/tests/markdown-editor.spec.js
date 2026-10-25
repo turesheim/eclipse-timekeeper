@@ -25,7 +25,7 @@ test('Markdown editor lazily loads local formatting and preserves exact mode rou
 test('Markdown rich edits, tasks, undo and source edits keep semantic content and metadata',async({page})=>{
   await open(page);const original=await fixture('standard');await importNote(page,original);await page.locator('#markdown-rich').click();
   await page.getByRole('checkbox',{name:'Task: Follow up'}).check();await page.locator('#markdown-source').click();
-  await expect(page.locator('#markdown-body')).toHaveValue(/- \[x\] Follow up/);let output=await downloaded(page);expect(output.startsWith(original.slice(0,original.indexOf('# Sunday')))).toBe(true);expect(output).toContain('[[This is a code example, not a wikilink]]');
+  await expect(page.locator('#markdown-body')).toHaveValue(/[-*] \[x\] Follow up/);const output=await downloaded(page);expect(output.startsWith(original.slice(0,original.indexOf('# Sunday')))).toBe(true);expect(output).toContain('[[This is a code example, not a wikilink]]');
   await page.locator('#markdown-body').fill('# New note\n\nPreserve **this**.\n');await page.locator('#markdown-rich').click();
   const paragraph=page.locator('#markdown-formatted p').first();await paragraph.click();await page.keyboard.press('End');await page.keyboard.type(' More.');
   await page.locator('#markdown-toolbar').getByRole('button',{name:'Undo',exact:true}).click();await expect(paragraph).not.toContainText('More.');
@@ -64,4 +64,9 @@ test('Markdown supports touch task toggling and text entry on a mobile viewport'
     await page.locator('#markdown-source').tap();await expect(page.locator('#markdown-body')).toHaveValue(/\[x\] Touch task[\s\S]*Touch text edited/);
     await downloaded(page);
   }finally{await context.close();}
+});
+test('Markdown schema round-trip guard retains unsupported code-block metadata as source',async({page})=>{
+  await open(page);const value='```js title="preserve this"\nconst day = "Sunday";\n```\n';
+  await page.locator('#markdown-body').fill(value);await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-status')).toContainText('cannot safely preserve');
+  await expect(page.locator('#markdown-body')).toHaveValue(value);expect(await downloaded(page)).toBe(value);
 });

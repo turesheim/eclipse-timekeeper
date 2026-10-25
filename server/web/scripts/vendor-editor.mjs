@@ -12,10 +12,12 @@ const packages=new Map();
 for(const input of Object.keys(result.metafile.inputs)){
   if(!input.includes('node_modules/'))continue;
   let directory=dirname(resolve(root,input));
-  while(directory.startsWith(root)){
-    try{const pkg=JSON.parse(await readFile(join(directory,'package.json'),'utf8'));if(pkg.name&&pkg.version){packages.set(pkg.name,{...pkg,directory});break;}}catch{}
+  let found=false;
+  while(dirname(directory)!==directory){
+    try{const pkg=JSON.parse(await readFile(join(directory,'package.json'),'utf8'));if(pkg.name&&pkg.version){packages.set(pkg.name+'@'+pkg.version,{...pkg,directory});found=true;break;}}catch{}
     directory=dirname(directory);
   }
+  if(!found)throw new Error('Missing package metadata: '+input);
 }
 let notices='Complete licenses for packages included in the locally bundled Markdown editor.\n';
 const inventory=[];
