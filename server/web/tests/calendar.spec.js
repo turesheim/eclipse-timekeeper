@@ -52,7 +52,12 @@ async function fixture(request) {
 async function position(page,element,edge=null) {
   await page.locator('.calendar-scroll').evaluate((scroll,{id,edge})=>{
     const card=[...scroll.querySelectorAll('.calendar-session:not(.preview)')].find(value=>value.dataset.sessionId===id);
-    scroll.scrollTop=parseFloat(card.style.top)+(edge==='end' ? parseFloat(card.style.height)-300 : -130);
+    const heading=scroll.querySelector('.calendar-heading').getBoundingClientRect().height;
+    const offset=edge==='end'?parseFloat(card.style.height):edge==='start'?0:30;
+    // Keep the gesture inside the visible grid and away from auto-scroll edges,
+    // including when the viewport leaves only the calendar's minimum height.
+    const point=heading+(scroll.clientHeight-heading)/2-20;
+    scroll.scrollTop=Math.max(0,heading+parseFloat(card.style.top)+offset-point);
     // Bootstrap enables smooth root scrolling; gesture coordinates require the
     // fixture's page positioning to have finished before the pointer is placed.
     window.scrollTo({top:scroll.getBoundingClientRect().top+window.scrollY-80,behavior:'instant'});
@@ -83,10 +88,14 @@ async function unchangedActivities(request,f) {for(const value of f.activities) 
 async function rangePoints(page,from,to) {
   const first=await page.locator('#calendar-date').inputValue(),week=calendarWeek(first,'Europe/Oslo');
   const row=clock=>week.rows.indexOf(clock);
-  await page.locator('.calendar-scroll').evaluate((scroll,start)=>{
-    scroll.scrollTop=Math.max(0,start*16-130);scroll.scrollLeft=0;
+  await page.locator('.calendar-scroll').evaluate((scroll,{start,end})=>{
+    const heading=scroll.querySelector('.calendar-heading').getBoundingClientRect().height;
+    const span=Math.abs(end-start)*16,padding=Math.max(8,(scroll.clientHeight-heading-span)/2);
+    // Center the whole range so a short touch drag does not enter the bottom
+    // auto-scroll zone and accidentally extend the selected time interval.
+    scroll.scrollTop=Math.max(0,Math.min(start,end)*16-padding);scroll.scrollLeft=0;
     window.scrollTo({top:scroll.getBoundingClientRect().top+window.scrollY-80,behavior:'instant'});
-  },row(from.clock));
+  },{start:row(from.clock),end:row(to.clock)});
   await page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
   await expect(page.locator(`.calendar-day[data-date="${from.date}"]`)).toBeVisible();
   await expect(page.locator(`.calendar-day[data-date="${to.date}"]`)).toBeVisible();
