@@ -3,10 +3,14 @@
 ## 2.0.0 (unreleased)
 
 Timekeeper 2.0.0 updates the plug-in for Eclipse 2026-09 (4.41), Mylyn Tasks
-4.12 and Java 21. It establishes H2 2.5.250 schema version 3 as the supported
+4.12 and Java 21. It establishes H2 2.4.240 schema version 3 as the supported
 database baseline.
 
 ### Highlights
+
+- Avoided the H2 2.5.250/2.5.252 crash-recovery data-loss regression by using
+  the unaffected published H2 2.4.240 runtime in the server and Eclipse client.
+  Added deterministic chunk-reuse and journal forced-restart regression checks.
 
 - Updated the build, target platform and runtime dependencies for Eclipse
   2026-09 and Java 21.

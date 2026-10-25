@@ -99,7 +99,7 @@ public final class DatabaseStartup {
 				failure.addSuppressed(cleanup);
 			}
 			if (failure instanceof SQLException sql && sql.getErrorCode() == 90048) {
-				throw new SQLException("H2 2.5.250 cannot open this database format."
+				throw new SQLException("H2 2.4.240 cannot open this database format."
 						+ " Historical migration is not supported. Keep the original; do not replace its files."
 						+ " Select separate empty storage for a new database.", sql.getSQLState(), sql.getErrorCode(), sql);
 			}

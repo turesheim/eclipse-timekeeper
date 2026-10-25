@@ -112,7 +112,7 @@ def main():
 
     client = contract.HttpAcceptance('test_authentication_and_read_only_permission')
     client.created = []
-    receipt = {'quarkus': '3.40.1', 'h2': '2.5.250', 'pids': pids,
+    receipt = {'quarkus': '3.40.1', 'h2': '2.4.240', 'pids': pids,
                'httpContractCases': 0, 'restartVerified': False, 'forcedRestartVerified': False,
                'revocationVerified': False, 'longPollVerified': False, 'distributionSha256': distribution_hash}
     try:
@@ -203,6 +203,10 @@ def main():
         active, active_headers = client.call('POST', '/activities/start', body=body, headers=key, status=201)
         client.created.append(('a', 'activities', active['id']))
         before, _ = client.call('GET', '/data/export')
+        journal_path = '/day-notes/2071-02-04'
+        _, journal_initial = client.call('GET', journal_path)
+        journal, journal_headers = client.call('PUT', journal_path, headers={'If-Match': journal_initial['ETag']},
+                                              body={'text': 'Durable journal label', 'body': '\r\n# Durable Markdown\r\n  keep whitespace  \t\r\n'})
         stop()
         start('restart')
         after, _ = client.call('GET', '/data/export')
@@ -212,16 +216,26 @@ def main():
         replay, headers = client.call('POST', '/activities/start', body=body, headers=key, status=201)
         client.assertEqual(active, replay)
         client.assertEqual(active_headers['ETag'], headers['ETag'])
+        reopened_journal, reopened_headers = client.call('GET', journal_path)
+        client.assertEqual(journal, reopened_journal)
+        client.assertEqual(journal_headers['ETag'], reopened_headers['ETag'])
+        receipt['journalRestartVerified'] = True
         receipt['restartVerified'] = True
         receipt['defaultLabelsVerified'] = True
         stop_key = {**client.key(), 'If-Match': active_headers['ETag']}
         ended, ended_headers = client.call('POST', f'/activities/{active["id"]}/stop', headers=stop_key)
+        journal, journal_headers = client.call('PUT', journal_path, headers={'If-Match': journal_headers['ETag']}, body={'text': ''})
+        client.assertTrue(journal['hasBody'])
         stop(force=True)
         start('forced-restart')
         replay_end, headers = client.call('POST', f'/activities/{active["id"]}/stop', headers=stop_key)
         client.assertEqual(ended, replay_end)
         client.assertEqual(ended_headers['ETag'], headers['ETag'])
         client.call('GET', '/activities/active', status=204)
+        reopened_journal, reopened_headers = client.call('GET', journal_path)
+        client.assertEqual(journal, reopened_journal)
+        client.assertEqual(journal_headers['ETag'], reopened_headers['ETag'])
+        receipt['journalForcedRestartVerified'] = True
         receipt['forcedRestartVerified'] = True
         # Revocation and downgraded permission are checked before any saved response is replayed.
         client.call('GET', '/projects', owner='expired', status=401, code='UNAUTHENTICATED')
@@ -230,10 +244,12 @@ def main():
         _, challenge = client.call('POST', f'/activities/{active["id"]}/stop', headers=stop_key,
                                     status=401, code='UNAUTHENTICATED')
         client.assertIn('invalid_token', challenge['WWW-Authenticate'])
+        client.call('GET', journal_path, status=401, code='UNAUTHENTICATED')
         reduced = [dict(row, permissions=['read']) if row['sha256'] == hashlib.sha256(tokens['a'].encode()).hexdigest()
                    else row for row in definitions]
         atomic_json(token_file, reduced)
         client.call('POST', f'/activities/{active["id"]}/stop', headers=stop_key, status=403, code='FORBIDDEN')
+        client.call('PUT', journal_path, headers={'If-Match': journal_headers['ETag']}, body={'body': ''}, status=403, code='FORBIDDEN')
         atomic_json(token_file, definitions)
         client.call('POST', f'/activities/{active["id"]}/stop', headers=stop_key)
         receipt['revocationVerified'] = True
@@ -264,6 +280,7 @@ def main():
             client.assertEqual(503, error.code)
         atomic_json(token_file, definitions)
         receipt['readinessVerified'] = True
+        client.call('DELETE', journal_path, headers={'If-Match': journal_headers['ETag']}, status=204)
         client.clean_records()
         receipt['resourceIds'] = {'project': project['id'], 'task': task['id'], 'label': label['id'], 'activity': active['id']}
         receipt['openActivity'] = active

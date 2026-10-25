@@ -1,9 +1,18 @@
 # Database baseline, backups and future migrations
 
-Timekeeper 2.0 establishes **H2 2.5.250, schema version 3** as the
+Timekeeper 2.0 establishes **H2 2.4.240, schema version 3** as the
 supported baseline. Historical H2 databases, unversioned databases, and Mylyn
 attribute storage are not migration inputs. The maintainer removed historical
 migration support because there are no users depending on those formats.
+
+The October 25 durability follow-up selects H2 2.4.240 because released H2
+2.5.250 and 2.5.252 can lose acknowledged writes after crash recovery and chunk
+reuse ([upstream #4446](https://github.com/h2database/h2database/issues/4446)).
+The upstream fix is not in a published release. Existing supported schema-2/3
+files retain their layout; this change does not authorize historical migrations.
+Stop all users of shared storage and make a closed-file backup before replacing
+the runtime. Use the same engine version in every client and H2 server sharing it.
+See the [durability verification](../verification/H2-CRASH-DURABILITY.md).
 
 There is no upgrade/recovery wizard, legacy driver, Flyway runtime or historical
 migration recipe. Old conversion receipts are not used. Earlier migration
@@ -51,7 +60,7 @@ backup with the matching earlier plugin, preserving later work separately.
    server using the database. Copy the closed `.mv.db` file into independent backup storage.
    Keep the original location, JDBC URL and matching plugin/H2 version recorded.
    Never copy an open database file.
-2. To test a backup, copy it to a **new** directory. Use the same H2 2.5.250
+2. To test a backup, copy it to a **new** directory. Use the same H2 2.4.240
    runtime and an explicit JDBC URL to the copied file's basename, without its
    `.mv.db` suffix, adding `;IFEXISTS=TRUE`. Do not test by overwriting the original.
 3. Deliberately select the copy and restart. Verify tasks, activities, labels and

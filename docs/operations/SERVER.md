@@ -1,7 +1,7 @@
 # Timekeeper Quarkus server
 
 The server implements the [owner-scoped v1 API](../architecture/API-V1.md) for #218.
-It uses Quarkus **3.40.1 LTS**, Java **21**, H2 **2.5.250**, and its own schema
+It uses Quarkus **3.40.1 LTS**, Java **21**, H2 **2.4.240**, and its own schema
 version **2**. The same ordinary Java domain/application-service sources are
 compiled by the standalone Maven reactor and the Eclipse build. The server has
 no Eclipse Platform, workspace, SWT, Mylyn, OSGi or JPA dependency.

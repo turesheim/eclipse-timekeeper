@@ -19,6 +19,27 @@ class H2RuntimeTest {
 	@TempDir Path directory;
 
 	@Test
+	void committedDataSurvivesCrashRecoveryAndFreedChunkReuse() {
+		var builder = new org.h2.mvstore.MVStore.Builder()
+				.fileName(directory.resolve("crash.mv.db").toString()).autoCommitDisabled();
+		var store = builder.open();
+		org.h2.mvstore.MVMap<Integer, byte[]> values = store.openMap("values");
+		for (int i = 0; i < 20; i++) { values.put(i % 10, new byte[1000 + i]); store.commit(); }
+		store.closeImmediately();
+		store = builder.open();
+		store.setRetentionTime(0); // Exercise H2 #4446 without timing-dependent sleeps.
+		values = store.openMap("values");
+		for (int i = 0; i < 60; i++) { values.put(i % 10, new byte[1000 + i]); store.commit(); }
+		values.put(999, new byte[] { 42 });
+		store.commit(); store.sync(); store.closeImmediately();
+		try (var reopened = builder.open()) {
+			org.h2.mvstore.MVMap<Integer, byte[]> saved = reopened.openMap("values");
+			org.junit.jupiter.api.Assertions.assertArrayEquals(new byte[] { 42 }, saved.get(999));
+			for (int i = 0; i < 10; i++) assertEquals(1050 + i, saved.get(i).length);
+		}
+	}
+
+	@Test
 	void currentEnginePreservesNanosecondTimestampsAcrossRestartAndSqlRestore() throws Exception {
 		var start = Instant.parse("2022-09-19T09:00:00.123456789Z");
 		var end = Instant.parse("2022-09-19T10:30:00.987654321Z");
@@ -40,7 +61,7 @@ class H2RuntimeTest {
 		Path script = directory.resolve("export.sql");
 		try (var connection = DriverManager.getConnection(url("original") + ";IFEXISTS=TRUE", "sa", "");
 				var statement = connection.createStatement()) {
-			assertTrue(connection.getMetaData().getDatabaseProductVersion().startsWith("2.5.250 "));
+			assertTrue(connection.getMetaData().getDatabaseProductVersion().startsWith("2.4.240 "));
 			statement.execute("SCRIPT TO '" + script.toString().replace("'", "''") + "'");
 		}
 		try (var restored = DriverManager.getConnection(url("restored"), "sa", "");
