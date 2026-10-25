@@ -320,7 +320,7 @@ test('journal controls use the account language and reject oversized UTF-8 draft
 test('journal toolbar creates the full evaluated Markdown subset and validates link edits',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage();
   try{
-    await signIn(page,await fresh(request));await month(page);await menu(page);const rich=page.locator('#journal-formatted .ProseMirror');
+    await signIn(page,await fresh(request));await month(page);await menu(page);const rich=page.locator('#journal-formatted .ProseMirror');await expect(rich).toBeVisible();await expect(page.locator('#journal-markdown-normalization')).toBeVisible();await expect(rich).toHaveAttribute('aria-describedby','journal-markdown-normalization');
     const action=name=>dialog(page).getByRole('button',{name,exact:true});
     async function draft(text){await expect(rich).toBeVisible();await action('Markdown source').click();await page.locator('#journal-body').fill(text);await action('Formatted').click();await expect(rich).toBeVisible();await rich.press('ControlOrMeta+A');}
     await draft('Done');await action('Strikethrough').click();await expect(rich.locator('del')).toHaveText('Done');

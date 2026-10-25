@@ -75,13 +75,13 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         }
       }else if(name==='tasks'){
         editor.action(callCommand(wrapInBulletListCommand.key));
-        const {$from}=view.state.selection;
-        for(let depth=$from.depth;depth>0;depth--){
-          const list=$from.node(depth);if(!['bullet_list','ordered_list'].includes(list.type.name))continue;
-          const start=$from.before(depth)+1;let transaction=view.state.tr;
-          list.descendants((node,position)=>{if(node.type.name==='list_item')transaction=transaction.setNodeMarkup(start+position,undefined,{...node.attrs,checked:node.attrs.checked??false});});
-          view.dispatch(transaction);break;
+        const {from,to,$from,empty}=view.state.selection;let transaction=view.state.tr;
+        if(empty){
+          for(let depth=$from.depth;depth>0;depth--){const item=$from.node(depth);if(item.type.name==='list_item'){transaction=transaction.setNodeMarkup($from.before(depth),undefined,{...item.attrs,checked:item.attrs.checked??false});break;}}
+        }else{
+          view.state.doc.nodesBetween(from,to,(item,position)=>{if(item.type.name==='list_item')transaction=transaction.setNodeMarkup(position,undefined,{...item.attrs,checked:item.attrs.checked??false});});
         }
+        if(transaction.docChanged)view.dispatch(transaction);
       }else{
         const action=commands[name];if(!action)return false;
         editor.action(callCommand(action.key,name==='heading'?2:undefined));
