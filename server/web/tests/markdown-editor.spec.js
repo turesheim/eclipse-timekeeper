@@ -10,7 +10,7 @@ async function downloaded(page){const pending=page.waitForEvent('download');awai
 test('Markdown editor lazily loads local formatting and preserves exact mode round trips',async({page})=>{
   const requests=[],outside=[];page.on('request',request=>{requests.push(request);if(new URL(request.url()).origin!==new URL(process.env.TIMEKEEPER_WEB_URL).origin)outside.push(request.url());});
   await open(page);expect(requests.some(request=>request.url().includes('/milkdown/milkdown.js'))).toBe(false);
-  const original=await fixture('standard');await importNote(page,original);await page.locator('#day-label').fill('Ferie');
+  const original=(await fixture('standard')).replaceAll('\n','\r\n');await importNote(page,original);await page.locator('#day-label').fill('Ferie');
   await page.locator('#markdown-rich').click();const rich=page.getByRole('textbox',{name:'Note body',exact:true});await expect(rich).toBeVisible();
   for(const selector of ['h1','strong','em','del','ul','ol','blockquote','pre code','table'])await expect(page.locator('#markdown-formatted '+selector).first()).toBeVisible();
   await expect(page.getByRole('checkbox',{name:'Task: Follow up'})).not.toBeChecked();await expect(page.getByRole('checkbox',{name:'Task: Completed'})).toBeChecked();
@@ -40,6 +40,7 @@ test('Obsidian extensions, frontmatter and CRLF remain exact source, with a usab
   await page.locator('#markdown-body').fill('Edited [[wikilink]]\n');expect(await downloaded(page)).toBe(original.slice(0,original.indexOf('# Sunday'))+'Edited [[wikilink]]\n');
   await page.locator('#markdown-body').fill('# Ordinary note\n');await page.route('**/assets/milkdown/milkdown.js',route=>route.abort());
   await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-status')).toContainText('could not be loaded');await expect(page.locator('#markdown-body')).toHaveValue('# Ordinary note\n');
+  await page.unroute('**/assets/milkdown/milkdown.js');await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-formatted')).toBeVisible();
   await downloaded(page);
 });
 test('Markdown controls are localized, keyboard accessible and fit mobile in all themes',async({page})=>{
@@ -48,9 +49,19 @@ test('Markdown controls are localized, keyboard accessible and fit mobile in all
   await open(page);await page.getByRole('button',{name:'Formatert',exact:true}).click();const rich=page.getByRole('textbox',{name:'Notattekst',exact:true});await expect(rich).toBeFocused();
   await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Markdown-kilde',exact:true})).toBeFocused();
   for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;},theme);
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
     expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
   await captureScreenshot(page,{path:'test-results/markdown-mobile.png',fullPage:true});
+});
+test('Markdown supports touch task toggling and text entry on a mobile viewport',async({browser})=>{
+  const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,viewport:{width:390,height:844},hasTouch:true,isMobile:true,ignoreHTTPSErrors:true});
+  try{
+    const page=await context.newPage();await open(page);await page.locator('#markdown-body').fill('- [ ] Touch task\n\nTouch text\n');await page.locator('#markdown-rich').tap();
+    const checkbox=page.getByRole('checkbox',{name:'Task: Touch task',exact:true});await checkbox.tap();await expect(checkbox).toBeChecked();
+    await page.locator('#markdown-formatted p').last().tap();await page.keyboard.press('End');await page.keyboard.insertText(' edited');
+    await page.locator('#markdown-source').tap();await expect(page.locator('#markdown-body')).toHaveValue(/\[x\] Touch task[\s\S]*Touch text edited/);
+    await downloaded(page);
+  }finally{await context.close();}
 });
