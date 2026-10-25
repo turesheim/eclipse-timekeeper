@@ -280,6 +280,7 @@ test('journal formatted editing fits narrow screens and all themes with accessib
       expect(await dialog(page).evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);if(theme==='dracula')await captureScreenshot(page,{path:'test-results/journal-editor-mobile.png'});await dialog(page).getByRole('button',{name:'Cancel',exact:true}).click();
     }
     await page.setViewportSize({width:320,height:740});await note(page).tap();await expect(rich).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.setViewportSize({width:844,height:390});await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeInViewport({ratio:.9});await page.setViewportSize({width:320,height:740});await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeInViewport({ratio:.9});
     await captureScreenshot(page,{path:'test-results/journal-editor-compact.png'});await save(page,'Touch label');await expect(note(page).locator('.bi-journal-text')).toBeVisible();await expect(note(page)).toHaveCSS('opacity','1');
   }finally{await owner.close();}
 });

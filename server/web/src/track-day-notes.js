@@ -110,7 +110,7 @@ export class TrackDayNotes {
     this.text.disabled=editor.loading||editor.busy||editor.uncertain||!editor.etag;this.text.readOnly=!this.writable;
     const readOnly=editor.loading||editor.busy||editor.uncertain||!editor.etag||!this.writable;
     if(this.markdown&&this.markdown.readOnly!==readOnly)this.markdown.setReadOnly(readOnly);
-    this.save.disabled=editor.loading||editor.busy||this.markdown?.loading||editor.uncertain||editor.stale||!editor.etag||!this.writable;
+    this.save.disabled=editor.loading||editor.failedRead||editor.busy||this.markdown?.loading||editor.uncertain||editor.stale||!editor.etag||!this.writable;
     this.cancel.disabled=editor.busy;
     if(this.reload){this.reload.hidden=!(editor.failedRead||editor.stale||editor.uncertain);this.reload.disabled=editor.loading||editor.busy||this.markdown.loading;this.reload.textContent=t(editor.uncertain?'journal.check_result':'journal.reload');}
     if(this.recovery){
@@ -200,7 +200,7 @@ export class TrackDayNotes {
     this.paint();this.closeEditor();this.callbacks.onChanged();
   }
   async commit(){
-    const editor=this.editor;if(!editor||editor.busy||editor.loading||editor.uncertain||editor.stale||!editor.etag||!this.writable||editor.session!==this.session)return;
+    const editor=this.editor;if(!editor||editor.busy||editor.loading||editor.failedRead||editor.uncertain||editor.stale||!editor.etag||!this.writable||editor.session!==this.session)return;
     if(this.markdown.loading)return;
     const body=this.markdown.value();if(new TextEncoder().encode(body).length>200000){this.error.textContent=t('journal.too_large');this.error.scrollIntoView({block:'nearest'});return;}
     editor.sent={text:this.text.value.trim(),body};editor.busy=true;this.error.textContent='';this.savedStatus.textContent=t('journal.saving');this.controls();

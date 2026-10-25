@@ -22,8 +22,8 @@
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror input[type="checkbox"] { min-width: 1.25rem; min-height: 1.25rem; accent-color: var(--bs-primary); }
 .markdown-lab-page #markdown-status { min-height: 1.5em; }
 
-.journal-dialog { width: min(68rem, calc(100vw - 1rem)); max-height: 94dvh; padding: clamp(.75rem, 2vw, 1.5rem); overflow: hidden; }
-.journal-dialog form { display: flex; flex-direction: column; gap: .25rem; height: min(86dvh, 54rem); }
+.journal-dialog { --journal-padding: clamp(.75rem, 2vw, 1.5rem); width: min(68rem, calc(100vw - 1rem)); max-height: 94dvh; padding: var(--journal-padding); overflow: hidden; }
+.journal-dialog form { display: flex; flex-direction: column; gap: .25rem; height: min(calc(94dvh - var(--journal-padding) - var(--journal-padding) - 2px), 54rem); }
 .journal-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: .25rem; }
 .journal-dialog h2 { font-size: 1.3rem; margin-bottom: .5rem; }
 .journal-dialog label.form-label { margin: .25rem 0 0; }
