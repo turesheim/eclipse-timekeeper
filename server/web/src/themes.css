@@ -65,7 +65,7 @@
     --bs-btn-disabled-color: var(--muted); --bs-btn-disabled-border-color: var(--line);
   }
   & .btn-outline-danger { --bs-btn-color: var(--bs-danger-text-emphasis); --bs-btn-border-color: var(--bs-danger-text-emphasis); }
-  & :is(a,button,input,select,summary,[tabindex]):focus-visible { box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--accent) 30%, transparent); }
+  & :is(a,button,input,select,summary,[tabindex]:not([tabindex="-1"])):focus-visible { box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--accent) 30%, transparent); }
   & :is(.form-control,.form-select):focus { border-color: var(--accent); box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--accent) 25%, transparent); }
   & #status[data-state=error] { color: var(--bs-danger-text-emphasis); }
   & .workspace-nav { --bs-navbar-color: var(--bs-body-color); --bs-navbar-hover-color: var(--accent); }

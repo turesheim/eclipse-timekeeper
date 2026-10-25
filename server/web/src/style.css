@@ -21,9 +21,11 @@ html { scroll-padding-block-end: calc(var(--workspace-nav-height) + 1rem); }
 body { background: #f3f6f5; }
 [hidden] { display: none !important; }
 a, button, input, select, summary { touch-action: manipulation; }
-:is(a, button, input, select, summary, [tabindex]):focus-visible {
+:is(a, button, input, select, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
   outline: none; box-shadow: 0 0 0 .2rem #17665326;
 }
+/* Static focus targets announce dialog/page context without outlining the region. */
+:is(main, nav, h1, h2, p)[tabindex="-1"]:focus { outline: none; }
 h1 { font-size: clamp(1.8rem, 3vw, 2.35rem); letter-spacing: -.035em; }
 h2 { font-size: 1.25rem; font-weight: 650; }
 h3 { font-size: 1.05rem; font-weight: 650; }
