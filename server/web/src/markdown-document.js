@@ -12,6 +12,7 @@ export function splitMarkdown(value) {
 
 // Conservative admission to rich mode. Unknown dialects remain editable as exact
 // source; code examples containing dialect syntax are ordinary supported Markdown.
+export const hasUnsupportedSyntax=value=>/\[\[|\]\]|\[![^\]]+\]|==|%%|\$|<|!\[|\[\^|^ {0,3}\[[^\]]+\]:|(?:^|\s)\^[\w-]+|^ {0,3}:::/m.test(value);
 export function needsSource(body) {
   let fence=null,text='';
   for(const line of body.split(/\r?\n/)){
@@ -20,5 +21,5 @@ export function needsSource(body) {
     if(match){fence=match[1];continue;}
     text+=line.replace(/(`+)([\s\S]*?)\1/g,'')+'\n';
   }
-  return /\[\[|\]\]|\[![^\]]+\]|==|%%|\$|<|!\[|\[\^|^ {0,3}\[[^\]]+\]:|(?:^|\s)\^[\w-]+|^ {0,3}:::/m.test(text);
+  return hasUnsupportedSyntax(text);
 }

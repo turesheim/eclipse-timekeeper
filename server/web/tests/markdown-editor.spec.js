@@ -65,8 +65,12 @@ test('Markdown supports touch task toggling and text entry on a mobile viewport'
     await downloaded(page);
   }finally{await context.close();}
 });
-test('Markdown schema round-trip guard retains unsupported code-block metadata as source',async({page})=>{
-  await open(page);const value='```js title="preserve this"\nconst day = "Sunday";\n```\n';
-  await page.locator('#markdown-body').fill(value);await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-status')).toContainText('cannot safely preserve');
-  await expect(page.locator('#markdown-body')).toHaveValue(value);expect(await downloaded(page)).toBe(value);
+test('Markdown schema guard retains metadata and escaped-code dialects without remote image requests',async({page})=>{
+  const external=[];page.on('request',request=>{if(request.url().includes('example.invalid'))external.push(request.url());});
+  await open(page);
+  for(const value of ['```js title="preserve this"\nconst day = "Sunday";\n```\n','\\`outside [[wikilink]]\\`','\\`![image](https://example.invalid/pixel)\\`']){
+    await page.locator('#markdown-body').fill(value);await page.locator('#markdown-rich').click();await expect(page.locator('#markdown-status')).toContainText('cannot safely preserve');
+    await expect(page.locator('#markdown-body')).toHaveValue(value);expect(await downloaded(page)).toBe(value);
+  }
+  expect(external).toEqual([]);
 });

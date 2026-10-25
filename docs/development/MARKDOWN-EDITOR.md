@@ -11,10 +11,9 @@ Use **Download Markdown** to keep a document; the label is separate and is not
 included. Importing over an edited draft asks before replacing it, and leaving
 an edited draft triggers the browser's unsaved-changes prompt.
 
-Storage/API changes (#394), calendar integration (#395), Markdown-file exports
+Storage/API changes (#394), calendar integration (#395), Markdown-folder import
 (#396) and optional bidirectional reconciliation (#397) remain separate work.
-They were not in the 2.0.0 milestone at evaluation time. In particular, the
-prototype does not overload the existing day-note `text` field with Markdown.
+In particular, the prototype does not overload the existing day-note `text` field with Markdown.
 
 ## Alternatives and bundle measurements
 
@@ -43,7 +42,7 @@ not a claim about the server's HTTP compression configuration.
 
 | Candidate | JavaScript | CSS | Other assets | Result |
 | --- | ---: | ---: | ---: | --- |
-| Chosen Milkdown kit integration | 460,392 / 141,119 | 1,561 / 618 | None | Full evaluated formatted surface |
+| Chosen Milkdown kit integration | 460,840 / 141,343 | 1,561 / 618 | None | Full evaluated formatted surface |
 | Default Crepe 7.22.3 | 2,781,408 / 925,123 | 78,756 / 11,767 | 60 KaTeX fonts, 1,076,572 bytes | More features than daily notes need |
 | CodeMirror source baseline | 506,628 / 175,030 | Runtime-generated | None | Does not include custom live preview |
 
@@ -108,7 +107,10 @@ interactive task checkboxes, links, quotations, fenced code and GFM tables.
   conservatively source-only. Detection ignores fenced and inline code examples.
   Unsupported content is never silently converted to a different syntax.
   The source textarea remains editable and downloads the complete document.
-- A second guard compares the semantic remark AST before and after the actual
+- A second guard checks unsupported nodes and literal dialect text in the parsed
+  remark AST, including escaped-backtick cases the fast scan cannot disambiguate.
+  Image node views are inert so even a rejected image cannot trigger a request.
+  It then compares the semantic remark AST before and after the actual
   Milkdown parse/serialize pass, ignoring only source positions and list spacing.
   A mismatch rejects rich mode before the draft is accepted. This catches schema
   limitations beyond the explicit dialect checks. It is a compatibility guard,

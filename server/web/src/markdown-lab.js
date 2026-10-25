@@ -30,7 +30,7 @@ $('markdown-rich').addEventListener('click',async()=>{
   if(loading)return;if(editor){editor.focus();return;}
   // Frontmatter pasted in source is also separated before rich parsing.
   if(!frontmatter){const parts=splitMarkdown(body());frontmatter=parts.frontmatter;setBody(parts.body);unterminated=parts.unterminated;paintMetadata();}
-  if(source.value.length>200000){status.textContent=t('markdown.too_large');return;}
+  if(new TextEncoder().encode(body()).length>200000){status.textContent=t('markdown.too_large');return;}
   if(unterminated||needsSource(body())||splitMarkdown(body()).frontmatter){status.textContent=t('markdown.source_only');return;}
   busy(true);
   status.textContent=t('markdown.loading');

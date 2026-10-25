@@ -5,10 +5,13 @@ import {commonmark,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingComman
 import {gfm,insertTableCommand} from '@milkdown/kit/preset/gfm';
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand} from '@milkdown/kit/utils';
+import {hasUnsupportedSyntax} from '../src/markdown-document.js';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
 
 const commands={bold:toggleStrongCommand,italic:toggleEmphasisCommand,heading:wrapInHeadingCommand,list:wrapInBulletListCommand,quote:wrapInBlockquoteCommand,table:insertTableCommand,undo:undoCommand,redo:redoCommand};
+const sourceNodes=new Set(['html','image','imageReference','linkReference','definition','footnoteReference','footnoteDefinition']);
+const unsupported=node=>!['code','inlineCode'].includes(node.type)&&(sourceNodes.has(node.type)||node.type==='text'&&hasUnsupportedSyntax(node.value)||Boolean(node.children?.some(unsupported)));
 // Presentation choices (blank-line spacing, bullet markers) can normalize on an
 // actual rich edit. All semantic fields must survive the initial round trip.
 const semantic=value=>{
@@ -36,7 +39,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape}){
     ctx.set(editorViewOptionsCtx,{
       attributes:{role:'textbox','aria-label':label,'aria-multiline':'true',spellcheck:'true'},
       handleKeyDown:(_view,event)=>{if(event.key==='Escape'){escape();return true;}return false;},
-      nodeViews:{list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel)},
+      nodeViews:{list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),image:node=>{const dom=document.createElement('span');dom.textContent=node.attrs.alt||'';return {dom};}},
       // Links are text-editable; clicking never navigates or executes a URI.
       handleClick:(_view,_pos,event)=>Boolean(event.target.closest('a')&&(event.preventDefault(),true)),
       // Prototype accepts pasted text only, so HTML/images cannot fetch remote
@@ -49,7 +52,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape}){
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
     const serialized=editor.action(getMarkdown());
-    const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx);return JSON.stringify(semantic(parser.parse(value)))===JSON.stringify(semantic(parser.parse(serialized)));});
+    const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx),tree=parser.parse(value);return !unsupported(tree)&&JSON.stringify(semantic(tree))===JSON.stringify(semantic(parser.parse(serialized)));});
     if(!safe){await editor.destroy();return null;}
     return {
       markdown:()=>view.state.doc.eq(original)?value:editor.action(getMarkdown()),
