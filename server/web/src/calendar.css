@@ -1,4 +1,16 @@
 /* Calendar lanes share wall-clock rows; shaded cells represent DST gaps. */
+/* Fill the space above navigation; short windows can still scroll the page. */
+body:has(#workspace[data-view=calendar]:not([hidden])) {
+  display:flex;flex-direction:column;height:100dvh;
+  & > .app-header { flex-shrink:0; }
+  & > main { display:flex;flex-direction:column;flex:1;width:100%;margin-block:0;padding-bottom:calc(var(--workspace-nav-height) + .5rem); }
+  & #workspace { display:flex;flex-direction:column;flex:1;padding-bottom:0; }
+  & #work-session { flex-shrink:0; }
+  & #calendar-panel { display:flex;flex-direction:column;flex:1; }
+  & #calendar-panel > :not(.calendar-scroll) { flex-shrink:0; }
+  & #calendar-panel > .calendar-toolbar { margin-bottom:.25rem; }
+  & .calendar-scroll { flex:1 1 auto;height:12rem;min-height:12rem; }
+}
 .calendar-toolbar{display:grid;grid-template-columns:minmax(11rem,1fr) minmax(0,auto) minmax(11rem,1fr);align-items:center}
 .calendar-controls{display:flex;align-items:flex-end;flex-wrap:wrap;gap:.75rem}
 .calendar-toolbar-heading{text-align:center;overflow-wrap:anywhere}
@@ -11,7 +23,7 @@
 @media(max-width:767px){.calendar-toolbar{grid-template-columns:minmax(0,1fr) auto;gap:.75rem}.calendar-toolbar-heading{grid-column:1/-1;grid-row:1}.calendar-controls{grid-column:1;grid-row:2}.calendar-toolbar .calendar-tools{grid-column:2;grid-row:2;max-width:calc(8.25rem + .8rem)}}
 @media(max-width:374px){.calendar-toolbar .calendar-tools{max-width:calc(5.5rem + .4rem)}}
 @media(max-width:640px){.calendar-scroll{display:block;height:68vh}.calendar-navigation button{padding:.5rem}}
-#calendar-message{height:2.8em;min-height:2.8em;overflow:auto;overflow-wrap:anywhere;margin:.25rem 0}.calendar-task h3{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-height:2.6em}.calendar-task li button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#calendar-dst{font-size:.75rem;margin:.2rem 0}
+#calendar-message{height:1.4em;min-height:1.4em;overflow:auto;overflow-wrap:anywhere;margin:0 0 .25rem}.calendar-task h3{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-height:2.6em}.calendar-task li button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#calendar-dst{font-size:.75rem;margin:.2rem 0}
 @media(max-width:640px){.calendar-toolbar h2{font-size:1.1rem}.calendar-toolbar input{width:10rem}}
 
 /* Mouse hit areas stay stable while grips fade in; touch requires selection. */
