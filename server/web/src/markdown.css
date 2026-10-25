@@ -15,6 +15,7 @@
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror h3 { font-size: 1.2rem; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror blockquote { border-inline-start: .25rem solid var(--bs-primary); padding-inline-start: 1rem; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror pre { padding: 1rem; background: var(--bs-tertiary-bg); border-radius: .25rem; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror code { color: inherit; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror table { width: 100%; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror :is(th,td) { border: 1px solid var(--bs-border-color); padding: .5rem; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror li[data-task="true"] { display: flex; align-items: baseline; gap: .75rem; list-style: none; }
