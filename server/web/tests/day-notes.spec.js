@@ -114,6 +114,20 @@ test('Escape immediately releases the day-note editor before its queued close ev
   }finally{await owner.close();}
 });
 
+test('calendar summaries expose body presence while label-only edits preserve private Markdown',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage();
+  try{
+    await signIn(page,await fresh(request));const api=await apiFor(page),date='2026-05-17',body='\r\n# Private Markdown marker\r\n  keep spaces  \r\n';
+    const empty=await api('GET','/day-notes/'+date);await api('PUT','/day-notes/'+date,{body},{'If-Match':empty.headers().etag});await month(page);
+    await expect(note(page)).not.toHaveClass(/is-empty/);await expect(note(page)).toHaveAttribute('title','Markdown note');
+    const summaries=await api('GET','/day-notes?fromDate='+date+'&toDate='+date),summary=await summaries.json();
+    expect(summary.items[0].hasBody).toBe(true);expect(summary.items[0]).not.toHaveProperty('body');expect(await summaries.text()).not.toContain('Private Markdown marker');
+    await menu(page);await expect(page.locator('#track-note-text')).toHaveValue('');await save(page,'Planning');
+    expect((await(await api('GET','/day-notes/'+date)).json()).body).toBe(body);
+    await menu(page);await save(page,'');await expect(note(page)).not.toHaveClass(/is-empty/);expect((await(await api('GET','/day-notes/'+date)).json()).body).toBe(body);
+  }finally{await owner.close();}
+});
+
 test('day notes keep a stale draft and require review after an unconfirmed save',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage();
   try{

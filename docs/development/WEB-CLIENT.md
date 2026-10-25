@@ -128,7 +128,11 @@ press and hold a day to create its note. Keyboard users can
 focus that button and press **Shift+F10** for the same menu. Movement cancels a
 long press, preserving scrolling and month swipes.
 
-Notes accept up to 80 characters. Clear the text and save to remove a label;
+Labels accept up to 80 characters. The API independently stores a Markdown body
+(up to 200,000 UTF-8 bytes), with a lightweight body-presence marker in calendar
+summaries. Label-only edits preserve that body, and clearing a label leaves a
+body-only note discoverable. The full formatted editor is a separate integration.
+Clear the text and save to remove a label;
 Cancel leaves the saved note unchanged. Each note belongs to its calendar date
 and account, including days without work. It follows the account across web
 sessions and devices, and remains on the same date after time-zone changes.

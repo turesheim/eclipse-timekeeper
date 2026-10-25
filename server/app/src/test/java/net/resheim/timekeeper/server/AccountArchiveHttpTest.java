@@ -29,11 +29,17 @@ class AccountArchiveHttpTest {
     }
     @Test void privateZipDownloadAndReviewedRestoreRespectReadOnlyOwnerAndConditionalBoundaries() throws Exception {
         call("test-a","POST","/projects",object().put("name","Source project"),null,UUID.randomUUID().toString()).then().statusCode(201);
+        String date="2026-08-06",journal="Private account journal\r\n  preserve this spacing  \n";
+        var empty=call("test-a","GET","/day-notes/"+date,null,null,null);
+        call("test-a","PUT","/day-notes/"+date,object().put("body",journal),empty.header("ETag"),null).then().statusCode(200);
         store.transaction("a",()->{store.update("UPDATE tk_account SET administrator=TRUE WHERE owner_id=?",store.owner());return null;});
         byte[] bytes=call("test-read","GET","/data/account/export",null,null,null).then().statusCode(200).header("Cache-Control","no-store").contentType("application/zip").extract().asByteArray();
         JsonNode source=null;
         try(var zip=new ZipInputStream(new ByteArrayInputStream(bytes))) {for(var entry=zip.getNextEntry();entry!=null;entry=zip.getNextEntry()) if(entry.getName().equals("archive.json")) source=parse(new String(zip.readAllBytes(),StandardCharsets.UTF_8));}
         assertNotNull(source);assertEquals("a",source.path("account").path("ownerId").asText());assertEquals(1,source.path("work").path("projects").size());
+        assertEquals(journal,source.path("dayNotes").get(0).path("body").asText());
+        byte[] foreign=call("test-b","GET","/data/account/export",null,null,null).then().statusCode(200).extract().asByteArray();
+        try(var zip=new ZipInputStream(new ByteArrayInputStream(foreign))){for(var entry=zip.getNextEntry();entry!=null;entry=zip.getNextEntry())if(entry.getName().equals("archive.json"))assertFalse(new String(zip.readAllBytes(),StandardCharsets.UTF_8).contains("Private account journal"));}
         given().get("/api/v1/data/account/export").then().statusCode(401);
         call("test-a","GET","/data/account/export?ownerId=b",null,null,null).then().statusCode(400);
         String digest=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
@@ -60,6 +66,7 @@ class AccountArchiveHttpTest {
         assertEquals(1,parse(call("test-b","GET","/data/account/imports",null,null,null).asString()).path("items").size());
         assertEquals(0,parse(call("test-a","GET","/data/account/imports",null,null,null).asString()).path("items").size());
         assertEquals(1,parse(call("test-a","GET","/projects",null,null,null).asString()).path("items").size());
+        assertEquals(journal,parse(call("test-b","GET","/day-notes/"+date,null,null,null).asString()).path("body").asText());
         // The extracted JSON and its original ZIP are one archive, even though
         // the upload bytes/hash and preference choice differ.
         byte[] extracted=source.toString().getBytes(StandardCharsets.UTF_8);
