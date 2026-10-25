@@ -57,11 +57,12 @@ class JournalMarkdownTest {
         rejects("FRONTMATTER_TOO_LARGE","---\nunknown: '"+"x".repeat(20000)+"'\n---\n");
     }
     @Test void exportingCalendarChangesPreservesUnknownYamlAndExactUnsupportedMarkdown(){
-        String original="\ufeff---\r\ntimekeeper-label: Original\r\nother: [1, true, null]\r\nwhen: 2000-01-01\r\ncustom:\r\n  message: |\r\n    Preserve this property\r\n---\r\nOld body";
+        String original="\ufeff---\r\ntimekeeper-label: Original\r\nother: [1, true, null]\r\nwhen: 2000-01-01\r\nbinary: !!binary SGVsbG8=\r\ncustom:\r\n  message: |\r\n    Preserve this property\r\n---\r\nOld body";
         byte[] bytes=original.getBytes(StandardCharsets.UTF_8);String body="\r\n<div data-private=\"unmodified\">\r\n  <!-- unsupported HTML -->\r\n</div>\r\n\r\n[link][custom]\r\n\t  ";
         byte[] rendered=JournalMarkdown.render("2026-10-25.md",bytes,"true: # Søndag",body);
         var before=JournalMarkdown.document("2026-10-25.md",bytes);var after=JournalMarkdown.document("2026-10-25.md",rendered);
         for(String key:new String[]{"other","when","custom"})assertEquals(before.metadata().get(key),after.metadata().get(key));
+        assertArrayEquals((byte[])before.metadata().get("binary"),(byte[])after.metadata().get("binary"));
         assertEquals("true: # Søndag",after.note().label());assertEquals(body,after.note().body());assertFalse(after.toString().contains("private"));
         assertArrayEquals(bytes,JournalMarkdown.render("2026-10-25.md",bytes,before.note().label(),before.note().body()));
     }

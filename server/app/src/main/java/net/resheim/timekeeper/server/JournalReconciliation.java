@@ -44,6 +44,7 @@ final class JournalReconciliation {
     private static String hash(byte[] data){return data==null?ABSENT:JournalMarkdown.hash(data);}
     private boolean equivalent(String name,boolean exists,byte[] input,ObjectNode note,byte[] remote){
         if(exists!=present(note))return false;if(!exists)return true;
+        if(Arrays.equals(input,remote))return true;
         var local=JournalMarkdown.document(name,input);var other=JournalMarkdown.document(name,remote);
         var left=new LinkedHashMap<>(local.metadata());var right=new LinkedHashMap<>(other.metadata());left.remove("timekeeper-label");right.remove("timekeeper-label");
         return local.note().label().equals(other.note().label())&&local.note().body().equals(other.note().body())&&left.equals(right);
