@@ -5,7 +5,7 @@ import {commonmark,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingComman
 import {gfm,insertTableCommand,toggleStrikethroughCommand} from '@milkdown/kit/preset/gfm';
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand,$prose} from '@milkdown/kit/utils';
-import {Plugin} from '@milkdown/kit/prose/state';
+import {Plugin,TextSelection} from '@milkdown/kit/prose/state';
 import {hasUnsupportedSyntax} from '../src/markdown-document.js';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
@@ -89,6 +89,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         const action=commands[name];if(!action)return false;
         const level=name==='heading'?(payload??2):undefined;
         if(name==='heading'&&(!Number.isInteger(level)||level<1||level>6))return false;
+        if(name==='hr'&&!view.state.selection.empty)view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(view.state.selection.to),-1)));
         editor.action(callCommand(action.key,level));
       }
       view.focus();return true;
