@@ -19,12 +19,16 @@ final class DomainTransfer {
     ApiReplies importRecords(JsonNode input) {
         Map<UUID,UUID> clients=new HashMap<>();
         Map<UUID,UUID> connections=new HashMap<>();
+        Map<UUID,UUID> lists=new HashMap<>();
         Map<UUID,ProjectId> projects=new HashMap<>();Map<UUID,TaskId> tasks=new HashMap<>();Map<UUID,LabelId> labels=new HashMap<>();Map<UUID,WorkSessionId> sessions=new HashMap<>();Set<UUID> sourceIds=new HashSet<>();
         var result=object();var mappings=result.putArray("ids");var service=store.service();
         // Validate source identity uniqueness before any record is created.
         TYPES.forEach((name,type) -> {for(JsonNode item:input.path(name)) if(!sourceIds.add(uuid(item.get("id")))) throw ApiFailure.validation();});
         Set<UUID> sourceConnections=new HashSet<>();input.path("taskConnections").forEach(item->sourceConnections.add(uuid(item.get("id"))));
         for(JsonNode item:input.path("taskLists")) if(!sourceConnections.contains(uuid(item.get("connectionId")))) throw ApiFailure.validation();
+        Map<UUID,JsonNode> sourceLists=new HashMap<>(),sourceConnectionRecords=new HashMap<>();
+        input.path("taskLists").forEach(item->sourceLists.put(uuid(item.get("id")),item));
+        input.path("taskConnections").forEach(item->sourceConnectionRecords.put(uuid(item.get("id")),item));
         Map<UUID,JsonNode> sourceProjectRecords=new HashMap<>();
         input.get("projects").forEach(item -> sourceProjectRecords.put(uuid(item.get("id")),item));
         Set<UUID> sourceProjects=new HashSet<>(),sourceLabels=new HashSet<>(),sourceSessions=new HashSet<>();Map<UUID,JsonNode> sourceTasks=new HashMap<>();
@@ -33,6 +37,10 @@ final class DomainTransfer {
         input.path("workSessions").forEach(item -> sourceSessions.add(uuid(item.get("id"))));
         input.get("tasks").forEach(item -> sourceTasks.put(uuid(item.get("id")),item));
         for(JsonNode item:input.get("tasks")) {
+            for(JsonNode reference:item.path("externalReferences")) if(reference.hasNonNull("taskListId")) {
+                var list=sourceLists.get(uuid(reference.get("taskListId")));
+                if(list==null || !sourceConnectionRecords.get(uuid(list.get("connectionId"))).path("providerId").asText().equals(reference.path("providerId").asText())) throw ApiFailure.validation();
+            }
             var project=optionalText(item.get("projectId")).map(UUID::fromString);
             if(project.isPresent() && !sourceProjects.contains(project.get())) throw ApiFailure.validation();
             Set<UUID> seen=new HashSet<>();JsonNode current=item;
@@ -81,6 +89,7 @@ final class DomainTransfer {
                     item.get("writable").asBoolean(),item.get("shared").asBoolean(),item.get("owner").asBoolean(),
                     item.get("present").asBoolean(),item.get("position").asInt(),0);
             store.save("TASK_LIST",created);store.change("TASK_LIST","CREATED",created.id().toString());
+            lists.put(uuid(item.get("id")),created.id());
             mapping(mappings,"TASK_LIST",item,created.id());
         }
         int openSessions=0;
@@ -128,7 +137,7 @@ final class DomainTransfer {
                 }
                 var project=optionalText(item.get("projectId")).map(UUID::fromString).map(id -> required(projects,id));
                 var parentId=parent.map(id -> required(tasks,id));
-                var created=service.createTask(new CreateTask(project,parentId,item.get("summary").asText(),optionalText(item.get("url")),references(item.get("externalReferences")),
+                var created=service.createTask(new CreateTask(project,parentId,item.get("summary").asText(),optionalText(item.get("url")),remapReferences(item.get("externalReferences"),lists),
                         new TaskPlanning(optionalText(item.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),
                                 optionalText(item.get("scheduledDate")).map(java.time.LocalDate::parse),optionalText(item.get("completedAt")).map(java.time.Instant::parse)),
                         checklist(item.get("checklistItems")),timing(item),importance(item),body(item)));
@@ -154,6 +163,11 @@ final class DomainTransfer {
         if(!fields.isEmpty()) store.clientDetails(type,id,fields);
     }
     private static <T> T required(Map<UUID,T> values,UUID id) {T value=values.get(id);if(value==null) throw ApiFailure.validation();return value;}
+    private static Set<ExternalTaskReference> remapReferences(JsonNode values,Map<UUID,UUID> lists) {
+        Set<ExternalTaskReference> result=new LinkedHashSet<>();
+        for(var reference:references(values)) result.add(reference.withTaskList(reference.taskListId().map(id -> required(lists,id))));
+        return result;
+    }
     private static void mapping(com.fasterxml.jackson.databind.node.ArrayNode mappings,String type,JsonNode source,UUID id) {
         var item=object();item.put("entityType",type);item.put("sourceId",uuid(source.get("id")).toString());item.put("id",id.toString());mappings.add(item);
     }

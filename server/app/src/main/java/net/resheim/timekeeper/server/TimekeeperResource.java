@@ -31,6 +31,17 @@ public class TimekeeperResource {
     private static ApiReplies json(JsonNode value) { return new ApiReplies(200,value,null,null); }
     private static ApiReplies empty() { return new ApiReplies(204,null,null,null); }
     private JsonNode required(String type,UUID id) { return store.find(type,id).orElseThrow(ApiFailure::notFound); }
+    private ExternalTaskReference checkedReference(ExternalTaskReference reference) {
+        reference.taskListId().ifPresent(id -> {
+            var list=required("TASK_LIST",id);
+            var connection=required("TASK_CONNECTION",uuid(list.get("connectionId")));
+            if(!connection.get("providerId").asText().equals(reference.providerId())) throw ApiFailure.validation();
+        });
+        return reference;
+    }
+    private Set<ExternalTaskReference> checkedReferences(JsonNode values) {
+        var result=references(values);result.forEach(this::checkedReference);return result;
+    }
     private static Optional<ProjectId> project(JsonNode input) { return optionalText(input.get("projectId")).map(UUID::fromString).map(ProjectId::new); }
     private static Optional<TaskId> parent(JsonNode input) { return optionalText(input.get("parentTaskId")).map(UUID::fromString).map(TaskId::new); }
     private static TaskConnection connection(JsonNode input,UUID id,long version) {
@@ -83,7 +94,7 @@ public class TimekeeperResource {
             }
             var service=store.service();Object value=switch(type) {
                 case "PROJECT" -> service.createProject(new CreateProject(input.get("name").asText()));
-                case "TASK" -> service.createTask(new CreateTask(project(input),parent(input),input.get("summary").asText(),optionalText(input.get("url")),references(input.get("externalReferences")),planning(input),checklist(input.get("checklistItems")),timing(input),importance(input),body(input)));
+                case "TASK" -> service.createTask(new CreateTask(project(input),parent(input),input.get("summary").asText(),optionalText(input.get("url")),checkedReferences(input.get("externalReferences")),planning(input),checklist(input.get("checklistItems")),timing(input),importance(input),body(input)));
                 case "LABEL" -> service.createLabel(new CreateLabel(input.get("name").asText(),optionalText(input.get("color"))));
                 case "ACTIVITY" -> service.createActivity(new CreateActivity(optionalText(input.get("taskId")).map(UUID::fromString).map(TaskId::new).orElse(null),new OwnerId(store.owner()),Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText(),labels(input.get("labelIds")),optionalText(input.get("workSessionId")).map(UUID::fromString).map(WorkSessionId::new),project(input)));
                 case "WORK_SESSION" -> store.workSessionService().createWorkSession(new CreateWorkSession(new OwnerId(store.owner()),Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),WorkSessionDescriptions.summary(input)));
@@ -186,7 +197,7 @@ public class TimekeeperResource {
     }
     @PUT @Path("/tasks/{id}/external-references") public Response link(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalReference",body);ContractInputs.queries(uri.getQueryParameters());
-        return tx(() -> { long version=ApiReplies.match(required("TASK",key),match);return ApiReplies.resource(200,snapshot(store.owner(),store.service().linkExternalReference(new LinkExternalReference(new TaskId(key),version,reference(input)))),null); });
+        return tx(() -> { long version=ApiReplies.match(required("TASK",key),match);return ApiReplies.resource(200,snapshot(store.owner(),store.service().linkExternalReference(new LinkExternalReference(new TaskId(key),version,checkedReference(reference(input))))),null); });
     }
     @PUT @Path("/tasks/{id}/external-references/source") public Response updateExternalTaskSource(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalTaskSourceInput",body);ContractInputs.queries(uri.getQueryParameters());

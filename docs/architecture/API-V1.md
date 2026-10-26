@@ -174,6 +174,13 @@ resource; a conflicting representation of the same remote identity returns
 409. Updates require `If-Match`. Mark a missing list `present=false` or a
 disconnected account `enabled=false`; remote disappearance must not trigger
 deletion of local tasks.
+An external task reference can carry `taskListId` to point at an owned provider
+list. The list's connection must use the same provider. The existing
+`repositoryId` remains the provider identity namespace and must distinguish
+accounts and lists when remote item IDs are only unique within a list. A legacy
+link update that omits `taskListId` preserves the association. Portable import
+remaps list IDs with the rest of the owned graph; deleting a referenced list is
+rejected. The Timekeeper project remains independent of this association.
 
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
