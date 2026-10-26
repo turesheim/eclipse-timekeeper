@@ -150,6 +150,16 @@ class HttpClientIntegrationTest {
     }
     @Test void javaClientPerformsOwnedCrudTrackingReportsAndProviderLinking() {
         try(var client=new HttpTimekeeperService(server,()->"test-a",Duration.ofSeconds(3))) {
+            var connection=client.createTaskConnection(new CreateTaskConnection("google",UUID.randomUUID().toString(),"Personal",true,true,true));
+            var remoteList=client.createTaskList(new CreateTaskList(connection.id(),UUID.randomUUID().toString(),"Tasks",TaskListKind.STANDARD,
+                    true,true,false,true,true,0));
+            var remoteListId=remoteList.id();
+            assertTrue(client.taskLists(connection.id()).stream().anyMatch(value -> value.id().equals(remoteListId)));
+            remoteList=client.updateTaskList(new UpdateTaskList(remoteList.id(),remoteList.version(),"Tasks",TaskListKind.STANDARD,
+                    true,true,false,true,false,0));
+            assertFalse(client.taskList(remoteList.id()).orElseThrow().present());
+            client.deleteTaskList(remoteList.id(),remoteList.version());
+            client.deleteTaskConnection(connection.id(),connection.version());
             var project=client.createProject(new CreateProject("HTTP client "+UUID.randomUUID()));
             var parent=client.createTask(new CreateTask(Optional.of(project.id()),"Parent",Optional.empty()));
             var child=client.createTask(new CreateTask(Optional.of(project.id()),Optional.of(parent.id()),"Child",Optional.empty()));

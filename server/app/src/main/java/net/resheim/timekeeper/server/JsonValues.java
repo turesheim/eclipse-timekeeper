@@ -51,6 +51,17 @@ public final class JsonValues {
         if (value.isEmpty()) node.putNull(name); else node.put(name, value.get().toString());
     }
     public static ObjectNode snapshot(String owner, Object value) {
+        if (value instanceof TaskConnection connection) {
+            var node=base(owner,connection.id(),connection.version());
+            node.put("providerId",connection.providerId());node.put("remoteAccountId",connection.remoteAccountId());node.put("name",connection.name());
+            node.put("readable",connection.readable());node.put("writable",connection.writable());node.put("enabled",connection.enabled());return node;
+        }
+        if (value instanceof TaskList list) {
+            var node=base(owner,list.id(),list.version());
+            node.put("connectionId",list.connectionId().toString());node.put("remoteListId",list.remoteListId());node.put("name",list.name());
+            node.put("kind",list.kind().name());node.put("readable",list.readable());node.put("writable",list.writable());
+            node.put("shared",list.shared());node.put("owner",list.owner());node.put("present",list.present());node.put("position",list.position());return node;
+        }
         if (value instanceof Project project) { var node = base(owner, project.id().value(), project.version()); node.put("name", project.name()); return node; }
         if (value instanceof Label label) { var node = base(owner, label.id().value(), label.version()); node.put("name", label.name()); nullable(node,"color",label.color()); return node; }
         if (value instanceof Task task) {
@@ -90,6 +101,11 @@ public final class JsonValues {
     public static Object decode(String type, JsonNode node) {
         UUID id = uuid(node.get("id")); long version = node.get("version").asLong();
         return switch (type) {
+            case "TASK_CONNECTION" -> new TaskConnection(id,node.get("providerId").asText(),node.get("remoteAccountId").asText(),node.get("name").asText(),
+                    node.get("readable").asBoolean(),node.get("writable").asBoolean(),node.get("enabled").asBoolean(),version);
+            case "TASK_LIST" -> new TaskList(id,uuid(node.get("connectionId")),node.get("remoteListId").asText(),node.get("name").asText(),
+                    TaskListKind.valueOf(node.get("kind").asText()),node.get("readable").asBoolean(),node.get("writable").asBoolean(),
+                    node.get("shared").asBoolean(),node.get("owner").asBoolean(),node.get("present").asBoolean(),node.get("position").asInt(),version);
             case "PROJECT" -> new Project(new ProjectId(id), node.get("name").asText(), version);
             case "LABEL" -> new Label(new LabelId(id), node.get("name").asText(), optionalText(node.get("color")), version);
             case "TASK" -> new Task(new TaskId(id), optionalText(node.get("projectId")).map(UUID::fromString).map(ProjectId::new),

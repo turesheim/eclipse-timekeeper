@@ -113,7 +113,8 @@ class HttpAcceptance(unittest.TestCase):
             self.assertIsNone(page.get('nextCursor'), 'Fixture cleanup must include every daily record')
             self.created.extend((owner,'activities',value['id']) for value in page['items'])
         # Clean only records created by this suite, including commands/imports.
-        order = {'activities': 0, 'work-sessions': 1, 'tasks': 2, 'labels': 3, 'projects': 4, 'clients': 5}
+        order = {'activities': 0, 'work-sessions': 1, 'tasks': 2, 'task-lists': 3,
+                 'task-connections': 4, 'labels': 5, 'projects': 6, 'clients': 7}
         unique = list(dict.fromkeys(reversed(self.created)))
         for owner, resource, identifier in sorted(unique, key=lambda row: order[row[1]]):
             value, headers = self.call('GET', f'/{resource}/{identifier}', owner=owner)
@@ -671,6 +672,44 @@ class HttpAcceptance(unittest.TestCase):
         cleared_result, _=self.call('PUT',path+'/external-references/source',body={**body,'source':cleared},
                                     headers={'If-Match':headers['ETag']})
         self.assertEqual(cleared,cleared_result['externalReferences'][0]['source'])
+
+    def test_provider_accounts_and_lists_are_owned_idempotent_and_portable(self):
+        account={'providerId':'microsoft','remoteAccountId':str(uuid4()),'name':'Personal',
+                 'readable':True,'writable':True,'enabled':True}
+        connection=self.create('task-connections',account)
+        replay, _=self.call('POST','/task-connections',body=account,status=200)
+        self.assertEqual(connection['id'],replay['id'])
+        self.call('POST','/task-connections',body={**account,'name':'Changed'},status=409,code='CONFLICT')
+        task_list={'connectionId':connection['id'],'remoteListId':str(uuid4()),'name':'Flagged emails',
+                   'kind':'BUILT_IN','readable':True,'writable':False,'shared':False,'owner':True,
+                   'present':True,'position':0}
+        linked=self.create('task-lists',task_list)
+        replay, _=self.call('POST','/task-lists',body=task_list,status=200)
+        self.assertEqual(linked['id'],replay['id'])
+        listed, _=self.call('GET','/task-lists?'+urlencode({'connectionId':connection['id']}))
+        self.assertEqual([linked['id']],[item['id'] for item in listed['items']])
+        foreign, _=self.call('GET','/task-lists',owner='b')
+        self.assertNotIn(linked['id'],[item['id'] for item in foreign['items']])
+        self.call('GET','/task-lists/'+linked['id'],owner='b',status=404,code='NOT_FOUND')
+        self.call('DELETE','/task-connections/'+connection['id'],
+                  headers={'If-Match':self.call('GET','/task-connections/'+connection['id'])[1]['ETag']},status=409,code='CONFLICT')
+        _, headers=self.call('GET','/task-lists/'+linked['id'])
+        self.call('PUT','/task-lists/'+linked['id'],owner='read',body={key:task_list[key] for key in
+                  ('name','kind','readable','writable','shared','owner','present','position')},
+                  headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        updated, headers=self.call('PUT','/task-lists/'+linked['id'],body={**{key:task_list[key] for key in
+                  ('name','kind','readable','writable','shared','owner','present','position')},'present':False},
+                  headers={'If-Match':headers['ETag']})
+        self.assertFalse(updated['present'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
+               'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
+        mappings={item['sourceId']:item['id'] for item in imported['ids']}
+        for item in imported['ids']:self.created.append(('b',kinds[item['entityType']],item['id']))
+        restored, _=self.call('GET','/task-lists/'+mappings[linked['id']],owner='b')
+        self.assertEqual(mappings[connection['id']],restored['connectionId'])
+        self.assertFalse(restored['present'])
 
     def test_provider_identity_is_unique_per_owner_and_history_survives_unlink(self):
         reference = {'providerId': 'jira', 'repositoryId': 'https://jira.invalid',
