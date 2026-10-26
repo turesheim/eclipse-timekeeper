@@ -445,6 +445,10 @@ Moved, completed, and skipped occurrences remain distinct from the series
 status. Legacy task updates preserve recurrence; older rows decode as a task
 without a series or occurrence exceptions. Account archives and portable
 transfers include it.
+`TASK.reminders` holds owner-scoped typed alert triggers with stable UUIDs.
+Absolute and relative time alerts, geofences, car events, and message contacts
+remain distinct from task scheduling and due dates. Older task writes preserve
+them, and archives and portable transfers include them.
 The account ZIP archive also includes active day labels and Markdown bodies;
 journal synchronization state and deletion tombstones are not portable account
 records.

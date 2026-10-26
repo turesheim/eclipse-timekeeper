@@ -3,6 +3,7 @@ package net.resheim.eclipse.timekeeper.service;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
+import java.util.List;
 
 import net.resheim.eclipse.timekeeper.domain.ActivityId;
 import net.resheim.eclipse.timekeeper.domain.WorkSessionId;
@@ -21,6 +22,7 @@ import net.resheim.eclipse.timekeeper.domain.TaskImportance;
 import net.resheim.eclipse.timekeeper.domain.TaskBody;
 import net.resheim.eclipse.timekeeper.domain.TaskRecurrence;
 import net.resheim.eclipse.timekeeper.domain.TaskOccurrence;
+import net.resheim.eclipse.timekeeper.domain.TaskReminder;
 import net.resheim.eclipse.timekeeper.domain.TaskSyncMode;
 
 /** Immutable inputs accepted by {@link TimekeeperService}. */
@@ -47,7 +49,7 @@ public final class Commands {
 			Optional<String> cursor, Optional<Instant> lastObservedAt, Optional<Instant> lastCompleteAt) { }
 
 	public record CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
-			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder, Set<ExternalTaskReferenceKey> externalAliases, TaskRecurrence recurrence) {
+			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder, Set<ExternalTaskReferenceKey> externalAliases, TaskRecurrence recurrence, List<TaskReminder> reminders) {
 		public CreateTask {
 			projectId = optional(projectId);
 			parentTaskId = optional(parentTaskId);
@@ -60,6 +62,14 @@ public final class Commands {
 			importance = importance == null ? TaskImportance.ordinary() : importance;
 			body = body == null ? TaskBody.empty() : body;
 			recurrence = recurrence == null ? TaskRecurrence.empty() : recurrence;
+			reminders = reminders == null ? List.of() : List.copyOf(reminders);
+		}
+
+		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
+				Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning,
+				TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder,
+				Set<ExternalTaskReferenceKey> externalAliases, TaskRecurrence recurrence) {
+			this(projectId, parentTaskId, summary, url, externalReferences, planning, checklist, timing, importance, body, siblingOrder, externalAliases, recurrence, List.of());
 		}
 
 		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
@@ -139,6 +149,7 @@ public final class Commands {
 	public record UpdateTaskBody(TaskId id, long expectedVersion, TaskBody body) { }
 	public record UpdateTaskRecurrence(TaskId id, long expectedVersion, TaskRecurrence recurrence) { }
 	public record UpdateTaskOccurrences(TaskId id, long expectedVersion, java.util.List<TaskOccurrence> occurrences) { }
+	public record UpdateTaskReminders(TaskId id, long expectedVersion, List<TaskReminder> reminders) { }
 	public record UpdateTaskOrder(TaskId id, long expectedVersion, int siblingOrder) { }
 	public record LinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReference reference) { }
 	public record ReplaceExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey previous, ExternalTaskReference current) { }
