@@ -15,7 +15,7 @@ final class DomainTransfer {
     private final ServerStore store;
     DomainTransfer(ServerStore store) {this.store=store;}
     static final Map<String,String> TYPES=Map.of("clients","CLIENT","projects","PROJECT","tasks","TASK","labels","LABEL","activities","ACTIVITY","workSessions","WORK_SESSION",
-            "taskConnections","TASK_CONNECTION","taskLists","TASK_LIST");
+            "taskConnections","TASK_CONNECTION","taskLists","TASK_LIST","taskTombstones","TASK_TOMBSTONE");
     ApiReplies importRecords(JsonNode input) {
         Map<UUID,UUID> clients=new HashMap<>();
         Map<UUID,UUID> connections=new HashMap<>();
@@ -156,6 +156,13 @@ final class DomainTransfer {
             if(end.isEmpty() && store.active().isPresent()) throw ApiFailure.conflict();
             Activity created=new Activity(new ActivityId(UUID.randomUUID()),task,new OwnerId(store.owner()),start,end,item.get("summary").asText(),assigned,item.get("manual").asBoolean(),0,Optional.empty(),optionalText(item.get("projectId")).map(UUID::fromString).map(id -> required(projects,id)));
             store.save("ACTIVITY",created);store.change("ACTIVITY","CREATED",created.id().value().toString());mapping(mappings,"ACTIVITY",item,created.id().value());
+        }
+        for(JsonNode item:input.path("taskTombstones")) {
+            UUID tombstoneId=UUID.randomUUID();Set<ExternalTaskReferenceKey> keys=aliases(item.get("externalReferences"));
+            var tombstone=new TaskTombstone(tombstoneId,uuid(item.get("taskId")),Instant.parse(item.get("deletedAt").asText()),
+                    item.get("taskVersion").asLong(),keys);
+            store.save("TASK_TOMBSTONE",tombstone);store.change("TASK_TOMBSTONE","CREATED",tombstoneId.toString());
+            mapping(mappings,"TASK_TOMBSTONE",item,tombstoneId);
         }
         service.rolloverActivities(new OwnerId(store.owner()));
         result.put("revision",store.revision());return new ApiReplies(201,result,null,null);

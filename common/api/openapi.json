@@ -13550,6 +13550,14 @@
             },
             "maxItems": 10000,
             "description": "Optional for archives predating provider account/list support."
+          },
+          "taskTombstones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskTombstone"
+            },
+            "maxItems": 10000,
+            "description": "Optional for older transfers and archives. Deleted task IDs are historical and are not live task relationships."
           }
         },
         "required": [
@@ -13709,7 +13717,8 @@
                     "WORK_SESSION",
                     "CLIENT",
                     "TASK_CONNECTION",
-                    "TASK_LIST"
+                    "TASK_LIST",
+                    "TASK_TOMBSTONE"
                   ]
                 },
                 "sourceId": {
@@ -16835,6 +16844,14 @@
             },
             "maxItems": 250000,
             "description": "Optional for archives predating provider account/list support."
+          },
+          "taskTombstones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskTombstone"
+            },
+            "maxItems": 250000,
+            "description": "Optional for older transfers and archives. Deleted task IDs are historical and are not live task relationships."
           }
         },
         "required": [
@@ -17168,6 +17185,11 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 10000
+          },
+          "taskTombstones": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Optional for older archives."
           }
         },
         "required": [
@@ -21889,41 +21911,6 @@
         ],
         "additionalProperties": false
       },
-      "JournalAssetUploadInput": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "data": {
-            "type": "string",
-            "contentEncoding": "base64",
-            "maxLength": 6666672,
-            "description": "At most 5,000,000 decoded bytes."
-          }
-        },
-        "required": [
-          "data"
-        ]
-      },
-      "ArchiveJournalAsset": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "filename",
-          "data"
-        ],
-        "properties": {
-          "filename": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
-          },
-          "data": {
-            "type": "string",
-            "contentEncoding": "base64",
-            "maxLength": 6666672,
-            "description": "Exact attachment bytes, at most 5,000,000 after decoding."
-          }
-        }
-      },
       "TaskReminderAbsolute": {
         "type": "object",
         "properties": {
@@ -22370,7 +22357,7 @@
       },
       "TaskTombstone": {
         "type": "object",
-        "description": "Durable record of an explicit local task deletion. Former external identities, including aliases, are retained for connector reconciliation; this is not evidence that a provider deleted the remote task.",
+        "description": "Owner-scoped deletion record for a task linked to at least one provider identity. Its own ID can be remapped on transfer; taskId retains the historical deleted task ID.",
         "properties": {
           "ownerId": {
             "type": "string"
@@ -22398,6 +22385,10 @@
               "$ref": "#/components/schemas/ExternalReferenceKey"
             },
             "uniqueItems": true
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Id",
+            "description": "ID of the task that was deleted. May differ from tombstone ID after cross-owner transfer."
           }
         },
         "required": [
@@ -22407,7 +22398,8 @@
           "taskVersion",
           "deletedAt",
           "reason",
-          "externalReferences"
+          "externalReferences",
+          "taskId"
         ],
         "additionalProperties": false
       },
@@ -22440,6 +22432,79 @@
           "revision"
         ],
         "additionalProperties": true
+      },
+      "JournalAssetUploadInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 6666672,
+            "description": "At most 5,000,000 decoded bytes."
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ArchiveJournalAsset": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "filename",
+          "data"
+        ],
+        "properties": {
+          "filename": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+          },
+          "data": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 6666672,
+            "description": "Exact attachment bytes, at most 5,000,000 after decoding."
+          }
+        }
+      },
+      "TransferTaskTombstone": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskVersion": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "deletedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "reason": {
+            "type": "string",
+            "const": "LOCAL_DELETED"
+          },
+          "externalReferences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalReferenceKey"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "id",
+          "taskId",
+          "taskVersion",
+          "deletedAt",
+          "reason",
+          "externalReferences"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {

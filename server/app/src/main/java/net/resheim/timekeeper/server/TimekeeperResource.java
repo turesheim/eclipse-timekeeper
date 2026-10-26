@@ -271,10 +271,15 @@ public class TimekeeperResource {
         ContractInputs.queries(uri.getQueryParameters(),"providerId","repositoryId","externalId");
         var key=referenceQuery(uri.getQueryParameters());
         return tx(() -> {
+            JsonNode newest=null;
             for(var tombstone:store.list("TASK_TOMBSTONE")) for(var ref:tombstone.path("externalReferences"))
                 if(ref.path("providerId").asText().equals(key.providerId()) && ref.path("repositoryId").asText().equals(key.repositoryId())
-                        && ref.path("externalId").asText().equals(key.externalId())) return ApiReplies.resource(200,tombstone,null);
-            throw ApiFailure.notFound();
+                        && ref.path("externalId").asText().equals(key.externalId()))
+                    if(newest==null || Instant.parse(tombstone.path("deletedAt").asText()).isAfter(Instant.parse(newest.path("deletedAt").asText()))
+                            || tombstone.path("deletedAt").asText().equals(newest.path("deletedAt").asText())
+                            && tombstone.path("id").asText().compareTo(newest.path("id").asText())>0) newest=tombstone;
+            if(newest==null) throw ApiFailure.notFound();
+            return ApiReplies.resource(200,newest,null);
         });
     }
     private ExternalTaskReferenceKey referenceQuery(MultivaluedMap<String,String> query) {

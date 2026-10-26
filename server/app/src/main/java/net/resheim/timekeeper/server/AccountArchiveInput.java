@@ -15,7 +15,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 final class AccountArchiveInput {
     private static final Set<String> FIELDS=Set.of("format","archiveId","generatedAt","account","preferences","work","importHistory");
     private static final Set<String> LEGACY_FILES=Set.of("archive.json","manifest.json","README.txt","clients.csv","projects.csv","tasks.csv","labels.csv","activities.csv","workSessions.csv");
-    private static final Set<String> FILES=Set.of("archive.json","manifest.json","README.txt","clients.csv","projects.csv","tasks.csv","labels.csv","activities.csv","workSessions.csv","taskConnections.csv","taskLists.csv");
+    private static final Set<String> PREVIOUS_FILES=Set.of("archive.json","manifest.json","README.txt","clients.csv","projects.csv","tasks.csv","labels.csv","activities.csv","workSessions.csv","taskConnections.csv","taskLists.csv");
+    private static final Set<String> FILES=Set.of("archive.json","manifest.json","README.txt","clients.csv","projects.csv","tasks.csv","labels.csv","activities.csv","workSessions.csv","taskConnections.csv","taskLists.csv","taskTombstones.csv");
     private static final ObjectMapper READER=reader();
     private static ObjectMapper reader() {
         var mapper=new ObjectMapper();mapper.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
@@ -38,7 +39,7 @@ final class AccountArchiveInput {
                     if(entry.getSize()<0 || entry.getSize()>AccountUploads.MAX_BYTES) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
                     declared+=entry.getSize();if(declared>3*AccountUploads.MAX_BYTES) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
                 }
-                if(!seen.equals(FILES) && !seen.equals(LEGACY_FILES)) throw ApiFailure.validation();
+                if(!seen.equals(FILES) && !seen.equals(PREVIOUS_FILES) && !seen.equals(LEGACY_FILES)) throw ApiFailure.validation();
                 Verified verified;
                 try(var input=zip.getInputStream(zip.getEntry("archive.json"))) {verified=verified(input);}
                 var archive=verified.data();
@@ -73,7 +74,7 @@ final class AccountArchiveInput {
     static ObjectNode counts(JsonNode archive) {
         var result=object();for(String name:AccountArchive.WORK.keySet()) {
             var values=archive.path("work").path(name);
-            if(values.isMissingNode() && Set.of("taskConnections","taskLists").contains(name)) continue;
+            if(values.isMissingNode() && Set.of("taskConnections","taskLists","taskTombstones").contains(name)) continue;
             if(!values.isArray()) throw ApiFailure.validation();result.put(name,values.size());
         }
         result.put("importAuditRecords",archive.path("importHistory").size());

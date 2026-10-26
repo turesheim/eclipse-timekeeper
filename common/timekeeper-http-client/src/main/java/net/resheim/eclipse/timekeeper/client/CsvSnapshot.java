@@ -69,6 +69,8 @@ public final class CsvSnapshot {
         var tables=columns(sessions,clients);
         if(clients && snapshot.has("taskConnections") && snapshot.has("taskLists")) providerColumns(tables);
         else if(snapshot.has("taskConnections") || snapshot.has("taskLists")) throw invalid();
+        if(clients && snapshot.has("taskTombstones")) tables.put("taskTombstones",List.of("id","taskId","deletedAt","taskVersion","reason","externalReferences"));
+        else if(snapshot.has("taskTombstones")) throw invalid();
         Files.createDirectory(folder);
         int count = 0;
         for (var table : tables.entrySet()) {
@@ -105,6 +107,7 @@ public final class CsvSnapshot {
         JsonObject metadata = new JsonObject();metadata.addProperty("format", clients ? "timekeeper-domain-csv-v3" : sessions ? "timekeeper-domain-csv-v2" : "timekeeper-domain-csv-v1");
         metadata.add("zoneId", snapshot.get("zoneId"));
         if(tables.containsKey("taskConnections")) metadata.addProperty("providerCollections",true);
+        if(tables.containsKey("taskTombstones")) metadata.addProperty("taskTombstones",true);
         if(snapshot.getAsJsonArray("tasks").asList().stream().anyMatch(item -> TASK_EXTRAS.stream().anyMatch(item.getAsJsonObject()::has)))
             metadata.addProperty("taskExtras",true);
         // The descriptor is last: incomplete/cancelled exports cannot be imported.
@@ -129,6 +132,11 @@ public final class CsvSnapshot {
                     || !metadata.get("providerCollections").getAsJsonPrimitive().isBoolean()
                     || metadata.get("providerCollections").getAsBoolean()!=connections)) throw invalid();
             if(connections) providerColumns(tables);
+            boolean tombstones=Files.exists(folder.resolve("taskTombstones.csv"));
+            if(tombstones && !clients || metadata.has("taskTombstones") != tombstones) throw invalid();
+            if(tombstones && (!metadata.get("taskTombstones").isJsonPrimitive() || !metadata.get("taskTombstones").getAsJsonPrimitive().isBoolean()
+                    || !metadata.get("taskTombstones").getAsBoolean())) throw invalid();
+            if(tombstones) tables.put("taskTombstones",List.of("id","taskId","deletedAt","taskVersion","reason","externalReferences"));
             for (var table : tables.entrySet()) {
                 checkCancelled();
                 List<List<String>> rows = parse(readFile(folder.resolve(table.getKey() + ".csv"), remaining));
@@ -163,6 +171,8 @@ public final class CsvSnapshot {
                             JsonElement data=JsonParser.parseString(value);if(!data.isJsonObject()) throw invalid();item.add(column,data);
                         } else if (column.equals("externalReferences") || column.equals("labelIds")) {
                             JsonElement array = JsonParser.parseString(value);if (!array.isJsonArray()) throw invalid();item.add(column, array);
+                        } else if (table.getKey().equals("taskTombstones") && column.equals("taskVersion")) {
+                            try {item.addProperty(column,Long.parseLong(value));} catch(NumberFormatException error) {throw invalid();}
                         } else if (column.equals("manual") || (List.of("taskConnections","taskLists").contains(table.getKey())
                                 && List.of("readable","writable","enabled","shared","owner","present").contains(column))) {
                             if (!value.equals("true") && !value.equals("false")) throw invalid();item.addProperty(column, Boolean.parseBoolean(value));

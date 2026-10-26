@@ -514,8 +514,10 @@ public class ServerStore {
                 var identities=new HashSet<ExternalTaskReferenceKey>(task.externalAliases());
                 task.externalReferences().forEach(reference -> identities.add(reference.key()));
                 ServerStore.this.delete("TASK",id.value());
-                ServerStore.this.save("TASK_TOMBSTONE",new TaskTombstone(id.value(),now(),task.version(),identities));
-                change("TASK_TOMBSTONE","CREATED",id.value().toString());
+                if(!identities.isEmpty()) {
+                    ServerStore.this.save("TASK_TOMBSTONE",new TaskTombstone(id.value(),now(),task.version(),identities));
+                    change("TASK_TOMBSTONE","CREATED",id.value().toString());
+                }
             }
         }; }
         LabelRepository labels() { return new LabelRepository() {

@@ -69,7 +69,7 @@ public final class JsonValues {
         }
         if (value instanceof TaskTombstone tombstone) {
             var node=base(owner,tombstone.id(),0);node.put("deletedAt",tombstone.deletedAt().toString());
-            node.put("taskVersion",tombstone.taskVersion());node.put("reason","LOCAL_DELETED");
+            node.put("taskId",tombstone.taskId().toString());node.put("taskVersion",tombstone.taskVersion());node.put("reason","LOCAL_DELETED");
             var refs=node.putArray("externalReferences");
             tombstone.externalReferences().stream().sorted(Comparator.comparing(ExternalTaskReferenceKey::providerId)
                     .thenComparing(ExternalTaskReferenceKey::repositoryId).thenComparing(ExternalTaskReferenceKey::externalId))

@@ -210,12 +210,20 @@ class ContractTest(unittest.TestCase):
         self.assertEqual('updateExternalTaskSyncState',CONTRACT['paths']['/tasks/{id}/external-references/sync-state']['put']['operationId'])
 
     def test_explicit_local_task_deletions_have_reconcilable_tombstones(self):
-        tombstone={'ownerId':'owner','id':ID,'version':0,'taskVersion':2,'deletedAt':'2026-10-26T10:00:00Z',
+        tombstone={'ownerId':'owner','id':ID,'taskId':ID,'version':0,'taskVersion':2,'deletedAt':'2026-10-26T10:00:00Z',
                    'reason':'LOCAL_DELETED','externalReferences':[{'providerId':'google','repositoryId':'account/list','externalId':'item'}]}
         validator('TaskTombstone').validate(tombstone)
         self.assertFalse(validator('TaskTombstone').is_valid({**tombstone,'reason':'REMOTE_DELETED'}))
         self.assertEqual('listTaskTombstones',CONTRACT['paths']['/task-tombstones']['get']['operationId'])
         self.assertEqual('findTaskTombstoneByExternalReference',CONTRACT['paths']['/task-tombstones/by-external-reference']['get']['operationId'])
+
+    def test_linked_task_tombstones_are_optional_in_legacy_transfers(self):
+        tombstone={'id':ID,'taskId':ID,'taskVersion':2,'deletedAt':'2026-10-26T10:00:00Z',
+                   'reason':'LOCAL_DELETED','externalReferences':[{'providerId':'google','repositoryId':'account/list','externalId':'item'}]}
+        validator('TransferTaskTombstone').validate(tombstone)
+        self.assertFalse(validator('TransferTaskTombstone').is_valid({**tombstone,'externalReferences':[]}))
+        self.assertIn('taskTombstones',CONTRACT['components']['schemas']['TransferSnapshot']['properties'])
+        self.assertNotIn('taskTombstones',CONTRACT['components']['schemas']['TransferSnapshot']['required'])
 
     def test_provider_connections_and_lists_keep_remote_identity_separate_from_projects(self):
         connection={'providerId':'google','remoteAccountId':'account-1','name':'Personal',

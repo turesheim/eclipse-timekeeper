@@ -173,14 +173,19 @@ state out of the field map. Ordinary task edits and legacy link updates retain
 the baseline; identity replacement inherits it until a new exchange completes.
 The snapshot is the comparison base for a later field-level three-way merge.
 
-An explicit local task deletion writes a durable, owner-scoped tombstone with
-the deleted task ID, deletion time, prior task version, and all active and alias
+An explicit local deletion of a task with external identities writes a durable,
+owner-scoped tombstone with the deleted task ID, deletion time, prior task
+version, and all active and alias
 provider identities. `GET /task-tombstones` is paginated;
 `GET /task-tombstones/by-external-reference` resolves a former identity. A
 tombstone means Timekeeper deleted its local task. It does not mean the provider
 deleted its remote item, and a temporary missing provider response must never
 be treated as this deletion. The task's `DELETED` change and the tombstone's
 `CREATED` change are emitted in the same transaction for retrying connectors.
+Tombstones are included in portable transfer and private account archives.
+Their record IDs are remapped when imported into another owner, while the
+historical deleted task ID remains visible as `taskId`. Older transfers without
+the collection still import.
 
 `PUT /tasks/{id}/external-references/replace` atomically changes one current
 provider identity using `previous` (provider, repository, external ID) and a
