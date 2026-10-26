@@ -104,6 +104,7 @@ public final class JsonValues {
             task.externalReferences().stream().sorted(Comparator.comparing(ExternalTaskReference::providerId).thenComparing(ExternalTaskReference::repositoryId).thenComparing(ExternalTaskReference::externalId)).forEach(reference -> {
                 var ref = object(); ref.put("providerId",reference.providerId()); ref.put("repositoryId",reference.repositoryId()); ref.put("externalId",reference.externalId()); nullable(ref,"externalUrl",reference.externalUrl());
                 reference.taskListId().ifPresent(list -> ref.put("taskListId",list.toString()));
+                reference.sectionId().ifPresent(section -> ref.put("sectionId",section.toString()));
                 reference.providerData().ifPresent(data -> {
                     var envelope=ref.putObject("providerData");envelope.put("namespace",data.namespace());envelope.put("version",data.version());
                     envelope.set("payload",parse(data.json()));
@@ -158,7 +159,7 @@ public final class JsonValues {
         };
     }
     public static ExternalTaskReference reference(JsonNode node) {
-        return new ExternalTaskReference(node.get("providerId").asText(),node.get("repositoryId").asText(),node.get("externalId").asText(),optionalText(node.get("externalUrl")),source(node.get("source")),optionalText(node.get("taskListId")).map(UUID::fromString),
+        return new ExternalTaskReference(node.get("providerId").asText(),node.get("repositoryId").asText(),node.get("externalId").asText(),optionalText(node.get("externalUrl")),source(node.get("source")),optionalText(node.get("taskListId")).map(UUID::fromString),optionalText(node.get("sectionId")).map(UUID::fromString),
                 Optional.ofNullable(node.get("providerData")).filter(value -> !value.isNull()).map(JsonValues::providerData),
                 Optional.ofNullable(node.get("baseline")).filter(value -> !value.isNull()).map(JsonValues::baseline));
     }
@@ -168,7 +169,7 @@ public final class JsonValues {
         String json=value.get("payload").toString();if(json.length()>65536) throw ApiFailure.validation();
         return new ExternalTaskProviderData(value.get("namespace").asText(),value.get("version").asInt(),json);
     }
-    private static final Set<String> BASELINE_FIELDS = Set.of("summary","url","body","status","scheduledDate","completedAt","start","due","priority","flagged","urgent","parentTaskId","siblingOrder","checklistItems","recurrence","reminders","metadata","taskListId");
+    private static final Set<String> BASELINE_FIELDS = Set.of("summary","url","body","status","scheduledDate","completedAt","start","due","priority","flagged","urgent","parentTaskId","siblingOrder","checklistItems","recurrence","reminders","metadata","taskListId","sectionId");
     public static ExternalTaskBaseline baseline(JsonNode value) {
         if(value==null || !value.isObject() || !value.path("fields").isObject()) throw ApiFailure.validation();
         var fields=value.get("fields");

@@ -169,6 +169,8 @@ public final class Commands {
 	public record UpdateTaskMetadata(TaskId id, long expectedVersion, TaskMetadata metadata) { }
 	public record UpdateTaskOrder(TaskId id, long expectedVersion, int siblingOrder) { }
 	public record LinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReference reference) { }
+	public record UpdateExternalTaskLocation(TaskId taskId,long expectedVersion,ExternalTaskReferenceKey reference,
+			Optional<java.util.UUID> taskListId,Optional<java.util.UUID> sectionId) { }
 	public record ReplaceExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey previous, ExternalTaskReference current) { }
 	public record UpdateExternalTaskSource(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference, ExternalTaskSource source) { }
 	public record UpdateExternalTaskSyncState(TaskId taskId,long expectedVersion,ExternalTaskReferenceKey reference,

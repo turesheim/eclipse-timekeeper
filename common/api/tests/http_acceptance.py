@@ -926,9 +926,23 @@ class HttpAcceptance(unittest.TestCase):
         listed, _=self.call('GET','/task-list-sections?'+urlencode({'listId':task_list['id']}))
         self.assertEqual([section['id']],[item['id'] for item in listed['items']])
         self.call('GET','/task-list-sections/'+section['id'],owner='b',status=404,code='NOT_FOUND')
+        reference={'providerId':'apple','repositoryId':connection['remoteAccountId']+'/'+task_list['remoteListId'],
+                   'externalId':str(uuid4()),'externalUrl':None,'taskListId':task_list['id'],'sectionId':section['id']}
+        task_path='/tasks/'+self.task['id']
+        _, task_headers=self.call('GET',task_path)
+        self.call('PUT',task_path+'/external-references',body={**reference,'sectionId':str(uuid4())},
+                  headers={'If-Match':task_headers['ETag']},status=404,code='NOT_FOUND')
+        linked, task_headers=self.call('PUT',task_path+'/external-references',body=reference,
+                                       headers={'If-Match':task_headers['ETag']})
+        self.assertEqual(section['id'],linked['externalReferences'][0]['sectionId'])
+        legacy={key:reference[key] for key in ('providerId','repositoryId','externalId','externalUrl')}
+        linked, task_headers=self.call('PUT',task_path+'/external-references',body=legacy,
+                                       headers={'If-Match':task_headers['ETag']})
+        self.assertEqual(section['id'],linked['externalReferences'][0]['sectionId'])
         _, list_headers=self.call('GET','/task-lists/'+task_list['id'])
         self.call('DELETE','/task-lists/'+task_list['id'],headers={'If-Match':list_headers['ETag']},status=409,code='CONFLICT')
         _, headers=self.call('GET','/task-list-sections/'+section['id'])
+        self.call('DELETE','/task-list-sections/'+section['id'],headers={'If-Match':headers['ETag']},status=409,code='CONFLICT')
         replacement={key:source[key] for key in ('name','kind','position','present','writable')}
         self.call('PUT','/task-list-sections/'+section['id'],body=replacement,owner='read',headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
         changed, headers=self.call('PUT','/task-list-sections/'+section['id'],body={**replacement,'present':False},headers={'If-Match':headers['ETag']})
@@ -944,6 +958,14 @@ class HttpAcceptance(unittest.TestCase):
         restored, _=self.call('GET','/task-list-sections/'+mappings[section['id']],owner='b')
         self.assertEqual(mappings[task_list['id']],restored['taskListId'])
         self.assertFalse(restored['present'])
+        copied, _=self.call('GET','/tasks/'+mappings[self.task['id']],owner='b')
+        self.assertEqual(mappings[section['id']],copied['externalReferences'][0]['sectionId'])
+        location={key:reference[key] for key in ('providerId','repositoryId','externalId')}
+        location.update({'taskListId':None,'sectionId':None})
+        unlinked, _=self.call('PUT',task_path+'/external-references/location',body=location,
+                              headers={'If-Match':task_headers['ETag']})
+        self.assertNotIn('sectionId',unlinked['externalReferences'][0])
+        self.assertNotIn('taskListId',unlinked['externalReferences'][0])
         self.call('DELETE','/task-list-sections/'+section['id'],headers={'If-Match':headers['ETag']},status=204)
         self.created.remove(('a','task-list-sections',section['id']))
 

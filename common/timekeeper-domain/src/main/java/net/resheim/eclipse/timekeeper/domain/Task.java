@@ -5,6 +5,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 /** Immutable, provider-independent Timekeeper task aggregate state. */
 public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary, Optional<String> url,
@@ -152,6 +153,8 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		ExternalTaskReference previous = updated.stream().filter(candidate -> candidate.key().equals(key)).findFirst().orElse(null);
 		if (previous != null && reference.source().equals(ExternalTaskSource.empty())) reference = reference.withSource(previous.source());
 		if (previous != null && reference.taskListId().isEmpty()) reference = reference.withTaskList(previous.taskListId());
+		if (previous != null && reference.sectionId().isEmpty() && reference.taskListId().equals(previous.taskListId()))
+			reference = reference.withLocation(reference.taskListId(),previous.sectionId());
 		if (previous != null && reference.providerData().isEmpty()) reference = reference.withProviderData(previous.providerData());
 		if (previous != null && reference.baseline().isEmpty()) reference = reference.withBaseline(previous.baseline());
 		updated.removeIf(candidate -> candidate.key().equals(key));
@@ -173,6 +176,8 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		ExternalTaskReference old = externalReferences.stream().filter(reference -> reference.key().equals(previous)).findFirst().orElseThrow();
 		if (current.source().equals(ExternalTaskSource.empty())) current = current.withSource(old.source());
 		if (current.taskListId().isEmpty()) current = current.withTaskList(old.taskListId());
+		if (current.sectionId().isEmpty() && current.taskListId().equals(old.taskListId()))
+			current = current.withLocation(current.taskListId(),old.sectionId());
 		if (current.providerData().isEmpty()) current = current.withProviderData(old.providerData());
 		if (current.baseline().isEmpty()) current = current.withBaseline(old.baseline());
 		Set<ExternalTaskReference> updated = new LinkedHashSet<>(externalReferences);
@@ -180,6 +185,19 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		Set<ExternalTaskReferenceKey> aliases = new LinkedHashSet<>(externalAliases);
 		aliases.add(previous);aliases.remove(currentKey);
 		return new Task(id, projectId, parentTaskId, summary, url, updated, aliases, planning, checklist, timing, importance, body, recurrence, reminders, metadata, siblingOrder, version + 1);
+	}
+
+	public Task withExternalLocation(ExternalTaskReferenceKey key,Optional<UUID> listId,Optional<UUID> sectionId) {
+		Set<ExternalTaskReference> updated = new LinkedHashSet<>();
+		boolean found = false;
+		for (ExternalTaskReference reference : externalReferences) {
+			if (reference.key().equals(key)) {
+				updated.add(reference.withLocation(listId,sectionId));
+				found = true;
+			} else updated.add(reference);
+		}
+		if (!found) throw new DomainValidationException("externalReference", "reference is not linked to task");
+		return new Task(id,projectId,parentTaskId,summary,url,updated,externalAliases,planning,checklist,timing,importance,body,recurrence,reminders,metadata,siblingOrder,version+1);
 	}
 
 	public Task withExternalSource(ExternalTaskReferenceKey key, ExternalTaskSource source) {

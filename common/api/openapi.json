@@ -12490,6 +12490,101 @@
         ],
         "description": "Explicit deletion only; mark a missing remote section present=false. A section with linked tasks returns 409."
       }
+    },
+    "/tasks/{id}/external-references/location": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateExternalTaskLocation",
+        "summary": "Set or clear the list and section of a linked provider task",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalTaskLocationInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional location update. The provider identity and all other task fields are preserved."
+      }
     }
   },
   "components": {
@@ -12603,6 +12698,10 @@
           "baseline": {
             "$ref": "#/components/schemas/ExternalTaskBaseline",
             "description": "Optional last-common snapshot; omitted on links that have not completed a sync."
+          },
+          "sectionId": {
+            "$ref": "#/components/schemas/Id",
+            "description": "Optional owner-scoped section within taskListId. Omission on an existing link preserves the section if its list is unchanged."
           }
         },
         "required": [
@@ -22718,11 +22817,12 @@
                 "recurrence",
                 "reminders",
                 "metadata",
-                "taskListId"
+                "taskListId",
+                "sectionId"
               ]
             },
             "additionalProperties": true,
-            "maxProperties": 18
+            "maxProperties": 19
           }
         },
         "required": [
@@ -23136,6 +23236,58 @@
           "writable"
         ],
         "additionalProperties": false
+      },
+      "ExternalTaskLocationInput": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "taskListId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sectionId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "providerId",
+          "repositoryId",
+          "externalId",
+          "taskListId",
+          "sectionId"
+        ],
+        "additionalProperties": false,
+        "description": "Conditionally set or clear a provider reference location. A section requires a list and must belong to it. Null clears the association."
       }
     },
     "parameters": {

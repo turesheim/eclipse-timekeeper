@@ -33,12 +33,20 @@ public class TimekeeperResource {
     private JsonNode required(String type,UUID id) { return store.find(type,id).orElseThrow(ApiFailure::notFound); }
     private ExternalTaskReference checkedReference(ExternalTaskReference reference) {
         reference.providerData().ifPresent(data -> checkedProviderData(reference.providerId(),data));
-        reference.taskListId().ifPresent(id -> {
+        checkedLocation(reference.providerId(),reference.taskListId(),reference.sectionId());
+        return reference;
+    }
+    private void checkedLocation(String providerId,Optional<UUID> listId,Optional<UUID> sectionId) {
+        if(sectionId.isPresent() && listId.isEmpty()) throw ApiFailure.validation();
+        listId.ifPresent(id -> {
             var list=required("TASK_LIST",id);
             var connection=required("TASK_CONNECTION",uuid(list.get("connectionId")));
-            if(!connection.get("providerId").asText().equals(reference.providerId())) throw ApiFailure.validation();
+            if(!connection.get("providerId").asText().equals(providerId)) throw ApiFailure.validation();
         });
-        return reference;
+        sectionId.ifPresent(id -> {
+            var section=required("TASK_SECTION",id);
+            if(!section.path("taskListId").asText().equals(listId.orElseThrow().toString())) throw ApiFailure.validation();
+        });
     }
     private static ExternalTaskProviderData checkedProviderData(String providerId,ExternalTaskProviderData data) {
         if(!data.namespace().equals(providerId) && !data.namespace().startsWith(providerId+".")) throw ApiFailure.validation();
@@ -312,6 +320,18 @@ public class TimekeeperResource {
     @PUT @Path("/tasks/{id}/external-references") public Response link(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalReference",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> { long version=ApiReplies.match(required("TASK",key),match);return ApiReplies.resource(200,snapshot(store.owner(),store.service().linkExternalReference(new LinkExternalReference(new TaskId(key),version,checkedReference(reference(input))))),null); });
+    }
+    @PUT @Path("/tasks/{id}/external-references/location") public Response updateExternalTaskLocation(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
+        UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalTaskLocationInput",body);ContractInputs.queries(uri.getQueryParameters());
+        return tx(() -> {
+            long version=ApiReplies.match(required("TASK",key),match);
+            var reference=alias(input);
+            var listId=optionalText(input.get("taskListId")).map(UUID::fromString);
+            var sectionId=optionalText(input.get("sectionId")).map(UUID::fromString);
+            checkedLocation(reference.providerId(),listId,sectionId);
+            var updated=store.service().updateExternalTaskLocation(new UpdateExternalTaskLocation(new TaskId(key),version,reference,listId,sectionId));
+            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+        });
     }
     @PUT @Path("/tasks/{id}/external-references/replace") public Response replaceExternalReference(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalReferenceReplacementInput",body);ContractInputs.queries(uri.getQueryParameters());

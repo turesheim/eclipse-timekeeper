@@ -430,6 +430,10 @@ Task-to-list relations protect referenced lists from deletion, while portable
 imports remap the list ID. The reference's provider must match the list's
 connection provider. `repositoryId` remains the remote identity namespace;
 connectors must include the account/list scope when remote task IDs can repeat.
+The optional `sectionId` is valid only with a `taskListId` and must identify a
+section in that list. Task-to-section relations guard deletion, and portable
+imports remap section IDs. A conditional location update can explicitly clear
+both IDs without changing the provider identity or other task fields.
 
 `TASK_SYNC_CURSOR` is owner-scoped durable connector state linked to one
 connection and optionally one list. Its mode is `INITIAL`, `INCREMENTAL`, or

@@ -297,6 +297,8 @@ public class ServerStore {
             task.parentTaskId().ifPresent(parent -> relation(type,id,"parent","TASK",parent.value()));
             Set<UUID> lists=new HashSet<>();task.externalReferences().forEach(reference -> reference.taskListId().ifPresent(lists::add));
             lists.forEach(list -> relation(type,id,"list","TASK_LIST",list));
+            Set<UUID> sections=new HashSet<>();task.externalReferences().forEach(reference -> reference.sectionId().ifPresent(sections::add));
+            sections.forEach(section -> relation(type,id,"section","TASK_SECTION",section));
             update("DELETE FROM tk_external_reference WHERE owner_id=? AND entity_type='TASK' AND task_id=?",owner(),id);
             task.externalReferences().forEach(reference -> {
                 if (postgres()) update("INSERT INTO tk_external_reference(owner_id,provider_id,repository_id,external_id,entity_type,task_id,reference_key) VALUES(?,?,?,?,'TASK',?,?)",

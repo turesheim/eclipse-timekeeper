@@ -214,8 +214,8 @@ one task list. A section has a stable Timekeeper ID, remote section ID, name,
 permission. Discovery is idempotent by list and remote ID. Missing sections
 can be marked `present=false`; a list with sections cannot be deleted. These
 rows do not create Timekeeper projects or imply that Google Tasks or Microsoft
-To Do expose Apple section behavior. Task-to-section linking is handled
-separately from catalog discovery.
+To Do expose Apple section behavior. An external task reference can point to
+a section only when that section belongs to its provider list.
 Sections are included in portable JSON/CSV transfer and private account
 archives. Their list IDs are remapped with the owned provider list; older
 transfers without sections remain accepted.
@@ -246,6 +246,11 @@ accounts and lists when remote item IDs are only unique within a list. A legacy
 link update that omits `taskListId` preserves the association. Portable import
 remaps list IDs with the rest of the owned graph; deleting a referenced list is
 rejected. The Timekeeper project remains independent of this association.
+`sectionId` optionally identifies a section inside that list. Legacy link
+updates preserve it when the list stays the same; moving a link to another list
+clears the old section. `PUT /tasks/{id}/external-references/location` sets or
+clears both IDs with `If-Match` and explicit nulls. Portable imports remap both
+IDs, and deleting a referenced section is rejected.
 
 An external reference can also hold an optional `providerData` envelope with
 `namespace`, positive schema `version`, and an opaque JSON object `payload`.
