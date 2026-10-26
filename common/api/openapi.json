@@ -13195,6 +13195,71 @@
           }
         ]
       }
+    },
+    "/task-sync/preview": {
+      "post": {
+        "operationId": "previewTaskSync",
+        "summary": "Preview one provider task page against local tasks",
+        "description": "Read-only, owner-scoped three-way field comparison. Never deletes or imports tasks. Deletion always requires explicit review and a healthy complete scan.",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskSyncPreviewInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "200": {
+            "description": "Per-task preview decisions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSyncPreviewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -24385,6 +24450,409 @@
           "bytes",
           "sha256",
           "data"
+        ],
+        "additionalProperties": false
+      },
+      "TaskSyncFields": {
+        "type": "object",
+        "description": "Presence is the field mask; explicit null clears nullable fields. Unobserved fields are omitted.",
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Url"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body": {
+            "$ref": "#/components/schemas/TaskBodyInput"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "scheduledDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Civil scheduled day without an implied time, deadline, or alert."
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "due": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskPriority"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flagged": {
+            "type": "boolean"
+          },
+          "urgent": {
+            "type": "boolean"
+          },
+          "parentTaskId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "siblingOrder": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Position among sibling tasks. This is independent of provider list order."
+          },
+          "checklistItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskChecklistItem"
+            },
+            "maxItems": 1000,
+            "description": "Ordered checklist items distinct from parentTaskId subtasks."
+          },
+          "recurrence": {
+            "$ref": "#/components/schemas/TaskRecurrence"
+          },
+          "reminders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskReminder"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/TaskMetadata"
+          },
+          "taskListId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sectionId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assignment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskAssignment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "maxProperties": 20
+      },
+      "TaskSyncObservedItem": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "fields": {
+            "$ref": "#/components/schemas/TaskSyncFields"
+          }
+        },
+        "required": [
+          "operationId",
+          "providerId",
+          "repositoryId",
+          "externalId",
+          "deleted",
+          "fields"
+        ],
+        "additionalProperties": false
+      },
+      "TaskSyncPreviewInput": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "listId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "sourceState": {
+            "type": "string",
+            "enum": [
+              "HEALTHY",
+              "UNAVAILABLE",
+              "AUTH_EXPIRED",
+              "PERMISSION_CHANGED",
+              "LIST_MISSING"
+            ]
+          },
+          "scanComplete": {
+            "type": "boolean"
+          },
+          "pageToken": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 32768
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskSyncObservedItem"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "connectionId",
+          "listId",
+          "sourceState",
+          "scanComplete",
+          "items"
+        ],
+        "additionalProperties": false,
+        "description": "Read-only comparison of one provider page with the saved last-common snapshot. The provider cursor and page token are opaque."
+      },
+      "TaskSyncFieldDecision": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "summary",
+              "url",
+              "body",
+              "status",
+              "scheduledDate",
+              "completedAt",
+              "start",
+              "due",
+              "priority",
+              "flagged",
+              "urgent",
+              "parentTaskId",
+              "siblingOrder",
+              "checklistItems",
+              "recurrence",
+              "reminders",
+              "metadata",
+              "taskListId",
+              "sectionId",
+              "assignment"
+            ]
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "UNSUPPORTED",
+              "INCOMPLETE_GROUP",
+              "OTHER_LIST",
+              "NO_BASELINE",
+              "UNCHANGED",
+              "REMOTE_ONLY",
+              "LOCAL_ONLY",
+              "CONVERGED",
+              "CONFLICT"
+            ]
+          }
+        },
+        "required": [
+          "field",
+          "outcome"
+        ],
+        "additionalProperties": false
+      },
+      "TaskSyncPreviewItem": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "operationId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "taskEtag": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DEFERRED",
+              "IGNORE_DELETED",
+              "CREATE",
+              "INCOMPLETE",
+              "RECONCILE_ID",
+              "DELETE_DEFERRED",
+              "DELETE_CONFLICT",
+              "DELETE_REVIEW",
+              "CONFLICT",
+              "UPDATE",
+              "UNSUPPORTED",
+              "KEEP_LOCAL",
+              "UNCHANGED"
+            ]
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskSyncFieldDecision"
+            }
+          }
+        },
+        "required": [
+          "providerId",
+          "repositoryId",
+          "externalId",
+          "operationId",
+          "taskId",
+          "taskEtag",
+          "reason",
+          "status",
+          "decisions"
+        ],
+        "additionalProperties": false
+      },
+      "TaskSyncPreviewResponse": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pageToken": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskSyncPreviewItem"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "revision",
+          "pageToken",
+          "items"
         ],
         "additionalProperties": false
       }

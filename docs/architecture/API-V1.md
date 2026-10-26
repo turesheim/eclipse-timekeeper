@@ -246,6 +246,22 @@ tasks. Cursors are excluded from portable transfers and account archives:
 after restoration, a connector must perform a full scan before interpreting
 remote absence as deletion. The opaque cursor is never a Timekeeper version.
 
+`POST /task-sync/preview` compares up to 100 observed items from one owned
+connection/list page with linked tasks and each reference's last-common
+baseline. The endpoint does not write. Each item has a unique operation ID and
+typed provider identity; field presence is the observation mask, while a JSON
+null explicitly clears a nullable field. `REMOTE_ONLY` is a candidate local
+update, `LOCAL_ONLY` preserves the user's edit, and two different edits to one
+field produce `CONFLICT`. A missing baseline produces `NO_BASELINE`, not a
+guess. Completion, hierarchy/order, and list/section are paired to prevent
+partial changes. The connection capability declaration gates all observed
+fields. Unknown or unreadable fields are `UNSUPPORTED` and remain local.
+Alias matches require identity reconciliation. Existing links must belong to
+the requested list. A deleted item is deferred for an unhealthy source or an
+incomplete scan; otherwise it requires explicit review and conflicts if the
+local task changed. Preview responses include task ETags for a later
+conditional apply step. Provider page tokens remain opaque.
+
 An external task reference can carry `taskListId` to point at an owned provider
 list. The list's connection must use the same provider. The existing
 `repositoryId` remains the provider identity namespace and must distinguish

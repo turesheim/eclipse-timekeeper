@@ -139,6 +139,17 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskCapabilities').is_valid({**body,'fields':{'linkedResources':{**field,'ownerId':'other'}}}))
         self.assertEqual('updateTaskConnectionCapabilities',CONTRACT['paths']['/task-connections/{id}/capabilities']['put']['operationId'])
 
+    def test_sync_preview_is_bounded_and_uses_field_presence(self):
+        identity={'operationId':ID,'providerId':'google','repositoryId':'account/list',
+                  'externalId':'remote-1','deleted':False}
+        body={'connectionId':ID,'listId':ID,'sourceState':'HEALTHY','scanComplete':False,
+              'items':[{**identity,'fields':{'summary':'Import','completedAt':None}}]}
+        validator('TaskSyncPreviewInput').validate(body)
+        self.assertFalse(validator('TaskSyncPreviewInput').is_valid({**body,'items':[{**identity,'fields':{'accessToken':'secret'}}]}))
+        self.assertFalse(validator('TaskSyncPreviewInput').is_valid({**body,'items':body['items']*101}))
+        self.assertFalse(validator('TaskSyncPreviewInput').is_valid({**body,'ownerId':'other'}))
+        self.assertEqual('previewTaskSync',CONTRACT['paths']['/task-sync/preview']['post']['operationId'])
+
     def test_task_tags_categories_and_provider_links_are_distinct(self):
         link={'id':ID,'kind':'PROVIDER_SOURCE','url':'https://tasks.google.com/task/1',
               'title':'Original task','providerId':'google','remoteId':None}
@@ -452,7 +463,7 @@ class ContractTest(unittest.TestCase):
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'deleteTaskList', 'getTaskList', 'listTaskLists',
             'createTaskListSection', 'updateTaskListSection', 'deleteTaskListSection', 'getTaskListSection', 'listTaskListSections',
-            'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors',
+            'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors', 'previewTaskSync',
             'getTaskTombstone', 'listTaskTombstones', 'findTaskTombstoneByExternalReference',
             'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskMetadata', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskSyncState', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
             'listTaskAttachments', 'createTaskAttachment', 'getTaskAttachment', 'updateTaskAttachment', 'deleteTaskAttachment', 'downloadTaskAttachmentContent',
