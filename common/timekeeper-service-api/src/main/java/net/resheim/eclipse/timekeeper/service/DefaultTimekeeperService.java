@@ -30,6 +30,7 @@ import net.resheim.eclipse.timekeeper.domain.OwnerId;
 import net.resheim.eclipse.timekeeper.domain.Project;
 import net.resheim.eclipse.timekeeper.domain.ProjectId;
 import net.resheim.eclipse.timekeeper.domain.Task;
+import net.resheim.eclipse.timekeeper.domain.TaskRecurrence;
 import net.resheim.eclipse.timekeeper.domain.TaskId;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateLabel;
@@ -55,6 +56,8 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskTiming;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskImportance;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskBody;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskRecurrence;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskOccurrences;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskOrder;
 import net.resheim.eclipse.timekeeper.service.Ports.ServicePorts;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
@@ -140,7 +143,7 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			}
 			Task created = ports.tasks().save(new Task(ports.identifiers().newTaskId(), command.projectId(),
 					command.parentTaskId(),
-					command.summary(), command.url(), command.externalReferences(), command.externalAliases(), command.planning(), command.checklist(), command.timing(), command.importance(), command.body(), command.siblingOrder(), 0));
+					command.summary(), command.url(), command.externalReferences(), command.externalAliases(), command.planning(), command.checklist(), command.timing(), command.importance(), command.body(), command.recurrence(), command.siblingOrder(), 0));
 			publish(TASK, CREATED, created.id().value().toString());
 			return created;
 		});
@@ -203,6 +206,27 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			Task updated = ports.tasks().save(current.withBody(required(command.body(), "body")));
 			publish(TASK, UPDATED, updated.id().value().toString());
 			return updated;
+		});
+	}
+
+	@Override
+	public Task updateTaskRecurrence(UpdateTaskRecurrence command) {
+		return tx(() -> {
+			required(command,"command");Task current=requiredTask(command.id());
+			version(current.version(),command.expectedVersion(),"task");
+			Task updated=ports.tasks().save(current.withRecurrence(required(command.recurrence(),"recurrence")));
+			publish(TASK,UPDATED,updated.id().value().toString());return updated;
+		});
+	}
+
+	@Override
+	public Task updateTaskOccurrences(UpdateTaskOccurrences command) {
+		return tx(() -> {
+			required(command,"command");Task current=requiredTask(command.id());
+			version(current.version(),command.expectedVersion(),"task");
+			TaskRecurrence recurrence=new TaskRecurrence(current.recurrence().series(),required(command.occurrences(),"occurrences"));
+			Task updated=ports.tasks().save(current.withRecurrence(recurrence));
+			publish(TASK,UPDATED,updated.id().value().toString());return updated;
 		});
 	}
 

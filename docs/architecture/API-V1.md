@@ -219,6 +219,18 @@ the same parent. `PUT /tasks/{id}/order` changes only this value with `If-Match`
 legacy task and other section writes preserve it. Provider ordering tokens can
 remain opaque in provider source state and are not inferred from this number.
 
+Task `recurrence` separates an RFC 5545 rule from its `NEVER`, `UNTIL`, or
+`COUNT` end condition. `UNTIL` uses the same date-only or zoned wall-time
+representation as other task moments; connectors must convert it according to
+their provider's rules. The `occurrences` array stores completed, skipped, or
+moved exceptions keyed by each original generated slot. `PUT
+/tasks/{id}/recurrence` replaces the entire series and its exceptions; `PUT
+/tasks/{id}/occurrences` replaces exceptions without changing the series.
+Both require `If-Match`. An empty series clears all exceptions, while older
+task writes preserve them. The server stores these values but does not expand
+rules or infer new due dates or alerts. A connector must report unsupported
+recurrence before writing to a provider rather than approximate its rule.
+
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
 Manual editing sets `manual=true` and cannot change activity task/owner. Creating,

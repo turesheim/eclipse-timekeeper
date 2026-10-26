@@ -15,14 +15,16 @@ import com.google.gson.JsonParser;
 class CsvSnapshotTest {
     @TempDir Path temporary;
 
-    @Test void taskExtrasPreservePlanningTimingNotesOrderAndAliasesInMixedRows() throws Exception {
+    @Test void taskExtrasPreservePlanningTimingNotesOrderAliasesAndRecurrenceInMixedRows() throws Exception {
         var data=JsonParser.parseString("""
             {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[],"projects":[],"labels":[],"activities":[],"workSessions":[],
              "tasks":[{"id":"new","projectId":null,"parentTaskId":null,"summary":"Future","url":null,"externalReferences":[],
                        "status":"NOT_STARTED","scheduledDate":"2026-10-26","completedAt":null,"checklistItems":[],
                        "start":null,"due":{"kind":"DATE","date":"2026-10-27"},"priority":"HIGH","flagged":true,"urgent":false,
                        "body":{"format":"TEXT","content":"Keep me"},"siblingOrder":7,
-                       "externalAliases":[{"providerId":"microsoft","repositoryId":"account/list-a","externalId":"previous"}]},
+                       "externalAliases":[{"providerId":"microsoft","repositoryId":"account/list-a","externalId":"previous"}],
+                       "recurrence":{"series":{"rule":"FREQ=WEEKLY;BYDAY=MO","end":"COUNT","until":null,"count":8},
+                                     "occurrences":[{"original":{"kind":"DATE","date":"2026-10-26"},"movedTo":null,"state":"COMPLETED","completedAt":"2026-10-26T12:00:00Z"}]}},
                       {"id":"old","projectId":null,"parentTaskId":null,"summary":"Earlier","url":null,"externalReferences":[]}]}
             """).getAsJsonObject();
         var folder=temporary.resolve("task-extras");assertEquals(2,CsvSnapshot.write(data,folder));assertEquals(data,CsvSnapshot.read(folder));

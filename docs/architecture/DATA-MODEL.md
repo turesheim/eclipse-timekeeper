@@ -439,6 +439,12 @@ writes retain the envelope. Connector credentials never belong in task data.
 `TASK.siblingOrder` is a nonnegative local position among tasks under the same
 parent. It defaults to zero for older rows, is independent of a provider list's
 position, and survives updates from clients that do not know this field.
+`TASK.recurrence` stores a series rule with an explicit end condition and a
+bounded set of occurrence exceptions keyed by original date or wall-time slot.
+Moved, completed, and skipped occurrences remain distinct from the series
+status. Legacy task updates preserve recurrence; older rows decode as a task
+without a series or occurrence exceptions. Account archives and portable
+transfers include it.
 The account ZIP archive also includes active day labels and Markdown bodies;
 journal synchronization state and deletion tombstones are not portable account
 records.

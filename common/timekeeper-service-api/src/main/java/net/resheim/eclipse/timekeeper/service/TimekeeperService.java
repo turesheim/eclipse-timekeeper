@@ -46,6 +46,8 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskTiming;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskImportance;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskBody;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskRecurrence;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskOccurrences;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskOrder;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityReport;
@@ -80,6 +82,8 @@ public interface TimekeeperService {
 	default Task updateTaskTiming(UpdateTaskTiming command) { throw new UnsupportedOperationException("Task timing is not supported"); }
 	default Task updateTaskImportance(UpdateTaskImportance command) { throw new UnsupportedOperationException("Task importance is not supported"); }
 	default Task updateTaskBody(UpdateTaskBody command) { throw new UnsupportedOperationException("Task body is not supported"); }
+	default Task updateTaskRecurrence(UpdateTaskRecurrence command) { throw new UnsupportedOperationException("Task recurrence is not supported"); }
+	default Task updateTaskOccurrences(UpdateTaskOccurrences command) { throw new UnsupportedOperationException("Task occurrences are not supported"); }
 	default Task updateTaskOrder(UpdateTaskOrder command) { throw new UnsupportedOperationException("Task order is not supported"); }
 	void deleteTask(DeleteTask command);
 	Optional<Task> task(TaskId id);

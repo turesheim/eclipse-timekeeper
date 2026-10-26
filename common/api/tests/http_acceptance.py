@@ -712,6 +712,38 @@ class HttpAcceptance(unittest.TestCase):
         self.call('GET','/tasks/by-external-reference?'+urlencode({key:new[key] for key in old}),status=404,code='NOT_FOUND')
         self.assertEqual(other_task['id'],self.call('GET','/tasks/by-external-reference?'+urlencode({key:other[key] for key in old}))[0]['id'])
 
+    def test_recurrence_series_and_occurrence_exceptions_are_independent(self):
+        path='/tasks/'+self.task['id']
+        day={'kind':'DATE','date':'2026-10-26'}
+        moved={'kind':'DATE','date':'2026-10-27'}
+        series={'rule':'FREQ=WEEKLY;BYDAY=MO','end':'COUNT','until':None,'count':8}
+        occurrence={'original':day,'movedTo':moved,'state':'COMPLETED','completedAt':'2026-10-27T12:00:00Z'}
+        original,headers=self.call('GET',path)
+        self.assertEqual({'series':None,'occurrences':[]},original['recurrence'])
+        request={'series':series,'occurrences':[]}
+        self.call('PUT',path+'/recurrence',owner='read',body=request,headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        updated,headers=self.call('PUT',path+'/recurrence',body=request,headers={'If-Match':headers['ETag']})
+        self.assertEqual(series,updated['recurrence']['series'])
+        self.call('PUT',path+'/occurrences',body={'occurrences':[occurrence]},headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        updated,headers=self.call('PUT',path+'/occurrences',body={'occurrences':[occurrence]},headers={'If-Match':headers['ETag']})
+        self.assertEqual([occurrence],updated['recurrence']['occurrences'])
+        self.assertEqual(series,updated['recurrence']['series'])
+        self.call('PUT',path+'/occurrences',body={'occurrences':[occurrence,occurrence]},headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        self.call('PUT',path+'/recurrence',body={'series':None,'occurrences':[occurrence]},headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        legacy={'projectId':updated['projectId'],'parentTaskId':updated['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        updated,headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        self.assertEqual({'series':series,'occurrences':[occurrence]},updated['recurrence'])
+        exported,_=self.call('GET','/data/export')
+        imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored,_=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual(updated['recurrence'],restored['recurrence'])
+        cleared,_=self.call('PUT',path+'/recurrence',body={'series':None,'occurrences':[]},headers={'If-Match':headers['ETag']})
+        self.assertEqual({'series':None,'occurrences':[]},cleared['recurrence'])
+
     def test_provider_accounts_and_lists_are_owned_idempotent_and_portable(self):
         account={'providerId':'microsoft','remoteAccountId':str(uuid4()),'name':'Personal',
                  'readable':True,'writable':True,'enabled':True}
