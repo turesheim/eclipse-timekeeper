@@ -221,9 +221,14 @@ test('optional project icons persist and Track shows distinct icons to the right
     await page.getByRole('button',{name:'Calendar',exact:true}).click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
     const entry=page.locator(`[data-track-date="2025-10-20"] [data-track-daily-client="${client.id}"]`),icons=entry.locator('.track-project-icons [data-project-icon]');
     await expect(entry.locator('.track-client-day-time')).toHaveText('5h 0m');await expect(icons).toHaveCount(2);await expect(entry.locator('[data-project-icon=code]')).toHaveAttribute('title',new RegExp(other.name));await expect(entry).toHaveAttribute('title',new RegExp(globe.name));
-    async function iconsFollow(duration){const clock=await duration.boundingBox();for(const icon of await icons.all()){const box=await icon.boundingBox();expect(box.x).toBeGreaterThanOrEqual(clock.x+clock.width-.5);}}
-    await iconsFollow(entry.locator('.track-client-day-time'));await captureScreenshot(page,{path:'test-results/track-project-icons.png',fullPage:true});
-    await page.setViewportSize({width:390,height:844});await expect(entry.locator('.track-client-day-time-short')).toHaveText('5h');await iconsFollow(entry.locator('.track-client-day-time-short'));expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    async function iconsFollow(selector){
+      await expect.poll(()=>entry.evaluate((node,selector)=>{
+        const clock=node.querySelector(selector)?.getBoundingClientRect(),icons=[...node.querySelectorAll('.track-project-icons [data-project-icon]')];
+        return !!clock?.width&&icons.length===2&&icons.every(icon=>{const box=icon.getBoundingClientRect();return !!box.width&&box.x>=clock.right-.5;});
+      },selector)).toBe(true);
+    }
+    await iconsFollow('.track-client-day-time');await captureScreenshot(page,{path:'test-results/track-project-icons.png',fullPage:true});
+    await page.setViewportSize({width:390,height:844});await expect(entry.locator('.track-client-day-time-short')).toHaveText('5h');await iconsFollow('.track-client-day-time-short');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     expect((await new AxeBuilder({page}).include('#track-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await captureScreenshot(page,{path:'test-results/track-project-icons-mobile.png',fullPage:true});
     await page.getByRole('button',{name:'Projects',exact:true}).click();await row.getByRole('button',{name:'Edit',exact:true}).click();await page.getByRole('radio',{name:'None',exact:true}).check();await save(page);await expect(row.locator('[data-project-icon]')).toHaveCount(0);

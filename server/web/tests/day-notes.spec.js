@@ -24,6 +24,11 @@ async function signIn(page,user){
   await page.locator('#auth-mode').selectOption('login');await page.locator('#username').fill(user.username);await page.locator('#password').fill(user.password);await page.locator('#login-form button[type=submit]').click();
   await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');
 }
+async function signInWithFixtureToken(page){
+  await page.goto('/web/');await expect(page.locator('#login-form button[type=submit]')).toBeEnabled();
+  await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_TOKEN);await page.locator('#login-form button[type=submit]').click();
+  await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');
+}
 async function apiFor(page){
   const api=browserRequest(page),identity=await(await api.get('/api/v1/auth/session')).json();
   return async(method,path,data,extra={})=>{
@@ -370,10 +375,10 @@ test('journal text-style menu supports keyboard selection and Escape without clo
 });
 
 
-test('Week day headings open shared daily notes with one toolbar and right-aligned buttons',async({browser,request})=>{
+test('Week day headings open shared daily notes with one toolbar and right-aligned buttons',async({browser})=>{
   const owner=await context(browser),page=await owner.newPage();
   try {
-    await signIn(page,await fresh(request));const api=await apiFor(page),date='2026-05-17',initial=await api('GET','/day-notes/'+date);
+    await signInWithFixtureToken(page);const api=await apiFor(page),date='2026-05-17',initial=await api('GET','/day-notes/'+date);
     await api('PUT','/day-notes/'+date,{text:'Shared Sunday',body:'# A shared note\n'},{'If-Match':initial.headers().etag});
     const before=await(await api('GET','/work-sessions')).json();
     await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill(date);
@@ -393,10 +398,10 @@ test('Week day headings open shared daily notes with one toolbar and right-align
   } finally {await owner.close();}
 });
 
-test('Week daily-note buttons respect read-only access and clear private bodies at sign-out',async({browser,request})=>{
+test('Week daily-note buttons respect read-only access and clear private bodies at sign-out',async({browser})=>{
   const owner=await context(browser),viewer=await context(browser),page=await owner.newPage(),read=await viewer.newPage();
   try {
-    await signIn(page,await fresh(request));const api=await apiFor(page),date='2026-05-17',initial=await api('GET','/day-notes/'+date);await api('PUT','/day-notes/'+date,{body:'Private Week note'},{'If-Match':initial.headers().etag});
+    await signInWithFixtureToken(page);const api=await apiFor(page),date='2026-05-17',initial=await api('GET','/day-notes/'+date);await api('PUT','/day-notes/'+date,{text:'',body:'Private Week note'},{'If-Match':initial.headers().etag});
     const token=await(await api('POST','/auth/tokens',{name:'Week note reader',permissions:['read'],expiresAt:null})).json();await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#workspace')).toBeVisible();
     await read.locator('[data-tab=calendar]').click();await read.locator('#calendar-date').fill(date);const entry=read.locator('[data-week-note-date="'+date+'"]'),editor=read.locator('#week-note-editor');await expect(entry).toBeEnabled();await expect(read.locator('[data-week-note-date="2026-05-11"]')).toBeDisabled();await entry.click();
     await expect(editor.locator('.ProseMirror')).toHaveAttribute('contenteditable','false');await expect(editor.getByRole('button',{name:'Save',exact:true})).toBeDisabled();await editor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(editor.locator('#week-journal-body')).toHaveJSProperty('readOnly',true);
@@ -404,30 +409,30 @@ test('Week daily-note buttons respect read-only access and clear private bodies 
   } finally {await owner.close();await viewer.close();}
 });
 
-test('journal link round trips keep resource links and dashed horizontal rules renderable',async({browser,request})=>{
+test('journal link round trips keep resource links and dashed horizontal rules renderable',async({browser})=>{
   const owner=await context(browser),page=await owner.newPage();
   try {
-    await signIn(page,await fresh(request));const api=await apiFor(page),url='https://example.com/original-link',body='First paragraph\n\n['+url+']('+url+')\n\n---\n\nLast paragraph\n';
-    const initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body},{'If-Match':initial.headers().etag});await month(page);await menu(page);
+    await signInWithFixtureToken(page);const api=await apiFor(page),url='https://example.com/original-link',body='First paragraph\n\n['+url+']('+url+')\n\n---\n\nLast paragraph\n';
+    const initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{text:'',body},{'If-Match':initial.headers().etag});await month(page);await menu(page);
     const rich=dialog(page).locator('.ProseMirror');await expect(rich.locator('a')).toHaveAttribute('href',url);await expect(rich.locator('hr')).toHaveCount(1);await rich.locator('p').last().click();await page.keyboard.press('End');await page.keyboard.insertText(' edited');await save(page,'');
     const saved=(await(await api('GET','/day-notes/2026-05-17')).json()).body;expect(saved).toContain('['+url+']('+url+')');expect(saved).toMatch(/\n---\n/);expect(saved).not.toContain('<'+url+'>');expect(saved).not.toMatch(/\n\*\*\*\n/);
     await menu(page);await expect(rich.locator('a')).toHaveAttribute('href',url);await expect(rich.locator('hr')).toHaveCount(1);await expect(rich).toContainText('Last paragraph edited');
   } finally {await owner.close();}
 });
 
-test('journal links already saved as angle-bracket autolinks open in formatted mode',async({browser,request})=>{
+test('journal links already saved as angle-bracket autolinks open in formatted mode',async({browser})=>{
   const owner=await context(browser),page=await owner.newPage();
   try {
-    await signIn(page,await fresh(request));const api=await apiFor(page),body='Links: <https://example.com/path?q=1&v=2>, <mailto:notes@example.com> and <person@example.com>.\n';
-    const initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body},{'If-Match':initial.headers().etag});await month(page);await menu(page);
+    await signInWithFixtureToken(page);const api=await apiFor(page),body='Links: <https://example.com/path?q=1&v=2>, <mailto:notes@example.com> and <person@example.com>.\n';
+    const initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{text:'',body},{'If-Match':initial.headers().etag});await month(page);await menu(page);
     const rich=dialog(page).locator('.ProseMirror');await expect(rich).toBeVisible();await expect(rich.locator('a')).toHaveCount(3);await rich.locator('a').first().click();await expect(page).toHaveURL(/\/web\/$/);await save(page,'Autolinks');expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe(body);
   } finally {await owner.close();}
 });
 
-test('journal horizontal rules at the start of a note remain Markdown rather than unfinished frontmatter',async({browser,request})=>{
+test('journal horizontal rules at the start of a note remain Markdown rather than unfinished frontmatter',async({browser})=>{
   const owner=await context(browser),page=await owner.newPage();
   try {
-    await signIn(page,await fresh(request));const api=await apiFor(page),body='---\n\nFirst paragraph\n',initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body},{'If-Match':initial.headers().etag});await month(page);await menu(page);
+    await signInWithFixtureToken(page);const api=await apiFor(page),body='---\n\nFirst paragraph\n',initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{text:'',body},{'If-Match':initial.headers().etag});await month(page);await menu(page);
     const rich=dialog(page).locator('.ProseMirror');await expect(rich.locator('hr')).toHaveCount(1);await rich.locator('p').click();await page.keyboard.press('End');await page.keyboard.insertText(' edited');await save(page,'');expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toMatch(/^---\n/);await menu(page);await expect(rich.locator('hr')).toHaveCount(1);
   } finally {await owner.close();}
 });
