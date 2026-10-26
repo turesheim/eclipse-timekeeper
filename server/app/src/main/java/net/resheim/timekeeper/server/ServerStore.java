@@ -255,6 +255,9 @@ public class ServerStore {
                 if(!node.has("checklistItems"))node.putArray("checklistItems");
                 if(!node.has("start"))node.putNull("start");
                 if(!node.has("due"))node.putNull("due");
+                if(!node.has("priority"))node.put("priority",TaskPriority.UNSPECIFIED.name());
+                if(!node.has("flagged"))node.put("flagged",false);
+                if(!node.has("urgent"))node.put("urgent",false);
             }
         }
         return value;

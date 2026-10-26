@@ -25,7 +25,14 @@ public final class WireValues {
         var planning=new TaskPlanning(value.has("status")?TaskStatus.valueOf(value.get("status").getAsString()):TaskStatus.NOT_STARTED,
                 text(value.get("scheduledDate")).map(LocalDate::parse),text(value.get("completedAt")).map(Instant::parse));
         var checklist=checklist(value.get("checklistItems"));
-        return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,planning,checklist,timing(value),value.get("version").getAsLong());
+        return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,planning,checklist,timing(value),importance(value),value.get("version").getAsLong());
+    }
+    public static TaskImportance importance(JsonObject value) {
+        return new TaskImportance(value.has("priority")?TaskPriority.valueOf(value.get("priority").getAsString()):TaskPriority.UNSPECIFIED,
+                value.has("flagged")&&value.get("flagged").getAsBoolean(),value.has("urgent")&&value.get("urgent").getAsBoolean());
+    }
+    public static void importance(JsonObject body,TaskImportance value) {
+        body.addProperty("priority",value.priority().name());body.addProperty("flagged",value.flagged());body.addProperty("urgent",value.urgent());
     }
     public static TaskTiming timing(JsonObject value) {
         return new TaskTiming(moment(value.get("start")),moment(value.get("due")));

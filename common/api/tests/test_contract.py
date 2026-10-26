@@ -130,6 +130,14 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskTimingInput').is_valid({'start':date}))
         self.assertEqual('updateTaskTiming',CONTRACT['paths']['/tasks/{id}/timing']['put']['operationId'])
 
+    def test_task_importance_keeps_priority_flag_and_urgency_separate(self):
+        value={'priority':'HIGH','flagged':True,'urgent':False}
+        validator('TaskImportanceInput').validate(value)
+        self.assertFalse(validator('TaskImportanceInput').is_valid({**value,'priority':'URGENT'}))
+        self.assertFalse(validator('TaskImportanceInput').is_valid({**value,'flagged':None}))
+        self.assertFalse(validator('TaskImportanceInput').is_valid({'priority':'HIGH','flagged':True}))
+        self.assertEqual('updateTaskImportance',CONTRACT['paths']['/tasks/{id}/importance']['put']['operationId'])
+
     def test_timestamp_precision_and_zone_boundary(self):
         for value in ['2026-03-29T00:00:00Z', '2026-03-29T00:00:00.123456789Z']:
             validator('Instant').validate(value)
@@ -254,7 +262,7 @@ class ContractTest(unittest.TestCase):
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'convertCalendarEvent',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
-            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'deleteTask', 'getTask', 'listTasks',
+            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'deleteTask', 'getTask', 'listTasks',
             'linkExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',

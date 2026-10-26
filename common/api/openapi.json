@@ -10200,6 +10200,101 @@
         },
         "description": "Conditional replacement of start and due only. Date-only values stay date-only; timed values retain their local time and time-zone ID. Legacy task, planning, and checklist updates preserve timing."
       }
+    },
+    "/tasks/{id}/importance": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskImportance",
+        "summary": "Replace owned task importance fields",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskImportanceInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of priority, flag, and urgency only. Legacy task, planning, checklist, and timing updates preserve these fields."
+      }
     }
   },
   "components": {
@@ -10793,6 +10888,15 @@
                 "type": "null"
               }
             ]
+          },
+          "priority": {
+            "$ref": "#/components/schemas/TaskPriority"
+          },
+          "flagged": {
+            "type": "boolean"
+          },
+          "urgent": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -10809,7 +10913,10 @@
           "completedAt",
           "checklistItems",
           "start",
-          "due"
+          "due",
+          "priority",
+          "flagged",
+          "urgent"
         ],
         "additionalProperties": true
       },
@@ -11357,6 +11464,15 @@
                 "type": "null"
               }
             ]
+          },
+          "priority": {
+            "$ref": "#/components/schemas/TaskPriority"
+          },
+          "flagged": {
+            "type": "boolean"
+          },
+          "urgent": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -11850,6 +11966,15 @@
                 "type": "null"
               }
             ]
+          },
+          "priority": {
+            "$ref": "#/components/schemas/TaskPriority"
+          },
+          "flagged": {
+            "type": "boolean"
+          },
+          "urgent": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -19270,6 +19395,37 @@
         ],
         "additionalProperties": false,
         "description": "Replace only start and due values. Null clears a value. Scheduled day and reminders are separate concepts."
+      },
+      "TaskPriority": {
+        "type": "string",
+        "enum": [
+          "UNSPECIFIED",
+          "LOW",
+          "NORMAL",
+          "HIGH"
+        ],
+        "description": "UNSPECIFIED preserves absence of a provider priority; NORMAL is an explicit normal/medium value."
+      },
+      "TaskImportanceInput": {
+        "type": "object",
+        "properties": {
+          "priority": {
+            "$ref": "#/components/schemas/TaskPriority"
+          },
+          "flagged": {
+            "type": "boolean"
+          },
+          "urgent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "priority",
+          "flagged",
+          "urgent"
+        ],
+        "additionalProperties": false,
+        "description": "Replace priority, flag, and urgency independently of planning, timing, and provider list membership."
       }
     },
     "parameters": {

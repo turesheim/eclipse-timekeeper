@@ -577,6 +577,40 @@ class HttpAcceptance(unittest.TestCase):
         cleared, _=self.call('PUT',path+'/timing',body={'start':None,'due':None},headers={'If-Match':headers['ETag']})
         self.assertIsNone(cleared['start']);self.assertIsNone(cleared['due'])
 
+    def test_task_priority_flag_and_urgency_remain_independent(self):
+        path='/tasks/'+self.task['id']
+        original, headers=self.call('GET',path)
+        self.assertEqual(('UNSPECIFIED',False,False),(original['priority'],original['flagged'],original['urgent']))
+        important={'priority':'HIGH','flagged':True,'urgent':False}
+        self.call('PUT',path+'/importance',owner='read',body=important,headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        updated, headers=self.call('PUT',path+'/importance',body=important,headers={'If-Match':headers['ETag']})
+        self.assertEqual(important,{key:updated[key] for key in important})
+        self.call('PUT',path+'/importance',body={'priority':'LOW','flagged':False,'urgent':True},
+                  headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        self.call('PUT',path+'/importance',body={'priority':'UNKNOWN','flagged':False,'urgent':False},
+                  headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        legacy={'projectId':updated['projectId'],'parentTaskId':updated['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        updated, headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        updated, headers=self.call('PUT',path+'/planning',body={'status':'NOT_STARTED','scheduledDate':None,'completedAt':None},
+                                   headers={'If-Match':headers['ETag']})
+        updated, headers=self.call('PUT',path+'/checklist',body={'items':[]},headers={'If-Match':headers['ETag']})
+        updated, headers=self.call('PUT',path+'/timing',body={'start':None,'due':None},headers={'If-Match':headers['ETag']})
+        self.assertEqual(important,{key:updated[key] for key in important})
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual(important,{key:restored[key] for key in important})
+        normal={'priority':'NORMAL','flagged':False,'urgent':True}
+        changed, headers=self.call('PUT',path+'/importance',body=normal,headers={'If-Match':headers['ETag']})
+        self.assertEqual(normal,{key:changed[key] for key in normal})
+        cleared, _=self.call('PUT',path+'/importance',body={'priority':'UNSPECIFIED','flagged':False,'urgent':False},
+                              headers={'If-Match':headers['ETag']})
+        self.assertEqual(('UNSPECIFIED',False,False),(cleared['priority'],cleared['flagged'],cleared['urgent']))
+
     def test_provider_identity_is_unique_per_owner_and_history_survives_unlink(self):
         reference = {'providerId': 'jira', 'repositoryId': 'https://jira.invalid',
                      'externalId': str(uuid4()), 'externalUrl': None}

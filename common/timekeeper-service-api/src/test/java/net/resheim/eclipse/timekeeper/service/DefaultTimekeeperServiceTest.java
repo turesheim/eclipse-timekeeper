@@ -39,6 +39,8 @@ import net.resheim.eclipse.timekeeper.domain.TaskChecklist;
 import net.resheim.eclipse.timekeeper.domain.TaskChecklistItem;
 import net.resheim.eclipse.timekeeper.domain.TaskMoment;
 import net.resheim.eclipse.timekeeper.domain.TaskTiming;
+import net.resheim.eclipse.timekeeper.domain.TaskImportance;
+import net.resheim.eclipse.timekeeper.domain.TaskPriority;
 import net.resheim.eclipse.timekeeper.domain.TaskPlanning;
 import net.resheim.eclipse.timekeeper.domain.TaskStatus;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateActivity;
@@ -60,6 +62,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskPlanning;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskTiming;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskImportance;
 import net.resheim.eclipse.timekeeper.service.Ports.ActivityRepository;
 import net.resheim.eclipse.timekeeper.service.Ports.IdentifierSource;
 import net.resheim.eclipse.timekeeper.service.Ports.LabelRepository;
@@ -187,6 +190,28 @@ class DefaultTimekeeperServiceTest {
 		Task stale=task;
 		assertThrows(ServiceException.class,()->service.updateTaskTiming(new UpdateTaskTiming(stale.id(),stale.version(),timing)));
 		assertThrows(DomainValidationException.class,()->new TaskMoment(day,Optional.of(LocalTime.NOON),Optional.empty()));
+	}
+
+	@Test
+	void taskImportanceKeepsPriorityFlagsAndUrgencyIndependent() {
+		var importance=new TaskImportance(TaskPriority.NORMAL,true,false);
+		Task task=service.createTask(new CreateTask(Optional.empty(),Optional.empty(),"Important review",Optional.empty(),Set.of(),
+				TaskPlanning.unplanned(),TaskChecklist.empty(),TaskTiming.empty(),importance));
+		assertEquals(importance,task.importance());
+		task=service.updateTask(new UpdateTask(task.id(),task.version(),Optional.empty(),"Renamed review",Optional.empty()));
+		assertEquals(importance,task.importance());
+		task=service.updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),TaskPlanning.unplanned()));
+		assertEquals(importance,task.importance());
+		task=service.updateTaskChecklist(new UpdateTaskChecklist(task.id(),task.version(),TaskChecklist.empty()));
+		assertEquals(importance,task.importance());
+		task=service.updateTaskTiming(new UpdateTaskTiming(task.id(),task.version(),TaskTiming.empty()));
+		assertEquals(importance,task.importance());
+		var replacement=new TaskImportance(TaskPriority.HIGH,false,true);
+		Task updated=service.updateTaskImportance(new UpdateTaskImportance(task.id(),task.version(),replacement));
+		assertEquals(replacement,updated.importance());
+		Task stale=task;
+		assertThrows(ServiceException.class,()->service.updateTaskImportance(new UpdateTaskImportance(stale.id(),stale.version(),importance)));
+		assertThrows(DomainValidationException.class,()->new TaskImportance(null,false,false));
 	}
 
 	@Test

@@ -387,6 +387,11 @@ Windows time-zone identifier. These values are not inferred from the Google
 Tasks scheduled day, and no instant is invented at DST gaps or overlaps.
 Older task payloads read with null start/due; legacy edits preserve them, and
 portable exports and account archives retain their exact date/time kind.
+`priority` (`UNSPECIFIED`, `LOW`, `NORMAL`, `HIGH`), `flagged`, and `urgent`
+are independent task values. Missing values on older payloads read as
+`UNSPECIFIED`/false/false. Ordinary task edits preserve them, and both portable
+exports and account archives retain them. Provider capabilities determine
+which of these fields a connector may write remotely.
 The account ZIP archive also includes active day labels and Markdown bodies;
 journal synchronization state and deletion tombstones are not portable account
 records.

@@ -45,17 +45,19 @@ class AccountStoreTest {
         var actual=io.quarkus.arc.ClientProxy.unwrap(store);
         try(var connection=actual.datasource.getConnection();var statement=connection.prepareStatement("UPDATE tk_resource SET payload=? WHERE owner_id=? AND entity_type='TASK' AND id=?")) {
             var legacy=(com.fasterxml.jackson.databind.node.ObjectNode)store.transaction(owner,()->store.find("TASK",created.id().value()).orElseThrow()).deepCopy();
-            legacy.remove(List.of("status","scheduledDate","completedAt","checklistItems","start","due"));
+            legacy.remove(List.of("status","scheduledDate","completedAt","checklistItems","start","due","priority","flagged","urgent"));
             statement.setString(1,legacy.toString());statement.setString(2,owner);statement.setObject(3,created.id().value());assertEquals(1,statement.executeUpdate());
         }
         var read=store.transaction(owner,()->store.find("TASK",created.id().value()).orElseThrow());
         assertEquals("NOT_STARTED",read.get("status").asText());assertTrue(read.get("scheduledDate").isNull());assertTrue(read.get("completedAt").isNull());
         assertTrue(read.get("checklistItems").isArray());assertEquals(0,read.get("checklistItems").size());
         assertTrue(read.get("start").isNull());assertTrue(read.get("due").isNull());
+        assertEquals("UNSPECIFIED",read.get("priority").asText());assertFalse(read.get("flagged").asBoolean());assertFalse(read.get("urgent").asBoolean());
         var updated=store.transaction(owner,()->store.service().updateTask(new net.resheim.eclipse.timekeeper.service.Commands.UpdateTask(created.id(),created.version(),Optional.empty(),"Renamed task",Optional.empty())));
         assertEquals(net.resheim.eclipse.timekeeper.domain.TaskPlanning.unplanned(),updated.planning());
         assertEquals(net.resheim.eclipse.timekeeper.domain.TaskChecklist.empty(),updated.checklist());
         assertEquals(net.resheim.eclipse.timekeeper.domain.TaskTiming.empty(),updated.timing());
+        assertEquals(net.resheim.eclipse.timekeeper.domain.TaskImportance.ordinary(),updated.importance());
     }
     @Test void oneUseSetupMultipleAccountsAndTokensRetainOwnershipAndRevokeAcrossReplicas() throws Exception {
         String owner="existing-owner-"+UUID.randomUUID();
