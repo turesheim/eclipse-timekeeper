@@ -17,15 +17,15 @@ through the testing update site and GitHub Actions artifacts described below.
 
 ## Web client
 
-A work session records time for one client, with an optional project, summary and
-labels. Clients have colors; projects belong to clients and can have optional
-icons. Task activities are tracked independently of work sessions; their time
-overlap provides context.
+A work session records time for one client, with an optional project and summary.
+Labels classify Activities and are configured under My Account. Clients have
+colors; projects belong to clients and can have optional icons. Task activities
+are tracked independently of work sessions; their time overlap provides context.
 
-- **Track** shows monthly work-session totals by client and day. Open a daily
+- **Calendar** shows monthly work-session totals by client and day. Open a daily
   entry to edit its session, or choose one when several sessions contribute.
 - **Workweek** groups sessions by client and project, with editable start/end
-  times in daily cells. **Calendar** supports creating, moving, resizing and
+  times in daily cells. **Week** supports creating, moving, resizing and
   copying sessions. Dates and times use your account's time zone. Work-session
   edits and deletions show a temporary **Undo** notification.
 - **Activities** contains the project/task/activity table and its daily and weekly
