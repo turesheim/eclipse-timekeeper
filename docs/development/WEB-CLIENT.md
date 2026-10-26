@@ -113,8 +113,9 @@ choice, dependency licenses, bundle measurements, tests and integration limits.
 The date field and adjacent buttons move between days; the mini calendar selects
 any visible date and has separate month controls. The sidebar shows work
 sessions clipped to that day in the account time zone, imported all-day calendar
-plans, and the task for an active activity. A planned-tasks section is ready for
-the scheduled task dates being designed in issue #413. Selecting a work
+plans, tasks scheduled for the selected date, and tasks in progress or tied to
+the active activity. Scheduled dates and task status come from the task model in
+issue #413; older servers show empty task sections. Selecting a work
 session opens its editor. The inline journal uses the same saved day note and
 conflict handling as Calendar and Week. Unsaved changes require confirmation
 before selecting another date. On narrow screens the sidebar follows the journal.

@@ -87,10 +87,10 @@ export class TodayView {
   }
   paintTasks(){
     const planned=byId('today-planned-tasks'),active=byId('today-active-tasks');planned.replaceChildren();active.replaceChildren();
-    // Task dates belong to the provider-compatible task model in issue #413.
-    planned.append(node('p',t('today.planning_unavailable'),'hint'));
-    const current=this.data.active.data,task=current&&this.data.tasks.find(value=>value.id===current.taskId);
-    this.taskList(active,task?[task]:[],t('today.no_active_tasks'));
+    const tasks=this.data.tasks.filter(task=>task.status!=='COMPLETED');
+    this.taskList(planned,tasks.filter(task=>task.scheduledDate===this.date),t('today.no_planned_tasks'));
+    const currentId=this.data.active.data?.taskId;
+    this.taskList(active,tasks.filter(task=>task.status==='IN_PROGRESS'||task.id===currentId),t('today.no_active_tasks'));
   }
   taskList(root,tasks,empty){
     if(!tasks.length){root.append(node('p',empty,'hint'));return;}

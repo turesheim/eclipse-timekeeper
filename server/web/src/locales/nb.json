@@ -735,7 +735,7 @@
   "today.no_plans": "Ingen heldagsplaner denne dagen.",
   "today.planned_tasks": "Planlagte oppgaver",
   "today.active_tasks": "Aktive oppgaver",
-  "today.planning_unavailable": "Oppgaver kan ikke planlegges etter dato ennå.",
+  "today.no_planned_tasks": "Ingen oppgaver er planlagt denne dagen.",
   "today.no_active_tasks": "Ingen oppgave er aktiv nå.",
   "ui.calendar_date": "Kalenderdato",
   "ui.the_clocks_change_this_week_repeated_times_have_an_extra_row_shaded_slots_do_not_occu": "Klokken stilles denne uken. Gjentatte klokkeslett har en ekstra rad. Skraverte tidsrom finnes ikke den aktuelle dagen.",
