@@ -87,6 +87,7 @@ test('day notes can be added from the day menu, edited, canceled and removed wit
     await expect(day(page).locator('.track-holiday-label')).toContainText('Constitution Day');const total=await page.locator('#track-total').innerText(),original=await api('GET','/work-sessions/'+work.id);
     await menu(page);await save(page,'Ferie');await expect(note(page)).toHaveText('Ferie');await expect(day(page).locator('.track-holiday-label')).toContainText('Constitution Day');
     await menu(page);await expect(page.locator('#track-note-text')).toHaveValue('Ferie');await page.locator('#track-note-text').fill('Canceled draft');await discard(page,()=>page.keyboard.press('Escape'));await expect(note(page)).toBeFocused();await expect(note(page)).toHaveText('Ferie');
+    await page.locator('#duration-format').dispatchEvent('change');await expect(note(page)).toBeFocused();
     await note(page).focus();await page.keyboard.press('Shift+F10');await expect(page.getByRole('menuitem')).toHaveText('Edit day note');await page.keyboard.press('Escape');await expect(note(page)).toBeFocused();
     await menu(page);await save(page,'Avspasering');await expect(note(page)).toHaveText('Avspasering');
     await note(page,'2026-05-18').click();await save(page,'Ferie');await expect(note(page,'2026-05-18')).toHaveText('Ferie');expect(await day(page,'2026-05-18').locator('[data-track-daily-client]').count()).toBe(0);

@@ -58,8 +58,8 @@ export class TrackHolidays {
       const fullDate=dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
       button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-label',i18nText('holidays.details',{date:fullDate,names}));button.title=names;
       button.append(cell.querySelector('.track-date'),node('span',names,'track-holiday-name'));button.addEventListener('click',()=>this.openHoliday(date));
-      const heading=cell.querySelector('.track-date-row'),note=heading.querySelector('.track-day-note');
-      heading.replaceChildren(button);if(note)heading.append(note);
+      const heading=cell.querySelector('.track-date-row'),previous=heading.querySelector('.track-holiday-label');
+      if(previous)previous.replaceWith(button);else heading.prepend(button);
     }
     if(focused&&document.activeElement===document.body)this.grid.querySelector(`[data-track-holiday-date="${focused}"]`)?.focus();
     else if(retryFocused)this.input.focus();
