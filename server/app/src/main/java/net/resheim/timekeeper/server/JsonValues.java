@@ -68,7 +68,9 @@ public final class JsonValues {
             var body=node.putObject("body");body.put("format",task.body().format().name());body.put("content",task.body().content());
             ArrayNode refs = node.putArray("externalReferences");
             task.externalReferences().stream().sorted(Comparator.comparing(ExternalTaskReference::providerId).thenComparing(ExternalTaskReference::repositoryId).thenComparing(ExternalTaskReference::externalId)).forEach(reference -> {
-                var ref = object(); ref.put("providerId",reference.providerId()); ref.put("repositoryId",reference.repositoryId()); ref.put("externalId",reference.externalId()); nullable(ref,"externalUrl",reference.externalUrl()); refs.add(ref);
+                var ref = object(); ref.put("providerId",reference.providerId()); ref.put("repositoryId",reference.repositoryId()); ref.put("externalId",reference.externalId()); nullable(ref,"externalUrl",reference.externalUrl());
+                var source=ref.putObject("source");nullable(source,"createdAt",reference.source().createdAt());nullable(source,"modifiedAt",reference.source().modifiedAt());
+                nullable(source,"remoteEtag",reference.source().remoteEtag());nullable(source,"remoteRevision",reference.source().remoteRevision());refs.add(ref);
             }); return node;
         }
         if (value instanceof WorkSession session) {
@@ -102,7 +104,12 @@ public final class JsonValues {
         };
     }
     public static ExternalTaskReference reference(JsonNode node) {
-        return new ExternalTaskReference(node.get("providerId").asText(),node.get("repositoryId").asText(),node.get("externalId").asText(),optionalText(node.get("externalUrl")));
+        return new ExternalTaskReference(node.get("providerId").asText(),node.get("repositoryId").asText(),node.get("externalId").asText(),optionalText(node.get("externalUrl")),source(node.get("source")));
+    }
+    public static ExternalTaskSource source(JsonNode value) {
+        if(value==null || value.isNull())return ExternalTaskSource.empty();
+        return new ExternalTaskSource(optionalText(value.get("createdAt")).map(Instant::parse),
+                optionalText(value.get("modifiedAt")).map(Instant::parse),optionalText(value.get("remoteEtag")),optionalText(value.get("remoteRevision")));
     }
     public static Set<ExternalTaskReference> references(JsonNode values) {
         if (values == null) return Set.of();

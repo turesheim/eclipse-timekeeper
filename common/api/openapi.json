@@ -10390,6 +10390,101 @@
         },
         "description": "Conditional replacement of task notes only. Legacy task and other section updates preserve the body. HTML is untrusted source markup; clients must sanitize before rendering."
       }
+    },
+    "/tasks/{id}/external-references/source": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateExternalTaskSource",
+        "summary": "Replace per-provider task source metadata",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalTaskSourceInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of source timestamps and opaque remote versions for one linked identity. Legacy link updates preserve this source state; a remote version never substitutes for the Timekeeper If-Match ETag."
+      }
     }
   },
   "components": {
@@ -10487,6 +10582,10 @@
                 "type": "null"
               }
             ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/ExternalTaskSource",
+            "description": "Optional when linking. Omission preserves existing source state for the same identity."
           }
         },
         "required": [
@@ -11962,6 +12061,9 @@
                 "type": "null"
               }
             ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/ExternalTaskSource"
           }
         },
         "required": [
@@ -19558,6 +19660,89 @@
         ],
         "additionalProperties": false,
         "description": "Replace task notes. Empty TEXT content clears notes. HTML remains untrusted source content until sanitized by a renderer."
+      },
+      "ExternalTaskSource": {
+        "type": "object",
+        "properties": {
+          "createdAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "modifiedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "remoteEtag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "remoteRevision": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "createdAt",
+          "modifiedAt",
+          "remoteEtag",
+          "remoteRevision"
+        ],
+        "additionalProperties": false,
+        "description": "Provider-supplied timestamps and opaque remote versions for one linked identity. Remote versions are never Timekeeper ETags."
+      },
+      "ExternalTaskSourceInput": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ExternalTaskSource"
+          }
+        },
+        "required": [
+          "providerId",
+          "repositoryId",
+          "externalId",
+          "source"
+        ],
+        "additionalProperties": false,
+        "description": "Replace source metadata for one linked provider identity. Explicit null clears a value."
       }
     },
     "parameters": {

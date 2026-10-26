@@ -89,8 +89,17 @@ public final class WireValues {
         if(!session.state().name().equals(value.get("state").getAsString())) throw new IllegalArgumentException("Inconsistent work session state");
         return session;
     }
-    public static ExternalTaskReference reference(JsonObject value) {return new ExternalTaskReference(value.get("providerId").getAsString(),value.get("repositoryId").getAsString(),value.get("externalId").getAsString(),text(value.get("externalUrl")));}
-    public static JsonObject reference(ExternalTaskReference value) {var out=object();out.addProperty("providerId",value.providerId());out.addProperty("repositoryId",value.repositoryId());out.addProperty("externalId",value.externalId());optional(out,"externalUrl",value.externalUrl());return out;}
+    public static ExternalTaskReference reference(JsonObject value) {return new ExternalTaskReference(value.get("providerId").getAsString(),value.get("repositoryId").getAsString(),value.get("externalId").getAsString(),text(value.get("externalUrl")),source(value.get("source")));}
+    public static JsonObject reference(ExternalTaskReference value) {var out=object();out.addProperty("providerId",value.providerId());out.addProperty("repositoryId",value.repositoryId());out.addProperty("externalId",value.externalId());optional(out,"externalUrl",value.externalUrl());if(!value.source().equals(ExternalTaskSource.empty()))out.add("source",source(value.source()));return out;}
+    public static ExternalTaskSource source(JsonElement value) {
+        if(value==null || value.isJsonNull())return ExternalTaskSource.empty();
+        var item=value.getAsJsonObject();return new ExternalTaskSource(text(item.get("createdAt")).map(Instant::parse),
+                text(item.get("modifiedAt")).map(Instant::parse),text(item.get("remoteEtag")),text(item.get("remoteRevision")));
+    }
+    public static JsonObject source(ExternalTaskSource value) {
+        var out=object();optional(out,"createdAt",value.createdAt());optional(out,"modifiedAt",value.modifiedAt());
+        optional(out,"remoteEtag",value.remoteEtag());optional(out,"remoteRevision",value.remoteRevision());return out;
+    }
     public static String hex(String value) {
         if(value.matches("#[0-9a-fA-F]{6}")) return value;
         String[] parts=value.split(",");if(parts.length!=3) throw new IllegalArgumentException("Use an RGB label color");

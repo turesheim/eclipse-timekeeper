@@ -27,6 +27,7 @@ import net.resheim.eclipse.timekeeper.domain.ActivityId;
 import net.resheim.eclipse.timekeeper.domain.DomainValidationException;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
+import net.resheim.eclipse.timekeeper.domain.ExternalTaskSource;
 import net.resheim.eclipse.timekeeper.domain.FailureCode;
 import net.resheim.eclipse.timekeeper.domain.Label;
 import net.resheim.eclipse.timekeeper.domain.LabelId;
@@ -66,6 +67,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskTiming;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskImportance;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskBody;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskSource;
 import net.resheim.eclipse.timekeeper.service.Ports.ActivityRepository;
 import net.resheim.eclipse.timekeeper.service.Ports.IdentifierSource;
 import net.resheim.eclipse.timekeeper.service.Ports.LabelRepository;
@@ -234,6 +236,26 @@ class DefaultTimekeeperServiceTest {
 		assertEquals(TaskBody.empty(),cleared.body());
 		assertThrows(ServiceException.class,()->service.updateTaskBody(new UpdateTaskBody(stale.id(),stale.version(),body)));
 		assertThrows(DomainValidationException.class,()->new TaskBody(null,"text"));
+	}
+
+	@Test
+	void externalSourceStateBelongsToOneProviderIdentity() {
+		var first=new ExternalTaskReference("google","account/list","remote-1",Optional.empty());
+		var second=new ExternalTaskReference("microsoft","account/list","remote-2",Optional.empty());
+		Task task=service.createTask(new CreateTask(Optional.empty(),Optional.empty(),"Shared task",Optional.empty(),Set.of(first,second)));
+		var source=new ExternalTaskSource(Optional.of(Instant.parse("2026-10-01T10:00:00Z")),
+				Optional.of(Instant.parse("2026-10-26T10:00:00Z")),Optional.of("\"etag\""),Optional.of("revision-1"));
+		task=service.updateExternalTaskSource(new UpdateExternalTaskSource(task.id(),task.version(),first.key(),source));
+		assertEquals(source,task.externalReferences().stream().filter(value->value.key().equals(first.key())).findFirst().orElseThrow().source());
+		assertEquals(ExternalTaskSource.empty(),task.externalReferences().stream().filter(value->value.key().equals(second.key())).findFirst().orElseThrow().source());
+		task=service.linkExternalReference(new LinkExternalReference(task.id(),task.version(),first));
+		assertEquals(source,task.externalReferences().stream().filter(value->value.key().equals(first.key())).findFirst().orElseThrow().source());
+		Task stale=task;
+		task=service.updateExternalTaskSource(new UpdateExternalTaskSource(task.id(),task.version(),first.key(),ExternalTaskSource.empty()));
+		assertEquals(ExternalTaskSource.empty(),task.externalReferences().stream().filter(value->value.key().equals(first.key())).findFirst().orElseThrow().source());
+		assertThrows(ServiceException.class,()->service.updateExternalTaskSource(new UpdateExternalTaskSource(stale.id(),stale.version(),first.key(),source)));
+		Task current=task;
+		assertThrows(ServiceException.class,()->service.updateExternalTaskSource(new UpdateExternalTaskSource(current.id(),current.version(),new ExternalTaskReferenceKey("apple","account","missing"),source)));
 	}
 
 	@Test

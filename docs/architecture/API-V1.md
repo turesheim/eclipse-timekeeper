@@ -154,6 +154,15 @@ notes. The body is optional on creation and defaults to empty text. Older task
 updates and the other task section endpoints preserve it. HTML is untrusted
 source content; clients must sanitize it before rendering.
 
+External task references have optional `source` metadata: `createdAt`,
+`modifiedAt`, `remoteEtag`, and `remoteRevision`. The timestamps are provider
+instants, and the version strings are opaque. A conditional
+`PUT /tasks/{id}/external-references/source` addresses one existing reference by
+provider, repository, and external ID and replaces its complete source state.
+Explicit null clears a value. Older link calls omit `source` and preserve state
+for an existing identity. The remote ETag is independent of the Timekeeper
+`If-Match` value.
+
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
 Manual editing sets `manual=true` and cannot change activity task/owner. Creating,
