@@ -15,7 +15,7 @@ const record = {};
 const apiRequest=await request.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true});
 async function tab(name) {
   if(name==='Labels'){await openLabelSettings(page);return;}
-  if(await page.locator('#account-page').isVisible())await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
+  if(new URL(page.url()).hash.startsWith('#account')){await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await expect(page.locator('#workspace')).toBeVisible();}
   await page.getByRole('button', {name, exact:true}).click();
 }
 async function api(method,path,data,headers={}) {
