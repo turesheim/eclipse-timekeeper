@@ -151,7 +151,7 @@ export class TrackDayNotes {
       value.append(icon(hasBody?'journal-text':'journal-plus'));value.classList.toggle('has-body',hasBody);
       if(previous)previous.replaceWith(value);else heading.append(value);
     }
-    if(focused&&!this.root.hidden)this.grid.querySelector(`button[data-track-note-date="${focused}"]`)?.focus({preventScroll:true});
+    if(focused&&!this.root.hidden)this.grid.querySelector(`button[${this.noteAttr}="${focused}"]`)?.focus({preventScroll:true});
   }
   async open(date){
     if(!this.session||this.editor||!this.cells?.has(date))return;
