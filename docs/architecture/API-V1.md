@@ -130,6 +130,16 @@ an empty list clears it. IDs and positions must be unique, positions must be
 contiguous, and a completion instant requires `completed: true`. The ordinary
 task and planning updates preserve checklist items they do not understand.
 
+Task start and due values are separate from `scheduledDate`. A conditional
+`PUT /tasks/{id}/timing` supplies both `start` and `due`; `null` clears one.
+`{ "kind": "DATE", "date": "2026-03-29" }` is a civil day without a time
+or time zone. A `DATE_TIME` also carries `time` and the original `timeZone`
+identifier, which may use IANA or Windows naming. Timekeeper preserves that
+wall time and identifier, including at DST gaps and overlaps, without deriving
+an instant or converting it to midnight. Neither form creates a reminder.
+Omitting timing fields on task creation uses null defaults. Ordinary task,
+planning, and checklist updates preserve existing timing.
+
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
 Manual editing sets `manual=true` and cannot change activity task/owner. Creating,
