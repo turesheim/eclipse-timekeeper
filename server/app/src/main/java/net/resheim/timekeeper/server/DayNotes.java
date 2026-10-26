@@ -20,7 +20,7 @@ final class DayNotes {
     }
     // Ordered UUIDs allow bounded date reads through the existing owner/type/id index.
     static UUID id(LocalDate date){return UUID.fromString("00000000-0000-0000-0000-"+String.format(Locale.ROOT,"%012d",date.getYear()*10000+date.getMonthValue()*100+date.getDayOfMonth()));}
-    ObjectNode get(LocalDate date){
+    private ObjectNode record(LocalDate date){
         var value=store.find(TYPE,id(date)).map(record->((ObjectNode)record).deepCopy()).orElseGet(()->object().put("id",id(date).toString()).put("ownerId",store.owner()).put("version",0).put("date",date.toString()).put("text",""));
         if(!value.has("body"))value.put("body","");
         // Old replicas preserve unknown DAY_NOTE payload fields when saving.
@@ -31,12 +31,25 @@ final class DayNotes {
         value.put("deleted",deleted);
         return value.put("hasBody",!value.path("body").asText().isEmpty());
     }
+    ObjectNode get(LocalDate date){
+        var value=record(date);value.remove("markdown");return value;
+    }
+    /** Complete document for an existing note, including legacy read-time reconstruction. */
+    byte[] document(LocalDate date){
+        var value=record(date);
+        if(value.path("version").asLong()==0||value.path("deleted").asBoolean())return null;
+        return document(date,value);
+    }
+    private static byte[] document(LocalDate date,ObjectNode value){
+        if(value.has("markdown"))return value.path("markdown").asText().getBytes(StandardCharsets.UTF_8);
+        return JournalMarkdown.render(date+".md",null,value.path("text").asText(),value.path("body").asText());
+    }
     static boolean hasContent(JsonNode note){return !note.path("text").asText().isEmpty()||!note.path("body").asText().isEmpty();}
     ObjectNode list(LocalDate first,LocalDate last){
         long days=ChronoUnit.DAYS.between(first,last);if(days<0 || days>=62)throw ApiFailure.validation();
         var result=object().put("revision",store.revision());var items=result.putArray("items");
         for(var value:store.list(TYPE,id(first),id(last)))if(hasContent(value)){
-            var summary=((ObjectNode)value).deepCopy();summary.remove("body");summary.put("hasBody",!value.path("body").asText().isEmpty());items.add(summary);
+            var summary=((ObjectNode)value).deepCopy();summary.remove(List.of("body","markdown"));summary.put("hasBody",!value.path("body").asText().isEmpty());items.add(summary);
         }
         return result;
     }
@@ -52,15 +65,35 @@ final class DayNotes {
     ObjectNode delete(LocalDate date,String match){
         return write(date,match,object().put("text","").put("body",""),true,true);
     }
+    /** Store a validated external document and its Calendar projections in one version. */
+    ObjectNode saveDocument(LocalDate date,String match,byte[] bytes){
+        var previous=record(date);ApiReplies.match(publicValue(previous),match);
+        final JournalMarkdown.Note parsed;
+        try{parsed=JournalMarkdown.parse(date+".md",bytes);}
+        catch(JournalMarkdown.Invalid invalid){throw ApiFailure.validation();}
+        if(!previous.path("deleted").asBoolean()&&previous.path("version").asLong()>0
+                &&Arrays.equals(document(date,previous),bytes))return publicValue(previous);
+        return persist(date,previous,parsed.label(),parsed.body(),new String(bytes,StandardCharsets.UTF_8),false);
+    }
     private ObjectNode write(LocalDate date,String match,JsonNode input,boolean deleted,boolean materialize){
-        var previous=get(date);ApiReplies.match(previous,match);
+        var previous=record(date);ApiReplies.match(publicValue(previous),match);
         String text=input.has("text")?input.get("text").asText().strip():previous.path("text").asText();
         String body=input.has("body")?input.get("body").asText():previous.path("body").asText();
         if(text.codePointCount(0,text.length())>80 || text.codePoints().anyMatch(Character::isISOControl))throw ApiFailure.validation();
         if(!StandardCharsets.UTF_8.newEncoder().canEncode(body)||body.getBytes(StandardCharsets.UTF_8).length>BODY_BYTES)throw ApiFailure.validation();
-        if(previous.path("text").asText().equals(text)&&previous.path("body").asText().equals(body)&&previous.path("deleted").asBoolean()==deleted&&(!materialize||previous.path("version").asLong()>0))return previous;
+        if(previous.path("text").asText().equals(text)&&previous.path("body").asText().equals(body)&&previous.path("deleted").asBoolean()==deleted&&(!materialize||previous.path("version").asLong()>0))return publicValue(previous);
+        final String markdown;
+        byte[] original=previous.path("deleted").asBoolean()||previous.path("version").asLong()==0?null:document(date,previous);
+        try{markdown=deleted?"":new String(JournalMarkdown.render(date+".md",original,text,body),StandardCharsets.UTF_8);}
+        catch(JournalMarkdown.Invalid invalid){throw ApiFailure.validation();}
+        return persist(date,previous,text,body,markdown,deleted);
+    }
+    private static ObjectNode publicValue(ObjectNode value){
+        var result=value.deepCopy();result.remove("markdown");return result;
+    }
+    private ObjectNode persist(LocalDate date,ObjectNode previous,String text,String body,String markdown,boolean deleted){
         long version=previous.path("version").asLong();if(version>=9007199254740991L)throw ApiFailure.conflict();
-        var value=previous.deepCopy().put("version",version+1).put("text",text).put("body",body).put("hasBody",!body.isEmpty()).put("deleted",deleted);
+        var value=previous.deepCopy().put("version",version+1).put("text",text).put("body",body).put("markdown",markdown).put("hasBody",!body.isEmpty()).put("deleted",deleted);
         var stored=value.deepCopy();stored.remove(List.of("hasBody","deleted"));
         if(version==0)store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,1,?)",store.owner(),TYPE,id(date),stored.toString());
         else if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,stored.toString(),store.owner(),TYPE,id(date),version)!=1)throw new ApiFailure(412,"STALE_VERSION");
@@ -72,7 +105,7 @@ final class DayNotes {
         // Empty values retain their version so deleting and recreating cannot
         // make an older editor's ETag valid again. Existing clients already
         // understand profile invalidations; no Eclipse/domain type is added.
-        store.change("PROFILE","UPDATED",store.owner());return value;
+        store.change("PROFILE","UPDATED",store.owner());return publicValue(value);
     }
     void restore(JsonNode notes){
         var seen=new HashSet<LocalDate>();
