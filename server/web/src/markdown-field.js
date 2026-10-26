@@ -1,5 +1,6 @@
 import {t} from './i18n.js';
 import {splitMarkdown,needsSource} from './markdown-document.js';
+import {iconButton} from './icons.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 const button=text=>{const value=node('button',text,'btn btn-outline-secondary');value.type='button';return value;};
@@ -25,8 +26,12 @@ export class MarkdownField {
     this.helpDetails=node('details',undefined,'markdown-help');this.helpDetails.append(node('summary',t('journal.help')),node('p',t('markdown.normalization'),'hint'),this.help);
     this.metadata=node('details');this.metadata.hidden=true;this.frontmatterView=node('pre');this.metadata.append(node('summary',t('markdown.metadata')),this.frontmatterView);
     this.tools=node('div',undefined,'markdown-tools');this.tools.setAttribute('role','group');this.tools.setAttribute('aria-label',t('markdown.formatting'));
-    for(const name of ['paragraph','heading','bold','italic','strike','inline_code','code_block','list','ordered','tasks','link','quote','table','undo','redo']){
-      const action=button(t('markdown.'+(name==='heading'?'heading_button':name)));
+    for(const [name,glyph] of [
+      ['paragraph','paragraph'],['heading','type-h1'],['bold','type-bold'],['italic','type-italic'],['strike','type-strikethrough'],
+      ['inline_code','code'],['code_block','code-square'],['list','list-ul'],['ordered','list-ol'],['tasks','list-check'],
+      ['link','link-45deg'],['quote','quote'],['table','table'],['undo','arrow-counterclockwise'],['redo','arrow-clockwise']
+    ]){
+      const action=iconButton(button(),glyph,t('markdown.'+(name==='heading'?'heading_button':name)));
       action.addEventListener('mousedown',event=>event.preventDefault());action.addEventListener('click',()=>{
         if(this.readOnly||this.loading||!this.editor)return;
         if(name==='link'){
