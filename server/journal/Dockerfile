@@ -1,15 +1,15 @@
 FROM debian:bookworm-slim AS build
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl build-essential python3 \
+RUN apt-get -o Acquire::Retries=3 update && apt-get -o Acquire::Retries=3 install -y --no-install-recommends ca-certificates curl build-essential python3 \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /source
-RUN curl --fail --silent --show-error --location https://download.samba.org/pub/rsync/src/rsync-3.5.1.tar.gz -o rsync.tar.gz \
+RUN curl --fail --silent --show-error --location --retry 4 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 90 https://download.samba.org/pub/rsync/src/rsync-3.5.1.tar.gz -o rsync.tar.gz \
     && echo 'c55f9c9dc10fb8bec397b399a0fdded53cc9a2d8e30891bb0d63724d25c37bef  rsync.tar.gz' | sha256sum -c - \
     && tar -xzf rsync.tar.gz \
     && cd rsync-3.5.1 && ./configure --disable-openssl --disable-xxhash --disable-zstd --disable-lz4 --disable-idn --disable-acl-support --disable-xattr-support \
     && make -j2
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssh-server openssh-client python3 passwd \
+RUN apt-get -o Acquire::Retries=3 update && apt-get -o Acquire::Retries=3 install -y --no-install-recommends ca-certificates openssh-server openssh-client python3 passwd \
     && rm -rf /var/lib/apt/lists/* /etc/ssh/ssh_host_* \
     && mkdir -p /usr/local/libexec /usr/share/doc/timekeeper-journal
 COPY --from=build /source/rsync-3.5.1/rsync /usr/local/libexec/rsync-real

@@ -32,6 +32,15 @@ def command(*args,input=None,check=True):
     return result
 
 
+def build_gateway_image():
+    # The image is built before any private fixture data is created. Let Docker
+    # write its diagnostics to CI; the generic command helper deliberately hides
+    # output because later invocations can contain journal contents and tokens.
+    result=subprocess.run(('docker','build','--progress=plain','-t',GATEWAY_IMAGE,
+                           '-f',str(ROOT/'server/journal/Dockerfile'),str(ROOT)),timeout=1200)
+    if result.returncode:raise RuntimeError('Disposable journal gateway image build failed (exit '+str(result.returncode)+')')
+
+
 class Api:
     def __init__(self,base,certificate,origin=None):
         self.base=base;self.origin=origin or base;self.csrf=None;self.opener=build_opener(HTTPCookieProcessor(http.cookiejar.CookieJar()),HTTPSHandler(context=ssl.create_default_context(cafile=certificate)))
@@ -55,7 +64,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--distribution',type=Path,required=True);parser.add_argument('--skip-image-build',action='store_true');parser.add_argument('--gateway-image',default=GATEWAY_IMAGE);parser.add_argument('--bidirectional',action='store_true');args=parser.parse_args();GATEWAY_IMAGE=args.gateway_image
     archive=args.distribution.resolve();digest=hashlib.sha256(archive.read_bytes()).hexdigest()
     if archive.with_suffix('.zip.sha256').read_text().split()[0]!=digest:raise ValueError('Distribution checksum mismatch')
-    if not args.skip_image_build:command('docker','build','-t',GATEWAY_IMAGE,'-f',str(ROOT/'server/journal/Dockerfile'),str(ROOT))
+    if not args.skip_image_build:build_gateway_image()
     suffix=secrets.token_hex(5);network='journal-'+suffix;containers=[];volumes=[];background=[]
     sensitive=[b'Private daily Markdown',b'Private pressure note',b'INDEPENDENT_VALID_NOTE_SENTINEL',b'PRIVATE_CALENDAR_EDIT_SENTINEL',b'PRIVATE_CONFLICT_SOURCE_SENTINEL',b'INFLIGHT_PRIVATE_SENTINEL',b'UNRELATED_VAULT',b'UNACKNOWLEDGED_NOTE_SENTINEL',b'Private outgoing acceptance note',b'Local simultaneous variant',b'Calendar simultaneous variant',b'Database pressure']
     output=ROOT/'server/target/journal-gateway-acceptance';output.mkdir(parents=True,exist_ok=True);output.chmod(0o700)
