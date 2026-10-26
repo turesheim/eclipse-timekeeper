@@ -12,11 +12,15 @@ import net.resheim.eclipse.timekeeper.domain.OwnerId;
 import net.resheim.eclipse.timekeeper.domain.Project;
 import net.resheim.eclipse.timekeeper.domain.ProjectId;
 import net.resheim.eclipse.timekeeper.domain.Task;
+import net.resheim.eclipse.timekeeper.domain.TaskConnection;
+import net.resheim.eclipse.timekeeper.domain.TaskList;
 import net.resheim.eclipse.timekeeper.domain.TaskId;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateTask;
+import net.resheim.eclipse.timekeeper.service.Commands.CreateTaskConnection;
+import net.resheim.eclipse.timekeeper.service.Commands.CreateTaskList;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteProject;
@@ -30,6 +34,8 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskConnection;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskList;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskPlanning;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskTiming;
@@ -45,6 +51,16 @@ public interface TimekeeperService {
 	void deleteProject(DeleteProject command);
 	Optional<Project> project(ProjectId id);
 	List<Project> projects();
+	default TaskConnection createTaskConnection(CreateTaskConnection command) { throw new UnsupportedOperationException("Task connections are not supported"); }
+	default TaskConnection updateTaskConnection(UpdateTaskConnection command) { throw new UnsupportedOperationException("Task connections are not supported"); }
+	default void deleteTaskConnection(java.util.UUID id,long expectedVersion) { throw new UnsupportedOperationException("Task connections are not supported"); }
+	default Optional<TaskConnection> taskConnection(java.util.UUID id) { throw new UnsupportedOperationException("Task connections are not supported"); }
+	default List<TaskConnection> taskConnections() { throw new UnsupportedOperationException("Task connections are not supported"); }
+	default TaskList createTaskList(CreateTaskList command) { throw new UnsupportedOperationException("Provider task lists are not supported"); }
+	default TaskList updateTaskList(UpdateTaskList command) { throw new UnsupportedOperationException("Provider task lists are not supported"); }
+	default void deleteTaskList(java.util.UUID id,long expectedVersion) { throw new UnsupportedOperationException("Provider task lists are not supported"); }
+	default Optional<TaskList> taskList(java.util.UUID id) { throw new UnsupportedOperationException("Provider task lists are not supported"); }
+	default List<TaskList> taskLists(java.util.UUID connectionId) { throw new UnsupportedOperationException("Provider task lists are not supported"); }
 
 	Task createTask(CreateTask command);
 	Task updateTask(UpdateTask command);

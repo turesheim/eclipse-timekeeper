@@ -133,6 +133,37 @@ class AccountArchiveImportTest {
         var changed=archive.deepCopy();((ObjectNode)changed.path("work").path("projects").get(0)).put("name","Changed after restore");UUID changedId=stage(changed);
         assertEquals(409,assertThrows(ApiFailure.class,()->store.transaction("b",()->importer().preview(changedId,false))).status);assertEquals(saved,work());
     }
+    @Test void providerListsRoundTripThroughAccountZipWithNewOwnedIds() throws Exception {
+        source();
+        UUID sourceConnection=UUID.randomUUID(),sourceList=UUID.randomUUID();
+        store.transaction("a",()->{
+            store.save("TASK_CONNECTION",new TaskConnection(sourceConnection,"microsoft","account-1","Personal",true,true,true,0));
+            store.save("TASK_LIST",new TaskList(sourceList,sourceConnection,"remote-list","Flagged emails",TaskListKind.BUILT_IN,
+                    true,false,false,true,true,0,0));return null;
+        });
+        ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=AccountArchiveInput.read(file.file(),"application/zip");}
+        assertEquals(1,archive.path("work").path("taskConnections").size());
+        assertEquals(1,archive.path("work").path("taskLists").size());
+        UUID id=stage(archive);var review=store.transaction("b",()->importer().preview(id,false));
+        assertTrue(review.body().path("canImport").asBoolean());
+        store.transaction("b",()->importer().apply(id,false,review.etag()));
+        store.transaction("b",()->{
+            var connection=store.list("TASK_CONNECTION").getFirst();var list=store.list("TASK_LIST").getFirst();
+            assertNotEquals(sourceConnection.toString(),connection.path("id").asText());
+            assertNotEquals(sourceList.toString(),list.path("id").asText());
+            assertEquals(connection.path("id"),list.path("connectionId"));
+            assertEquals("Flagged emails",list.path("name").asText());return null;
+        });
+    }
+    @Test void olderAccountArchiveWithoutProviderCollectionsStillRestores() throws Exception {
+        var archive=source();var work=(ObjectNode)archive.path("work");
+        work.remove("taskConnections");work.remove("taskLists");
+        inputs.validate("AccountArchiveSnapshot",archive);
+        UUID id=stage(archive);var review=store.transaction("b",()->importer().preview(id,false));
+        assertTrue(review.body().path("canImport").asBoolean());
+        store.transaction("b",()->importer().apply(id,false,review.etag()));
+        store.transaction("b",()->{assertEquals(1,store.list("TASK").size());assertTrue(store.list("TASK_CONNECTION").isEmpty());return null;});
+    }
     @Test void previewShowsValidatedLinksAndRestoreKeepsTaskHierarchyAndSessionLabels() throws Exception {
         var archive=source();var work=(ObjectNode)archive.path("work");var root=work.path("tasks").get(0);
         var child=((ObjectNode)root).deepCopy().put("id",UUID.randomUUID().toString()).put("parentTaskId",root.path("id").asText()).put("summary","Archive child");
@@ -142,7 +173,7 @@ class AccountArchiveImportTest {
         assertTrue(review.body().path("canImport").asBoolean());inputs.validate("AccountArchiveReview",review.body());
         assertEquals(object().put("projectClients",1L).put("taskProjects",2L).put("parentTasks",1L)
                 .put("activityTasks",1L).put("activityProjects",1L).put("activityLabels",1L)
-                .put("workSessionClients",1L).put("workSessionProjects",1L).put("workSessionLabels",1L),review.body().path("relationships"));
+                .put("workSessionClients",1L).put("workSessionProjects",1L).put("workSessionLabels",1L).put("listConnections",0L),review.body().path("relationships"));
         assertEquals(before,work());
         store.transaction("b",()->importer().apply(id,false,review.etag()));
         store.transaction("b",()->{

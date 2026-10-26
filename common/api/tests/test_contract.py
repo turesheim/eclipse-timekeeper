@@ -155,6 +155,18 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('ExternalTaskSourceInput').is_valid({**value,'source':{'createdAt':None}}))
         self.assertEqual('updateExternalTaskSource',CONTRACT['paths']['/tasks/{id}/external-references/source']['put']['operationId'])
 
+    def test_provider_connections_and_lists_keep_remote_identity_separate_from_projects(self):
+        connection={'providerId':'google','remoteAccountId':'account-1','name':'Personal',
+                    'readable':True,'writable':False,'enabled':True}
+        task_list={'connectionId':ID,'remoteListId':'list-1','name':'Tasks','kind':'STANDARD',
+                   'readable':True,'writable':False,'shared':False,'owner':True,'present':True,'position':0}
+        validator('TaskConnectionCreateInput').validate(connection)
+        validator('TaskListCreateInput').validate(task_list)
+        self.assertFalse(validator('TaskListCreateInput').is_valid({**task_list,'kind':'PROJECT'}))
+        self.assertFalse(validator('TaskListCreateInput').is_valid({**task_list,'position':-1}))
+        self.assertFalse(validator('TaskConnectionCreateInput').is_valid({**connection,'accessToken':'secret'}))
+        self.assertEqual('listTaskLists',CONTRACT['paths']['/task-lists']['get']['operationId'])
+
     def test_timestamp_precision_and_zone_boundary(self):
         for value in ['2026-03-29T00:00:00Z', '2026-03-29T00:00:00.123456789Z']:
             validator('Instant').validate(value)
@@ -279,6 +291,8 @@ class ContractTest(unittest.TestCase):
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'convertCalendarEvent',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
+            'createTaskConnection', 'updateTaskConnection', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
+            'createTaskList', 'updateTaskList', 'deleteTaskList', 'getTaskList', 'listTaskLists',
             'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateExternalTaskSource', 'deleteTask', 'getTask', 'listTasks',
             'linkExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',

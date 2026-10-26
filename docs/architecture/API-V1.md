@@ -163,6 +163,18 @@ Explicit null clears a value. Older link calls omit `source` and preserve state
 for an existing identity. The remote ETag is independent of the Timekeeper
 `If-Match` value.
 
+Provider accounts and lists have owner-scoped `/task-connections` and
+`/task-lists` collections. A connection holds a provider and remote account
+identity, display name, access flags, and enabled state; no OAuth or Apple
+credentials are stored in these resources. A list holds a stable Timekeeper ID,
+remote list ID, connection ID, name, `STANDARD`/`BUILT_IN`/`SMART` kind,
+read/write and sharing/ownership flags, presence, and order. Lists are separate
+from Timekeeper projects. Repeating an identical create returns the existing
+resource; a conflicting representation of the same remote identity returns
+409. Updates require `If-Match`. Mark a missing list `present=false` or a
+disconnected account `enabled=false`; remote disappearance must not trigger
+deletion of local tasks.
+
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
 Manual editing sets `manual=true` and cannot change activity task/owner. Creating,
@@ -195,10 +207,14 @@ Portable interchange exports `timekeeper-domain-v3` JSON, including clients, man
 project/session client links, session summaries and optional task, direct-project
 assignments. Import also accepts older `timekeeper-domain-v1` and
 `timekeeper-domain-v2` snapshots, assigning their projects/sessions to General.
-The formats contain no SQL/JPA table names. CSV v3 adds `clients.csv` and client/summary
-columns; v2 includes `workSessions.csv`. Every declared
-file must be present. Older CSV clients reject the new format instead of silently
-discarding independent sessions or client metadata.
+The formats contain no SQL/JPA table names. CSV v3 includes client/summary
+columns and writes `taskConnections.csv` and `taskLists.csv` together when
+provider collections are present. The descriptor marks these files as required,
+so deleting both cannot silently discard them. Earlier v3 CSV exports without
+either file remain readable; an export with only one provider file is invalid. v2 includes
+`workSessions.csv`. Every declared file must be present. Older CSV clients
+reject the new format instead of silently discarding independent sessions or
+client metadata.
 Export reads a consistent owned snapshot. Import validates the entire graph,
 then generates fresh UUIDs and rewrites references in one transaction; it never
 updates existing records. Source IDs are correlation keys only. A failure leaves

@@ -15,6 +15,19 @@ import com.google.gson.JsonParser;
 class CsvSnapshotTest {
     @TempDir Path temporary;
 
+    @Test void providerAccountsAndListsRoundTripWithoutChangingOlderCsvExports() throws Exception {
+        var data=JsonParser.parseString("""
+            {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[],"projects":[],"tasks":[],"labels":[],"activities":[],"workSessions":[],
+             "taskConnections":[{"id":"account","providerId":"google","remoteAccountId":"user@example.com","name":"Personal","readable":true,"writable":false,"enabled":true}],
+             "taskLists":[{"id":"list","connectionId":"account","remoteListId":"remote","name":"Tasks","kind":"BUILT_IN","readable":true,"writable":false,"shared":false,"owner":true,"present":true,"position":3}]}
+            """).getAsJsonObject();
+        var folder=temporary.resolve("providers");assertEquals(2,CsvSnapshot.write(data,folder));assertEquals(data,CsvSnapshot.read(folder));
+        Files.delete(folder.resolve("taskLists.csv"));assertThrows(IOException.class,()->CsvSnapshot.read(folder));
+        Files.delete(folder.resolve("taskConnections.csv"));assertThrows(IOException.class,()->CsvSnapshot.read(folder));
+        data.remove("taskConnections");data.remove("taskLists");
+        var legacy=temporary.resolve("legacy");CsvSnapshot.write(data,legacy);assertEquals(data,CsvSnapshot.read(legacy));
+    }
+
     @Test void v3CsvRetainsTheClientGraphAndCannotBeSilentlyDowngraded() throws Exception {
         var data=JsonParser.parseString("""
             {"format":"timekeeper-domain-v3","zoneId":"UTC",
