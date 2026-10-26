@@ -1164,6 +1164,10 @@
   "journal.sync.error.JOURNAL_DEVICE_WRITE_ONLY": "This key has upload-only permission. Register or rotate a new key with explicit download access.",
   "journal.sync.error.JOURNAL_CLIENT_STATE_CHANGED": "Local synchronization state changed or was lost. Keep the files and recovery copies, and register a new device profile.",
   "journal.sync.error.JOURNAL_BASE_CHANGED": "This exchange has an older common state. Keep the private client state and retry the pending acknowledgements.",
+  "markdown.block_style": "Text style",
+  "markdown.heading_level": "Heading {{level}}",
+  "markdown.plain_text": "Plain text",
+  "markdown.hr": "Horizontal rule",
   "journal.sync.advanced": "Connection setup and troubleshooting",
   "journal.sync.simple_help": "Add a client with its name and public key. New clients synchronize journal notes in both directions automatically."
 }
