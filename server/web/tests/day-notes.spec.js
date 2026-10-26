@@ -384,7 +384,10 @@ test('Week day headings open shared daily notes with one toolbar and right-align
     await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill(date);
     const buttons=page.locator('.calendar-heading [data-week-note-date]'),entry=page.locator('[data-week-note-date="'+date+'"]'),editor=page.locator('#week-note-editor');
     await expect(buttons).toHaveCount(7);for(const button of await buttons.all())await expect(button).toBeEnabled();await expect(entry.locator('.bi-journal-text')).toBeVisible();
-    const bounds=await entry.boundingBox(),heading=await entry.locator('xpath=ancestor::*[contains(@class,"calendar-heading")]').boundingBox();expect(Math.abs(bounds.x+bounds.width-heading.x-heading.width)).toBeLessThanOrEqual(4);
+    await expect.poll(async()=>{
+      const bounds=await entry.boundingBox(),heading=await entry.locator('xpath=ancestor::*[contains(@class,"calendar-heading")]').boundingBox();
+      return bounds&&heading?Math.abs(bounds.x+bounds.width-heading.x-heading.width):Infinity;
+    }).toBeLessThanOrEqual(4);
     await entry.click();await expect(editor).toBeVisible();await expect(editor.locator('#week-journal-formatted .ProseMirror')).toHaveText('A shared note');await expect(page.locator('dialog[open]')).toHaveCount(1);
     const toolbar=editor.locator('.markdown-toolbar');await expect(toolbar.locator('.markdown-modes button')).toHaveCount(2);await expect(toolbar.getByRole('separator')).toHaveAttribute('aria-orientation','vertical');
     expect(await toolbar.evaluate(node=>node.querySelector('.markdown-modes').nextElementSibling.getAttribute('role')==='separator'&&node.querySelector('.markdown-tools').previousElementSibling.getAttribute('role')==='separator')).toBe(true);

@@ -1,5 +1,5 @@
 import {t} from './i18n.js';
-import {splitMarkdown,needsSource} from './markdown-document.js';
+import {splitMarkdown,needsSource,normalizeEditorMarkdown} from './markdown-document.js';
 const $=id=>document.getElementById(id),source=$('markdown-body'),rich=$('markdown-formatted'),status=$('markdown-status');
 let frontmatter='',unterminated=false,editor=null,loading=false,dirty=false,rawBody='',displayedBody='';
 let engine=null,attempt=0,stylePromise=null;
@@ -31,12 +31,13 @@ $('markdown-rich').addEventListener('click',async()=>{
   // Frontmatter pasted in source is also separated before rich parsing.
   if(!frontmatter){const parts=splitMarkdown(body());frontmatter=parts.frontmatter;setBody(parts.body);unterminated=parts.unterminated;paintMetadata();}
   if(new TextEncoder().encode(body()).length>200000){status.textContent=t('markdown.too_large');return;}
-  if(unterminated||needsSource(body())||splitMarkdown(body()).frontmatter){status.textContent=t('markdown.source_only');return;}
+  const richBody=normalizeEditorMarkdown(body());
+  if(unterminated||needsSource(richBody)||splitMarkdown(richBody).frontmatter){status.textContent=t('markdown.source_only');return;}
   busy(true);
   status.textContent=t('markdown.loading');
   try{
     const [module]=await Promise.all([loadEngine(),loadStyle()]);
-    editor=await module.createMarkdownEditor({root:rich,value:body(),label:t('markdown.body'),taskLabel:text=>t('markdown.task',{text}),escape:()=>$('markdown-source').focus()});
+    editor=await module.createMarkdownEditor({root:rich,value:richBody,label:t('markdown.body'),taskLabel:text=>t('markdown.task',{text}),escape:()=>$('markdown-source').focus()});
     if(!editor){status.textContent=t('markdown.source_only');return;}
     setMode(true);status.textContent=t('markdown.normalization');editor.focus();
   }catch{rich.replaceChildren();status.textContent=t('markdown.failed');setMode(false);}

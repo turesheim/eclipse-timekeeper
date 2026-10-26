@@ -31,3 +31,18 @@ export function needsSource(body) {
   }
   return hasUnsupportedSyntax(text);
 }
+
+// Milkdown emits this HTML placeholder for an empty paragraph created with
+// Enter. It is not part of the note: keeping it would force source-only mode
+// after the next save. Markdown blank lines are the closest representable form.
+export function normalizeEditorMarkdown(value) {
+  let fence=null;
+  return (value.match(/[^\n]*\n|[^\n]+$/g)||[]).map(line=>{
+    const content=line.replace(/\r?\n$/,''),marker=content.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if(marker){
+      if(!fence)fence=marker[1];
+      else if(marker[1][0]===fence[0]&&marker[1].length>=fence.length&&!marker[2].trim())fence=null;
+    }
+    return !fence&&/^\s*<br\s*\/?>\s*$/i.test(content)?line.slice(content.length):line;
+  }).join('');
+}

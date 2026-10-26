@@ -33,6 +33,26 @@ test('Markdown rich edits, tasks, undo and source edits keep semantic content an
   await page.locator('#markdown-source').click();await expect(page.locator('#markdown-body')).toHaveValue(/Preserve \*\*this\*\*\. More\./);
   await downloaded(page);
 });
+test('empty paragraph created with Enter stays editable after a Markdown round trip',async({page})=>{
+  await open(page);await page.locator('#markdown-body').fill('First line\n');await page.locator('#markdown-rich').click();
+  const rich=page.locator('#markdown-formatted [role="textbox"]');await expect(rich).toBeVisible();
+  await rich.click();await page.keyboard.press('Home');await page.keyboard.press('Enter');
+  await page.locator('#markdown-source').click();
+  const value=await page.locator('#markdown-body').inputValue();expect(value).toContain('First line');expect(value).not.toContain('<br');
+  await page.locator('#markdown-rich').click();await expect(rich).toBeVisible();
+  await page.locator('#markdown-source').click();expect(await downloaded(page)).not.toContain('<br');
+  await page.locator('#markdown-body').fill('<br />\n\nFirst line\n');
+  await page.locator('#markdown-rich').click();await expect(rich).toBeVisible();
+  await page.locator('#markdown-source').click();expect(await page.locator('#markdown-body').inputValue()).not.toContain('<br');
+});
+test('soft line break stays editable after a Markdown round trip',async({page})=>{
+  await open(page);await page.locator('#markdown-body').fill('First line\n');await page.locator('#markdown-rich').click();
+  const rich=page.locator('#markdown-formatted [role="textbox"]');await expect(rich).toBeVisible();
+  await rich.click();await page.keyboard.press('End');await page.keyboard.press('Shift+Enter');await page.keyboard.type('Second line');
+  await page.locator('#markdown-source').click();
+  const value=await page.locator('#markdown-body').inputValue();expect(value).toContain('First line');expect(value).toContain('Second line');expect(value).not.toContain('<br');
+  await page.locator('#markdown-rich').click();await expect(rich).toBeVisible();
+});
 test('Obsidian extensions, frontmatter and CRLF remain exact source, with a usable failed-load fallback',async({page})=>{
   await open(page);const original='\uFEFF'+(await fixture('obsidian')).replaceAll('\n','\r\n');await importNote(page,original);
   await expect(page.locator('#markdown-metadata')).toBeVisible();await expect(page.locator('#markdown-body')).not.toHaveValue(/^---/);

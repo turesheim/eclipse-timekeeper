@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {splitMarkdown,needsSource} from '../src/markdown-document.js';
+import {splitMarkdown,needsSource,normalizeEditorMarkdown} from '../src/markdown-document.js';
 test('frontmatter is kept byte-for-byte outside the body, including BOM and CRLF',()=>{
   for(const value of ['---\ntags: [daily]\n---\n\n# Day\n','\uFEFF---\r\ntitle: Mandag\r\n...\r\n\r\nA note\r\n','---\n---\nBody','---\nkey: value\n---']){
     const parts=splitMarkdown(value);assert.ok(parts.frontmatter);assert.equal(parts.unterminated,false);assert.equal(parts.frontmatter+parts.body,value);
@@ -20,4 +20,10 @@ test('safe CommonMark autolinks remain renderable without admitting HTML or unsa
 test('leading dashed horizontal rules are distinct from unfinished YAML frontmatter',()=>{
   for(const value of ['---','---\n','---\n\n','---\n\nParagraph\n'])assert.deepEqual(splitMarkdown(value),{frontmatter:'',body:value,unterminated:false});
   const yaml='---\ntags: [unfinished]';assert.deepEqual(splitMarkdown(yaml),{frontmatter:'',body:yaml,unterminated:true});
+});
+test('empty rich paragraphs serialize as Markdown blank lines without changing code or inline HTML',()=>{
+  assert.equal(normalizeEditorMarkdown('<br />\n\nFirst line\n'),'\n\nFirst line\n');
+  assert.equal(normalizeEditorMarkdown('Before\n\n<br />\n\nAfter\n'),'Before\n\n\n\nAfter\n');
+  assert.equal(normalizeEditorMarkdown('```html\n<br />\n```\n'),'```html\n<br />\n```\n');
+  assert.equal(normalizeEditorMarkdown('Before <br /> after\n'),'Before <br /> after\n');
 });
