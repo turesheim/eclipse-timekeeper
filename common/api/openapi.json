@@ -13335,6 +13335,77 @@
           }
         }
       }
+    },
+    "/task-sync/apply": {
+      "post": {
+        "operationId": "applyTaskSyncItem",
+        "summary": "Apply non-conflicting provider task fields",
+        "description": "Requires the current task ETag. Recomputes field decisions inside the owner transaction, applies remote-only values, advances per-reference baselines, and preserves local-only fields. Conflicts require manual resolution. Remote deletion is not supported here.",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskSyncApplyInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "200": {
+            "description": "Updated or unchanged task.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -24962,6 +25033,38 @@
         ],
         "additionalProperties": false,
         "description": "Idempotent import of one provider-observed root task. The item operationId is the command receipt key."
+      },
+      "TaskSyncApplyInput": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "listId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "sourceState": {
+            "type": "string",
+            "enum": [
+              "HEALTHY",
+              "UNAVAILABLE",
+              "AUTH_EXPIRED",
+              "PERMISSION_CHANGED",
+              "LIST_MISSING"
+            ]
+          },
+          "item": {
+            "$ref": "#/components/schemas/TaskSyncObservedItem"
+          }
+        },
+        "required": [
+          "connectionId",
+          "listId",
+          "sourceState",
+          "item"
+        ],
+        "additionalProperties": false,
+        "description": "Conditionally merge one observed task against the current ETag and last-common baseline. The item operationId is the durable receipt key."
       }
     },
     "parameters": {

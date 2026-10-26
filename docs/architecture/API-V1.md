@@ -256,6 +256,8 @@ field produce `CONFLICT`. A missing baseline produces `NO_BASELINE`, not a
 guess. Completion, hierarchy/order, and list/section are paired to prevent
 partial changes. The connection capability declaration gates all observed
 fields. Unknown or unreadable fields are `UNSUPPORTED` and remain local.
+Opposing local-only and remote-only edits within a paired field group are
+reported as a conflict, so an apply cannot combine mismatched halves.
 Alias matches require identity reconciliation. Existing links must belong to
 the requested list. A deleted item is deferred for an unhealthy source or an
 incomplete scan; otherwise it requires explicit review and conflicts if the
@@ -273,6 +275,16 @@ including civil schedule, completion, recurrence, reminders, checklist and
 provider list association. Remote subtasks need a later hierarchy pass before
 they can be imported. Remote changes to existing tasks go through a separate
 conditional apply workflow.
+
+`POST /task-sync/apply` conditionally merges one existing provider observation.
+The caller supplies the current task ETag through `If-Match`; the server
+recomputes the three-way comparison inside the owner transaction. A remote-only
+change updates the task, a local-only change stays local, and a converged
+change advances the baseline. Conflicting, unbased, incomplete, cross-list,
+alias and deleted observations are rejected. Supported remote fields update
+the reference baseline at the same time as the task. The operation ID is a
+durable receipt so retrying the exact request cannot apply it twice. Remote
+deletions still need a separate explicit review workflow.
 
 An external task reference can carry `taskListId` to point at an owned provider
 list. The list's connection must use the same provider. The existing

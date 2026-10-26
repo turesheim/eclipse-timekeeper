@@ -158,6 +158,14 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskSyncImportInput').is_valid({**body,'item':{**item,'fields':{'token':'secret'}}}))
         self.assertEqual('importTaskSyncItem',CONTRACT['paths']['/task-sync/import']['post']['operationId'])
 
+    def test_sync_apply_requires_conditional_task_version(self):
+        item={'operationId':ID,'providerId':'google','repositoryId':'account/list','externalId':'remote-1',
+              'deleted':False,'fields':{'status':'COMPLETED','completedAt':'2026-10-26T12:00:00Z'}}
+        validator('TaskSyncApplyInput').validate({'connectionId':ID,'listId':ID,'sourceState':'HEALTHY','item':item})
+        operation=CONTRACT['paths']['/task-sync/apply']['post']
+        self.assertEqual('applyTaskSyncItem',operation['operationId'])
+        self.assertIn({'$ref':'#/components/parameters/IfMatch'},operation['parameters'])
+
     def test_task_tags_categories_and_provider_links_are_distinct(self):
         link={'id':ID,'kind':'PROVIDER_SOURCE','url':'https://tasks.google.com/task/1',
               'title':'Original task','providerId':'google','remoteId':None}
@@ -471,7 +479,7 @@ class ContractTest(unittest.TestCase):
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'deleteTaskList', 'getTaskList', 'listTaskLists',
             'createTaskListSection', 'updateTaskListSection', 'deleteTaskListSection', 'getTaskListSection', 'listTaskListSections',
-            'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors', 'previewTaskSync', 'importTaskSyncItem',
+            'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors', 'previewTaskSync', 'importTaskSyncItem', 'applyTaskSyncItem',
             'getTaskTombstone', 'listTaskTombstones', 'findTaskTombstoneByExternalReference',
             'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskMetadata', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskSyncState', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
             'listTaskAttachments', 'createTaskAttachment', 'getTaskAttachment', 'updateTaskAttachment', 'deleteTaskAttachment', 'downloadTaskAttachmentContent',

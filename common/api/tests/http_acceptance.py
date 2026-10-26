@@ -1181,6 +1181,14 @@ class HttpAcceptance(unittest.TestCase):
         self.assertEqual('DEFERRED',result['items'][0]['status'])
         unchanged,_=self.call('GET',path)
         self.assertEqual('Locally edited',unchanged['summary'])
+        _, task_headers=self.call('GET',path)
+        self.call('PUT',path+'/planning',body={'status':'IN_PROGRESS','scheduledDate':None,'completedAt':None},
+                  headers={'If-Match':task_headers['ETag']})
+        split={**observed,'fields':{'status':'NOT_STARTED','completedAt':'2026-10-26T12:00:00Z'}}
+        result,_=self.call('POST','/task-sync/preview',body={**request,'items':[split]})
+        self.assertEqual('CONFLICT',result['items'][0]['status'])
+        self.assertEqual({'status':'CONFLICT','completedAt':'CONFLICT'},
+                         {item['field']:item['outcome'] for item in result['items'][0]['decisions']})
 
     def test_initial_task_sync_import_replays_without_overwriting_local_edits(self):
         connection=self.create('task-connections',{'providerId':'google','remoteAccountId':str(uuid4()),
@@ -1211,12 +1219,29 @@ class HttpAcceptance(unittest.TestCase):
         same,_=self.call('POST','/task-sync/import',body=request,status=201)
         self.assertEqual(created['id'],same['id'])
         task_path='/tasks/'+created['id']
-        edited,_=self.call('PUT',task_path,body={'projectId':None,'parentTaskId':None,
+        edited,edited_headers=self.call('PUT',task_path,body={'projectId':None,'parentTaskId':None,
                             'summary':'My edited title','url':None},headers={'If-Match':headers['ETag']})
         replay,_=self.call('POST','/task-sync/import',body={**request,'item':{**item,'operationId':str(uuid4())}},status=200)
         self.assertEqual(edited['summary'],replay['summary'])
         self.call('POST','/task-sync/import',body={**request,'item':{**item,'operationId':str(uuid4()),
                   'fields':{**item['fields'],'summary':'Remote edit'}}},status=409,code='CONFLICT')
+        self.assertEqual('My edited title',self.call('GET',task_path)[0]['summary'])
+        remote={**item,'operationId':str(uuid4()),'fields':{**item['fields'],
+                'status':'COMPLETED','completedAt':'2026-10-26T12:00:00Z'}}
+        apply={'connectionId':connection['id'],'listId':task_list['id'],'sourceState':'HEALTHY','item':remote}
+        self.call('POST','/task-sync/apply',body=apply,headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        updated,updated_headers=self.call('POST','/task-sync/apply',body=apply,
+                                            headers={'If-Match':edited_headers['ETag']})
+        self.assertEqual(('My edited title','COMPLETED','2026-10-26T12:00:00Z'),
+                         (updated['summary'],updated['status'],updated['completedAt']))
+        self.assertEqual('COMPLETED',updated['externalReferences'][0]['baseline']['fields']['status'])
+        self.assertEqual('Imported provider task',updated['externalReferences'][0]['baseline']['fields']['summary'])
+        replay,_=self.call('POST','/task-sync/apply',body=apply,headers={'If-Match':edited_headers['ETag']})
+        self.assertEqual(updated['version'],replay['version'])
+        conflicting={**apply,'item':{**remote,'operationId':str(uuid4()),
+                     'fields':{**remote['fields'],'summary':'Conflicting remote title'}}}
+        self.call('POST','/task-sync/apply',body=conflicting,headers={'If-Match':updated_headers['ETag']},
+                  status=409,code='CONFLICT')
         self.assertEqual('My edited title',self.call('GET',task_path)[0]['summary'])
 
     def test_external_task_list_link_is_owned_guarded_and_remapped(self):
