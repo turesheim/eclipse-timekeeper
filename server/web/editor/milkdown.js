@@ -6,7 +6,7 @@ import {gfm,insertTableCommand,toggleStrikethroughCommand} from '@milkdown/kit/p
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand,$prose} from '@milkdown/kit/utils';
 import {Plugin,TextSelection} from '@milkdown/kit/prose/state';
-import {hasUnsupportedSyntax} from '../src/markdown-document.js';
+import {hasUnsupportedSyntax,normalizeEditorMarkdown} from '../src/markdown-document.js';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
 
@@ -64,7 +64,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
   try{
     await editor.create();
     const view=editor.action(ctx=>ctx.get(editorViewCtx)),original=view.state.doc;
-    const serialized=editor.action(getMarkdown());
+    const serialized=normalizeEditorMarkdown(editor.action(getMarkdown()));
     const safe=editor.action(ctx=>{const parser=ctx.get(remarkCtx),tree=parser.parse(value);return !unsupported(tree)&&JSON.stringify(semantic(tree))===JSON.stringify(semantic(parser.parse(serialized)));});
     if(!safe){await editor.destroy();return null;}
     const setReadOnly=value=>{readOnly=value;view.setProps({editable:()=>!readOnly});for(const checkbox of root.querySelectorAll('input[type=checkbox]'))checkbox.disabled=readOnly;};
@@ -97,7 +97,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
     };
     setReadOnly(readOnly);
     return {
-      markdown:()=>view.state.doc.eq(original)?value:editor.action(getMarkdown()),
+      markdown:()=>view.state.doc.eq(original)?value:normalizeEditorMarkdown(editor.action(getMarkdown())),
       focus:()=>view.focus(),
       setReadOnly,
       command,
