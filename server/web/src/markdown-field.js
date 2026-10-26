@@ -1,5 +1,5 @@
 import {t} from './i18n.js';
-import {splitMarkdown,needsSource} from './markdown-document.js';
+import {splitMarkdown,needsSource,normalizeEditorMarkdown} from './markdown-document.js';
 import {icon,iconButton} from './icons.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
@@ -131,12 +131,13 @@ export class MarkdownField {
     if(this.loading)return;if(this.editor){this.editor.focus();return;}
     if(!this.frontmatter){const parts=splitMarkdown(this.rawBody());this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);this.frontmatterView.textContent=this.frontmatter;this.metadata.hidden=!this.frontmatter;}
     if(new TextEncoder().encode(this.value()).length>200000){this.status.textContent=t('journal.too_large');return;}
-    if(this.unterminated||needsSource(this.rawBody())||splitMarkdown(this.rawBody()).frontmatter){this.status.textContent=t('markdown.source_only');return;}
+    const richBody=normalizeEditorMarkdown(this.rawBody());
+    if(this.unterminated||needsSource(richBody)||splitMarkdown(richBody).frontmatter){this.status.textContent=t('markdown.source_only');return;}
     const current=++this.generation;this.loading=true;this.status.textContent=t('markdown.loading');this.controls();
     const host=node('div');this.rich.replaceChildren(host);
     try{
       const [module]=await Promise.all([loadEngine(),loadStyle()]);if(current!==this.generation)return;
-      const created=await module.createMarkdownEditor({root:host,value:this.rawBody(),label:t('markdown.body'),description:this.normalization.id,taskLabel:text=>t('markdown.task',{text}),readOnly:this.readOnly,changed:()=>{if(current===this.generation)this.onChange();},stateChanged:()=>{if(current===this.generation)this.paintBlockStyle();},escape:()=>this.source.focus()});
+      const created=await module.createMarkdownEditor({root:host,value:richBody,label:t('markdown.body'),description:this.normalization.id,taskLabel:text=>t('markdown.task',{text}),readOnly:this.readOnly,changed:()=>{if(current===this.generation)this.onChange();},stateChanged:()=>{if(current===this.generation)this.paintBlockStyle();},escape:()=>this.source.focus()});
       if(current!==this.generation){await created?.destroy();return;}
       this.editor=created;
       if(!created){this.rich.replaceChildren();this.status.textContent=t('markdown.source_only');return;}
