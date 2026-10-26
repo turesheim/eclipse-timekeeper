@@ -39,6 +39,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskConnection;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskConnectionCapabilities;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskList;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskSyncCursor;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskPlanning;
@@ -62,6 +63,7 @@ public interface TimekeeperService {
 	List<Project> projects();
 	default TaskConnection createTaskConnection(CreateTaskConnection command) { throw new UnsupportedOperationException("Task connections are not supported"); }
 	default TaskConnection updateTaskConnection(UpdateTaskConnection command) { throw new UnsupportedOperationException("Task connections are not supported"); }
+	default TaskConnection updateTaskConnectionCapabilities(UpdateTaskConnectionCapabilities command) { throw new UnsupportedOperationException("Task connection capabilities are not supported"); }
 	default void deleteTaskConnection(java.util.UUID id,long expectedVersion) { throw new UnsupportedOperationException("Task connections are not supported"); }
 	default Optional<TaskConnection> taskConnection(java.util.UUID id) { throw new UnsupportedOperationException("Task connections are not supported"); }
 	default List<TaskConnection> taskConnections() { throw new UnsupportedOperationException("Task connections are not supported"); }

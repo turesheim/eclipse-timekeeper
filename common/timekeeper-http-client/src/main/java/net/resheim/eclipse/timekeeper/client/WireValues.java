@@ -23,7 +23,7 @@ public final class WireValues {
     public static TaskConnection taskConnection(JsonObject value) {
         return new TaskConnection(id(value.get("id")),value.get("providerId").getAsString(),value.get("remoteAccountId").getAsString(),
                 value.get("name").getAsString(),value.get("readable").getAsBoolean(),value.get("writable").getAsBoolean(),
-                value.get("enabled").getAsBoolean(),value.get("version").getAsLong());
+                value.get("enabled").getAsBoolean(),capabilities(value.get("capabilities")),value.get("version").getAsLong());
     }
     public static TaskList taskList(JsonObject value) {
         return new TaskList(id(value.get("id")),id(value.get("connectionId")),value.get("remoteListId").getAsString(),
@@ -104,6 +104,19 @@ public final class WireValues {
                 default -> throw new IllegalArgumentException("Unsupported reminder kind");
             };
         }).toList();
+    }
+    public static TaskCapabilities capabilities(JsonElement value) {
+        if(value==null || value.isJsonNull())return TaskCapabilities.unknown();
+        var node=value.getAsJsonObject();var fields=new java.util.TreeMap<String,TaskFieldCapability>();
+        node.getAsJsonObject("fields").entrySet().forEach(entry -> {
+            var item=entry.getValue().getAsJsonObject();fields.put(entry.getKey(),new TaskFieldCapability(item.get("readable").getAsBoolean(),item.get("writable").getAsBoolean(),item.get("deletable").getAsBoolean(),text(item.get("note"))));
+        });return new TaskCapabilities(node.get("version").getAsInt(),node.get("providerApiVersion").getAsString(),fields);
+    }
+    public static JsonObject capabilities(TaskCapabilities value) {
+        var node=object();node.addProperty("version",value.version());node.addProperty("providerApiVersion",value.providerApiVersion());var fields=object();
+        new java.util.TreeMap<>(value.fields()).forEach((key,entry) -> {
+            var field=object();field.addProperty("readable",entry.readable());field.addProperty("writable",entry.writable());field.addProperty("deletable",entry.deletable());optional(field,"note",entry.note());fields.add(key,field);
+        });node.add("fields",fields);return node;
     }
     public static TaskImportance importance(JsonObject value) {
         return new TaskImportance(value.has("priority")?TaskPriority.valueOf(value.get("priority").getAsString()):TaskPriority.UNSPECIFIED,

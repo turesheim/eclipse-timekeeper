@@ -184,6 +184,14 @@ resource; a conflicting representation of the same remote identity returns
 disconnected account `enabled=false`; remote disappearance must not trigger
 deletion of local tasks.
 
+Each connection also has a versioned `capabilities` declaration. Connectors
+replace it conditionally through `PUT /task-connections/{id}/capabilities`.
+Entries state whether a field can be read, written, and deleted; an omitted
+field means unknown. Ordinary connection updates preserve the declaration.
+The initial declaration has no field claims. See
+[task sync capabilities](TASK-SYNC-CAPABILITIES.md) for the version 1 provider
+mapping and export gate.
+
 `/task-sync-cursors` holds durable, owner-scoped connector progress separately
 from task payloads. A connection-level cursor tracks list discovery; a
 list-level cursor tracks tasks in that owned list. `INITIAL` has no cursor,

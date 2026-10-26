@@ -430,6 +430,11 @@ connection and optionally one list. Its mode is `INITIAL`, `INCREMENTAL`, or
 is not a task version and is intentionally excluded from account archives and
 portable domain transfers, which require a fresh provider scan after restore.
 
+`TASK_CONNECTION.capabilities` is a versioned, owner-scoped declaration of
+effective field read/write/delete support. Unlisted fields are unknown.
+Older records decode to an empty declaration; legacy connection updates keep
+the existing map. Credentials never belong in it.
+
 Each external reference may contain one namespaced, versioned provider-data
 envelope. Its JSON object preserves exposed provider fields that are not yet
 normalized. The envelope belongs to that reference, so links to other

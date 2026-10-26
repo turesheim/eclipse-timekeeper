@@ -52,7 +52,7 @@ public class TimekeeperResource {
     private static Optional<TaskId> parent(JsonNode input) { return optionalText(input.get("parentTaskId")).map(UUID::fromString).map(TaskId::new); }
     private static TaskConnection connection(JsonNode input,UUID id,long version) {
         return new TaskConnection(id,input.get("providerId").asText(),input.get("remoteAccountId").asText(),input.get("name").asText(),
-                input.get("readable").asBoolean(),input.get("writable").asBoolean(),input.get("enabled").asBoolean(),version);
+                input.get("readable").asBoolean(),input.get("writable").asBoolean(),input.get("enabled").asBoolean(),capabilities(input.get("capabilities")),version);
     }
     private static TaskList taskList(JsonNode input,UUID id,long version) {
         return new TaskList(id,uuid(input.get("connectionId")),input.get("remoteListId").asText(),input.get("name").asText(),
@@ -90,7 +90,7 @@ public class TimekeeperResource {
                 var candidate=connection(input,UUID.randomUUID(),0);
                 for(var existing:store.list(type)) if(existing.get("providerId").asText().equals(candidate.providerId()) && existing.get("remoteAccountId").asText().equals(candidate.remoteAccountId())) {
                     var old=(TaskConnection)decode(type,existing);
-                    if(old.name().equals(candidate.name()) && old.readable()==candidate.readable() && old.writable()==candidate.writable() && old.enabled()==candidate.enabled())
+                    if(old.name().equals(candidate.name()) && old.readable()==candidate.readable() && old.writable()==candidate.writable() && old.enabled()==candidate.enabled() && old.capabilities().equals(candidate.capabilities()))
                         return ApiReplies.resource(200,existing,null);
                     throw ApiFailure.conflict();
                 }
@@ -132,6 +132,14 @@ public class TimekeeperResource {
                 default -> throw ApiFailure.notFound();
             };
             JsonNode snapshot=stored(type,value,input);return ApiReplies.resource(201,snapshot,"/api/v1/"+collection+"/"+snapshot.get("id").asText());
+        });
+    }
+    @PUT @Path("/task-connections/{id}/capabilities") public Response updateTaskConnectionCapabilities(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
+        UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskCapabilities",body);ContractInputs.queries(uri.getQueryParameters());
+        return tx(() -> {var before=required("TASK_CONNECTION",key);ApiReplies.match(before,match);
+            var current=(TaskConnection)decode("TASK_CONNECTION",before);
+            var updated=current.withCapabilities(capabilities(input));store.save("TASK_CONNECTION",updated);store.change("TASK_CONNECTION","UPDATED",key.toString());
+            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
         });
     }
     @PUT @Path("/tasks/{id}/planning") public Response planTask(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {

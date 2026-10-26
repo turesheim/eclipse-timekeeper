@@ -774,6 +774,34 @@ class HttpAcceptance(unittest.TestCase):
         cleared,_=self.call('PUT',path+'/reminders',body={'reminders':[]},headers={'If-Match':headers['ETag']})
         self.assertEqual([],cleared['reminders'])
 
+    def test_connection_capabilities_are_conditional_and_portable(self):
+        account={'providerId':'google','remoteAccountId':str(uuid4()),'name':'Capabilities',
+                 'readable':True,'writable':True,'enabled':True}
+        connection=self.create('task-connections',account)
+        path='/task-connections/'+connection['id']
+        self.assertEqual({'version':1,'providerApiVersion':'unknown','fields':{}},connection['capabilities'])
+        body={'version':1,'providerApiVersion':'tasks-v1',
+              'fields':{'scheduledDate':{'readable':True,'writable':True,'deletable':False,'note':None},
+                        'links':{'readable':True,'writable':False,'deletable':False,'note':'Output only'}}}
+        current,headers=self.call('GET',path)
+        self.call('PUT',path+'/capabilities',owner='read',body=body,headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        self.call('PUT',path+'/capabilities',body=body,headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        invalid={'version':1,'providerApiVersion':'tasks-v1','fields':{'links':{'readable':True,'writable':False,'deletable':True,'note':None}}}
+        self.call('PUT',path+'/capabilities',body=invalid,headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        updated,headers=self.call('PUT',path+'/capabilities',body=body,headers={'If-Match':headers['ETag']})
+        self.assertEqual(body,updated['capabilities'])
+        legacy={key:updated[key] for key in ('name','readable','writable','enabled')}
+        updated,headers=self.call('PUT',path,body={**legacy,'name':'Renamed'},headers={'If-Match':headers['ETag']})
+        self.assertEqual(body,updated['capabilities'])
+        exported,_=self.call('GET','/data/export')
+        imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK_CONNECTION' and item['sourceId']==connection['id']:
+                restored,_=self.call('GET','/task-connections/'+item['id'],owner='b')
+                self.assertEqual(body,restored['capabilities'])
+
     def test_provider_accounts_and_lists_are_owned_idempotent_and_portable(self):
         account={'providerId':'microsoft','remoteAccountId':str(uuid4()),'name':'Personal',
                  'readable':True,'writable':True,'enabled':True}

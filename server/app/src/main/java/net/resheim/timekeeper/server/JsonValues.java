@@ -54,7 +54,7 @@ public final class JsonValues {
         if (value instanceof TaskConnection connection) {
             var node=base(owner,connection.id(),connection.version());
             node.put("providerId",connection.providerId());node.put("remoteAccountId",connection.remoteAccountId());node.put("name",connection.name());
-            node.put("readable",connection.readable());node.put("writable",connection.writable());node.put("enabled",connection.enabled());return node;
+            node.put("readable",connection.readable());node.put("writable",connection.writable());node.put("enabled",connection.enabled());node.set("capabilities",capabilities(connection.capabilities()));return node;
         }
         if (value instanceof TaskList list) {
             var node=base(owner,list.id(),list.version());
@@ -119,7 +119,7 @@ public final class JsonValues {
         UUID id = uuid(node.get("id")); long version = node.get("version").asLong();
         return switch (type) {
             case "TASK_CONNECTION" -> new TaskConnection(id,node.get("providerId").asText(),node.get("remoteAccountId").asText(),node.get("name").asText(),
-                    node.get("readable").asBoolean(),node.get("writable").asBoolean(),node.get("enabled").asBoolean(),version);
+                    node.get("readable").asBoolean(),node.get("writable").asBoolean(),node.get("enabled").asBoolean(),capabilities(node.get("capabilities")),version);
             case "TASK_LIST" -> new TaskList(id,uuid(node.get("connectionId")),node.get("remoteListId").asText(),node.get("name").asText(),
                     TaskListKind.valueOf(node.get("kind").asText()),node.get("readable").asBoolean(),node.get("writable").asBoolean(),
                     node.get("shared").asBoolean(),node.get("owner").asBoolean(),node.get("present").asBoolean(),node.get("position").asInt(),version);
@@ -261,5 +261,18 @@ public final class JsonValues {
                 default -> throw new DomainValidationException("reminderKind","unsupported reminder kind");
             };
         }).toList();
+    }
+    public static ObjectNode capabilities(TaskCapabilities value) {
+        var node=object();node.put("version",value.version());node.put("providerApiVersion",value.providerApiVersion());var fields=node.putObject("fields");
+        new TreeMap<>(value.fields()).forEach((key,entry) -> {
+            var field=fields.putObject(key);field.put("readable",entry.readable());field.put("writable",entry.writable());field.put("deletable",entry.deletable());nullable(field,"note",entry.note());
+        });return node;
+    }
+    public static TaskCapabilities capabilities(JsonNode value) {
+        if(value==null || value.isNull())return TaskCapabilities.unknown();
+        var fields=new TreeMap<String,TaskFieldCapability>();
+        value.path("fields").fields().forEachRemaining(entry -> {
+            var item=entry.getValue();fields.put(entry.getKey(),new TaskFieldCapability(item.get("readable").asBoolean(),item.get("writable").asBoolean(),item.get("deletable").asBoolean(),optionalText(item.get("note"))));
+        });return new TaskCapabilities(value.get("version").asInt(),value.get("providerApiVersion").asText(),fields);
     }
 }

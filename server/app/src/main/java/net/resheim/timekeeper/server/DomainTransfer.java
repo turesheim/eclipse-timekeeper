@@ -80,7 +80,7 @@ final class DomainTransfer {
             for(var existing:store.list("TASK_CONNECTION")) if(existing.get("providerId").asText().equals(item.get("providerId").asText())
                     && existing.get("remoteAccountId").asText().equals(item.get("remoteAccountId").asText())) throw ApiFailure.conflict();
             var created=new TaskConnection(UUID.randomUUID(),item.get("providerId").asText(),item.get("remoteAccountId").asText(),
-                    item.get("name").asText(),item.get("readable").asBoolean(),item.get("writable").asBoolean(),item.get("enabled").asBoolean(),0);
+                    item.get("name").asText(),item.get("readable").asBoolean(),item.get("writable").asBoolean(),item.get("enabled").asBoolean(),capabilities(item.get("capabilities")),0);
             store.save("TASK_CONNECTION",created);store.change("TASK_CONNECTION","CREATED",created.id().toString());
             connections.put(uuid(item.get("id")),created.id());mapping(mappings,"TASK_CONNECTION",item,created.id());
         }

@@ -11601,6 +11601,101 @@
         },
         "description": "Conditional replacement of all typed reminder triggers. Scheduled and due dates are unchanged. Older task writes preserve reminders."
       }
+    },
+    "/task-connections/{id}/capabilities": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskConnectionCapabilities",
+        "summary": "Replace connector field capabilities",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskConnection"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskCapabilities"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of the complete per-connection capability declaration. Legacy connection updates preserve it."
+      }
     }
   },
   "components": {
@@ -20459,6 +20554,9 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/TaskCapabilities"
           }
         },
         "required": [
@@ -20532,6 +20630,9 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/TaskCapabilities"
           }
         },
         "required": [
@@ -20543,7 +20644,8 @@
           "name",
           "readable",
           "writable",
-          "enabled"
+          "enabled",
+          "capabilities"
         ],
         "additionalProperties": true
       },
@@ -21019,6 +21121,9 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/TaskCapabilities"
           }
         },
         "required": [
@@ -21575,6 +21680,73 @@
           "reminders"
         ],
         "additionalProperties": false
+      },
+      "TaskFieldCapability": {
+        "type": "object",
+        "properties": {
+          "readable": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "deletable": {
+            "type": "boolean"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "readable",
+          "writable",
+          "deletable",
+          "note"
+        ],
+        "additionalProperties": false,
+        "description": "Effective capability for one field. Delete implies write and write implies read."
+      },
+      "TaskCapabilities": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "providerApiVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "fields": {
+            "type": "object",
+            "propertyNames": {
+              "pattern": "^[a-z][A-Za-z0-9.]{0,99}$"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TaskFieldCapability"
+            },
+            "maxProperties": 200
+          }
+        },
+        "required": [
+          "version",
+          "providerApiVersion",
+          "fields"
+        ],
+        "additionalProperties": false,
+        "description": "Versioned connector declaration for this account. Omitted field keys are unknown, not unsupported."
       }
     },
     "parameters": {

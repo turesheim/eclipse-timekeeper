@@ -23,6 +23,7 @@ import net.resheim.eclipse.timekeeper.domain.TaskBody;
 import net.resheim.eclipse.timekeeper.domain.TaskRecurrence;
 import net.resheim.eclipse.timekeeper.domain.TaskOccurrence;
 import net.resheim.eclipse.timekeeper.domain.TaskReminder;
+import net.resheim.eclipse.timekeeper.domain.TaskCapabilities;
 import net.resheim.eclipse.timekeeper.domain.TaskSyncMode;
 
 /** Immutable inputs accepted by {@link TimekeeperService}. */
@@ -36,6 +37,7 @@ public final class Commands {
 			boolean readable, boolean writable, boolean enabled) { }
 	public record UpdateTaskConnection(java.util.UUID id, long expectedVersion, String name,
 			boolean readable, boolean writable, boolean enabled) { }
+	public record UpdateTaskConnectionCapabilities(java.util.UUID id,long expectedVersion,TaskCapabilities capabilities) { }
 	public record CreateTaskList(java.util.UUID connectionId, String remoteListId, String name,
 			net.resheim.eclipse.timekeeper.domain.TaskListKind kind, boolean readable, boolean writable,
 			boolean shared, boolean owner, boolean present, int position) { }

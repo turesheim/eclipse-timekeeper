@@ -37,10 +37,14 @@ class CsvSnapshotTest {
     @Test void providerAccountsAndListsRoundTripWithoutChangingOlderCsvExports() throws Exception {
         var data=JsonParser.parseString("""
             {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[],"projects":[],"tasks":[],"labels":[],"activities":[],"workSessions":[],
-             "taskConnections":[{"id":"account","providerId":"google","remoteAccountId":"user@example.com","name":"Personal","readable":true,"writable":false,"enabled":true}],
+             "taskConnections":[{"id":"account","providerId":"google","remoteAccountId":"user@example.com","name":"Personal","readable":true,"writable":false,"enabled":true,
+                                 "capabilities":{"version":1,"providerApiVersion":"tasks-v1","fields":{"links":{"readable":true,"writable":false,"deletable":false,"note":"Output only"}}}}],
              "taskLists":[{"id":"list","connectionId":"account","remoteListId":"remote","name":"Tasks","kind":"BUILT_IN","readable":true,"writable":false,"shared":false,"owner":true,"present":true,"position":3}]}
             """).getAsJsonObject();
         var folder=temporary.resolve("providers");assertEquals(2,CsvSnapshot.write(data,folder));assertEquals(data,CsvSnapshot.read(folder));
+        assertTrue(Files.readString(folder.resolve("taskConnections.csv")).contains("capabilities"));
+        var oldProviders=data.deepCopy();oldProviders.getAsJsonArray("taskConnections").get(0).getAsJsonObject().remove("capabilities");
+        var oldFolder=temporary.resolve("old-providers");CsvSnapshot.write(oldProviders,oldFolder);assertEquals(oldProviders,CsvSnapshot.read(oldFolder));
         Files.delete(folder.resolve("taskLists.csv"));assertThrows(IOException.class,()->CsvSnapshot.read(folder));
         Files.delete(folder.resolve("taskConnections.csv"));assertThrows(IOException.class,()->CsvSnapshot.read(folder));
         data.remove("taskConnections");data.remove("taskLists");

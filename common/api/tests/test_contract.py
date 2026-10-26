@@ -131,6 +131,14 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskReminder').is_valid({**base,'kind':'ABSOLUTE','at':{'kind':'DATE','date':'2026-10-26'}}))
         self.assertEqual('updateTaskReminders',CONTRACT['paths']['/tasks/{id}/reminders']['put']['operationId'])
 
+    def test_connection_capabilities_are_versioned_and_field_scoped(self):
+        field={'readable':True,'writable':False,'deletable':False,'note':'Read-only source'}
+        body={'version':1,'providerApiVersion':'v1.0','fields':{'linkedResources':field}}
+        validator('TaskCapabilities').validate(body)
+        self.assertFalse(validator('TaskCapabilities').is_valid({**body,'fields':{'bad key':field}}))
+        self.assertFalse(validator('TaskCapabilities').is_valid({**body,'fields':{'linkedResources':{**field,'ownerId':'other'}}}))
+        self.assertEqual('updateTaskConnectionCapabilities',CONTRACT['paths']['/task-connections/{id}/capabilities']['put']['operationId'])
+
     def test_task_planning_has_a_date_only_schedule_and_conditional_update_contract(self):
         body = {'summary': 'Review', 'projectId': None, 'parentTaskId': None, 'url': None,
                 'status': 'COMPLETED', 'scheduledDate': '2026-10-26', 'completedAt': '2026-10-26T11:12:13Z'}
@@ -355,7 +363,7 @@ class ContractTest(unittest.TestCase):
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'convertCalendarEvent',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
-            'createTaskConnection', 'updateTaskConnection', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
+            'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'deleteTaskList', 'getTaskList', 'listTaskLists',
             'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors',
             'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
