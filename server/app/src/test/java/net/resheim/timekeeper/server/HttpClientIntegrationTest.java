@@ -175,6 +175,11 @@ class HttpClientIntegrationTest {
                     Optional.of("\"remote-etag\""),Optional.empty());
             child=client.updateExternalTaskSource(new UpdateExternalTaskSource(child.id(),child.version(),reference.key(),source));
             assertEquals(source,client.task(child.id()).orElseThrow().externalReferences().iterator().next().source());
+            var providerData=new ExternalTaskProviderData("jira.custom",1,"{\"opaque\":{\"nested\":[1,true,null]}}");
+            child=client.updateExternalTaskProviderData(new UpdateExternalTaskProviderData(child.id(),child.version(),reference.key(),Optional.of(providerData)));
+            assertEquals(providerData,client.task(child.id()).orElseThrow().externalReferences().iterator().next().providerData().orElseThrow());
+            child=client.updateExternalTaskProviderData(new UpdateExternalTaskProviderData(child.id(),child.version(),reference.key(),Optional.empty()));
+            assertTrue(client.task(child.id()).orElseThrow().externalReferences().iterator().next().providerData().isEmpty());
             var checklist=new TaskChecklist(List.of(new TaskChecklistItem(UUID.randomUUID(),"Review",true,
                     Optional.of(Instant.parse("2026-10-26T11:12:13Z")),0)));
             child=client.updateTaskChecklist(new UpdateTaskChecklist(child.id(),child.version(),checklist));

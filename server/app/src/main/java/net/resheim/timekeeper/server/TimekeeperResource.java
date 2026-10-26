@@ -32,12 +32,18 @@ public class TimekeeperResource {
     private static ApiReplies empty() { return new ApiReplies(204,null,null,null); }
     private JsonNode required(String type,UUID id) { return store.find(type,id).orElseThrow(ApiFailure::notFound); }
     private ExternalTaskReference checkedReference(ExternalTaskReference reference) {
+        reference.providerData().ifPresent(data -> checkedProviderData(reference.providerId(),data));
         reference.taskListId().ifPresent(id -> {
             var list=required("TASK_LIST",id);
             var connection=required("TASK_CONNECTION",uuid(list.get("connectionId")));
             if(!connection.get("providerId").asText().equals(reference.providerId())) throw ApiFailure.validation();
         });
         return reference;
+    }
+    private static ExternalTaskProviderData checkedProviderData(String providerId,ExternalTaskProviderData data) {
+        if(!data.namespace().equals(providerId) && !data.namespace().startsWith(providerId+".")) throw ApiFailure.validation();
+        if(!parse(data.json()).isObject()) throw ApiFailure.validation();
+        return data;
     }
     private Set<ExternalTaskReference> checkedReferences(JsonNode values) {
         var result=references(values);result.forEach(this::checkedReference);return result;
@@ -210,6 +216,16 @@ public class TimekeeperResource {
         return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
             var reference=new ExternalTaskReferenceKey(input.get("providerId").asText(),input.get("repositoryId").asText(),input.get("externalId").asText());
             var updated=store.service().updateExternalTaskSource(new UpdateExternalTaskSource(new TaskId(key),version,reference,source(input.get("source"))));
+            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+        });
+    }
+    @PUT @Path("/tasks/{id}/external-references/provider-data") public Response updateExternalTaskProviderData(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
+        UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalTaskProviderDataInput",body);ContractInputs.queries(uri.getQueryParameters());
+        return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
+            var reference=new ExternalTaskReferenceKey(input.get("providerId").asText(),input.get("repositoryId").asText(),input.get("externalId").asText());
+            var data=Optional.ofNullable(input.get("providerData")).filter(value -> !value.isNull()).map(JsonValues::providerData)
+                    .map(value -> checkedProviderData(reference.providerId(),value));
+            var updated=store.service().updateExternalTaskProviderData(new UpdateExternalTaskProviderData(new TaskId(key),version,reference,data));
             return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
         });
     }
