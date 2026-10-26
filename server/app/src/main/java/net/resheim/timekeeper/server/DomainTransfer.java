@@ -102,7 +102,9 @@ final class DomainTransfer {
                 }
                 var project=optionalText(item.get("projectId")).map(UUID::fromString).map(id -> required(projects,id));
                 var parentId=parent.map(id -> required(tasks,id));
-                var created=service.createTask(new CreateTask(project,parentId,item.get("summary").asText(),optionalText(item.get("url")),references(item.get("externalReferences"))));
+                var created=service.createTask(new CreateTask(project,parentId,item.get("summary").asText(),optionalText(item.get("url")),references(item.get("externalReferences")),
+                        new TaskPlanning(optionalText(item.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),
+                                optionalText(item.get("scheduledDate")).map(java.time.LocalDate::parse),optionalText(item.get("completedAt")).map(java.time.Instant::parse))));
                 tasks.put(entry.getKey(),created.id());mapping(mappings,"TASK",item,created.id().value());iterator.remove();progressed=true;
             }
             if(!progressed) throw ApiFailure.validation();

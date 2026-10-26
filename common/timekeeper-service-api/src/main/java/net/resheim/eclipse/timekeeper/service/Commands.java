@@ -12,6 +12,7 @@ import net.resheim.eclipse.timekeeper.domain.LabelId;
 import net.resheim.eclipse.timekeeper.domain.OwnerId;
 import net.resheim.eclipse.timekeeper.domain.ProjectId;
 import net.resheim.eclipse.timekeeper.domain.TaskId;
+import net.resheim.eclipse.timekeeper.domain.TaskPlanning;
 
 /** Immutable inputs accepted by {@link TimekeeperService}. */
 public final class Commands {
@@ -22,21 +23,27 @@ public final class Commands {
 	public record DeleteProject(ProjectId id, long expectedVersion) { }
 
 	public record CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
-			Optional<String> url, Set<ExternalTaskReference> externalReferences) {
+			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning) {
 		public CreateTask {
 			projectId = optional(projectId);
 			parentTaskId = optional(parentTaskId);
 			url = optional(url);
 			externalReferences = copy(externalReferences);
+			planning = planning == null ? TaskPlanning.unplanned() : planning;
+		}
+
+		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
+				Optional<String> url, Set<ExternalTaskReference> externalReferences) {
+			this(projectId, parentTaskId, summary, url, externalReferences, TaskPlanning.unplanned());
 		}
 
 		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
 				Optional<String> url) {
-			this(projectId, parentTaskId, summary, url, Set.of());
+			this(projectId, parentTaskId, summary, url, Set.of(), TaskPlanning.unplanned());
 		}
 
 		public CreateTask(Optional<ProjectId> projectId, String summary, Optional<String> url) {
-			this(projectId, Optional.empty(), summary, url, Set.of());
+			this(projectId, Optional.empty(), summary, url, Set.of(), TaskPlanning.unplanned());
 		}
 	}
 
@@ -56,6 +63,7 @@ public final class Commands {
 	}
 
 	public record DeleteTask(TaskId id, long expectedVersion) { }
+	public record UpdateTaskPlanning(TaskId id, long expectedVersion, TaskPlanning planning) { }
 	public record LinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReference reference) { }
 	public record UnlinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference) { }
 

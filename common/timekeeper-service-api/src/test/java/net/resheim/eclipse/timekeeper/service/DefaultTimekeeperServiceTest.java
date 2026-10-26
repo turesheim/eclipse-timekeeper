@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,6 +34,8 @@ import net.resheim.eclipse.timekeeper.domain.Project;
 import net.resheim.eclipse.timekeeper.domain.ProjectId;
 import net.resheim.eclipse.timekeeper.domain.Task;
 import net.resheim.eclipse.timekeeper.domain.TaskId;
+import net.resheim.eclipse.timekeeper.domain.TaskPlanning;
+import net.resheim.eclipse.timekeeper.domain.TaskStatus;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateProject;
@@ -49,6 +52,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskPlanning;
 import net.resheim.eclipse.timekeeper.service.Ports.ActivityRepository;
 import net.resheim.eclipse.timekeeper.service.Ports.IdentifierSource;
 import net.resheim.eclipse.timekeeper.service.Ports.LabelRepository;
@@ -116,6 +120,23 @@ class DefaultTimekeeperServiceTest {
 		assertEquals(9, events.size());
 		assertEquals(new EventShape(EntityType.PROJECT, ChangeType.CREATED), shape(events.get(0)));
 		assertEquals(new EventShape(EntityType.LABEL, ChangeType.DELETED), shape(events.get(events.size() - 1)));
+	}
+
+	@Test
+	void taskPlanningKeepsDateOnlyMeaningAndSurvivesLegacyUpdates() {
+		var day=LocalDate.parse("2026-10-26");
+		var planning=new TaskPlanning(TaskStatus.NOT_STARTED,Optional.of(day),Optional.empty());
+		Task task=service.createTask(new CreateTask(Optional.empty(),Optional.empty(),"Plan review",Optional.empty(),Set.of(),planning));
+		assertEquals(planning,task.planning());
+		task=service.updateTask(new UpdateTask(task.id(),task.version(),Optional.empty(),"Review plan",Optional.empty()));
+		assertEquals(planning,task.planning());
+		var completed=new TaskPlanning(TaskStatus.COMPLETED,Optional.of(day),Optional.of(Instant.parse("2026-10-26T11:12:13Z")));
+		Task updated=service.updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),completed));
+		assertEquals(completed,updated.planning());
+		assertEquals("Review plan",updated.summary());
+		Task stale=task;
+		assertThrows(ServiceException.class,()->service.updateTaskPlanning(new UpdateTaskPlanning(stale.id(),stale.version(),planning)));
+		assertThrows(DomainValidationException.class,()->new TaskPlanning(TaskStatus.NOT_STARTED,Optional.empty(),completed.completedAt()));
 	}
 
 	@Test

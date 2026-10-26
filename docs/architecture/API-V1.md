@@ -111,6 +111,16 @@ separately from the editable task fields. A reference conflict at creation must
 not leave an orphan task. After an ambiguous provider-linked create, reconcile
 through the external-reference lookup instead of creating a duplicate.
 
+Task planning is a separate conditional `PUT /tasks/{id}/planning` resource.
+Its `status` is `NOT_STARTED`, `IN_PROGRESS`, `COMPLETED`, `WAITING`, or
+`DEFERRED`; `scheduledDate` is a date-only civil day, and `completedAt` is a UTC
+instant or null. The request supplies all three fields, and `completedAt` is
+only valid with `COMPLETED`. A missing planning field on task creation uses
+`NOT_STARTED`/null defaults. Existing `PUT /tasks/{id}` clients update the
+legacy fields while preserving task planning. The scheduled day never implies
+a midnight deadline, reminder, or time zone conversion. Further provider task
+metadata and synchronization behavior are tracked in #413.
+
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
 Manual editing sets `manual=true` and cannot change activity task/owner. Creating,

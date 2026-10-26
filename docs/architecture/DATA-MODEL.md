@@ -370,6 +370,12 @@ require the corresponding work-session file.
 The server's portable domain-v3 JSON and CSV formats include clients, projects,
 tasks, labels, activities and independent work sessions. They preserve mandatory
 project/session client links and session summaries, and remap identifiers on import.
+Server task payloads now include a provider-neutral status, optional date-only
+`scheduledDate`, and optional UTC `completedAt`. Older task payloads read with
+`NOT_STARTED` and null date defaults. These fields live in the existing
+owner-scoped `tk_resource` JSON payload in both H2 and PostgreSQL, so they need
+no new table or schema-version change. Legacy task updates and reference changes
+carry planning forward; account export/import retains it.
 The account ZIP archive also includes active day labels and Markdown bodies;
 journal synchronization state and deletion tombstones are not portable account
 records.
