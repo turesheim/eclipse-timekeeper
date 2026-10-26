@@ -50,7 +50,7 @@ audit those separately and avoid destructive whole-object updates.
 | Scheduled day | `due` | `scheduledDate` | RW | The API discards time; never map to a timed deadline. |
 | Hierarchy and order | `parent`, `position`, `tasks.move` | `parentTaskId`, `siblingOrder` | RW | Respect provider restrictions on moves and assigned tasks. |
 | Lists | task lists | connection and `taskListId` | RW | Keep Timekeeper project independent. |
-| Source links and assignment | `links`, `webViewLink`, `assignmentInfo` | links and assignment metadata | R | Output-only; do not write as editable task URL. |
+| Source links and assignment | `links`, `webViewLink`, `assignmentInfo` | provider `assignment` source context and linked resources, separate from task `url` | R | Output-only; do not write as editable task URL. |
 | Update and delete state | `updated`, `etag`, `hidden`, `deleted` | source metadata, tombstones | R | Include hidden/deleted/assigned items during reconciliation where permitted. |
 | Start time, timed due, reminders, recurrence, importance, tags, checklist, attachments | No corresponding Tasks v1 fields | Local task fields | — | Retain locally and show a lossy-export warning. |
 

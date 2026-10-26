@@ -1051,7 +1051,9 @@ class HttpAcceptance(unittest.TestCase):
                     'name':'Tasks','kind':'STANDARD','readable':True,'writable':True,'shared':False,
                     'owner':True,'present':True,'position':0})
         ref={'providerId':'google','repositoryId':account['remoteAccountId']+'/'+task_list['remoteListId'],
-             'externalId':str(uuid4()),'externalUrl':None,'taskListId':task_list['id']}
+             'externalId':str(uuid4()),'externalUrl':None,'taskListId':task_list['id'],
+             'assignment':{'assigneeId':'person-1','assigneeName':'Alex','sourceId':'document-1',
+                           'sourceUrl':'https://example.test/documents/1','writable':False}}
         path='/tasks/'+self.task['id']
         _, headers=self.call('GET',path)
         self.call('PUT',path+'/external-references',body={**ref,'providerId':'microsoft'},
@@ -1061,6 +1063,8 @@ class HttpAcceptance(unittest.TestCase):
         linked, headers=self.call('PUT',path+'/external-references',body=ref,
                                   headers={'If-Match':headers['ETag']})
         self.assertEqual(task_list['id'],linked['externalReferences'][0]['taskListId'])
+        self.assertEqual(ref['assignment'],linked['externalReferences'][0]['assignment'])
+        self.assertIsNone(linked['url'])
         self.call('DELETE','/task-lists/'+task_list['id'],
                   headers={'If-Match':self.call('GET','/task-lists/'+task_list['id'])[1]['ETag']},
                   status=409,code='CONFLICT')
@@ -1068,6 +1072,7 @@ class HttpAcceptance(unittest.TestCase):
         linked, headers=self.call('PUT',path+'/external-references',body=legacy,
                                   headers={'If-Match':headers['ETag']})
         self.assertEqual(task_list['id'],linked['externalReferences'][0]['taskListId'])
+        self.assertEqual(ref['assignment'],linked['externalReferences'][0]['assignment'])
         exported, _=self.call('GET','/data/export')
         imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
         kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
@@ -1078,6 +1083,12 @@ class HttpAcceptance(unittest.TestCase):
                 self.created.append(('b',kinds[item['entityType']],item['id']))
         copied, _=self.call('GET','/tasks/'+mappings[self.task['id']],owner='b')
         self.assertEqual(mappings[task_list['id']],copied['externalReferences'][0]['taskListId'])
+        self.assertEqual(ref['assignment'],copied['externalReferences'][0]['assignment'])
+        assignment_input={key:ref[key] for key in ('providerId','repositoryId','externalId')}
+        assignment_input['assignment']=None
+        cleared, _=self.call('PUT',path+'/external-references/assignment',body=assignment_input,
+                             headers={'If-Match':headers['ETag']})
+        self.assertNotIn('assignment',cleared['externalReferences'][0])
         self.call('GET','/task-lists/'+task_list['id'],owner='b',status=404,code='NOT_FOUND')
 
     def test_task_sibling_order_survives_legacy_writes_and_transfer(self):

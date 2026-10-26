@@ -252,6 +252,15 @@ clears the old section. `PUT /tasks/{id}/external-references/location` sets or
 clears both IDs with `If-Match` and explicit nulls. Portable imports remap both
 IDs, and deleting a referenced section is rejected.
 
+An external reference may also carry `assignment` with an assignee, assigner,
+and read-only provider source context. `sourceUrl` is separate from the task's
+editable `url` and from linked resources. `writable=false` records that a
+connector cannot edit the assignment even when the task itself is writable.
+Legacy link updates preserve assignment data; `PUT
+/tasks/{id}/external-references/assignment` conditionally replaces it or
+clears it with explicit `null`. It survives account archives and portable
+transfer without storing connector credentials.
+
 An external reference can also hold an optional `providerData` envelope with
 `namespace`, positive schema `version`, and an opaque JSON object `payload`.
 The namespace is the provider ID or a dot-prefixed extension of it. The server

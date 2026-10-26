@@ -333,6 +333,16 @@ public class TimekeeperResource {
             return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
         });
     }
+    @PUT @Path("/tasks/{id}/external-references/assignment") public Response updateExternalTaskAssignment(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
+        UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalTaskAssignmentInput",body);ContractInputs.queries(uri.getQueryParameters());
+        return tx(() -> {
+            long version=ApiReplies.match(required("TASK",key),match);
+            var reference=alias(input);
+            var assignment=Optional.ofNullable(input.get("assignment")).filter(value -> !value.isNull()).map(JsonValues::assignment);
+            var updated=store.service().updateExternalTaskAssignment(new UpdateExternalTaskAssignment(new TaskId(key),version,reference,assignment));
+            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+        });
+    }
     @PUT @Path("/tasks/{id}/external-references/replace") public Response replaceExternalReference(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalReferenceReplacementInput",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);

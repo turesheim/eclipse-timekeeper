@@ -105,6 +105,7 @@ public final class JsonValues {
                 var ref = object(); ref.put("providerId",reference.providerId()); ref.put("repositoryId",reference.repositoryId()); ref.put("externalId",reference.externalId()); nullable(ref,"externalUrl",reference.externalUrl());
                 reference.taskListId().ifPresent(list -> ref.put("taskListId",list.toString()));
                 reference.sectionId().ifPresent(section -> ref.put("sectionId",section.toString()));
+                reference.assignment().ifPresent(assigned -> ref.set("assignment",assignment(assigned)));
                 reference.providerData().ifPresent(data -> {
                     var envelope=ref.putObject("providerData");envelope.put("namespace",data.namespace());envelope.put("version",data.version());
                     envelope.set("payload",parse(data.json()));
@@ -160,8 +161,23 @@ public final class JsonValues {
     }
     public static ExternalTaskReference reference(JsonNode node) {
         return new ExternalTaskReference(node.get("providerId").asText(),node.get("repositoryId").asText(),node.get("externalId").asText(),optionalText(node.get("externalUrl")),source(node.get("source")),optionalText(node.get("taskListId")).map(UUID::fromString),optionalText(node.get("sectionId")).map(UUID::fromString),
+                Optional.ofNullable(node.get("assignment")).filter(value -> !value.isNull()).map(JsonValues::assignment),
                 Optional.ofNullable(node.get("providerData")).filter(value -> !value.isNull()).map(JsonValues::providerData),
                 Optional.ofNullable(node.get("baseline")).filter(value -> !value.isNull()).map(JsonValues::baseline));
+    }
+    public static TaskAssignment assignment(JsonNode value) {
+        return new TaskAssignment(optionalText(value.get("assigneeId")),optionalText(value.get("assigneeName")),
+                optionalText(value.get("assignedById")),optionalText(value.get("assignedByName")),
+                optionalText(value.get("sourceId")),optionalText(value.get("sourceUrl")),value.path("writable").asBoolean());
+    }
+    public static ObjectNode assignment(TaskAssignment value) {
+        var node=object();value.assigneeId().ifPresent(text -> node.put("assigneeId",text));
+        value.assigneeName().ifPresent(text -> node.put("assigneeName",text));
+        value.assignedById().ifPresent(text -> node.put("assignedById",text));
+        value.assignedByName().ifPresent(text -> node.put("assignedByName",text));
+        value.sourceId().ifPresent(text -> node.put("sourceId",text));
+        value.sourceUrl().ifPresent(text -> node.put("sourceUrl",text));
+        node.put("writable",value.writable());return node;
     }
     public static ExternalTaskProviderData providerData(JsonNode value) {
         if(value==null || !value.isObject() || !value.path("payload").isObject()) throw ApiFailure.validation();
@@ -169,7 +185,7 @@ public final class JsonValues {
         String json=value.get("payload").toString();if(json.length()>65536) throw ApiFailure.validation();
         return new ExternalTaskProviderData(value.get("namespace").asText(),value.get("version").asInt(),json);
     }
-    private static final Set<String> BASELINE_FIELDS = Set.of("summary","url","body","status","scheduledDate","completedAt","start","due","priority","flagged","urgent","parentTaskId","siblingOrder","checklistItems","recurrence","reminders","metadata","taskListId","sectionId");
+    private static final Set<String> BASELINE_FIELDS = Set.of("summary","url","body","status","scheduledDate","completedAt","start","due","priority","flagged","urgent","parentTaskId","siblingOrder","checklistItems","recurrence","reminders","metadata","taskListId","sectionId","assignment");
     public static ExternalTaskBaseline baseline(JsonNode value) {
         if(value==null || !value.isObject() || !value.path("fields").isObject()) throw ApiFailure.validation();
         var fields=value.get("fields");

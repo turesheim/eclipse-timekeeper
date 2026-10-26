@@ -434,6 +434,10 @@ The optional `sectionId` is valid only with a `taskListId` and must identify a
 section in that list. Task-to-section relations guard deletion, and portable
 imports remap section IDs. A conditional location update can explicitly clear
 both IDs without changing the provider identity or other task fields.
+`ExternalTaskReference.assignment` holds provider assignee/assigner identity
+and read-only source context independently of the task's primary URL. It is
+retained through legacy writes, identity replacement, and transfer. A
+conditional assignment update can clear it explicitly.
 
 `TASK_SYNC_CURSOR` is owner-scoped durable connector state linked to one
 connection and optionally one list. Its mode is `INITIAL`, `INCREMENTAL`, or

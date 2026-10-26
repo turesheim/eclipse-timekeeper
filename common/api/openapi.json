@@ -12585,6 +12585,101 @@
         },
         "description": "Conditional location update. The provider identity and all other task fields are preserved."
       }
+    },
+    "/tasks/{id}/external-references/assignment": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateExternalTaskAssignment",
+        "summary": "Set or clear provider assignment context",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalTaskAssignmentInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional assignment update. Null clears the recorded assignment; the provider identity and task URL are unchanged."
+      }
     }
   },
   "components": {
@@ -12702,6 +12797,10 @@
           "sectionId": {
             "$ref": "#/components/schemas/Id",
             "description": "Optional owner-scoped section within taskListId. Omission on an existing link preserves the section if its list is unchanged."
+          },
+          "assignment": {
+            "$ref": "#/components/schemas/TaskAssignment",
+            "description": "Provider assignment metadata. Omission on an existing link preserves it; use the conditional assignment endpoint to clear it."
           }
         },
         "required": [
@@ -22818,11 +22917,12 @@
                 "reminders",
                 "metadata",
                 "taskListId",
-                "sectionId"
+                "sectionId",
+                "assignment"
               ]
             },
             "additionalProperties": true,
-            "maxProperties": 19
+            "maxProperties": 20
           }
         },
         "required": [
@@ -23288,6 +23388,115 @@
         ],
         "additionalProperties": false,
         "description": "Conditionally set or clear a provider reference location. A section requires a list and must belong to it. Null clears the association."
+      },
+      "TaskAssignment": {
+        "type": "object",
+        "description": "Provider-specific assignment and read-only source context, separate from task URL and editable task links. No connector credentials are stored.",
+        "properties": {
+          "assigneeId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "assigneeName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "assignedById": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "assignedByName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "sourceUrl": {
+            "$ref": "#/components/schemas/Url"
+          },
+          "writable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "writable"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "assigneeId"
+            ]
+          },
+          {
+            "required": [
+              "assigneeName"
+            ]
+          },
+          {
+            "required": [
+              "sourceId"
+            ]
+          },
+          {
+            "required": [
+              "sourceUrl"
+            ]
+          }
+        ],
+        "additionalProperties": false
+      },
+      "ExternalTaskAssignmentInput": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "assignment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskAssignment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "providerId",
+          "repositoryId",
+          "externalId",
+          "assignment"
+        ],
+        "additionalProperties": false,
+        "description": "Conditionally set or clear provider assignment and source context for an already linked task."
       }
     },
     "parameters": {

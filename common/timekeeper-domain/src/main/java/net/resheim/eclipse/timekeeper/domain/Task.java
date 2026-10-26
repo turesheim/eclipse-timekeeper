@@ -155,6 +155,7 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		if (previous != null && reference.taskListId().isEmpty()) reference = reference.withTaskList(previous.taskListId());
 		if (previous != null && reference.sectionId().isEmpty() && reference.taskListId().equals(previous.taskListId()))
 			reference = reference.withLocation(reference.taskListId(),previous.sectionId());
+		if (previous != null && reference.assignment().isEmpty()) reference = reference.withAssignment(previous.assignment());
 		if (previous != null && reference.providerData().isEmpty()) reference = reference.withProviderData(previous.providerData());
 		if (previous != null && reference.baseline().isEmpty()) reference = reference.withBaseline(previous.baseline());
 		updated.removeIf(candidate -> candidate.key().equals(key));
@@ -178,6 +179,7 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		if (current.taskListId().isEmpty()) current = current.withTaskList(old.taskListId());
 		if (current.sectionId().isEmpty() && current.taskListId().equals(old.taskListId()))
 			current = current.withLocation(current.taskListId(),old.sectionId());
+		if (current.assignment().isEmpty()) current = current.withAssignment(old.assignment());
 		if (current.providerData().isEmpty()) current = current.withProviderData(old.providerData());
 		if (current.baseline().isEmpty()) current = current.withBaseline(old.baseline());
 		Set<ExternalTaskReference> updated = new LinkedHashSet<>(externalReferences);
@@ -193,6 +195,19 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		for (ExternalTaskReference reference : externalReferences) {
 			if (reference.key().equals(key)) {
 				updated.add(reference.withLocation(listId,sectionId));
+				found = true;
+			} else updated.add(reference);
+		}
+		if (!found) throw new DomainValidationException("externalReference", "reference is not linked to task");
+		return new Task(id,projectId,parentTaskId,summary,url,updated,externalAliases,planning,checklist,timing,importance,body,recurrence,reminders,metadata,siblingOrder,version+1);
+	}
+
+	public Task withExternalAssignment(ExternalTaskReferenceKey key,Optional<TaskAssignment> assignment) {
+		Set<ExternalTaskReference> updated = new LinkedHashSet<>();
+		boolean found = false;
+		for (ExternalTaskReference reference : externalReferences) {
+			if (reference.key().equals(key)) {
+				updated.add(reference.withAssignment(assignment));
 				found = true;
 			} else updated.add(reference);
 		}

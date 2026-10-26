@@ -248,6 +248,13 @@ class ContractTest(unittest.TestCase):
         validator('ExternalTaskLocationInput').validate({**location,'taskListId':None,'sectionId':None})
         self.assertFalse(validator('ExternalTaskLocationInput').is_valid({**location,'sectionId':'invalid'}))
         self.assertEqual('updateExternalTaskLocation',CONTRACT['paths']['/tasks/{id}/external-references/location']['put']['operationId'])
+        assignment={'assigneeId':'person-1','sourceId':'document-1','sourceUrl':'https://example.test/1','writable':False}
+        validator('TaskAssignment').validate(assignment)
+        self.assertFalse(validator('TaskAssignment').is_valid({'writable':False}))
+        validator('ExternalReference').validate({**reference,'assignment':assignment})
+        validator('ExternalTaskAssignmentInput').validate({'providerId':'google','repositoryId':'account/list',
+            'externalId':'task-1','assignment':None})
+        self.assertEqual('updateExternalTaskAssignment',CONTRACT['paths']['/tasks/{id}/external-references/assignment']['put']['operationId'])
 
     def test_provider_list_sections_are_distinct_from_projects_and_grocery_categories(self):
         section={'taskListId':ID,'remoteSectionId':'produce','name':'Produce','kind':'GROCERY_CATEGORY',
@@ -425,7 +432,7 @@ class ContractTest(unittest.TestCase):
             'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors',
             'getTaskTombstone', 'listTaskTombstones', 'findTaskTombstoneByExternalReference',
             'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskMetadata', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskSyncState', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
-            'linkExternalReference', 'replaceExternalReference', 'updateExternalTaskLocation', 'unlinkExternalReference', 'findTaskByExternalReference',
+            'linkExternalReference', 'replaceExternalReference', 'updateExternalTaskLocation', 'updateExternalTaskAssignment', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
             'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',
