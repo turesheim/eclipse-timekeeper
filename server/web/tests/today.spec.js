@@ -18,8 +18,8 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     task=await(await api(request,'POST','/tasks',{summary:'Scheduled review',projectId:null,parentTaskId:null,url:null})).json();
     session=await(await api(request,'POST','/work-sessions',{clientId:client.id,projectId:null,summary:'Today review',start:'2025-05-17T08:00:00Z',end:'2025-05-17T09:30:00Z'})).json();
     await page.route('**/api/v1/tasks?**',async route=>{
-      const response=await route.fetch(),body=await response.json();
-      await route.fulfill({response,json:{...body,items:body.items.map(value=>value.id===task.id?{...value,status:'IN_PROGRESS',scheduledDate:date}:value)}});
+      const response=await api(request,'GET','/tasks?limit=500'),body=await response.json();
+      await route.fulfill({status:200,headers:{'X-Timekeeper-Owner':response.headers()['x-timekeeper-owner']},contentType:'application/json',json:{...body,items:body.items.map(value=>value.id===task.id?{...value,status:'IN_PROGRESS',scheduledDate:date}:value)}});
     });
     await page.route('**/api/v1/calendar-events?**',async route=>{
       const response=await route.fetch(),body=await response.json(),from=new URL(route.request().url()).searchParams.get('fromDate');
