@@ -376,6 +376,11 @@ Server task payloads now include a provider-neutral status, optional date-only
 owner-scoped `tk_resource` JSON payload in both H2 and PostgreSQL, so they need
 no new table or schema-version change. Legacy task updates and reference changes
 carry planning forward; account export/import retains it.
+The same task payload also contains ordered `checklistItems`, each with its own
+UUID, text, completion state and time, and position. These are embedded task
+values and are never independent tasks or activity targets. Older payloads read
+with an empty checklist; legacy task and planning updates retain existing items.
+Portable exports and account archives preserve checklist contents and item IDs.
 The account ZIP archive also includes active day labels and Markdown bodies;
 journal synchronization state and deletion tombstones are not portable account
 records.

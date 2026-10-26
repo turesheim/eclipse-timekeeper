@@ -56,6 +56,11 @@ public final class JsonValues {
             nullable(node,"projectId",task.projectId().map(ProjectId::value)); nullable(node,"parentTaskId",task.parentTaskId().map(TaskId::value));
             node.put("summary",task.summary()); nullable(node,"url",task.url());
             node.put("status",task.planning().status().name());nullable(node,"scheduledDate",task.planning().scheduledDate());nullable(node,"completedAt",task.planning().completedAt());
+            ArrayNode checklist = node.putArray("checklistItems");
+            task.checklist().items().forEach(item -> {
+                var entry = object();entry.put("id",item.id().toString());entry.put("text",item.text());entry.put("completed",item.completed());
+                nullable(entry,"completedAt",item.completedAt());entry.put("position",item.position());checklist.add(entry);
+            });
             ArrayNode refs = node.putArray("externalReferences");
             task.externalReferences().stream().sorted(Comparator.comparing(ExternalTaskReference::providerId).thenComparing(ExternalTaskReference::repositoryId).thenComparing(ExternalTaskReference::externalId)).forEach(reference -> {
                 var ref = object(); ref.put("providerId",reference.providerId()); ref.put("repositoryId",reference.repositoryId()); ref.put("externalId",reference.externalId()); nullable(ref,"externalUrl",reference.externalUrl()); refs.add(ref);
@@ -82,7 +87,8 @@ public final class JsonValues {
             case "LABEL" -> new Label(new LabelId(id), node.get("name").asText(), optionalText(node.get("color")), version);
             case "TASK" -> new Task(new TaskId(id), optionalText(node.get("projectId")).map(UUID::fromString).map(ProjectId::new),
                     optionalText(node.get("parentTaskId")).map(UUID::fromString).map(TaskId::new), node.get("summary").asText(), optionalText(node.get("url")), references(node.get("externalReferences")),
-                    new TaskPlanning(optionalText(node.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),optionalText(node.get("scheduledDate")).map(java.time.LocalDate::parse),optionalText(node.get("completedAt")).map(Instant::parse)),version);
+                    new TaskPlanning(optionalText(node.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),optionalText(node.get("scheduledDate")).map(java.time.LocalDate::parse),optionalText(node.get("completedAt")).map(Instant::parse)),
+                    checklist(node.get("checklistItems")),version);
             case "ACTIVITY" -> new Activity(new ActivityId(id), optionalText(node.get("taskId")).map(UUID::fromString).map(TaskId::new).orElse(null), new OwnerId(node.get("ownerId").asText()),
                     Instant.parse(node.get("start").asText()), optionalText(node.get("end")).map(Instant::parse),node.get("summary").asText(), labels(node.get("labelIds")),node.get("manual").asBoolean(),version,Optional.empty(),optionalText(node.get("projectId")).map(UUID::fromString).map(ProjectId::new));
             case "WORK_SESSION" -> new WorkSession(new WorkSessionId(id),new OwnerId(node.get("ownerId").asText()),
@@ -99,5 +105,12 @@ public final class JsonValues {
     }
     public static Set<LabelId> labels(JsonNode values) {
         return java.util.stream.StreamSupport.stream(values.spliterator(),false).map(JsonValues::uuid).map(LabelId::new).collect(Collectors.toUnmodifiableSet());
+    }
+    public static TaskChecklist checklist(JsonNode values) {
+        if (values == null || values.isNull()) return TaskChecklist.empty();
+        var items = java.util.stream.StreamSupport.stream(values.spliterator(),false).map(value ->
+                new TaskChecklistItem(uuid(value.get("id")),value.get("text").asText(),value.get("completed").asBoolean(),
+                        optionalText(value.get("completedAt")).map(Instant::parse),value.get("position").asInt())).toList();
+        return new TaskChecklist(items);
     }
 }

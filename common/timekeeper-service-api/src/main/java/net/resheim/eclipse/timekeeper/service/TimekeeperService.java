@@ -30,6 +30,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskPlanning;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityReport;
 
@@ -44,6 +45,7 @@ public interface TimekeeperService {
 	Task createTask(CreateTask command);
 	Task updateTask(UpdateTask command);
 	default Task updateTaskPlanning(UpdateTaskPlanning command) { throw new UnsupportedOperationException("Task planning is not supported"); }
+	default Task updateTaskChecklist(UpdateTaskChecklist command) { throw new UnsupportedOperationException("Task checklists are not supported"); }
 	void deleteTask(DeleteTask command);
 	Optional<Task> task(TaskId id);
 	List<Task> tasks();

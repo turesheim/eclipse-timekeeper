@@ -252,6 +252,7 @@ public class ServerStore {
                 if(!node.has("status"))node.put("status",TaskStatus.NOT_STARTED.name());
                 if(!node.has("scheduledDate"))node.putNull("scheduledDate");
                 if(!node.has("completedAt"))node.putNull("completedAt");
+                if(!node.has("checklistItems"))node.putArray("checklistItems");
             }
         }
         return value;
