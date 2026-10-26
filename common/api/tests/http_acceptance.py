@@ -772,6 +772,37 @@ class HttpAcceptance(unittest.TestCase):
         copied, _=self.call('GET','/tasks/'+mappings[self.task['id']],owner='b')
         self.assertEqual(12,copied['siblingOrder'])
 
+    def test_versioned_provider_data_survives_legacy_edits_and_can_be_cleared(self):
+        identity={'providerId':'google','repositoryId':str(uuid4()),'externalId':str(uuid4())}
+        envelope={'namespace':'google.tasks','version':2,'payload':{'future':{'nested':[1,True,None]},'opaque':'keep'}}
+        path='/tasks/'+self.task['id']
+        _, headers=self.call('GET',path)
+        linked, headers=self.call('PUT',path+'/external-references',body={**identity,'externalUrl':None,'providerData':envelope},
+                                  headers={'If-Match':headers['ETag']})
+        self.assertEqual(envelope,linked['externalReferences'][0]['providerData'])
+        self.call('PUT',path+'/external-references/provider-data',body={**identity,'providerData':{**envelope,'namespace':'microsoft.graph'}},
+                  headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        self.call('PUT',path+'/external-references/provider-data',body={**identity,'providerData':{**envelope,'payload':{'nested':{'refresh_token':'secret'}}}},
+                  headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        linked, headers=self.call('PUT',path+'/external-references',body={**identity,'externalUrl':None},
+                                  headers={'If-Match':headers['ETag']})
+        self.assertEqual(envelope,linked['externalReferences'][0]['providerData'])
+        source={'createdAt':'2026-10-01T00:00:00Z','modifiedAt':None,'remoteEtag':'"opaque"','remoteRevision':None}
+        linked, headers=self.call('PUT',path+'/external-references/source',body={**identity,'source':source},
+                                  headers={'If-Match':headers['ETag']})
+        self.assertEqual(envelope,linked['externalReferences'][0]['providerData'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
+               'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
+        mappings={item['sourceId']:item['id'] for item in imported['ids']}
+        for item in imported['ids']:self.created.append(('b',kinds[item['entityType']],item['id']))
+        copied, _=self.call('GET','/tasks/'+mappings[self.task['id']],owner='b')
+        self.assertEqual(envelope,copied['externalReferences'][0]['providerData'])
+        cleared, _=self.call('PUT',path+'/external-references/provider-data',body={**identity,'providerData':None},
+                             headers={'If-Match':headers['ETag']})
+        self.assertNotIn('providerData',cleared['externalReferences'][0])
+
     def test_provider_identity_is_unique_per_owner_and_history_survives_unlink(self):
         reference = {'providerId': 'jira', 'repositoryId': 'https://jira.invalid',
                      'externalId': str(uuid4()), 'externalUrl': None}

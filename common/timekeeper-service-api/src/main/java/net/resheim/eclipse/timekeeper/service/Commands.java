@@ -9,6 +9,7 @@ import net.resheim.eclipse.timekeeper.domain.WorkSessionId;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskSource;
+import net.resheim.eclipse.timekeeper.domain.ExternalTaskProviderData;
 import net.resheim.eclipse.timekeeper.domain.LabelId;
 import net.resheim.eclipse.timekeeper.domain.OwnerId;
 import net.resheim.eclipse.timekeeper.domain.ProjectId;
@@ -116,6 +117,7 @@ public final class Commands {
 	public record UpdateTaskOrder(TaskId id, long expectedVersion, int siblingOrder) { }
 	public record LinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReference reference) { }
 	public record UpdateExternalTaskSource(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference, ExternalTaskSource source) { }
+	public record UpdateExternalTaskProviderData(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference, Optional<ExternalTaskProviderData> data) { }
 	public record UnlinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference) { }
 
 	public record CreateLabel(String name, Optional<String> color) {

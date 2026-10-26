@@ -181,6 +181,16 @@ accounts and lists when remote item IDs are only unique within a list. A legacy
 link update that omits `taskListId` preserves the association. Portable import
 remaps list IDs with the rest of the owned graph; deleting a referenced list is
 rejected. The Timekeeper project remains independent of this association.
+An external reference can also hold an optional `providerData` envelope with
+`namespace`, positive schema `version`, and an opaque JSON object `payload`.
+The namespace is the provider ID or a dot-prefixed extension of it. The server
+retains unknown payload fields through reads, unrelated and legacy writes,
+portable transfers, and account archives. `PUT
+/tasks/{id}/external-references/provider-data` conditionally replaces the
+whole envelope for one linked identity; explicit `null` clears it. Connectors
+must store only fields they can actually read, must keep their own OAuth or
+Apple authorization material outside task data, and must not write an
+approximation of an unsupported field to another provider.
 Tasks have a nonnegative `siblingOrder` for local ordering among tasks with
 the same parent. `PUT /tasks/{id}/order` changes only this value with `If-Match`;
 legacy task and other section writes preserve it. Provider ordering tokens can

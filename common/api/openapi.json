@@ -10581,6 +10581,101 @@
         "description": "Conditional replacement of source timestamps and opaque remote versions for one linked identity. Legacy link updates preserve this source state; a remote version never substitutes for the Timekeeper If-Match ETag."
       }
     },
+    "/tasks/{id}/external-references/provider-data": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateExternalTaskProviderData",
+        "summary": "Replace versioned provider task data",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalTaskProviderDataInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement or explicit clearing of one linked identity’s provider-data envelope. Legacy link and source updates preserve the envelope."
+      }
+    },
     "/task-connections": {
       "get": {
         "operationId": "listTaskConnections",
@@ -11464,6 +11559,10 @@
           "source": {
             "$ref": "#/components/schemas/ExternalTaskSource",
             "description": "Optional when linking. Omission preserves existing source state for the same identity."
+          },
+          "providerData": {
+            "$ref": "#/components/schemas/ExternalTaskProviderData",
+            "description": "Optional on link. Omission preserves previously stored provider data."
           }
         },
         "required": [
@@ -12978,6 +13077,10 @@
           },
           "source": {
             "$ref": "#/components/schemas/ExternalTaskSource"
+          },
+          "providerData": {
+            "$ref": "#/components/schemas/ExternalTaskProviderData",
+            "description": "Optional on link. Omission preserves previously stored provider data."
           }
         },
         "required": [
@@ -20661,6 +20764,71 @@
         ],
         "additionalProperties": false,
         "description": "Provider-supplied timestamps and opaque remote versions for one linked identity. Remote versions are never Timekeeper ETags."
+      },
+      "ExternalTaskProviderData": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]{0,99}$"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "namespace",
+          "version",
+          "payload"
+        ],
+        "additionalProperties": false,
+        "description": "Versioned provider-owned fields. The namespace must equal the reference provider ID or start with that ID and a dot. No credentials or private tokens."
+      },
+      "ExternalTaskProviderDataInput": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "providerData": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExternalTaskProviderData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "providerId",
+          "repositoryId",
+          "externalId",
+          "providerData"
+        ],
+        "additionalProperties": false
       },
       "ExternalTaskSourceInput": {
         "type": "object",

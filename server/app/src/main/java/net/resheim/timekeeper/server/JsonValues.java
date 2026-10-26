@@ -82,6 +82,10 @@ public final class JsonValues {
             task.externalReferences().stream().sorted(Comparator.comparing(ExternalTaskReference::providerId).thenComparing(ExternalTaskReference::repositoryId).thenComparing(ExternalTaskReference::externalId)).forEach(reference -> {
                 var ref = object(); ref.put("providerId",reference.providerId()); ref.put("repositoryId",reference.repositoryId()); ref.put("externalId",reference.externalId()); nullable(ref,"externalUrl",reference.externalUrl());
                 reference.taskListId().ifPresent(list -> ref.put("taskListId",list.toString()));
+                reference.providerData().ifPresent(data -> {
+                    var envelope=ref.putObject("providerData");envelope.put("namespace",data.namespace());envelope.put("version",data.version());
+                    envelope.set("payload",parse(data.json()));
+                });
                 var source=ref.putObject("source");nullable(source,"createdAt",reference.source().createdAt());nullable(source,"modifiedAt",reference.source().modifiedAt());
                 nullable(source,"remoteEtag",reference.source().remoteEtag());nullable(source,"remoteRevision",reference.source().remoteRevision());refs.add(ref);
             }); return node;
@@ -122,7 +126,23 @@ public final class JsonValues {
         };
     }
     public static ExternalTaskReference reference(JsonNode node) {
-        return new ExternalTaskReference(node.get("providerId").asText(),node.get("repositoryId").asText(),node.get("externalId").asText(),optionalText(node.get("externalUrl")),source(node.get("source")),optionalText(node.get("taskListId")).map(UUID::fromString));
+        return new ExternalTaskReference(node.get("providerId").asText(),node.get("repositoryId").asText(),node.get("externalId").asText(),optionalText(node.get("externalUrl")),source(node.get("source")),optionalText(node.get("taskListId")).map(UUID::fromString),
+                Optional.ofNullable(node.get("providerData")).filter(value -> !value.isNull()).map(JsonValues::providerData));
+    }
+    public static ExternalTaskProviderData providerData(JsonNode value) {
+        if(value==null || !value.isObject() || !value.path("payload").isObject()) throw ApiFailure.validation();
+        rejectCredentials(value.get("payload"));
+        String json=value.get("payload").toString();if(json.length()>65536) throw ApiFailure.validation();
+        return new ExternalTaskProviderData(value.get("namespace").asText(),value.get("version").asInt(),json);
+    }
+    private static void rejectCredentials(JsonNode value) {
+        if(value.isObject()) value.fields().forEachRemaining(entry -> {
+            String field=entry.getKey().replaceAll("[^A-Za-z]","").toLowerCase(java.util.Locale.ROOT);
+            if(Set.of("token","accesstoken","refreshtoken","authtoken","oauthtoken","bearertoken",
+                    "clientsecret","privatekey","password","apikey","authorization").contains(field)) throw ApiFailure.validation();
+            rejectCredentials(entry.getValue());
+        });
+        else if(value.isArray()) value.forEach(JsonValues::rejectCredentials);
     }
     public static ExternalTaskSource source(JsonNode value) {
         if(value==null || value.isNull())return ExternalTaskSource.empty();
