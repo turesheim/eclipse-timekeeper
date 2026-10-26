@@ -22,7 +22,7 @@ async function review(page) {
   await page.getByRole('button',{name:'Read CSV',exact:true}).click();await expect(page.getByRole('heading',{name:'Review import',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Review mappings',exact:true}).click();await expect(page.getByRole('heading',{name:'Review mappings',exact:true})).toBeVisible();
   await page.getByLabel('New client name',{exact:true}).fill('Browser imported client');
-  await expect(page.getByLabel('New label name',{exact:true})).toHaveCount(1);
+  await expect(page.getByLabel('New label name',{exact:true})).toHaveCount(await page.getByLabel('Import as',{exact:true}).inputValue()==='ACTIVITY'?1:0);
   await page.getByRole('button',{name:'Review server matches',exact:true}).click();await expect(page.getByRole('heading',{name:'Confirm import',exact:true})).toBeVisible();
 }
 async function undo(page,index) {
