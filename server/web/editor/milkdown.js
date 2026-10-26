@@ -1,7 +1,7 @@
 // This build-time entry is bundled to one local native ES module. The application
 // and source-mode fallback do not import Milkdown until rich mode is requested.
 import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx} from '@milkdown/kit/core';
-import {commonmark,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand} from '@milkdown/kit/preset/commonmark';
+import {commonmark,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand,insertHrCommand} from '@milkdown/kit/preset/commonmark';
 import {gfm,insertTableCommand,toggleStrikethroughCommand} from '@milkdown/kit/preset/gfm';
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand,$prose} from '@milkdown/kit/utils';
@@ -10,7 +10,7 @@ import {hasUnsupportedSyntax} from '../src/markdown-document.js';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
 
-const commands={bold:toggleStrongCommand,italic:toggleEmphasisCommand,strike:toggleStrikethroughCommand,inline_code:toggleInlineCodeCommand,code_block:createCodeBlockCommand,paragraph:turnIntoTextCommand,heading:wrapInHeadingCommand,list:wrapInBulletListCommand,ordered:wrapInOrderedListCommand,quote:wrapInBlockquoteCommand,table:insertTableCommand,undo:undoCommand,redo:redoCommand};
+const commands={bold:toggleStrongCommand,italic:toggleEmphasisCommand,strike:toggleStrikethroughCommand,inline_code:toggleInlineCodeCommand,code_block:createCodeBlockCommand,paragraph:turnIntoTextCommand,heading:wrapInHeadingCommand,list:wrapInBulletListCommand,ordered:wrapInOrderedListCommand,quote:wrapInBlockquoteCommand,table:insertTableCommand,hr:insertHrCommand,undo:undoCommand,redo:redoCommand};
 const sourceNodes=new Set(['html','image','imageReference','linkReference','definition','footnoteReference','footnoteDefinition']);
 const safeLink=url=>{if(typeof url!=='string'||!url.trim())return false;try{return ['https:','http:','mailto:'].includes(new URL(url,location.origin).protocol);}catch{return false;}};
 const safeDocument=doc=>{
@@ -40,8 +40,11 @@ function taskItem(node,view,getPos,taskLabel){
   });
   return {dom,contentDOM,update(value){if(value.type!==node.type)return false;paint(value);return true;},stopEvent:event=>event.target===checkbox,ignoreMutation:mutation=>mutation.type==='attributes'&&(mutation.target===checkbox||mutation.target===dom)};
 }
-export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,description,readOnly=false}){
-  const changePlugin=$prose(()=>new Plugin({filterTransaction:transaction=>!transaction.docChanged||!readOnly&&safeDocument(transaction.doc),view:()=>({update:(view,previous)=>{if(!view.state.doc.eq(previous.doc))changed?.();}})}));
+export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,stateChanged,description,readOnly=false}){
+  const changePlugin=$prose(()=>new Plugin({filterTransaction:transaction=>!transaction.docChanged||!readOnly&&safeDocument(transaction.doc),view:()=>({update:(view,previous)=>{
+    const documentChanged=!view.state.doc.eq(previous.doc);if(documentChanged)changed?.();
+    if(documentChanged||!view.state.selection.eq(previous.selection))stateChanged?.();
+  }})}));
   const editor=Editor.make().config(ctx=>{
     ctx.set(rootCtx,root);ctx.set(defaultValueCtx,value);
     ctx.set(editorViewOptionsCtx,{
@@ -84,7 +87,9 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
         if(transaction.docChanged)view.dispatch(transaction);
       }else{
         const action=commands[name];if(!action)return false;
-        editor.action(callCommand(action.key,name==='heading'?2:undefined));
+        const level=name==='heading'?(payload??2):undefined;
+        if(name==='heading'&&(!Number.isInteger(level)||level<1||level>6))return false;
+        editor.action(callCommand(action.key,level));
       }
       view.focus();return true;
     };
@@ -94,6 +99,13 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       focus:()=>view.focus(),
       setReadOnly,
       command,
+      headingLevel:()=>{
+        const {from,to,$from}=view.state.selection;
+        if($from.parent.isTextblock)return $from.parent.type.name==='heading'?$from.parent.attrs.level:0;
+        let level=0,found=false;
+        view.state.doc.nodesBetween(from,to,node=>{if(found)return false;if(node.isTextblock){level=node.type.name==='heading'?node.attrs.level:0;found=true;return false;}return true;});
+        return level;
+      },
       linkHref:()=>view.state.selection.$from.marks().find(mark=>mark.type.name==='link')?.attrs.href||'',
       destroy:()=>editor.destroy()
     };

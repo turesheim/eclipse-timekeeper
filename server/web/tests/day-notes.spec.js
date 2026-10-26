@@ -122,6 +122,12 @@ test('calendar summaries expose body presence while label-only edits preserve pr
   try{
     await signIn(page,await fresh(request));const api=await apiFor(page),date='2026-05-17',body='\r\n# Private Markdown marker\r\n  keep spaces  \r\n';
     const empty=await api('GET','/day-notes/'+date);await api('PUT','/day-notes/'+date,{body},{'If-Match':empty.headers().etag});await month(page);
+    const viewport=page.viewportSize();
+    for(const width of [1280,390,320]){
+      await page.setViewportSize({width,height:740});
+      await expect.poll(async()=>note(page).evaluate(button=>{const row=button.closest('.track-date-row').getBoundingClientRect(),glyph=button.querySelector('.icon').getBoundingClientRect();return Math.abs(row.right-glyph.right);})).toBeLessThan(4);
+    }
+    await page.setViewportSize(viewport);
     await expect(note(page)).not.toHaveClass(/is-empty/);await expect(note(page)).toHaveAttribute('title','Markdown note');
     const summaries=await api('GET','/day-notes?fromDate='+date+'&toDate='+date),summary=await summaries.json();
     expect(summary.items[0].hasBody).toBe(true);expect(summary.items[0]).not.toHaveProperty('body');expect(await summaries.text()).not.toContain('Private Markdown marker');
@@ -277,7 +283,9 @@ test('journal formatted editing fits narrow screens and all themes with accessib
     await signIn(page,await fresh(request));const api=await apiFor(page),initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body:'# Journal entry\n\n**Bold** and *italic*, ~~done~~ and `inline code`.\n\n[Reference](https://example.com).\n\n> A quotation\n\n1. Numbered item\n\n- [ ] Touch task\n\n```text\nconst value = 1;\n```\n\n| Topic | Status |\n| --- | --- |\n| Writing | Ready |\n'},{'If-Match':initial.headers().etag});await month(page);await note(page).tap();
     const rich=page.locator('#journal-formatted .ProseMirror');await expect(rich).toBeVisible();await expect(rich.locator('h1')).toBeInViewport();await rich.getByRole('checkbox').tap();await expect(rich.getByRole('checkbox')).toBeChecked();await save(page,'Touch label');
     for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
-      await setTheme(page,theme);await note(page).tap();await expect(rich).toBeVisible();const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>({theme,id:value.id,nodes:value.nodes.map(node=>({target:node.target,reason:node.failureSummary}))}))).toEqual([]);
+      await setTheme(page,theme);await note(page).tap();await expect(rich).toBeVisible();
+      expect(await rich.locator('li[data-task="true"]').evaluate(row=>{const checkbox=row.querySelector('input').getBoundingClientRect(),range=document.createRange();range.selectNodeContents(row.querySelector('p'));const text=range.getClientRects()[0];return Math.abs(checkbox.y+checkbox.height/2-text.y-text.height/2);})).toBeLessThan(4);
+      const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>({theme,id:value.id,nodes:value.nodes.map(node=>({target:node.target,reason:node.failureSummary}))}))).toEqual([]);
       expect(await dialog(page).evaluate(node=>node.scrollWidth<=node.clientWidth+1)).toBe(true);if(theme==='dracula')await captureScreenshot(page,{path:'test-results/journal-editor-mobile.png'});await dialog(page).getByRole('button',{name:'Cancel',exact:true}).click();
     }
     await page.setViewportSize({width:320,height:740});await note(page).tap();await expect(rich).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -332,6 +340,31 @@ test('journal toolbar creates the full evaluated Markdown subset and validates l
     await action('Formatted').click();await draft('Selected link');page.once('dialog',prompt=>prompt.accept('https://example.com/journal'));await action('Link').click();await expect(rich.locator('a')).toHaveAttribute('href','https://example.com/journal');
     const address=page.url();await rich.locator('a').click();expect(page.url()).toBe(address);await rich.press('ControlOrMeta+A');page.once('dialog',prompt=>prompt.accept('mailto:journal@example.org'));await action('Link').click();await expect(rich.locator('a')).toHaveAttribute('href','mailto:journal@example.org');
     await rich.press('ControlOrMeta+A');page.once('dialog',prompt=>prompt.accept('javascript:alert(1)'));await action('Link').click();await expect(dialog(page)).toContainText('Use an HTTP(S)');await expect(rich.locator('a')).toHaveAttribute('href','mailto:journal@example.org');
-    await draft('Plain paragraph');await action('Heading').click();await expect(rich.locator('h2')).toHaveText('Plain paragraph');await action('Paragraph').click();await expect(rich.locator('h2')).toHaveCount(0);await expect(rich.locator('p')).toHaveText('Plain paragraph');
+    await draft('Plain paragraph');
+    for(let level=1;level<=6;level++){
+      await action('Text style').click();await dialog(page).getByRole('menuitemradio',{name:'Heading '+level,exact:true}).click();await expect(rich.locator('h'+level)).toHaveText('Plain paragraph');
+      await expect(action('Text style').locator('.bi-type-h'+level)).toBeVisible();await expect(rich).toBeFocused();
+    }
+    await action('Text style').click();await dialog(page).getByRole('menuitemradio',{name:'Plain text',exact:true}).click();await expect(rich.locator('h1,h2,h3,h4,h5,h6')).toHaveCount(0);await expect(rich.locator('p')).toHaveText('Plain paragraph');
+    await rich.press('End');await action('Horizontal rule').click();await expect(rich.locator('hr')).toHaveCount(1);await expect(rich).toContainText('Plain paragraph');
+    await action('Undo').click();await expect(rich.locator('hr')).toHaveCount(0);await action('Redo').click();await expect(rich.locator('hr')).toHaveCount(1);
+    await action('Markdown source').click();await expect(page.locator('#journal-body')).toHaveValue(/Plain paragraph[\s\S]*(?:\*\*\*|---|___)/);
+  }finally{await owner.close();}
+});
+
+test('journal text-style menu supports keyboard selection and Escape without closing the editor',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage();
+  try{
+    await signIn(page,await fresh(request));await month(page);await menu(page);const rich=page.locator('#journal-formatted .ProseMirror');await expect(rich).toBeVisible();await rich.fill('Keyboard heading');
+    const styles=dialog(page).getByRole('button',{name:'Text style',exact:true});await styles.focus();await styles.press('ArrowDown');
+    const choices=dialog(page).getByRole('menuitemradio');await expect(choices).toHaveCount(7);await expect(choices.first()).toBeFocused();await choices.first().press('ArrowDown');await expect(choices.nth(1)).toBeFocused();
+    await choices.nth(1).press('Escape');await expect(dialog(page)).toBeVisible();await expect(styles).toBeFocused();await expect(styles).toHaveAttribute('aria-expanded','false');
+    await styles.press('ArrowUp');await expect(choices.last()).toBeFocused();await choices.last().press('Enter');await expect(rich.locator('h6')).toHaveCount(1);await expect(rich).toBeFocused();
+    await page.setViewportSize({width:320,height:740});await styles.click();await expect(choices.last()).toBeInViewport();
+    for(const theme of ['timekeeper','timekeeper-dark','solarized-light','solarized-dark','nord','dracula']){
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.bsTheme=['timekeeper','solarized-light'].includes(theme)?'light':'dark';},theme);
+      expect((await new AxeBuilder({page}).include('#track-note-editor').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations,theme).toEqual([]);
+    }
+    await captureScreenshot(page,{path:'test-results/journal-heading-menu-mobile.png'});await choices.first().click();await expect(rich.locator('p')).toHaveCount(1);
   }finally{await owner.close();}
 });
