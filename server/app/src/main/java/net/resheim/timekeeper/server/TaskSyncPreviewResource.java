@@ -56,7 +56,6 @@ public class TaskSyncPreviewResource {
             });
             if(!accepted.hasNonNull("summary")) throw ApiFailure.validation();
             for(var group:GROUPS) if(accepted.has(group[0])!=accepted.has(group[1])) throw ApiFailure.validation();
-            if(accepted.hasNonNull("parentTaskId")) throw ApiFailure.conflict(); // Remote hierarchy is resolved in a later pass.
             if(accepted.hasNonNull("taskListId") && !accepted.path("taskListId").asText().equals(list.path("id").asText())) throw ApiFailure.conflict();
             if(accepted.hasNonNull("sectionId") && !sectionInList(accepted.path("sectionId").asText(),list.path("id").asText())) throw ApiFailure.validation();
             var old=store.byReference(key);
@@ -70,6 +69,9 @@ public class TaskSyncPreviewResource {
                 throw ApiFailure.conflict();
             }
             if(tombstoned(key)) throw ApiFailure.conflict();
+            var parentId=optionalText(accepted.get("parentTaskId")).map(TaskSyncPreviewResource::uuidText);
+            var parent=parentId.map(value -> providerParent(value,key.providerId(),list.path("id").asText()));
+            var projectId=parent.flatMap(value -> optionalText(value.get("projectId"))).map(TaskSyncPreviewResource::uuidText).map(ProjectId::new);
             var baseline=new ExternalTaskBaseline(1,store.now(),accepted.toString());
             var assignment=Optional.ofNullable(accepted.get("assignment")).filter(value -> !value.isNull()).map(JsonValues::assignment);
             var ref=new ExternalTaskReference(key.providerId(),key.repositoryId(),key.externalId(),Optional.empty(),
@@ -78,7 +80,7 @@ public class TaskSyncPreviewResource {
             var planning=new TaskPlanning(optionalText(accepted.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),
                     optionalText(accepted.get("scheduledDate")).map(LocalDate::parse),
                     optionalText(accepted.get("completedAt")).map(Instant::parse));
-            var created=store.service().createTask(new CreateTask(Optional.empty(),Optional.empty(),accepted.path("summary").asText(),
+            var created=store.service().createTask(new CreateTask(projectId,parentId.map(TaskId::new),accepted.path("summary").asText(),
                     optionalText(accepted.get("url")),Set.of(ref),planning,checklist(accepted.get("checklistItems")),timing(accepted),
                     importance(accepted),JsonValues.body(accepted),accepted.path("siblingOrder").asInt(0),Set.of(),
                     recurrence(accepted.get("recurrence")),reminders(accepted.get("reminders")),metadata(accepted.get("metadata"))));
@@ -117,7 +119,7 @@ public class TaskSyncPreviewResource {
                 String field=decision.path("field").asText(),outcome=decision.path("outcome").asText();
                 var remote=observed.path("fields").get(field);
                 if(outcome.equals("REMOTE_ONLY")) {
-                    if(field.equals("parentTaskId") && remote.isTextual()) validateParent(uuid(current.get("id")),remote.asText());
+                    if(field.equals("parentTaskId") && remote.isTextual()) validateParent(current,key,list.path("id").asText(),remote.asText());
                     if(Set.of("taskListId","sectionId","assignment").contains(field)) reference.set(field,remote.deepCopy());
                     else candidate.set(field,remote.deepCopy());
                     changed=true;
@@ -134,10 +136,18 @@ public class TaskSyncPreviewResource {
             return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
         }).response());
     }
-    private void validateParent(UUID child,String parentId) {
+    private JsonNode providerParent(UUID parentId,String providerId,String listId) {
+        var parent=store.find("TASK",parentId).orElseThrow(ApiFailure::conflict);
+        for(var reference:parent.path("externalReferences")) if(reference.path("providerId").asText().equals(providerId)
+                && reference.path("taskListId").asText().equals(listId)) return parent;
+        throw ApiFailure.conflict();
+    }
+    private void validateParent(JsonNode child,ExternalTaskReferenceKey key,String listId,String parentId) {
+        var first=providerParent(uuidText(parentId),key.providerId(),listId);
+        if(!child.path("projectId").equals(first.path("projectId"))) throw ApiFailure.conflict();
         UUID cursor=uuidText(parentId);Set<UUID> seen=new HashSet<>();
         while(cursor!=null) {
-            if(cursor.equals(child) || !seen.add(cursor)) throw ApiFailure.conflict();
+            if(cursor.equals(uuid(child.get("id"))) || !seen.add(cursor)) throw ApiFailure.conflict();
             var parent=store.find("TASK",cursor).orElseThrow(ApiFailure::conflict);
             cursor=optionalText(parent.get("parentTaskId")).map(TaskSyncPreviewResource::uuidText).orElse(null);
         }

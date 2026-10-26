@@ -272,8 +272,10 @@ still match its baseline. Local edits remain untouched. The connection must
 declare the summary readable; other unclaimed fields are skipped and excluded
 from the baseline. This initial import accepts the normalized task fields,
 including civil schedule, completion, recurrence, reminders, checklist and
-provider list association. Remote subtasks need a later hierarchy pass before
-they can be imported. Remote changes to existing tasks go through a separate
+provider list association. A connector resolves a remote parent to its owned
+Timekeeper task ID and imports parents before children. The child inherits the
+parent's Timekeeper project, including no project. Remote changes to existing
+tasks go through a separate
 conditional apply workflow.
 
 `POST /task-sync/apply` conditionally merges one existing provider observation.

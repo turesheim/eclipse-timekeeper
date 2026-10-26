@@ -41,8 +41,8 @@ credential store and Apple authorization on the Mac. Never put credentials in
    `KEEP_LOCAL`, and `UNCHANGED` refer to an existing task and can use
    `/task-sync/apply` with its current ETag. `CONFLICT`, `NO_BASELINE`,
    `INCOMPLETE_GROUP`, `OTHER_LIST`, and `RECONCILE_ID` need reconciliation.
-   The import endpoint currently defers remote child tasks until their parent
-   identity is resolved.
+   Resolve remote parent identities to existing Timekeeper task IDs and import
+   parents before children. A child must share its parent's provider list.
 4. Complete every safe item before advancing the list cursor with `PUT
    /task-sync-cursors/{id}` and `If-Match`. Store the provider's opaque next
    page token or delta URL as-is. Set `lastCompleteAt` only after the entire

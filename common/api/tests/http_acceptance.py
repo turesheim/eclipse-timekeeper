@@ -1263,6 +1263,48 @@ class HttpAcceptance(unittest.TestCase):
         self.call('POST','/task-sync/import',body={**request,'item':{**item,'operationId':str(uuid4())}},
                   status=409,code='CONFLICT')
 
+    def test_provider_subtasks_import_under_an_unassigned_parent(self):
+        connection=self.create('task-connections',{'providerId':'google','remoteAccountId':str(uuid4()),
+                    'name':'Hierarchy','readable':True,'writable':True,'enabled':True})
+        task_list=self.create('task-lists',{'connectionId':connection['id'],'remoteListId':str(uuid4()),
+                    'name':'Hierarchy','kind':'STANDARD','readable':True,'writable':True,'shared':False,
+                    'owner':True,'present':True,'position':0})
+        field={'readable':True,'writable':True,'deletable':False,'note':None}
+        path='/task-connections/'+connection['id']
+        _,headers=self.call('GET',path)
+        capabilities={'version':1,'providerApiVersion':'test','fields':{name:field for name in
+                      ('summary','parentTaskId','siblingOrder')}}
+        self.call('PUT',path+'/capabilities',body=capabilities,headers={'If-Match':headers['ETag']})
+        key={'providerId':'google','repositoryId':connection['remoteAccountId']+'/'+task_list['remoteListId']}
+        parent_item={'operationId':str(uuid4()),**key,'externalId':str(uuid4()),'deleted':False,
+                     'fields':{'summary':'Remote parent'}}
+        base={'connectionId':connection['id'],'listId':task_list['id'],'sourceState':'HEALTHY'}
+        parent,_=self.call('POST','/task-sync/import',body={**base,'item':parent_item},status=201)
+        self.created.append(('a','tasks',parent['id']))
+        child_item={'operationId':str(uuid4()),**key,'externalId':str(uuid4()),'deleted':False,
+                    'fields':{'summary':'Remote child','parentTaskId':parent['id'],'siblingOrder':2}}
+        child,child_headers=self.call('POST','/task-sync/import',body={**base,'item':child_item},status=201)
+        self.created.append(('a','tasks',child['id']))
+        self.assertIsNone(child['projectId'])
+        self.assertEqual((parent['id'],2),(child['parentTaskId'],child['siblingOrder']))
+        self.assertEqual(parent['id'],child['externalReferences'][0]['baseline']['fields']['parentTaskId'])
+        replay,_=self.call('POST','/task-sync/import',body={**base,'item':{**child_item,
+                           'operationId':str(uuid4())}},status=200)
+        self.assertEqual(child['id'],replay['id'])
+        self.call('POST','/task-sync/import',body={**base,'item':{**child_item,
+                  'operationId':str(uuid4()),'fields':{**child_item['fields'],'parentTaskId':str(uuid4())}}},
+                  status=409,code='CONFLICT')
+        second_item={**parent_item,'operationId':str(uuid4()),'externalId':str(uuid4()),
+                     'fields':{'summary':'Second provider parent'}}
+        second,_=self.call('POST','/task-sync/import',body={**base,'item':second_item},status=201)
+        self.created.append(('a','tasks',second['id']))
+        moved={**child_item,'operationId':str(uuid4()),'fields':{'parentTaskId':second['id'],'siblingOrder':3}}
+        updated,_=self.call('POST','/task-sync/apply',body={**base,'item':moved},
+                            headers={'If-Match':child_headers['ETag']})
+        self.assertEqual((second['id'],3),(updated['parentTaskId'],updated['siblingOrder']))
+        self.created.remove(('a','tasks',child['id']))
+        self.created.append(('a','tasks',child['id']))
+
     def test_external_task_list_link_is_owned_guarded_and_remapped(self):
         account=self.create('task-connections',{'providerId':'google','remoteAccountId':str(uuid4()),
                     'name':'Personal','readable':True,'writable':True,'enabled':True})
