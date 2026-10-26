@@ -208,6 +208,15 @@ resource; a conflicting representation of the same remote identity returns
 disconnected account `enabled=false`; remote disappearance must not trigger
 deletion of local tasks.
 
+`/task-list-sections` stores optional, owner-scoped provider groupings inside
+one task list. A section has a stable Timekeeper ID, remote section ID, name,
+`STANDARD` or `GROCERY_CATEGORY` kind, order, presence, and section write
+permission. Discovery is idempotent by list and remote ID. Missing sections
+can be marked `present=false`; a list with sections cannot be deleted. These
+rows do not create Timekeeper projects or imply that Google Tasks or Microsoft
+To Do expose Apple section behavior. Task-to-section linking is handled
+separately from catalog discovery.
+
 Each connection also has a versioned `capabilities` declaration. Connectors
 replace it conditionally through `PUT /task-connections/{id}/capabilities`.
 Entries state whether a field can be read, written, and deleted; an omitted

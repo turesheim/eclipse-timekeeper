@@ -418,6 +418,11 @@ retains the records and associated tasks. Explicit deletion is conditional and
 rejects a connection with lists or a list with linked tasks. Account archives
 and portable transfers include these records; older archives import without
 them.
+`TASK_SECTION` records are optional children of one provider list. They
+store a provider section identity, name, standard or grocery-category kind,
+position, presence, and section write permission. A relation prevents
+deleting a list while sections remain. The section catalog does not change
+Timekeeper projects or infer sections for providers that lack them.
 An external task reference may include the stable Timekeeper `taskListId`.
 Task-to-list relations protect referenced lists from deletion, while portable
 imports remap the list ID. The reference's provider must match the list's

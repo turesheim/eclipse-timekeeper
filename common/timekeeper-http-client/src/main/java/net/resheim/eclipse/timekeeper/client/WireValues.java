@@ -31,6 +31,11 @@ public final class WireValues {
                 value.get("writable").getAsBoolean(),value.get("shared").getAsBoolean(),value.get("owner").getAsBoolean(),
                 value.get("present").getAsBoolean(),value.get("position").getAsInt(),value.get("version").getAsLong());
     }
+    public static TaskListSection taskListSection(JsonObject value) {
+        return new TaskListSection(id(value.get("id")),id(value.get("taskListId")),value.get("remoteSectionId").getAsString(),
+                value.get("name").getAsString(),TaskListSectionKind.valueOf(value.get("kind").getAsString()),
+                value.get("position").getAsInt(),value.get("present").getAsBoolean(),value.get("writable").getAsBoolean(),value.get("version").getAsLong());
+    }
     public static TaskSyncCursor taskSyncCursor(JsonObject value) {
         return new TaskSyncCursor(id(value.get("id")),id(value.get("connectionId")),text(value.get("listId")).map(UUID::fromString),
                 TaskSyncMode.valueOf(value.get("mode").getAsString()),text(value.get("cursor")),

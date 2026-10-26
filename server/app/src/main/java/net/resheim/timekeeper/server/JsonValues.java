@@ -62,6 +62,11 @@ public final class JsonValues {
             node.put("kind",list.kind().name());node.put("readable",list.readable());node.put("writable",list.writable());
             node.put("shared",list.shared());node.put("owner",list.owner());node.put("present",list.present());node.put("position",list.position());return node;
         }
+        if (value instanceof TaskListSection section) {
+            var node=base(owner,section.id(),section.version());node.put("taskListId",section.taskListId().toString());
+            node.put("remoteSectionId",section.remoteSectionId());node.put("name",section.name());node.put("kind",section.kind().name());
+            node.put("position",section.position());node.put("present",section.present());node.put("writable",section.writable());return node;
+        }
         if (value instanceof TaskSyncCursor cursor) {
             var node=base(owner,cursor.id(),cursor.version());node.put("connectionId",cursor.connectionId().toString());
             nullable(node,"listId",cursor.listId());node.put("mode",cursor.mode().name());nullable(node,"cursor",cursor.cursor());
@@ -134,6 +139,8 @@ public final class JsonValues {
             case "TASK_LIST" -> new TaskList(id,uuid(node.get("connectionId")),node.get("remoteListId").asText(),node.get("name").asText(),
                     TaskListKind.valueOf(node.get("kind").asText()),node.get("readable").asBoolean(),node.get("writable").asBoolean(),
                     node.get("shared").asBoolean(),node.get("owner").asBoolean(),node.get("present").asBoolean(),node.get("position").asInt(),version);
+            case "TASK_SECTION" -> new TaskListSection(id,uuid(node.get("taskListId")),node.get("remoteSectionId").asText(),node.get("name").asText(),
+                    TaskListSectionKind.valueOf(node.get("kind").asText()),node.get("position").asInt(),node.get("present").asBoolean(),node.get("writable").asBoolean(),version);
             case "TASK_SYNC_CURSOR" -> new TaskSyncCursor(id,uuid(node.get("connectionId")),optionalText(node.get("listId")).map(UUID::fromString),
                     TaskSyncMode.valueOf(node.get("mode").asText()),optionalText(node.get("cursor")),
                     optionalText(node.get("lastObservedAt")).map(Instant::parse),optionalText(node.get("lastCompleteAt")).map(Instant::parse),version);

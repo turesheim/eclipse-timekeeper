@@ -14,6 +14,7 @@ import net.resheim.eclipse.timekeeper.domain.ProjectId;
 import net.resheim.eclipse.timekeeper.domain.Task;
 import net.resheim.eclipse.timekeeper.domain.TaskConnection;
 import net.resheim.eclipse.timekeeper.domain.TaskList;
+import net.resheim.eclipse.timekeeper.domain.TaskListSection;
 import net.resheim.eclipse.timekeeper.domain.TaskSyncCursor;
 import net.resheim.eclipse.timekeeper.domain.TaskId;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateActivity;
@@ -22,6 +23,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.CreateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateTask;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateTaskConnection;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateTaskList;
+import net.resheim.eclipse.timekeeper.service.Commands.CreateTaskListSection;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateTaskSyncCursor;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteLabel;
@@ -42,6 +44,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskConnection;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskConnectionCapabilities;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskList;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskListSection;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskSyncCursor;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskPlanning;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
@@ -74,6 +77,11 @@ public interface TimekeeperService {
 	default void deleteTaskList(java.util.UUID id,long expectedVersion) { throw new UnsupportedOperationException("Provider task lists are not supported"); }
 	default Optional<TaskList> taskList(java.util.UUID id) { throw new UnsupportedOperationException("Provider task lists are not supported"); }
 	default List<TaskList> taskLists(java.util.UUID connectionId) { throw new UnsupportedOperationException("Provider task lists are not supported"); }
+	default TaskListSection createTaskListSection(CreateTaskListSection command) { throw new UnsupportedOperationException("Provider list sections are not supported"); }
+	default TaskListSection updateTaskListSection(UpdateTaskListSection command) { throw new UnsupportedOperationException("Provider list sections are not supported"); }
+	default void deleteTaskListSection(java.util.UUID id,long expectedVersion) { throw new UnsupportedOperationException("Provider list sections are not supported"); }
+	default Optional<TaskListSection> taskListSection(java.util.UUID id) { throw new UnsupportedOperationException("Provider list sections are not supported"); }
+	default List<TaskListSection> taskListSections(java.util.UUID listId) { throw new UnsupportedOperationException("Provider list sections are not supported"); }
 	default TaskSyncCursor createTaskSyncCursor(CreateTaskSyncCursor command) { throw new UnsupportedOperationException("Task sync cursors are not supported"); }
 	default TaskSyncCursor updateTaskSyncCursor(UpdateTaskSyncCursor command) { throw new UnsupportedOperationException("Task sync cursors are not supported"); }
 	default void deleteTaskSyncCursor(java.util.UUID id,long expectedVersion) { throw new UnsupportedOperationException("Task sync cursors are not supported"); }

@@ -113,8 +113,8 @@ class HttpAcceptance(unittest.TestCase):
             self.assertIsNone(page.get('nextCursor'), 'Fixture cleanup must include every daily record')
             self.created.extend((owner,'activities',value['id']) for value in page['items'])
         # Clean only records created by this suite, including commands/imports.
-        order = {'activities': 0, 'work-sessions': 1, 'tasks': 2, 'task-sync-cursors': 3, 'task-lists': 4,
-                 'task-connections': 5, 'labels': 6, 'projects': 7, 'clients': 8}
+        order = {'activities': 0, 'work-sessions': 1, 'tasks': 2, 'task-sync-cursors': 3, 'task-list-sections': 4, 'task-lists': 5,
+                 'task-connections': 6, 'labels': 7, 'projects': 8, 'clients': 9}
         unique = list(dict.fromkeys(reversed(self.created)))
         for owner, resource, identifier in sorted(unique, key=lambda row: order[row[1]]):
             value, headers = self.call('GET', f'/{resource}/{identifier}', owner=owner)
@@ -911,6 +911,30 @@ class HttpAcceptance(unittest.TestCase):
             if item['entityType']=='TASK_CONNECTION' and item['sourceId']==connection['id']:
                 restored,_=self.call('GET','/task-connections/'+item['id'],owner='b')
                 self.assertEqual(body,restored['capabilities'])
+
+    def test_provider_list_sections_are_owned_and_idempotent(self):
+        connection=self.create('task-connections',{'providerId':'apple','remoteAccountId':str(uuid4()),'name':'iCloud',
+                  'readable':True,'writable':False,'enabled':True})
+        task_list=self.create('task-lists',{'connectionId':connection['id'],'remoteListId':str(uuid4()),'name':'Groceries',
+                  'kind':'STANDARD','readable':True,'writable':False,'shared':False,'owner':True,'present':True,'position':0})
+        source={'taskListId':task_list['id'],'remoteSectionId':'produce','name':'Produce','kind':'GROCERY_CATEGORY',
+                'position':1,'present':True,'writable':False}
+        section=self.create('task-list-sections',source)
+        repeated, _=self.call('POST','/task-list-sections',body=source,status=200)
+        self.assertEqual(section['id'],repeated['id'])
+        self.call('POST','/task-list-sections',body={**source,'name':'Vegetables'},status=409,code='CONFLICT')
+        listed, _=self.call('GET','/task-list-sections?'+urlencode({'listId':task_list['id']}))
+        self.assertEqual([section['id']],[item['id'] for item in listed['items']])
+        self.call('GET','/task-list-sections/'+section['id'],owner='b',status=404,code='NOT_FOUND')
+        _, list_headers=self.call('GET','/task-lists/'+task_list['id'])
+        self.call('DELETE','/task-lists/'+task_list['id'],headers={'If-Match':list_headers['ETag']},status=409,code='CONFLICT')
+        _, headers=self.call('GET','/task-list-sections/'+section['id'])
+        replacement={key:source[key] for key in ('name','kind','position','present','writable')}
+        self.call('PUT','/task-list-sections/'+section['id'],body=replacement,owner='read',headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        changed, headers=self.call('PUT','/task-list-sections/'+section['id'],body={**replacement,'present':False},headers={'If-Match':headers['ETag']})
+        self.assertFalse(changed['present'])
+        self.call('DELETE','/task-list-sections/'+section['id'],headers={'If-Match':headers['ETag']},status=204)
+        self.created.remove(('a','task-list-sections',section['id']))
 
     def test_provider_accounts_and_lists_are_owned_idempotent_and_portable(self):
         account={'providerId':'microsoft','remoteAccountId':str(uuid4()),'name':'Personal',

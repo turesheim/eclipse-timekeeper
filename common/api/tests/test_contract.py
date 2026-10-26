@@ -241,6 +241,15 @@ class ContractTest(unittest.TestCase):
         validator('ExternalReference').validate(reference)
         self.assertFalse(validator('ExternalReference').is_valid({**reference,'taskListId':'not-a-uuid'}))
 
+    def test_provider_list_sections_are_distinct_from_projects_and_grocery_categories(self):
+        section={'taskListId':ID,'remoteSectionId':'produce','name':'Produce','kind':'GROCERY_CATEGORY',
+                 'position':2,'present':True,'writable':False}
+        validator('TaskListSectionCreateInput').validate(section)
+        self.assertFalse(validator('TaskListSectionCreateInput').is_valid({**section,'kind':'PROJECT'}))
+        self.assertFalse(validator('TaskListSectionCreateInput').is_valid({**section,'position':-1}))
+        self.assertEqual('createTaskListSection',CONTRACT['paths']['/task-list-sections']['post']['operationId'])
+        self.assertEqual('listTaskListSections',CONTRACT['paths']['/task-list-sections']['get']['operationId'])
+
     def test_task_sibling_order_is_a_conditional_section(self):
         validator('TaskOrderInput').validate({'siblingOrder':7})
         self.assertFalse(validator('TaskOrderInput').is_valid({'siblingOrder':-1}))
@@ -400,6 +409,7 @@ class ContractTest(unittest.TestCase):
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'deleteTaskList', 'getTaskList', 'listTaskLists',
+            'createTaskListSection', 'updateTaskListSection', 'deleteTaskListSection', 'getTaskListSection', 'listTaskListSections',
             'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors',
             'getTaskTombstone', 'listTaskTombstones', 'findTaskTombstoneByExternalReference',
             'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskMetadata', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskSyncState', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
