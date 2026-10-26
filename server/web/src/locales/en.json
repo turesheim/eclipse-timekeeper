@@ -1050,7 +1050,7 @@
   "journal.sync.new_device": "Register as a new device",
   "journal.sync.public_key": "Public SSH key (.pub)",
   "journal.sync.rotation_help": "For rotation, generate a new key with a new local filename, select the old device, and register the new public key. This immediately revokes the old key. Download a new profile and configure the new local identity before verifying it.",
-  "journal.sync.enrolled": "Client added. Download its profile below.",
+  "journal.sync.enrolled": "Client added. Download its profile from the client list.",
   "journal.sync.devices": "Clients",
   "journal.sync.imports": "Imports and conflicts",
   "journal.sync.conflicts_help": "A different first import or a change after a Calendar edit becomes a conflict. Review both copies and deliberately keep Calendar or use the incoming copy. Download an original copy before discarding it.",

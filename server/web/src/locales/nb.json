@@ -1050,7 +1050,7 @@
   "journal.sync.new_device": "Registrer som ny enhet",
   "journal.sync.public_key": "Offentlig SSH-nøkkel (.pub)",
   "journal.sync.rotation_help": "Ved nøkkelbytte lager du en ny nøkkel med et nytt lokalt filnavn, velger den gamle enheten og registrerer den nye offentlige nøkkelen. Den gamle nøkkelen tilbakekalles straks. Last ned en ny profil og velg den nye lokale nøkkelfilen før du bekrefter tilkoblingen.",
-  "journal.sync.enrolled": "Klienten er lagt til. Last ned profilen nedenfor.",
+  "journal.sync.enrolled": "Klienten er lagt til. Last ned profilen fra klientlisten.",
   "journal.sync.devices": "Klienter",
   "journal.sync.imports": "Importer og konflikter",
   "journal.sync.conflicts_help": "En ulik første import eller en endring etter en kalenderredigering gir konflikt. Se gjennom begge kopiene, og velg å beholde Kalender eller bruke den innkommende kopien. Last ned originalkopien før du forkaster den.",
