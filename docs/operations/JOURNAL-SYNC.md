@@ -1,8 +1,8 @@
 # Synchronize daily Markdown over SSH
 
-Timekeeper supports upload-only imports and explicitly enabled bidirectional
+Timekeeper supports upload-only imports and two-way
 exchanges between a chosen daily-note directory and the database. Calendar and
-account archives read the database. Existing keys remain upload-only. Calendar
+account archives read the database. New clients synchronize both ways by default; existing upload-only keys keep their permissions. Calendar
 edits and differing first imports produce recoverable conflicts in
 **My account → Journal**. This is server-readable
 storage, not end-to-end encryption. Follow [storage protection](JOURNAL-STORAGE.md)
@@ -112,6 +112,22 @@ gateway host key and mapping, database and recovery material on encrypted
 storage; keep backup encryption keys separately. Test restoration without
 reassigning account UIDs or silently replacing the pinned host key.
 
+## Add a client
+
+In **My account → Journal**, enter a **Client name** and its **Public SSH key (.pub)**,
+then choose **Add client**. This enables synchronization in both directions for
+that client automatically. You must be signed in with your account password or a
+passkey; an API token cannot add clients. No additional password entry or direction
+switch is needed. Existing upload-only keys retain their current permissions.
+Download the new client's profile to finish local setup.
+
+The client list and add form are shown first. **Connection setup and troubleshooting**
+is collapsed by default and contains endpoint details, local setup instructions,
+transfer diagnostics and optional pause controls. Conflicts appear when there are
+imports to review. To replace a key, revoke the old client and add its replacement.
+Revocation and changes to the advanced pause controls still require your current
+password.
+
 ## Local client setup
 
 Supported clients are macOS, Linux and Windows through WSL2, with Python 3.11+,
@@ -141,9 +157,8 @@ ssh-add ~/.ssh/timekeeper_journal
 cat ~/.ssh/timekeeper_journal.pub
 ```
 
-Sign in directly to your account over HTTPS. In **My account → Journal**, enable
-sync, then enroll the public `.pub` text with a recognizable device label and
-your current account password. Download that device's public JSON profile and
+Sign in directly to your account over HTTPS. In **My account → Journal**, add
+a client with a recognizable name and the public `.pub` text. Download its JSON profile and
 the client script. Put both in a private, user-owned mode 700 local directory
 (`chmod 700`); the client checks this boundary. Keep the vault and private sync
 state on encrypted local storage and encrypt their backups. The script is called
@@ -189,12 +204,11 @@ to resolve a database conflict.
 
 ## Bidirectional access and first exchange
 
-Enable **Allow bidirectional synchronization** in Journal settings with your
-current password. Register a fresh key with **Allow this device to download
-Calendar notes** selected, or rotate an existing key into a new device profile.
-Both grants are required; the global setting does not upgrade old keys.
-Download the new format-2 profile. Turning off the global setting stops these
-devices while upload-only keys can continue importing.
+Adding a client enables two-way synchronization and produces a format-2 profile
+automatically. Existing upload-only keys keep their permissions. To replace one
+with two-way access, revoke it and add a new client key. Advanced pause controls
+are under **Connection setup and troubleshooting**. Turning off two-way access
+stops two-way clients while upload-only keys can continue importing.
 
 Keep the profile and its entire private state directory outside `Daily` and
 outside other vault synchronization. They must share the daily-note folder's
@@ -294,9 +308,9 @@ than prompting unattended or storing a passphrase. Review launchd/systemd
 status and Journal health after enabling a schedule. WSL2 must be running and
 have systemd enabled for its timer to execute.
 
-To rotate a device, create a fresh local key, enroll its public half with the
-old device selected for replacement, download/configure/pin its new profile,
-verify and sync before rescheduling. Rotation immediately revokes the old key,
+To replace a client key, create a fresh local key, revoke the old client, add its
+public half as a new client, then download/configure/pin its new profile,
+verify and sync before rescheduling. Revocation immediately stops the old key,
 including in-flight work. Revoke a lost device in Journal and remove its local
 schedule when possible. Disabling Journal stops all devices; disabling the
 account also blocks transfers and import. Keep local originals and any wanted

@@ -43,13 +43,19 @@ public class JournalResource {
         });
     }
     @POST @Path("/devices") public Response enroll(@HeaderParam("Idempotency-Key")String key,JsonNode body){
-        var input=inputs.validate("JournalDeviceInput",body);ContractInputs.pathId(key);proof(input);
+        var input=inputs.validate("JournalDeviceInput",body);ContractInputs.pathId(key);requireSecure();if(input.has("currentPassword"))proof(input);
         var safe=((com.fasterxml.jackson.databind.node.ObjectNode)input).deepCopy();safe.remove("currentPassword");
-        return tx(()->receipts.execute(key,"POST","/journal/devices",null,safe,()->{
+        return tx(()->{
+            if(!AccountStore.accountSession(store.current().connection(),identity.principal()))throw new ApiFailure(403,"JOURNAL_ACCOUNT_SIGN_IN_REQUIRED");
+            return receipts.execute(key,"POST","/journal/devices",null,safe,()->{
             var deployment=configuration.load();if(deployment.owner(store.owner()).isEmpty())throw new ApiFailure(503,"JOURNAL_ADMIN_ACCOUNT_NOT_PROVISIONED");
             UUID rotate=input.has("rotateDeviceId")?ContractInputs.pathId(input.path("rotateDeviceId").asText()):null;
-            return ApiReplies.resource(201,new JournalDevices(store).enroll(input.path("label").asText(),input.path("publicKey").asText(),rotate,input.path("bidirectional").asBoolean()),null);
-        }).response());
+            var devices=new JournalDevices(store);
+            // The simple client form enables two-way sync. Explicit legacy scopes keep their semantics.
+            boolean bidirectional=input.path("bidirectional").asBoolean(true);
+            if(!input.has("bidirectional"))devices.configure(true,true);
+            return ApiReplies.resource(201,devices.enroll(input.path("label").asText(),input.path("publicKey").asText(),rotate,bidirectional),null);
+        }).response();});
     }
     @POST @Path("/devices/{id}/revoke") public Response revoke(@PathParam("id")String id,JsonNode body){
         UUID device=ContractInputs.pathId(id);var input=inputs.validate("JournalProofInput",body);proof(input);return tx(()->ok(new JournalDevices(store).revoke(device)));

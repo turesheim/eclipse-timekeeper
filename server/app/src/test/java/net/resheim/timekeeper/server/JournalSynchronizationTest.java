@@ -128,7 +128,7 @@ class JournalSynchronizationTest {
         given().header("Authorization",credential).contentType("application/json").body(manifest(Map.of(NAME,body)).toString()).post(transfer+"/complete").then().statusCode(200).header("Cache-Control","private, no-store");
         synchronization.rescan("a");assertEquals(body,body());
     }
-    @Test void accountSetupRequiresFreshDirectSignInAndCsrfAndKeepsSecretsOutOfStatusAndReceipts()throws Exception{
+    @Test void clientEnrollmentDefaultsToTwoWayAndRequiresDirectSignInAndCsrfAndKeepsSecretsOutOfStatusAndReceipts()throws Exception{
         var status=given().header("Authorization","Bearer test-read").get("/api/v1/journal").then().statusCode(200).header("Cache-Control","private, no-store").extract().response();
         inputs.validate("JournalStatus",parse(status.asString()));
         assertFalse(status.jsonPath().getBoolean("canManage"));assertFalse(status.asString().contains(TOKEN));assertFalse(status.asString().contains(incoming.toString()));
@@ -139,12 +139,15 @@ class JournalSynchronizationTest {
         var disabled=given().cookie(AuthenticationFilter.COOKIE,session.secret()).header("X-CSRF-Token",session.csrf()).header("If-Match",status.jsonPath().getString("settings.etag")).contentType("application/json").body(settings.toString()).put("/api/v1/journal/settings").then().statusCode(200).extract().response();
         assertFalse(disabled.jsonPath().getBoolean("settings.enabled"));settings.put("enabled",true);
         given().cookie(AuthenticationFilter.COOKIE,session.secret()).header("X-CSRF-Token",session.csrf()).header("If-Match",disabled.jsonPath().getString("settings.etag")).contentType("application/json").body(settings.toString()).put("/api/v1/journal/settings").then().statusCode(200);
-        String key=UUID.randomUUID().toString();var enrollment=password.deepCopy().put("label","New laptop").put("publicKey",JournalKeyTest.publicKey());
+        String key=UUID.randomUUID().toString();var enrollment=object().put("label","New laptop").put("publicKey",JournalKeyTest.publicKey());
+        given().header("Authorization","Bearer test-a").header("Idempotency-Key",key).contentType("application/json").body(enrollment.toString()).post("/api/v1/journal/devices").then().statusCode(403);
+        given().cookie(AuthenticationFilter.COOKIE,session.secret()).header("Idempotency-Key",key).contentType("application/json").body(enrollment.toString()).post("/api/v1/journal/devices").then().statusCode(403);
         var enrolled=given().cookie(AuthenticationFilter.COOKIE,session.secret()).header("X-CSRF-Token",session.csrf()).header("Idempotency-Key",key).contentType("application/json").body(enrollment.toString()).post("/api/v1/journal/devices").then().statusCode(201).extract().response();
         var replay=given().cookie(AuthenticationFilter.COOKIE,session.secret()).header("X-CSRF-Token",session.csrf()).header("Idempotency-Key",key).contentType("application/json").body(enrollment.toString()).post("/api/v1/journal/devices").then().statusCode(201).extract().response();assertEquals(enrolled.asString(),replay.asString());
-        String enrolledId=enrolled.jsonPath().getString("id");
+        String enrolledId=enrolled.jsonPath().getString("id");assertTrue(enrolled.jsonPath().getBoolean("bidirectional"));
+        store.transaction("a",()->{var devices=new JournalDevices(store);assertTrue(devices.settings().path("enabled").asBoolean());assertTrue(devices.settings().path("bidirectional").asBoolean());assertFalse(devices.list().stream().filter(value->value.path("id").asText().equals(device.toString())).findFirst().orElseThrow().path("bidirectional").asBoolean());return null;});
         var profile=given().cookie(AuthenticationFilter.COOKIE,session.secret()).get("/api/v1/journal/devices/"+enrolledId+"/profile").then().statusCode(200).extract().response();assertEquals("ssh.example.invalid",profile.jsonPath().getString("hostname"));assertEquals(2222,profile.jsonPath().getInt("port"));assertFalse(profile.asString().contains(TOKEN));assertFalse(profile.asString().contains("ownerId"));
-        inputs.validate("JournalProfile",parse(profile.asString()));
+        assertEquals(2,profile.jsonPath().getInt("format"));assertEquals("BIDIRECTIONAL",profile.jsonPath().getString("direction"));inputs.validate("JournalProfile",parse(profile.asString()));
         given().header("Authorization","Bearer test-b").get("/api/v1/journal/devices/"+enrolledId+"/profile").then().statusCode(404);
         store.transaction("a",()->{try(var statement=store.statement("SELECT body FROM tk_receipt WHERE owner_id=? AND command_id=?",store.owner(),UUID.fromString(key));var rows=statement.executeQuery()){assertTrue(rows.next());assertFalse(rows.getString(1).contains("fixture passphrase"));}catch(java.sql.SQLException failure){throw new AssertionError(failure);}return null;});
         given().cookie(AuthenticationFilter.COOKIE,session.secret()).header("X-CSRF-Token",session.csrf()).contentType("application/json").body(password.toString()).post("/api/v1/journal/devices/"+enrolledId+"/revoke").then().statusCode(200);
