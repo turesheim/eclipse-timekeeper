@@ -66,8 +66,11 @@ test('journal synchronization reviews both conflict copies, preserves originals 
   const context=await browser.newContext({baseURL:base(),ignoreHTTPSErrors:true,locale:'en-GB'}),page=await context.newPage(),machine=await playwright.request.newContext({baseURL:base(),ignoreHTTPSErrors:true});
   try{
     const user=await fresh(request);await signIn(page,user);await page.getByText('Connection setup and troubleshooting',{exact:true}).click();
-    await enroll(page).getByLabel('Client name').fill('Conflict laptop');await enroll(page).getByLabel('Public SSH key (.pub)',{exact:true}).fill(key());await enroll(page).getByRole('button',{name:'Add client'}).click();await expect(enroll(page)).toContainText('Client added.');
-    const api=browserRequest(page),identity=await(await api.get('/api/v1/auth/session')).json(),device=(await(await api.get('/api/v1/journal')).json()).devices[0],date='/api/v1/day-notes/2026-10-25';
+    // Preserve coverage for existing upload-only clients using their explicit legacy API scope.
+    const api=browserRequest(page),identity=await(await api.get('/api/v1/auth/session')).json(),status=await(await api.get('/api/v1/journal')).json();
+    expect((await api.put('/api/v1/journal/settings',{headers:{'X-CSRF-Token':identity.csrf,'If-Match':status.settings.etag},data:{enabled:true,bidirectional:false,currentPassword:user.password}})).status()).toBe(200);
+    const enrolled=await api.post('/api/v1/journal/devices',{headers:{'X-CSRF-Token':identity.csrf,'Idempotency-Key':randomUUID()},data:{label:'Conflict laptop',publicKey:key(),bidirectional:false}});expect(enrolled.status()).toBe(201);
+    const device=await enrolled.json(),date='/api/v1/day-notes/2026-10-25';
     let current=await api.get(date);await api.put(date,{headers:{'X-CSRF-Token':identity.csrf,'If-Match':current.headers().etag},data:{body:'Calendar original'}});
     const gateway='/internal/journal/'+user.transport.username,headers={Authorization:'JournalTransport '+user.transport.token};
     const started=await machine.post(gateway+'/transfers',{headers,data:{deviceId:device.id}});expect(started.status()).toBe(200);const id=(await started.json()).id;
