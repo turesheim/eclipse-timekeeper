@@ -19,7 +19,7 @@ import com.google.gson.JsonParser;
 /** Owner-neutral CSV representation of the domain transfer API; no database is opened. */
 public final class CsvSnapshot {
     private static final int MAX_BYTES = 48 * 1024 * 1024;
-    private static final List<String> TASK_EXTRAS = List.of("status","scheduledDate","completedAt","checklistItems","externalAliases","recurrence","reminders",
+    private static final List<String> TASK_EXTRAS = List.of("status","scheduledDate","completedAt","checklistItems","externalAliases","recurrence","reminders","metadata",
             "start","due","priority","flagged","urgent","body","siblingOrder");
     private static final Map<String,List<String>> COLUMNS = new LinkedHashMap<>();
     static {

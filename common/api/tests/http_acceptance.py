@@ -774,6 +774,33 @@ class HttpAcceptance(unittest.TestCase):
         cleared,_=self.call('PUT',path+'/reminders',body={'reminders':[]},headers={'If-Match':headers['ETag']})
         self.assertEqual([],cleared['reminders'])
 
+    def test_task_metadata_keeps_provider_source_links_distinct(self):
+        path='/tasks/'+self.task['id']
+        links=[{'id':str(uuid4()),'kind':'LOCAL','url':'https://example.invalid/local','title':'Local link','providerId':None,'remoteId':None},
+               {'id':str(uuid4()),'kind':'PROVIDER_SOURCE','url':'https://tasks.google.com/task/1','title':'Source','providerId':'google','remoteId':None},
+               {'id':str(uuid4()),'kind':'PROVIDER_LINKED','url':'https://example.invalid/resource','title':'Linked','providerId':'microsoft','remoteId':'link-1'}]
+        metadata={'tags':['Home'],'categories':['Blue Category'],'links':links}
+        original,headers=self.call('GET',path)
+        self.assertEqual({'tags':[],'categories':[],'links':[]},original['metadata'])
+        self.call('PUT',path+'/metadata',owner='read',body=metadata,headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        updated,headers=self.call('PUT',path+'/metadata',body=metadata,headers={'If-Match':headers['ETag']})
+        self.assertEqual(metadata,updated['metadata'])
+        self.assertIsNone(updated['url'])
+        self.call('PUT',path+'/metadata',body={**metadata,'links':links+[links[0]]},headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        legacy={'projectId':updated['projectId'],'parentTaskId':updated['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        updated,headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        self.assertEqual(metadata,updated['metadata'])
+        exported,_=self.call('GET','/data/export')
+        imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored,_=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual(metadata,restored['metadata'])
+        cleared,_=self.call('PUT',path+'/metadata',body={'tags':[],'categories':[],'links':[]},headers={'If-Match':headers['ETag']})
+        self.assertEqual({'tags':[],'categories':[],'links':[]},cleared['metadata'])
+
     def test_connection_capabilities_are_conditional_and_portable(self):
         account={'providerId':'google','remoteAccountId':str(uuid4()),'name':'Capabilities',
                  'readable':True,'writable':True,'enabled':True}

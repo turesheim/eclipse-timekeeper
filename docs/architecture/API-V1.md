@@ -250,6 +250,15 @@ kinds locally and warn on attempted export; they must never convert them to a
 timed alert or treat a due date as an alert. Apple companion authorization and
 contact resolution remain outside task payloads.
 
+Task `metadata` stores `tags`, `categories`, and `links` separately. Tags can
+represent Apple Reminders tags; categories can represent Outlook categories.
+Links have stable IDs and `LOCAL`, `PROVIDER_SOURCE`, or `PROVIDER_LINKED` kinds.
+Provider source links, such as Google Tasks output-only links, remain separate
+from the editable primary task `url`. Provider links carry a provider ID and
+linked resources can carry a remote ID. `PUT /tasks/{id}/metadata` conditionally
+replaces the full metadata value. Legacy task writes retain it, and connectors
+must use their declared field capabilities before exporting any change.
+
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
 Manual editing sets `manual=true` and cannot change activity task/owner. Creating,

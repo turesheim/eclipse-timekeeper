@@ -454,6 +454,11 @@ transfers include it.
 Absolute and relative time alerts, geofences, car events, and message contacts
 remain distinct from task scheduling and due dates. Older task writes preserve
 them, and archives and portable transfers include them.
+`TASK.metadata` stores Apple-style tags, Outlook categories, and typed links as
+separate collections. A provider source link is not the task's editable primary
+URL. Each link has a stable Timekeeper UUID; provider-origin links also record
+their provider and, where available, remote link ID. Legacy task writes retain
+the collections and transfers preserve them.
 The account ZIP archive also includes active day labels and Markdown bodies;
 deletion tombstones are not portable account records.
 Imports also accept v1/v2 snapshots, assign their projects and sessions to the

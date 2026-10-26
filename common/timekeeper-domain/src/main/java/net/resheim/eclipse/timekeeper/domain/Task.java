@@ -9,7 +9,7 @@ import java.util.Set;
 /** Immutable, provider-independent Timekeeper task aggregate state. */
 public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary, Optional<String> url,
 		Set<ExternalTaskReference> externalReferences, Set<ExternalTaskReferenceKey> externalAliases, TaskPlanning planning,
-		TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, TaskRecurrence recurrence, List<TaskReminder> reminders, int siblingOrder, long version) {
+		TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, TaskRecurrence recurrence, List<TaskReminder> reminders, TaskMetadata metadata, int siblingOrder, long version) {
 	public Task {
 		id = Values.required(id, "taskId");
 		projectId = projectId == null ? Optional.empty() : projectId;
@@ -28,6 +28,7 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		body = body == null ? TaskBody.empty() : body;
 		recurrence = recurrence == null ? TaskRecurrence.empty() : recurrence;
 		reminders = reminders == null ? List.of() : List.copyOf(reminders);
+		metadata = metadata == null ? TaskMetadata.empty() : metadata;
 		if(reminders.size()>100 || reminders.stream().map(TaskReminder::id).distinct().count()!=reminders.size())
 			throw new DomainValidationException("reminders","too many or duplicate reminder IDs");
 		if (siblingOrder < 0) throw new DomainValidationException("siblingOrder", "sibling order must not be negative");
@@ -38,6 +39,13 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		if (externalAliases.stream().anyMatch(key -> !keys.add(key)))
 			throw new DomainValidationException("externalAliases", "aliases must be unique and separate from current references");
 		version = Values.version(version);
+	}
+
+	public Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
+			Optional<String> url, Set<ExternalTaskReference> externalReferences, Set<ExternalTaskReferenceKey> externalAliases,
+			TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body,
+			TaskRecurrence recurrence, List<TaskReminder> reminders, int siblingOrder, long version) {
+		this(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, checklist, timing, importance, body, recurrence, reminders, TaskMetadata.empty(), siblingOrder, version);
 	}
 
 	public Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
@@ -98,39 +106,43 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 
 	public Task update(Optional<ProjectId> newProjectId, Optional<TaskId> newParentTaskId,
 			String newSummary, Optional<String> newUrl) {
-		return new Task(id, newProjectId, newParentTaskId, newSummary, newUrl, externalReferences, externalAliases, planning, checklist, timing, importance, body, recurrence, reminders, siblingOrder, version + 1);
+		return new Task(id, newProjectId, newParentTaskId, newSummary, newUrl, externalReferences, externalAliases, planning, checklist, timing, importance, body, recurrence, reminders, metadata, siblingOrder, version + 1);
 	}
 
 	public Task plan(TaskPlanning newPlanning) {
-		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, newPlanning, checklist, timing, importance, body, recurrence, reminders, siblingOrder, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, newPlanning, checklist, timing, importance, body, recurrence, reminders, metadata, siblingOrder, version + 1);
 	}
 
 	public Task withChecklist(TaskChecklist newChecklist) {
-		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, newChecklist, timing, importance, body, recurrence, reminders, siblingOrder, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, newChecklist, timing, importance, body, recurrence, reminders, metadata, siblingOrder, version + 1);
 	}
 
 	public Task withTiming(TaskTiming newTiming) {
-		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, checklist, newTiming, importance, body, recurrence, reminders, siblingOrder, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, checklist, newTiming, importance, body, recurrence, reminders, metadata, siblingOrder, version + 1);
 	}
 
 	public Task withImportance(TaskImportance newImportance) {
-		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, checklist, timing, newImportance, body, recurrence, reminders, siblingOrder, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, checklist, timing, newImportance, body, recurrence, reminders, metadata, siblingOrder, version + 1);
 	}
 
 	public Task withBody(TaskBody newBody) {
-		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, checklist, timing, importance, newBody, recurrence, reminders, siblingOrder, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, checklist, timing, importance, newBody, recurrence, reminders, metadata, siblingOrder, version + 1);
 	}
 
 	public Task withRecurrence(TaskRecurrence value) {
-		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, checklist, timing, importance, body, value, reminders, siblingOrder, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, checklist, timing, importance, body, value, reminders, metadata, siblingOrder, version + 1);
 	}
 
 	public Task withReminders(List<TaskReminder> value) {
-		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, checklist, timing, importance, body, recurrence, value, siblingOrder, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, checklist, timing, importance, body, recurrence, value, metadata, siblingOrder, version + 1);
+	}
+
+	public Task withMetadata(TaskMetadata value) {
+		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, checklist, timing, importance, body, recurrence, reminders, value, siblingOrder, version + 1);
 	}
 
 	public Task withSiblingOrder(int order) {
-		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, checklist, timing, importance, body, recurrence, reminders, order, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, externalAliases, planning, checklist, timing, importance, body, recurrence, reminders, metadata, order, version + 1);
 	}
 
 	public Task link(ExternalTaskReference reference) {
@@ -144,7 +156,7 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		updated.removeIf(candidate -> candidate.key().equals(key));
 		updated.add(reference);
 		Set<ExternalTaskReferenceKey> aliases = new LinkedHashSet<>(externalAliases);aliases.remove(key);
-		return new Task(id, projectId, parentTaskId, summary, url, updated, aliases, planning, checklist, timing, importance, body, recurrence, reminders, siblingOrder, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, updated, aliases, planning, checklist, timing, importance, body, recurrence, reminders, metadata, siblingOrder, version + 1);
 	}
 
 	public Task replaceExternalReference(ExternalTaskReferenceKey previous, ExternalTaskReference current) {
@@ -165,7 +177,7 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		updated.removeIf(reference -> reference.key().equals(previous));updated.add(current);
 		Set<ExternalTaskReferenceKey> aliases = new LinkedHashSet<>(externalAliases);
 		aliases.add(previous);aliases.remove(currentKey);
-		return new Task(id, projectId, parentTaskId, summary, url, updated, aliases, planning, checklist, timing, importance, body, recurrence, reminders, siblingOrder, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, updated, aliases, planning, checklist, timing, importance, body, recurrence, reminders, metadata, siblingOrder, version + 1);
 	}
 
 	public Task withExternalSource(ExternalTaskReferenceKey key, ExternalTaskSource source) {
@@ -178,7 +190,7 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 			else updated.add(reference);
 		}
 		if (!found) throw new DomainValidationException("externalReference", "reference is not linked to task");
-		return new Task(id, projectId, parentTaskId, summary, url, updated, externalAliases, planning, checklist, timing, importance, body, recurrence, reminders, siblingOrder, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, updated, externalAliases, planning, checklist, timing, importance, body, recurrence, reminders, metadata, siblingOrder, version + 1);
 	}
 
 	public Task withExternalProviderData(ExternalTaskReferenceKey key, Optional<ExternalTaskProviderData> data) {
@@ -190,13 +202,13 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 			else updated.add(reference);
 		}
 		if (!found) throw new DomainValidationException("externalReference", "reference is not linked to task");
-		return new Task(id, projectId, parentTaskId, summary, url, updated, externalAliases, planning, checklist, timing, importance, body, recurrence, reminders, siblingOrder, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, updated, externalAliases, planning, checklist, timing, importance, body, recurrence, reminders, metadata, siblingOrder, version + 1);
 	}
 
 	public Task unlink(ExternalTaskReference reference) {
 		Values.required(reference, "externalReference");
 		Set<ExternalTaskReference> updated = new LinkedHashSet<>(externalReferences);
 		updated.removeIf(candidate -> candidate.key().equals(reference.key()));
-		return new Task(id, projectId, parentTaskId, summary, url, updated, externalAliases, planning, checklist, timing, importance, body, recurrence, reminders, siblingOrder, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, updated, externalAliases, planning, checklist, timing, importance, body, recurrence, reminders, metadata, siblingOrder, version + 1);
 	}
 }

@@ -11696,6 +11696,101 @@
         },
         "description": "Conditional replacement of the complete per-connection capability declaration. Legacy connection updates preserve it."
       }
+    },
+    "/tasks/{id}/metadata": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskMetadata",
+        "summary": "Replace task tags, categories, and links",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskMetadata"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of task metadata. Ordinary task updates preserve it. A provider source link does not become the editable primary URL."
+      }
     }
   },
   "components": {
@@ -12338,6 +12433,9 @@
             },
             "maxItems": 100,
             "default": []
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/TaskMetadata"
           }
         },
         "required": [
@@ -12362,7 +12460,8 @@
           "siblingOrder",
           "externalAliases",
           "recurrence",
-          "reminders"
+          "reminders",
+          "metadata"
         ],
         "additionalProperties": true
       },
@@ -12951,6 +13050,9 @@
             },
             "maxItems": 100,
             "default": []
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/TaskMetadata"
           }
         },
         "required": [
@@ -13510,6 +13612,9 @@
             },
             "maxItems": 100,
             "default": []
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/TaskMetadata"
           }
         },
         "required": [
@@ -21747,6 +21852,116 @@
         ],
         "additionalProperties": false,
         "description": "Versioned connector declaration for this account. Omitted field keys are unknown, not unsupported."
+      },
+      "TaskLink": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "LOCAL",
+              "PROVIDER_SOURCE",
+              "PROVIDER_LINKED"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^(https?://|mailto:)",
+            "description": "Only HTTP(S) and mailto URLs are accepted."
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "providerId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "remoteId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "url",
+          "title",
+          "providerId",
+          "remoteId"
+        ],
+        "additionalProperties": false,
+        "description": "Local link or provider-origin source/linked resource. Provider source links are not an editable primary task URL."
+      },
+      "TaskMetadata": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "\\S"
+            },
+            "uniqueItems": true,
+            "maxItems": 100
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "\\S"
+            },
+            "uniqueItems": true,
+            "maxItems": 100
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskLink"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "tags",
+          "categories",
+          "links"
+        ],
+        "additionalProperties": false,
+        "description": "Apple-style tags, Outlook categories, and linked resources remain distinct."
       }
     },
     "parameters": {

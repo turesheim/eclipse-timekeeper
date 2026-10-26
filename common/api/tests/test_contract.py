@@ -139,6 +139,15 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskCapabilities').is_valid({**body,'fields':{'linkedResources':{**field,'ownerId':'other'}}}))
         self.assertEqual('updateTaskConnectionCapabilities',CONTRACT['paths']['/task-connections/{id}/capabilities']['put']['operationId'])
 
+    def test_task_tags_categories_and_provider_links_are_distinct(self):
+        link={'id':ID,'kind':'PROVIDER_SOURCE','url':'https://tasks.google.com/task/1',
+              'title':'Original task','providerId':'google','remoteId':None}
+        body={'tags':['Personal'],'categories':['Blue Category'],'links':[link]}
+        validator('TaskMetadata').validate(body)
+        self.assertFalse(validator('TaskMetadata').is_valid({**body,'tags':['Personal','Personal']}))
+        self.assertFalse(validator('TaskLink').is_valid({**link,'url':'javascript:alert(1)'}))
+        self.assertEqual('updateTaskMetadata',CONTRACT['paths']['/tasks/{id}/metadata']['put']['operationId'])
+
     def test_task_planning_has_a_date_only_schedule_and_conditional_update_contract(self):
         body = {'summary': 'Review', 'projectId': None, 'parentTaskId': None, 'url': None,
                 'status': 'COMPLETED', 'scheduledDate': '2026-10-26', 'completedAt': '2026-10-26T11:12:13Z'}
@@ -366,7 +375,7 @@ class ContractTest(unittest.TestCase):
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'deleteTaskList', 'getTaskList', 'listTaskLists',
             'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors',
-            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
+            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskMetadata', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
             'linkExternalReference', 'replaceExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',

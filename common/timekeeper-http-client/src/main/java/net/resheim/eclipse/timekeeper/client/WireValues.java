@@ -43,7 +43,7 @@ public final class WireValues {
         var planning=new TaskPlanning(value.has("status")?TaskStatus.valueOf(value.get("status").getAsString()):TaskStatus.NOT_STARTED,
                 text(value.get("scheduledDate")).map(LocalDate::parse),text(value.get("completedAt")).map(Instant::parse));
         var checklist=checklist(value.get("checklistItems"));
-		return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,aliases,planning,checklist,timing(value),importance(value),body(value),recurrence(value.get("recurrence")),reminders(value.get("reminders")),value.has("siblingOrder")?value.get("siblingOrder").getAsInt():0,value.get("version").getAsLong());
+		return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,aliases,planning,checklist,timing(value),importance(value),body(value),recurrence(value.get("recurrence")),reminders(value.get("reminders")),metadata(value.get("metadata")),value.has("siblingOrder")?value.get("siblingOrder").getAsInt():0,value.get("version").getAsLong());
     }
     public static TaskBody body(JsonObject value) {
         if(!value.has("body") || value.get("body").isJsonNull())return TaskBody.empty();
@@ -117,6 +117,23 @@ public final class WireValues {
         new java.util.TreeMap<>(value.fields()).forEach((key,entry) -> {
             var field=object();field.addProperty("readable",entry.readable());field.addProperty("writable",entry.writable());field.addProperty("deletable",entry.deletable());optional(field,"note",entry.note());fields.add(key,field);
         });node.add("fields",fields);return node;
+    }
+    public static TaskMetadata metadata(JsonElement value) {
+        if(value==null || value.isJsonNull())return TaskMetadata.empty();
+        var node=value.getAsJsonObject();var tags=StreamSupport.stream(node.getAsJsonArray("tags").spliterator(),false).map(JsonElement::getAsString).collect(Collectors.toUnmodifiableSet());
+        var categories=StreamSupport.stream(node.getAsJsonArray("categories").spliterator(),false).map(JsonElement::getAsString).collect(Collectors.toUnmodifiableSet());
+        var links=StreamSupport.stream(node.getAsJsonArray("links").spliterator(),false).map(item -> {
+            var entry=item.getAsJsonObject();return new TaskLink(id(entry.get("id")),TaskLinkKind.valueOf(entry.get("kind").getAsString()),entry.get("url").getAsString(),
+                    text(entry.get("title")),text(entry.get("providerId")),text(entry.get("remoteId")));
+        }).toList();return new TaskMetadata(tags,categories,links);
+    }
+    public static JsonObject metadata(TaskMetadata value) {
+        var node=object();var tags=new JsonArray();value.tags().stream().sorted().forEach(tags::add);node.add("tags",tags);
+        var categories=new JsonArray();value.categories().stream().sorted().forEach(categories::add);node.add("categories",categories);
+        var links=new JsonArray();value.links().forEach(link -> {
+            var entry=object();entry.addProperty("id",link.id().toString());entry.addProperty("kind",link.kind().name());entry.addProperty("url",link.url());
+            optional(entry,"title",link.title());optional(entry,"providerId",link.providerId());optional(entry,"remoteId",link.remoteId());links.add(entry);
+        });node.add("links",links);return node;
     }
     public static TaskImportance importance(JsonObject value) {
         return new TaskImportance(value.has("priority")?TaskPriority.valueOf(value.get("priority").getAsString()):TaskPriority.UNSPECIFIED,

@@ -50,6 +50,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskBody;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskRecurrence;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskOccurrences;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskReminders;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskMetadata;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskOrder;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityReport;
@@ -88,6 +89,7 @@ public interface TimekeeperService {
 	default Task updateTaskRecurrence(UpdateTaskRecurrence command) { throw new UnsupportedOperationException("Task recurrence is not supported"); }
 	default Task updateTaskOccurrences(UpdateTaskOccurrences command) { throw new UnsupportedOperationException("Task occurrences are not supported"); }
 	default Task updateTaskReminders(UpdateTaskReminders command) { throw new UnsupportedOperationException("Task reminders are not supported"); }
+	default Task updateTaskMetadata(UpdateTaskMetadata command) { throw new UnsupportedOperationException("Task metadata is not supported"); }
 	default Task updateTaskOrder(UpdateTaskOrder command) { throw new UnsupportedOperationException("Task order is not supported"); }
 	void deleteTask(DeleteTask command);
 	Optional<Task> task(TaskId id);

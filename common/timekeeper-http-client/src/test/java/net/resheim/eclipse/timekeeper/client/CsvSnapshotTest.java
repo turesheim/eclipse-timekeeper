@@ -15,7 +15,7 @@ import com.google.gson.JsonParser;
 class CsvSnapshotTest {
     @TempDir Path temporary;
 
-    @Test void taskExtrasPreservePlanningTimingNotesOrderAliasesRecurrenceAndReminders() throws Exception {
+    @Test void taskExtrasPreservePlanningTimingNotesOrderAliasesRecurrenceRemindersAndMetadata() throws Exception {
         var data=JsonParser.parseString("""
             {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[],"projects":[],"labels":[],"activities":[],"workSessions":[],
              "tasks":[{"id":"new","projectId":null,"parentTaskId":null,"summary":"Future","url":null,"externalReferences":[],
@@ -25,7 +25,8 @@ class CsvSnapshotTest {
                        "externalAliases":[{"providerId":"microsoft","repositoryId":"account/list-a","externalId":"previous"}],
                        "recurrence":{"series":{"rule":"FREQ=WEEKLY;BYDAY=MO","end":"COUNT","until":null,"count":8},
                                      "occurrences":[{"original":{"kind":"DATE","date":"2026-10-26"},"movedTo":null,"state":"COMPLETED","completedAt":"2026-10-26T12:00:00Z"}]},
-                       "reminders":[{"id":"11111111-1111-4111-8111-111111111111","kind":"RELATIVE","anchor":"DUE","offsetMinutes":30}]},
+                       "reminders":[{"id":"11111111-1111-4111-8111-111111111111","kind":"RELATIVE","anchor":"DUE","offsetMinutes":30}],
+                       "metadata":{"tags":["Home"],"categories":["Blue Category"],"links":[{"id":"22222222-2222-4222-8222-222222222222","kind":"PROVIDER_SOURCE","url":"https://tasks.google.com/task/1","title":null,"providerId":"google","remoteId":null}]}},
                       {"id":"old","projectId":null,"parentTaskId":null,"summary":"Earlier","url":null,"externalReferences":[]}]}
             """).getAsJsonObject();
         var folder=temporary.resolve("task-extras");assertEquals(2,CsvSnapshot.write(data,folder));assertEquals(data,CsvSnapshot.read(folder));
