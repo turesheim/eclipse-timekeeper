@@ -90,7 +90,7 @@ Run `npm run vendor:icons` in `server/web` to regenerate the pinned assets,
 project catalog and API allow-list. `npm run check:assets` verifies them.
 
 Workspace views use a Bootstrap `navbar fixed-bottom` with `navbar-nav` and
-`nav-link` controls. The six views appear in this order: Calendar, Week, Workweek, Activities,
+`nav-link` controls. The seven views appear in this order: Today, Calendar, Week, Workweek, Activities,
 Clients and Projects. Labels are configured under **My Account → Labels**.
 The active view has `aria-current="page"`; compact screens show icons with
 accessible names, and wide screens also show labels. Safe-area padding keeps the
@@ -108,6 +108,20 @@ the [evaluation and preservation contract](MARKDOWN-EDITOR.md) for the editor
 choice, dependency licenses, bundle measurements, tests and integration limits.
 
 ## Calendar month view
+
+**Today** opens a selected day with its Markdown journal in the main column.
+The date field and adjacent buttons move between days; the mini calendar selects
+any visible date and has separate month controls. The sidebar shows work
+sessions clipped to that day in the account time zone, imported all-day calendar
+plans, and the task for an active activity. A planned-tasks section is ready for
+the scheduled task dates being designed in issue #413. Selecting a work
+session opens its editor. The inline journal uses the same saved day note and
+conflict handling as Calendar and Week. Unsaved changes require confirmation
+before selecting another date. On narrow screens the sidebar follows the journal.
+
+![Today view with journal and day overview](../assets/screenshots/today-desktop.png)
+
+![Today view on a narrow screen](../assets/screenshots/today-mobile.png)
 
 **Calendar** is the default workspace tab. Its Monday-to-Sunday month grid shows
 one client-coloured summary per client and day, with recorded session hours per
