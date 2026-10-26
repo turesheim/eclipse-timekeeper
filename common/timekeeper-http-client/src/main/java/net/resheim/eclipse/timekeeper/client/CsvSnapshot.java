@@ -19,6 +19,8 @@ import com.google.gson.JsonParser;
 /** Owner-neutral CSV representation of the domain transfer API; no database is opened. */
 public final class CsvSnapshot {
     private static final int MAX_BYTES = 48 * 1024 * 1024;
+    private static final List<String> TASK_EXTRAS = List.of("status","scheduledDate","completedAt","checklistItems",
+            "start","due","priority","flagged","urgent","body","siblingOrder");
     private static final Map<String,List<String>> COLUMNS = new LinkedHashMap<>();
     static {
         COLUMNS.put("projects", List.of("id", "name"));
@@ -78,11 +80,17 @@ public final class CsvSnapshot {
                     for(var item:items) if(item.getAsJsonObject().has(optional)) {names.add(optional);break;}
             if(table.getKey().equals("projects"))
                 for(var item:items) if(item.getAsJsonObject().has("icon")) {names.add("icon");break;}
+            if(table.getKey().equals("tasks"))
+                for(var item:items) if(TASK_EXTRAS.stream().anyMatch(item.getAsJsonObject()::has)) {names.add("taskExtras");break;}
             StringBuilder csv = new StringBuilder();row(csv, names);
             for (JsonElement item : items) {
                 List<String> fields = new ArrayList<>();
                 for (String column : names) {
                     JsonElement value = item.getAsJsonObject().get(column);
+                    if(column.equals("taskExtras")) {
+                        var extras=new JsonObject();for(String field:TASK_EXTRAS) if(item.getAsJsonObject().has(field)) extras.add(field,item.getAsJsonObject().get(field));
+                        value=extras;
+                    }
                     if(value==null && table.getKey().equals("workSessions") && column.equals("labelIds")) value=new JsonArray();
                     if (value == null && !List.of("workSessionId","projectId","title","icon").contains(column)) throw invalid();
                     if(value==null) value=JsonNull.INSTANCE;
@@ -95,6 +103,8 @@ public final class CsvSnapshot {
         JsonObject metadata = new JsonObject();metadata.addProperty("format", clients ? "timekeeper-domain-csv-v3" : sessions ? "timekeeper-domain-csv-v2" : "timekeeper-domain-csv-v1");
         metadata.add("zoneId", snapshot.get("zoneId"));
         if(tables.containsKey("taskConnections")) metadata.addProperty("providerCollections",true);
+        if(snapshot.getAsJsonArray("tasks").asList().stream().anyMatch(item -> TASK_EXTRAS.stream().anyMatch(item.getAsJsonObject()::has)))
+            metadata.addProperty("taskExtras",true);
         // The descriptor is last: incomplete/cancelled exports cannot be imported.
         Files.writeString(folder.resolve("timekeeper.csv.json"), metadata.toString(), StandardCharsets.UTF_8);
         return count;
@@ -125,6 +135,11 @@ public final class CsvSnapshot {
                 if(clients && table.getKey().equals("workSessions"))
                     for(String optional:List.of("title","labelIds","projectId")) if(names.contains(optional)) expected.add(optional);
                 if(table.getKey().equals("projects") && names.contains("icon")) expected.add("icon");
+                if(table.getKey().equals("tasks") && names.contains("taskExtras")) expected.add("taskExtras");
+                if(table.getKey().equals("tasks") && (metadata.has("taskExtras") != names.contains("taskExtras")
+                        || metadata.has("taskExtras") && (!metadata.get("taskExtras").isJsonPrimitive()
+                        || !metadata.get("taskExtras").getAsJsonPrimitive().isBoolean()
+                        || !metadata.get("taskExtras").getAsBoolean()))) throw invalid();
                 if(!names.equals(expected) || rows.size()>10000) throw invalid();
                 JsonArray items = new JsonArray();
                 for (List<String> fields : rows) {
@@ -135,7 +150,13 @@ public final class CsvSnapshot {
                         String column = names.get(i), value = fields.get(i);
                         if ((column.equals("title") || column.equals("icon")) && value == null) continue; // Optional metadata in mixed exports.
                         if (value == null) item.add(column, JsonNull.INSTANCE);
-                        else if (column.equals("externalReferences") || column.equals("labelIds")) {
+                        else if (column.equals("taskExtras")) {
+                            JsonElement extras=JsonParser.parseString(value);if(!extras.isJsonObject()) throw invalid();
+                            for(var extra:extras.getAsJsonObject().entrySet()) {
+                                if(!TASK_EXTRAS.contains(extra.getKey())) throw invalid();
+                                item.add(extra.getKey(),extra.getValue());
+                            }
+                        } else if (column.equals("externalReferences") || column.equals("labelIds")) {
                             JsonElement array = JsonParser.parseString(value);if (!array.isJsonArray()) throw invalid();item.add(column, array);
                         } else if (column.equals("manual") || (List.of("taskConnections","taskLists").contains(table.getKey())
                                 && List.of("readable","writable","enabled","shared","owner","present").contains(column))) {
