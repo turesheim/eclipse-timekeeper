@@ -113,8 +113,8 @@ class HttpAcceptance(unittest.TestCase):
             self.assertIsNone(page.get('nextCursor'), 'Fixture cleanup must include every daily record')
             self.created.extend((owner,'activities',value['id']) for value in page['items'])
         # Clean only records created by this suite, including commands/imports.
-        order = {'activities': 0, 'work-sessions': 1, 'tasks': 2, 'task-lists': 3,
-                 'task-connections': 4, 'labels': 5, 'projects': 6, 'clients': 7}
+        order = {'activities': 0, 'work-sessions': 1, 'tasks': 2, 'task-sync-cursors': 3, 'task-lists': 4,
+                 'task-connections': 5, 'labels': 6, 'projects': 7, 'clients': 8}
         unique = list(dict.fromkeys(reversed(self.created)))
         for owner, resource, identifier in sorted(unique, key=lambda row: order[row[1]]):
             value, headers = self.call('GET', f'/{resource}/{identifier}', owner=owner)
@@ -710,6 +710,41 @@ class HttpAcceptance(unittest.TestCase):
         restored, _=self.call('GET','/task-lists/'+mappings[linked['id']],owner='b')
         self.assertEqual(mappings[connection['id']],restored['connectionId'])
         self.assertFalse(restored['present'])
+
+    def test_sync_cursors_are_durable_opaque_and_require_explicit_rescan(self):
+        account=self.create('task-connections',{'providerId':'microsoft','remoteAccountId':str(uuid4()),
+                    'name':'Personal','readable':True,'writable':True,'enabled':True})
+        task_list=self.create('task-lists',{'connectionId':account['id'],'remoteListId':str(uuid4()),
+                    'name':'Tasks','kind':'STANDARD','readable':True,'writable':True,'shared':False,
+                    'owner':True,'present':True,'position':0})
+        initial={'connectionId':account['id'],'listId':None,'mode':'INITIAL','cursor':None,
+                 'lastObservedAt':None,'lastCompleteAt':None}
+        discovery=self.create('task-sync-cursors',initial)
+        replay, _=self.call('POST','/task-sync-cursors',body=initial,status=200)
+        self.assertEqual(discovery['id'],replay['id'])
+        self.call('POST','/task-sync-cursors',body={**initial,'mode':'RESCAN_REQUIRED'},status=409,code='CONFLICT')
+        list_cursor=self.create('task-sync-cursors',{**initial,'listId':task_list['id']})
+        self.call('GET','/task-sync-cursors/'+list_cursor['id'],owner='b',status=404,code='NOT_FOUND')
+        listed, _=self.call('GET','/task-sync-cursors?'+urlencode({'connectionId':account['id'],'listId':task_list['id']}))
+        self.assertEqual([list_cursor['id']],[item['id'] for item in listed['items']])
+        path='/task-sync-cursors/'+list_cursor['id']
+        _, headers=self.call('GET',path)
+        self.call('PUT',path,body={'mode':'INCREMENTAL','cursor':None,'lastObservedAt':None,'lastCompleteAt':None},
+                  headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        state='https://graph.example/delta?state=opaque%2Btoken%3D%3D'
+        incremental={'mode':'INCREMENTAL','cursor':state,'lastObservedAt':'2026-10-26T08:00:00Z',
+                     'lastCompleteAt':'2026-10-26T08:01:00Z'}
+        saved, headers=self.call('PUT',path,body=incremental,headers={'If-Match':headers['ETag']})
+        self.assertEqual(state,saved['cursor'])
+        self.call('PUT',path,body=incremental,headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        self.call('DELETE','/task-lists/'+task_list['id'],
+                  headers={'If-Match':self.call('GET','/task-lists/'+task_list['id'])[1]['ETag']},
+                  status=409,code='CONFLICT')
+        exported, _=self.call('GET','/data/export')
+        self.assertNotIn('taskSyncCursors',exported)
+        rescan, _=self.call('PUT',path,body={**incremental,'mode':'RESCAN_REQUIRED','cursor':None},
+                            headers={'If-Match':headers['ETag']})
+        self.assertEqual(('RESCAN_REQUIRED',None),(rescan['mode'],rescan['cursor']))
 
     def test_external_task_list_link_is_owned_guarded_and_remapped(self):
         account=self.create('task-connections',{'providerId':'google','remoteAccountId':str(uuid4()),

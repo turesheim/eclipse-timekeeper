@@ -19,6 +19,7 @@ import net.resheim.eclipse.timekeeper.domain.TaskPlanning;
 import net.resheim.eclipse.timekeeper.domain.TaskTiming;
 import net.resheim.eclipse.timekeeper.domain.TaskImportance;
 import net.resheim.eclipse.timekeeper.domain.TaskBody;
+import net.resheim.eclipse.timekeeper.domain.TaskSyncMode;
 
 /** Immutable inputs accepted by {@link TimekeeperService}. */
 public final class Commands {
@@ -37,6 +38,11 @@ public final class Commands {
 	public record UpdateTaskList(java.util.UUID id, long expectedVersion, String name,
 			net.resheim.eclipse.timekeeper.domain.TaskListKind kind, boolean readable, boolean writable,
 			boolean shared, boolean owner, boolean present, int position) { }
+	public record CreateTaskSyncCursor(java.util.UUID connectionId, Optional<java.util.UUID> listId,
+			TaskSyncMode mode, Optional<String> cursor, Optional<Instant> lastObservedAt,
+			Optional<Instant> lastCompleteAt) { }
+	public record UpdateTaskSyncCursor(java.util.UUID id, long expectedVersion, TaskSyncMode mode,
+			Optional<String> cursor, Optional<Instant> lastObservedAt, Optional<Instant> lastCompleteAt) { }
 
 	public record CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
 			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder) {
