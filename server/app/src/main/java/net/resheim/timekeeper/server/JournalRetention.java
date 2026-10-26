@@ -22,6 +22,7 @@ final class JournalRetention {
         var disposable=items.stream().filter(item->!item.has("sourceId")&&!item.path("state").asText().equals("PENDING")).toList();
         trim(JOURNAL_ITEM,disposable,200,"processedAt");
         var batchIds=new HashSet<String>();state.list(JOURNAL_ITEM).forEach(item->batchIds.add(item.path("batchId").asText()));
+        state.list(JOURNAL_OFFER).forEach(offer->batchIds.add(offer.path("batchId").asText()));
         trim(JOURNAL_BATCH,state.list(JOURNAL_BATCH).stream().filter(batch->!batchIds.contains(batch.path("id").asText())).toList(),200,"receivedAt");
         var retainedBatches=new HashSet<String>();state.list(JOURNAL_BATCH).forEach(batch->retainedBatches.add(batch.path("id").asText()));
         trim(JOURNAL_LEASE,state.list(JOURNAL_LEASE).stream().filter(lease->!lease.path("state").asText().equals("RECEIVING")&&!retainedBatches.contains(lease.path("id").asText())).toList(),200,"createdAt");

@@ -69,9 +69,20 @@ class JournalSynchronization {
             return object().put("deviceId",device.path("id").asText()).put("publicKey",canonical.publicKey());
         throw ApiFailure.unauthorized(false);
     }
-    ObjectNode verify(Gateway gateway,UUID device){var value=new JournalDevices(store).authorize(device);new JournalState(store).update(JOURNAL_DEVICE,value.put("lastVerifiedAt",store.now().toString()));return object().put("status","READY").put("direction","CLIENT_TO_SERVER");}
+    ObjectNode verify(Gateway gateway,UUID device){var devices=new JournalDevices(store);var value=devices.authorize(device);boolean bidi=value.path("bidirectional").asBoolean();if(bidi)devices.authorizeBidirectional(device);new JournalState(store).update(JOURNAL_DEVICE,value.put("lastVerifiedAt",store.now().toString()));return object().put("status","READY").put("direction",bidi?"BIDIRECTIONAL":"CLIENT_TO_SERVER");}
     ObjectNode begin(Gateway gateway,UUID device){
+        return begin(gateway,device,null);
+    }
+    ObjectNode begin(Gateway gateway,UUID device,UUID exchange){
         var devices=new JournalDevices(store);var credential=devices.authorize(device);var state=new JournalState(store);
+        if(credential.path("bidirectional").asBoolean()!=(exchange!=null))throw new ApiFailure(403,"JOURNAL_DIRECTION_REQUIRED");
+        if(exchange!=null){
+            devices.authorizeBidirectional(device);
+            for(var previous:state.list(JOURNAL_LEASE))if(previous.path("deviceId").asText().equals(device.toString())&&previous.path("clientExchangeId").asText().equals(exchange.toString())){
+                if(previous.path("state").asText().equals("COMPLETED")){valid(gateway.deployment(),previous);return leaseReply(previous);}
+                if(previous.path("state").asText().equals("RECEIVING")&&Instant.parse(previous.path("expiresAt").asText()).isAfter(store.now()))throw new ApiFailure(409,"JOURNAL_TRANSFER_ACTIVE");
+            }
+        }
         new JournalRetention(store).cleanup(gateway.deployment());
         long active=state.list(JOURNAL_LEASE).stream().filter(lease->lease.path("state").asText().equals("RECEIVING")&&Instant.parse(lease.path("expiresAt").asText()).isAfter(store.now())).count();
         if(active>=2)throw new ApiFailure(429,"JOURNAL_TRANSFER_LIMIT");
@@ -81,9 +92,10 @@ class JournalSynchronization {
         var lease=state.insert(JOURNAL_LEASE,id,object().put("deviceId",device.toString()).put("sequence",sequence).put("state","RECEIVING")
                 .put("syncEpoch",devices.settings().path("epoch").asLong()).put("configurationEpoch",gateway.deployment().epoch()).put("accountVersion",account.path("version").asLong())
                 .put("createdAt",store.now().toString()).put("hardEnd",store.now().plusSeconds(900).toString()).put("expiresAt",store.now().plusSeconds(120).toString()));
+        if(exchange!=null)lease=state.update(JOURNAL_LEASE,lease.put("clientExchangeId",exchange.toString()));
         folder(gateway.deployment(),id,true);return leaseReply(lease);
     }
-    private ObjectNode lease(Gateway gateway,UUID id,boolean completed){
+    ObjectNode lease(Gateway gateway,UUID id,boolean completed){
         var value=new JournalState(store).required(JOURNAL_LEASE,id);
         if(!(value.path("state").asText().equals("RECEIVING")||(completed&&value.path("state").asText().equals("COMPLETED"))))throw new ApiFailure(409,"JOURNAL_TRANSFER_ABORTED");
         valid(gateway.deployment(),value);
@@ -131,9 +143,12 @@ class JournalSynchronization {
     }
     ObjectNode complete(Gateway gateway,UUID id,JsonNode manifest){
         var lease=lease(gateway,id,true);var state=new JournalState(store);
-        var entries=manifest.path("files");if(!manifest.path("format").isIntegralNumber()||manifest.path("format").asLong()!=1||!manifest.path("completed").isBoolean()||!manifest.path("completed").asBoolean()||!entries.isArray()||entries.size()>JournalImport.BATCH_FILES)throw ApiFailure.validation();
+        boolean bidi=lease.has("clientExchangeId");long format=bidi?2:1;
+        if(bidi)new JournalDevices(store).authorizeBidirectional(uuid(lease.get("deviceId")));
+        var entries=manifest.path("files");if(!manifest.path("format").isIntegralNumber()||manifest.path("format").asLong()!=format||!manifest.path("completed").isBoolean()||!manifest.path("completed").asBoolean()||!entries.isArray()||entries.size()>(bidi?50:JournalImport.BATCH_FILES))throw ApiFailure.validation();
         var errors=manifest.has("errors")?manifest.path("errors"):array();
-        if(!errors.isArray()||entries.size()+errors.size()>JournalImport.BATCH_FILES)throw ApiFailure.validation();
+        if(!errors.isArray()||entries.size()+errors.size()>(bidi?50:JournalImport.BATCH_FILES))throw ApiFailure.validation();
+        if(bidi)JournalExchanges.validate(manifest,lease);
         var errorNames=new HashSet<String>();
         for(var error:errors){String name=error.path("name").asText();if(!name.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}\\.md")||!errorNames.add(name)||!Set.of("FILE_TOO_LARGE","UNSAFE_LOCAL_FILE","FILE_CHANGED","LOCAL_FILE_UNREADABLE").contains(error.path("code").asText()))throw ApiFailure.validation();}
         String manifestHash=hash(canonical(manifest).toString());
@@ -151,7 +166,7 @@ class JournalSynchronization {
             try(var staged=Files.list(folder)){if(!staged.map(path->path.getFileName().toString()).sorted().toList().equals(new ArrayList<>(files.keySet())))throw new ApiFailure(409,"JOURNAL_INCOMPLETE_TRANSFER");}
         }catch(IOException unsafe){throw new ApiFailure(409,"JOURNAL_INCOMPLETE_TRANSFER");}
         // Idempotent handoff is fingerprinted by the importer even after a lost response.
-        var batch=new JournalImport(store).seal(id,uuid(lease.get("deviceId")),lease.path("sequence").asLong(),files);
+        var batch=bidi?new JournalExchanges(store).seal(lease,manifest,files):new JournalImport(store).seal(id,uuid(lease.get("deviceId")),lease.path("sequence").asLong(),files);
         new JournalImport(store).localErrors(id,uuid(lease.get("deviceId")),lease.path("sequence").asLong(),errors);
         for(String field:List.of("syncEpoch","configurationEpoch","accountVersion"))batch.set(field,lease.get(field));state.update(JOURNAL_BATCH,batch);
         state.update(JOURNAL_LEASE,lease.put("state","COMPLETED").put("manifestHash",manifestHash).put("completedAt",store.now().toString()));
@@ -165,12 +180,12 @@ class JournalSynchronization {
             var state=new JournalState(store);var item=state.required(JOURNAL_ITEM,id);if(!item.path("state").asText().equals("PENDING"))return null;
             var batch=state.required(JOURNAL_BATCH,uuid(item.get("batchId")));var lease=state.required(JOURNAL_LEASE,uuid(batch.get("id")));
             if(!lease.path("state").asText().equals("COMPLETED"))throw new ApiFailure(409,"JOURNAL_INCOMPLETE_TRANSFER");
-            try{valid(configuration.load(),batch);}
+            try{valid(configuration.load(),batch);if(batch.path("bidirectional").asBoolean())new JournalDevices(store).authorizeBidirectional(uuid(batch.get("deviceId")));}
             catch(ApiFailure withdrawn){
-                if(!Set.of("JOURNAL_DISABLED","JOURNAL_ACCOUNT_DISABLED","JOURNAL_DEVICE_REVOKED","JOURNAL_AUTHORIZATION_CHANGED").contains(withdrawn.code))throw withdrawn;
+                if(!Set.of("JOURNAL_DISABLED","JOURNAL_ACCOUNT_DISABLED","JOURNAL_DEVICE_REVOKED","JOURNAL_AUTHORIZATION_CHANGED","JOURNAL_BIDIRECTIONAL_DISABLED","JOURNAL_DEVICE_WRITE_ONLY").contains(withdrawn.code))throw withdrawn;
                 state.update(JOURNAL_ITEM,item.put("state","ABORTED").put("error",withdrawn.code));return null;
             }
-            var outcome=new JournalImport(store).process(id);
+            var outcome=batch.path("bidirectional").asBoolean()?new JournalExchanges(store).process(item,batch,configuration.load().epoch()):new JournalImport(store).process(id);
             if(Set.of("IMPORTED","UNCHANGED").contains(outcome.path("state").asText())){
                 var device=state.required(JOURNAL_DEVICE,uuid(item.get("deviceId")));state.update(JOURNAL_DEVICE,device.put("lastImportAt",store.now().toString()));
             }return null;

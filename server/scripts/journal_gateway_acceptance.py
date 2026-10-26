@@ -51,7 +51,8 @@ class Api:
 
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--distribution',type=Path,required=True);parser.add_argument('--skip-image-build',action='store_true');args=parser.parse_args()
+    global GATEWAY_IMAGE
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--distribution',type=Path,required=True);parser.add_argument('--skip-image-build',action='store_true');parser.add_argument('--gateway-image',default=GATEWAY_IMAGE);parser.add_argument('--bidirectional',action='store_true');args=parser.parse_args();GATEWAY_IMAGE=args.gateway_image
     archive=args.distribution.resolve();digest=hashlib.sha256(archive.read_bytes()).hexdigest()
     if archive.with_suffix('.zip.sha256').read_text().split()[0]!=digest:raise ValueError('Distribution checksum mismatch')
     if not args.skip_image_build:command('docker','build','-t',GATEWAY_IMAGE,'-f',str(ROOT/'server/journal/Dockerfile'),str(ROOT))
@@ -130,15 +131,15 @@ def main():
             while client('id',check=False).returncode:
                 if time.monotonic()>deadline:raise RuntimeError('Clean journal client did not start')
                 time.sleep(.2)
-            def enroll(index,identity,profile_name,rotate=None):
+            def enroll(index,identity,profile_name,rotate=None,bidirectional=False,folder="/client/vault ' with spaces/Daily"):
                 client('ssh-keygen','-q','-t','ed25519','-N','','-f',identity)
                 public=client('cat',identity+'.pub').stdout.decode().strip();api=actors[index][1]
                 status,_=api.call('GET','/journal')
-                if not status['settings']['enabled']:api.call('PUT','/journal/settings',{'enabled':True,'currentPassword':password},match=status['settings']['etag'])
-                body={'label':'Clean client '+str(index),'publicKey':public,'currentPassword':password}
+                if not status['settings']['enabled'] or bidirectional and not status['settings']['bidirectional']:api.call('PUT','/journal/settings',{'enabled':True,'bidirectional':bidirectional or status['settings']['bidirectional'],'currentPassword':password},match=status['settings']['etag'])
+                body={'label':'Clean client '+str(index),'publicKey':public,'bidirectional':bidirectional,'currentPassword':password}
                 if rotate:body['rotateDeviceId']=rotate
                 device,_=api.call('POST','/journal/devices',body,status=201);public_profile,_=api.call('GET','/journal/devices/'+device['id']+'/profile');copy_client(profile_name,public_profile)
-                tool('configure',profile_name,'--folder',"/client/vault ' with spaces/Daily",'--identity',identity);tool('trust',profile_name,'--fingerprint',public_profile['hostKeyFingerprint'])
+                tool('configure',profile_name,'--folder',folder,'--identity',identity);tool('trust',profile_name,'--fingerprint',public_profile['hostKeyFingerprint'])
                 return device,public_profile
             python("from pathlib import Path;p=Path(\"/client/vault ' with spaces/Daily\");p.mkdir(parents=True);(p/'.obsidian').mkdir();(p/'.obsidian/private-config').write_text('UNRELATED_VAULT_CONFIGURATION');(p/'unrelated.md').write_text('UNRELATED_VAULT_FILE')")
             device,public_profile=enroll(0,"/client/identity ' with spaces",'profile-a.json')
@@ -193,6 +194,9 @@ def main():
             python(client_module().split('d,f,i,t=c.local_config')[0]+"p=pathlib.Path('/client/profile-a.json');_,t=c.paths(p);(t/'known_hosts').write_bytes((t/'original-pin').read_bytes());(t/'original-pin').unlink()")
             assert not tool('verify').returncode
             print('Real SSH command/forwarding/cross-account, malformed handoff, symlink, traversal and host mismatch denial: PASS',flush=True)
+            if args.bidirectional:
+                from journal_bidirectional_acceptance import run
+                run(api=actors[1][1],password=password,python=python,tool=tool,enroll=enroll,ssh=ssh,client_module=client_module,docker=docker,app_name=app_name)
             # More than the pending-copy quota must work as bounded, settled
             # batches rather than failing because a sender outruns the worker.
             names=[(date(1990,1,1)+timedelta(days=index)).isoformat()+'.md' for index in range(501)]
@@ -275,7 +279,7 @@ def main():
             tool('verify','profile-b.json')
             print('Real in-flight private permissions, rotation/revocation, disabled sync/account and Unix account isolation: PASS',flush=True)
             image_id=docker('image','inspect',GATEWAY_IMAGE,'--format','{{.Id}}').stdout.decode().strip()
-            receipt=output/'acceptance.json';receipt.write_text(json.dumps({'passed':True,'distributionSha256':digest,'sourceCommit':manifest['commit'],'clientSha256':hashlib.sha256(client_script).hexdigest(),'gatewayImageId':image_id,'rsync':'3.5.1','realSsh':True,'realHttps':True,'pressureFiles':501,'inflightWithdrawal':True,'crashRestart':True})+'\n');receipt.chmod(0o600)
+            receipt=output/'acceptance.json';receipt.write_text(json.dumps({'passed':True,'distributionSha256':digest,'sourceCommit':manifest['commit'],'clientSha256':hashlib.sha256(client_script).hexdigest(),'gatewayImageId':image_id,'rsync':'3.5.1','realSsh':True,'realHttps':True,'pressureFiles':501,'inflightWithdrawal':True,'crashRestart':True,'bidirectional':args.bidirectional})+'\n');receipt.chmod(0o600)
         finally:
             for process in background:
                 if process.poll() is None:process.kill();process.communicate(timeout=5)

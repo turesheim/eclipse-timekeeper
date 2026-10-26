@@ -9842,6 +9842,78 @@
           }
         }
       }
+    },
+    "/journal/items/{id}/calendar-source": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "journalCalendarSource",
+        "summary": "Download the private Calendar snapshot preserved with a bidirectional conflict",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -17913,6 +17985,10 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "bidirectional": {
+            "type": "boolean",
+            "description": "Explicitly enable bidirectional exchanges; existing device keys remain write-only unless registered with this capability."
           }
         },
         "required": [
@@ -17941,6 +18017,10 @@
           "rotateDeviceId": {
             "type": "string",
             "format": "uuid"
+          },
+          "bidirectional": {
+            "type": "boolean",
+            "description": "Explicitly enable bidirectional exchanges; existing device keys remain write-only unless registered with this capability."
           }
         },
         "required": [
@@ -18017,6 +18097,10 @@
             "type": "boolean",
             "readOnly": true,
             "description": "Explicit permission for prepared outbound journal exchanges. Existing write-only devices default to false."
+          },
+          "lastSyncAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
@@ -18068,7 +18152,9 @@
               "UNCHANGED",
               "SUPERSEDED",
               "KEPT_CALENDAR",
-              "DISCARDED"
+              "DISCARDED",
+              "OFFERED",
+              "ACKNOWLEDGED"
             ]
           },
           "error": {
@@ -18080,6 +18166,15 @@
             "format": "date-time"
           },
           "canDownload": {
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "BIDIRECTIONAL"
+          },
+          "canDiscard": {
+            "type": "boolean"
+          },
+          "canDownloadCalendar": {
             "type": "boolean"
           }
         },
@@ -18133,7 +18228,9 @@
               "UNCHANGED",
               "SUPERSEDED",
               "KEPT_CALENDAR",
-              "DISCARDED"
+              "DISCARDED",
+              "OFFERED",
+              "ACKNOWLEDGED"
             ]
           },
           "error": {
@@ -18161,6 +18258,66 @@
           "currentEtag": {
             "type": "string",
             "maxLength": 130
+          },
+          "kind": {
+            "const": "BIDIRECTIONAL"
+          },
+          "canDiscard": {
+            "type": "boolean"
+          },
+          "canDownloadCalendar": {
+            "type": "boolean"
+          },
+          "incomingExists": {
+            "type": "boolean"
+          },
+          "incoming": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "exists": {
+                "type": "boolean"
+              },
+              "deleted": {
+                "type": "boolean"
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 200000
+              }
+            },
+            "required": [
+              "exists",
+              "deleted"
+            ]
+          },
+          "remote": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "exists": {
+                "type": "boolean"
+              },
+              "deleted": {
+                "type": "boolean"
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 200000
+              }
+            },
+            "required": [
+              "exists",
+              "deleted"
+            ]
           }
         },
         "required": [
@@ -18182,13 +18339,19 @@
         "additionalProperties": false,
         "properties": {
           "format": {
-            "const": 1
+            "enum": [
+              1,
+              2
+            ]
           },
           "mechanism": {
             "const": "RSYNC_SSH"
           },
           "direction": {
-            "const": "CLIENT_TO_SERVER"
+            "enum": [
+              "CLIENT_TO_SERVER",
+              "BIDIRECTIONAL"
+            ]
           },
           "deviceId": {
             "type": "string",
@@ -18236,6 +18399,18 @@
           "identityFile": {
             "type": "string",
             "maxLength": 4096
+          },
+          "exchangeProtocol": {
+            "const": 1
+          },
+          "uploadPrefix": {
+            "const": "incoming/"
+          },
+          "downloadPrefix": {
+            "const": "outgoing/"
+          },
+          "maxExchangeFiles": {
+            "const": 50
           }
         },
         "required": [
@@ -18254,6 +18429,37 @@
           "knownHostsEntry",
           "localFolder",
           "identityFile"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": 2
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "direction": {
+                  "const": "BIDIRECTIONAL"
+                }
+              },
+              "required": [
+                "exchangeProtocol",
+                "uploadPrefix",
+                "downloadPrefix",
+                "maxExchangeFiles"
+              ]
+            },
+            "else": {
+              "properties": {
+                "direction": {
+                  "const": "CLIENT_TO_SERVER"
+                }
+              }
+            }
+          }
         ]
       },
       "JournalStatus": {
@@ -18264,7 +18470,10 @@
             "const": "RSYNC_SSH"
           },
           "direction": {
-            "const": "CLIENT_TO_SERVER"
+            "enum": [
+              "CLIENT_TO_SERVER",
+              "BIDIRECTIONAL"
+            ]
           },
           "canManage": {
             "type": "boolean"
@@ -18279,6 +18488,9 @@
               "etag": {
                 "type": "string",
                 "maxLength": 130
+              },
+              "bidirectional": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -18376,6 +18588,14 @@
               "lastImportAt": {
                 "type": "string",
                 "format": "date-time"
+              },
+              "outgoing": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "lastSyncAt": {
+                "type": "string",
+                "format": "date-time"
               }
             },
             "required": [
@@ -18391,7 +18611,7 @@
             "items": {
               "$ref": "#/components/schemas/JournalItem"
             },
-            "maxItems": 700
+            "maxItems": 1000
           }
         },
         "required": [

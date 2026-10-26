@@ -243,7 +243,7 @@ class ContractTest(unittest.TestCase):
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
             'getAdministrationSettings', 'updateAdministrationSettings', 'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
             'journalStatus', 'journalSettings', 'enrollJournalDevice', 'revokeJournalDevice', 'journalDeviceProfile',
-            'rescanJournal', 'journalCandidate', 'journalCandidateSource', 'resolveJournalConflict', 'discardJournalCandidate',
+            'rescanJournal', 'journalCandidate', 'journalCandidateSource', 'journalCalendarSource', 'resolveJournalConflict', 'discardJournalCandidate',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()
                       for key, v in item.items() if key in ('get', 'put', 'post', 'delete')}

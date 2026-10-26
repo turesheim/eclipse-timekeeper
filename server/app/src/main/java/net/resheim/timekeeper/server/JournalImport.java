@@ -30,7 +30,7 @@ final class JournalImport {
             if(!existing.get().path("fingerprint").asText().equals(fingerprint))throw ApiFailure.conflict();
             return existing.get();
         }
-        if(state.list(JOURNAL_ITEM).stream().filter(item->item.has("sourceId")).count()+files.size()>RETAINED_CANDIDATES)throw new ApiFailure(409,"JOURNAL_PENDING_LIMIT");
+        if(state.list(JOURNAL_ITEM).stream().filter(item->item.has("sourceId")).count()+state.list(JOURNAL_OFFER).stream().filter(item->item.has("sourceId")).count()+files.size()>RETAINED_CANDIDATES)throw new ApiFailure(409,"JOURNAL_PENDING_LIMIT");
         var value=state.insert(JOURNAL_BATCH,batch,object().put("deviceId",device.toString()).put("sequence",sequence)
                 .put("fingerprint",fingerprint).put("state",files.isEmpty()?"PROCESSED":"PENDING").put("receivedAt",store.now().toString()).put("files",files.size()));
         for(var file:files.entrySet()){
