@@ -146,6 +146,15 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskBodyInput').is_valid({'format':'TEXT'}))
         self.assertEqual('updateTaskBody',CONTRACT['paths']['/tasks/{id}/body']['put']['operationId'])
 
+    def test_external_source_has_per_reference_timestamps_and_remote_versions(self):
+        source={'createdAt':'2026-10-01T10:00:00Z','modifiedAt':None,'remoteEtag':'"remote"','remoteRevision':None}
+        value={'providerId':'google','repositoryId':'account/list','externalId':'item','source':source}
+        validator('ExternalTaskSourceInput').validate(value)
+        self.assertFalse(validator('ExternalTaskSourceInput').is_valid({**value,'source':{**source,'remoteEtag':42}}))
+        self.assertFalse(validator('ExternalTaskSourceInput').is_valid({**value,'source':{**source,'remoteRevision':''}}))
+        self.assertFalse(validator('ExternalTaskSourceInput').is_valid({**value,'source':{'createdAt':None}}))
+        self.assertEqual('updateExternalTaskSource',CONTRACT['paths']['/tasks/{id}/external-references/source']['put']['operationId'])
+
     def test_timestamp_precision_and_zone_boundary(self):
         for value in ['2026-03-29T00:00:00Z', '2026-03-29T00:00:00.123456789Z']:
             validator('Instant').validate(value)
@@ -270,7 +279,7 @@ class ContractTest(unittest.TestCase):
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'convertCalendarEvent',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
-            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'deleteTask', 'getTask', 'listTasks',
+            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateExternalTaskSource', 'deleteTask', 'getTask', 'listTasks',
             'linkExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',

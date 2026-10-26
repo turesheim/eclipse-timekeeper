@@ -637,6 +637,41 @@ class HttpAcceptance(unittest.TestCase):
         cleared, _=self.call('PUT',path+'/body',body={'format':'TEXT','content':''},headers={'If-Match':headers['ETag']})
         self.assertEqual({'format':'TEXT','content':''},cleared['body'])
 
+    def test_external_source_metadata_is_scoped_and_survives_legacy_link_and_archive(self):
+        path='/tasks/'+self.task['id']
+        ref={'providerId':'google','repositoryId':'account/list','externalId':str(uuid4()),'externalUrl':None}
+        source={'createdAt':'2026-10-01T10:00:00Z','modifiedAt':'2026-10-26T10:00:00Z',
+                'remoteEtag':'"remote-1"','remoteRevision':'revision-1'}
+        original, headers=self.call('GET',path)
+        linked, headers=self.call('PUT',path+'/external-references',body={**ref,'source':source},headers={'If-Match':headers['ETag']})
+        self.assertEqual(source,linked['externalReferences'][0]['source'])
+        linked, headers=self.call('PUT',path+'/external-references',body=ref,headers={'If-Match':headers['ETag']})
+        self.assertEqual(source,linked['externalReferences'][0]['source'])
+        replacement={**source,'remoteEtag':'"remote-2"','modifiedAt':None}
+        body={key:ref[key] for key in ('providerId','repositoryId','externalId')}
+        body['source']=replacement
+        self.call('PUT',path+'/external-references/source',owner='read',body=body,
+                  headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        self.call('PUT',path+'/external-references/source',body=body,
+                  headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        updated, headers=self.call('PUT',path+'/external-references/source',body=body,headers={'If-Match':headers['ETag']})
+        self.assertEqual(replacement,updated['externalReferences'][0]['source'])
+        legacy={'projectId':updated['projectId'],'parentTaskId':updated['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        updated, headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        self.assertEqual(replacement,updated['externalReferences'][0]['source'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual(replacement,restored['externalReferences'][0]['source'])
+        cleared={key:None for key in source}
+        cleared_result, _=self.call('PUT',path+'/external-references/source',body={**body,'source':cleared},
+                                    headers={'If-Match':headers['ETag']})
+        self.assertEqual(cleared,cleared_result['externalReferences'][0]['source'])
+
     def test_provider_identity_is_unique_per_owner_and_history_survives_unlink(self):
         reference = {'providerId': 'jira', 'repositoryId': 'https://jira.invalid',
                      'externalId': str(uuid4()), 'externalUrl': None}
