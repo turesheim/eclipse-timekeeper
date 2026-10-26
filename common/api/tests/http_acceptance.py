@@ -1061,6 +1061,17 @@ class HttpAcceptance(unittest.TestCase):
         page, _=self.call('GET',path)
         self.assertEqual([created['id']],[item['id'] for item in page['items']])
         self.assertNotIn('data',page['items'][0])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
+               'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists',
+               'TASK_SECTION':'task-list-sections'}
+        mappings={item['sourceId']:item['id'] for item in imported['ids']}
+        for item in imported['ids']:
+            if item['entityType'] in kinds:self.created.append(('b',kinds[item['entityType']],item['id']))
+        copied, _=self.call('GET','/tasks/'+mappings[self.task['id']]+'/attachments/'+mappings[created['id']],owner='b')
+        self.assertEqual(mappings[self.task['id']],copied['taskId'])
+        self.assertEqual(body['data'],copied['data'])
         request=Request(BASE_URL+path+'/'+created['id']+'/content',
                         headers={'Authorization':'Bearer '+TOKENS['a'],'Accept':'application/octet-stream'})
         with build_opener(NoRedirect()).open(request,timeout=35) as response:

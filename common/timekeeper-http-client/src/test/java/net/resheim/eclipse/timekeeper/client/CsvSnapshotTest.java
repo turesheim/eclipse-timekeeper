@@ -55,6 +55,19 @@ class CsvSnapshotTest {
         var legacy=temporary.resolve("legacy");CsvSnapshot.write(data,legacy);assertEquals(data,CsvSnapshot.read(legacy));
     }
 
+    @Test void verifiedTaskAttachmentsRoundTripAsOptionalCsvCollection() throws Exception {
+        var data=JsonParser.parseString("""
+            {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[],"projects":[],"tasks":[],"labels":[],"activities":[],"workSessions":[],
+             "taskAttachments":[{"id":"11111111-1111-4111-8111-111111111111","taskId":"22222222-2222-4222-8222-222222222222",
+               "fileName":"note.txt","contentType":"text/plain","bytes":4,
+               "sha256":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","data":"dGVzdA==",
+               "providerId":"apple","remoteId":"attachment-1"}]}
+            """).getAsJsonObject();
+        var folder=temporary.resolve("attachments");assertEquals(1,CsvSnapshot.write(data,folder));assertEquals(data,CsvSnapshot.read(folder));
+        assertTrue(Files.readString(folder.resolve("taskAttachments.csv")).contains("dGVzdA=="));
+        Files.delete(folder.resolve("taskAttachments.csv"));assertThrows(IOException.class,()->CsvSnapshot.read(folder));
+    }
+
     @Test void v3CsvRetainsTheClientGraphAndCannotBeSilentlyDowngraded() throws Exception {
         var data=JsonParser.parseString("""
             {"format":"timekeeper-domain-v3","zoneId":"UTC",

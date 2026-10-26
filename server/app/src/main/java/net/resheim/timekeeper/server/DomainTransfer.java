@@ -14,8 +14,11 @@ import net.resheim.eclipse.timekeeper.service.Commands.*;
 final class DomainTransfer {
     private final ServerStore store;
     DomainTransfer(ServerStore store) {this.store=store;}
-    static final Map<String,String> TYPES=Map.of("clients","CLIENT","projects","PROJECT","tasks","TASK","labels","LABEL","activities","ACTIVITY","workSessions","WORK_SESSION",
-            "taskConnections","TASK_CONNECTION","taskLists","TASK_LIST","taskListSections","TASK_SECTION","taskTombstones","TASK_TOMBSTONE");
+    static final Map<String,String> TYPES=Map.ofEntries(
+            Map.entry("clients","CLIENT"),Map.entry("projects","PROJECT"),Map.entry("tasks","TASK"),Map.entry("labels","LABEL"),
+            Map.entry("activities","ACTIVITY"),Map.entry("workSessions","WORK_SESSION"),Map.entry("taskConnections","TASK_CONNECTION"),
+            Map.entry("taskLists","TASK_LIST"),Map.entry("taskListSections","TASK_SECTION"),Map.entry("taskTombstones","TASK_TOMBSTONE"),
+            Map.entry("taskAttachments","TASK_ATTACHMENT"));
     ApiReplies importRecords(JsonNode input) {
         Map<UUID,UUID> clients=new HashMap<>();
         Map<UUID,UUID> connections=new HashMap<>();
@@ -40,6 +43,13 @@ final class DomainTransfer {
         input.get("labels").forEach(item -> sourceLabels.add(uuid(item.get("id"))));
         input.path("workSessions").forEach(item -> sourceSessions.add(uuid(item.get("id"))));
         input.get("tasks").forEach(item -> sourceTasks.put(uuid(item.get("id")),item));
+        Map<UUID,Integer> attachmentCounts=new HashMap<>();Set<String> attachmentKeys=new HashSet<>();
+        for(JsonNode item:input.path("taskAttachments")) {
+            UUID parent=uuid(item.get("taskId"));if(!sourceTasks.containsKey(parent)
+                    || attachmentCounts.merge(parent,1,Integer::sum)>20) throw ApiFailure.validation();
+            if(item.hasNonNull("providerId") && !attachmentKeys.add(parent+"\u0000"+item.path("providerId").asText()+"\u0000"+item.path("remoteId").asText()))
+                throw ApiFailure.validation();
+        }
         for(JsonNode item:input.get("tasks")) {
             for(JsonNode reference:item.path("externalReferences")) if(reference.path("providerData").isObject()) {
                 String namespace=reference.path("providerData").path("namespace").asText(),provider=reference.path("providerId").asText();
@@ -167,6 +177,14 @@ final class DomainTransfer {
                 tasks.put(entry.getKey(),created.id());mapping(mappings,"TASK",item,created.id().value());iterator.remove();progressed=true;
             }
             if(!progressed) throw ApiFailure.validation();
+        }
+        for(JsonNode item:input.path("taskAttachments")) {
+            UUID targetTask=required(tasks,uuid(item.get("taskId"))).value();
+            var created=new TaskAttachment(UUID.randomUUID(),targetTask,item.get("fileName").asText(),
+                    item.get("contentType").asText(),item.get("bytes").asInt(),item.get("sha256").asText(),item.get("data").asText(),
+                    optionalText(item.get("providerId")),optionalText(item.get("remoteId")),0);
+            store.save("TASK_ATTACHMENT",created);store.change("TASK_ATTACHMENT","CREATED",created.id().toString());
+            mapping(mappings,"TASK_ATTACHMENT",item,created.id());
         }
         for(JsonNode item:input.get("activities")) {
             Set<LabelId> assigned=new HashSet<>();item.get("labelIds").forEach(label -> assigned.add(required(labels,uuid(label))));

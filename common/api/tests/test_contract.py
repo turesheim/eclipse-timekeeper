@@ -287,6 +287,10 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskAttachmentInput').is_valid({**data,'remoteId':None}))
         self.assertNotIn('data',CONTRACT['components']['schemas']['TaskAttachmentSummary']['properties'])
         self.assertEqual('downloadTaskAttachmentContent',CONTRACT['paths']['/tasks/{taskId}/attachments/{id}/content']['get']['operationId'])
+        transferred={'id':ID,'taskId':ID,**data}
+        validator('TransferTaskAttachment').validate(transferred)
+        self.assertIn('taskAttachments',CONTRACT['components']['schemas']['TransferSnapshot']['properties'])
+        self.assertNotIn('taskAttachments',CONTRACT['components']['schemas']['TransferSnapshot']['required'])
 
     def test_task_sibling_order_is_a_conditional_section(self):
         validator('TaskOrderInput').validate({'siblingOrder':7})

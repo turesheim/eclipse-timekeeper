@@ -14674,6 +14674,13 @@
             },
             "maxItems": 10000,
             "description": "Optional for older transfers and archives. Section list IDs are remapped with provider lists."
+          },
+          "taskAttachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskAttachment"
+            },
+            "maxItems": 10000
           }
         },
         "required": [
@@ -14835,7 +14842,8 @@
                     "TASK_CONNECTION",
                     "TASK_LIST",
                     "TASK_TOMBSTONE",
-                    "TASK_SECTION"
+                    "TASK_SECTION",
+                    "TASK_ATTACHMENT"
                   ]
                 },
                 "sourceId": {
@@ -17977,6 +17985,13 @@
             },
             "maxItems": 250000,
             "description": "Optional for older transfers and archives. Section list IDs are remapped with provider lists."
+          },
+          "taskAttachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskAttachment"
+            },
+            "maxItems": 10000
           }
         },
         "required": [
@@ -18320,6 +18335,10 @@
             "type": "integer",
             "minimum": 0,
             "description": "Optional for older archives."
+          },
+          "taskAttachments": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -18775,6 +18794,10 @@
             "type": "integer",
             "minimum": 0,
             "description": "Optional for older archives."
+          },
+          "attachmentTasks": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -24302,6 +24325,66 @@
           "items",
           "nextCursor",
           "revision"
+        ],
+        "additionalProperties": false
+      },
+      "TransferTaskAttachment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^/\\\\]+$"
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "pattern": "^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "remoteId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "data": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 1398104,
+            "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+          }
+        },
+        "required": [
+          "id",
+          "taskId",
+          "fileName",
+          "contentType",
+          "bytes",
+          "sha256",
+          "data"
         ],
         "additionalProperties": false
       }

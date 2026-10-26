@@ -446,7 +446,7 @@ conditional assignment update can clear it explicitly.
 relation. It stores file name, media type, byte count, SHA-256, bounded Base64
 content, and optional provider/remote identity. Content is verified before
 storage, and deleting the task cascades attachment deletion. Portable transfer
-and account archive inclusion follow in a stacked change.
+and account archives retain the verified bytes and remap the parent task ID.
 
 `TASK_SYNC_CURSOR` is owner-scoped durable connector state linked to one
 connection and optionally one list. Its mode is `INITIAL`, `INCREMENTAL`, or

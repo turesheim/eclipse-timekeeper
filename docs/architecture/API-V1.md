@@ -275,7 +275,10 @@ provider and remote IDs travel together. The paginated list exposes metadata
 without bytes; item GET returns Base64 content, while `/content` downloads the
 verified bytes with `no-store`, `nosniff`, and forced attachment headers. An idempotency key is
 required for create. Deleting a task also deletes its attachments. Portable
-transfer and private archive support for these records is staged separately.
+JSON/CSV transfer and private archives include content and remap the parent
+task ID; older snapshots without attachments remain accepted. Portable JSON
+import retains its 20 MiB request limit, so larger backups use the private
+chunked account archive.
 
 An external reference can also hold an optional `providerData` envelope with
 `namespace`, positive schema `version`, and an opaque JSON object `payload`.
