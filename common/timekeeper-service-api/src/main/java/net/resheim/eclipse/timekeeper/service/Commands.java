@@ -15,6 +15,7 @@ import net.resheim.eclipse.timekeeper.domain.TaskId;
 import net.resheim.eclipse.timekeeper.domain.TaskChecklist;
 import net.resheim.eclipse.timekeeper.domain.TaskPlanning;
 import net.resheim.eclipse.timekeeper.domain.TaskTiming;
+import net.resheim.eclipse.timekeeper.domain.TaskImportance;
 
 /** Immutable inputs accepted by {@link TimekeeperService}. */
 public final class Commands {
@@ -25,7 +26,7 @@ public final class Commands {
 	public record DeleteProject(ProjectId id, long expectedVersion) { }
 
 	public record CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
-			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing) {
+			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance) {
 		public CreateTask {
 			projectId = optional(projectId);
 			parentTaskId = optional(parentTaskId);
@@ -34,30 +35,36 @@ public final class Commands {
 			planning = planning == null ? TaskPlanning.unplanned() : planning;
 			checklist = checklist == null ? TaskChecklist.empty() : checklist;
 			timing = timing == null ? TaskTiming.empty() : timing;
+			importance = importance == null ? TaskImportance.ordinary() : importance;
+		}
+
+		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
+				Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing) {
+			this(projectId, parentTaskId, summary, url, externalReferences, planning, checklist, timing, TaskImportance.ordinary());
 		}
 
 		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
 				Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist) {
-			this(projectId, parentTaskId, summary, url, externalReferences, planning, checklist, TaskTiming.empty());
+			this(projectId, parentTaskId, summary, url, externalReferences, planning, checklist, TaskTiming.empty(), TaskImportance.ordinary());
 		}
 
 		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
 				Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning) {
-			this(projectId, parentTaskId, summary, url, externalReferences, planning, TaskChecklist.empty(), TaskTiming.empty());
+			this(projectId, parentTaskId, summary, url, externalReferences, planning, TaskChecklist.empty(), TaskTiming.empty(), TaskImportance.ordinary());
 		}
 
 		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
 				Optional<String> url, Set<ExternalTaskReference> externalReferences) {
-			this(projectId, parentTaskId, summary, url, externalReferences, TaskPlanning.unplanned(), TaskChecklist.empty(), TaskTiming.empty());
+			this(projectId, parentTaskId, summary, url, externalReferences, TaskPlanning.unplanned(), TaskChecklist.empty(), TaskTiming.empty(), TaskImportance.ordinary());
 		}
 
 		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
 				Optional<String> url) {
-			this(projectId, parentTaskId, summary, url, Set.of(), TaskPlanning.unplanned(), TaskChecklist.empty(), TaskTiming.empty());
+			this(projectId, parentTaskId, summary, url, Set.of(), TaskPlanning.unplanned(), TaskChecklist.empty(), TaskTiming.empty(), TaskImportance.ordinary());
 		}
 
 		public CreateTask(Optional<ProjectId> projectId, String summary, Optional<String> url) {
-			this(projectId, Optional.empty(), summary, url, Set.of(), TaskPlanning.unplanned(), TaskChecklist.empty(), TaskTiming.empty());
+			this(projectId, Optional.empty(), summary, url, Set.of(), TaskPlanning.unplanned(), TaskChecklist.empty(), TaskTiming.empty(), TaskImportance.ordinary());
 		}
 	}
 
@@ -80,6 +87,7 @@ public final class Commands {
 	public record UpdateTaskPlanning(TaskId id, long expectedVersion, TaskPlanning planning) { }
 	public record UpdateTaskChecklist(TaskId id, long expectedVersion, TaskChecklist checklist) { }
 	public record UpdateTaskTiming(TaskId id, long expectedVersion, TaskTiming timing) { }
+	public record UpdateTaskImportance(TaskId id, long expectedVersion, TaskImportance importance) { }
 	public record LinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReference reference) { }
 	public record UnlinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference) { }
 

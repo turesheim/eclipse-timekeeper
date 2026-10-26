@@ -112,8 +112,10 @@ class AccountArchiveTest {
                 Optional.of(net.resheim.eclipse.timekeeper.domain.TaskMoment.dateOnly(java.time.LocalDate.parse("2026-10-26"))),
                 Optional.of(net.resheim.eclipse.timekeeper.domain.TaskMoment.zoned(java.time.LocalDate.parse("2026-10-27"),
                         java.time.LocalTime.parse("09:15"),"Pacific Standard Time")));
+        var importance=new net.resheim.eclipse.timekeeper.domain.TaskImportance(
+                net.resheim.eclipse.timekeeper.domain.TaskPriority.HIGH,true,true);
         var task=store.transaction(principal.owner(),()->store.service().createTask(new net.resheim.eclipse.timekeeper.service.Commands.CreateTask(
-                Optional.empty(),Optional.empty(),"Portable scheduled task",Optional.empty(),Set.of(),planning,checklist,timing)));
+                Optional.empty(),Optional.empty(),"Portable scheduled task",Optional.empty(),Set.of(),planning,checklist,timing,importance)));
         try(var download=archives.download(principal);var zip=new ZipFile(download.file().toFile())) {
             var archive=parse(new String(zip.getInputStream(zip.getEntry("archive.json")).readAllBytes(),StandardCharsets.UTF_8));
             var restored=java.util.stream.StreamSupport.stream(archive.path("work").path("tasks").spliterator(),false)
@@ -123,8 +125,9 @@ class AccountArchiveTest {
             assertEquals(checklist.items().get(0).id().toString(),restored.path("checklistItems").get(0).path("id").asText());
             assertEquals("DATE",restored.path("start").path("kind").asText());
             assertEquals("Pacific Standard Time",restored.path("due").path("timeZone").asText());
+            assertEquals("HIGH",restored.path("priority").asText());assertTrue(restored.path("flagged").asBoolean());assertTrue(restored.path("urgent").asBoolean());
             String csv=new String(zip.getInputStream(zip.getEntry("tasks.csv")).readAllBytes(),StandardCharsets.UTF_8);
-            assertTrue(csv.contains("scheduledDate"));assertTrue(csv.contains("2026-10-26T11:12:13Z"));assertTrue(csv.contains("Review archive"));assertTrue(csv.contains("Pacific Standard Time"));
+            assertTrue(csv.contains("scheduledDate"));assertTrue(csv.contains("2026-10-26T11:12:13Z"));assertTrue(csv.contains("Review archive"));assertTrue(csv.contains("Pacific Standard Time"));assertTrue(csv.contains("flagged"));
         }
     }
     @Test void downloadIncludesMoreThanTenThousandRecordsAndTwentyMebibytesWithoutPagination() throws Exception {
