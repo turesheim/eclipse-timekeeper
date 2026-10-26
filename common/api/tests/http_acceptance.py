@@ -611,6 +611,32 @@ class HttpAcceptance(unittest.TestCase):
                               headers={'If-Match':headers['ETag']})
         self.assertEqual(('UNSPECIFIED',False,False),(cleared['priority'],cleared['flagged'],cleared['urgent']))
 
+    def test_task_notes_survive_legacy_updates_and_archive(self):
+        path='/tasks/'+self.task['id']
+        original, headers=self.call('GET',path)
+        self.assertEqual({'format':'TEXT','content':''},original['body'])
+        note={'format':'HTML','content':'<p>Review <strong>draft</strong></p>'}
+        self.call('PUT',path+'/body',owner='read',body=note,headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        updated, headers=self.call('PUT',path+'/body',body=note,headers={'If-Match':headers['ETag']})
+        self.assertEqual(note,updated['body'])
+        self.call('PUT',path+'/body',body={'format':'TEXT','content':'wrong'},headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        self.call('PUT',path+'/body',body={'format':'MARKDOWN','content':'wrong'},headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        legacy={'projectId':updated['projectId'],'parentTaskId':updated['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        updated, headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        updated, headers=self.call('PUT',path+'/planning',body={'status':'NOT_STARTED','scheduledDate':None,'completedAt':None},headers={'If-Match':headers['ETag']})
+        updated, headers=self.call('PUT',path+'/importance',body={'priority':'HIGH','flagged':True,'urgent':False},headers={'If-Match':headers['ETag']})
+        self.assertEqual(note,updated['body'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual(note,restored['body'])
+        cleared, _=self.call('PUT',path+'/body',body={'format':'TEXT','content':''},headers={'If-Match':headers['ETag']})
+        self.assertEqual({'format':'TEXT','content':''},cleared['body'])
+
     def test_provider_identity_is_unique_per_owner_and_history_survives_unlink(self):
         reference = {'providerId': 'jira', 'repositoryId': 'https://jira.invalid',
                      'externalId': str(uuid4()), 'externalUrl': None}

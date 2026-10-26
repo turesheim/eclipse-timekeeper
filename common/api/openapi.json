@@ -10295,6 +10295,101 @@
         },
         "description": "Conditional replacement of priority, flag, and urgency only. Legacy task, planning, checklist, and timing updates preserve these fields."
       }
+    },
+    "/tasks/{id}/body": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskBody",
+        "summary": "Replace owned task notes",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskBodyInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of task notes only. Legacy task and other section updates preserve the body. HTML is untrusted source markup; clients must sanitize before rendering."
+      }
     }
   },
   "components": {
@@ -10897,6 +10992,9 @@
           },
           "urgent": {
             "type": "boolean"
+          },
+          "body": {
+            "$ref": "#/components/schemas/TaskBodyInput"
           }
         },
         "required": [
@@ -10916,7 +11014,8 @@
           "due",
           "priority",
           "flagged",
-          "urgent"
+          "urgent",
+          "body"
         ],
         "additionalProperties": true
       },
@@ -11473,6 +11572,10 @@
           },
           "urgent": {
             "type": "boolean"
+          },
+          "body": {
+            "$ref": "#/components/schemas/TaskBodyInput",
+            "description": "Optional for older portable archives; absence imports as empty text."
           }
         },
         "required": [
@@ -11975,6 +12078,9 @@
           },
           "urgent": {
             "type": "boolean"
+          },
+          "body": {
+            "$ref": "#/components/schemas/TaskBodyInput"
           }
         },
         "required": [
@@ -19426,6 +19532,32 @@
         ],
         "additionalProperties": false,
         "description": "Replace priority, flag, and urgency independently of planning, timing, and provider list membership."
+      },
+      "TaskBodyFormat": {
+        "type": "string",
+        "enum": [
+          "TEXT",
+          "HTML"
+        ],
+        "description": "TEXT is plain text. HTML is source markup and must be sanitized before rendering."
+      },
+      "TaskBodyInput": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "$ref": "#/components/schemas/TaskBodyFormat"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 65536
+          }
+        },
+        "required": [
+          "format",
+          "content"
+        ],
+        "additionalProperties": false,
+        "description": "Replace task notes. Empty TEXT content clears notes. HTML remains untrusted source content until sanitized by a renderer."
       }
     },
     "parameters": {

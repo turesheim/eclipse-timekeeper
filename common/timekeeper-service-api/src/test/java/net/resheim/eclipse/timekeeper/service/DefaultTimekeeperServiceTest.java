@@ -41,6 +41,8 @@ import net.resheim.eclipse.timekeeper.domain.TaskMoment;
 import net.resheim.eclipse.timekeeper.domain.TaskTiming;
 import net.resheim.eclipse.timekeeper.domain.TaskImportance;
 import net.resheim.eclipse.timekeeper.domain.TaskPriority;
+import net.resheim.eclipse.timekeeper.domain.TaskBody;
+import net.resheim.eclipse.timekeeper.domain.TaskBodyFormat;
 import net.resheim.eclipse.timekeeper.domain.TaskPlanning;
 import net.resheim.eclipse.timekeeper.domain.TaskStatus;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateActivity;
@@ -63,6 +65,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskPlanning;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskTiming;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskImportance;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskBody;
 import net.resheim.eclipse.timekeeper.service.Ports.ActivityRepository;
 import net.resheim.eclipse.timekeeper.service.Ports.IdentifierSource;
 import net.resheim.eclipse.timekeeper.service.Ports.LabelRepository;
@@ -212,6 +215,25 @@ class DefaultTimekeeperServiceTest {
 		Task stale=task;
 		assertThrows(ServiceException.class,()->service.updateTaskImportance(new UpdateTaskImportance(stale.id(),stale.version(),importance)));
 		assertThrows(DomainValidationException.class,()->new TaskImportance(null,false,false));
+	}
+
+	@Test
+	void taskBodyKeepsMarkupAndSurvivesLegacyEdits() {
+		var body=new TaskBody(TaskBodyFormat.HTML,"<p>Review <strong>draft</strong></p>");
+		Task task=service.createTask(new CreateTask(Optional.empty(),Optional.empty(),"Review",Optional.empty(),Set.of(),
+				TaskPlanning.unplanned(),TaskChecklist.empty(),TaskTiming.empty(),TaskImportance.ordinary(),body));
+		assertEquals(body,task.body());
+		task=service.updateTask(new UpdateTask(task.id(),task.version(),Optional.empty(),"Renamed",Optional.empty()));
+		task=service.updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),TaskPlanning.unplanned()));
+		task=service.updateTaskChecklist(new UpdateTaskChecklist(task.id(),task.version(),TaskChecklist.empty()));
+		task=service.updateTaskTiming(new UpdateTaskTiming(task.id(),task.version(),TaskTiming.empty()));
+		task=service.updateTaskImportance(new UpdateTaskImportance(task.id(),task.version(),TaskImportance.ordinary()));
+		assertEquals(body,task.body());
+		Task stale=task;
+		Task cleared=service.updateTaskBody(new UpdateTaskBody(task.id(),task.version(),TaskBody.empty()));
+		assertEquals(TaskBody.empty(),cleared.body());
+		assertThrows(ServiceException.class,()->service.updateTaskBody(new UpdateTaskBody(stale.id(),stale.version(),body)));
+		assertThrows(DomainValidationException.class,()->new TaskBody(null,"text"));
 	}
 
 	@Test
