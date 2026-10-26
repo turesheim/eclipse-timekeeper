@@ -339,6 +339,10 @@ database constraint is explicitly mentioned:
   the session are allowed with a warning.
 - The composite external-reference key is unique in both the service and the
   database, so the same external issue cannot be linked to two Timekeeper tasks.
+- A replaced provider identity becomes an alias of the task. Active references
+  and aliases share the owner-scoped uniqueness index; either key resolves the
+  task. Deleting the task removes both keys. Ordinary unlink removes the current
+  key without making a new alias.
 - Task updates use the physical optimistic-lock `VERSION`. Projects, activities,
   and labels use deterministic content versions because those legacy tables do
   not have version columns.

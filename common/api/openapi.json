@@ -11855,6 +11855,101 @@
         ],
         "description": "Explicit deletion only; remote disappearance should update enabled/present instead. A connection with lists or a list with linked tasks returns 409."
       }
+    },
+    "/tasks/{id}/external-references/replace": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "replaceExternalReference",
+        "summary": "Replace a task provider identity and retain the old key as an alias",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalReferenceReplacementInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of a current provider identity. The previous key remains owner-scoped for lookup; ordinary unlink removes the current key without creating an alias."
+      }
     }
   },
   "components": {
@@ -12478,6 +12573,14 @@
           },
           "body": {
             "$ref": "#/components/schemas/TaskBodyInput"
+          },
+          "externalAliases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalReferenceKey"
+            },
+            "uniqueItems": true,
+            "description": "Former provider identities retained for stable task lookup after a remote ID changes."
           }
         },
         "required": [
@@ -12499,7 +12602,8 @@
           "flagged",
           "urgent",
           "body",
-          "siblingOrder"
+          "siblingOrder",
+          "externalAliases"
         ],
         "additionalProperties": true
       },
@@ -13069,6 +13173,14 @@
           "body": {
             "$ref": "#/components/schemas/TaskBodyInput",
             "description": "Optional for older portable archives; absence imports as empty text."
+          },
+          "externalAliases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalReferenceKey"
+            },
+            "uniqueItems": true,
+            "description": "Former provider identities retained for stable task lookup after a remote ID changes."
           }
         },
         "required": [
@@ -13608,6 +13720,15 @@
           },
           "body": {
             "$ref": "#/components/schemas/TaskBodyInput"
+          },
+          "externalAliases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalReferenceKey"
+            },
+            "uniqueItems": true,
+            "maxItems": 500,
+            "description": "Former provider identities retained for stable task lookup after a remote ID changes."
           }
         },
         "required": [
@@ -21936,6 +22057,52 @@
           "siblingOrder"
         ],
         "additionalProperties": false
+      },
+      "ExternalReferenceKey": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "providerId",
+          "repositoryId",
+          "externalId"
+        ],
+        "additionalProperties": false
+      },
+      "ExternalReferenceReplacementInput": {
+        "type": "object",
+        "properties": {
+          "previous": {
+            "$ref": "#/components/schemas/ExternalReferenceKey"
+          },
+          "current": {
+            "$ref": "#/components/schemas/ExternalReference"
+          }
+        },
+        "required": [
+          "previous",
+          "current"
+        ],
+        "additionalProperties": false,
+        "description": "Atomically replace a current provider identity while retaining its old key as a lookup alias."
       }
     },
     "parameters": {

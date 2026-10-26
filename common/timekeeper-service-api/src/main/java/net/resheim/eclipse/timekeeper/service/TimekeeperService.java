@@ -28,6 +28,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.DeleteLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteProject;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteTask;
 import net.resheim.eclipse.timekeeper.service.Commands.LinkExternalReference;
+import net.resheim.eclipse.timekeeper.service.Commands.ReplaceExternalReference;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskSource;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskProviderData;
 import net.resheim.eclipse.timekeeper.service.Commands.StartActivity;
@@ -84,6 +85,7 @@ public interface TimekeeperService {
 	Optional<Task> task(TaskId id);
 	List<Task> tasks();
 	Task linkExternalReference(LinkExternalReference command);
+	default Task replaceExternalReference(ReplaceExternalReference command) { throw new UnsupportedOperationException("External task identity replacement is not supported"); }
 	default Task updateExternalTaskSource(UpdateExternalTaskSource command) { throw new UnsupportedOperationException("External task source metadata is not supported"); }
 	default Task updateExternalTaskProviderData(UpdateExternalTaskProviderData command) { throw new UnsupportedOperationException("External task provider data is not supported"); }
 	Task unlinkExternalReference(UnlinkExternalReference command);
