@@ -31,6 +31,12 @@ public final class WireValues {
                 value.get("writable").getAsBoolean(),value.get("shared").getAsBoolean(),value.get("owner").getAsBoolean(),
                 value.get("present").getAsBoolean(),value.get("position").getAsInt(),value.get("version").getAsLong());
     }
+    public static TaskSyncCursor taskSyncCursor(JsonObject value) {
+        return new TaskSyncCursor(id(value.get("id")),id(value.get("connectionId")),text(value.get("listId")).map(UUID::fromString),
+                TaskSyncMode.valueOf(value.get("mode").getAsString()),text(value.get("cursor")),
+                text(value.get("lastObservedAt")).map(Instant::parse),text(value.get("lastCompleteAt")).map(Instant::parse),
+                value.get("version").getAsLong());
+    }
     public static Task task(JsonObject value) {
         var refs=StreamSupport.stream(value.getAsJsonArray("externalReferences").spliterator(),false).map(item -> reference(item.getAsJsonObject())).collect(Collectors.toUnmodifiableSet());
         var planning=new TaskPlanning(value.has("status")?TaskStatus.valueOf(value.get("status").getAsString()):TaskStatus.NOT_STARTED,

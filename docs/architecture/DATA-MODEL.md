@@ -419,6 +419,13 @@ Task-to-list relations protect referenced lists from deletion, while portable
 imports remap the list ID. The reference's provider must match the list's
 connection provider. `repositoryId` remains the remote identity namespace;
 connectors must include the account/list scope when remote task IDs can repeat.
+
+`TASK_SYNC_CURSOR` is owner-scoped durable connector state linked to one
+connection and optionally one list. Its mode is `INITIAL`, `INCREMENTAL`, or
+`RESCAN_REQUIRED`; only incremental mode carries an opaque cursor. A cursor
+is not a task version and is intentionally excluded from account archives and
+portable domain transfers, which require a fresh provider scan after restore.
+
 Each external reference may contain one namespaced, versioned provider-data
 envelope. Its JSON object preserves exposed provider fields that are not yet
 normalized. The envelope belongs to that reference, so links to other
