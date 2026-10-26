@@ -1257,6 +1257,11 @@ class HttpAcceptance(unittest.TestCase):
         outward,_=self.call('POST','/task-sync/export-preview',body=export)
         self.assertEqual('My edited title',outward['writeFields']['summary'])
         self.assertEqual(updated_headers['ETag'],outward['taskEtag'])
+        _,latest_headers=self.call('GET',task_path)
+        self.call('DELETE',task_path,headers={'If-Match':latest_headers['ETag']},status=204)
+        self.created.remove(('a','tasks',created['id']))
+        self.call('POST','/task-sync/import',body={**request,'item':{**item,'operationId':str(uuid4())}},
+                  status=409,code='CONFLICT')
 
     def test_external_task_list_link_is_owned_guarded_and_remapped(self):
         account=self.create('task-connections',{'providerId':'google','remoteAccountId':str(uuid4()),

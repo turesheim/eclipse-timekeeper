@@ -295,6 +295,8 @@ and list moves produce warnings rather than approximate provider writes. The
 endpoint is read-only and returns the current task ETag. A connector must
 still enforce provider item permissions, remote ETags and rate limits before
 using the proposed fields.
+The [connector protocol](TASK-SYNC-PROTOCOL.md) documents page commits,
+stable retries, authorization, recovery, and reviewed deletion.
 
 An external task reference can carry `taskListId` to point at an owned provider
 list. The list's connection must use the same provider. The existing

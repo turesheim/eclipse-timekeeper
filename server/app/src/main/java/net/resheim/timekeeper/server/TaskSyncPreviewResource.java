@@ -69,6 +69,7 @@ public class TaskSyncPreviewResource {
                 }
                 throw ApiFailure.conflict();
             }
+            if(tombstoned(key)) throw ApiFailure.conflict();
             var baseline=new ExternalTaskBaseline(1,store.now(),accepted.toString());
             var assignment=Optional.ofNullable(accepted.get("assignment")).filter(value -> !value.isNull()).map(JsonValues::assignment);
             var ref=new ExternalTaskReference(key.providerId(),key.repositoryId(),key.externalId(),Optional.empty(),
@@ -142,6 +143,13 @@ public class TaskSyncPreviewResource {
         }
     }
     private static UUID uuidText(String value) {try {return UUID.fromString(value);}catch(IllegalArgumentException error){throw ApiFailure.validation();}}
+    private boolean tombstoned(ExternalTaskReferenceKey key) {
+        for(var tombstone:store.list("TASK_TOMBSTONE")) for(var reference:tombstone.path("externalReferences"))
+            if(reference.path("providerId").asText().equals(key.providerId())
+                    && reference.path("repositoryId").asText().equals(key.repositoryId())
+                    && reference.path("externalId").asText().equals(key.externalId())) return true;
+        return false;
+    }
 
     /** Describe outbound changes without making a provider call or losing local-only fields. */
     @POST @Path("/export-preview") public Response exportPreview(JsonNode body) {
