@@ -509,7 +509,14 @@ public class ServerStore {
             public boolean existsByProject(ProjectId id) { check(); return related("project","PROJECT",id.value()); }
             public boolean existsByParent(TaskId id) { check(); return related("parent","TASK",id.value()); }
             public Task save(Task value) { check(); return ServerStore.this.save("TASK",value); }
-            public void delete(TaskId id) { check(); ServerStore.this.delete("TASK",id.value()); }
+            public void delete(TaskId id) {
+                check();var task=get("TASK",id.value(),Task.class).orElseThrow(ApiFailure::notFound);
+                var identities=new HashSet<ExternalTaskReferenceKey>(task.externalAliases());
+                task.externalReferences().forEach(reference -> identities.add(reference.key()));
+                ServerStore.this.delete("TASK",id.value());
+                ServerStore.this.save("TASK_TOMBSTONE",new TaskTombstone(id.value(),now(),task.version(),identities));
+                change("TASK_TOMBSTONE","CREATED",id.value().toString());
+            }
         }; }
         LabelRepository labels() { return new LabelRepository() {
             public Optional<Label> find(LabelId id) { return get("LABEL",id.value(),Label.class); }

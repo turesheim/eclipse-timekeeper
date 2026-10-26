@@ -267,6 +267,16 @@ public class TimekeeperResource {
         ContractInputs.queries(uri.getQueryParameters(),"providerId","repositoryId","externalId");var query=uri.getQueryParameters();
         var ref=referenceQuery(query);return tx(() -> ApiReplies.resource(200,snapshot(store.owner(),store.service().findTask(ref).orElseThrow(ApiFailure::notFound)),null));
     }
+    @GET @Path("/task-tombstones/by-external-reference") public Response deletedExternal() {
+        ContractInputs.queries(uri.getQueryParameters(),"providerId","repositoryId","externalId");
+        var key=referenceQuery(uri.getQueryParameters());
+        return tx(() -> {
+            for(var tombstone:store.list("TASK_TOMBSTONE")) for(var ref:tombstone.path("externalReferences"))
+                if(ref.path("providerId").asText().equals(key.providerId()) && ref.path("repositoryId").asText().equals(key.repositoryId())
+                        && ref.path("externalId").asText().equals(key.externalId())) return ApiReplies.resource(200,tombstone,null);
+            throw ApiFailure.notFound();
+        });
+    }
     private ExternalTaskReferenceKey referenceQuery(MultivaluedMap<String,String> query) {
         var value=object();for(String key:List.of("providerId","repositoryId","externalId")) { if(query.getFirst(key)==null) throw ApiFailure.badRequest();value.put(key,query.getFirst(key)); }
         value.putNull("externalUrl");inputs.validate("ExternalReference",value);return reference(value).key();
@@ -392,12 +402,14 @@ public class TimekeeperResource {
         else if(type.equals("PROJECT")) ContractInputs.queries(query,"q","clientId","limit","cursor");
         else if(type.equals("TASK_LIST")) ContractInputs.queries(query,"q","connectionId","limit","cursor");
         else if(type.equals("TASK_SYNC_CURSOR")) ContractInputs.queries(query,"connectionId","listId","limit","cursor");
+        else if(type.equals("TASK_TOMBSTONE")) ContractInputs.queries(query,"limit","cursor");
         else ContractInputs.queries(query,"q","limit","cursor");
         int limit=ContractInputs.number(query.getFirst("limit"),100,1,500);String q=Optional.ofNullable(query.getFirst("q")).orElse("").trim().toLowerCase(Locale.ROOT);if(q.codePointCount(0,q.length())>200) throw ApiFailure.validation();
         return tx(() -> {
             validateFilters(query);List<JsonNode> values;
             if(type.equals("ACTIVITY")) values=activities(query).stream().map(value -> (JsonNode)snapshot(store.owner(),value)).toList();
             else values=store.list(type).stream().filter(value -> {
+                if(type.equals("TASK_TOMBSTONE")) return true;
                 if(!value.path(Set.of("WORK_SESSION","TASK").contains(type) ? "summary" : type.equals("TASK_SYNC_CURSOR") ? "mode" : "name").asText().toLowerCase(Locale.ROOT).contains(q)) return false;
                 if(query.containsKey("clientId") && !value.path("clientId").asText().equals(ContractInputs.pathId(query.getFirst("clientId")).toString())) return false;
                 if(query.containsKey("connectionId") && !value.path("connectionId").asText().equals(ContractInputs.pathId(query.getFirst("connectionId")).toString())) return false;

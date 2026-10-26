@@ -673,6 +673,27 @@ class HttpAcceptance(unittest.TestCase):
                                     headers={'If-Match':headers['ETag']})
         self.assertEqual(cleared,cleared_result['externalReferences'][0]['source'])
 
+    def test_explicit_task_deletion_retains_provider_identity_tombstone(self):
+        ref={'providerId':'google','repositoryId':self.prefix+'/list','externalId':'old','externalUrl':None}
+        task=self.create('tasks',{'summary':self.prefix+' deleted','projectId':None,'parentTaskId':None,'url':None,'externalReferences':[ref]})
+        path='/tasks/'+task['id']
+        replacement={'previous':{key:ref[key] for key in ('providerId','repositoryId','externalId')},'current':{**ref,'externalId':'new'}}
+        _, headers=self.call('GET',path)
+        _, headers=self.call('PUT',path+'/external-references/replace',body=replacement,headers={'If-Match':headers['ETag']})
+        self.call('DELETE',path,headers={'If-Match':headers['ETag']},status=204)
+        self.created.remove(('a','tasks',task['id']))
+        tombstone, _=self.call('GET','/task-tombstones/'+task['id'])
+        self.assertEqual('LOCAL_DELETED',tombstone['reason'])
+        self.assertEqual(task['id'],tombstone['id'])
+        self.assertEqual({'old','new'},{item['externalId'] for item in tombstone['externalReferences']})
+        query=urlencode({key:ref[key] for key in ('providerId','repositoryId','externalId')})
+        found, _=self.call('GET','/task-tombstones/by-external-reference?'+query)
+        self.assertEqual(tombstone,found)
+        self.call('GET','/task-tombstones/'+task['id'],owner='b',status=404,code='NOT_FOUND')
+        page, _=self.call('GET','/task-tombstones?limit=500')
+        self.assertIn(task['id'],{item['id'] for item in page['items']})
+        self.call('GET',path,status=404,code='NOT_FOUND')
+
     def test_external_sync_baseline_is_atomic_preserved_and_clearable(self):
         path='/tasks/'+self.task['id']
         ref={'providerId':'google','repositoryId':self.prefix+'/list','externalId':'old','externalUrl':None}

@@ -443,6 +443,13 @@ Older records decode without one; legacy task and link writes preserve it.
 The field map excludes credentials, provider transport state, and unsupported
 fields. It supplies the base for later field-level three-way conflict handling.
 
+`TASK_TOMBSTONE` is an owner-scoped, append-only record created when a local
+task is explicitly deleted. Its ID is the deleted task ID; it stores deletion
+time, previous task version, and every former active or alias provider key.
+The task row is removed while this record and both change-feed entries remain.
+It distinguishes an intentional local deletion from a never-imported remote
+identity. It says nothing about whether the provider deleted its own item.
+
 Each external reference may contain one namespaced, versioned provider-data
 envelope. Its JSON object preserves exposed provider fields that are not yet
 normalized. The envelope belongs to that reference, so links to other

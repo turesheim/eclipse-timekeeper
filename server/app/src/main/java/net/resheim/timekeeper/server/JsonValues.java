@@ -67,6 +67,15 @@ public final class JsonValues {
             nullable(node,"listId",cursor.listId());node.put("mode",cursor.mode().name());nullable(node,"cursor",cursor.cursor());
             nullable(node,"lastObservedAt",cursor.lastObservedAt());nullable(node,"lastCompleteAt",cursor.lastCompleteAt());return node;
         }
+        if (value instanceof TaskTombstone tombstone) {
+            var node=base(owner,tombstone.id(),0);node.put("deletedAt",tombstone.deletedAt().toString());
+            node.put("taskVersion",tombstone.taskVersion());node.put("reason","LOCAL_DELETED");
+            var refs=node.putArray("externalReferences");
+            tombstone.externalReferences().stream().sorted(Comparator.comparing(ExternalTaskReferenceKey::providerId)
+                    .thenComparing(ExternalTaskReferenceKey::repositoryId).thenComparing(ExternalTaskReferenceKey::externalId))
+                    .forEach(key -> {var ref=object();ref.put("providerId",key.providerId());ref.put("repositoryId",key.repositoryId());ref.put("externalId",key.externalId());refs.add(ref);});
+            return node;
+        }
         if (value instanceof Project project) { var node = base(owner, project.id().value(), project.version()); node.put("name", project.name()); return node; }
         if (value instanceof Label label) { var node = base(owner, label.id().value(), label.version()); node.put("name", label.name()); nullable(node,"color",label.color()); return node; }
         if (value instanceof Task task) {

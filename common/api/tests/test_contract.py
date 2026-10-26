@@ -209,6 +209,14 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('ExternalTaskSyncStateInput').is_valid({**value,'baseline':{**baseline,'fields':{'accessToken':'secret'}}}))
         self.assertEqual('updateExternalTaskSyncState',CONTRACT['paths']['/tasks/{id}/external-references/sync-state']['put']['operationId'])
 
+    def test_explicit_local_task_deletions_have_reconcilable_tombstones(self):
+        tombstone={'ownerId':'owner','id':ID,'version':0,'taskVersion':2,'deletedAt':'2026-10-26T10:00:00Z',
+                   'reason':'LOCAL_DELETED','externalReferences':[{'providerId':'google','repositoryId':'account/list','externalId':'item'}]}
+        validator('TaskTombstone').validate(tombstone)
+        self.assertFalse(validator('TaskTombstone').is_valid({**tombstone,'reason':'REMOTE_DELETED'}))
+        self.assertEqual('listTaskTombstones',CONTRACT['paths']['/task-tombstones']['get']['operationId'])
+        self.assertEqual('findTaskTombstoneByExternalReference',CONTRACT['paths']['/task-tombstones/by-external-reference']['get']['operationId'])
+
     def test_provider_connections_and_lists_keep_remote_identity_separate_from_projects(self):
         connection={'providerId':'google','remoteAccountId':'account-1','name':'Personal',
                     'readable':True,'writable':False,'enabled':True}
@@ -385,6 +393,7 @@ class ContractTest(unittest.TestCase):
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'deleteTaskList', 'getTaskList', 'listTaskLists',
             'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors',
+            'getTaskTombstone', 'listTaskTombstones', 'findTaskTombstoneByExternalReference',
             'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskMetadata', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskSyncState', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
             'linkExternalReference', 'replaceExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
