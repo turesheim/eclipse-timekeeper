@@ -94,3 +94,19 @@ test('Markdown schema guard retains metadata and escaped-code dialects without r
   }
   expect(external).toEqual([]);
 });
+test('Mermaid fences render in an isolated preview and preserve editable Markdown',async({page})=>{
+  const outside=[];page.on('request',request=>{if(new URL(request.url()).origin!==new URL(process.env.TIMEKEEPER_WEB_URL).origin)outside.push(request.url());});
+  await open(page);
+  const source='```mermaid\nflowchart LR\n  Start --> Finish\n```\n';
+  await page.locator('#markdown-body').fill(source);
+  await page.locator('#markdown-rich').click();
+  const diagram=page.locator('.markdown-mermaid-block');await expect(diagram).toBeVisible();
+  await expect(diagram.locator('pre')).toHaveAttribute('data-language','mermaid');
+  const frame=diagram.locator('iframe');await expect(frame).toBeVisible();await expect(frame).toHaveAttribute('sandbox','');
+  await expect(page.frameLocator('.markdown-mermaid-block iframe').locator('svg')).toBeVisible();
+  await page.locator('#markdown-source').click();await expect(page.locator('#markdown-body')).toHaveValue(source);
+  await page.locator('#markdown-body').fill('```mermaid\nnot a diagram\n```\n');await page.locator('#markdown-rich').click();
+  await expect(page.locator('.markdown-mermaid-preview')).toContainText('Diagram syntax could not be rendered');
+  await page.locator('#markdown-source').click();await expect(page.locator('#markdown-body')).toHaveValue('```mermaid\nnot a diagram\n```\n');
+  expect(outside).toEqual([]);
+});
