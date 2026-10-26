@@ -216,6 +216,9 @@ can be marked `present=false`; a list with sections cannot be deleted. These
 rows do not create Timekeeper projects or imply that Google Tasks or Microsoft
 To Do expose Apple section behavior. Task-to-section linking is handled
 separately from catalog discovery.
+Sections are included in portable JSON/CSV transfer and private account
+archives. Their list IDs are remapped with the owned provider list; older
+transfers without sections remain accepted.
 
 Each connection also has a versioned `capabilities` declaration. Connectors
 replace it conditionally through `PUT /task-connections/{id}/capabilities`.

@@ -249,6 +249,10 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskListSectionCreateInput').is_valid({**section,'position':-1}))
         self.assertEqual('createTaskListSection',CONTRACT['paths']['/task-list-sections']['post']['operationId'])
         self.assertEqual('listTaskListSections',CONTRACT['paths']['/task-list-sections']['get']['operationId'])
+        transferred={'id':ID,**section}
+        validator('TransferTaskListSection').validate(transferred)
+        self.assertIn('taskListSections',CONTRACT['components']['schemas']['TransferSnapshot']['properties'])
+        self.assertNotIn('taskListSections',CONTRACT['components']['schemas']['TransferSnapshot']['required'])
 
     def test_task_sibling_order_is_a_conditional_section(self):
         validator('TaskOrderInput').validate({'siblingOrder':7})

@@ -933,6 +933,17 @@ class HttpAcceptance(unittest.TestCase):
         self.call('PUT','/task-list-sections/'+section['id'],body=replacement,owner='read',headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
         changed, headers=self.call('PUT','/task-list-sections/'+section['id'],body={**replacement,'present':False},headers={'If-Match':headers['ETag']})
         self.assertFalse(changed['present'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
+               'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists',
+               'TASK_SECTION':'task-list-sections'}
+        mappings={item['sourceId']:item['id'] for item in imported['ids']}
+        for item in imported['ids']:
+            if item['entityType'] in kinds:self.created.append(('b',kinds[item['entityType']],item['id']))
+        restored, _=self.call('GET','/task-list-sections/'+mappings[section['id']],owner='b')
+        self.assertEqual(mappings[task_list['id']],restored['taskListId'])
+        self.assertFalse(restored['present'])
         self.call('DELETE','/task-list-sections/'+section['id'],headers={'If-Match':headers['ETag']},status=204)
         self.created.remove(('a','task-list-sections',section['id']))
 

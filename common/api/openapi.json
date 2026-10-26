@@ -13953,6 +13953,14 @@
             },
             "maxItems": 10000,
             "description": "Optional for older transfers and archives. Deleted task IDs are historical and are not live task relationships."
+          },
+          "taskListSections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskListSection"
+            },
+            "maxItems": 10000,
+            "description": "Optional for older transfers and archives. Section list IDs are remapped with provider lists."
           }
         },
         "required": [
@@ -14113,7 +14121,8 @@
                     "CLIENT",
                     "TASK_CONNECTION",
                     "TASK_LIST",
-                    "TASK_TOMBSTONE"
+                    "TASK_TOMBSTONE",
+                    "TASK_SECTION"
                   ]
                 },
                 "sourceId": {
@@ -17247,6 +17256,14 @@
             },
             "maxItems": 250000,
             "description": "Optional for older transfers and archives. Deleted task IDs are historical and are not live task relationships."
+          },
+          "taskListSections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskListSection"
+            },
+            "maxItems": 250000,
+            "description": "Optional for older transfers and archives. Section list IDs are remapped with provider lists."
           }
         },
         "required": [
@@ -17582,6 +17599,11 @@
             "maximum": 10000
           },
           "taskTombstones": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Optional for older archives."
+          },
+          "taskListSections": {
             "type": "integer",
             "minimum": 0,
             "description": "Optional for older archives."
@@ -18035,6 +18057,11 @@
           "externalReferenceLists": {
             "type": "integer",
             "minimum": 0
+          },
+          "sectionLists": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Optional for older archives."
           }
         },
         "required": [
@@ -23064,6 +23091,51 @@
           "revision"
         ],
         "additionalProperties": true
+      },
+      "TransferTaskListSection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskListId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "remoteSectionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "\\S"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TaskListSectionKind"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "present": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "taskListId",
+          "remoteSectionId",
+          "name",
+          "kind",
+          "position",
+          "present",
+          "writable"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {

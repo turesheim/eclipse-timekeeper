@@ -15,7 +15,7 @@ final class DomainTransfer {
     private final ServerStore store;
     DomainTransfer(ServerStore store) {this.store=store;}
     static final Map<String,String> TYPES=Map.of("clients","CLIENT","projects","PROJECT","tasks","TASK","labels","LABEL","activities","ACTIVITY","workSessions","WORK_SESSION",
-            "taskConnections","TASK_CONNECTION","taskLists","TASK_LIST","taskTombstones","TASK_TOMBSTONE");
+            "taskConnections","TASK_CONNECTION","taskLists","TASK_LIST","taskListSections","TASK_SECTION","taskTombstones","TASK_TOMBSTONE");
     ApiReplies importRecords(JsonNode input) {
         Map<UUID,UUID> clients=new HashMap<>();
         Map<UUID,UUID> connections=new HashMap<>();
@@ -26,6 +26,8 @@ final class DomainTransfer {
         TYPES.forEach((name,type) -> {for(JsonNode item:input.path(name)) if(!sourceIds.add(uuid(item.get("id")))) throw ApiFailure.validation();});
         Set<UUID> sourceConnections=new HashSet<>();input.path("taskConnections").forEach(item->sourceConnections.add(uuid(item.get("id"))));
         for(JsonNode item:input.path("taskLists")) if(!sourceConnections.contains(uuid(item.get("connectionId")))) throw ApiFailure.validation();
+        Set<UUID> sourceListIds=new HashSet<>();input.path("taskLists").forEach(item -> sourceListIds.add(uuid(item.get("id"))));
+        for(JsonNode item:input.path("taskListSections")) if(!sourceListIds.contains(uuid(item.get("taskListId")))) throw ApiFailure.validation();
         Map<UUID,JsonNode> sourceLists=new HashMap<>(),sourceConnectionRecords=new HashMap<>();
         input.path("taskLists").forEach(item->sourceLists.put(uuid(item.get("id")),item));
         input.path("taskConnections").forEach(item->sourceConnectionRecords.put(uuid(item.get("id")),item));
@@ -95,6 +97,16 @@ final class DomainTransfer {
             store.save("TASK_LIST",created);store.change("TASK_LIST","CREATED",created.id().toString());
             lists.put(uuid(item.get("id")),created.id());
             mapping(mappings,"TASK_LIST",item,created.id());
+        }
+        Set<String> sectionKeys=new HashSet<>();
+        for(JsonNode item:input.path("taskListSections")) {
+            UUID sourceList=uuid(item.get("taskListId"));String key=sourceList+"\u0000"+item.get("remoteSectionId").asText();
+            if(!sectionKeys.add(key)) throw ApiFailure.validation();
+            var created=new TaskListSection(UUID.randomUUID(),required(lists,sourceList),item.get("remoteSectionId").asText(),
+                    item.get("name").asText(),TaskListSectionKind.valueOf(item.get("kind").asText()),item.get("position").asInt(),
+                    item.get("present").asBoolean(),item.get("writable").asBoolean(),0);
+            store.save("TASK_SECTION",created);store.change("TASK_SECTION","CREATED",created.id().toString());
+            mapping(mappings,"TASK_SECTION",item,created.id());
         }
         int openSessions=0;
         for(JsonNode item:input.path("workSessions")) {

@@ -193,29 +193,33 @@ class AccountArchiveImportTest {
     }
     @Test void providerListsRoundTripThroughAccountZipWithNewOwnedIds() throws Exception {
         source();
-        UUID sourceConnection=UUID.randomUUID(),sourceList=UUID.randomUUID();
+        UUID sourceConnection=UUID.randomUUID(),sourceList=UUID.randomUUID(),sourceSection=UUID.randomUUID();
         store.transaction("a",()->{
             store.save("TASK_CONNECTION",new TaskConnection(sourceConnection,"microsoft","account-1","Personal",true,true,true,0));
             store.save("TASK_LIST",new TaskList(sourceList,sourceConnection,"remote-list","Flagged emails",TaskListKind.BUILT_IN,
-                    true,false,false,true,true,0,0));return null;
+                    true,false,false,true,true,0,0));
+            store.save("TASK_SECTION",new TaskListSection(sourceSection,sourceList,"produce","Produce",TaskListSectionKind.GROCERY_CATEGORY,1,true,false,0));return null;
         });
         ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=AccountArchiveInput.read(file.file(),"application/zip");}
         assertEquals(1,archive.path("work").path("taskConnections").size());
         assertEquals(1,archive.path("work").path("taskLists").size());
+        assertEquals(1,archive.path("work").path("taskListSections").size());
         UUID id=stage(archive);var review=store.transaction("b",()->importer().preview(id,false));
         assertTrue(review.body().path("canImport").asBoolean());
         store.transaction("b",()->importer().apply(id,false,review.etag()));
         store.transaction("b",()->{
-            var connection=store.list("TASK_CONNECTION").getFirst();var list=store.list("TASK_LIST").getFirst();
+            var connection=store.list("TASK_CONNECTION").getFirst();var list=store.list("TASK_LIST").getFirst();var section=store.list("TASK_SECTION").getFirst();
             assertNotEquals(sourceConnection.toString(),connection.path("id").asText());
             assertNotEquals(sourceList.toString(),list.path("id").asText());
             assertEquals(connection.path("id"),list.path("connectionId"));
-            assertEquals("Flagged emails",list.path("name").asText());return null;
+            assertEquals("Flagged emails",list.path("name").asText());
+            assertNotEquals(sourceSection.toString(),section.path("id").asText());assertEquals(list.path("id"),section.path("taskListId"));
+            assertEquals("GROCERY_CATEGORY",section.path("kind").asText());return null;
         });
     }
     @Test void olderAccountArchiveWithoutProviderCollectionsStillRestores() throws Exception {
         var archive=source();var work=(ObjectNode)archive.path("work");
-        work.remove("taskConnections");work.remove("taskLists");
+        work.remove("taskConnections");work.remove("taskLists");work.remove("taskListSections");
         inputs.validate("AccountArchiveSnapshot",archive);
         UUID id=stage(archive);var review=store.transaction("b",()->importer().preview(id,false));
         assertTrue(review.body().path("canImport").asBoolean());
@@ -232,6 +236,7 @@ class AccountArchiveImportTest {
         assertEquals(object().put("projectClients",1L).put("taskProjects",2L).put("parentTasks",1L)
                 .put("activityTasks",1L).put("activityProjects",1L).put("activityLabels",1L)
                 .put("workSessionClients",1L).put("workSessionProjects",1L).put("workSessionLabels",1L).put("listConnections",0L)
+                .put("sectionLists",0L)
                 .put("externalReferenceLists",0L),review.body().path("relationships"));
         assertEquals(before,work());
         store.transaction("b",()->importer().apply(id,false,review.etag()));

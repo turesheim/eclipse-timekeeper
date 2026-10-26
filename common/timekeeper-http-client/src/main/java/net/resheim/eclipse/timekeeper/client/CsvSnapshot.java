@@ -69,6 +69,9 @@ public final class CsvSnapshot {
         var tables=columns(sessions,clients);
         if(clients && snapshot.has("taskConnections") && snapshot.has("taskLists")) providerColumns(tables);
         else if(snapshot.has("taskConnections") || snapshot.has("taskLists")) throw invalid();
+        if(clients && snapshot.has("taskListSections") && tables.containsKey("taskLists"))
+            tables.put("taskListSections",List.of("id","taskListId","remoteSectionId","name","kind","position","present","writable"));
+        else if(snapshot.has("taskListSections")) throw invalid();
         if(clients && snapshot.has("taskTombstones")) tables.put("taskTombstones",List.of("id","taskId","deletedAt","taskVersion","reason","externalReferences"));
         else if(snapshot.has("taskTombstones")) throw invalid();
         Files.createDirectory(folder);
@@ -107,6 +110,7 @@ public final class CsvSnapshot {
         JsonObject metadata = new JsonObject();metadata.addProperty("format", clients ? "timekeeper-domain-csv-v3" : sessions ? "timekeeper-domain-csv-v2" : "timekeeper-domain-csv-v1");
         metadata.add("zoneId", snapshot.get("zoneId"));
         if(tables.containsKey("taskConnections")) metadata.addProperty("providerCollections",true);
+        if(tables.containsKey("taskListSections")) metadata.addProperty("sectionCollections",true);
         if(tables.containsKey("taskTombstones")) metadata.addProperty("taskTombstones",true);
         if(snapshot.getAsJsonArray("tasks").asList().stream().anyMatch(item -> TASK_EXTRAS.stream().anyMatch(item.getAsJsonObject()::has)))
             metadata.addProperty("taskExtras",true);
@@ -132,6 +136,11 @@ public final class CsvSnapshot {
                     || !metadata.get("providerCollections").getAsJsonPrimitive().isBoolean()
                     || metadata.get("providerCollections").getAsBoolean()!=connections)) throw invalid();
             if(connections) providerColumns(tables);
+            boolean sections=Files.exists(folder.resolve("taskListSections.csv"));
+            if(sections && (!clients || !lists) || metadata.has("sectionCollections") != sections) throw invalid();
+            if(sections && (!metadata.get("sectionCollections").isJsonPrimitive() || !metadata.get("sectionCollections").getAsJsonPrimitive().isBoolean()
+                    || !metadata.get("sectionCollections").getAsBoolean())) throw invalid();
+            if(sections) tables.put("taskListSections",List.of("id","taskListId","remoteSectionId","name","kind","position","present","writable"));
             boolean tombstones=Files.exists(folder.resolve("taskTombstones.csv"));
             if(tombstones && !clients || metadata.has("taskTombstones") != tombstones) throw invalid();
             if(tombstones && (!metadata.get("taskTombstones").isJsonPrimitive() || !metadata.get("taskTombstones").getAsJsonPrimitive().isBoolean()
@@ -173,10 +182,10 @@ public final class CsvSnapshot {
                             JsonElement array = JsonParser.parseString(value);if (!array.isJsonArray()) throw invalid();item.add(column, array);
                         } else if (table.getKey().equals("taskTombstones") && column.equals("taskVersion")) {
                             try {item.addProperty(column,Long.parseLong(value));} catch(NumberFormatException error) {throw invalid();}
-                        } else if (column.equals("manual") || (List.of("taskConnections","taskLists").contains(table.getKey())
+                        } else if (column.equals("manual") || (List.of("taskConnections","taskLists","taskListSections").contains(table.getKey())
                                 && List.of("readable","writable","enabled","shared","owner","present").contains(column))) {
                             if (!value.equals("true") && !value.equals("false")) throw invalid();item.addProperty(column, Boolean.parseBoolean(value));
-                        } else if (table.getKey().equals("taskLists") && column.equals("position")) {
+                        } else if (List.of("taskLists","taskListSections").contains(table.getKey()) && column.equals("position")) {
                             try {item.addProperty(column,Integer.parseInt(value));} catch(NumberFormatException error) {throw invalid();}
                         } else item.addProperty(column, value);
                     }

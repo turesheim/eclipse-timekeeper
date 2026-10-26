@@ -422,7 +422,9 @@ them.
 store a provider section identity, name, standard or grocery-category kind,
 position, presence, and section write permission. A relation prevents
 deleting a list while sections remain. The section catalog does not change
-Timekeeper projects or infer sections for providers that lack them.
+Timekeeper projects or infer sections for providers that lack them. Archive and
+portable transfer include sections and remap their list IDs; older snapshots
+without sections remain valid.
 An external task reference may include the stable Timekeeper `taskListId`.
 Task-to-list relations protect referenced lists from deletion, while portable
 imports remap the list ID. The reference's provider must match the list's
