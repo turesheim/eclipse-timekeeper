@@ -105,16 +105,20 @@ class AccountArchiveTest {
         var principal=tokens.authenticate("Bearer test-read");
         var planning=new net.resheim.eclipse.timekeeper.domain.TaskPlanning(net.resheim.eclipse.timekeeper.domain.TaskStatus.COMPLETED,
                 Optional.of(java.time.LocalDate.parse("2026-10-26")),Optional.of(java.time.Instant.parse("2026-10-26T11:12:13Z")));
+        var checklist=new net.resheim.eclipse.timekeeper.domain.TaskChecklist(List.of(
+                new net.resheim.eclipse.timekeeper.domain.TaskChecklistItem(UUID.randomUUID(),"Review archive",true,
+                        Optional.of(java.time.Instant.parse("2026-10-26T11:12:13Z")),0)));
         var task=store.transaction(principal.owner(),()->store.service().createTask(new net.resheim.eclipse.timekeeper.service.Commands.CreateTask(
-                Optional.empty(),Optional.empty(),"Portable scheduled task",Optional.empty(),Set.of(),planning)));
+                Optional.empty(),Optional.empty(),"Portable scheduled task",Optional.empty(),Set.of(),planning,checklist)));
         try(var download=archives.download(principal);var zip=new ZipFile(download.file().toFile())) {
             var archive=parse(new String(zip.getInputStream(zip.getEntry("archive.json")).readAllBytes(),StandardCharsets.UTF_8));
             var restored=java.util.stream.StreamSupport.stream(archive.path("work").path("tasks").spliterator(),false)
                     .filter(value->value.path("id").asText().equals(task.id().value().toString())).findFirst().orElseThrow();
             assertEquals("COMPLETED",restored.path("status").asText());assertEquals("2026-10-26",restored.path("scheduledDate").asText());
             assertEquals("2026-10-26T11:12:13Z",restored.path("completedAt").asText());
+            assertEquals(checklist.items().get(0).id().toString(),restored.path("checklistItems").get(0).path("id").asText());
             String csv=new String(zip.getInputStream(zip.getEntry("tasks.csv")).readAllBytes(),StandardCharsets.UTF_8);
-            assertTrue(csv.contains("scheduledDate"));assertTrue(csv.contains("2026-10-26T11:12:13Z"));
+            assertTrue(csv.contains("scheduledDate"));assertTrue(csv.contains("2026-10-26T11:12:13Z"));assertTrue(csv.contains("Review archive"));
         }
     }
     @Test void downloadIncludesMoreThanTenThousandRecordsAndTwentyMebibytesWithoutPagination() throws Exception {
