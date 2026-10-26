@@ -1163,5 +1163,9 @@
   "journal.sync.error.JOURNAL_BIDIRECTIONAL_DISABLED": "Aktiver toveis synkronisering før du bruker denne enheten. Enheter med bare opplasting kan fortsette.",
   "journal.sync.error.JOURNAL_DEVICE_WRITE_ONLY": "Denne nøkkelen har bare opplastingstilgang. Registrer eller roter en ny nøkkel med uttrykkelig nedlastingstilgang.",
   "journal.sync.error.JOURNAL_CLIENT_STATE_CHANGED": "Lokal synkroniseringstilstand er endret eller tapt. Behold filer og gjenopprettingskopier, og registrer en ny enhetsprofil.",
-  "journal.sync.error.JOURNAL_BASE_CHANGED": "Denne utvekslingen har en eldre felles tilstand. Behold den private klienttilstanden og prøv utestående bekreftelser på nytt."
+  "journal.sync.error.JOURNAL_BASE_CHANGED": "Denne utvekslingen har en eldre felles tilstand. Behold den private klienttilstanden og prøv utestående bekreftelser på nytt.",
+  "markdown.block_style": "Tekststil",
+  "markdown.heading_level": "Overskrift {{level}}",
+  "markdown.plain_text": "Vanlig tekst",
+  "markdown.hr": "Horisontal linje"
 }

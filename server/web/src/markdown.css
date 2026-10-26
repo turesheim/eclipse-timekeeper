@@ -13,14 +13,23 @@
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror h1 { font-size: 1.7rem; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror h2 { font-size: 1.4rem; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror h3 { font-size: 1.2rem; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror h4 { font-size: 1.1rem; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror h5 { font-size: 1rem; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror h6 { font-size: .9rem; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror blockquote { border-inline-start: .25rem solid var(--bs-primary); padding-inline-start: 1rem; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror pre { padding: 1rem; background: var(--bs-tertiary-bg); border-radius: .25rem; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror code { color: inherit; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror table { width: 100%; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror :is(th,td) { border: 1px solid var(--bs-border-color); padding: .5rem; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror li[data-task="true"] { display: flex; align-items: baseline; gap: .75rem; list-style: none; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror li[data-task="true"] { display: flex; align-items: flex-start; gap: .75rem; list-style: none; }
 :is(.markdown-lab-page,.markdown-editor) .ProseMirror li > div { min-width: 0; }
-:is(.markdown-lab-page,.markdown-editor) .ProseMirror input[type="checkbox"] { min-width: 1.25rem; min-height: 1.25rem; accent-color: var(--bs-primary); }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror li[data-task="true"] > div > p:first-child { margin-block-start: 0; }
+:is(.markdown-lab-page,.markdown-editor) .ProseMirror input[type="checkbox"] { flex: none; width: 1.25rem; height: 1.25rem; min-width: 1.25rem; min-height: 1.25rem; margin: max(0px,calc((1lh - 1.25rem)/2)) 0 0; accent-color: var(--bs-primary); }
+.markdown-block-trigger { width: auto; gap: .2rem; padding-inline: .5rem; }
+.markdown-block-menu { position: fixed; inset: auto; margin: 0; max-height: min(24rem,calc(100dvh - 1rem)); overflow-y: auto; }
+.markdown-block-menu:popover-open { display: block; }
+.markdown-block-menu .dropdown-item { display: flex; align-items: center; gap: .5rem; min-height: 2.75rem; }
+.markdown-block-menu [aria-checked="true"] { background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); font-weight: 700; }
 .markdown-lab-page #markdown-status { min-height: 1.5em; }
 
 .journal-dialog { --journal-padding: clamp(.75rem, 2vw, 1.5rem); width: min(68rem, calc(100vw - 1rem)); max-height: 94dvh; padding: var(--journal-padding); overflow: hidden; }

@@ -217,12 +217,12 @@ fieldset label { display: flex; align-items: center; gap: .65rem; font-weight: 4
 .track-holiday-label { display: flex; align-items: center; gap: .2rem; flex: 1; min-width: 0; max-width: 100%; padding: .1rem 0; border: 0; text-align: left; color: var(--track-holiday-color); font-size: .72rem; font-weight: 600; text-decoration: none; }
 .track-holiday-label:is(:hover,:active,:focus-visible) { color: var(--track-holiday-color); text-decoration: none; }
 .track-holiday-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.track-day-note { display: inline-flex; align-items: center; gap: .3rem; min-width: 0; max-width: 100%; min-height: 2.75rem; flex: 0 1 auto; padding: 0 .1rem; text-decoration: none; border: 0; }
+.track-day-note { display: inline-flex; align-items: center; gap: .3rem; min-width: 0; max-width: 100%; min-height: 2.75rem; flex: 0 1 auto; margin-inline-start: auto; padding: 0 .1rem; text-decoration: none; border: 0; }
 .track-day-note:is(:hover,:active,:focus-visible) { text-decoration: none; }
 .track-day-note .badge { overflow: hidden; text-overflow: ellipsis; font-size: .72rem; }
-.track-day-note .icon { flex: none; }
+.track-day-note .icon { flex: none; margin-inline-start: auto; }
 .track-day-note.has-body { opacity: 1; }
-.track-day-note.is-empty { margin-inline-start: auto; flex: none; opacity: 0; color: var(--accent); }
+.track-day-note.is-empty { flex: none; opacity: 0; color: var(--accent); }
 .track-day:focus-within .track-day-note.is-empty, .track-day-note.is-empty:focus-visible { opacity: 1; }
 /* Menu coordinates come from the press's viewport position, including after scrolling. */
 .track-note-menu { position: fixed; inset: auto; margin: 0; padding: .25rem; min-width: 11rem; max-width: calc(100vw - 1rem); }
