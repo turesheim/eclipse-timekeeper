@@ -7,7 +7,7 @@ import java.util.Set;
 
 /** Immutable, provider-independent Timekeeper task aggregate state. */
 public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary, Optional<String> url,
-		Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, long version) {
+		Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder, long version) {
 	public Task {
 		id = Values.required(id, "taskId");
 		projectId = projectId == null ? Optional.empty() : projectId;
@@ -23,11 +23,18 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		timing = timing == null ? TaskTiming.empty() : timing;
 		importance = importance == null ? TaskImportance.ordinary() : importance;
 		body = body == null ? TaskBody.empty() : body;
+		if (siblingOrder < 0) throw new DomainValidationException("siblingOrder", "sibling order must not be negative");
 		Set<ExternalTaskReferenceKey> keys = new HashSet<>();
 		if (externalReferences.stream().map(ExternalTaskReference::key).anyMatch(key -> !keys.add(key))) {
 			throw new DomainValidationException("externalReferences", "external reference keys must be unique");
 		}
 		version = Values.version(version);
+	}
+
+	public Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
+			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning,
+			TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, long version) {
+		this(id, projectId, parentTaskId, summary, url, externalReferences, planning, checklist, timing, importance, body, 0, version);
 	}
 
 	public Task(TaskId id, Optional<ProjectId> projectId, String summary, Optional<String> url,
@@ -62,27 +69,31 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 
 	public Task update(Optional<ProjectId> newProjectId, Optional<TaskId> newParentTaskId,
 			String newSummary, Optional<String> newUrl) {
-		return new Task(id, newProjectId, newParentTaskId, newSummary, newUrl, externalReferences, planning, checklist, timing, importance, body, version + 1);
+		return new Task(id, newProjectId, newParentTaskId, newSummary, newUrl, externalReferences, planning, checklist, timing, importance, body, siblingOrder, version + 1);
 	}
 
 	public Task plan(TaskPlanning newPlanning) {
-		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, newPlanning, checklist, timing, importance, body, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, newPlanning, checklist, timing, importance, body, siblingOrder, version + 1);
 	}
 
 	public Task withChecklist(TaskChecklist newChecklist) {
-		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, planning, newChecklist, timing, importance, body, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, planning, newChecklist, timing, importance, body, siblingOrder, version + 1);
 	}
 
 	public Task withTiming(TaskTiming newTiming) {
-		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, planning, checklist, newTiming, importance, body, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, planning, checklist, newTiming, importance, body, siblingOrder, version + 1);
 	}
 
 	public Task withImportance(TaskImportance newImportance) {
-		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, planning, checklist, timing, newImportance, body, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, planning, checklist, timing, newImportance, body, siblingOrder, version + 1);
 	}
 
 	public Task withBody(TaskBody newBody) {
-		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, planning, checklist, timing, importance, newBody, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, planning, checklist, timing, importance, newBody, siblingOrder, version + 1);
+	}
+
+	public Task withSiblingOrder(int order) {
+		return new Task(id, projectId, parentTaskId, summary, url, externalReferences, planning, checklist, timing, importance, body, order, version + 1);
 	}
 
 	public Task link(ExternalTaskReference reference) {
@@ -94,7 +105,7 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		if (previous != null && reference.taskListId().isEmpty()) reference = reference.withTaskList(previous.taskListId());
 		updated.removeIf(candidate -> candidate.key().equals(key));
 		updated.add(reference);
-		return new Task(id, projectId, parentTaskId, summary, url, updated, planning, checklist, timing, importance, body, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, updated, planning, checklist, timing, importance, body, siblingOrder, version + 1);
 	}
 
 	public Task withExternalSource(ExternalTaskReferenceKey key, ExternalTaskSource source) {
@@ -107,13 +118,13 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 			else updated.add(reference);
 		}
 		if (!found) throw new DomainValidationException("externalReference", "reference is not linked to task");
-		return new Task(id, projectId, parentTaskId, summary, url, updated, planning, checklist, timing, importance, body, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, updated, planning, checklist, timing, importance, body, siblingOrder, version + 1);
 	}
 
 	public Task unlink(ExternalTaskReference reference) {
 		Values.required(reference, "externalReference");
 		Set<ExternalTaskReference> updated = new LinkedHashSet<>(externalReferences);
 		updated.removeIf(candidate -> candidate.key().equals(reference.key()));
-		return new Task(id, projectId, parentTaskId, summary, url, updated, planning, checklist, timing, importance, body, version + 1);
+		return new Task(id, projectId, parentTaskId, summary, url, updated, planning, checklist, timing, importance, body, siblingOrder, version + 1);
 	}
 }

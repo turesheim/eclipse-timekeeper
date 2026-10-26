@@ -94,7 +94,7 @@ public class TimekeeperResource {
             }
             var service=store.service();Object value=switch(type) {
                 case "PROJECT" -> service.createProject(new CreateProject(input.get("name").asText()));
-                case "TASK" -> service.createTask(new CreateTask(project(input),parent(input),input.get("summary").asText(),optionalText(input.get("url")),checkedReferences(input.get("externalReferences")),planning(input),checklist(input.get("checklistItems")),timing(input),importance(input),body(input)));
+                case "TASK" -> service.createTask(new CreateTask(project(input),parent(input),input.get("summary").asText(),optionalText(input.get("url")),checkedReferences(input.get("externalReferences")),planning(input),checklist(input.get("checklistItems")),timing(input),importance(input),body(input),input.path("siblingOrder").asInt(0)));
                 case "LABEL" -> service.createLabel(new CreateLabel(input.get("name").asText(),optionalText(input.get("color"))));
                 case "ACTIVITY" -> service.createActivity(new CreateActivity(optionalText(input.get("taskId")).map(UUID::fromString).map(TaskId::new).orElse(null),new OwnerId(store.owner()),Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText(),labels(input.get("labelIds")),optionalText(input.get("workSessionId")).map(UUID::fromString).map(WorkSessionId::new),project(input)));
                 case "WORK_SESSION" -> store.workSessionService().createWorkSession(new CreateWorkSession(new OwnerId(store.owner()),Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),WorkSessionDescriptions.summary(input)));
@@ -133,6 +133,12 @@ public class TimekeeperResource {
             var updated=store.service().updateTaskBody(new UpdateTaskBody(new TaskId(key),version,
                     new TaskBody(TaskBodyFormat.valueOf(input.get("format").asText()),input.get("content").asText())));
             return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+        });
+    }
+    @PUT @Path("/tasks/{id}/order") public Response updateTaskOrder(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
+        UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskOrderInput",body);ContractInputs.queries(uri.getQueryParameters());
+        return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
+            return ApiReplies.resource(200,snapshot(store.owner(),store.service().updateTaskOrder(new UpdateTaskOrder(new TaskId(key),version,input.get("siblingOrder").asInt()))),null);
         });
     }
     @PUT @Path("/{collection}/{id}") public Response update(@PathParam("collection") String collection,@PathParam("id") String id,@HeaderParam("If-Match") String match,@HeaderParam("X-Timekeeper-Undo") String undo,JsonNode body) {

@@ -36,7 +36,7 @@ public final class WireValues {
         var planning=new TaskPlanning(value.has("status")?TaskStatus.valueOf(value.get("status").getAsString()):TaskStatus.NOT_STARTED,
                 text(value.get("scheduledDate")).map(LocalDate::parse),text(value.get("completedAt")).map(Instant::parse));
         var checklist=checklist(value.get("checklistItems"));
-		return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,planning,checklist,timing(value),importance(value),body(value),value.get("version").getAsLong());
+		return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,planning,checklist,timing(value),importance(value),body(value),value.has("siblingOrder")?value.get("siblingOrder").getAsInt():0,value.get("version").getAsLong());
     }
     public static TaskBody body(JsonObject value) {
         if(!value.has("body") || value.get("body").isJsonNull())return TaskBody.empty();

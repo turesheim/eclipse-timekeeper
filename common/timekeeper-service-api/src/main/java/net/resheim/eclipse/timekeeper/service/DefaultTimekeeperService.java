@@ -53,6 +53,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskTiming;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskImportance;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskBody;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskOrder;
 import net.resheim.eclipse.timekeeper.service.Ports.ServicePorts;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityReport;
@@ -133,7 +134,7 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			}
 			Task created = ports.tasks().save(new Task(ports.identifiers().newTaskId(), command.projectId(),
 					command.parentTaskId(),
-					command.summary(), command.url(), command.externalReferences(), command.planning(), command.checklist(), command.timing(), command.importance(), command.body(), 0));
+					command.summary(), command.url(), command.externalReferences(), command.planning(), command.checklist(), command.timing(), command.importance(), command.body(), command.siblingOrder(), 0));
 			publish(TASK, CREATED, created.id().value().toString());
 			return created;
 		});
@@ -194,6 +195,18 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			Task current = requiredTask(command.id());
 			version(current.version(), command.expectedVersion(), "task");
 			Task updated = ports.tasks().save(current.withBody(required(command.body(), "body")));
+			publish(TASK, UPDATED, updated.id().value().toString());
+			return updated;
+		});
+	}
+
+	@Override
+	public Task updateTaskOrder(UpdateTaskOrder command) {
+		return tx(() -> {
+			required(command, "command");
+			Task current = requiredTask(command.id());
+			version(current.version(), command.expectedVersion(), "task");
+			Task updated = ports.tasks().save(current.withSiblingOrder(command.siblingOrder()));
 			publish(TASK, UPDATED, updated.id().value().toString());
 			return updated;
 		});

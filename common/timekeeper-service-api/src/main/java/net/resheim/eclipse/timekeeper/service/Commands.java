@@ -38,7 +38,7 @@ public final class Commands {
 			boolean shared, boolean owner, boolean present, int position) { }
 
 	public record CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
-			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body) {
+			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder) {
 		public CreateTask {
 			projectId = optional(projectId);
 			parentTaskId = optional(parentTaskId);
@@ -49,6 +49,12 @@ public final class Commands {
 			timing = timing == null ? TaskTiming.empty() : timing;
 			importance = importance == null ? TaskImportance.ordinary() : importance;
 			body = body == null ? TaskBody.empty() : body;
+		}
+
+		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
+				Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning,
+				TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body) {
+			this(projectId, parentTaskId, summary, url, externalReferences, planning, checklist, timing, importance, body, 0);
 		}
 
 		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
@@ -107,6 +113,7 @@ public final class Commands {
 	public record UpdateTaskTiming(TaskId id, long expectedVersion, TaskTiming timing) { }
 	public record UpdateTaskImportance(TaskId id, long expectedVersion, TaskImportance importance) { }
 	public record UpdateTaskBody(TaskId id, long expectedVersion, TaskBody body) { }
+	public record UpdateTaskOrder(TaskId id, long expectedVersion, int siblingOrder) { }
 	public record LinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReference reference) { }
 	public record UpdateExternalTaskSource(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference, ExternalTaskSource source) { }
 	public record UnlinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference) { }

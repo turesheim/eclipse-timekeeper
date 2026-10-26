@@ -745,6 +745,33 @@ class HttpAcceptance(unittest.TestCase):
         self.assertEqual(mappings[task_list['id']],copied['externalReferences'][0]['taskListId'])
         self.call('GET','/task-lists/'+task_list['id'],owner='b',status=404,code='NOT_FOUND')
 
+    def test_task_sibling_order_survives_legacy_writes_and_transfer(self):
+        path='/tasks/'+self.task['id']
+        original, headers=self.call('GET',path)
+        self.assertEqual(0,original['siblingOrder'])
+        self.call('PUT',path+'/order',body={'siblingOrder':-1},headers={'If-Match':headers['ETag']},
+                  status=422,code='VALIDATION')
+        ordered, headers=self.call('PUT',path+'/order',body={'siblingOrder':12},
+                                  headers={'If-Match':headers['ETag']})
+        self.assertEqual(12,ordered['siblingOrder'])
+        self.call('PUT',path+'/order',body={'siblingOrder':2},headers={'If-Match':'"wrong"'},
+                  status=412,code='STALE_VERSION')
+        legacy={'projectId':ordered['projectId'],'parentTaskId':ordered['parentTaskId'],
+                'summary':self.prefix+' ordered','url':None}
+        updated, _=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        self.assertEqual(12,updated['siblingOrder'])
+        created=self.create('tasks',{'projectId':self.project['id'],'parentTaskId':None,
+                    'summary':self.prefix+' created in order','url':None,'siblingOrder':3})
+        self.assertEqual(3,created['siblingOrder'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
+               'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
+        mappings={item['sourceId']:item['id'] for item in imported['ids']}
+        for item in imported['ids']:self.created.append(('b',kinds[item['entityType']],item['id']))
+        copied, _=self.call('GET','/tasks/'+mappings[self.task['id']],owner='b')
+        self.assertEqual(12,copied['siblingOrder'])
+
     def test_provider_identity_is_unique_per_owner_and_history_survives_unlink(self):
         reference = {'providerId': 'jira', 'repositoryId': 'https://jira.invalid',
                      'externalId': str(uuid4()), 'externalUrl': None}
