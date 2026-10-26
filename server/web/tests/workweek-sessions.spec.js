@@ -25,27 +25,25 @@ async function fixture(request) {
     const current = await api(request, 'GET', '/me'); await api(request, 'PUT', '/me', {zoneId: previous.zoneId}, {'If-Match': current.headers().etag});
   }};
 }
-test('work-session label choices, compact display and timer edits stay independent of activity labels',async({page,request})=>{
+test('work-session forms omit labels while edits and stop preserve legacy metadata',async({page,request})=>{
   const f=await fixture(request);let id;
   try {
-    const first=await f.create('labels',{name:'Office '+randomUUID().slice(0,6),color:'#176653'});
-    const second=await f.create('labels',{name:'Billable '+randomUUID().slice(0,6),color:'#6750a4'});
-    await signIn(page);await page.getByRole('button',{name:'Start work session',exact:true}).click();
-    await page.getByLabel('Summary',{exact:true}).fill('Labelled working day');await page.getByLabel('Client',{exact:true}).selectOption(f.client.id);
-    await page.getByLabel(first.name,{exact:true}).check();await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();
-    const active=await (await api(request,'GET','/work-sessions/active')).json();id=active.id;expect(active.labelIds).toEqual([first.id]);
-    await expect(page.locator('#work-session-labels')).toContainText(first.name);
-    await page.getByRole('button',{name:'Edit work session',exact:true}).click();await expect(page.getByLabel(first.name,{exact:true})).toBeChecked();
-    await page.getByLabel(first.name,{exact:true}).uncheck();await page.getByLabel(second.name,{exact:true}).check();await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();
-    await expect(page.locator('#work-session-labels')).toContainText(second.name);await expect(page.locator('#work-session-labels')).not.toContainText(first.name);
-    expect((await (await api(request,'GET','/work-sessions/'+id)).json()).labelIds).toEqual([second.id]);
-    const audit=await new AxeBuilder({page}).include('#work-session').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(audit.violations).toEqual([]);
-    await page.locator('#work-session').screenshot({path:'test-results/work-session-labels-desktop.png',timeout:10000});
-    await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    await page.locator('#work-session').screenshot({path:'test-results/work-session-labels-mobile.png',timeout:10000});
+    const legacy=await f.create('labels',{name:'Legacy session label '+randomUUID().slice(0,6),color:'#176653'}),writes=[];
+    page.on('request',request=>{if(request.method()==='POST' && request.url().endsWith('/work-sessions/start') || request.method()==='PUT' && request.url().includes('/work-sessions/'))writes.push(request.postDataJSON());});
+    await signIn(page);await page.getByRole('button',{name:'Record work session',exact:true}).click();await expect(page.locator('#editor-labels')).toHaveCount(0);await page.locator('#cancel').click();
+    await page.getByRole('button',{name:'Start work session',exact:true}).click();await expect(page.locator('#editor-labels')).toHaveCount(0);
+    await page.getByLabel('Summary',{exact:true}).fill('Working day without label controls');await page.getByLabel('Client',{exact:true}).selectOption(f.client.id);await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();
+    const active=await (await api(request,'GET','/work-sessions/active')).json();id=active.id;expect(active.labelIds??[]).toEqual([]);expect(writes[0]).not.toHaveProperty('labelIds');
+    const loaded=await api(request,'GET','/work-sessions/'+id);
+    await api(request,'PUT','/work-sessions/'+id,{clientId:active.clientId,summary:active.summary,start:active.start,end:null,labelIds:[legacy.id]},{'If-Match':loaded.headers().etag});
+    await page.getByRole('button',{name:'Edit work session',exact:true}).click();await expect(page.locator('#editor-labels')).toHaveCount(0);await page.getByLabel('Summary',{exact:true}).fill('Edited without changing legacy labels');await page.locator('#save').click();await expect(page.locator('#editor')).not.toBeVisible();
+    expect(writes.at(-1)).not.toHaveProperty('labelIds');expect((await (await api(request,'GET','/work-sessions/'+id)).json()).labelIds).toEqual([legacy.id]);
+    await expect(page.locator('#work-session-labels')).toHaveCount(0);await expect(page.locator('#work-session')).not.toContainText(legacy.name);
+    expect((await new AxeBuilder({page}).include('#work-session').analyze()).violations).toEqual([]);
     await page.getByRole('button',{name:'Stop work session',exact:true}).click();await expect(page.locator('#work-session-state')).toHaveText('Stopped');
-    expect((await (await api(request,'GET','/work-sessions/'+id)).json()).labelIds).toEqual([second.id]);
-    await expect(page.locator(`#week-sessions [data-work-session-id="${id}"]`).first()).toHaveAttribute('title',new RegExp(second.name));
+    expect((await (await api(request,'GET','/work-sessions/'+id)).json()).labelIds).toEqual([legacy.id]);
+    const entry=page.locator(`#week-sessions [data-work-session-id="${id}"]`).first();await expect(entry).not.toHaveAttribute('title',new RegExp(legacy.name));
+    await workSessionDetails(page,id);await expect(page.locator('#week-session-details')).not.toContainText(legacy.name);await page.keyboard.press('Escape');
   } finally {
     if(id) {const current=await api(request,'GET','/work-sessions/'+id);await api(request,'DELETE','/work-sessions/'+id,undefined,{'If-Match':current.headers().etag});}
     await f.close();
@@ -146,7 +144,7 @@ test('compact Workweek cells group sessions and edit exact endpoints without cha
     // Every compact clock must fit its field even at the table's minimum width.
     for(const input of await page.locator('#week-sessions input').all())expect(await input.evaluate(node=>{const style=getComputedStyle(node),canvas=document.createElement('canvas'),context=canvas.getContext('2d');context.font=style.font;return context.measureText(node.value).width+parseFloat(style.paddingLeft)+parseFloat(style.paddingRight)<=node.clientWidth;})).toBe(true);
     await captureScreenshot(page,{path:'test-results/compact-workweek-mobile.png',fullPage:true});
-    const details=await workSessionDetails(page,first.id);await expect(details).toContainText('Morning planning');await expect(details).toContainText(label.name);await expect(details).toContainText(project.name);
+    const details=await workSessionDetails(page,first.id);await expect(details).toContainText('Morning planning');await expect(details).not.toContainText(label.name);await expect(details).toContainText(project.name);
   } finally {await context.close();await f.close();}
 });
 test('Workweek inline edits keep stale and uncertain proposals without overwriting or repeating writes',async({page,request})=>{

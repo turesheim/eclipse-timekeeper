@@ -16,19 +16,17 @@ async function loadEngine(){if(!engine)engine=await import('./assets/milkdown/mi
 
 /** One in-memory Markdown field. Neither drafts nor bodies enter browser storage. */
 export class MarkdownField {
-  constructor(root,onChange,onState){
+  constructor(root,onChange,onState,prefix='journal'){
     Object.assign(this,{root,onChange,onState,generation:0,readOnly:true});root.classList.add('markdown-editor');
     this.modes=node('div',undefined,'markdown-modes');this.modes.setAttribute('role','group');this.modes.setAttribute('aria-label',t('markdown.mode'));
-    this.formatted=button(t('markdown.formatted'));this.source=button(t('markdown.source'));this.modes.append(this.formatted,this.source);
+    this.formatted=iconButton(button(),'file-richtext',t('markdown.formatted'));this.source=iconButton(button(),'markdown',t('markdown.source'));this.modes.append(this.formatted,this.source);
     this.status=node('p','','hint');this.status.setAttribute('role','status');
-    this.normalization=node('p',t('journal.normalization'),'hint');this.normalization.id='journal-markdown-normalization';
-    this.help=node('p',t('markdown.help'),'hint');this.help.id='journal-markdown-help';
-    this.helpDetails=node('details',undefined,'markdown-help');this.helpDetails.append(node('summary',t('journal.help')),node('p',t('markdown.normalization'),'hint'),this.help);
+    this.normalization=node('p',t('journal.normalization'),'hint');this.normalization.id=prefix+'-markdown-normalization';
     this.metadata=node('details');this.metadata.hidden=true;this.frontmatterView=node('pre');this.metadata.append(node('summary',t('markdown.metadata')),this.frontmatterView);
     this.tools=node('div',undefined,'markdown-tools');this.tools.setAttribute('role','group');this.tools.setAttribute('aria-label',t('markdown.formatting'));
     this.blockTrigger=iconButton(button(),'paragraph',t('markdown.block_style'));this.blockTrigger.classList.add('markdown-block-trigger');
-    this.blockTrigger.setAttribute('aria-haspopup','menu');this.blockTrigger.setAttribute('aria-expanded','false');this.blockTrigger.setAttribute('aria-controls','journal-block-menu');
-    this.blockMenu=node('div',undefined,'dropdown-menu markdown-block-menu shadow');this.blockMenu.id='journal-block-menu';this.blockMenu.popover='auto';this.blockMenu.setAttribute('role','menu');this.blockMenu.setAttribute('aria-label',t('markdown.block_style'));
+    this.blockTrigger.setAttribute('aria-haspopup','menu');this.blockTrigger.setAttribute('aria-expanded','false');this.blockTrigger.setAttribute('aria-controls',prefix+'-block-menu');
+    this.blockMenu=node('div',undefined,'dropdown-menu markdown-block-menu shadow');this.blockMenu.id=prefix+'-block-menu';this.blockMenu.popover='auto';this.blockMenu.setAttribute('role','menu');this.blockMenu.setAttribute('aria-label',t('markdown.block_style'));
     for(let level=0;level<=6;level++){
       const choice=button();choice.className='dropdown-item';choice.dataset.level=String(level);choice.tabIndex=-1;choice.setAttribute('role','menuitemradio');choice.setAttribute('aria-checked','false');
       choice.append(icon(level?'type-h'+level:'paragraph'),node('span',level?t('markdown.heading_level',{level}):t('markdown.plain_text')));
@@ -65,11 +63,12 @@ export class MarkdownField {
         }else this.editor.command(name);
       });this.tools.append(action);
     }
-    this.rich=node('div',undefined,'journal-formatted');this.rich.id='journal-formatted';
-    this.plain=node('div',undefined,'journal-source');const label=node('label',t('markdown.body'),'form-label');label.htmlFor='journal-body';
-    this.text=node('textarea',undefined,'form-control');this.text.id='journal-body';this.text.rows=14;this.text.spellcheck=false;this.text.setAttribute('aria-describedby',this.help.id);this.plain.append(label,this.text);
+    this.rich=node('div',undefined,'journal-formatted');this.rich.id=prefix+'-formatted';
+    this.plain=node('div',undefined,'journal-source');const label=node('label',t('markdown.body'),'form-label');label.htmlFor=prefix+'-body';
+    this.text=node('textarea',undefined,'form-control');this.text.id=prefix+'-body';this.text.rows=14;this.text.spellcheck=false;this.plain.append(label,this.text);
     this.formatted.setAttribute('aria-controls',this.rich.id);this.source.setAttribute('aria-controls',this.text.id);
-    root.append(this.metadata,this.modes,this.normalization,this.status,this.helpDetails,this.tools,this.rich,this.plain,this.blockMenu);
+    this.toolbar=node('div',undefined,'markdown-toolbar');this.separator=node('span',undefined,'markdown-toolbar-separator');this.separator.setAttribute('role','separator');this.separator.setAttribute('aria-orientation','vertical');this.toolbar.append(this.modes,this.separator,this.tools);
+    root.append(this.metadata,this.toolbar,this.normalization,this.status,this.rich,this.plain,this.blockMenu);
     this.source.addEventListener('click',()=>void this.showSource());this.formatted.addEventListener('click',()=>void this.showFormatted());
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();});this.clear();
   }
@@ -102,19 +101,19 @@ export class MarkdownField {
     for(const action of this.tools.children)action.disabled=this.readOnly||this.loading;
     for(const choice of this.blockMenu.children)choice.disabled=this.readOnly||this.loading;
     if(this.readOnly||this.loading||this.rich.hidden)this.closeBlockMenu();
-    this.tools.hidden=this.rich.hidden||this.readOnly;
+    this.tools.hidden=this.rich.hidden||this.readOnly;this.separator.hidden=this.tools.hidden;
     this.normalization.hidden=this.rich.hidden||this.readOnly;
     this.formatted.disabled=this.loading;this.source.disabled=this.loading;this.onState?.();
   }
   mode(formatted){
     if(!formatted)this.closeBlockMenu();
-    this.rich.hidden=!formatted;this.tools.hidden=!formatted;this.plain.hidden=formatted;
+    this.rich.hidden=!formatted;this.tools.hidden=!formatted;this.separator.hidden=!formatted;this.plain.hidden=formatted;
     this.normalization.hidden=!formatted||this.readOnly;
     this.formatted.setAttribute('aria-pressed',String(formatted));this.source.setAttribute('aria-pressed',String(!formatted));
   }
   clear(){
     ++this.generation;const previous=this.editor;this.editor=null;void previous?.destroy().catch(()=>{});
-    this.rich.replaceChildren();this.tools.scrollLeft=0;this.frontmatter='';this.frontmatterView.textContent='';this.metadata.hidden=true;this.unterminated=false;this.setRaw('');this.loading=false;this.status.textContent='';this.paintBlockStyle();this.mode(false);this.controls();
+    this.rich.replaceChildren();this.toolbar.scrollLeft=0;this.frontmatter='';this.frontmatterView.textContent='';this.metadata.hidden=true;this.unterminated=false;this.setRaw('');this.loading=false;this.status.textContent='';this.paintBlockStyle();this.mode(false);this.controls();
   }
   setValue(value){
     this.clear();const parts=splitMarkdown(value);this.frontmatter=parts.frontmatter;this.unterminated=parts.unterminated;this.setRaw(parts.body);

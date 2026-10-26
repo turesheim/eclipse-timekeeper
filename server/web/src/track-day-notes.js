@@ -8,22 +8,20 @@ const button=(text,className)=>{const value=node('button',text,className);value.
 
 /** Optional web metadata has its own read state and never changes timed work. */
 export class TrackDayNotes {
-  constructor(root,grid,monthInput,callbacks){
-    Object.assign(this,{root,grid,monthInput,callbacks,notes:new Map(),bodyDates:new Set(),generation:0});
-    this.status=node('p',undefined,'hint track-note-status');this.status.setAttribute('role','status');this.message=node('span');
-    this.retry=button(t('ui.retry'),'btn btn-link btn-sm');this.retry.hidden=true;this.retry.addEventListener('click',()=>{this.key=null;this.load();});this.status.append(this.message,' ',this.retry);grid.after(this.status);this.status.hidden=true;
-    this.dialog=node('dialog',undefined,'app-dialog journal-dialog shadow-lg');this.dialog.id='track-note-editor';this.dialog.setAttribute('aria-labelledby','track-note-title');
-    this.form=node('form');this.title=node('h2');this.title.id='track-note-title';
-    const label=node('label',t('day_notes.text'),'form-label');label.htmlFor='track-note-text';this.text=node('input',undefined,'form-control');this.text.id='track-note-text';this.text.maxLength=80;this.text.autocomplete='off';this.text.setAttribute('aria-describedby','track-note-hint');
-    const hint=node('p',t('day_notes.hint'),'hint');hint.id='track-note-hint';this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');
+  constructor(root,grid,monthInput,callbacks,options={}){
+    Object.assign(this,{prefix:'track',headingSelector:'.track-date-row',alwaysShow:false,compact:false},options,{root,grid,monthInput,callbacks,notes:new Map(),bodyDates:new Set(),generation:0});
+    this.noteAttr='data-'+this.prefix+'-note-date';this.cellAttr='data-'+this.prefix+'-date';
+    this.status=node('p',undefined,'hint '+this.prefix+'-note-status');this.status.setAttribute('role','status');this.message=node('span');
+    this.retry=button(t('ui.retry'),'btn btn-link btn-sm');this.retry.hidden=true;this.retry.addEventListener('click',()=>{this.key=null;this.load();});this.status.append(this.message,' ',this.retry);if(this.statusAnchor)this.statusAnchor.before(this.status);else grid.after(this.status);this.status.hidden=true;
+    this.dialog=node('dialog',undefined,'app-dialog journal-dialog shadow-lg');this.dialog.id=this.prefix+'-note-editor';this.dialog.setAttribute('aria-labelledby',this.prefix+'-note-title');
+    this.form=node('form');this.title=node('h2');this.title.id=this.prefix+'-note-title';
+    const label=node('label',t('day_notes.text'),'form-label');label.htmlFor=this.prefix+'-note-text';this.text=node('input',undefined,'form-control journal-note-label');this.text.id=this.prefix+'-note-text';this.text.maxLength=80;this.text.autocomplete='off';
+    this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');
     this.savedStatus=node('p','','hint');this.savedStatus.setAttribute('role','status');
-    const markdown=node('div');this.markdown=new MarkdownField(markdown,()=>this.changed(),()=>this.controls());
-    this.markdown.helpDetails.append(hint);
-    this.clearBody=button(t('journal.clear_body'),'btn btn-outline-secondary');this.clearBody.addEventListener('click',()=>{if(!this.markdown.readOnly){this.markdown.setValue('');this.changed();void this.markdown.showFormatted();}});
-    this.download=button(t('markdown.download'),'btn btn-outline-secondary');this.download.addEventListener('click',()=>this.downloadDraft());
+    const markdown=node('div');this.markdown=new MarkdownField(markdown,()=>this.changed(),()=>this.controls(),this.prefix==='track'?'journal':this.prefix+'-journal');
     this.reload=button(t('journal.reload'),'btn btn-outline-secondary');this.reload.addEventListener('click',()=>void this.reloadEditor());
     const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.savedStatus,this.cancel,this.save);
-    this.recovery=node('div',undefined,'journal-recovery');this.recovery.append(this.clearBody,this.download,this.reload);
+    this.recovery=node('div',undefined,'journal-recovery');this.recovery.append(this.reload);
     this.content=node('div',undefined,'journal-content');this.content.append(this.title,label,this.text,this.error,markdown,this.recovery);this.form.append(this.content,actions);this.dialog.append(this.form);root.append(this.dialog);
     this.text.addEventListener('input',()=>this.changed());
     this.cancel.addEventListener('click',()=>this.requestClose());
@@ -46,7 +44,7 @@ export class TrackDayNotes {
     if(uncertain&&this.session){this.key=null;this.load();}
   }
   buildMenu(){
-    this.menu=node('div',undefined,'track-note-menu dropdown-menu shadow');this.menu.id='track-note-menu';this.menu.popover='manual';this.menu.setAttribute('role','menu');this.menu.setAttribute('aria-label',t('day_notes.actions'));
+    this.menu=node('div',undefined,'track-note-menu dropdown-menu shadow');this.menu.id=this.prefix+'-note-menu';this.menu.popover='manual';this.menu.setAttribute('role','menu');this.menu.setAttribute('aria-label',t('day_notes.actions'));
     this.menuItem=button('', 'dropdown-item');this.menuItem.setAttribute('role','menuitem');this.menu.append(this.menuItem);this.root.append(this.menu);
     // Automatic popovers dismiss on the release of the touch that opened them.
     // Keep this menu open through release and dismiss on the next outside press.
@@ -61,20 +59,20 @@ export class TrackDayNotes {
       if(event.key==='Escape'){event.preventDefault();this.closeMenu();this.focusDate(this.menuDate);}
     });
     this.grid.addEventListener('contextmenu',event=>{
-      const cell=event.target.closest('[data-track-date]');if(!cell||!this.writable||!this.loaded)return;
-      event.preventDefault();const touch=!!this.hold||event.pointerType==='touch'||event.pointerType==='pen';if(touch)this.suppressClickUntil=Infinity;this.cancelHold();this.showMenu(cell.dataset.trackDate,event.clientX,event.clientY,!touch);
+      const cell=event.target.closest('['+this.cellAttr+']');if(!cell||!this.writable||!this.loaded)return;
+      event.preventDefault();const touch=!!this.hold||event.pointerType==='touch'||event.pointerType==='pen';if(touch)this.suppressClickUntil=Infinity;this.cancelHold();this.showMenu(cell.getAttribute(this.cellAttr),event.clientX,event.clientY,!touch);
     });
     this.grid.addEventListener('keydown',event=>{
       if(event.key==='ContextMenu'||event.key==='F10'&&event.shiftKey){
-        const cell=event.target.closest('[data-track-date]');if(!cell||!this.writable||!this.loaded)return;
-        event.preventDefault();const rect=event.target.getBoundingClientRect();this.showMenu(cell.dataset.trackDate,rect.left,rect.bottom);
+        const cell=event.target.closest('['+this.cellAttr+']');if(!cell||!this.writable||!this.loaded)return;
+        event.preventDefault();const rect=event.target.getBoundingClientRect();this.showMenu(cell.getAttribute(this.cellAttr),rect.left,rect.bottom);
       }
     });
     this.grid.addEventListener('pointerdown',event=>{
       this.cancelHold();this.suppressClickUntil=0;
       if(!event.isPrimary||!['touch','pen'].includes(event.pointerType)||!this.writable||!this.loaded)return;
-      const cell=event.target.closest('[data-track-date]');if(!cell||!getSelection().isCollapsed)return;
-      const hold={id:event.pointerId,date:cell.dataset.trackDate,x:event.clientX,y:event.clientY};this.hold=hold;
+      const cell=event.target.closest('['+this.cellAttr+']');if(!cell||!getSelection().isCollapsed)return;
+      const hold={id:event.pointerId,date:cell.getAttribute(this.cellAttr),x:event.clientX,y:event.clientY};this.hold=hold;
       this.holdTimer=setTimeout(()=>{if(this.hold!==hold)return;this.hold=null;this.suppressClickUntil=Infinity;this.showMenu(hold.date,hold.x,hold.y,false);},450);
     },{passive:true});
     this.grid.addEventListener('pointermove',event=>{if(this.hold&&(Math.hypot(event.clientX-this.hold.x,event.clientY-this.hold.y)>10||event.pointerId!==this.hold.id))this.cancelHold();},{passive:true});
@@ -97,7 +95,7 @@ export class TrackDayNotes {
     this.menu.style.top=Math.max(8,Math.min(y,innerHeight-this.menu.offsetHeight-8))+'px';if(focus)this.menuItem.focus({preventScroll:true});
   }
   closeMenu(){if(this.menu.matches(':popover-open'))this.menu.hidePopover();}
-  focusDate(date){if(!this.root.hidden)(this.grid.querySelector(`button[data-track-note-date="${date}"]`)||this.monthInput).focus();}
+  focusDate(date){if(!this.root.hidden)(this.grid.querySelector(`button[${this.noteAttr}="${date}"]`)||this.monthInput).focus();}
   dateLabel(date){return dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));}
   update(calendar,cells,session,revision,writable,focused){
     if(session!==this.session){this.reset();this.session=session;}
@@ -117,8 +115,7 @@ export class TrackDayNotes {
       if(editor.failedRead||editor.stale||editor.uncertain){if(this.markdown.root.previousSibling!==this.recovery)this.markdown.root.before(this.recovery);}
       else if(this.markdown.root.nextSibling!==this.recovery)this.markdown.root.after(this.recovery);
     }
-    if(this.download)this.download.disabled=!editor.etag||editor.loading||editor.busy||this.markdown.loading;
-    if(this.clearBody)this.clearBody.disabled=readOnly||!editor.etag||this.markdown.loading;
+    this.recovery.hidden=this.reload.hidden;
   }
   reset(){
     this.cancelHold();this.closeMenu();++this.generation;this.session=null;this.key=null;this.range=null;this.loaded=false;this.notes.clear();this.bodyDates.clear();this.loadingFocus=null;this.cells=null;this.calendar=null;this.editor=null;
@@ -129,7 +126,7 @@ export class TrackDayNotes {
     if(!this.session||!this.calendar)return;
     const first=this.calendar.days[0].date,last=this.calendar.days.at(-1).date,key=first+'|'+last+'|'+this.revision;
     if(key===this.key)return;
-    const range=first+'|'+last;if(range!==this.range)this.loaded=false;this.range=range;this.key=key;this.loadingFocus=this.grid.contains(document.activeElement)?document.activeElement?.dataset.trackNoteDate:this.loadingFocus;this.paint();this.status.hidden=false;this.message.textContent=t('day_notes.loading');this.retry.hidden=true;
+    const range=first+'|'+last;if(range!==this.range)this.loaded=false;this.range=range;this.key=key;this.loadingFocus=this.grid.contains(document.activeElement)?document.activeElement?.getAttribute(this.noteAttr):this.loadingFocus;this.paint();this.status.hidden=false;this.message.textContent=t('day_notes.loading');this.retry.hidden=true;
     const generation=++this.generation,session=this.session;
     void session.request('/day-notes?'+new URLSearchParams({fromDate:first,toDate:last})).then(reply=>{
       if(generation!==this.generation||session!==this.session)return;
@@ -142,19 +139,19 @@ export class TrackDayNotes {
   }
   paint(focused){
     if(!this.cells)return;
-    focused=focused|| (this.grid.contains(document.activeElement)?document.activeElement?.dataset.trackNoteDate:null);
+    focused=focused|| (this.grid.contains(document.activeElement)?document.activeElement?.getAttribute(this.noteAttr):null);
     for(const [date,cell] of this.cells){
-      const heading=cell.querySelector('.track-date-row'),previous=heading.querySelector('.track-day-note'),text=this.notes.get(date),hasBody=this.bodyDates.has(date);
-      if(!this.writable&&!text&&!hasBody){previous?.remove();continue;}
-      const interactive=this.writable||hasBody;
-      const value=node(interactive?'button':'span',undefined,'track-day-note'+(text||hasBody?'':' is-empty'));value.dataset.trackNoteDate=date;
-      if(interactive){value.type='button';value.classList.add('btn','btn-link','btn-sm');value.disabled=!this.loaded;value.setAttribute('aria-haspopup','dialog');value.addEventListener('click',()=>void this.open(date));}
+      const heading=cell.querySelector(this.headingSelector),previous=heading.querySelector('.track-day-note'),text=this.notes.get(date),hasBody=this.bodyDates.has(date);
+      if(!this.alwaysShow&&!this.writable&&!text&&!hasBody){previous?.remove();continue;}
+      const interactive=this.alwaysShow||this.writable||hasBody;
+      const value=node(interactive?'button':'span',undefined,'track-day-note'+(this.alwaysShow?' calendar-day-note':'')+(text||hasBody?'':' is-empty'));value.setAttribute(this.noteAttr,date);
+      if(interactive){value.type='button';value.classList.add('btn','btn-link','btn-sm');value.disabled=!this.loaded||!this.writable&&!text&&!hasBody;value.setAttribute('aria-haspopup','dialog');value.addEventListener('click',()=>void this.open(date));}
       value.title=text||(hasBody?t('day_notes.body_present'):t('day_notes.add',{date:this.dateLabel(date)}));value.setAttribute('aria-label',t(text||hasBody?(this.writable?'day_notes.edit':'day_notes.view'):'day_notes.add',{date:this.dateLabel(date),text:text||(hasBody?t('day_notes.body_present'):'')}));
-      if(text)value.append(node('span',text,'badge rounded-pill bg-info-subtle text-info-emphasis'));
+      if(text&&!this.compact)value.append(node('span',text,'badge rounded-pill bg-info-subtle text-info-emphasis'));
       value.append(icon(hasBody?'journal-text':'journal-plus'));value.classList.toggle('has-body',hasBody);
       if(previous)previous.replaceWith(value);else heading.append(value);
     }
-    if(focused&&!this.root.hidden)this.grid.querySelector(`button[data-track-note-date="${focused}"]`)?.focus({preventScroll:true});
+    if(focused&&!this.root.hidden)this.grid.querySelector(`button[${this.noteAttr}="${focused}"]`)?.focus({preventScroll:true});
   }
   async open(date){
     if(!this.session||this.editor||!this.cells?.has(date))return;
@@ -173,10 +170,6 @@ export class TrackDayNotes {
       if(this.editor!==editor||editor.session!==this.session)return;
       editor.loading=false;editor.failedRead=true;this.error.textContent=error.message;this.savedStatus.textContent='';this.controls();this.error.scrollIntoView({block:'nearest'});if(error.status===401)this.callbacks.onUnauthorized(error);
     }
-  }
-  downloadDraft(){
-    if(!this.editor?.etag||this.markdown.loading)return;
-    const url=URL.createObjectURL(new Blob([this.markdown.value()],{type:'text/markdown;charset=utf-8'})),link=node('a');link.href=url;link.download=this.editor.date+'.md';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
   async reloadEditor(){
     const editor=this.editor;if(!editor||editor.loading||editor.busy||this.markdown.loading)return;

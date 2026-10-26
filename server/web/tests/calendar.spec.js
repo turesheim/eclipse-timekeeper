@@ -365,6 +365,7 @@ test('calendar copy and paste create only a new session and clear the clipboard 
     const targetDay=page.getByRole('button',{name:'Select 2025-10-21',exact:true});
     await targetDay.click();await expect(targetDay).toBeFocused();await page.keyboard.press('ControlOrMeta+v');
     await expect(page.locator('#editor-title')).toHaveText('Paste work session');
+    await expect(page.locator('#editor-labels')).toHaveCount(0);
     await expect(page.getByLabel('Start (local time)',{exact:true})).toHaveValue('2025-10-21T08:03');await save(page);
     let sessions=(await (await api(request,'GET','/work-sessions')).json()).items.filter(value=>value.summary===f.session.summary);expect(sessions).toHaveLength(2);
     const copy=sessions.find(value=>value.id!==f.session.id);expect(copy.projectId).toBe(f.project.id);expect(copy.labelIds).toEqual([f.label.id]);expect(copy.clientId).toBe(f.client.id);expect(copy.summary).toBe(f.session.summary);expect(copy.start).toBe('2025-10-21T06:03:00.123456789Z');expect(copy.end).toBe('2025-10-21T14:03:00.987654321Z');

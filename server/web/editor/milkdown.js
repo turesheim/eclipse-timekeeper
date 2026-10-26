@@ -1,6 +1,6 @@
 // This build-time entry is bundled to one local native ES module. The application
 // and source-mode fallback do not import Milkdown until rich mode is requested.
-import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx} from '@milkdown/kit/core';
+import {Editor,rootCtx,defaultValueCtx,editorViewCtx,editorViewOptionsCtx,remarkCtx,remarkStringifyOptionsCtx} from '@milkdown/kit/core';
 import {commonmark,toggleStrongCommand,toggleEmphasisCommand,wrapInHeadingCommand,wrapInBulletListCommand,wrapInOrderedListCommand,wrapInBlockquoteCommand,toggleInlineCodeCommand,createCodeBlockCommand,turnIntoTextCommand,toggleLinkCommand,updateLinkCommand,insertHrCommand} from '@milkdown/kit/preset/commonmark';
 import {gfm,insertTableCommand,toggleStrikethroughCommand} from '@milkdown/kit/preset/gfm';
 import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
@@ -47,6 +47,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
   }})}));
   const editor=Editor.make().config(ctx=>{
     ctx.set(rootCtx,root);ctx.set(defaultValueCtx,value);
+    ctx.update(remarkStringifyOptionsCtx,options=>({...options,resourceLink:true,rule:'-',ruleRepetition:3,ruleSpaces:false}));
     ctx.set(editorViewOptionsCtx,{
       attributes:()=>({role:'textbox','aria-label':label,'aria-multiline':'true','aria-readonly':String(readOnly),...(!readOnly&&description?{'aria-describedby':description}:{}),tabindex:'0',spellcheck:'true'}),
       editable:()=>!readOnly,

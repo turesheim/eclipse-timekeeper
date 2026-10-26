@@ -218,7 +218,6 @@
   "ui.activity": "Aktivitet",
   "ui.edit_task": "Rediger oppgave",
   "ui.weekly_total": "Ukestotal",
-  "ui.create_labels_in_the_labels_tab": "Opprett etiketter i fanen Etiketter.",
   "ui.client": "Kunde",
   "ui.choose_a_client": "Velg en kunde",
   "ui.each_project_and_work_session_belongs_to_one_client": "Hvert prosjekt og hver arbeidsøkt tilhører én kunde.",
@@ -366,7 +365,7 @@
   "ui.unsupported_metadata_these_columns_will_not_be_imported": "Metadata som ikke støttes: {{value0}}. Disse kolonnene blir ikke importert.",
   "ui.client_for_entries_without_a_client": "Kunde for oppføringer uten kunde",
   "ui.imported_from_toggl": "Importert fra Toggl",
-  "ui.each_entry_becomes_one_work_session_descriptions_become_work_session_summaries_source": "Hver oppføring blir én arbeidsøkt. Beskrivelser blir sammendrag for arbeidsøktene. Kildeprosjekter foreslår kundenavn når kunde mangler. Gjennomgå hver kunde nedenfor. Tagger blir etiketter for arbeidsøkter. Oppgaver beholdes bare i importloggen.",
+  "ui.each_entry_becomes_one_work_session_descriptions_become_work_session_summaries_source": "Hver oppføring blir én arbeidsøkt. Beskrivelser blir sammendrag for arbeidsøktene. Hvis klient mangler, foreslås klientnavn fra kildeprosjektene; se gjennom hver klient nedenfor. Etiketter og oppgaver fra kilden beholdes i importloggen.",
   "ui.project_for_entries_without_a_project": "Prosjekt for oppføringer uten prosjekt",
   "ui.imported_time": "Importert tid",
   "ui.exclude_invalid_rows_after_reviewing_the_diagnostics": "Utelat ugyldige rader etter å ha gjennomgått diagnostikken",
@@ -1169,5 +1168,6 @@
   "markdown.plain_text": "Vanlig tekst",
   "markdown.hr": "Horisontal linje",
   "journal.sync.advanced": "Tilkobling og feilsøking",
-  "journal.sync.simple_help": "Legg til en klient med navn og offentlig nøkkel. Nye klienter synkroniserer journalnotater begge veier automatisk."
+  "journal.sync.simple_help": "Legg til en klient med navn og offentlig nøkkel. Nye klienter synkroniserer journalnotater begge veier automatisk.",
+  "ui.manage_labels_in_my_account": "Administrer etiketter under Min konto → Etiketter."
 }

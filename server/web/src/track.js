@@ -67,8 +67,7 @@ export class MonthTrack {
     const sessions = this.sessions(date, clientId),zone = this.snapshot.profile.data.zoneId;
     return i18nText('count.work_sessions',{count:sessions.length}) + sessions.map((session) => {
       const project = this.snapshot.projects.find((project) => project.id === session.projectId);
-      const labels = (session.labelIds || []).map((id) => this.snapshot.labels.find((label) => label.id === id)?.name).filter(Boolean);
-      return [session.summary || i18nText("ui.work_session_21aa04"), project?.name, labels.join(', '), `${
+      return [session.summary || i18nText("ui.work_session_21aa04"), project?.name, `${
       instantText(session.start, zone)} → ${session.end ? instantText(session.end, zone) : i18nText("ui.in_progress")}`,
       session.end ? this.format(instantNanos(session.end) - instantNanos(session.start)) : null].filter(Boolean).join('\n');
     }).join('\n\n');

@@ -5,7 +5,7 @@ import { emailRecovery } from './email-recovery.js';
 import { PasskeyCeremony, passkeysSupported, canceledPasskey } from './webauthn.js';
 
 const $ = (id) => document.getElementById(id);
-export function authentication({ connect, clear, updateAccount, refreshProfile, renderCalendars }) {
+export function authentication({ connect, clear, updateAccount, refreshProfile, renderCalendars, renderLabels }) {
   let active = null,generation = 0,recovery = null;
   let passkeysEnabled = false,passkeyBusy = false,passkeyStage = '',statusRequest = null;
   const errorText = (error) => error instanceof ApiError ? error.message : i18nText("ui.unable_to_sign_in_use_https_and_check_your_account_details");
@@ -53,7 +53,7 @@ export function authentication({ connect, clear, updateAccount, refreshProfile, 
     const session = new Api(null, undefined, data);active = session;forgetToken();
     $('login-form').reset();mode();$('login-error').textContent = '';
     if ((await connect(session, data)) === false) return;
-    if (current === generation && active === session) await connectAccount(session, data, reset, updateAccount, refreshProfile, renderCalendars);
+    if (current === generation && active === session) await connectAccount(session, data, reset, updateAccount, refreshProfile, renderCalendars, renderLabels);
   }
   function reset(message = '', retry = null, {restoring = false} = {}) {
     loginPasskey.cancel();passkeyState(false);

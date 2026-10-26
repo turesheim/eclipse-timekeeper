@@ -90,8 +90,8 @@ Run `npm run vendor:icons` in `server/web` to regenerate the pinned assets,
 project catalog and API allow-list. `npm run check:assets` verifies them.
 
 Workspace views use a Bootstrap `navbar fixed-bottom` with `navbar-nav` and
-`nav-link` controls. The seven views appear in this order: Calendar, Week, Workweek, Activities,
-Clients, Projects and Labels.
+`nav-link` controls. The six views appear in this order: Calendar, Week, Workweek, Activities,
+Clients and Projects. Labels are configured under **My Account → Labels**.
 The active view has `aria-current="page"`; compact screens show icons with
 accessible names, and wide screens also show labels. Safe-area padding keeps the
 bar and page content clear of each other. Standard action buttons use Bootstrap
@@ -137,8 +137,12 @@ bold, italic, strikethrough, inline/fenced code, bulleted/numbered/task lists,
 links, quotations, tables and undo/redo. Link addresses are validated; activating
 a rendered link does not navigate. **Markdown source**
 retains unsupported syntax, including Obsidian extensions. Opaque YAML
-frontmatter is shown separately and preserved in saves and downloads. Formatting
-normalization and keyboard guidance are available under **Editing help**.
+frontmatter is shown separately and preserved in saves. The Formatted and Markdown
+source mode buttons share the editor toolbar with formatting actions, separated
+by a vertical divider. Mode buttons use icons with localized tooltips. Editing
+help and the separate clear/download actions are omitted. Safe angle-bracket
+autolinks remain renderable, rich edits retain resource-link syntax, and
+horizontal rules are saved as `---`.
 The [layout evaluation](JOURNAL-EDITOR.md) records why this keeps the existing
 Calendar navigation rather than introducing a separate Journal tab.
 Clear the text and save to remove a label;
@@ -151,15 +155,20 @@ populated bodies, including body-only notes; `journal-plus` offers creation when
 there is no body. Clearing only the label retains the body indicator; clearing
 the body retains an existing badge. Empty-day add actions keep the existing
 hover/keyboard/long-press behavior. Read-only sessions can open saved bodies,
-switch modes and download Markdown; editing and task toggles remain disabled.
+switch modes; editing and task toggles remain disabled.
 
 Dirty dismissal asks before discarding either field. Failed saves keep the
-draft. A stale version disables Save and offers **Download Markdown** and
-**Reload saved note**, with confirmation before replacing the draft. An
+draft. A stale version disables Save and offers **Reload saved note**, with confirmation before replacing the draft. An
 unconfirmed write offers **Check saved result**: it reads the server and accepts
 a matching saved value without issuing another write. A differing saved value
 requires explicit reload/review. No source or draft is stored in browser storage,
 and logout clears both editor modes and their private content.
+
+Week has a right-aligned daily-note button in each day heading, including
+weekends. It edits the same dated note as the month view and retains the same
+conflict, read-only, source-preservation and logout protections. Empty note
+buttons stay visible in Week and are disabled for read-only sessions. Failed
+note reads expose retry controls without blocking timed work.
 
 ![Day notes beside dates and holidays](../assets/screenshots/day-notes-desktop.png)
 
@@ -167,7 +176,7 @@ and logout clears both editor modes and their private content.
 
 ![Formatted journal on a narrow screen](../assets/screenshots/journal-editor-mobile.png)
 
-Hover over a daily client total to see its sessions, summaries, projects, labels,
+Hover over a daily client total to see its sessions, summaries, projects,
 local start/end times and durations in a tooltip. These details are also available
 when viewing the account with read-only access.
 Month boundaries and daily slices follow the account's time zone, including DST;
@@ -493,18 +502,17 @@ A work session is an independent interval for one client. Its tools are **Edit**
 and **Delete**. Create or edit activities in Activities; task timers
 run independently. There are no session selectors or manual activity links.
 
-Work sessions may have several labels selected in the start, record and edit
-forms. The compact card shows their names; Workweek tooltips and the session
-details menu include them. Week strips include them in their accessible
-description without changing the client's color.
-Moving, resizing, stopping and copying a session preserve its labels without
-changing any activity labels. JSON and CSV transfers remap labels into the
-destination account. Older sessions and exports may omit `labelIds`; omitted
-labels are preserved on edits, and an empty array explicitly clears them.
+Work-session forms, cards, tooltips and details do not offer or display labels.
+Client and optional project classify a work session. Labels belong to Activities
+and are managed under **My Account → Labels**, rather than a tracking tab. The
+account page reuses the existing label editor, deletion safeguards, read-only
+permissions and live catalog updates.
 
-![Work-session labels on desktop](../assets/screenshots/work-session-labels-desktop.png)
-
-![Work-session labels on a narrow screen](../assets/screenshots/work-session-labels-mobile.png)
+Legacy session labels remain in stored records and portable transfers. Session
+edits omit `labelIds`, preserving existing metadata. Moving, resizing, stopping,
+copying and Undo preserve it without changing Activity labels. New work-session
+imports retain source tags in the import audit without creating session labels;
+older resumable import plans keep their original mapping behavior.
 
 Reports derive context from that account's activities overlapping the session,
 including running timers. Tracked time sums clipped intervals; covered time is
@@ -803,7 +811,7 @@ Each CSV row defaults to one continuous work session with a reviewed client and
 optional description in Summary. Activity import is an explicit alternative. Both modes
 share durable progress, duplicate review and whole-job Undo; sessions create no
 companion task/activity records and contribute to Calendar’s client totals.
-Source tags become reviewed work-session labels. Resuming an older import keeps
+Source tags are retained in the import audit for work-session imports. Activity imports map tags to labels. Resuming an older import keeps
 its original mappings, and repeat imports preserve existing session edits.
 
 Open **My Account → Import** for the source preview, catalog mappings and duplicate

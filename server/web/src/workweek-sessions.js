@@ -87,7 +87,7 @@ export class WorkweekSessions {
   interval(entry, client, project) {
     const record = entry.session,box = node('div', undefined, 'week-session-interval');box.dataset.workSessionId = record.id;box.dataset.sessionDate = entry.date;
     if (entry.running) box.append(node('span', i18nText("ui.running"), 'visually-hidden'));
-    box.title = [record.summary, `${client.name} · ${project.name}`, (record.labelIds || []).map((id) => this.snapshot.labels.find((label) => label.id === id)?.name).filter(Boolean).join(', '), `${instantText(record.start, this.snapshot.profile.data.zoneId)} → ${instantText(record.end, this.snapshot.profile.data.zoneId)}`].filter(Boolean).join('\n');
+    box.title = [record.summary, `${client.name} · ${project.name}`, `${instantText(record.start, this.snapshot.profile.data.zoneId)} → ${instantText(record.end, this.snapshot.profile.data.zoneId)}`].filter(Boolean).join('\n');
     for (const key of ['start', 'end']) {
       if (key === 'end') box.append(node('span', '–', 'week-session-separator'));
       const input = node('input', undefined, 'form-control week-session-time');input.type = 'text';input.value = compactClock(entry[key]);input.placeholder = entry.running && key === 'end' ? i18nText("ui.running") : '';
@@ -160,7 +160,6 @@ export class WorkweekSessions {
     if (!record) {this.details.append(node('p', i18nText("ui.this_work_session_was_removed")));this.editButton.disabled = this.deleteButton.disabled = true;return;}
     const client = this.snapshot.clients.find((value) => value.id === record.clientId),project = this.snapshot.projects.find((value) => value.id === record.projectId);
     this.details.append(node('p', record.summary || i18nText("ui.work_session_21aa04"), 'text-break'), node('p', [client?.name, project?.name].filter(Boolean).join(' · ')), node('p', `${instantText(record.start, this.snapshot.profile.data.zoneId)} → ${instantText(record.end, this.snapshot.profile.data.zoneId)}`));
-    const labels = (record.labelIds || []).map((id) => this.snapshot.labels.find((label) => label.id === id)?.name).filter(Boolean);if (labels.length) this.details.append(node('p', labels.join(', ')));
     this.editButton.setAttribute('aria-label', i18nText("ui.edit_session_6f031a", { value0: record.summary || i18nText("ui.work_session_21aa04") }));this.deleteButton.setAttribute('aria-label', i18nText("ui.delete_session_aaa590", { value0: record.summary || i18nText("ui.work_session_21aa04") }));
     this.editButton.disabled = this.deleteButton.disabled = !this.writable;
   }

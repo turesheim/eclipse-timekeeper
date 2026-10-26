@@ -8,8 +8,10 @@ test('work sessions are the default, using reviewed clients and projects without
   const parsed = parseTogglDetailedCsv(readFileSync(new URL('./fixtures/toggl/detailed-member-stop.csv', import.meta.url), 'utf8'), {zone:'Europe/Oslo'});
   const plan = await importPlan(parsed.rows, parsed.people[0].key, {fallbackClient:'Fallback'});
   assert.equal(plan.mode,'WORK_SESSION');assert.equal(plan.selectedEntries,7);assert.equal(plan.selectedNanos,'151462000000000');
-  assert.deepEqual(plan.mappings.map(value=>value.resourceType),['CLIENT','PROJECT','LABEL']);assert.equal(plan.mappings[0].name,parsed.rows[0].project);
-  assert.ok(plan.rows.every(row=>row.clientKey===plan.mappings[0].key && row.title===row.summary && row.projectKey===plan.mappings[1].key && row.labelKeys.length===row.tags.length));
+  assert.deepEqual(plan.mappings.map(value=>value.resourceType),['CLIENT','PROJECT']);assert.equal(plan.mappings[0].name,parsed.rows[0].project);
+  assert.ok(plan.rows.every(row=>row.clientKey===plan.mappings[0].key && row.title===row.summary && row.projectKey===plan.mappings[1].key && !('labelKeys' in row)));
+  assert.deepEqual(plan.rows.map(row=>row.tags),parsed.rows.filter(row=>row.personKey===parsed.people[0].key && !row.errors.length).map(row=>row.tags));
+  const resumable=await importPlan(parsed.rows,parsed.people[0].key,{fallbackClient:'Fallback',mapWorkSessionTags:true});assert.ok(resumable.rows.every(row=>row.labelKeys.length===row.tags.length));assert.equal(resumable.selectionFingerprint,plan.selectionFingerprint);
   const long = {start:'2000-01-01T00:00:00Z',end:'2025-01-01T00:00:00Z'};
   assert.deepEqual(importBatches(Array.from({length:201},()=>long),'UTC',0,plan.mode).map(batch=>batch.length),[100,100,1]);
   const legacy=await importPlan(parsed.rows,parsed.people[0].key,{fallbackClient:'Fallback',mapWorkSessionTags:false,mapWorkSessionProjects:false});

@@ -12,3 +12,12 @@ test('Obsidian extensions and unsupported constructs use exact source mode',()=>
   for(const value of ['[[Project|alias]]','![[diagram.png]]','> [!note] Callout','==highlight==','%%private%%','$a+b$','text ^block-id','<div>HTML</div>','![image](https://example.org/pixel)','Footnote[^one]','[reference]: /somewhere',':::custom\ncontent'])assert.equal(needsSource(value),true,value);
   for(const value of ['# Heading\n\n**bold** and *emphasis*','- [ ] Task\n- [x] Done','[link](https://example.org)','> Quotation','| Name | Value |\n| --- | --- |\n| a | b |','```md\n[[literal]]\n```','~~~\n<div>Literal HTML</div>\n~~~','Example `[[literal]]`'])assert.equal(needsSource(value),false,value);
 });
+
+test('safe CommonMark autolinks remain renderable without admitting HTML or unsafe schemes',()=>{
+  for(const value of ['<https://example.com/path?q=1&v=2>','<http://example.com>','<mailto:person@example.com>','<person@example.com>','A link <https://example.com> in text','<https://example.com/?token=abc==>','[link](https://example.com/?token=abc==)','https://example.com/?token=abc=='])assert.equal(needsSource(value),false,value);
+  for(const value of ['<script>alert(1)</script>','<img src="https://example.com/pixel">','<javascript:alert(1)>','<data:text/html,x>','<https://example.com> <div>HTML</div>','<https://example.com onload=x>'])assert.equal(needsSource(value),true,value);
+});
+test('leading dashed horizontal rules are distinct from unfinished YAML frontmatter',()=>{
+  for(const value of ['---','---\n','---\n\n','---\n\nParagraph\n'])assert.deepEqual(splitMarkdown(value),{frontmatter:'',body:value,unterminated:false});
+  const yaml='---\ntags: [unfinished]';assert.deepEqual(splitMarkdown(yaml),{frontmatter:'',body:yaml,unterminated:true});
+});

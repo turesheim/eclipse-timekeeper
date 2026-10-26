@@ -48,7 +48,7 @@ reports without individual timestamps are unsupported.
    Several Toggl clients can use the same existing client. Reusing a client
    preserves its name and color; Undo keeps that client. Review the destinations
    again on the confirmation screen.
-   Work-session imports map clients, optional source projects and labels: a
+   Work-session imports map clients and optional source projects: a
    source Client is used when present; otherwise its Project suggests a client
    name for review, with a fallback for rows missing both. Activity imports map
    clients, projects, tasks and labels and require missing-name fallbacks. Existing projects are available
@@ -58,8 +58,7 @@ reports without individual timestamps are unsupported.
 4. Review matching entries, then confirm the additive import. Existing records
    and running timers remain intact. In work-session mode, each row becomes one
    completed session with its original start/end, client and description. The
-   description is retained as the optional summary; there is no separate title. Source tags become
-   reviewed work-session labels. Source projects have reviewed mappings to new or
+   description is retained as the optional summary; there is no separate title. Source tags are retained in the import audit without creating work-session labels. Source projects have reviewed mappings to new or
    existing Timekeeper projects under the selected client. Entries without a
    source project remain projectless. No tasks or activities are created alongside
    work sessions; source task values remain in the audit. In activity mode,
@@ -86,8 +85,7 @@ Cancelling before creating the job writes no import or business records.
 **Import history** records committed progress and exact imported/reused source
 time. Pause after the current batch, or reload and choose **Resume**. Reselect
 the unchanged CSV, original source user, time conversion and row exclusions.
-The original mapping plan is retained. Jobs started before work-session labels
-were supported keep their original tag handling when resumed, and re-importing
+The original mapping plan is retained. Existing jobs keep their original tag handling when resumed, and re-importing
 previously imported sessions does not overwrite their labels. If your account
 time zone changed, undo
 the partial job or start a newly reviewed import.

@@ -22,7 +22,7 @@ async function review(page) {
   await page.getByRole('button',{name:'Read CSV',exact:true}).click();await expect(page.getByRole('heading',{name:'Review import',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Review mappings',exact:true}).click();await expect(page.getByRole('heading',{name:'Review mappings',exact:true})).toBeVisible();
   await page.getByLabel('New client name',{exact:true}).fill('Browser imported client');
-  await expect(page.getByLabel('New label name',{exact:true})).toHaveCount(1);
+  await expect(page.getByLabel('New label name',{exact:true})).toHaveCount(await page.getByLabel('Import as',{exact:true}).inputValue()==='ACTIVITY'?1:0);
   await page.getByRole('button',{name:'Review server matches',exact:true}).click();await expect(page.getByRole('heading',{name:'Confirm import',exact:true})).toBeVisible();
 }
 async function undo(page,index) {
@@ -149,8 +149,7 @@ test('Toggl defaults to work sessions with client totals, repeat detection and w
   const imported=await api(request,'/data/export'),sessions=imported.workSessions.filter(value=>!before.workSessions.some(old=>old.id===value.id));expect(sessions).toHaveLength(7);
   for(const type of ['activities','tasks']) expect(imported[type].length).toBe(before[type].length);
   const importedProjects=imported.projects.filter(value=>!before.projects.some(old=>old.id===value.id));expect(importedProjects).toHaveLength(1);expect(sessions.every(value=>value.projectId===importedProjects[0].id)).toBe(true);
-  expect(imported.labels.length).toBe(before.labels.length+1);const importedLabel=imported.labels.find(value=>!before.labels.some(old=>old.id===value.id));
-  expect(sessions.every(value=>value.labelIds.includes(importedLabel.id))).toBe(true);
+  expect(imported.labels).toEqual(before.labels);expect(sessions.every(value=>!value.labelIds?.length)).toBe(true);
   expect(sessions.every(value=>!('title' in value) && value.clientId===sessions[0].clientId)).toBe(true);
   expect(sessions.reduce((sum,value)=>sum+(+new Date(value.end)-+new Date(value.start)),0)).toBe(151462000);
   const job=(await api(request,'/imports')).items.find(value=>value.mode==='WORK_SESSION' && value.state==='IMPORTED' && value.selectedEntries===7);expect(job.workSessionCount).toBe(7);expect(job.importedNanos).toBe('151462000000000');
