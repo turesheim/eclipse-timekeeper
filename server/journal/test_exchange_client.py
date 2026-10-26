@@ -71,6 +71,10 @@ class ExchangeClientTest(unittest.TestCase):
         name='2026-10-25.md';secret=self.root/'private-secret';secret.write_bytes(b'private');(self.folder/name).symlink_to(secret);self.remote['2026-10-26.md']=b'Independent export'
         with self.assertRaises(client.Failure):self.sync()
         manifest=next(iter(self.received.values()))['manifest'];self.assertEqual([{'name':name,'code':'LOCAL_FILE_UNREADABLE'}],manifest['errors']);self.assertNotIn(name,[entry['name'] for entry in manifest['absent']]);self.assertEqual(b'private',secret.read_bytes());self.assertEqual(b'Independent export',(self.folder/'2026-10-26.md').read_bytes())
+    def test_impossible_date_is_an_independent_error_instead_of_blocking_other_notes(self):
+        (self.folder/'2026-02-30.md').write_bytes(b'Invalid date');self.remote['2026-10-26.md']=b'Independent export'
+        with self.assertRaises(client.Failure):self.sync()
+        manifest=next(iter(self.received.values()))['manifest'];self.assertEqual([{'name':'2026-02-30.md','code':'LOCAL_FILE_UNREADABLE'}],manifest['errors']);self.assertEqual(b'Independent export',(self.folder/'2026-10-26.md').read_bytes());self.assertEqual(b'Invalid date',(self.folder/'2026-02-30.md').read_bytes())
 
 
 if __name__=='__main__':unittest.main()

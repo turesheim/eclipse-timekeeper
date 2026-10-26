@@ -57,7 +57,7 @@ def main():
     if archive.with_suffix('.zip.sha256').read_text().split()[0]!=digest:raise ValueError('Distribution checksum mismatch')
     if not args.skip_image_build:command('docker','build','-t',GATEWAY_IMAGE,'-f',str(ROOT/'server/journal/Dockerfile'),str(ROOT))
     suffix=secrets.token_hex(5);network='journal-'+suffix;containers=[];volumes=[];background=[]
-    sensitive=[b'Private daily Markdown',b'Private pressure note',b'INDEPENDENT_VALID_NOTE_SENTINEL',b'PRIVATE_CALENDAR_EDIT_SENTINEL',b'PRIVATE_CONFLICT_SOURCE_SENTINEL',b'INFLIGHT_PRIVATE_SENTINEL',b'UNRELATED_VAULT',b'UNACKNOWLEDGED_NOTE_SENTINEL']
+    sensitive=[b'Private daily Markdown',b'Private pressure note',b'INDEPENDENT_VALID_NOTE_SENTINEL',b'PRIVATE_CALENDAR_EDIT_SENTINEL',b'PRIVATE_CONFLICT_SOURCE_SENTINEL',b'INFLIGHT_PRIVATE_SENTINEL',b'UNRELATED_VAULT',b'UNACKNOWLEDGED_NOTE_SENTINEL',b'Private outgoing acceptance note',b'Local simultaneous variant',b'Calendar simultaneous variant',b'Database pressure']
     output=ROOT/'server/target/journal-gateway-acceptance';output.mkdir(parents=True,exist_ok=True);output.chmod(0o700)
     with contextlib.suppress(FileNotFoundError):(output/'acceptance.json').unlink()
     for previous in output.glob('*.log'):previous.unlink()
@@ -110,17 +110,17 @@ def main():
             password='Journal acceptance account passphrase '+suffix
             sensitive.append(password.encode())
             admin.call('POST','/auth/setup',{'code':code,'username':'journal-admin','password':password,'displayName':'Journal administrator','email':'journal-admin@example.invalid'})
-            actors=[]
-            for name in ['a','b']:
+            actors=[];account_names=list('abcdefgh') if args.bidirectional else ['a','b']
+            for name in account_names:
                 value,_=admin.call('POST','/admin/users',{'username':'journal-'+name,'password':password,'displayName':'Journal '+name,'email':'journal-'+name+'@example.invalid','administrator':False},status=201)
                 api=Api(base,str(directory/'tls.crt'),origin);api.call('GET','/auth/status');api.call('POST','/auth/login',{'username':'journal-'+name,'password':password,'remember':False});actors.append((value['user']['ownerId'],api))
-            tokens=[secrets.token_urlsafe(32),secrets.token_urlsafe(32)]
+            tokens=[secrets.token_urlsafe(32) for _ in account_names]
             sensitive.extend(token.encode() for token in tokens)
             config={'format':1,'hostname':'gateway.test','port':2222,'hostKey':host,'incomingRoot':'/data/incoming','encryptedStorage':True,'backupKeysSeparated':True,
-                    'accounts':[{'ownerId':owner,'username':'journal_'+name,'brokerTokenSha256':hashlib.sha256(token.encode()).hexdigest()} for (owner,api),name,token in zip(actors,['a','b'],tokens)]}
+                    'accounts':[{'ownerId':owner,'username':'journal_'+name,'brokerTokenSha256':hashlib.sha256(token.encode()).hexdigest()} for (owner,api),name,token in zip(actors,account_names,tokens)]}
             populate(app_volume,"import sys,os;from pathlib import Path;p=Path('/target/journal.json');p.write_bytes(sys.stdin.buffer.read());p.chmod(0o600);os.chown(p,10001,10001)",input=json.dumps(config).encode())
             gateway_config={'format':1,'brokerUrl':'https://web.test:8443/internal/journal','caFile':'/run/secrets/ca.pem','encryptedStorage':True,'backupKeysSeparated':True,
-                            'accounts':[{'username':'journal_'+name,'uid':20001+index,'token':token} for index,(name,token) in enumerate(zip(['a','b'],tokens))]}
+                            'accounts':[{'username':'journal_'+name,'uid':20001+index,'token':token} for index,(name,token) in enumerate(zip(account_names,tokens))]}
             populate(secret_volume,"import sys,shutil;from pathlib import Path;p=Path('/target/journal-gateway.json');p.write_bytes(sys.stdin.buffer.read());p.chmod(0o600);shutil.copyfile('/fixture/tls.crt','/target/ca.pem')",input=json.dumps(gateway_config).encode())
             gateway_name='journal-gateway-'+suffix;containers.append(gateway_name)
             docker('run','-d','--name',gateway_name,'--network',network,'--network-alias','gateway.test','-v',gateway_volume+':/var/lib/timekeeper-journal','-v',secret_volume+':/run/secrets:ro',GATEWAY_IMAGE)
@@ -172,6 +172,8 @@ def main():
                 return python(prefix+'a=c.ssh_arguments(d,i,t);'+('n=a.index("ClearAllForwardings=yes");del a[n-1:n+1];' if options else '')+'r=subprocess.run(a+'+repr(list(options))+'+["-l",'+repr(username)+' or d["username"],d["hostname"],'+repr(remote)+']);sys.exit(r.returncode)',check=False)
             def raw_sync(folder,options=(),destination='.',profile='profile-a.json'):
                 return python(client_module(profile)+'r=subprocess.run(["rsync","-r","--rsh",shlex.join(c.ssh_arguments(d,i,t))]+'+repr(list(options))+'+['+repr(folder+'/')+',d["username"]+"@"+d["hostname"]+":"+'+repr(destination)+']);sys.exit(r.returncode)',check=False)
+            def relogin(index):
+                api=Api(base,str(directory/'tls.crt'),origin);api.call('GET','/auth/status');api.call('POST','/auth/login',{'username':'journal-'+account_names[index],'password':password,'remember':False});actors[index]=(actors[index][0],api);return api
             for remote in ['id','sh','rsync --server --sender -r . .','rsync --daemon','rsync --server -r . ../../escape']:
                 assert ssh(remote).returncode,'Restricted SSH command was accepted'
             assert ssh('timekeeper-journal-test',username='journal_b').returncode,'Cross-account key was accepted'
@@ -196,7 +198,7 @@ def main():
             print('Real SSH command/forwarding/cross-account, malformed handoff, symlink, traversal and host mismatch denial: PASS',flush=True)
             if args.bidirectional:
                 from journal_bidirectional_acceptance import run
-                run(api=actors[1][1],password=password,python=python,tool=tool,enroll=enroll,ssh=ssh,client_module=client_module,docker=docker,app_name=app_name)
+                run(api=actors[2][1],account_index=2,read_accounts=[(index,*actors[index]) for index in range(3,8)],admin=admin,relogin=relogin,password=password,python=python,tool=tool,enroll=enroll,ssh=ssh,client_module=client_module,docker=docker,app_name=app_name,gateway_name=gateway_name,client_name=client_name,background=background)
             # More than the pending-copy quota must work as bounded, settled
             # batches rather than failing because a sender outruns the worker.
             names=[(date(1990,1,1)+timedelta(days=index)).isoformat()+'.md' for index in range(501)]

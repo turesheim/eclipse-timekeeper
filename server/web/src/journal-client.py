@@ -78,8 +78,13 @@ def sync_directory(path):
     finally:os.close(descriptor)
 
 
+def file_name(name):
+    if not isinstance(name,str) or not DATE_NAME.fullmatch(name):fail('The exchange contains an invalid daily-note filename.')
+    return name
+
+
 def note_name(name):
-    try:require(isinstance(name,str) and DATE_NAME.fullmatch(name));date.fromisoformat(name[:-3])
+    try:file_name(name);date.fromisoformat(name[:-3])
     except (ValueError,TypeError):fail('The exchange contains an invalid daily-note filename.')
     return name
 
@@ -444,7 +449,7 @@ def exchange_results(value,exchange,names):
             name=note_name(entry['filename']);require(name not in found and name in names);found.add(name)
             require(str(uuid.UUID(entry['id']))==entry['id'] and entry['state'] in ['OFFERED','CONFLICT','ACKNOWLEDGED','DISCARDED'])
         for entry in value['errors']:
-            name=note_name(entry['name']);require(name not in found and name in names);found.add(name);require(isinstance(entry['code'],str))
+            name=file_name(entry['name']);require(name not in found and name in names);found.add(name);require(isinstance(entry['code'],str))
         require(found==names)
     except (KeyError,TypeError,ValueError):fail('Incomplete or invalid exchange results. Private snapshots and local notes are kept.')
     return value
@@ -489,7 +494,7 @@ def sync_bidirectional(data,folder,identity,state):
         names=set(replica.bases())
         with os.scandir(folder) as directory:
             for entry in directory:
-                if DATE_NAME.fullmatch(entry.name):note_name(entry.name);names.add(entry.name)
+                if DATE_NAME.fullmatch(entry.name):names.add(entry.name)
         after=None
         while True:
             page=remote_json(data,identity,state,'timekeeper-journal-inventory',{} if after is None else {'after':after})

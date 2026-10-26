@@ -7,7 +7,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from datetime import date
 import pwd
 import re
 import resource
@@ -108,8 +107,8 @@ def identifier(value):
 
 def note_name(value):
     if not isinstance(value,str) or not NAME.fullmatch(value):raise Failure('JOURNAL_INVALID_MANIFEST')
-    try:date.fromisoformat(value[:-3])
-    except ValueError:raise Failure('JOURNAL_INVALID_MANIFEST') from None
+    # The importer reports an impossible date per file. Do not reject its
+    # independent valid neighbours before the completed-batch handoff.
     return value
 
 
@@ -259,12 +258,12 @@ def receive(user,device):
             return
         lease=request(config,'/transfers',{'deviceId':device,**({'exchangeId':exchange} if exchange else {})});transfer=identifier(lease['id']);completed=False
         def heartbeat():
-            if lease['state']=='COMPLETED':results(config,device,exchange)
+            if lease['status']=='COMPLETED':results(config,device,exchange)
             else:request(config,'/transfers/'+transfer+'/heartbeat',{})
         def finish(deadline):
             nonlocal completed
             manifest,files=completed_files(stage,exchange)
-            if lease['state']!='COMPLETED':
+            if lease['status']!='COMPLETED':
                 for name,content in files.items():
                     heartbeat();request(config,'/transfers/'+transfer+'/files/'+name,{'data':base64.b64encode(content).decode()},'PUT')
             manifest['completed']=True

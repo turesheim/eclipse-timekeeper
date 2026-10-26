@@ -155,8 +155,8 @@ jobs:
         path: server/target/distribution
     - name: Verify private local client configuration and snapshots
       run: python3 -m unittest discover -s server/journal -v
-    - name: Verify actual OpenSSH, rsync and packaged HTTPS journal import
-      run: python3 server/scripts/journal_gateway_acceptance.py --distribution server/target/distribution/timekeeper-server.zip
+    - name: Verify actual OpenSSH, rsync and packaged HTTPS journal exchanges
+      run: python3 server/scripts/journal_gateway_acceptance.py --distribution server/target/distribution/timekeeper-server.zip --bidirectional
     - name: Upload private fixture evidence
       if: always()
       uses: actions/upload-artifact@v7.0.1

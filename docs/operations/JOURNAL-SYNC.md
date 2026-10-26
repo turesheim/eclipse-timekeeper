@@ -1,10 +1,10 @@
-# Import daily Markdown over SSH
+# Synchronize daily Markdown over SSH
 
-Timekeeper imports daily notes in one direction: your chosen local directory to
-the database. Calendar and account archives read the database. Missing local
-files never delete notes; an explicitly empty daily file clears that date.
-Calendar edits and differing first imports produce recoverable conflicts in
-**My account → Journal**, rather than being overwritten. This is server-readable
+Timekeeper supports upload-only imports and explicitly enabled bidirectional
+exchanges between a chosen daily-note directory and the database. Calendar and
+account archives read the database. Existing keys remain upload-only. Calendar
+edits and differing first imports produce recoverable conflicts in
+**My account → Journal**. This is server-readable
 storage, not end-to-end encryption. Follow [storage protection](JOURNAL-STORAGE.md)
 for every database, incoming, conflict, temporary and backup location.
 
@@ -159,7 +159,9 @@ python3 timekeeper-journal.py sync --profile profile.json
 Configure asks for the local daily-note folder and private-key filename. Those
 paths stay in a mode 600 local sidecar, never in Timekeeper. Compare the full
 fingerprint with the value displayed over authenticated HTTPS before trusting.
-SSH refuses an unknown or changed host key, shell access, forwarding and pulls.
+SSH refuses an unknown or changed host key, shell access and forwarding.
+Upload-only keys cannot download notes. Bidirectional keys can download only
+their own prepared exchanges, never arbitrary server directories.
 For a host-key change, stop schedules and independently confirm the new key
 with the operator, download an updated profile, then deliberately use
 `trust --replace --fingerprint …`. Do not bypass verification or use ssh-keyscan
@@ -168,8 +170,11 @@ as evidence of authenticity.
 Only top-level `YYYY-MM-DD.md` files are considered; real dates, strict UTF-8 and
 safe bounded YAML are validated by the server. Optional YAML
 `timekeeper-label: Label` supplies the Calendar label; the exact Markdown body
-follows the frontmatter. Unknown properties, original bytes, unrelated files
-and `.obsidian` are never rewritten. Symlinks and hard links are skipped;
+follows the frontmatter. Upload-only imports never rewrite local originals.
+Bidirectional exports preserve unknown YAML properties and exact Markdown body
+bytes; editing a label can normalize the YAML envelope. An unchanged document
+keeps its original bytes. Unrelated files and `.obsidian` are excluded.
+Symlinks and hard links are skipped;
 oversized/changing/unreadable files produce per-file errors while independent
 valid notes continue. Each file is limited to 220,000 input bytes, including at
 most 20,000 frontmatter and 200,000 body bytes. A complete private snapshot and
@@ -181,6 +186,89 @@ before discarding it if needed. A conflict decision checks the current Calendar
 version again; refresh and reconsider if somebody edited it. Retry after a
 network interruption; identical files are no-ops. Do not delete a local original
 to resolve a database conflict.
+
+## Bidirectional access and first exchange
+
+Enable **Allow bidirectional synchronization** in Journal settings with your
+current password. Register a fresh key with **Allow this device to download
+Calendar notes** selected, or rotate an existing key into a new device profile.
+Both grants are required; the global setting does not upgrade old keys.
+Download the new format-2 profile. Turning off the global setting stops these
+devices while upload-only keys can continue importing.
+
+Keep the profile and its entire private state directory outside `Daily` and
+outside other vault synchronization. They must share the daily-note folder's
+filesystem for atomic recovery moves and exclusive installation. Use an
+encrypted local filesystem; on WSL2 use its Linux filesystem with working
+Unix permissions and hard links. Configure checks folder identity and filesystem
+placement. A second local process cannot run the same profile concurrently.
+
+Run verify, then sync. A first exchange imports local-only notes, exports
+database-only notes, and asks for a deliberate decision when both copies differ.
+Review conflicts in Journal and sync again with the same profile to deliver the
+chosen copy. Unrelated dates continue. The client transfers batches of at most
+50 dates through private staging; rsync never targets the canonical local folder.
+The common state advances only after a durable local installation and matching
+server acknowledgement. Retry interrupted runs with the same private state.
+
+An explicitly empty file is a present, empty note. After a date has an
+acknowledged common state, deleting its local file can delete the database note;
+Calendar deletion can remove the corresponding local file. Deleting against an
+independent edit creates a conflict, including a visible deleted variant. A
+missing untracked file never deletes a database note. Explicit recreation after
+an acknowledged deletion creates a new present note. Calendar **Clear** produces
+empty content; **Delete** records a deletion.
+
+Do not reset, copy between devices, or reconstruct common state from file dates.
+The server binds its device to the local client identity; the client also binds
+the configured folder inode. If state is lost or a folder is moved/replaced,
+preserve all local files and recovery material, revoke the old device, and enroll
+a new key/profile. Its first exchange treats missing files as untracked and
+requires review of differing copies. Keep other synchronization tools away from
+private state; their independent edits to canonical daily files are treated as
+local edits and can require conflict review.
+
+## Local recovery
+
+Exports retain replaced originals privately, including their original inodes.
+An editor can still write through an old open descriptor after a rename; the
+next run detects such a changed recovery copy and stops automatic installation.
+An editor's atomic replacement is never overwritten by the exclusive installer.
+Private recovery storage is limited to 500 retained variants; nothing removes
+these originals automatically. Review them before explicit disposal.
+
+```sh
+python3 timekeeper-journal.py recoveries --profile profile.json
+python3 timekeeper-journal.py recover --profile profile.json --id RECOVERY_UUID --variant original --output /private/review/original.md
+python3 timekeeper-journal.py recover --profile profile.json --id RECOVERY_UUID --variant offered --output /private/review/offered.md
+```
+
+The list prints metadata and private locations, never note contents. Recovery
+copies to a new mode-600 file outside `Daily` without replacing an existing file
+or changing synchronization state. An offered private file is available only
+while retained by the interrupted operation. Close the editor, compare variants,
+and deliberately save the desired content in the canonical daily file. Preserve
+any other variant you need before using:
+
+```sh
+python3 timekeeper-journal.py discard-recovery --profile profile.json --id RECOVERY_UUID
+```
+
+This explicitly removes that operation's retained original and prepared variant;
+it keeps the current canonical file and does not advance common state. Retry
+sync. If an interrupted exchange cannot continue against the chosen local file,
+first resolve or discard its local recovery operations, then deliberately
+abandon that exchange:
+
+```sh
+python3 timekeeper-journal.py abandon-exchange --profile profile.json --id EXCHANGE_UUID
+```
+
+Its immutable uploaded snapshot stays in the printed private directory for
+manual review. Download/review and discard the corresponding retained server
+copies in Journal. A fresh exchange uses the previous acknowledged common state,
+so simultaneous server changes still require conflict review. Never delete the
+SQLite database or edit its tokens as a recovery shortcut.
 
 ## Scheduling and disconnecting
 

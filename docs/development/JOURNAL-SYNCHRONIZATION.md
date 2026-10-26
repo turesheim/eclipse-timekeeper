@@ -5,6 +5,14 @@ one-way import delivery. This document records the implementation plan and its
 acceptance gates. A parser alone does not complete the issue. Reconciliation in
 both directions belongs to #397.
 
+The bidirectional delivery keeps the same restricted SSH transport and adds
+explicit per-account/per-device read permission. Format-2 exchanges bind an
+immutable client snapshot to its device, local state identity and common tokens.
+Only an acknowledged, durable local installation advances common state. Prepared
+downloads contain only that exchange's owned note files and metadata; they do not
+expose the server filesystem. Upload-only format-1 devices retain their original
+permissions and missing-file behavior.
+
 ## Transport decision
 
 Use rsync over OpenSSH, with a separate gateway and restricted identity for each
@@ -95,6 +103,7 @@ Run the actual transport gate with:
 ```sh
 python3 -m unittest discover -s server/journal -v
 python3 server/scripts/journal_gateway_acceptance.py --distribution server/target/distribution/timekeeper-server.zip
+python3 server/scripts/journal_gateway_acceptance.py --distribution server/target/distribution/timekeeper-server.zip --bidirectional
 ```
 
 It uses disposable Docker volumes, a clean Linux client with generated local

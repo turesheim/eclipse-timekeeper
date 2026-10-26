@@ -3,6 +3,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import pwd
 from pathlib import Path
 import tempfile
 import unittest
@@ -37,13 +38,13 @@ class GatewayTest(unittest.TestCase):
         self.assertEqual(value,manifest);self.assertEqual({self.name:self.content},files)
         self.write(self.name,self.content+b'interrupted')
         with self.assertRaises(gateway.Failure):gateway.completed_files(self.stage,self.exchange)
-    def test_duplicates_unsafe_files_invalid_dates_and_wrong_exchange_are_rejected(self):
+    def test_duplicates_unsafe_files_invalid_paths_and_wrong_exchange_are_rejected(self):
         value=self.manifest();self.write(self.name,self.content)
-        for mutation in ['duplicate','invalid-date','wrong-exchange','unexpected','symlink','permissions']:
+        for mutation in ['duplicate','invalid-path','wrong-exchange','unexpected','symlink','permissions']:
             item=json.loads(json.dumps(value))
             with self.subTest(mutation=mutation):
                 if mutation=='duplicate':item['absent'][0]['name']=self.name
-                if mutation=='invalid-date':item['absent'][0]['name']='2026-02-30.md'
+                if mutation=='invalid-path':item['absent'][0]['name']='../2026-02-30.md'
                 if mutation=='wrong-exchange':item['exchangeId']=str(uuid.uuid4())
                 if mutation=='unexpected':self.write('extra',b'private')
                 if mutation=='symlink':(self.stage/self.name).unlink();(self.stage/self.name).symlink_to('/etc/passwd')
@@ -72,6 +73,26 @@ class GatewayTest(unittest.TestCase):
             with tempfile.TemporaryDirectory() as other,patch.object(gateway,'request',return_value=b'wrong snapshot'):
                 with self.assertRaises(gateway.Failure):gateway.prepared_files(Path(other),{},self.device,self.exchange,value)
         finally:os.umask(previous)
+    def test_real_lease_reply_status_field_drives_receiver_and_completed_retry(self):
+        user=pwd.getpwuid(os.getuid()).pw_name;self.stage.chmod(0o700);transfer=str(uuid.uuid4());config={'username':user,'spool':str(self.stage)}
+        for completed in [False,True]:
+            calls=[]
+            def request(config,path,data,method='POST',binary=False):
+                calls.append(path)
+                if path=='/transfers':return {'id':transfer,'status':'COMPLETED' if completed else 'RECEIVING','expiresAt':'future'}
+                return {'pending':0}
+            def run(stage,original,sending,heartbeat,finish):
+                self.assertFalse(sending);heartbeat();self.assertTrue(any(path.endswith('/results' if completed else '/heartbeat') for path in calls))
+                value=self.manifest() if completed else {'format':1,'files':[{'name':self.name,'bytes':len(self.content),'sha256':hashlib.sha256(self.content).hexdigest()}],'errors':[]}
+                self.write_stage(stage,self.name,self.content);self.write_stage(stage,'.timekeeper-batch.json',json.dumps(value).encode());finish(float('inf'))
+            previous=os.umask(0o077)
+            try:
+                original='rsync --server -r . '+('incoming/'+self.exchange if completed else '.')
+                with patch.object(gateway,'private_json',return_value=config),patch.object(gateway,'request',side_effect=request),patch.object(gateway,'run_rsync',side_effect=run),patch.dict(os.environ,{'SSH_ORIGINAL_COMMAND':original}):gateway.receive(user,self.device)
+                self.assertIn('/transfers/'+transfer+'/complete',calls);self.assertEqual(not completed,'/transfers/'+transfer+'/files/'+self.name in calls)
+            finally:os.umask(previous)
+    def write_stage(self,stage,name,data):
+        path=stage/name;path.write_bytes(data);path.chmod(0o600)
 
 
 if __name__=='__main__':unittest.main()
