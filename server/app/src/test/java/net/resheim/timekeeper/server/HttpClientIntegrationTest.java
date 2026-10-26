@@ -165,6 +165,10 @@ class HttpClientIntegrationTest {
                     Optional.of(Instant.parse("2026-10-26T11:12:13Z")),0)));
             child=client.updateTaskChecklist(new UpdateTaskChecklist(child.id(),child.version(),checklist));
             assertEquals(checklist,client.task(child.id()).orElseThrow().checklist());
+            var timing=new TaskTiming(Optional.of(TaskMoment.dateOnly(LocalDate.parse("2026-10-26"))),
+                    Optional.of(TaskMoment.zoned(LocalDate.parse("2026-10-27"),LocalTime.parse("09:15"),"Pacific Standard Time")));
+            child=client.updateTaskTiming(new UpdateTaskTiming(child.id(),child.version(),timing));
+            assertEquals(timing,client.task(child.id()).orElseThrow().timing());
             var first=client.activate(child.id(),"Tracked",Set.of(label.id()),Optional.empty());
             assertEquals(client.profile().owner(),first.ownerId());
             var second=client.activate(parent.id(),"Successor",Set.of(),Optional.of(first));

@@ -121,6 +121,15 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskChecklistInput').is_valid({'items':[{**item,'parentTaskId':item['id']}]}))
         self.assertEqual('updateTaskChecklist',CONTRACT['paths']['/tasks/{id}/checklist']['put']['operationId'])
 
+    def test_task_timing_distinguishes_civil_dates_from_zoned_wall_times(self):
+        date={'kind':'DATE','date':'2026-03-29'}
+        wall={'kind':'DATE_TIME','date':'2026-03-29','time':'02:30','timeZone':'Europe/Oslo'}
+        validator('TaskTimingInput').validate({'start':date,'due':wall})
+        self.assertFalse(validator('TaskTimingInput').is_valid({'start':date,'due':{**wall,'timeZone':None}}))
+        self.assertFalse(validator('TaskTimingInput').is_valid({'start':{**date,'time':'00:00'},'due':None}))
+        self.assertFalse(validator('TaskTimingInput').is_valid({'start':date}))
+        self.assertEqual('updateTaskTiming',CONTRACT['paths']['/tasks/{id}/timing']['put']['operationId'])
+
     def test_timestamp_precision_and_zone_boundary(self):
         for value in ['2026-03-29T00:00:00Z', '2026-03-29T00:00:00.123456789Z']:
             validator('Instant').validate(value)
@@ -245,7 +254,7 @@ class ContractTest(unittest.TestCase):
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'convertCalendarEvent',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
-            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'deleteTask', 'getTask', 'listTasks',
+            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'deleteTask', 'getTask', 'listTasks',
             'linkExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',

@@ -49,6 +49,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskPlanning;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskTiming;
 import net.resheim.eclipse.timekeeper.service.Ports.ServicePorts;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityReport;
@@ -129,7 +130,7 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			}
 			Task created = ports.tasks().save(new Task(ports.identifiers().newTaskId(), command.projectId(),
 					command.parentTaskId(),
-					command.summary(), command.url(), command.externalReferences(), command.planning(), command.checklist(), 0));
+					command.summary(), command.url(), command.externalReferences(), command.planning(), command.checklist(), command.timing(), 0));
 			publish(TASK, CREATED, created.id().value().toString());
 			return created;
 		});
@@ -154,6 +155,18 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			Task current = requiredTask(command.id());
 			version(current.version(), command.expectedVersion(), "task");
 			Task updated = ports.tasks().save(current.withChecklist(required(command.checklist(), "checklist")));
+			publish(TASK, UPDATED, updated.id().value().toString());
+			return updated;
+		});
+	}
+
+	@Override
+	public Task updateTaskTiming(UpdateTaskTiming command) {
+		return tx(() -> {
+			required(command, "command");
+			Task current = requiredTask(command.id());
+			version(current.version(), command.expectedVersion(), "task");
+			Task updated = ports.tasks().save(current.withTiming(required(command.timing(), "timing")));
 			publish(TASK, UPDATED, updated.id().value().toString());
 			return updated;
 		});

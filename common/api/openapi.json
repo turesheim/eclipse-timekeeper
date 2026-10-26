@@ -10105,6 +10105,101 @@
         },
         "description": "Conditional replacement of the checklist only. A legacy PUT /tasks/{id} and PUT /tasks/{id}/planning preserve the checklist."
       }
+    },
+    "/tasks/{id}/timing": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskTiming",
+        "summary": "Replace owned task start and due values",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskTimingInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of start and due only. Date-only values stay date-only; timed values retain their local time and time-zone ID. Legacy task, planning, and checklist updates preserve timing."
+      }
     }
   },
   "components": {
@@ -10678,6 +10773,26 @@
             },
             "maxItems": 1000,
             "description": "Ordered checklist items distinct from parentTaskId subtasks."
+          },
+          "start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "due": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -10692,7 +10807,9 @@
           "status",
           "scheduledDate",
           "completedAt",
-          "checklistItems"
+          "checklistItems",
+          "start",
+          "due"
         ],
         "additionalProperties": true
       },
@@ -11220,6 +11337,26 @@
             },
             "maxItems": 1000,
             "description": "Optional for older portable archives."
+          },
+          "start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "due": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -11693,6 +11830,26 @@
             },
             "maxItems": 1000,
             "description": "Ordered checklist items distinct from parentTaskId subtasks."
+          },
+          "start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "due": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -19024,6 +19181,95 @@
         ],
         "additionalProperties": false,
         "description": "Replace only checklist items. An empty array clears the checklist. Existing task fields and external references are preserved."
+      },
+      "TaskDateOnly": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "const": "DATE"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "kind",
+          "date"
+        ],
+        "additionalProperties": false,
+        "description": "Civil calendar date with no implied time, deadline instant, or time zone."
+      },
+      "TaskZonedDateTime": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "const": "DATE_TIME"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "time": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9](?::[0-5][0-9](?:\\.[0-9]{1,9})?)?$"
+          },
+          "timeZone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "kind",
+          "date",
+          "time",
+          "timeZone"
+        ],
+        "additionalProperties": false,
+        "description": "Local wall time and the original IANA or Windows time-zone ID. The API does not invent or resolve an instant at DST gaps or overlaps."
+      },
+      "TaskMoment": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TaskDateOnly"
+          },
+          {
+            "$ref": "#/components/schemas/TaskZonedDateTime"
+          }
+        ]
+      },
+      "TaskTimingInput": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "due": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "start",
+          "due"
+        ],
+        "additionalProperties": false,
+        "description": "Replace only start and due values. Null clears a value. Scheduled day and reminders are separate concepts."
       }
     },
     "parameters": {

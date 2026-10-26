@@ -381,6 +381,12 @@ UUID, text, completion state and time, and position. These are embedded task
 values and are never independent tasks or activity targets. Older payloads read
 with an empty checklist; legacy task and planning updates retain existing items.
 Portable exports and account archives preserve checklist contents and item IDs.
+Tasks also carry independent optional `start` and `due` values. Each value is
+either a date-only civil day or a local wall time plus its original IANA or
+Windows time-zone identifier. These values are not inferred from the Google
+Tasks scheduled day, and no instant is invented at DST gaps or overlaps.
+Older task payloads read with null start/due; legacy edits preserve them, and
+portable exports and account archives retain their exact date/time kind.
 The account ZIP archive also includes active day labels and Markdown bodies;
 journal synchronization state and deletion tombstones are not portable account
 records.

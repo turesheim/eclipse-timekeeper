@@ -541,6 +541,42 @@ class HttpAcceptance(unittest.TestCase):
                 restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
                 self.assertEqual(body['items'],restored['checklistItems'])
 
+    def test_task_start_and_due_keep_date_and_wall_time_meaning(self):
+        path='/tasks/'+self.task['id']
+        original, headers=self.call('GET',path)
+        self.assertIsNone(original['start']);self.assertIsNone(original['due'])
+        start={'kind':'DATE','date':'2026-03-29'}
+        due={'kind':'DATE_TIME','date':'2026-03-29','time':'02:30','timeZone':'Europe/Oslo'}
+        body={'start':start,'due':due}
+        self.call('PUT',path+'/timing',owner='read',body=body,headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        timed, headers=self.call('PUT',path+'/timing',body=body,headers={'If-Match':headers['ETag']})
+        self.assertEqual(start,timed['start']);self.assertEqual(due,timed['due'])
+        self.assertIsNone(timed['scheduledDate'])
+        self.call('PUT',path+'/timing',body={'start':None,'due':None},headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        self.call('PUT',path+'/timing',body={'start':start,'due':{'kind':'DATE_TIME','date':'2026-03-29','time':'02:30'}},
+                  headers={'If-Match':headers['ETag']},status=400,code='BAD_REQUEST')
+        legacy={'projectId':timed['projectId'],'parentTaskId':timed['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        updated, headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        self.assertEqual((start,due),(updated['start'],updated['due']))
+        updated, headers=self.call('PUT',path+'/planning',body={'status':'NOT_STARTED','scheduledDate':'2026-03-29','completedAt':None},
+                                   headers={'If-Match':headers['ETag']})
+        self.assertEqual((start,due),(updated['start'],updated['due']))
+        updated, headers=self.call('PUT',path+'/checklist',body={'items':[]},headers={'If-Match':headers['ETag']})
+        self.assertEqual((start,due),(updated['start'],updated['due']))
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual((start,due),(restored['start'],restored['due']))
+        windows={'start':None,'due':{'kind':'DATE_TIME','date':'2026-11-01','time':'01:30','timeZone':'Pacific Standard Time'}}
+        windows_result, headers=self.call('PUT',path+'/timing',body=windows,headers={'If-Match':headers['ETag']})
+        self.assertEqual(windows['due'],windows_result['due'])
+        cleared, _=self.call('PUT',path+'/timing',body={'start':None,'due':None},headers={'If-Match':headers['ETag']})
+        self.assertIsNone(cleared['start']);self.assertIsNone(cleared['due'])
+
     def test_provider_identity_is_unique_per_owner_and_history_survives_unlink(self):
         reference = {'providerId': 'jira', 'repositoryId': 'https://jira.invalid',
                      'externalId': str(uuid4()), 'externalUrl': None}
