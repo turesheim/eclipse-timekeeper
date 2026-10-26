@@ -346,7 +346,7 @@ test('journal toolbar creates the full evaluated Markdown subset and validates l
       await expect(action('Text style').locator('.bi-type-h'+level)).toBeVisible();await expect(rich).toBeFocused();
     }
     await action('Text style').click();await dialog(page).getByRole('menuitemradio',{name:'Plain text',exact:true}).click();await expect(rich.locator('h1,h2,h3,h4,h5,h6')).toHaveCount(0);await expect(rich.locator('p')).toHaveText('Plain paragraph');
-    await rich.press('End');await action('Horizontal rule').click();await expect(rich.locator('hr')).toHaveCount(1);await expect(rich).toContainText('Plain paragraph');
+    await rich.press('ControlOrMeta+A');await action('Horizontal rule').click();await expect(rich.locator('hr')).toHaveCount(1);await expect(rich).toContainText('Plain paragraph');
     await action('Undo').click();await expect(rich.locator('hr')).toHaveCount(0);await action('Redo').click();await expect(rich.locator('hr')).toHaveCount(1);
     await action('Markdown source').click();await expect(page.locator('#journal-body')).toHaveValue(/Plain paragraph[\s\S]*(?:\*\*\*|---|___)/);
   }finally{await owner.close();}
