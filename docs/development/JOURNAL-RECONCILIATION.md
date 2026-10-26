@@ -22,6 +22,9 @@ file has no deletion meaning. Tombstones persist until the relevant devices
 acknowledge them; initial collisions never silently delete or resurrect data.
 Existing empty database records remain cleared notes; deletion markers are
 created only by explicit deletion, never inferred from older empty content.
+Markers are private records bound to the exact note version. An older replica
+can still save the ordinary note payload during rolling updates; its later
+version cannot accidentally retain an earlier deletion marker.
 
 Only one side changed since the common base: import the external change or
 export the database change. Identical results adopt a base without duplicate

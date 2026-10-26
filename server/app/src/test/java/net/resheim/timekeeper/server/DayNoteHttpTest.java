@@ -70,6 +70,17 @@ class DayNoteHttpTest {
         assertEquals(400,update("test-a",day,full.header("ETag"),object().put("body","injected").put("ownerId","b")).statusCode());
         assertEquals(body,get("test-a",day).jsonPath().getString("body"));
     }
+    @Test void olderReplicaSavesCannotCarryAStaleDeletionMarkerIntoNewContent(){
+        var date=DayNotes.date("2026-08-08");
+        store.transaction("a",()->{var notes=new DayNotes(store);notes.delete(date,etag(notes.get(date)));assertTrue(notes.get(date).path("deleted").asBoolean());
+            var stored=(com.fasterxml.jackson.databind.node.ObjectNode)store.find(DayNotes.TYPE,DayNotes.id(date)).orElseThrow();assertFalse(stored.has("deleted"));
+            // An older replica updates only the existing note payload/version.
+            stored.put("body","Edited by an older replica").put("version",2);
+            store.update("UPDATE tk_resource SET version=2,payload=? WHERE owner_id=? AND entity_type=? AND id=?",stored.toString(),store.owner(),DayNotes.TYPE,DayNotes.id(date));
+            assertFalse(notes.get(date).path("deleted").asBoolean());assertEquals("Edited by an older replica",notes.get(date).path("body").asText());
+            stored.put("body","").put("version",3);store.update("UPDATE tk_resource SET version=3,payload=? WHERE owner_id=? AND entity_type=? AND id=?",stored.toString(),store.owner(),DayNotes.TYPE,DayNotes.id(date));
+            assertFalse(notes.get(date).path("deleted").asBoolean());return null;});
+    }
     @Test void simultaneousLabelAndBodyEditsRequireOneWriterToReload() throws Exception {
         String day="2026-08-05",match=get("test-a",day).header("ETag");var start=new java.util.concurrent.CountDownLatch(1);
         try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)){
