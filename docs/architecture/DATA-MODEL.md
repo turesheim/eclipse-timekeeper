@@ -435,6 +435,14 @@ effective field read/write/delete support. Unlisted fields are unknown.
 Older records decode to an empty declaration; legacy connection updates keep
 the existing map. Credentials never belong in it.
 
+Each external reference may also contain a versioned last-common `baseline`:
+capture time plus a sparse JSON map of normalized task fields that the local
+task and that provider last agreed on. It belongs to one provider identity and
+is updated atomically with source revision metadata after an accepted exchange.
+Older records decode without one; legacy task and link writes preserve it.
+The field map excludes credentials, provider transport state, and unsupported
+fields. It supplies the base for later field-level three-way conflict handling.
+
 Each external reference may contain one namespaced, versioned provider-data
 envelope. Its JSON object preserves exposed provider fields that are not yet
 normalized. The envelope belongs to that reference, so links to other

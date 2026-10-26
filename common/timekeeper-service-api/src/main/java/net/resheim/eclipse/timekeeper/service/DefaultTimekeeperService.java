@@ -43,6 +43,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.DeleteTask;
 import net.resheim.eclipse.timekeeper.service.Commands.LinkExternalReference;
 import net.resheim.eclipse.timekeeper.service.Commands.ReplaceExternalReference;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskSource;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskSyncState;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskProviderData;
 import net.resheim.eclipse.timekeeper.service.Commands.StartActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.StopActivity;
@@ -358,6 +359,17 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			Task updated = ports.tasks().save(current.replaceExternalReference(required(command.previous(), "previousReference"),reference));
 			publish(TASK, UPDATED, updated.id().value().toString());
 			return updated;
+		});
+	}
+
+	@Override
+	public Task updateExternalTaskSyncState(UpdateExternalTaskSyncState command) {
+		return tx(() -> {
+			required(command,"command");Task current=requiredTask(command.taskId());
+			version(current.version(),command.expectedVersion(),"task");
+			Task updated=ports.tasks().save(current.withExternalSyncState(required(command.reference(),"reference"),
+					required(command.source(),"source"),command.baseline()==null?Optional.empty():command.baseline()));
+			publish(TASK,UPDATED,updated.id().value().toString());return updated;
 		});
 	}
 

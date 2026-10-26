@@ -11791,6 +11791,101 @@
         },
         "description": "Conditional replacement of task metadata. Ordinary task updates preserve it. A provider source link does not become the editable primary URL."
       }
+    },
+    "/tasks/{id}/external-references/sync-state": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateExternalTaskSyncState",
+        "summary": "Replace per-provider task sync revision and baseline",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalTaskSyncStateInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional atomic replacement of provider source state and last-common field snapshot. Use after an accepted provider exchange; Timekeeper If-Match still protects the local task version."
+      }
     }
   },
   "components": {
@@ -11900,6 +11995,10 @@
           "providerData": {
             "$ref": "#/components/schemas/ExternalTaskProviderData",
             "description": "Optional on link. Omission preserves previously stored provider data."
+          },
+          "baseline": {
+            "$ref": "#/components/schemas/ExternalTaskBaseline",
+            "description": "Optional last-common snapshot; omitted on links that have not completed a sync."
           }
         },
         "required": [
@@ -13467,6 +13566,10 @@
           "providerData": {
             "$ref": "#/components/schemas/ExternalTaskProviderData",
             "description": "Optional on link. Omission preserves previously stored provider data."
+          },
+          "baseline": {
+            "$ref": "#/components/schemas/ExternalTaskBaseline",
+            "description": "Optional last-common snapshot; omitted on links that have not completed a sync."
           }
         },
         "required": [
@@ -21962,6 +22065,97 @@
         ],
         "additionalProperties": false,
         "description": "Apple-style tags, Outlook categories, and linked resources remain distinct."
+      },
+      "ExternalTaskBaseline": {
+        "type": "object",
+        "description": "Versioned last-common normalized field values agreed with this provider identity. Only fields participating in sync are included; absence means unsupported or unknown. Credentials and provider transport state are excluded.",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capturedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "fields": {
+            "type": "object",
+            "propertyNames": {
+              "enum": [
+                "summary",
+                "url",
+                "body",
+                "status",
+                "scheduledDate",
+                "completedAt",
+                "start",
+                "due",
+                "priority",
+                "flagged",
+                "urgent",
+                "parentTaskId",
+                "siblingOrder",
+                "checklistItems",
+                "recurrence",
+                "reminders",
+                "metadata",
+                "taskListId"
+              ]
+            },
+            "additionalProperties": true,
+            "maxProperties": 18
+          }
+        },
+        "required": [
+          "version",
+          "capturedAt",
+          "fields"
+        ],
+        "additionalProperties": false
+      },
+      "ExternalTaskSyncStateInput": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ExternalTaskSource"
+          },
+          "baseline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExternalTaskBaseline"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "providerId",
+          "repositoryId",
+          "externalId",
+          "source",
+          "baseline"
+        ],
+        "additionalProperties": false,
+        "description": "Atomically replace a linked identity’s source revision and last-common field snapshot. Null baseline clears the snapshot."
       }
     },
     "parameters": {

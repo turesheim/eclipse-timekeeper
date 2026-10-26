@@ -673,6 +673,37 @@ class HttpAcceptance(unittest.TestCase):
                                     headers={'If-Match':headers['ETag']})
         self.assertEqual(cleared,cleared_result['externalReferences'][0]['source'])
 
+    def test_external_sync_baseline_is_atomic_preserved_and_clearable(self):
+        path='/tasks/'+self.task['id']
+        ref={'providerId':'google','repositoryId':self.prefix+'/list','externalId':'old','externalUrl':None}
+        source={'createdAt':None,'modifiedAt':'2026-10-26T10:00:00Z','remoteEtag':'"r1"','remoteRevision':None}
+        baseline={'version':1,'capturedAt':'2026-10-26T10:01:00Z','fields':{'summary':'Agreed','status':'NOT_STARTED'}}
+        _, headers=self.call('GET',path)
+        linked, headers=self.call('PUT',path+'/external-references',body=ref,headers={'If-Match':headers['ETag']})
+        request={key:ref[key] for key in ('providerId','repositoryId','externalId')}
+        request.update(source=source,baseline=baseline)
+        self.call('PUT',path+'/external-references/sync-state',body=request,headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        self.call('PUT',path+'/external-references/sync-state',body={**request,'baseline':{**baseline,'fields':{'accessToken':'secret'}}},headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        updated, headers=self.call('PUT',path+'/external-references/sync-state',body=request,headers={'If-Match':headers['ETag']})
+        self.assertEqual(source,updated['externalReferences'][0]['source'])
+        self.assertEqual(baseline,updated['externalReferences'][0]['baseline'])
+        legacy={'projectId':updated['projectId'],'parentTaskId':updated['parentTaskId'],'summary':self.prefix+' edited','url':None}
+        updated, headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        self.assertEqual(baseline,updated['externalReferences'][0]['baseline'])
+        changed, headers=self.call('PUT',path+'/external-references/replace',body={'previous':{key:ref[key] for key in ('providerId','repositoryId','externalId')},'current':{**ref,'externalId':'new'}},headers={'If-Match':headers['ETag']})
+        self.assertEqual(baseline,changed['externalReferences'][0]['baseline'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual(baseline,restored['externalReferences'][0]['baseline'])
+        request['externalId']='new'
+        cleared, _=self.call('PUT',path+'/external-references/sync-state',body={**request,'baseline':None},headers={'If-Match':headers['ETag']})
+        self.assertNotIn('baseline',cleared['externalReferences'][0])
+
     def test_remote_identity_replacement_preserves_lookup_and_transfer(self):
         path='/tasks/'+self.task['id']
         old={'providerId':'microsoft','repositoryId':self.prefix+'/list-a','externalId':'old'}
