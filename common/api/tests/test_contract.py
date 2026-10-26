@@ -166,6 +166,10 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskListCreateInput').is_valid({**task_list,'position':-1}))
         self.assertFalse(validator('TaskConnectionCreateInput').is_valid({**connection,'accessToken':'secret'}))
         self.assertEqual('listTaskLists',CONTRACT['paths']['/task-lists']['get']['operationId'])
+        reference={'providerId':'google','repositoryId':'account/list','externalId':'task-1',
+                   'externalUrl':None,'taskListId':ID}
+        validator('ExternalReference').validate(reference)
+        self.assertFalse(validator('ExternalReference').is_valid({**reference,'taskListId':'not-a-uuid'}))
 
     def test_timestamp_precision_and_zone_boundary(self):
         for value in ['2026-03-29T00:00:00Z', '2026-03-29T00:00:00.123456789Z']:

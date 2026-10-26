@@ -11362,6 +11362,10 @@
               }
             ]
           },
+          "taskListId": {
+            "$ref": "#/components/schemas/Id",
+            "description": "Optional owner-scoped provider list association. Omission on an existing link preserves its list."
+          },
           "source": {
             "$ref": "#/components/schemas/ExternalTaskSource",
             "description": "Optional when linking. Omission preserves existing source state for the same identity."
@@ -12860,6 +12864,9 @@
                 "type": "null"
               }
             ]
+          },
+          "taskListId": {
+            "$ref": "#/components/schemas/Id"
           },
           "source": {
             "$ref": "#/components/schemas/ExternalTaskSource"
@@ -16652,6 +16659,10 @@
             "minimum": 0
           },
           "listConnections": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "externalReferenceLists": {
             "type": "integer",
             "minimum": 0
           }

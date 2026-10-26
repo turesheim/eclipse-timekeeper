@@ -91,6 +91,7 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		Set<ExternalTaskReference> updated = new LinkedHashSet<>(externalReferences);
 		ExternalTaskReference previous = updated.stream().filter(candidate -> candidate.key().equals(key)).findFirst().orElse(null);
 		if (previous != null && reference.source().equals(ExternalTaskSource.empty())) reference = reference.withSource(previous.source());
+		if (previous != null && reference.taskListId().isEmpty()) reference = reference.withTaskList(previous.taskListId());
 		updated.removeIf(candidate -> candidate.key().equals(key));
 		updated.add(reference);
 		return new Task(id, projectId, parentTaskId, summary, url, updated, planning, checklist, timing, importance, body, version + 1);
