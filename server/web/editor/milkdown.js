@@ -43,14 +43,14 @@ function taskItem(node,view,getPos,taskLabel){
 }
 let diagrams;
 function mermaidBlock(node){
-  const dom=document.createElement('div'),pre=document.createElement('pre'),code=document.createElement('code'),preview=document.createElement('div'),status=document.createElement('p'),frame=document.createElement('iframe');
+  const dom=document.createElement('div'),pre=document.createElement('pre'),code=document.createElement('code'),preview=document.createElement('div'),status=document.createElement('p'),image=document.createElement('img');
   dom.className='markdown-mermaid-block';pre.dataset.language=node.attrs.language;pre.append(code);
   preview.className='markdown-mermaid-preview';status.setAttribute('role','status');
-  frame.title=t('markdown.mermaid_diagram');frame.setAttribute('sandbox','');frame.loading='lazy';frame.hidden=true;
-  preview.append(status,frame);dom.append(pre,preview);
+  image.alt=t('markdown.mermaid_diagram');image.hidden=true;
+  preview.append(status,image);dom.append(pre,preview);
   let timer,generation=0,source;
   const schedule=value=>{
-    if(value===source)return;source=value;const current=++generation;clearTimeout(timer);frame.hidden=true;frame.removeAttribute('srcdoc');
+    if(value===source)return;source=value;const current=++generation;clearTimeout(timer);image.hidden=true;image.removeAttribute('src');
     if(!value.trim()){status.textContent='';return;}
     if(new TextEncoder().encode(value).length>10000){status.textContent=t('markdown.mermaid_too_large');return;}
     status.textContent=t('markdown.mermaid_loading');
@@ -59,13 +59,13 @@ function mermaidBlock(node){
         diagrams??=import(new URL('../mermaid/mermaid.js',import.meta.url).href);
         const {renderDiagram}=await diagrams,svg=await renderDiagram(value);
         if(current!==generation)return;
-        frame.srcdoc=`<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><style>html,body{margin:0;background:transparent;color:#233b38}svg{max-width:100%;height:auto}</style>${svg}`;
-        frame.hidden=false;status.textContent='';
+        image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+        image.hidden=false;status.textContent='';
       }catch{if(current===generation)status.textContent=t('markdown.mermaid_invalid');}
     },300);
   };
   schedule(node.textContent);
-  return {dom,contentDOM:code,update(value){if(value.type!==node.type||String(value.attrs.language).toLowerCase()!=='mermaid')return false;schedule(value.textContent);return true;},destroy(){++generation;clearTimeout(timer);frame.removeAttribute('srcdoc');},ignoreMutation:mutation=>preview.contains(mutation.target),stopEvent:event=>preview.contains(event.target)};
+  return {dom,contentDOM:code,update(value){if(value.type!==node.type||String(value.attrs.language).toLowerCase()!=='mermaid')return false;schedule(value.textContent);return true;},destroy(){++generation;clearTimeout(timer);image.removeAttribute('src');},ignoreMutation:mutation=>preview.contains(mutation.target),stopEvent:event=>preview.contains(event.target)};
 }
 export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,stateChanged,description,readOnly=false}){
   const changePlugin=$prose(()=>new Plugin({filterTransaction:transaction=>!transaction.docChanged||!readOnly&&safeDocument(transaction.doc),view:()=>({update:(view,previous)=>{

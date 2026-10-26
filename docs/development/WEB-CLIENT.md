@@ -145,7 +145,7 @@ autolinks remain renderable, rich edits retain resource-link syntax, and
 horizontal rules are saved as `---`.
 Fenced `mermaid` blocks retain editable source and show a diagram preview in
 Formatted mode. The renderer is loaded only when a diagram is present, runs
-without third-party requests, and places its SVG in a sandboxed frame. Invalid
+without third-party requests, and displays its SVG as an inert image. Invalid
 diagrams leave their Markdown source intact.
 The [layout evaluation](JOURNAL-EDITOR.md) records why this keeps the existing
 Calendar navigation rather than introducing a separate Journal tab.

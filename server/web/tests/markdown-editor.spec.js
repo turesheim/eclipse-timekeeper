@@ -94,16 +94,19 @@ test('Markdown schema guard retains metadata and escaped-code dialects without r
   }
   expect(external).toEqual([]);
 });
-test('Mermaid fences render in an isolated preview and preserve editable Markdown',async({page})=>{
-  const outside=[];page.on('request',request=>{if(new URL(request.url()).origin!==new URL(process.env.TIMEKEEPER_WEB_URL).origin)outside.push(request.url());});
+test('Mermaid fences render as inert SVG previews and preserve editable Markdown',async({page})=>{
+  const outside=[],requested=[];page.on('request',request=>{requested.push(request.url());if(!request.url().startsWith('data:')&&new URL(request.url()).origin!==new URL(process.env.TIMEKEEPER_WEB_URL).origin)outside.push(request.url());});
   await open(page);
+  expect(requested.some(url=>url.includes('/assets/mermaid/mermaid.js'))).toBe(false);
   const source='```mermaid\nflowchart LR\n  Start --> Finish\n```\n';
   await page.locator('#markdown-body').fill(source);
   await page.locator('#markdown-rich').click();
   const diagram=page.locator('.markdown-mermaid-block');await expect(diagram).toBeVisible();
   await expect(diagram.locator('pre')).toHaveAttribute('data-language','mermaid');
-  const frame=diagram.locator('iframe');await expect(frame).toBeVisible();await expect(frame).toHaveAttribute('sandbox','');
-  await expect(page.frameLocator('.markdown-mermaid-block iframe').locator('svg')).toBeVisible();
+  const image=diagram.getByRole('img',{name:'Mermaid diagram preview'});await expect(image).toBeVisible();
+  await expect.poll(()=>image.evaluate(element=>element.complete?element.naturalWidth:0)).toBeGreaterThan(0);
+  expect(requested.some(url=>url.includes('/assets/mermaid/mermaid.js'))).toBe(true);
+  await captureScreenshot(page,{path:'test-results/mermaid-editor.png',fullPage:true});
   await page.locator('#markdown-source').click();await expect(page.locator('#markdown-body')).toHaveValue(source);
   await page.locator('#markdown-body').fill('```mermaid\nnot a diagram\n```\n');await page.locator('#markdown-rich').click();
   await expect(page.locator('.markdown-mermaid-preview')).toContainText('Diagram syntax could not be rendered');
