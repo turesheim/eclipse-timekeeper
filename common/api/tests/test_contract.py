@@ -119,6 +119,18 @@ class ContractTest(unittest.TestCase):
         self.assertEqual('updateTaskRecurrence',CONTRACT['paths']['/tasks/{id}/recurrence']['put']['operationId'])
         self.assertEqual('updateTaskOccurrences',CONTRACT['paths']['/tasks/{id}/occurrences']['put']['operationId'])
 
+    def test_reminder_kinds_do_not_collapse_into_due_dates(self):
+        base={'id':ID}
+        examples=[{'kind':'ABSOLUTE','at':{'kind':'DATE_TIME','date':'2026-10-26','time':'09:00:00','timeZone':'Europe/Oslo'}},
+                  {'kind':'RELATIVE','anchor':'DUE','offsetMinutes':30},
+                  {'kind':'LOCATION','latitude':59.9,'longitude':10.7,'radiusMeters':100,'transition':'ARRIVE'},
+                  {'kind':'CAR','event':'DISCONNECT'}, {'kind':'MESSAGE','contactKey':'contact-1'}]
+        for example in examples:
+            validator('TaskReminder').validate({**base,**example})
+        self.assertFalse(validator('TaskReminder').is_valid({**base,'kind':'LOCATION','at':examples[0]['at']}))
+        self.assertFalse(validator('TaskReminder').is_valid({**base,'kind':'ABSOLUTE','at':{'kind':'DATE','date':'2026-10-26'}}))
+        self.assertEqual('updateTaskReminders',CONTRACT['paths']['/tasks/{id}/reminders']['put']['operationId'])
+
     def test_task_planning_has_a_date_only_schedule_and_conditional_update_contract(self):
         body = {'summary': 'Review', 'projectId': None, 'parentTaskId': None, 'url': None,
                 'status': 'COMPLETED', 'scheduledDate': '2026-10-26', 'completedAt': '2026-10-26T11:12:13Z'}
@@ -346,7 +358,7 @@ class ContractTest(unittest.TestCase):
             'createTaskConnection', 'updateTaskConnection', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'deleteTaskList', 'getTaskList', 'listTaskLists',
             'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors',
-            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
+            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
             'linkExternalReference', 'replaceExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',

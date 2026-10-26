@@ -11506,6 +11506,101 @@
           }
         ]
       }
+    },
+    "/tasks/{id}/reminders": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskReminders",
+        "summary": "Replace task reminder triggers",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRemindersInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of all typed reminder triggers. Scheduled and due dates are unchanged. Older task writes preserve reminders."
+      }
     }
   },
   "components": {
@@ -12140,6 +12235,14 @@
           },
           "recurrence": {
             "$ref": "#/components/schemas/TaskRecurrence"
+          },
+          "reminders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskReminder"
+            },
+            "maxItems": 100,
+            "default": []
           }
         },
         "required": [
@@ -12163,7 +12266,8 @@
           "body",
           "siblingOrder",
           "externalAliases",
-          "recurrence"
+          "recurrence",
+          "reminders"
         ],
         "additionalProperties": true
       },
@@ -12744,6 +12848,14 @@
           },
           "recurrence": {
             "$ref": "#/components/schemas/TaskRecurrence"
+          },
+          "reminders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskReminder"
+            },
+            "maxItems": 100,
+            "default": []
           }
         },
         "required": [
@@ -13295,6 +13407,14 @@
           },
           "recurrence": {
             "$ref": "#/components/schemas/TaskRecurrence"
+          },
+          "reminders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskReminder"
+            },
+            "maxItems": 100,
+            "default": []
           }
         },
         "required": [
@@ -21279,6 +21399,182 @@
             "description": "Exact attachment bytes, at most 5,000,000 after decoding."
           }
         }
+      },
+      "TaskReminderAbsolute": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "const": "ABSOLUTE"
+          },
+          "at": {
+            "$ref": "#/components/schemas/TaskZonedDateTime"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "at"
+        ],
+        "additionalProperties": false
+      },
+      "TaskReminderRelative": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "const": "RELATIVE"
+          },
+          "anchor": {
+            "type": "string",
+            "enum": [
+              "START",
+              "DUE"
+            ]
+          },
+          "offsetMinutes": {
+            "type": "integer",
+            "minimum": -525600,
+            "maximum": 525600
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "anchor",
+          "offsetMinutes"
+        ],
+        "additionalProperties": false
+      },
+      "TaskReminderLocation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "const": "LOCATION"
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "radiusMeters": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 100000
+          },
+          "transition": {
+            "type": "string",
+            "enum": [
+              "ARRIVE",
+              "DEPART"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "latitude",
+          "longitude",
+          "radiusMeters",
+          "transition"
+        ],
+        "additionalProperties": false
+      },
+      "TaskReminderCar": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "const": "CAR"
+          },
+          "event": {
+            "type": "string",
+            "enum": [
+              "CONNECT",
+              "DISCONNECT"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "event"
+        ],
+        "additionalProperties": false
+      },
+      "TaskReminderMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "const": "MESSAGE"
+          },
+          "contactKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "contactKey"
+        ],
+        "additionalProperties": false
+      },
+      "TaskReminder": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TaskReminderAbsolute"
+          },
+          {
+            "$ref": "#/components/schemas/TaskReminderRelative"
+          },
+          {
+            "$ref": "#/components/schemas/TaskReminderLocation"
+          },
+          {
+            "$ref": "#/components/schemas/TaskReminderCar"
+          },
+          {
+            "$ref": "#/components/schemas/TaskReminderMessage"
+          }
+        ],
+        "description": "A typed alert trigger; location, car, and messaging triggers never imply a time."
+      },
+      "TaskRemindersInput": {
+        "type": "object",
+        "properties": {
+          "reminders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskReminder"
+            },
+            "maxItems": 100,
+            "default": []
+          }
+        },
+        "required": [
+          "reminders"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {

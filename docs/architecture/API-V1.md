@@ -231,6 +231,17 @@ task writes preserve them. The server stores these values but does not expand
 rules or infer new due dates or alerts. A connector must report unsupported
 recurrence before writing to a provider rather than approximate its rule.
 
+Task `reminders` is a bounded list of individually identified triggers,
+independent of scheduled, start, and due dates. `ABSOLUTE` requires a zoned
+wall time; `RELATIVE` uses signed minutes before a `START` or `DUE` anchor
+(negative means after). `LOCATION` stores a geofence and arrival/departure
+transition; `CAR` stores connect/disconnect; `MESSAGE` stores an opaque contact
+key. `PUT /tasks/{id}/reminders` conditionally replaces the whole list and
+legacy task writes preserve it. Connectors must retain unsupported trigger
+kinds locally and warn on attempted export; they must never convert them to a
+timed alert or treat a due date as an alert. Apple companion authorization and
+contact resolution remain outside task payloads.
+
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
 Manual editing sets `manual=true` and cannot change activity task/owner. Creating,

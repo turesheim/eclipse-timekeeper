@@ -744,6 +744,36 @@ class HttpAcceptance(unittest.TestCase):
         cleared,_=self.call('PUT',path+'/recurrence',body={'series':None,'occurrences':[]},headers={'If-Match':headers['ETag']})
         self.assertEqual({'series':None,'occurrences':[]},cleared['recurrence'])
 
+    def test_typed_reminders_survive_legacy_writes_and_transfer(self):
+        path='/tasks/'+self.task['id']
+        reminders=[
+            {'id':str(uuid4()),'kind':'ABSOLUTE','at':{'kind':'DATE_TIME','date':'2026-10-26','time':'09:00','timeZone':'Europe/Oslo'}},
+            {'id':str(uuid4()),'kind':'RELATIVE','anchor':'DUE','offsetMinutes':30},
+            {'id':str(uuid4()),'kind':'LOCATION','latitude':59.9,'longitude':10.7,'radiusMeters':100,'transition':'ARRIVE'},
+            {'id':str(uuid4()),'kind':'CAR','event':'DISCONNECT'},
+            {'id':str(uuid4()),'kind':'MESSAGE','contactKey':'contact-1'}]
+        original,headers=self.call('GET',path)
+        self.assertEqual([],original['reminders'])
+        self.call('PUT',path+'/reminders',owner='read',body={'reminders':reminders},headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        updated,headers=self.call('PUT',path+'/reminders',body={'reminders':reminders},headers={'If-Match':headers['ETag']})
+        self.assertEqual(reminders,updated['reminders'])
+        self.call('PUT',path+'/reminders',body={'reminders':[]},headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        self.call('PUT',path+'/reminders',body={'reminders':reminders+[reminders[0]]},headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        self.call('PUT',path+'/reminders',body={'reminders':[{'id':str(uuid4()),'kind':'ABSOLUTE','at':{'kind':'DATE','date':'2026-10-26'}}]},headers={'If-Match':headers['ETag']},status=400,code='BAD_REQUEST')
+        legacy={'projectId':updated['projectId'],'parentTaskId':updated['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        updated,headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        self.assertEqual(reminders,updated['reminders'])
+        exported,_=self.call('GET','/data/export')
+        imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored,_=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual(reminders,restored['reminders'])
+        cleared,_=self.call('PUT',path+'/reminders',body={'reminders':[]},headers={'If-Match':headers['ETag']})
+        self.assertEqual([],cleared['reminders'])
+
     def test_provider_accounts_and_lists_are_owned_idempotent_and_portable(self):
         account={'providerId':'microsoft','remoteAccountId':str(uuid4()),'name':'Personal',
                  'readable':True,'writable':True,'enabled':True}
