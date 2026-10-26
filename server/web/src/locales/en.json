@@ -1171,6 +1171,7 @@
   "markdown.mermaid_loading": "Rendering diagram…",
   "markdown.mermaid_invalid": "Diagram syntax could not be rendered. The Markdown source is unchanged.",
   "markdown.mermaid_too_large": "Diagram exceeds the 10,000-byte preview limit. The Markdown source is unchanged.",
+  "markdown.mermaid_external": "Diagram previews cannot contain external resources. The Markdown source is unchanged.",
   "journal.sync.advanced": "Connection setup and troubleshooting",
   "journal.sync.simple_help": "Add a client with its name and public key. New clients synchronize journal notes in both directions automatically.",
   "ui.manage_labels_in_my_account": "Manage labels in My Account → Labels."

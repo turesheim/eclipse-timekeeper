@@ -53,6 +53,7 @@ function mermaidBlock(node){
     if(value===source)return;source=value;const current=++generation;clearTimeout(timer);image.hidden=true;image.removeAttribute('src');
     if(!value.trim()){status.textContent='';return;}
     if(new TextEncoder().encode(value).length>10000){status.textContent=t('markdown.mermaid_too_large');return;}
+    if(/(?:https?:\/\/|data:|file:|javascript:)/i.test(value)){status.textContent=t('markdown.mermaid_external');return;}
     status.textContent=t('markdown.mermaid_loading');
     timer=setTimeout(async()=>{
       try{

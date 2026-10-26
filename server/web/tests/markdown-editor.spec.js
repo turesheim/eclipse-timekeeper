@@ -111,5 +111,9 @@ test('Mermaid fences render as inert SVG previews and preserve editable Markdown
   await page.locator('#markdown-body').fill('```mermaid\nnot a diagram\n```\n');await page.locator('#markdown-rich').click();
   await expect(page.locator('.markdown-mermaid-preview')).toContainText('Diagram syntax could not be rendered');
   await page.locator('#markdown-source').click();await expect(page.locator('#markdown-body')).toHaveValue('```mermaid\nnot a diagram\n```\n');
+  const external='```mermaid\nflowchart LR\n  A --> B\n  click A "https://example.invalid/private"\n```\n';
+  await page.locator('#markdown-body').fill(external);await page.locator('#markdown-rich').click();
+  await expect(page.locator('.markdown-mermaid-preview')).toContainText('cannot contain external resources');
+  await page.locator('#markdown-source').click();await expect(page.locator('#markdown-body')).toHaveValue(external);
   expect(outside).toEqual([]);
 });

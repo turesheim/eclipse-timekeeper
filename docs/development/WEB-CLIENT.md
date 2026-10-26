@@ -147,6 +147,8 @@ Fenced `mermaid` blocks retain editable source and show a diagram preview in
 Formatted mode. The renderer is loaded only when a diagram is present, runs
 without third-party requests, and displays its SVG as an inert image. Invalid
 diagrams leave their Markdown source intact.
+
+![Mermaid diagram in the formatted Markdown editor](../assets/screenshots/mermaid-editor.png)
 The [layout evaluation](JOURNAL-EDITOR.md) records why this keeps the existing
 Calendar navigation rather than introducing a separate Journal tab.
 Clear the text and save to remove a label;
