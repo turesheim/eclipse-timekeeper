@@ -70,7 +70,7 @@ final class JournalReconciliation {
             if(!prior.get().path("fingerprint").asText().equals(fingerprint))throw new ApiFailure(409,"IDEMPOTENCY_KEY_REUSED");return summary(prior.get());
         }
         latest(device,name,sequence);
-        if(state.list(JOURNAL_OFFER).stream().filter(value->!value.path("state").asText().equals("ACKNOWLEDGED")).count()>=500)throw new ApiFailure(409,"JOURNAL_PENDING_LIMIT");
+        if(state.list(JOURNAL_OFFER).stream().filter(value->value.has("sourceId")).count()>=500)throw new ApiFailure(409,"JOURNAL_PENDING_LIMIT");
         var common=state.find(JOURNAL_COMMON,commonId(device,name)).orElse(null);
         if(!Objects.toString(baseToken,"").equals(common==null?"":common.path("token").asText()))throw new ApiFailure(409,"JOURNAL_BASE_CHANGED");
         if(common!=null&&sequence<=common.path("sequence").asLong())throw new ApiFailure(409,"JOURNAL_SUPERSEDED");
@@ -89,7 +89,7 @@ final class JournalReconciliation {
             remote=document(name,note);
         }
         var account=AccountStore.account(store.current().connection(),store.owner(),true);
-        var offer=object().put("deviceId",device.toString()).put("clientStateId",client.toString()).put("filename",name).put("sequence",sequence)
+        var offer=object().put("deviceId",device.toString()).put("batchId",exchange.toString()).put("sourceId",id.toString()).put("clientStateId",client.toString()).put("filename",name).put("sequence",sequence)
                 .put("fingerprint",fingerprint).put("parentToken",Objects.toString(baseToken,"")).put("token",UUID.randomUUID().toString())
                 .put("expectedExists",exists).put("expectedHash",hash(input)).put("targetExists",present(note)).put("targetHash",hash(remote))
                 .put("remoteVersion",note.path("version").asLong()).put("remoteDeleted",note.path("deleted").asBoolean())
@@ -115,19 +115,22 @@ final class JournalReconciliation {
             if(common.path("exists").asBoolean()!=exists||!common.path("hash").asText().equals(installedHash))throw ApiFailure.conflict();
             return ((ObjectNode)common.path("receipt")).deepCopy();
         }
-        var offer=retained.get();authority(offer,device,configuration);
+        var offer=retained.get();if(!offer.path("deviceId").asText().equals(device.toString()))throw ApiFailure.notFound();
         if(!offer.path("token").asText().equals(token)||offer.path("targetExists").asBoolean()!=exists||!offer.path("targetHash").asText().equals(installedHash))throw ApiFailure.conflict();
         if(offer.path("state").asText().equals("ACKNOWLEDGED"))return summary(offer);
+        authority(offer,device,configuration);
         if(!offer.path("state").asText().equals("OFFERED"))throw ApiFailure.conflict();parent(offer);
         var key=commonId(device,offer.path("filename").asText());var prior=state.find(JOURNAL_COMMON,key);
         var value=object().put("deviceId",device.toString()).put("filename",offer.path("filename").asText()).put("token",token).put("sequence",offer.path("sequence").asLong())
                 .put("exists",exists).put("hash",installedHash).put("remoteVersion",offer.path("remoteVersion").asLong()).put("remoteHash",installedHash).put("remoteDeleted",offer.path("remoteDeleted").asBoolean());
-        offer=state.update(JOURNAL_OFFER,offer.put("state","ACKNOWLEDGED").put("acknowledgedAt",store.now().toString()));state.remove(JOURNAL_SOURCE,state.required(JOURNAL_SOURCE,id));
+        offer.remove("sourceId");offer=state.update(JOURNAL_OFFER,offer.put("state","ACKNOWLEDGED").put("acknowledgedAt",store.now().toString()));state.remove(JOURNAL_SOURCE,state.required(JOURNAL_SOURCE,id));
         value.put("offerId",id.toString()).set("receipt",summary(offer));
         if(prior.isEmpty())state.insert(JOURNAL_COMMON,key,value);else{var copy=prior.get();value.fields().forEachRemaining(entry->copy.set(entry.getKey(),entry.getValue()));state.update(JOURNAL_COMMON,copy);}
-        var acknowledged=state.list(JOURNAL_OFFER).stream().filter(item->item.path("state").asText().equals("ACKNOWLEDGED"))
-                .sorted(Comparator.comparing((ObjectNode item)->item.path("acknowledgedAt").asText()).reversed()).skip(200).toList();acknowledged.forEach(item->state.remove(JOURNAL_OFFER,item));
-        return summary(offer);
+        prune();return summary(offer);
+    }
+    void prune(){
+        var acknowledged=state.list(JOURNAL_OFFER).stream().filter(item->!item.has("sourceId"))
+                .sorted(Comparator.comparing((ObjectNode item)->java.time.Instant.parse(item.path("finishedAt").asText(item.path("acknowledgedAt").asText()))).reversed()).skip(200).toList();acknowledged.forEach(item->state.remove(JOURNAL_OFFER,item));
     }
     ObjectNode resolve(UUID id,String match,String currentEtag,boolean incoming,UUID device,String configuration){
         var offer=state.required(JOURNAL_OFFER,id);authority(offer,device,configuration);parent(offer);ApiReplies.match(offer,match);
@@ -145,12 +148,23 @@ final class JournalReconciliation {
         return summary(state.update(JOURNAL_OFFER,offer));
     }
     ObjectNode candidate(UUID id){
-        var offer=state.required(JOURNAL_OFFER,id);var source=state.required(JOURNAL_SOURCE,id);var result=summary(offer);
+        var offer=state.required(JOURNAL_OFFER,id);var source=state.required(JOURNAL_SOURCE,id);var result=JournalImport.summary(offer);
         for(String side:List.of("incoming","remote")){
             boolean exists=source.path(side+"Exists").asBoolean();var copy=result.putObject(side).put("exists",exists).put("deleted",!exists);
             if(exists){var parsed=JournalMarkdown.parse(offer.path("filename").asText(),Base64.getDecoder().decode(source.path(side+"Data").asText()));copy.put("text",parsed.label()).put("body",parsed.body());}
         }
-        var current=current(offer.path("filename").asText());result.set("current",current);result.put("currentEtag",etag(current));return result;
+        var current=current(offer.path("filename").asText());result.set("current",current);result.put("currentEtag",etag(current));
+        var incoming=result.path("incoming");result.put("kind","BIDIRECTIONAL").put("text",incoming.path("text").asText()).put("body",incoming.path("body").asText()).put("incomingExists",incoming.path("exists").asBoolean());return result;
+    }
+    byte[] source(UUID id,boolean remote){var value=state.required(JOURNAL_SOURCE,id);String side=remote?"remote":"incoming";if(!value.path(side+"Exists").asBoolean())throw ApiFailure.notFound();return Base64.getDecoder().decode(value.path(side+"Data").asText());}
+    ObjectNode discard(UUID id,String match){
+        var offer=state.required(JOURNAL_OFFER,id);ApiReplies.match(offer,match);if(!offer.has("sourceId"))throw ApiFailure.conflict();
+        state.remove(JOURNAL_SOURCE,state.required(JOURNAL_SOURCE,id));offer.remove("sourceId");var saved=state.update(JOURNAL_OFFER,offer.put("state","DISCARDED").put("finishedAt",store.now().toString()));prune();return management(saved);
+    }
+    ObjectNode management(ObjectNode offer){
+        var value=JournalImport.summary(offer).put("kind","BIDIRECTIONAL").put("canDiscard",offer.has("sourceId")).put("canDownload",false).put("canDownloadCalendar",false);
+        if(offer.has("sourceId"))value.put("canDownload",offer.path("expectedExists").asBoolean()).put("canDownloadCalendar",offer.path("targetExists").asBoolean());
+        return value;
     }
     static ObjectNode summary(ObjectNode offer){
         var result=object().put("candidateEtag",etag(offer));for(String field:List.of("id","deviceId","filename","sequence","state","token","parentToken","expectedExists","expectedHash","targetExists","targetHash","remoteVersion","remoteDeleted"))result.set(field,offer.get(field));return result;

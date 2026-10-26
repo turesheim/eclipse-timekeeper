@@ -59,5 +59,5 @@ final class JournalDevices {
         if(!device.path("bidirectional").asBoolean())throw new ApiFailure(403,"JOURNAL_DEVICE_WRITE_ONLY");return device;
     }
     List<ObjectNode> list(){return state.list(JOURNAL_DEVICE).stream().map(JournalDevices::management).toList();}
-    static ObjectNode management(ObjectNode device){var result=object();for(String field:List.of("id","version","label","fingerprint","revoked","bidirectional","createdAt","revokedAt","lastVerifiedAt","lastTransferAt","lastImportAt"))if(device.has(field))result.set(field,device.get(field));return result;}
+    static ObjectNode management(ObjectNode device){var result=object();for(String field:List.of("id","version","label","fingerprint","revoked","bidirectional","createdAt","revokedAt","lastVerifiedAt","lastTransferAt","lastImportAt","lastSyncAt"))if(device.has(field))result.set(field,device.get(field));return result;}
 }

@@ -184,4 +184,45 @@ class JournalSynchronizationTest {
         var result=synchronization.settle("journal_a","JournalTransport "+TOKEN,id);assertEquals(0,result.path("pending").asInt());assertEquals(1,result.path("errors").asInt());assertEquals("INDEPENDENT_NOTE_BODY_MARKER",body());
         var status=given().header("Authorization","Bearer test-a").get("/api/v1/journal").then().statusCode(200).extract().response();assertEquals(1,status.jsonPath().getInt("health.errors"));assertFalse(status.asString().contains("INDEPENDENT_NOTE_BODY_MARKER"));
     }
+    private void bidirectional()throws Exception{
+        String key=JournalKeyTest.publicKey();device=store.transaction("a",()->{var devices=new JournalDevices(store);devices.configure(true,true);return uuid(devices.enroll("Two directions",key,device,true).get("id"));});
+    }
+    private ObjectNode beginExchange(UUID exchange){return synchronization.gateway("journal_a","JournalTransport "+TOKEN,gateway->synchronization.begin(gateway,device,exchange));}
+    private ObjectNode exchangeManifest(UUID exchange,UUID client,Map<String,String> files){
+        var value=manifest(files).put("format",2).put("exchangeId",exchange.toString()).put("clientStateId",client.toString());value.putArray("absent");value.putArray("errors");
+        value.path("files").forEach(file->((ObjectNode)file).put("baseToken",""));return value;
+    }
+    private ObjectNode results(UUID exchange){return synchronization.gateway("journal_a","JournalTransport "+TOKEN,gateway->new JournalExchanges(store).results(device,exchange,gateway.deployment().epoch()));}
+    @Test void bidirectionalBatchesNeedCompletionAndProduceDurablePrivateOffersWithIdempotentReceipts()throws Exception{
+        bidirectional();UUID exchange=UUID.randomUUID(),client=UUID.randomUUID();UUID id=uuid(beginExchange(exchange).get("id"));String input="---\r\ncustom: [one, two]\r\n---\r\n# Exact  \r\n";
+        upload(id,NAME,input);synchronization.rescan("a");assertEquals("",body());assertThrows(ApiFailure.class,()->results(exchange));
+        var manifest=exchangeManifest(exchange,client,Map.of(NAME,input));complete(id,manifest);assertEquals("",body());synchronization.settle("journal_a","JournalTransport "+TOKEN,id);
+        var result=results(exchange);assertEquals(0,result.path("pending").asInt());assertEquals(1,result.path("offers").size());var offer=result.path("offers").get(0);UUID offered=uuid(offer.get("id"));
+        assertFalse(result.toString().contains("# Exact"));assertEquals("# Exact  \r\n",body());
+        byte[] output=synchronization.gateway("journal_a","JournalTransport "+TOKEN,gateway->new JournalExchanges(store).outbound(device,exchange,offered,gateway.deployment().epoch()));assertEquals(input,new String(output,StandardCharsets.UTF_8));
+        assertEquals(id,uuid(beginExchange(exchange).get("id")));assertEquals("COMPLETED",complete(id,manifest).path("status").asText());
+        var receipt=synchronization.gateway("journal_a","JournalTransport "+TOKEN,gateway->new JournalReconciliation(store).acknowledge(offered,device,offer.path("token").asText(),true,offer.path("targetHash").asText(),gateway.deployment().epoch()));assertEquals("ACKNOWLEDGED",receipt.path("state").asText());
+        assertEquals(1,store.transaction("a",()->new DayNotes(store).get(DayNotes.date("2026-10-25")).path("version").asLong()));
+        UUID next=UUID.randomUUID();UUID second=uuid(beginExchange(next).get("id"));var deleted=exchangeManifest(next,client,Map.of());deleted.withArray("absent").add(object().put("name",NAME).put("baseToken",offer.path("token").asText()));
+        complete(second,deleted);synchronization.settle("journal_a","JournalTransport "+TOKEN,second);assertTrue(store.transaction("a",()->new DayNotes(store).get(DayNotes.date("2026-10-25")).path("deleted").asBoolean()));assertFalse(results(next).path("offers").get(0).path("targetExists").asBoolean());
+    }
+    @Test void bidirectionalInternalHttpScopesOutboundDataToTheForcedDeviceAndRejectsWriteOnlyKeys()throws Exception{
+        String prefix="/internal/journal/journal_a",credential="JournalTransport "+TOKEN;UUID exchange=UUID.randomUUID();
+        given().header("Authorization",credential).contentType("application/json").body(object().put("deviceId",device.toString()).toString()).post(prefix+"/exchanges/inventory").then().statusCode(403);
+        given().header("Authorization",credential).contentType("application/json").body(object().put("deviceId",device.toString()).put("exchangeId",exchange.toString()).toString()).post(prefix+"/transfers").then().statusCode(403);
+        bidirectional();UUID id=uuid(beginExchange(exchange).get("id"));String input="PRIVATE_BIDIRECTIONAL_SOURCE_MARKER";upload(id,NAME,input);complete(id,exchangeManifest(exchange,UUID.randomUUID(),Map.of(NAME,input)));synchronization.settle("journal_a",credential,id);
+        var offer=results(exchange).path("offers").get(0);String path="/exchanges/"+exchange+"/files/"+offer.path("id").asText(),body=object().put("deviceId",device.toString()).toString();
+        given().header("Authorization",credential).contentType("application/json").body(body).post(prefix+path).then().statusCode(200).header("Cache-Control","private, no-store").contentType("application/octet-stream");
+        given().header("Authorization","JournalTransport "+OTHER_TOKEN).contentType("application/json").body(body).post("/internal/journal/journal_b"+path).then().statusCode(404);
+        given().header("Authorization","Bearer test-a").contentType("application/json").body(body).post(prefix+path).then().statusCode(401);
+        given().header("Authorization",credential).header("Origin","https://example.invalid").contentType("application/json").body(body).post(prefix+path).then().statusCode(400);
+        store.transaction("a",()->new JournalDevices(store).configure(true,false));given().header("Authorization",credential).contentType("application/json").body(body).post(prefix+path).then().statusCode(403);
+    }
+    @Test void malformedBidirectionalFilesDoNotBlockIndependentOffersAndUntrackedAbsenceDoesNotDelete()throws Exception{
+        bidirectional();store.transaction("a",()->{var notes=new DayNotes(store);var day=DayNotes.date("2026-10-27");return notes.save(day,etag(notes.get(day)),object().put("body","Calendar-only file"));});
+        UUID exchange=UUID.randomUUID(),id=uuid(beginExchange(exchange).get("id"));Map<String,String> files=Map.of(NAME,"---\ninvalid: [\n---\n","2026-10-26.md","Independent valid file");files.forEach((name,data)->upload(id,name,data));
+        var manifest=exchangeManifest(exchange,UUID.randomUUID(),files);manifest.withArray("absent").add(object().put("name","2026-10-27.md").put("baseToken",""));complete(id,manifest);synchronization.settle("journal_a","JournalTransport "+TOKEN,id);
+        var result=results(exchange);assertEquals(1,result.path("errors").size());assertEquals("INVALID_YAML",result.path("errors").get(0).path("code").asText());assertEquals(2,result.path("offers").size());
+        assertEquals("Calendar-only file",store.transaction("a",()->new DayNotes(store).get(DayNotes.date("2026-10-27")).path("body").asText()));assertEquals("Independent valid file",store.transaction("a",()->new DayNotes(store).get(DayNotes.date("2026-10-26")).path("body").asText()));
+    }
 }

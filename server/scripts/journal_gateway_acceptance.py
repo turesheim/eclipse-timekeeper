@@ -51,12 +51,13 @@ class Api:
 
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--distribution',type=Path,required=True);parser.add_argument('--skip-image-build',action='store_true');args=parser.parse_args()
+    global GATEWAY_IMAGE
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--distribution',type=Path,required=True);parser.add_argument('--skip-image-build',action='store_true');parser.add_argument('--gateway-image',default=GATEWAY_IMAGE);parser.add_argument('--bidirectional',action='store_true');args=parser.parse_args();GATEWAY_IMAGE=args.gateway_image
     archive=args.distribution.resolve();digest=hashlib.sha256(archive.read_bytes()).hexdigest()
     if archive.with_suffix('.zip.sha256').read_text().split()[0]!=digest:raise ValueError('Distribution checksum mismatch')
     if not args.skip_image_build:command('docker','build','-t',GATEWAY_IMAGE,'-f',str(ROOT/'server/journal/Dockerfile'),str(ROOT))
     suffix=secrets.token_hex(5);network='journal-'+suffix;containers=[];volumes=[];background=[]
-    sensitive=[b'Private daily Markdown',b'Private pressure note',b'INDEPENDENT_VALID_NOTE_SENTINEL',b'PRIVATE_CALENDAR_EDIT_SENTINEL',b'PRIVATE_CONFLICT_SOURCE_SENTINEL',b'INFLIGHT_PRIVATE_SENTINEL',b'UNRELATED_VAULT',b'UNACKNOWLEDGED_NOTE_SENTINEL']
+    sensitive=[b'Private daily Markdown',b'Private pressure note',b'INDEPENDENT_VALID_NOTE_SENTINEL',b'PRIVATE_CALENDAR_EDIT_SENTINEL',b'PRIVATE_CONFLICT_SOURCE_SENTINEL',b'INFLIGHT_PRIVATE_SENTINEL',b'UNRELATED_VAULT',b'UNACKNOWLEDGED_NOTE_SENTINEL',b'Private outgoing acceptance note',b'Local simultaneous variant',b'Calendar simultaneous variant',b'Database pressure']
     output=ROOT/'server/target/journal-gateway-acceptance';output.mkdir(parents=True,exist_ok=True);output.chmod(0o700)
     with contextlib.suppress(FileNotFoundError):(output/'acceptance.json').unlink()
     for previous in output.glob('*.log'):previous.unlink()
@@ -109,17 +110,17 @@ def main():
             password='Journal acceptance account passphrase '+suffix
             sensitive.append(password.encode())
             admin.call('POST','/auth/setup',{'code':code,'username':'journal-admin','password':password,'displayName':'Journal administrator','email':'journal-admin@example.invalid'})
-            actors=[]
-            for name in ['a','b']:
+            actors=[];account_names=list('abcdefgh') if args.bidirectional else ['a','b']
+            for name in account_names:
                 value,_=admin.call('POST','/admin/users',{'username':'journal-'+name,'password':password,'displayName':'Journal '+name,'email':'journal-'+name+'@example.invalid','administrator':False},status=201)
                 api=Api(base,str(directory/'tls.crt'),origin);api.call('GET','/auth/status');api.call('POST','/auth/login',{'username':'journal-'+name,'password':password,'remember':False});actors.append((value['user']['ownerId'],api))
-            tokens=[secrets.token_urlsafe(32),secrets.token_urlsafe(32)]
+            tokens=[secrets.token_urlsafe(32) for _ in account_names]
             sensitive.extend(token.encode() for token in tokens)
             config={'format':1,'hostname':'gateway.test','port':2222,'hostKey':host,'incomingRoot':'/data/incoming','encryptedStorage':True,'backupKeysSeparated':True,
-                    'accounts':[{'ownerId':owner,'username':'journal_'+name,'brokerTokenSha256':hashlib.sha256(token.encode()).hexdigest()} for (owner,api),name,token in zip(actors,['a','b'],tokens)]}
+                    'accounts':[{'ownerId':owner,'username':'journal_'+name,'brokerTokenSha256':hashlib.sha256(token.encode()).hexdigest()} for (owner,api),name,token in zip(actors,account_names,tokens)]}
             populate(app_volume,"import sys,os;from pathlib import Path;p=Path('/target/journal.json');p.write_bytes(sys.stdin.buffer.read());p.chmod(0o600);os.chown(p,10001,10001)",input=json.dumps(config).encode())
             gateway_config={'format':1,'brokerUrl':'https://web.test:8443/internal/journal','caFile':'/run/secrets/ca.pem','encryptedStorage':True,'backupKeysSeparated':True,
-                            'accounts':[{'username':'journal_'+name,'uid':20001+index,'token':token} for index,(name,token) in enumerate(zip(['a','b'],tokens))]}
+                            'accounts':[{'username':'journal_'+name,'uid':20001+index,'token':token} for index,(name,token) in enumerate(zip(account_names,tokens))]}
             populate(secret_volume,"import sys,shutil;from pathlib import Path;p=Path('/target/journal-gateway.json');p.write_bytes(sys.stdin.buffer.read());p.chmod(0o600);shutil.copyfile('/fixture/tls.crt','/target/ca.pem')",input=json.dumps(gateway_config).encode())
             gateway_name='journal-gateway-'+suffix;containers.append(gateway_name)
             docker('run','-d','--name',gateway_name,'--network',network,'--network-alias','gateway.test','-v',gateway_volume+':/var/lib/timekeeper-journal','-v',secret_volume+':/run/secrets:ro',GATEWAY_IMAGE)
@@ -130,15 +131,15 @@ def main():
             while client('id',check=False).returncode:
                 if time.monotonic()>deadline:raise RuntimeError('Clean journal client did not start')
                 time.sleep(.2)
-            def enroll(index,identity,profile_name,rotate=None):
+            def enroll(index,identity,profile_name,rotate=None,bidirectional=False,folder="/client/vault ' with spaces/Daily"):
                 client('ssh-keygen','-q','-t','ed25519','-N','','-f',identity)
                 public=client('cat',identity+'.pub').stdout.decode().strip();api=actors[index][1]
                 status,_=api.call('GET','/journal')
-                if not status['settings']['enabled']:api.call('PUT','/journal/settings',{'enabled':True,'currentPassword':password},match=status['settings']['etag'])
-                body={'label':'Clean client '+str(index),'publicKey':public,'currentPassword':password}
+                if not status['settings']['enabled'] or bidirectional and not status['settings']['bidirectional']:api.call('PUT','/journal/settings',{'enabled':True,'bidirectional':bidirectional or status['settings']['bidirectional'],'currentPassword':password},match=status['settings']['etag'])
+                body={'label':'Clean client '+str(index),'publicKey':public,'bidirectional':bidirectional,'currentPassword':password}
                 if rotate:body['rotateDeviceId']=rotate
                 device,_=api.call('POST','/journal/devices',body,status=201);public_profile,_=api.call('GET','/journal/devices/'+device['id']+'/profile');copy_client(profile_name,public_profile)
-                tool('configure',profile_name,'--folder',"/client/vault ' with spaces/Daily",'--identity',identity);tool('trust',profile_name,'--fingerprint',public_profile['hostKeyFingerprint'])
+                tool('configure',profile_name,'--folder',folder,'--identity',identity);tool('trust',profile_name,'--fingerprint',public_profile['hostKeyFingerprint'])
                 return device,public_profile
             python("from pathlib import Path;p=Path(\"/client/vault ' with spaces/Daily\");p.mkdir(parents=True);(p/'.obsidian').mkdir();(p/'.obsidian/private-config').write_text('UNRELATED_VAULT_CONFIGURATION');(p/'unrelated.md').write_text('UNRELATED_VAULT_FILE')")
             device,public_profile=enroll(0,"/client/identity ' with spaces",'profile-a.json')
@@ -171,6 +172,8 @@ def main():
                 return python(prefix+'a=c.ssh_arguments(d,i,t);'+('n=a.index("ClearAllForwardings=yes");del a[n-1:n+1];' if options else '')+'r=subprocess.run(a+'+repr(list(options))+'+["-l",'+repr(username)+' or d["username"],d["hostname"],'+repr(remote)+']);sys.exit(r.returncode)',check=False)
             def raw_sync(folder,options=(),destination='.',profile='profile-a.json'):
                 return python(client_module(profile)+'r=subprocess.run(["rsync","-r","--rsh",shlex.join(c.ssh_arguments(d,i,t))]+'+repr(list(options))+'+['+repr(folder+'/')+',d["username"]+"@"+d["hostname"]+":"+'+repr(destination)+']);sys.exit(r.returncode)',check=False)
+            def relogin(index):
+                api=Api(base,str(directory/'tls.crt'),origin);api.call('GET','/auth/status');api.call('POST','/auth/login',{'username':'journal-'+account_names[index],'password':password,'remember':False});actors[index]=(actors[index][0],api);return api
             for remote in ['id','sh','rsync --server --sender -r . .','rsync --daemon','rsync --server -r . ../../escape']:
                 assert ssh(remote).returncode,'Restricted SSH command was accepted'
             assert ssh('timekeeper-journal-test',username='journal_b').returncode,'Cross-account key was accepted'
@@ -193,6 +196,9 @@ def main():
             python(client_module().split('d,f,i,t=c.local_config')[0]+"p=pathlib.Path('/client/profile-a.json');_,t=c.paths(p);(t/'known_hosts').write_bytes((t/'original-pin').read_bytes());(t/'original-pin').unlink()")
             assert not tool('verify').returncode
             print('Real SSH command/forwarding/cross-account, malformed handoff, symlink, traversal and host mismatch denial: PASS',flush=True)
+            if args.bidirectional:
+                from journal_bidirectional_acceptance import run
+                run(api=actors[2][1],account_index=2,read_accounts=[(index,*actors[index]) for index in range(3,8)],admin=admin,relogin=relogin,password=password,python=python,tool=tool,enroll=enroll,ssh=ssh,client_module=client_module,docker=docker,app_name=app_name,gateway_name=gateway_name,client_name=client_name,background=background)
             # More than the pending-copy quota must work as bounded, settled
             # batches rather than failing because a sender outruns the worker.
             names=[(date(1990,1,1)+timedelta(days=index)).isoformat()+'.md' for index in range(501)]
@@ -275,7 +281,7 @@ def main():
             tool('verify','profile-b.json')
             print('Real in-flight private permissions, rotation/revocation, disabled sync/account and Unix account isolation: PASS',flush=True)
             image_id=docker('image','inspect',GATEWAY_IMAGE,'--format','{{.Id}}').stdout.decode().strip()
-            receipt=output/'acceptance.json';receipt.write_text(json.dumps({'passed':True,'distributionSha256':digest,'sourceCommit':manifest['commit'],'clientSha256':hashlib.sha256(client_script).hexdigest(),'gatewayImageId':image_id,'rsync':'3.5.1','realSsh':True,'realHttps':True,'pressureFiles':501,'inflightWithdrawal':True,'crashRestart':True})+'\n');receipt.chmod(0o600)
+            receipt=output/'acceptance.json';receipt.write_text(json.dumps({'passed':True,'distributionSha256':digest,'sourceCommit':manifest['commit'],'clientSha256':hashlib.sha256(client_script).hexdigest(),'gatewayImageId':image_id,'rsync':'3.5.1','realSsh':True,'realHttps':True,'pressureFiles':501,'inflightWithdrawal':True,'crashRestart':True,'bidirectional':args.bidirectional})+'\n');receipt.chmod(0o600)
         finally:
             for process in background:
                 if process.poll() is None:process.kill();process.communicate(timeout=5)

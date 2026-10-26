@@ -74,5 +74,27 @@ class ClientTest(unittest.TestCase):
         sizes=[]
         with patch.object(client,'rsync_version'),patch.object(client,'transfer',side_effect=lambda d,i,s,p,entries,errors:sizes.append(len(entries)+len(errors))):client.sync(self.args)
         self.assertEqual(1008,sum(sizes));self.assertLessEqual(max(sizes),100)
+    def bidirectional(self):
+        self.values.update({'format':2,'direction':'BIDIRECTIONAL','exchangeProtocol':1,'uploadPrefix':'incoming/','downloadPrefix':'outgoing/','maxExchangeFiles':50});self.write_profile()
+    def test_bidirectional_profile_grants_are_explicit_and_state_cannot_live_in_daily(self):
+        self.bidirectional();self.configure();self.assertEqual('BIDIRECTIONAL',client.profile(self.profile)['direction'])
+        for field,value in [('uploadPrefix','../'),('downloadPrefix','/etc/'),('maxExchangeFiles',100),('exchangeProtocol',True),('format',True),('direction','CLIENT_TO_SERVER')]:
+            previous=self.values[field];self.values[field]=value;self.write_profile()
+            with self.subTest(field=field),self.assertRaises(client.Failure):client.profile(self.profile)
+            self.values[field]=previous
+        self.write_profile();self.profile=self.notes/'profile.json';self.write_profile();self.args.profile=self.profile
+        with self.assertRaises(client.Failure):client.configure(self.args)
+    def test_explicit_recovery_copies_never_replace_notes_and_disposal_keeps_the_common_base(self):
+        self.bidirectional();self.configure();name='2026-10-25.md';path=self.notes/name;path.write_bytes(b'Original')
+        offer={'id':str(uuid.uuid4()),'token':str(uuid.uuid4()),'filename':name,'sequence':1,'state':'OFFERED','parentToken':'','expectedExists':True,'expectedHash':client.Replica.content_hash(b'Original'),'targetExists':True,'targetHash':client.Replica.content_hash(b'Calendar')}
+        _,state=client.paths(self.profile)
+        with client.Replica(state,self.notes,self.values['deviceId']) as replica:replica.apply(offer,b'Calendar');replica.acknowledged(offer)
+        self.args.command='recover';self.args.id=offer['id'];self.args.variant='original';self.args.output=self.root/'review.md';client.recovery(self.args)
+        self.assertEqual(b'Original',self.args.output.read_bytes());self.assertEqual(0o600,self.args.output.stat().st_mode&0o777);self.assertEqual(b'Calendar',path.read_bytes())
+        with self.assertRaises(OSError):client.recovery(self.args)
+        self.args.output=self.notes/'review.md'
+        with self.assertRaises(client.Failure):client.recovery(self.args)
+        self.args.command='discard-recovery';client.recovery(self.args)
+        with client.Replica(state,self.notes,self.values['deviceId']) as replica:self.assertFalse(replica.recoveries());self.assertEqual(offer['token'],replica.bases()[name]['token']);self.assertEqual(b'Calendar',path.read_bytes())
 
 if __name__=='__main__':unittest.main()
