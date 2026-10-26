@@ -18020,11 +18020,11 @@
           },
           "bidirectional": {
             "type": "boolean",
-            "description": "Explicitly enable bidirectional exchanges; existing device keys remain write-only unless registered with this capability."
+            "default": true,
+            "description": "New clients use two-way synchronization by default, enabling synchronization for this account. Explicit false preserves the legacy upload-only scope; existing keys keep their permissions."
           }
         },
         "required": [
-          "currentPassword",
           "label",
           "publicKey"
         ]
