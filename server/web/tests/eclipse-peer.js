@@ -5,7 +5,7 @@ import {chromium, expect, request} from '@playwright/test';
 import {createInterface} from 'node:readline';
 import {writeFile} from 'node:fs/promises';
 import {durationText} from '../src/model.js';
-import {setTimeZone,expandProjectClient} from './navigation.js';
+import {openLabelSettings,setTimeZone,expandProjectClient} from './navigation.js';
 import {openTaskHistory,clearTaskHistory} from './task-history.js';
 
 const browser = await chromium.launch();
@@ -13,7 +13,11 @@ const page = await browser.newPage({baseURL: process.env.TIMEKEEPER_WEB_URL});
 page.setDefaultTimeout(15000);
 const record = {};
 const apiRequest=await request.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,ignoreHTTPSErrors:true});
-async function tab(name) { await page.getByRole('button', {name, exact:true}).click(); }
+async function tab(name) {
+  if(name==='Labels'){await openLabelSettings(page);return;}
+  if(await page.locator('#account-page').isVisible())await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();
+  await page.getByRole('button', {name, exact:true}).click();
+}
 async function api(method,path,data,headers={}) {
   const reply=await apiRequest.fetch('/api/v1'+path,{method,data,headers:{Authorization:`Bearer ${process.env.TIMEKEEPER_WEB_TOKEN}`,...headers}});
   expect(reply.ok()).toBe(true);return reply;

@@ -473,7 +473,7 @@ async function openRecord(collection, id = null, initial = {}, caption = null) {
     catch(error){if(error.status===401)throw error;}
     if(session!==api||!connected)return;
   }
-  if (!begin(caption || i18nText(`record.${id?'edit':'new'}.${collection}`), { collection, id, etag: loaded.etag, deletionLabel: value.summary })) return;
+  if (!begin(caption || i18nText(`record.${id?'edit':'new'}.${collection}`), { collection, id, etag: loaded.etag, deletionLabel: value.summary, legacyLabelIds: collection === 'work-sessions' && !id && Array.isArray(value.labelIds) ? [...value.labelIds] : undefined })) return;
   if (['clients', 'projects', 'labels'].includes(collection)) field(i18nText("ui.name"), 'name', value.name, { required: true, max: 1000 });
   if (collection === 'clients') field(i18nText("ui.color"), 'color', value.color || '#2563eb', { type: 'color', required: true });
   if (collection === 'projects') {clientField(value.clientId);$('fields').append(createProjectIconPicker(value.icon));}
@@ -595,7 +595,7 @@ function values() {
     case 'labels':return { name: get('name'), color: get('color') || null };
     case 'tasks':return { summary: get('summary'), projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null };
     case 'activities':return { ...(editor.id ? {} : { taskId: get('taskId') || null, projectId: get('taskId') ? null : get('projectId') || null }), summary: get('summary'), start: localDateTimeToInstant(get('start'), editor.zone), end: get('end') ? localDateTimeToInstant(get('end'), editor.zone) : null, labelIds: labels() };
-    case 'work-sessions':return { clientId: get('clientId'), projectId: get('projectId') || null, summary: get('summary'), start: localDateTimeToInstant(time('start'), editor.zone), end: time('end') ? localDateTimeToInstant(time('end'), editor.zone) : null };
+    case 'work-sessions':return { ...(editor.legacyLabelIds?.length ? { labelIds: [...editor.legacyLabelIds] } : {}), clientId: get('clientId'), projectId: get('projectId') || null, summary: get('summary'), start: localDateTimeToInstant(time('start'), editor.zone), end: time('end') ? localDateTimeToInstant(time('end'), editor.zone) : null };
   }
 }
 function freeze(state) {

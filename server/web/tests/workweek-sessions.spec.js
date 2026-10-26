@@ -144,7 +144,7 @@ test('compact Workweek cells group sessions and edit exact endpoints without cha
     // Every compact clock must fit its field even at the table's minimum width.
     for(const input of await page.locator('#week-sessions input').all())expect(await input.evaluate(node=>{const style=getComputedStyle(node),canvas=document.createElement('canvas'),context=canvas.getContext('2d');context.font=style.font;return context.measureText(node.value).width+parseFloat(style.paddingLeft)+parseFloat(style.paddingRight)<=node.clientWidth;})).toBe(true);
     await captureScreenshot(page,{path:'test-results/compact-workweek-mobile.png',fullPage:true});
-    const details=await workSessionDetails(page,first.id);await expect(details).toContainText('Morning planning');await expect(details).toContainText(label.name);await expect(details).toContainText(project.name);
+    const details=await workSessionDetails(page,first.id);await expect(details).toContainText('Morning planning');await expect(details).not.toContainText(label.name);await expect(details).toContainText(project.name);
   } finally {await context.close();await f.close();}
 });
 test('Workweek inline edits keep stale and uncertain proposals without overwriting or repeating writes',async({page,request})=>{
