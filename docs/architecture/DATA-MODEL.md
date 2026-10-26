@@ -437,7 +437,7 @@ their JSON payloads and are validated within owner-scoped server transactions.
 
 | `entity_type` | Identity and purpose |
 | --- | --- |
-| `DAY_NOTE` | One deterministic UUID per civil `YYYY-MM-DD` date and owner. Stores `date`, a canonical complete UTF-8 `markdown` document, derived short `text` label and Markdown `body`, and an optimistic `version`. A note is independent of activities and work sessions. An untouched date has no row and reads as version zero. |
+| `DAY_NOTE` | One deterministic UUID per civil `YYYY-MM-DD` date and owner. Stores `date`, a canonical complete UTF-8 `markdown` document, derived short `text` label and Markdown `body`, an internal `modifiedAt` timestamp, and an optimistic `version`. A note is independent of activities and work sessions. An untouched date has no row and reads as version zero. |
 | `JOURNAL_DELETE` | Date-keyed deletion marker with the `DAY_NOTE` version it applies to. Deleting keeps an empty, versioned note row so stale editors cannot recreate it with an old ETag. |
 | `JOURNAL_CFG` | One fixed-ID settings row per owner: enabled/bidirectional state and an epoch that invalidates earlier authorization. |
 | `JOURNAL_DEVICE` | Enrolled device ID, label, public SSH key/fingerprint, direction permission, revocation state, sequence and sync timestamps. Private SSH keys stay on the client. |

@@ -2,6 +2,7 @@ package net.resheim.timekeeper.server;
 
 import static net.resheim.timekeeper.server.JsonValues.*;
 import java.time.LocalDate;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -32,7 +33,21 @@ final class DayNotes {
         return value.put("hasBody",!value.path("body").asText().isEmpty());
     }
     ObjectNode get(LocalDate date){
-        var value=record(date);value.remove("markdown");return value;
+        return publicValue(record(date));
+    }
+    Instant modifiedAt(LocalDate date){
+        var value=record(date);
+        return value.hasNonNull("modifiedAt")?Instant.parse(value.path("modifiedAt").asText()):Instant.EPOCH;
+    }
+    List<LocalDate> presentDates(){
+        var deleted=new HashMap<UUID,Long>();
+        for(var marker:store.list(JournalState.Kind.JOURNAL_DELETE.name()))deleted.put(uuid(marker.path("id")),marker.path("noteVersion").asLong());
+        var dates=new ArrayList<LocalDate>();
+        for(var value:store.list(TYPE)){
+            if(value.path("version").asLong()>0&&!(deleted.getOrDefault(uuid(value.path("id")),-1L)==value.path("version").asLong()&&!hasContent(value)))
+                dates.add(date(value.path("date").asText()));
+        }
+        return dates;
     }
     /** Complete document for an existing note, including legacy read-time reconstruction. */
     byte[] document(LocalDate date){
@@ -49,7 +64,7 @@ final class DayNotes {
         long days=ChronoUnit.DAYS.between(first,last);if(days<0 || days>=62)throw ApiFailure.validation();
         var result=object().put("revision",store.revision());var items=result.putArray("items");
         for(var value:store.list(TYPE,id(first),id(last)))if(hasContent(value)){
-            var summary=((ObjectNode)value).deepCopy();summary.remove(List.of("body","markdown"));summary.put("hasBody",!value.path("body").asText().isEmpty());items.add(summary);
+            var summary=((ObjectNode)value).deepCopy();summary.remove(List.of("body","markdown","modifiedAt"));summary.put("hasBody",!value.path("body").asText().isEmpty());items.add(summary);
         }
         return result;
     }
@@ -89,11 +104,11 @@ final class DayNotes {
         return persist(date,previous,text,body,markdown,deleted);
     }
     private static ObjectNode publicValue(ObjectNode value){
-        var result=value.deepCopy();result.remove("markdown");return result;
+        var result=value.deepCopy();result.remove(List.of("markdown","modifiedAt"));return result;
     }
     private ObjectNode persist(LocalDate date,ObjectNode previous,String text,String body,String markdown,boolean deleted){
         long version=previous.path("version").asLong();if(version>=9007199254740991L)throw ApiFailure.conflict();
-        var value=previous.deepCopy().put("version",version+1).put("text",text).put("body",body).put("markdown",markdown).put("hasBody",!body.isEmpty()).put("deleted",deleted);
+        var value=previous.deepCopy().put("version",version+1).put("text",text).put("body",body).put("markdown",markdown).put("modifiedAt",store.now().toString()).put("hasBody",!body.isEmpty()).put("deleted",deleted);
         var stored=value.deepCopy();stored.remove(List.of("hasBody","deleted"));
         if(version==0)store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,1,?)",store.owner(),TYPE,id(date),stored.toString());
         else if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,stored.toString(),store.owner(),TYPE,id(date),version)!=1)throw new ApiFailure(412,"STALE_VERSION");
