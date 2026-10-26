@@ -370,6 +370,9 @@ require the corresponding work-session file.
 The server's portable domain-v3 JSON and CSV formats include clients, projects,
 tasks, labels, activities and independent work sessions. They preserve mandatory
 project/session client links and session summaries, and remap identifiers on import.
+The account ZIP archive also includes active day labels and Markdown bodies;
+journal synchronization state and deletion tombstones are not portable account
+records.
 Imports also accept v1/v2 snapshots, assign their projects and sessions to the
 General client, and ignore retired activity/session links. Native table CSV and
 portable server CSV are distinct formats; see the
@@ -421,3 +424,43 @@ erDiagram
 This diagram shows client ownership links. Activities are not children of work
 sessions; session reports find overlapping activities within the same account.
 The time-overlap calculation does not create a persistent association.
+
+## Server day notes and journal synchronization
+
+The server has a separate physical schema from embedded Eclipse storage
+(`ServerSchema.CURRENT` is 6). Day notes and journal synchronization reuse
+`tk_resource(owner_id, entity_type, id, version, payload)` in both H2 and
+PostgreSQL. Its primary key is `(owner_id, entity_type, id)`; `payload` is JSON.
+These are logical row types, not extra SQL tables or Eclipse JPA entities.
+`owner_id` references `tk_owner`; links between the row types below are IDs in
+their JSON payloads and are validated within owner-scoped server transactions.
+
+| `entity_type` | Identity and purpose |
+| --- | --- |
+| `DAY_NOTE` | One deterministic UUID per civil `YYYY-MM-DD` date and owner. Stores `date`, the short `text` label, exact UTF-8 Markdown `body`, and an optimistic `version`. A note is independent of activities and work sessions. An untouched date has no row and reads as version zero. |
+| `JOURNAL_DELETE` | Date-keyed deletion marker with the `DAY_NOTE` version it applies to. Deleting keeps an empty, versioned note row so stale editors cannot recreate it with an old ETag. |
+| `JOURNAL_CFG` | One fixed-ID settings row per owner: enabled/bidirectional state and an epoch that invalidates earlier authorization. |
+| `JOURNAL_DEVICE` | Enrolled device ID, label, public SSH key/fingerprint, direction permission, revocation state, sequence and sync timestamps. Private SSH keys stay on the client. |
+| `JOURNAL_LEASE` | Transport authorization and state for an in-progress or completed gateway exchange, bound to a device. |
+| `JOURNAL_BATCH` and `JOURNAL_ITEM` | Sealed import/exchange batches and per-file results, including sequence, filename, processing state and conflict/error metadata. |
+| `JOURNAL_SOURCE` | Temporary private candidate bytes for an item or offer, stored base64 in the payload until processing, acknowledgement or explicit discard. |
+| `JOURNAL_FILE` | One-way import baseline per device and filename: accepted sequence, source hash and note version. |
+| `JOURNAL_COMMON` | Bidirectional common base per device and filename. It records the acknowledged token, sequence, file hash/existence, remote note version/deletion state and retry receipt. It advances only after acknowledgement. |
+| `JOURNAL_OFFER` | Bidirectional proposed per-file exchange, conditional parent token, target hash/version, authorization epochs, state and acknowledgement/conflict information. |
+| `JOURNAL_DOCUMENT` | Original Markdown file bytes and hash per filename, retained to preserve frontmatter and formatting not represented by the note's label/body fields. |
+| `JOURNAL_AUDIT` | Account-scoped device and synchronization security events, without note content. |
+
+`DAY_NOTE` writes use conditional versions and publish a content-free profile
+invalidation through `tk_change`. Calendar range reads return only the label
+and `hasBody`, not the Markdown body. Active notes are included in account
+archives; empty deletion markers, device credentials and synchronization
+baselines are not. The gateway's private incoming spool and the client's local
+file/state directory are filesystem storage outside this SQL model.
+
+The note bodies, original Markdown documents and pending source bytes are
+readable to the server; base64 is an encoding, not encryption. Protect their
+database, spool, temporary files, backups and exports as described in
+[journal storage protection](../operations/JOURNAL-STORAGE.md). See the
+[day-note API](API-V1.md#private-day-labels-and-markdown-bodies) and
+[journal synchronization guide](../operations/JOURNAL-SYNC.md) for write,
+conflict and authorization behavior.
