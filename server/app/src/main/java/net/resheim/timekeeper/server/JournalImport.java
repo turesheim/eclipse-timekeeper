@@ -30,12 +30,15 @@ final class JournalImport {
             if(!existing.get().path("fingerprint").asText().equals(fingerprint))throw ApiFailure.conflict();
             return existing.get();
         }
-        if(state.list(JOURNAL_ITEM).stream().filter(item->item.has("source")).count()+files.size()>RETAINED_CANDIDATES)throw new ApiFailure(409,"JOURNAL_PENDING_LIMIT");
+        if(state.list(JOURNAL_ITEM).stream().filter(item->item.has("sourceId")).count()+state.list(JOURNAL_OFFER).stream().filter(item->item.has("sourceId")).count()+files.size()>RETAINED_CANDIDATES)throw new ApiFailure(409,"JOURNAL_PENDING_LIMIT");
         var value=state.insert(JOURNAL_BATCH,batch,object().put("deviceId",device.toString()).put("sequence",sequence)
                 .put("fingerprint",fingerprint).put("state",files.isEmpty()?"PROCESSED":"PENDING").put("receivedAt",store.now().toString()).put("files",files.size()));
-        for(var file:files.entrySet())state.insert(JOURNAL_ITEM,itemId(batch,file.getKey()),object().put("batchId",batch.toString()).put("deviceId",device.toString())
-                .put("sequence",sequence).put("filename",file.getKey()).put("hash",manifest.path(file.getKey()).asText()).put("state","PENDING")
-                .put("source",Base64.getEncoder().encodeToString(file.getValue())));
+        for(var file:files.entrySet()){
+            UUID id=itemId(batch,file.getKey());
+            state.insert(JOURNAL_SOURCE,id,object().put("data",Base64.getEncoder().encodeToString(file.getValue())));
+            state.insert(JOURNAL_ITEM,id,object().put("batchId",batch.toString()).put("deviceId",device.toString())
+                    .put("sequence",sequence).put("filename",file.getKey()).put("hash",manifest.path(file.getKey()).asText()).put("state","PENDING").put("sourceId",id.toString()));
+        }
         return value;
     }
     List<UUID> pending(){return state.list(JOURNAL_ITEM).stream().filter(item->item.path("state").asText().equals("PENDING")).map(item->uuid(item.get("id"))).toList();}
@@ -45,9 +48,10 @@ final class JournalImport {
         var item=state.required(JOURNAL_ITEM,id);if(!item.path("state").asText().equals("PENDING"))return summary(item);
         UUID device=uuid(item.get("deviceId"));String filename=item.path("filename").asText();long sequence=item.path("sequence").asLong();
         var baseline=state.find(JOURNAL_FILE,baselineId(device,filename)).orElse(null);
+        if(state.list(JOURNAL_ITEM).stream().anyMatch(other->other.path("deviceId").asText().equals(device.toString())&&other.path("filename").asText().equals(filename)&&other.path("sequence").asLong()>sequence))return finish(item,"SUPERSEDED",null,true);
         if(baseline!=null&&sequence<=baseline.path("sequence").asLong())return finish(item,"SUPERSEDED",null,true);
         final JournalMarkdown.Note note;
-        try{note=JournalMarkdown.parse(filename,Base64.getDecoder().decode(item.path("source").asText()));}
+        try{note=JournalMarkdown.parse(filename,source(item));}
         catch(JournalMarkdown.Invalid failure){return finish(item,"ERROR",failure.code,true);}
         var current=new DayNotes(store).get(note.date());
         boolean identical=current.path("text").asText().equals(note.label())&&current.path("body").asText().equals(note.body());
@@ -68,11 +72,15 @@ final class JournalImport {
         value.put("sequence",sequence).put("hash",hash).put("noteVersion",noteVersion);
         if(baseline==null)state.insert(JOURNAL_FILE,baselineId(device,filename),value);else state.update(JOURNAL_FILE,value);
     }
+    void localErrors(UUID batch,UUID device,long sequence,com.fasterxml.jackson.databind.JsonNode errors){
+        for(var error:errors)state.insert(JOURNAL_ITEM,itemId(batch,error.path("name").asText()),object().put("batchId",batch.toString()).put("deviceId",device.toString())
+                .put("sequence",sequence).put("filename",error.path("name").asText()).put("state","ERROR").put("error",error.path("code").asText()).put("processedAt",store.now().toString()));
+    }
     ObjectNode candidate(UUID id){
         var item=state.required(JOURNAL_ITEM,id);if(!item.path("state").asText().equals("CONFLICT"))throw ApiFailure.conflict();
-        var note=JournalMarkdown.parse(item.path("filename").asText(),Base64.getDecoder().decode(item.path("source").asText()));
+        var note=JournalMarkdown.parse(item.path("filename").asText(),source(item));
         var result=summary(item);result.put("text",note.label()).put("body",note.body());
-        result.set("current",new DayNotes(store).get(note.date()));return result;
+        var current=new DayNotes(store).get(note.date());result.set("current",current);result.put("currentEtag",etag(current));return result;
     }
     /** Explicit resolution is conditional on both the candidate and current calendar version. */
     ObjectNode resolve(UUID id,String candidateMatch,String noteMatch,boolean incoming){
@@ -83,7 +91,7 @@ final class JournalImport {
         if(baseline!=null&&sequence<=baseline.path("sequence").asLong())throw new ApiFailure(409,"JOURNAL_SUPERSEDED");
         // A newer completed candidate also takes precedence, even while it is pending/conflicting.
         if(state.list(JOURNAL_ITEM).stream().anyMatch(other->other.path("deviceId").asText().equals(device.toString())&&other.path("filename").asText().equals(filename)&&other.path("sequence").asLong()>sequence))throw new ApiFailure(409,"JOURNAL_SUPERSEDED");
-        var note=JournalMarkdown.parse(filename,Base64.getDecoder().decode(item.path("source").asText()));
+        var note=JournalMarkdown.parse(filename,source(item));
         var current=new DayNotes(store).get(note.date());ApiReplies.match(current,noteMatch);
         if(incoming)current=new DayNotes(store).save(note.date(),noteMatch,object().put("text",note.label()).put("body",note.body()));
         accepted(device,filename,sequence,note.hash(),current.path("version").asLong(),baseline);
@@ -91,7 +99,10 @@ final class JournalImport {
     }
     private ObjectNode finish(ObjectNode item,String status,String error,boolean discard){
         item.put("state",status).put("processedAt",store.now().toString());if(error!=null)item.put("error",error);else item.remove("error");
-        if(discard)item.remove("source");item=state.update(JOURNAL_ITEM,item);
+        if(discard&&item.has("sourceId")){
+            state.remove(JOURNAL_SOURCE,state.required(JOURNAL_SOURCE,uuid(item.get("sourceId"))));item.remove("sourceId");
+        }
+        item=state.update(JOURNAL_ITEM,item);
         var batch=state.required(JOURNAL_BATCH,uuid(item.get("batchId")));
         String batchId=item.path("batchId").asText();
         boolean pending=state.list(JOURNAL_ITEM).stream().anyMatch(other->other.path("batchId").asText().equals(batchId)&&other.path("state").asText().equals("PENDING"));
@@ -101,4 +112,7 @@ final class JournalImport {
     static ObjectNode summary(ObjectNode item){
         var result=object().put("candidateEtag",etag(item));for(String field:List.of("id","version","batchId","deviceId","filename","state","error","processedAt"))if(item.has(field))result.set(field,item.get(field));return result;
     }
+    byte[] download(UUID id){var item=state.required(JOURNAL_ITEM,id);if(!item.has("sourceId"))throw ApiFailure.notFound();return source(item);}
+    ObjectNode discard(UUID id,String match){var item=state.required(JOURNAL_ITEM,id);ApiReplies.match(item,match);if(!item.has("sourceId")||item.path("state").asText().equals("PENDING"))throw ApiFailure.conflict();return finish(item,"DISCARDED",null,true);}
+    private byte[] source(ObjectNode item){return Base64.getDecoder().decode(state.required(JOURNAL_SOURCE,uuid(item.get("sourceId"))).path("data").asText());}
 }

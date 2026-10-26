@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import java.lang.reflect.Field;
 import java.time.Instant;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.FutureTask;
@@ -64,9 +65,11 @@ public class IdleClientTest {
 		var task = service.createTask(new CreateTask(Optional.empty(), "Native idle return", Optional.empty()));
 		var label = service.createLabel(new CreateLabel("Idle client label", Optional.empty()));
 		Instant start = Instant.now().minusSeconds(1200);
-		Instant lastActive = start.plusSeconds(600);
 		var activity = service.createActivity(new CreateActivity(task.id(), OwnerId.LOCAL, start, Optional.empty(),
 				"Preserve idle summary", Set.of(label.id())));
+		// Creation can return today's part when the requested interval crosses
+		// midnight. Keep the idle sample inside that actual active interval.
+		Instant lastActive = activity.start().plus(Duration.between(activity.start(), Instant.now()).dividedBy(2));
 		var handler = TimekeeperUiPlugin.class.getDeclaredMethod("handleReactivation", long.class);
 		handler.setAccessible(true);
 		Field idle = field("lastIdleTimeMillis");

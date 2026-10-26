@@ -9030,7 +9030,7 @@
       },
       "delete": {
         "operationId": "deleteDayNote",
-        "summary": "Clear both label and body, retaining the version tombstone",
+        "summary": "Delete the note, retaining its versioned deletion marker",
         "x-required-permission": "write",
         "responses": {
           "400": {
@@ -9087,7 +9087,832 @@
           {
             "$ref": "#/components/parameters/Csrf"
           }
+        ],
+        "description": "Retain a versioned tombstone distinct from clearing content. Repeated deletion with its current ETag is a no-op; a later conditional save deliberately restores the note."
+      }
+    },
+    "/journal": {
+      "get": {
+        "operationId": "journalStatus",
+        "summary": "Read private journal setup, devices and content-free import health",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/journal/settings": {
+      "put": {
+        "operationId": "journalSettings",
+        "summary": "Enable or disable synchronization with fresh account password proof",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JournalSettingsInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "browserSession": []
+          }
         ]
+      }
+    },
+    "/journal/devices": {
+      "post": {
+        "operationId": "enrollJournalDevice",
+        "summary": "Enroll a public SSH key or atomically rotate an active device; private keys are rejected",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalDevice"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JournalDeviceInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "browserSession": []
+          }
+        ]
+      }
+    },
+    "/journal/devices/{id}/revoke": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "revokeJournalDevice",
+        "summary": "Revoke a journal device with fresh account password proof",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalDevice"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JournalProofInput"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "browserSession": []
+          }
+        ]
+      }
+    },
+    "/journal/devices/{id}/profile": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "journalDeviceProfile",
+        "summary": "Download public SSH connection configuration with pinned host key",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/journal/items/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "journalCandidate",
+        "summary": "Review a conflict and the current database version",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalCandidate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/journal/items/{id}/source": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "journalCandidateSource",
+        "summary": "Download an owned original pending or conflict copy without internal metadata",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/journal/items/{id}/resolve": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "resolveJournalConflict",
+        "summary": "Resolve a conflict conditionally against candidate and calendar versions",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JournalResolutionInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/journal/items/{id}/discard": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "discardJournalCandidate",
+        "summary": "Discard an external conflict or aborted copy without deleting the database note",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/journal/rescan": {
+      "post": {
+        "operationId": "rescanJournal",
+        "summary": "Retry completed pending imports and refresh private synchronization health",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/journal/items/{id}/calendar-source": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "journalCalendarSource",
+        "summary": "Download the private Calendar snapshot preserved with a bidirectional conflict",
+        "x-required-permission": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
       }
     }
   },
@@ -17024,6 +17849,11 @@
           "hasBody": {
             "type": "boolean",
             "description": "Whether the Markdown body contains any bytes, including whitespace."
+          },
+          "deleted": {
+            "type": "boolean",
+            "readOnly": true,
+            "description": "Versioned deletion marker. Clearing label/body leaves this false; DELETE sets it true. A deliberate save restores the note, including an explicitly empty file. Never-seen dates have version zero and deleted false."
           }
         }
       },
@@ -17079,6 +17909,11 @@
           "hasBody": {
             "type": "boolean",
             "description": "Whether the Markdown body contains any bytes, including whitespace."
+          },
+          "deleted": {
+            "type": "boolean",
+            "readOnly": true,
+            "description": "Versioned deletion marker. Clearing label/body leaves this false; DELETE sets it true. A deliberate save restores the note, including an explicitly empty file. Never-seen dates have version zero and deleted false."
           }
         },
         "description": "Private calendar metadata only. Fetch /day-notes/{date} with its ETag to read or change the complete note."
@@ -17125,6 +17960,669 @@
               }
             }
           }
+        ]
+      },
+      "JournalProofInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "currentPassword"
+        ]
+      },
+      "JournalSettingsInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "bidirectional": {
+            "type": "boolean",
+            "description": "Explicitly enable bidirectional exchanges; existing device keys remain write-only unless registered with this capability."
+          }
+        },
+        "required": [
+          "currentPassword",
+          "enabled"
+        ]
+      },
+      "JournalDeviceInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1
+          },
+          "publicKey": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1
+          },
+          "rotateDeviceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bidirectional": {
+            "type": "boolean",
+            "description": "Explicitly enable bidirectional exchanges; existing device keys remain write-only unless registered with this capability."
+          }
+        },
+        "required": [
+          "currentPassword",
+          "label",
+          "publicKey"
+        ]
+      },
+      "JournalResolutionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "INCOMING",
+              "CALENDAR"
+            ]
+          },
+          "currentEtag": {
+            "type": "string",
+            "maxLength": 130
+          }
+        },
+        "required": [
+          "action",
+          "currentEtag"
+        ]
+      },
+      "JournalDevice": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "fingerprint": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "revoked": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revokedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastVerifiedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastTransferAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastImportAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "bidirectional": {
+            "type": "boolean",
+            "readOnly": true,
+            "description": "Explicit permission for prepared outbound journal exchanges. Existing write-only devices default to false."
+          },
+          "lastSyncAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "label",
+          "fingerprint",
+          "revoked",
+          "createdAt"
+        ]
+      },
+      "JournalItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "candidateEtag": {
+            "type": "string",
+            "maxLength": 130
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "batchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deviceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 13,
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}\\.md$"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "CONFLICT",
+              "ERROR",
+              "ABORTED",
+              "IMPORTED",
+              "UNCHANGED",
+              "SUPERSEDED",
+              "KEPT_CALENDAR",
+              "DISCARDED",
+              "OFFERED",
+              "ACKNOWLEDGED"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "processedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "canDownload": {
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "BIDIRECTIONAL"
+          },
+          "canDiscard": {
+            "type": "boolean"
+          },
+          "canDownloadCalendar": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "candidateEtag",
+          "id",
+          "version",
+          "batchId",
+          "deviceId",
+          "filename",
+          "state"
+        ]
+      },
+      "JournalCandidate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "candidateEtag": {
+            "type": "string",
+            "maxLength": 130
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "batchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deviceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 13,
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}\\.md$"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "CONFLICT",
+              "ERROR",
+              "ABORTED",
+              "IMPORTED",
+              "UNCHANGED",
+              "SUPERSEDED",
+              "KEPT_CALENDAR",
+              "DISCARDED",
+              "OFFERED",
+              "ACKNOWLEDGED"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "processedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "canDownload": {
+            "type": "boolean"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 200000
+          },
+          "current": {
+            "$ref": "#/components/schemas/DayNote"
+          },
+          "currentEtag": {
+            "type": "string",
+            "maxLength": 130
+          },
+          "kind": {
+            "const": "BIDIRECTIONAL"
+          },
+          "canDiscard": {
+            "type": "boolean"
+          },
+          "canDownloadCalendar": {
+            "type": "boolean"
+          },
+          "incomingExists": {
+            "type": "boolean"
+          },
+          "incoming": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "exists": {
+                "type": "boolean"
+              },
+              "deleted": {
+                "type": "boolean"
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 200000
+              }
+            },
+            "required": [
+              "exists",
+              "deleted"
+            ]
+          },
+          "remote": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "exists": {
+                "type": "boolean"
+              },
+              "deleted": {
+                "type": "boolean"
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 200000
+              }
+            },
+            "required": [
+              "exists",
+              "deleted"
+            ]
+          }
+        },
+        "required": [
+          "candidateEtag",
+          "id",
+          "version",
+          "batchId",
+          "deviceId",
+          "filename",
+          "state",
+          "text",
+          "body",
+          "current",
+          "currentEtag"
+        ]
+      },
+      "JournalProfile": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "enum": [
+              1,
+              2
+            ]
+          },
+          "mechanism": {
+            "const": "RSYNC_SSH"
+          },
+          "direction": {
+            "enum": [
+              "CLIENT_TO_SERVER",
+              "BIDIRECTIONAL"
+            ]
+          },
+          "deviceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "minimumRsyncVersion": {
+            "const": "3.5.1"
+          },
+          "hostname": {
+            "type": "string",
+            "maxLength": 253
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "username": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "remotePath": {
+            "const": "."
+          },
+          "hostKey": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "hostKeyFingerprint": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "hostAlias": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "knownHostsEntry": {
+            "type": "string",
+            "maxLength": 1200
+          },
+          "localFolder": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "identityFile": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "exchangeProtocol": {
+            "const": 1
+          },
+          "uploadPrefix": {
+            "const": "incoming/"
+          },
+          "downloadPrefix": {
+            "const": "outgoing/"
+          },
+          "maxExchangeFiles": {
+            "const": 50
+          }
+        },
+        "required": [
+          "format",
+          "mechanism",
+          "direction",
+          "deviceId",
+          "minimumRsyncVersion",
+          "hostname",
+          "port",
+          "username",
+          "remotePath",
+          "hostKey",
+          "hostKeyFingerprint",
+          "hostAlias",
+          "knownHostsEntry",
+          "localFolder",
+          "identityFile"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": 2
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "direction": {
+                  "const": "BIDIRECTIONAL"
+                }
+              },
+              "required": [
+                "exchangeProtocol",
+                "uploadPrefix",
+                "downloadPrefix",
+                "maxExchangeFiles"
+              ]
+            },
+            "else": {
+              "properties": {
+                "direction": {
+                  "const": "CLIENT_TO_SERVER"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "JournalStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mechanism": {
+            "const": "RSYNC_SSH"
+          },
+          "direction": {
+            "enum": [
+              "CLIENT_TO_SERVER",
+              "BIDIRECTIONAL"
+            ]
+          },
+          "canManage": {
+            "type": "boolean"
+          },
+          "settings": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "etag": {
+                "type": "string",
+                "maxLength": 130
+              },
+              "bidirectional": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "enabled",
+              "etag"
+            ]
+          },
+          "deployment": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "ready": {
+                "type": "boolean"
+              },
+              "code": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "hostname": {
+                "type": "string",
+                "maxLength": 253
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "username": {
+                "type": "string",
+                "maxLength": 32
+              },
+              "remotePath": {
+                "const": "."
+              },
+              "hostKey": {
+                "type": "string",
+                "maxLength": 1024
+              },
+              "hostKeyFingerprint": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "hostAlias": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "knownHostsEntry": {
+                "type": "string",
+                "maxLength": 1200
+              }
+            },
+            "required": [
+              "ready"
+            ]
+          },
+          "devices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JournalDevice"
+            },
+            "maxItems": 1000
+          },
+          "health": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "pending": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "conflicts": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "errors": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "aborted": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "receiving": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "lastVerifiedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "lastTransferAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "lastImportAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "outgoing": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "lastSyncAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "pending",
+              "conflicts",
+              "errors",
+              "aborted",
+              "receiving"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JournalItem"
+            },
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "mechanism",
+          "direction",
+          "canManage",
+          "settings",
+          "deployment",
+          "devices",
+          "health",
+          "items"
         ]
       }
     },

@@ -375,3 +375,11 @@ button.track-client-day:disabled { opacity: .65; }
 .app-header .status-refresh { min-width: 0; }
 .app-header #status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 575px) { .app-header #owner { display: none; } }
+/* Local journal setup and private, inert conflict previews. */
+.journal-sync-command { white-space: pre-wrap; overflow-wrap: anywhere; }
+.journal-sync-preview { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 18rem; overflow: auto; }
+.journal-account code { color: inherit; overflow-wrap: anywhere; }
+.journal-sync-facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .5rem 1rem; }
+.journal-sync-facts :is(dt, dd) { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.journal-sync-facts dt { font-weight: 500; }
+.journal-account details > summary { cursor: pointer; margin-block-end: 1rem; }

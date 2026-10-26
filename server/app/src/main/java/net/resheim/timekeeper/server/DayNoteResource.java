@@ -28,6 +28,6 @@ public class DayNoteResource {
     }
     @DELETE @Path("/{date}") public Response delete(@PathParam("date")String date,@HeaderParam("If-Match")String match){
         ContractInputs.queries(uri.getQueryParameters());var day=DayNotes.date(date);
-        return tx(()->{var value=new DayNotes(store).save(day,match,JsonValues.object().put("text","").put("body",""));return new ApiReplies(204,null,JsonValues.etag(value),null);});
+        return tx(()->{var value=new DayNotes(store).delete(day,match);return new ApiReplies(204,null,JsonValues.etag(value),null);});
     }
 }

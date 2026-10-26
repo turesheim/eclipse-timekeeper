@@ -7,12 +7,14 @@ import { renderRecoveryEmails } from './recovery-emails.js';
 import { renderImports } from './imports.js';
 import { renderPasskeys } from './passkeys.js';
 import { renderAccountData } from './account-data.js';
+import { renderJournal } from './journal-account.js';
 
 export async function renderAccount(view, part) {
   const [loaded, profile] = await Promise.all([view.session.request('/auth/account'), view.session.request('/me')]);
   if (!view.valid()) return;
   const account = loaded.data,zone = profile.data.zoneId;
   if (part === 'data') {await renderAccountData(view, zone);return;}
+  if (part === 'journal') {await renderJournal(view, zone);return;}
   if (part === 'passkeys') {await renderPasskeys(view, zone);return;}
   if (part === 'import') {await renderImports(view, zone);return;}
   if (part === 'tokens') {await renderTokens(view, zone);return;}

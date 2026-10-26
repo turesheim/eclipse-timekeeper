@@ -43,7 +43,7 @@
       <resource>
         <directory>${project.basedir}/../web/src</directory>
         <targetPath>META-INF/resources/web</targetPath>
-        <excludes><exclude>admin/**</exclude></excludes>
+        <excludes><exclude>admin/**</exclude><exclude>**/__pycache__/**</exclude></excludes>
       </resource>
       <resource>
         <directory>${project.basedir}/../web/src/admin</directory>

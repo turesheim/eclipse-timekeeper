@@ -17,6 +17,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 from configure_accounts import create_challenge
 from recovery_fixture import RecoveryFixture
+from journal_fixture import JournalFixture
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -55,9 +56,10 @@ def main():
             sock.bind(('127.0.0.1', 0)); port = sock.getsockname()[1]
         backend = f'http://127.0.0.1:{port}'
         fixture = RecoveryFixture(data,port,https=args.https,mail=args.mail,hostname='localhost' if args.passkeys else '127.0.0.1',calendars=True)
+        journals = JournalFixture(data)
         base = fixture.base
         environment = {**os.environ, 'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:' + str(data / 'database'), 'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry), 'TIMEKEEPER_SERVER_SETUP_FILE':str(data / 'setup.json'),
-                       'TIMEKEEPER_PUBLIC_ORIGIN':base if args.https else 'NONE', 'TIMEKEEPER_DEPLOYED_AT':'2026-10-13T08:30:00Z', 'TIMEKEEPER_WEB_BUILD_COMMIT':manifest['commit'], 'TIMEKEEPER_SPK_VERSION':'1.99.0-146', **fixture.environment}
+                       'TIMEKEEPER_PUBLIC_ORIGIN':base if args.https else 'NONE', 'TIMEKEEPER_DEPLOYED_AT':'2026-10-13T08:30:00Z', 'TIMEKEEPER_WEB_BUILD_COMMIT':manifest['commit'], 'TIMEKEEPER_SPK_VERSION':'1.99.0-146', **fixture.environment, **journals.environment}
         server_log = ROOT / 'server/web/target/server.log'
         server_log.parent.mkdir(parents=True, exist_ok=True)
         with server_log.open('w') as log:
@@ -93,6 +95,7 @@ def main():
             finally:
                 (output / 'transport.json').write_text(json.dumps({'authenticationRequests':fixture.events},indent=2)+'\n')
                 fixture.close()
+                journals.close()
                 process.terminate()
                 try: process.wait(timeout=10)
                 except subprocess.TimeoutExpired: process.kill(); process.wait(timeout=5)

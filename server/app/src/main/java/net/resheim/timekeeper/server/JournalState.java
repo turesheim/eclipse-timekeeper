@@ -6,7 +6,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** Private journal authority; callers must hold the account's owner transaction. */
 final class JournalState {
-    enum Kind { JOURNAL_CFG, JOURNAL_DEVICE, JOURNAL_BATCH, JOURNAL_FILE, JOURNAL_ITEM, JOURNAL_AUDIT, JOURNAL_LEASE }
+    enum Kind { JOURNAL_CFG, JOURNAL_DEVICE, JOURNAL_BATCH, JOURNAL_FILE, JOURNAL_ITEM, JOURNAL_SOURCE, JOURNAL_AUDIT, JOURNAL_LEASE,
+        JOURNAL_COMMON, JOURNAL_OFFER, JOURNAL_DOCUMENT, JOURNAL_DELETE }
     private final ServerStore store;
     JournalState(ServerStore store){this.store=store;}
     Optional<ObjectNode> find(Kind kind,UUID id){return store.find(kind.name(),id).map(value->((ObjectNode)value).deepCopy());}

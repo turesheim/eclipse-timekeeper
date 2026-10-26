@@ -3,6 +3,30 @@ import {getLocale} from './i18n.js';
 import { t as i18nText } from "./i18n.js";const nameOrder = new Intl.Collator(getLocale(), { numeric: true, sensitivity: 'base' });
 const sortedNames = (values) => [...values].sort((a, b) => nameOrder.compare(a.name, b.name) || a.id.localeCompare(b.id));
 const messages = {
+  JOURNAL_ADMIN_SETUP_REQUIRED: "journal.sync.error.JOURNAL_ADMIN_SETUP_REQUIRED",
+  JOURNAL_ADMIN_CONFIGURATION_INVALID: "journal.sync.error.JOURNAL_ADMIN_CONFIGURATION_INVALID",
+  JOURNAL_ADMIN_ACCOUNT_NOT_PROVISIONED: "journal.sync.error.JOURNAL_ADMIN_ACCOUNT_NOT_PROVISIONED",
+  JOURNAL_HTTPS_REQUIRED: "journal.sync.error.JOURNAL_HTTPS_REQUIRED",
+  JOURNAL_ACCOUNT_SIGN_IN_REQUIRED: "journal.sync.error.JOURNAL_ACCOUNT_SIGN_IN_REQUIRED",
+  JOURNAL_PROOF_REQUIRED: "journal.sync.error.JOURNAL_PROOF_REQUIRED",
+  JOURNAL_DISABLED: "journal.sync.error.JOURNAL_DISABLED",
+  JOURNAL_ACCOUNT_DISABLED: "journal.sync.error.JOURNAL_ACCOUNT_DISABLED",
+  JOURNAL_DEVICE_REVOKED: "journal.sync.error.JOURNAL_DEVICE_REVOKED",
+  JOURNAL_DEVICE_LIMIT: "journal.sync.error.JOURNAL_DEVICE_LIMIT",
+  JOURNAL_KEY_ALREADY_ENROLLED: "journal.sync.error.JOURNAL_KEY_ALREADY_ENROLLED",
+  JOURNAL_PUBLIC_KEY_REQUIRED: "journal.sync.error.JOURNAL_PUBLIC_KEY_REQUIRED",
+  JOURNAL_PENDING_LIMIT: "journal.sync.error.JOURNAL_PENDING_LIMIT",
+  JOURNAL_TRANSFER_LIMIT: "journal.sync.error.JOURNAL_TRANSFER_LIMIT",
+  JOURNAL_TRANSFER_EXPIRED: "journal.sync.error.JOURNAL_TRANSFER_EXPIRED",
+  JOURNAL_TRANSFER_ABORTED: "journal.sync.error.JOURNAL_TRANSFER_ABORTED",
+  JOURNAL_AUTHORIZATION_CHANGED: "journal.sync.error.JOURNAL_AUTHORIZATION_CHANGED",
+  JOURNAL_AUTHORIZATION_WITHDRAWN: "journal.sync.error.JOURNAL_AUTHORIZATION_WITHDRAWN",
+  JOURNAL_PRIVATE_STORAGE_UNAVAILABLE: "journal.sync.error.JOURNAL_PRIVATE_STORAGE_UNAVAILABLE",
+  JOURNAL_INCOMPLETE_TRANSFER: "journal.sync.error.JOURNAL_INCOMPLETE_TRANSFER",
+  JOURNAL_BATCH_TOO_LARGE: "journal.sync.error.JOURNAL_BATCH_TOO_LARGE",
+  JOURNAL_ENCRYPTED_BROKER_REQUIRED: "journal.sync.error.JOURNAL_ENCRYPTED_BROKER_REQUIRED",
+  JOURNAL_SUPERSEDED: "journal.sync.error.JOURNAL_SUPERSEDED",
+  RATE_LIMITED: "journal.sync.error.RATE_LIMITED",
   CALENDAR_FUTURE_ACTIVITY: "calendar.error.CALENDAR_FUTURE_ACTIVITY",
   CALENDAR_INVALID_FEED: "calendar.error.CALENDAR_INVALID_FEED",
   CALENDAR_TOO_COMPLEX: "calendar.error.CALENDAR_TOO_COMPLEX",
@@ -82,7 +106,8 @@ export class Api {
     if(signal?.aborted)abort();else signal?.addEventListener('abort',abort,{once:true});
     const timer = setTimeout(abort, timeout);
     try {
-      const headers = { Accept: binary ? 'application/zip' : 'application/json' };
+      const binaryType=binary===true?'application/zip':binary==='application/octet-stream'?binary:null;
+      const headers = { Accept: binaryType || 'application/json' };
       if (this.#token) headers.Authorization = `Bearer ${this.#token}`;else
       if (this.#csrf && !['GET', 'HEAD', 'OPTIONS'].includes(method)) headers['X-CSRF-Token'] = this.#csrf;
       if (this.#owner !== null) headers['X-Timekeeper-Owner'] = ownerHeader(this.#owner);
@@ -91,7 +116,7 @@ export class Api {
       if (key) headers["Idempotency-Key"] = key;
       if (undo) headers["X-Timekeeper-Undo"] = 'true';
       const response = await this.fetcher(`/api/v1${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, redirect: 'error', referrerPolicy: 'origin', credentials: this.#token && path !== '/auth/token-login' ? 'omit' : 'same-origin', cache: 'no-store' });
-      if (binary && response.ok && !/^application\/zip(?:;|$)/i.test(response.headers.get('Content-Type') || '')) throw new ApiError('UNAVAILABLE');
+      if (binary && response.ok && (response.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase()!==binaryType) throw new ApiError('UNAVAILABLE');
       const data = response.status === 204 ? null : binary && response.ok ? await response.blob() : await response.json();
       if (!response.ok) throw new ApiError(typeof data?.code === 'string' ? data.code : 'UNAVAILABLE', response.status);
       if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);

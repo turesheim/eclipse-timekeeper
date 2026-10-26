@@ -81,6 +81,11 @@ class JournalImportTest {
             assertEquals("good",new DayNotes(store).get(DayNotes.date("2026-10-26")).path("body").asText());return null;
         });assertEquals("keep",note().path("body").asText());
     }
+    @Test void aNewerRejectedSnapshotPreventsOlderPendingContentFromReplaying(){
+        UUID older=seal(1,Map.of(FILE,"stale snapshot")),newer=seal(2,Map.of(FILE,"---\ninvalid: [\n---\n"));
+        assertEquals("ERROR",process(newer).path("state").asText());
+        assertEquals("SUPERSEDED",process(older).path("state").asText());assertEquals("",note().path("body").asText());
+    }
     @Test void batchHandoffIsIdempotentAndUnsafeNamesCannotPartlySeal(){
         UUID batch=UUID.randomUUID();var files=Map.of(FILE,"body".getBytes(StandardCharsets.UTF_8));
         var first=store.transaction("a",()->new JournalImport(store).seal(batch,device,1,files));assertEquals(first.toString(),store.transaction("a",()->new JournalImport(store).seal(batch,device,1,files)).toString());
