@@ -56,7 +56,7 @@
     <div id="workspace" data-view="track" hidden="">
       <p id="remember-notice" class="hint" role="status"></p>
       <section id="work-session" class="card work-session" aria-label="Work session" data-i18n-aria-label="ui.work_session_21aa04">
-        <div class="work-session-heading"><div><p class="eyebrow"><span data-i18n="ui.work_session_a7e3b2">WORK SESSION</span></p><div class="session-title"><h2 id="work-session-title"><span data-i18n="ui.your_work_session">Your work session</span></h2><span id="work-session-state" class="badge rounded-pill text-bg-secondary"><span data-i18n="ui.stopped">Stopped</span></span></div><p id="work-session-current" class="hint"></p><div id="work-session-labels" class="d-flex flex-wrap gap-1" aria-label="Work session labels" hidden="" data-i18n-aria-label="ui.work_session_labels"></div></div>
+        <div class="work-session-heading"><div><p class="eyebrow"><span data-i18n="ui.work_session_a7e3b2">WORK SESSION</span></p><div class="session-title"><h2 id="work-session-title"><span data-i18n="ui.your_work_session">Your work session</span></h2><span id="work-session-state" class="badge rounded-pill text-bg-secondary"><span data-i18n="ui.stopped">Stopped</span></span></div><p id="work-session-current" class="hint"></p></div>
           <p id="work-session-timing" class="session-elapsed" hidden=""><span><span data-i18n="ui.duration">Duration</span></span><strong id="work-session-elapsed"></strong></p>
           <div class="session-controls">
             <div class="session-actions" role="group" aria-label="Work session timing" data-i18n-aria-label="ui.work_session_timing"><button class="btn btn-primary" id="session-start"><span data-i18n="ui.start_work_session">Start work session</span></button><button class="btn btn-outline-danger" id="session-stop" hidden=""><span data-i18n="ui.stop_work_session">Stop work session</span></button><button class="btn btn-outline-secondary" id="session-new"><span data-i18n="ui.record_work_session">Record work session</span></button></div>
@@ -72,7 +72,6 @@
         <button class="nav-link" data-tab="activities" aria-label="Activities" title="Activities" data-i18n-aria-label="ui.activities" data-i18n-title="ui.activities"><span class="icon bi bi-hourglass-split" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.activities">Activities</span></span></button>
         <button class="nav-link" data-tab="clients" aria-label="Clients" title="Clients" data-i18n-aria-label="ui.clients" data-i18n-title="ui.clients"><span class="icon bi bi-buildings" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.clients">Clients</span></span></button>
         <button class="nav-link" data-tab="projects" aria-label="Projects" title="Projects" data-i18n-aria-label="ui.projects" data-i18n-title="ui.projects"><span class="icon bi bi-folder" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.projects">Projects</span></span></button>
-        <button class="nav-link" data-tab="labels" aria-label="Labels" title="Labels" data-i18n-aria-label="ui.labels" data-i18n-title="ui.labels"><span class="icon bi bi-tags" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.labels">Labels</span></span></button>
         </div></div>
       </nav>
       <p id="period-announcement" class="visually-hidden" role="status" aria-live="polite"></p>
@@ -118,9 +117,10 @@
       </section>
       <section id="clients-panel" hidden=""><div class="toolbar"><h2><span data-i18n="ui.clients">Clients</span></h2><button class="btn btn-primary" id="add-client"><span data-i18n="ui.new_client">New client</span></button></div><div id="clients" class="card table-wrap"></div></section>
       <section id="projects-panel" hidden=""><div class="toolbar"><h2><span data-i18n="ui.projects">Projects</span></h2><button class="btn btn-primary" id="add-project"><span data-i18n="ui.new_project">New project</span></button></div><div id="projects" class="card table-wrap"></div></section>
-      <section id="labels-panel" hidden=""><div class="toolbar"><h2><span data-i18n="ui.labels">Labels</span></h2><button class="btn btn-primary" id="add-label"><span data-i18n="ui.new_label">New label</span></button></div><div id="labels" class="card table-wrap"></div></section>
+
       <aside id="undo-notice" class="card undo-notice shadow" aria-label="Undo work-session change" hidden="" data-i18n-aria-label="ui.undo_work_session_change"><p role="status" aria-live="polite"></p><button type="button" class="btn btn-primary" data-undo=""><span data-i18n="ui.undo_a8283a">Undo</span></button><button type="button" class="btn btn-outline-secondary" data-dismiss-undo=""><span data-i18n="ui.dismiss">Dismiss</span></button></aside>
     </div>
+    <div id="account-labels-home" hidden><section id="labels-panel" aria-labelledby="account-labels-title" hidden=""><div class="toolbar"><h2 id="account-labels-title"><span data-i18n="ui.labels">Labels</span></h2><button class="btn btn-primary" id="add-label"><span data-i18n="ui.new_label">New label</span></button></div><div id="labels" class="card table-wrap"></div></section></div>
   </main>
   <dialog class="app-dialog server-info shadow-lg" id="server-info" aria-labelledby="about-title">
     <h2 id="about-title" tabindex="-1"><span data-i18n="ui.about_timekeeper">About Timekeeper</span></h2>

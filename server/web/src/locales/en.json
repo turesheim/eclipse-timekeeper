@@ -218,7 +218,6 @@
   "ui.activity": "Activity",
   "ui.edit_task": "Edit task",
   "ui.weekly_total": "Weekly total",
-  "ui.create_labels_in_the_labels_tab": "Create labels in the Labels tab.",
   "ui.client": "Client",
   "ui.choose_a_client": "Choose a client",
   "ui.each_project_and_work_session_belongs_to_one_client": "Each project and work session belongs to one client.",
@@ -366,7 +365,7 @@
   "ui.unsupported_metadata_these_columns_will_not_be_imported": "Unsupported metadata: {{value0}}. These columns will not be imported.",
   "ui.client_for_entries_without_a_client": "Client for entries without a client",
   "ui.imported_from_toggl": "Imported from Toggl",
-  "ui.each_entry_becomes_one_work_session_descriptions_become_work_session_summaries_source": "Each entry becomes one work session. Descriptions become work-session summaries. Source projects suggest client names when Client is missing; review each client below. Tags become work-session labels; tasks remain in the import audit only.",
+  "ui.each_entry_becomes_one_work_session_descriptions_become_work_session_summaries_source": "Each entry becomes one work session. Descriptions become work-session summaries. Source projects suggest client names when Client is missing; review each client below. Source tags and tasks are retained in the import audit.",
   "ui.project_for_entries_without_a_project": "Project for entries without a project",
   "ui.imported_time": "Imported time",
   "ui.exclude_invalid_rows_after_reviewing_the_diagnostics": "Exclude invalid rows after reviewing the diagnostics",
@@ -1169,5 +1168,6 @@
   "markdown.plain_text": "Plain text",
   "markdown.hr": "Horizontal rule",
   "journal.sync.advanced": "Connection setup and troubleshooting",
-  "journal.sync.simple_help": "Add a client with its name and public key. New clients synchronize journal notes in both directions automatically."
+  "journal.sync.simple_help": "Add a client with its name and public key. New clients synchronize journal notes in both directions automatically.",
+  "ui.manage_labels_in_my_account": "Manage labels in My Account → Labels."
 }

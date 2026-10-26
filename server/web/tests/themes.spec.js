@@ -33,7 +33,7 @@ test('themes cover tracking, records, editors and account settings with accessib
       await page.setViewportSize({width:1440,height:1000});await setTheme(page,id);
       await expect(page.locator('html')).toHaveAttribute('data-theme',id);await audit(page);
       await page.locator('[data-tab=track]').click();await captureScreenshot(page,{path:`test-results/theme-${id}-desktop.png`,fullPage:false});
-      for(const view of ['track','week','calendar','activities','clients','projects','labels']) {
+      for(const view of ['track','week','calendar','activities','clients','projects']) {
         await page.locator(`[data-tab=${view}]`).click();
         if(view==='activities') {
           const activity=page.locator('#activities tr[data-kind=activity]').first();
@@ -41,9 +41,9 @@ test('themes cover tracking, records, editors and account settings with accessib
         }
         await audit(page);
       }
-      await page.getByRole('button',{name:'Record work session',exact:true}).click();await page.getByRole('checkbox',{name:label.name,exact:true}).check();await audit(page);await page.locator('#cancel').click();
+      await page.getByRole('button',{name:'Record work session',exact:true}).click();await expect(page.locator('#editor-labels')).toHaveCount(0);await audit(page);await page.locator('#cancel').click();
       await page.locator('[data-tab=projects]').click();await page.getByRole('button',{name:'New project',exact:true}).click();await page.getByRole('radio',{name:'Code',exact:true}).check();await audit(page);await page.locator('#cancel').click();
-      await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');await audit(page);
+      await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');await audit(page);await page.locator('#account-navigation').getByRole('link',{name:'Labels',exact:true}).click();await expect(page.locator('#labels-panel')).toBeVisible();await audit(page);
       await page.getByRole('link',{name:'Back to time tracking',exact:true}).click();await page.locator('[data-tab=track]').click();
       await page.setViewportSize({width:390,height:844});await audit(page);await captureScreenshot(page,{path:`test-results/theme-${id}-mobile.png`,fullPage:false});
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

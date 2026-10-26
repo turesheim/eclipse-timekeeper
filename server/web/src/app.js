@@ -115,6 +115,7 @@ async function refreshServerInfo(session) {
 function readOnlyWhileDisconnected() {
   for (const id of ['add-client', 'add-project', 'add-label', 'add-activity', 'stop', 'session-start', 'session-stop', 'session-new', 'session-edit', 'session-delete']) $(id).disabled = !connected;
   for (const action of document.querySelectorAll('td.actions button')) action.disabled = !connected;
+  for (const action of $('labels-panel').querySelectorAll('button')) action.disabled = !connected || !canWrite;
   calendar.setConnected(connected);
   track.setWritable(connected && canWrite);
   weekSessions.setWritable(connected && canWrite);
@@ -123,7 +124,7 @@ function readOnlyWhileDisconnected() {
   updateSessionActions();
 }
 function tab(name) {
-  for (const item of ['track', 'week', 'calendar', 'activities', 'clients', 'projects', 'labels']) $(`${item}-panel`).hidden = item !== name;
+  for (const item of ['track', 'week', 'calendar', 'activities', 'clients', 'projects']) $(`${item}-panel`).hidden = item !== name;
   $('week-toolbar').hidden = !['week', 'activities'].includes(name);$('week-report-title').textContent = name === 'activities' ? i18nText("ui.your_activities") : i18nText("ui.your_workweek");$('week-actions').hidden = name !== 'activities';
   $('workspace').dataset.view = name;if (name === 'calendar') calendar.show();else calendar.hide();
   if (name !== 'track') track.hide();
@@ -137,6 +138,10 @@ for (const node of document.querySelectorAll('[data-tab]')) node.addEventListene
 
 const auth = authentication({
   renderCalendars:view=>calendar.subscriptions.mount(view),
+  renderLabels(view) {
+    const panel=$('labels-panel');view.root.append(panel);panel.hidden=false;
+    view.cleanup.add(()=>{panel.hidden=true;$('account-labels-home').append(panel);});
+  },
   async connect(session, account) {
     api = session;accountName = account.displayName;canWrite = account.permissions.includes('write');
     const { data: profile } = await session.initializeTimeZone();
@@ -154,7 +159,7 @@ const auth = authentication({
     return refresh();
   },
   clear({restoring = false} = {}) {
-    undoNotice.clear();weekSessions.reset();$('week-sessions-section').hidden = true;$('work-session-labels').replaceChildren();$('work-session-labels').hidden = true;
+    undoNotice.clear();weekSessions.reset();$('week-sessions-section').hidden = true;
     refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
@@ -312,6 +317,7 @@ function render() {
   table('clients', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.clients.map((value) => row([value.name, colorSwatch(value.color)], [action(i18nText("ui.edit"), () => openRecord('clients', value.id)), action(i18nText("ui.delete"), () => openDelete('clients', value.id))])));
   renderProjects(s);
   table('labels', [i18nText("ui.name"), i18nText("ui.color"), i18nText("ui.actions")], s.labels.map((value) => row([value.name, /^#[0-9a-f]{6}$/i.test(value.color) ? colorSwatch(value.color) : value.color || '—'], [action(i18nText("ui.edit"), () => openRecord('labels', value.id)), action(i18nText("ui.delete"), () => openDelete('labels', value.id))])));
+  for (const action of $('labels-panel').querySelectorAll('button')) action.disabled = !connected || !canWrite;
   refreshLabelFields();refreshClientChoices();renderSession();
   $('week-total').textContent = displayDuration(s.report.total);$('days').replaceChildren();
   for (let index = 0; index < 7; index++) {
@@ -389,7 +395,7 @@ function field(labelText, key, value = '', options = {}) {
 }
 function labelFields(ids = []) {
   const group = element('fieldset');group.id = 'editor-labels';group.append(element('legend', i18nText("ui.labels")));
-  const hint = element('p', i18nText("ui.create_labels_in_the_labels_tab"), 'hint');hint.id = 'label-choice-hint';group.append(hint);
+  const hint = element('p', i18nText("ui.manage_labels_in_my_account"), 'hint');hint.id = 'label-choice-hint';group.append(hint);
   $('fields').append(group);refreshLabelFields(ids);
 }
 function refreshLabelFields(ids = []) {
@@ -444,7 +450,6 @@ function sessionFields(value) {
   project.addEventListener('change', () => {const selected = snapshot.projects.find((value) => value.id === project.value);if (selected) client.value = selected.clientId;refreshSessionProjectChoices();});
   client.addEventListener('change', () => {const selected = snapshot.projects.find((value) => value.id === project.value);if (!selected || selected.clientId !== client.value) project.value = '';refreshSessionProjectChoices();});
   field(i18nText("ui.summary"), 'summary', value.summary || '', { max: 4000, multiline: true });
-  labelFields(value.labelIds);
 }
 function begin(title, state) {
   if (editor || $('editor').open) return false;
@@ -582,7 +587,7 @@ function values() {
   const time = (key) => editor.timeValue ? editor.timeValue(key) : get(key);
   const labels = () => [...$('fields').querySelectorAll('[name="labelIds"]:checked')].map((node) => node.value);
   if (editor.command === 'stop' || editor.command === 'session-stop' || editor.remove) return undefined;
-  if (editor.command === 'session-start') return { summary: get('summary'), clientId: get('clientId'), projectId: get('projectId') || null, labelIds: labels() };
+  if (editor.command === 'session-start') return { summary: get('summary'), clientId: get('clientId'), projectId: get('projectId') || null };
   if (editor.command === 'start') return { taskId: get('taskId'), summary: get('summary'), labelIds: labels(), expectedActiveId: editor.expected?.id ?? null, expectedActiveVersion: editor.expected?.version ?? null };
   switch (editor.collection) {
     case 'clients':return { name: get('name'), color: get('color') };
@@ -590,7 +595,7 @@ function values() {
     case 'labels':return { name: get('name'), color: get('color') || null };
     case 'tasks':return { summary: get('summary'), projectId: get('projectId') || null, parentTaskId: get('parentTaskId') || null, url: get('url') || null };
     case 'activities':return { ...(editor.id ? {} : { taskId: get('taskId') || null, projectId: get('taskId') ? null : get('projectId') || null }), summary: get('summary'), start: localDateTimeToInstant(get('start'), editor.zone), end: get('end') ? localDateTimeToInstant(get('end'), editor.zone) : null, labelIds: labels() };
-    case 'work-sessions':return { clientId: get('clientId'), projectId: get('projectId') || null, summary: get('summary'), labelIds: labels(), start: localDateTimeToInstant(time('start'), editor.zone), end: time('end') ? localDateTimeToInstant(time('end'), editor.zone) : null };
+    case 'work-sessions':return { clientId: get('clientId'), projectId: get('projectId') || null, summary: get('summary'), start: localDateTimeToInstant(time('start'), editor.zone), end: time('end') ? localDateTimeToInstant(time('end'), editor.zone) : null };
   }
 }
 function freeze(state) {
@@ -658,9 +663,7 @@ function renderSession() {
   $('work-session').style.setProperty('--session-color', snapshot.clients.find((client) => client.id === session?.clientId)?.color || 'var(--accent)');
   const zone = snapshot.profile.data.zoneId;
   $('work-session-current').textContent = session ? `${[name(snapshot.clients, session.clientId), session.projectId ? name(snapshot.projects, session.projectId) : null].filter(Boolean).join(' · ')} · ${active ? i18nText("ui.started_fdc851") : ''}${instantText(session.start, zone)}${session.end ? ' → ' + instantText(session.end, zone) : ''}` : '';
-  const labels = $('work-session-labels');labels.replaceChildren();
-  for (const id of session?.labelIds || []) labels.append(element('span', name(snapshot.labels, id), 'badge rounded-pill text-bg-secondary'));
-  labels.hidden = !labels.childElementCount;
+
   $('work-session-timing').hidden = !session;
   updateSessionActions();
   renderSessionTime();

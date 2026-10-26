@@ -6,7 +6,7 @@ export async function importDigest(value) {
 }
 
 /** Stable source keys exclude filenames and chosen destination names/IDs. All defaults are reviewed. */
-export async function importPlan(sourceRows, personKey, { fallbackClient, fallbackProject, mode = 'WORK_SESSION', mapWorkSessionTags = true, mapWorkSessionProjects = true }) {
+export async function importPlan(sourceRows, personKey, { fallbackClient, fallbackProject, mode = 'WORK_SESSION', mapWorkSessionTags = false, mapWorkSessionProjects = true }) {
   if (!['WORK_SESSION', 'ACTIVITY'].includes(mode)) throw new Error(i18nText("ui.choose_an_import_type"));
   const sourceKey = await importDigest(personKey),definitions = new Map(),rows = [];
   async function mapping(identity, resourceType, name, parentKey) {

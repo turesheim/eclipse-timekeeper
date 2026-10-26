@@ -167,7 +167,7 @@ and logout clears both editor modes and their private content.
 
 ![Formatted journal on a narrow screen](../assets/screenshots/journal-editor-mobile.png)
 
-Hover over a daily client total to see its sessions, summaries, projects, labels,
+Hover over a daily client total to see its sessions, summaries, projects,
 local start/end times and durations in a tooltip. These details are also available
 when viewing the account with read-only access.
 Month boundaries and daily slices follow the account's time zone, including DST;
@@ -493,18 +493,17 @@ A work session is an independent interval for one client. Its tools are **Edit**
 and **Delete**. Create or edit activities in Activities; task timers
 run independently. There are no session selectors or manual activity links.
 
-Work sessions may have several labels selected in the start, record and edit
-forms. The compact card shows their names; Workweek tooltips and the session
-details menu include them. Week strips include them in their accessible
-description without changing the client's color.
-Moving, resizing, stopping and copying a session preserve its labels without
-changing any activity labels. JSON and CSV transfers remap labels into the
-destination account. Older sessions and exports may omit `labelIds`; omitted
-labels are preserved on edits, and an empty array explicitly clears them.
+Work-session forms, cards, tooltips and details do not offer or display labels.
+Client and optional project classify a work session. Labels belong to Activities
+and are managed under **My Account → Labels**, rather than a tracking tab. The
+account page reuses the existing label editor, deletion safeguards, read-only
+permissions and live catalog updates.
 
-![Work-session labels on desktop](../assets/screenshots/work-session-labels-desktop.png)
-
-![Work-session labels on a narrow screen](../assets/screenshots/work-session-labels-mobile.png)
+Legacy session labels remain in stored records and portable transfers. Session
+edits omit `labelIds`, preserving existing metadata. Moving, resizing, stopping,
+copying and Undo preserve it without changing Activity labels. New work-session
+imports retain source tags in the import audit without creating session labels;
+older resumable import plans keep their original mapping behavior.
 
 Reports derive context from that account's activities overlapping the session,
 including running timers. Tracked time sums clipped intervals; covered time is
@@ -803,7 +802,7 @@ Each CSV row defaults to one continuous work session with a reviewed client and
 optional description in Summary. Activity import is an explicit alternative. Both modes
 share durable progress, duplicate review and whole-job Undo; sessions create no
 companion task/activity records and contribute to Calendar’s client totals.
-Source tags become reviewed work-session labels. Resuming an older import keeps
+Source tags are retained in the import audit for work-session imports. Activity imports map tags to labels. Resuming an older import keeps
 its original mappings, and repeat imports preserve existing session edits.
 
 Open **My Account → Import** for the source preview, catalog mappings and duplicate

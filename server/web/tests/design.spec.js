@@ -77,7 +77,7 @@ for(const [name,width,height] of [['desktop',1440,1100],['narrow',390,844]]) {
       await page.mouse.move(0,0);
       await captureScreenshot(page,{path:`test-results/design-work-session-${name}.png`,fullPage:false});
       await page.locator('#work-session').screenshot({path:`test-results/design-session-card-${name}.png`});
-      for(const tab of ['week','calendar','activities','clients','projects','labels']) {
+      for(const tab of ['week','calendar','activities','clients','projects']) {
         await page.locator(`[data-tab=${tab}]`).click();
         await expect(page.locator(`[data-tab=${tab}]`)).toHaveAttribute('aria-current','page');
         await expect(page.locator('#work-session')).toBeVisible();

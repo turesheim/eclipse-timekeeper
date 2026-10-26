@@ -40,3 +40,10 @@ export async function expandProjectClient(page,clientId) {
   const toggle=page.locator(`#projects tbody[data-client-id="${clientId}"] .projects-client-toggle`);
   if(await toggle.getAttribute('aria-expanded')==='false')await toggle.click();
 }
+
+export async function openLabelSettings(page) {
+  await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();
+  await page.locator('#account-navigation').getByRole('link',{name:'Labels',exact:true}).click();
+  await expect(page.locator('#labels-panel')).toBeVisible();
+  await expect(page.locator('#account-content')).toHaveAttribute('aria-busy','false');
+}

@@ -94,11 +94,12 @@ test('Norwegian administration and workspace navigation retain accessible narrow
   const user=await fresh(request,true),session=await context(browser,'nb-NO');
   try {
     const page=await session.newPage();await login(page,user);
-    for(const tab of ['track','week','calendar','activities','clients','projects','labels']) {
+    for(const tab of ['track','week','calendar','activities','clients','projects']) {
       await page.locator(`[data-tab=${tab}]`).click();
       await expect(page.locator(`[data-tab=${tab}]`)).toHaveAttribute('aria-current','page');
       await expect(page.locator('#workspace')).not.toContainText(/\b(?:ui\.|count\.|record\.)[a-z_]+/);
     }
+    await page.evaluate(()=>location.hash='#account/labels');await expect(page.locator('#labels-panel')).toBeVisible();await expect(page.locator('#account-navigation')).toContainText('Etiketter');
     await page.goto('/admin/');await expect(page.getByRole('heading',{name:'Generelle innstillinger',exact:true})).toBeVisible();
     const settings=await browserRequest(page).get('/api/v1/admin/settings');expect(settings.status()).toBe(200);
     const status=(await settings.json()).restartRequired
