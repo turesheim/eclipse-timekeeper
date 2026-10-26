@@ -46,6 +46,8 @@ public final class Commands {
 	public record UpdateTaskList(java.util.UUID id, long expectedVersion, String name,
 			net.resheim.eclipse.timekeeper.domain.TaskListKind kind, boolean readable, boolean writable,
 			boolean shared, boolean owner, boolean present, int position) { }
+	public record UpdateTaskListSharing(java.util.UUID id,long expectedVersion,
+			net.resheim.eclipse.timekeeper.domain.TaskListSharing sharing) { }
 	public record CreateTaskListSection(java.util.UUID taskListId,String remoteSectionId,String name,
 			net.resheim.eclipse.timekeeper.domain.TaskListSectionKind kind,int position,boolean present,boolean writable) { }
 	public record UpdateTaskListSection(java.util.UUID id,long expectedVersion,String name,

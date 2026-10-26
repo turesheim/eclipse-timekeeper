@@ -3,6 +3,7 @@ package net.resheim.eclipse.timekeeper.client;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -29,7 +30,21 @@ public final class WireValues {
         return new TaskList(id(value.get("id")),id(value.get("connectionId")),value.get("remoteListId").getAsString(),
                 value.get("name").getAsString(),TaskListKind.valueOf(value.get("kind").getAsString()),value.get("readable").getAsBoolean(),
                 value.get("writable").getAsBoolean(),value.get("shared").getAsBoolean(),value.get("owner").getAsBoolean(),
-                value.get("present").getAsBoolean(),value.get("position").getAsInt(),value.get("version").getAsLong());
+                value.get("present").getAsBoolean(),value.get("position").getAsInt(),sharing(value.get("sharing")),value.get("version").getAsLong());
+    }
+    public static TaskListSharing sharing(JsonElement value) {
+        if(value==null || value.isJsonNull()) return TaskListSharing.empty();
+        var node=value.getAsJsonObject();var members=new ArrayList<TaskListParticipant>();
+        for(var item:node.getAsJsonArray("participants")) {var participant=item.getAsJsonObject();members.add(new TaskListParticipant(
+                participant.get("remotePrincipalId").getAsString(),text(participant.get("displayName")),
+                TaskListMemberRole.valueOf(participant.get("role").getAsString())));}
+        return new TaskListSharing(text(node.get("remoteOwnerId")),members);
+    }
+    public static JsonObject sharing(TaskListSharing value) {
+        var node=object();value.remoteOwnerId().ifPresent(id -> node.addProperty("remoteOwnerId",id));
+        var members=new JsonArray();for(var item:value.participants()) {var member=object();member.addProperty("remotePrincipalId",item.remotePrincipalId());
+            item.displayName().ifPresent(name -> member.addProperty("displayName",name));member.addProperty("role",item.role().name());members.add(member);}
+        node.add("participants",members);return node;
     }
     public static TaskListSection taskListSection(JsonObject value) {
         return new TaskListSection(id(value.get("id")),id(value.get("taskListId")),value.get("remoteSectionId").getAsString(),

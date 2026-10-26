@@ -208,6 +208,13 @@ resource; a conflicting representation of the same remote identity returns
 disconnected account `enabled=false`; remote disappearance must not trigger
 deletion of local tasks.
 
+A provider list may include `sharing` with a remote owner ID and disclosed
+participants and roles. This context is distinct from the list's `shared`,
+`owner`, `readable`, and `writable` flags and does not grant Timekeeper access.
+Providers may expose only the flags, leaving participant details empty.
+`PUT /task-lists/{id}/sharing` replaces the context with `If-Match`; ordinary
+list updates preserve it. Portable JSON/CSV and account archives retain it.
+
 `/task-list-sections` stores optional, owner-scoped provider groupings inside
 one task list. A section has a stable Timekeeper ID, remote section ID, name,
 `STANDARD` or `GROCERY_CATEGORY` kind, order, presence, and section write

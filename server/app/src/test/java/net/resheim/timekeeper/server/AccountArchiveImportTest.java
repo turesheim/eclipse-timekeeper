@@ -197,7 +197,8 @@ class AccountArchiveImportTest {
         store.transaction("a",()->{
             store.save("TASK_CONNECTION",new TaskConnection(sourceConnection,"microsoft","account-1","Personal",true,true,true,0));
             store.save("TASK_LIST",new TaskList(sourceList,sourceConnection,"remote-list","Flagged emails",TaskListKind.BUILT_IN,
-                    true,false,false,true,true,0,0));
+                    true,false,false,true,true,0,new TaskListSharing(Optional.of("owner-1"),List.of(
+                    new TaskListParticipant("owner-1",Optional.of("Alex"),TaskListMemberRole.OWNER))),0));
             store.save("TASK_SECTION",new TaskListSection(sourceSection,sourceList,"produce","Produce",TaskListSectionKind.GROCERY_CATEGORY,1,true,false,0));return null;
         });
         ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=AccountArchiveInput.read(file.file(),"application/zip");}
@@ -213,6 +214,8 @@ class AccountArchiveImportTest {
             assertNotEquals(sourceList.toString(),list.path("id").asText());
             assertEquals(connection.path("id"),list.path("connectionId"));
             assertEquals("Flagged emails",list.path("name").asText());
+            assertEquals("owner-1",list.path("sharing").path("remoteOwnerId").asText());
+            assertEquals("Alex",list.path("sharing").path("participants").get(0).path("displayName").asText());
             assertNotEquals(sourceSection.toString(),section.path("id").asText());assertEquals(list.path("id"),section.path("taskListId"));
             assertEquals("GROCERY_CATEGORY",section.path("kind").asText());return null;
         });

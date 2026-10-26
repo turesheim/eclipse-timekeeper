@@ -158,6 +158,9 @@ class HttpClientIntegrationTest {
             remoteList=client.updateTaskList(new UpdateTaskList(remoteList.id(),remoteList.version(),"Tasks",TaskListKind.STANDARD,
                     true,true,false,true,false,0));
             assertFalse(client.taskList(remoteList.id()).orElseThrow().present());
+            var sharing=new TaskListSharing(Optional.of("owner-1"),List.of(new TaskListParticipant("owner-1",Optional.of("Alex"),TaskListMemberRole.OWNER)));
+            remoteList=client.updateTaskListSharing(new UpdateTaskListSharing(remoteList.id(),remoteList.version(),sharing));
+            assertEquals(sharing,client.taskList(remoteList.id()).orElseThrow().sharing());
             var cursor=client.createTaskSyncCursor(new CreateTaskSyncCursor(connection.id(),Optional.of(remoteList.id()),
                     TaskSyncMode.INITIAL,Optional.empty(),Optional.empty(),Optional.empty()));
             var cursorId=cursor.id();assertTrue(client.taskSyncCursors(connection.id()).stream().anyMatch(value -> value.id().equals(cursorId)));

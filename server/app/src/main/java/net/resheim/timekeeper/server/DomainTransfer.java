@@ -99,7 +99,7 @@ final class DomainTransfer {
             var created=new TaskList(UUID.randomUUID(),required(connections,sourceConnection),item.get("remoteListId").asText(),
                     item.get("name").asText(),TaskListKind.valueOf(item.get("kind").asText()),item.get("readable").asBoolean(),
                     item.get("writable").asBoolean(),item.get("shared").asBoolean(),item.get("owner").asBoolean(),
-                    item.get("present").asBoolean(),item.get("position").asInt(),0);
+                    item.get("present").asBoolean(),item.get("position").asInt(),sharing(item.get("sharing")),0);
             store.save("TASK_LIST",created);store.change("TASK_LIST","CREATED",created.id().toString());
             lists.put(uuid(item.get("id")),created.id());
             mapping(mappings,"TASK_LIST",item,created.id());

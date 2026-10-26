@@ -269,6 +269,16 @@ class ContractTest(unittest.TestCase):
         self.assertIn('taskListSections',CONTRACT['components']['schemas']['TransferSnapshot']['properties'])
         self.assertNotIn('taskListSections',CONTRACT['components']['schemas']['TransferSnapshot']['required'])
 
+    def test_shared_list_participants_are_distinct_from_account_access(self):
+        sharing={'remoteOwnerId':'owner-1','participants':[
+            {'remotePrincipalId':'owner-1','displayName':'Alex','role':'OWNER'},
+            {'remotePrincipalId':'member-2','role':'VIEWER'}]}
+        validator('TaskListSharing').validate(sharing)
+        self.assertFalse(validator('TaskListSharing').is_valid({'participants':[
+            {'remotePrincipalId':'member-2','role':'ADMIN'}]}))
+        self.assertEqual('updateTaskListSharing',CONTRACT['paths']['/task-lists/{id}/sharing']['put']['operationId'])
+        self.assertIn('sharing',CONTRACT['components']['schemas']['TransferTaskList']['properties'])
+
     def test_task_sibling_order_is_a_conditional_section(self):
         validator('TaskOrderInput').validate({'siblingOrder':7})
         self.assertFalse(validator('TaskOrderInput').is_valid({'siblingOrder':-1}))
@@ -427,7 +437,7 @@ class ContractTest(unittest.TestCase):
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'convertCalendarEvent',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
-            'createTaskList', 'updateTaskList', 'deleteTaskList', 'getTaskList', 'listTaskLists',
+            'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'deleteTaskList', 'getTaskList', 'listTaskLists',
             'createTaskListSection', 'updateTaskListSection', 'deleteTaskListSection', 'getTaskListSection', 'listTaskListSections',
             'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors',
             'getTaskTombstone', 'listTaskTombstones', 'findTaskTombstoneByExternalReference',

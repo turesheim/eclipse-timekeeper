@@ -74,7 +74,7 @@ polling and periodic full reconciliation.
 | Checklist | `checklistItems` collection | `checklistItems` | RWD | A checklist item is not a child `todoTask`. |
 | Attachments | `taskFileAttachment` collection | attachments | RWD | Apply size/content limits; use upload sessions for large files. |
 | Linked resources | `linkedResources` collection | links | RW | Verify delete support and permissions before declaring D. |
-| Lists and built-in/shared metadata | `todoTaskList`, `wellknownListName`, `isShared`, `isOwner` | connection/list | R; name W when allowed | Smart and flagged-email views are not independent task ownership. |
+| Lists and built-in/shared metadata | `todoTaskList`, `wellknownListName`, `isShared`, `isOwner` | connection/list flags and optional `sharing` context | R; name W when allowed | Smart and flagged-email views are not independent task ownership. Participant details remain unknown when Graph does not expose them. |
 | Parent task, geofence, car, messaging | No corresponding `todoTask` fields | Local task fields | — | Retain locally and warn before lossy export. |
 | Identity and change feed | `id`, delta feed, modification time | external reference, alias, cursor/source metadata | R | A list move can change the task ID; reconcile before creating. |
 

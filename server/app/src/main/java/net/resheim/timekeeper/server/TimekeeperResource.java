@@ -65,7 +65,7 @@ public class TimekeeperResource {
     private static TaskList taskList(JsonNode input,UUID id,long version) {
         return new TaskList(id,uuid(input.get("connectionId")),input.get("remoteListId").asText(),input.get("name").asText(),
                 TaskListKind.valueOf(input.get("kind").asText()),input.get("readable").asBoolean(),input.get("writable").asBoolean(),
-                input.get("shared").asBoolean(),input.get("owner").asBoolean(),input.get("present").asBoolean(),input.get("position").asInt(),version);
+                input.get("shared").asBoolean(),input.get("owner").asBoolean(),input.get("present").asBoolean(),input.get("position").asInt(),sharing(input.get("sharing")),version);
     }
     private static TaskListSection taskListSection(JsonNode input,UUID id,long version) {
         return new TaskListSection(id,uuid(input.get("taskListId")),input.get("remoteSectionId").asText(),input.get("name").asText(),
@@ -115,7 +115,8 @@ public class TimekeeperResource {
                 for(var existing:store.list(type)) if(existing.get("connectionId").asText().equals(candidate.connectionId().toString()) && existing.get("remoteListId").asText().equals(candidate.remoteListId())) {
                     var old=(TaskList)decode(type,existing);
                     if(old.name().equals(candidate.name()) && old.kind()==candidate.kind() && old.readable()==candidate.readable() && old.writable()==candidate.writable()
-                            && old.shared()==candidate.shared() && old.owner()==candidate.owner() && old.present()==candidate.present() && old.position()==candidate.position())
+                            && old.shared()==candidate.shared() && old.owner()==candidate.owner() && old.present()==candidate.present() && old.position()==candidate.position()
+                            && old.sharing().equals(candidate.sharing()))
                         return ApiReplies.resource(200,existing,null);
                     throw ApiFailure.conflict();
                 }
@@ -163,6 +164,14 @@ public class TimekeeperResource {
         return tx(() -> {var before=required("TASK_CONNECTION",key);ApiReplies.match(before,match);
             var current=(TaskConnection)decode("TASK_CONNECTION",before);
             var updated=current.withCapabilities(capabilities(input));store.save("TASK_CONNECTION",updated);store.change("TASK_CONNECTION","UPDATED",key.toString());
+            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+        });
+    }
+    @PUT @Path("/task-lists/{id}/sharing") public Response updateTaskListSharing(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
+        UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskListSharing",body);ContractInputs.queries(uri.getQueryParameters());
+        return tx(() -> {var before=required("TASK_LIST",key);ApiReplies.match(before,match);
+            var updated=((TaskList)decode("TASK_LIST",before)).withSharing(sharing(input));
+            store.save("TASK_LIST",updated);store.change("TASK_LIST","UPDATED",key.toString());
             return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
         });
     }

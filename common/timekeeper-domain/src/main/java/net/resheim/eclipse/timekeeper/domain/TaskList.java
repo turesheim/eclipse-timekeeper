@@ -4,7 +4,8 @@ import java.util.UUID;
 
 /** A provider list, separate from a Timekeeper project and from task sections. */
 public record TaskList(UUID id, UUID connectionId, String remoteListId, String name, TaskListKind kind,
-		boolean readable, boolean writable, boolean shared, boolean owner, boolean present, int position, long version) {
+		boolean readable, boolean writable, boolean shared, boolean owner, boolean present, int position,
+		TaskListSharing sharing,long version) {
 	public TaskList {
 		id = Values.required(id, "taskListId");
 		connectionId = Values.required(connectionId, "connectionId");
@@ -13,12 +14,21 @@ public record TaskList(UUID id, UUID connectionId, String remoteListId, String n
 		kind = Values.required(kind, "kind");
 		if (writable && !readable) throw new DomainValidationException("writable", "write access requires read access");
 		if (position < 0) throw new DomainValidationException("position", "position must not be negative");
+		sharing=sharing==null?TaskListSharing.empty():sharing;
 		version = Values.version(version);
+	}
+
+	public TaskList(UUID id,UUID connectionId,String remoteListId,String name,TaskListKind kind,
+			boolean readable,boolean writable,boolean shared,boolean owner,boolean present,int position,long version) {
+		this(id,connectionId,remoteListId,name,kind,readable,writable,shared,owner,present,position,TaskListSharing.empty(),version);
 	}
 
 	public TaskList update(String newName, TaskListKind newKind, boolean newReadable, boolean newWritable,
 			boolean newShared, boolean newOwner, boolean newPresent, int newPosition) {
 		return new TaskList(id, connectionId, remoteListId, newName, newKind, newReadable, newWritable,
-				newShared, newOwner, newPresent, newPosition, version + 1);
+				newShared, newOwner, newPresent, newPosition, sharing,version + 1);
+	}
+	public TaskList withSharing(TaskListSharing value) {
+		return new TaskList(id,connectionId,remoteListId,name,kind,readable,writable,shared,owner,present,position,value,version+1);
 	}
 }

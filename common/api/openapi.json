@@ -12680,6 +12680,101 @@
         },
         "description": "Conditional assignment update. Null clears the recorded assignment; the provider identity and task URL are unchanged."
       }
+    },
+    "/task-lists/{id}/sharing": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskListSharing",
+        "summary": "Replace provider-disclosed sharing context for a task list",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskList"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskListSharing"
+              }
+            }
+          }
+        },
+        "description": "Conditional update of owner and participant metadata. Does not grant Timekeeper access or change list permissions."
+      }
     }
   },
   "components": {
@@ -21756,6 +21851,10 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 2147483647
+          },
+          "sharing": {
+            "$ref": "#/components/schemas/TaskListSharing",
+            "description": "Optional provider-disclosed owner and participant details. Ordinary list updates preserve this field."
           }
         },
         "required": [
@@ -21862,6 +21961,10 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 2147483647
+          },
+          "sharing": {
+            "$ref": "#/components/schemas/TaskListSharing",
+            "description": "Optional provider-disclosed owner and participant details. Ordinary list updates preserve this field."
           }
         },
         "required": [
@@ -22238,6 +22341,10 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 2147483647
+          },
+          "sharing": {
+            "$ref": "#/components/schemas/TaskListSharing",
+            "description": "Optional provider-disclosed owner and participant details. Ordinary list updates preserve this field."
           }
         },
         "required": [
@@ -23497,6 +23604,63 @@
         ],
         "additionalProperties": false,
         "description": "Conditionally set or clear provider assignment and source context for an already linked task."
+      },
+      "TaskListMemberRole": {
+        "type": "string",
+        "enum": [
+          "OWNER",
+          "EDITOR",
+          "VIEWER",
+          "UNKNOWN"
+        ]
+      },
+      "TaskListParticipant": {
+        "type": "object",
+        "properties": {
+          "remotePrincipalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "role": {
+            "$ref": "#/components/schemas/TaskListMemberRole"
+          }
+        },
+        "required": [
+          "remotePrincipalId",
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "TaskListSharing": {
+        "type": "object",
+        "description": "Provider-disclosed sharing context. Missing members mean the provider did not expose them; this is not a Timekeeper access grant.",
+        "properties": {
+          "remoteOwnerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskListParticipant"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "participants"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {

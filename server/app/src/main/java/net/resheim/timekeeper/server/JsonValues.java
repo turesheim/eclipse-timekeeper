@@ -5,6 +5,7 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.Optional;
@@ -60,7 +61,8 @@ public final class JsonValues {
             var node=base(owner,list.id(),list.version());
             node.put("connectionId",list.connectionId().toString());node.put("remoteListId",list.remoteListId());node.put("name",list.name());
             node.put("kind",list.kind().name());node.put("readable",list.readable());node.put("writable",list.writable());
-            node.put("shared",list.shared());node.put("owner",list.owner());node.put("present",list.present());node.put("position",list.position());return node;
+            node.put("shared",list.shared());node.put("owner",list.owner());node.put("present",list.present());node.put("position",list.position());
+            node.set("sharing",sharing(list.sharing()));return node;
         }
         if (value instanceof TaskListSection section) {
             var node=base(owner,section.id(),section.version());node.put("taskListId",section.taskListId().toString());
@@ -140,7 +142,7 @@ public final class JsonValues {
                     node.get("readable").asBoolean(),node.get("writable").asBoolean(),node.get("enabled").asBoolean(),capabilities(node.get("capabilities")),version);
             case "TASK_LIST" -> new TaskList(id,uuid(node.get("connectionId")),node.get("remoteListId").asText(),node.get("name").asText(),
                     TaskListKind.valueOf(node.get("kind").asText()),node.get("readable").asBoolean(),node.get("writable").asBoolean(),
-                    node.get("shared").asBoolean(),node.get("owner").asBoolean(),node.get("present").asBoolean(),node.get("position").asInt(),version);
+                    node.get("shared").asBoolean(),node.get("owner").asBoolean(),node.get("present").asBoolean(),node.get("position").asInt(),sharing(node.get("sharing")),version);
             case "TASK_SECTION" -> new TaskListSection(id,uuid(node.get("taskListId")),node.get("remoteSectionId").asText(),node.get("name").asText(),
                     TaskListSectionKind.valueOf(node.get("kind").asText()),node.get("position").asInt(),node.get("present").asBoolean(),node.get("writable").asBoolean(),version);
             case "TASK_SYNC_CURSOR" -> new TaskSyncCursor(id,uuid(node.get("connectionId")),optionalText(node.get("listId")).map(UUID::fromString),
@@ -169,6 +171,21 @@ public final class JsonValues {
         return new TaskAssignment(optionalText(value.get("assigneeId")),optionalText(value.get("assigneeName")),
                 optionalText(value.get("assignedById")),optionalText(value.get("assignedByName")),
                 optionalText(value.get("sourceId")),optionalText(value.get("sourceUrl")),value.path("writable").asBoolean());
+    }
+    public static TaskListSharing sharing(JsonNode value) {
+        if(value==null || value.isNull()) return TaskListSharing.empty();
+        var participants=new ArrayList<TaskListParticipant>();
+        for(var item:value.path("participants")) participants.add(new TaskListParticipant(item.path("remotePrincipalId").asText(),
+                optionalText(item.get("displayName")),TaskListMemberRole.valueOf(item.path("role").asText())));
+        return new TaskListSharing(optionalText(value.get("remoteOwnerId")),participants);
+    }
+    public static ObjectNode sharing(TaskListSharing value) {
+        var node=object();value.remoteOwnerId().ifPresent(id -> node.put("remoteOwnerId",id));
+        var members=node.putArray("participants");for(var item:value.participants()) {
+            var member=object();member.put("remotePrincipalId",item.remotePrincipalId());
+            item.displayName().ifPresent(name -> member.put("displayName",name));member.put("role",item.role().name());members.add(member);
+        }
+        return node;
     }
     public static ObjectNode assignment(TaskAssignment value) {
         var node=object();value.assigneeId().ifPresent(text -> node.put("assigneeId",text));

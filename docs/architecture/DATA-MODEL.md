@@ -418,6 +418,10 @@ retains the records and associated tasks. Explicit deletion is conditional and
 rejects a connection with lists or a list with linked tasks. Account archives
 and portable transfers include these records; older archives import without
 them.
+`TaskList.sharing` optionally records a provider owner principal and disclosed
+participant IDs, display names, and roles. This data is separate from
+Timekeeper account access and from the list's current permission flags. Older
+list writes preserve it, and portable transfers retain it.
 `TASK_SECTION` records are optional children of one provider list. They
 store a provider section identity, name, standard or grocery-category kind,
 position, presence, and section write permission. A relation prevents

@@ -46,6 +46,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskConnection;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskConnectionCapabilities;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskList;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskListSharing;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskListSection;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskSyncCursor;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskPlanning;
@@ -76,6 +77,7 @@ public interface TimekeeperService {
 	default List<TaskConnection> taskConnections() { throw new UnsupportedOperationException("Task connections are not supported"); }
 	default TaskList createTaskList(CreateTaskList command) { throw new UnsupportedOperationException("Provider task lists are not supported"); }
 	default TaskList updateTaskList(UpdateTaskList command) { throw new UnsupportedOperationException("Provider task lists are not supported"); }
+	default TaskList updateTaskListSharing(UpdateTaskListSharing command) { throw new UnsupportedOperationException("Provider task list sharing is not supported"); }
 	default void deleteTaskList(java.util.UUID id,long expectedVersion) { throw new UnsupportedOperationException("Provider task lists are not supported"); }
 	default Optional<TaskList> taskList(java.util.UUID id) { throw new UnsupportedOperationException("Provider task lists are not supported"); }
 	default List<TaskList> taskLists(java.util.UUID connectionId) { throw new UnsupportedOperationException("Provider task lists are not supported"); }

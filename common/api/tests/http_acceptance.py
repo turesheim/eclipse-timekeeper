@@ -1009,6 +1009,39 @@ class HttpAcceptance(unittest.TestCase):
         self.assertEqual(mappings[connection['id']],restored['connectionId'])
         self.assertFalse(restored['present'])
 
+    def test_provider_list_sharing_survives_legacy_writes_and_transfer(self):
+        connection=self.create('task-connections',{'providerId':'microsoft','remoteAccountId':str(uuid4()),
+            'name':'Work','readable':True,'writable':True,'enabled':True})
+        fields={'connectionId':connection['id'],'remoteListId':str(uuid4()),'name':'Team tasks',
+                'kind':'STANDARD','readable':True,'writable':True,'shared':True,'owner':False,
+                'present':True,'position':0}
+        task_list=self.create('task-lists',fields)
+        sharing={'remoteOwnerId':'owner-1','participants':[
+            {'remotePrincipalId':'owner-1','displayName':'Alex','role':'OWNER'},
+            {'remotePrincipalId':'member-2','displayName':'Sam','role':'EDITOR'}]}
+        path='/task-lists/'+task_list['id']
+        _, headers=self.call('GET',path)
+        self.call('PUT',path+'/sharing',body=sharing,owner='read',headers={'If-Match':headers['ETag']},
+                  status=403,code='FORBIDDEN')
+        self.call('PUT',path+'/sharing',body={**sharing,'participants':[sharing['participants'][0]]*2},
+                  headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        updated, headers=self.call('PUT',path+'/sharing',body=sharing,headers={'If-Match':headers['ETag']})
+        self.assertEqual(sharing,updated['sharing'])
+        updated, _=self.call('PUT',path,body={key:fields[key] for key in
+            ('name','kind','readable','writable','shared','owner','present','position')},
+            headers={'If-Match':headers['ETag']})
+        self.assertEqual(sharing,updated['sharing'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
+               'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
+        mappings={item['sourceId']:item['id'] for item in imported['ids']}
+        for item in imported['ids']:
+            if item['entityType'] in kinds:self.created.append(('b',kinds[item['entityType']],item['id']))
+        restored, _=self.call('GET','/task-lists/'+mappings[task_list['id']],owner='b')
+        self.assertEqual(sharing,restored['sharing'])
+        self.call('GET',path,owner='b',status=404,code='NOT_FOUND')
+
     def test_sync_cursors_are_durable_opaque_and_require_explicit_rescan(self):
         account=self.create('task-connections',{'providerId':'microsoft','remoteAccountId':str(uuid4()),
                     'name':'Personal','readable':True,'writable':True,'enabled':True})
