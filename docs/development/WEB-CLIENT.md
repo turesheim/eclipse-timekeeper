@@ -137,8 +137,12 @@ bold, italic, strikethrough, inline/fenced code, bulleted/numbered/task lists,
 links, quotations, tables and undo/redo. Link addresses are validated; activating
 a rendered link does not navigate. **Markdown source**
 retains unsupported syntax, including Obsidian extensions. Opaque YAML
-frontmatter is shown separately and preserved in saves and downloads. Formatting
-normalization and keyboard guidance are available under **Editing help**.
+frontmatter is shown separately and preserved in saves. The Formatted and Markdown
+source mode buttons share the editor toolbar with formatting actions, separated
+by a vertical divider. Mode buttons use icons with localized tooltips. Editing
+help and the separate clear/download actions are omitted. Safe angle-bracket
+autolinks remain renderable, rich edits retain resource-link syntax, and
+horizontal rules are saved as `---`.
 The [layout evaluation](JOURNAL-EDITOR.md) records why this keeps the existing
 Calendar navigation rather than introducing a separate Journal tab.
 Clear the text and save to remove a label;
@@ -151,15 +155,20 @@ populated bodies, including body-only notes; `journal-plus` offers creation when
 there is no body. Clearing only the label retains the body indicator; clearing
 the body retains an existing badge. Empty-day add actions keep the existing
 hover/keyboard/long-press behavior. Read-only sessions can open saved bodies,
-switch modes and download Markdown; editing and task toggles remain disabled.
+switch modes; editing and task toggles remain disabled.
 
 Dirty dismissal asks before discarding either field. Failed saves keep the
-draft. A stale version disables Save and offers **Download Markdown** and
-**Reload saved note**, with confirmation before replacing the draft. An
+draft. A stale version disables Save and offers **Reload saved note**, with confirmation before replacing the draft. An
 unconfirmed write offers **Check saved result**: it reads the server and accepts
 a matching saved value without issuing another write. A differing saved value
 requires explicit reload/review. No source or draft is stored in browser storage,
 and logout clears both editor modes and their private content.
+
+Week has a right-aligned daily-note button in each day heading, including
+weekends. It edits the same dated note as the month view and retains the same
+conflict, read-only, source-preservation and logout protections. Empty note
+buttons stay visible in Week and are disabled for read-only sessions. Failed
+note reads expose retry controls without blocking timed work.
 
 ![Day notes beside dates and holidays](../assets/screenshots/day-notes-desktop.png)
 

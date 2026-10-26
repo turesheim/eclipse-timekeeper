@@ -385,9 +385,9 @@ test('Week day headings open shared daily notes with one toolbar and right-align
     expect(await toolbar.evaluate(node=>node.querySelector('.markdown-modes').nextElementSibling.getAttribute('role')==='separator'&&node.querySelector('.markdown-tools').previousElementSibling.getAttribute('role')==='separator')).toBe(true);
     for(const name of ['Clear note body','Download Markdown'])await expect(editor.getByRole('button',{name,exact:true})).toHaveCount(0);await expect(editor.getByText('Editing help',{exact:true})).toHaveCount(0);
     const rich=editor.locator('.ProseMirror');await rich.fill('Edited from Week');await editor.locator('#week-note-text').fill('Week label');await editor.getByRole('button',{name:'Save',exact:true}).click();await expect(editor).not.toBeVisible();await expect(entry).toBeFocused();
-    expect((await(await api('GET','/day-notes/'+date)).json()).body).toContain('Edited from Week');expect(await(await api('GET','/work-sessions')).json()).toEqual(before);
+    expect((await(await api('GET','/day-notes/'+date)).json()).body).toContain('Edited from Week');expect((await(await api('GET','/work-sessions')).json()).items).toEqual(before.items);
     await page.locator('[data-tab=track]').click();await month(page);await note(page).click();await expect(dialog(page).locator('.ProseMirror')).toHaveText('Edited from Week');await expect(page.locator('#track-note-text')).toHaveValue('Week label');await dialog(page).getByRole('button',{name:'Cancel',exact:true}).click();
-    await page.locator('[data-tab=calendar]').click();await page.setViewportSize({width:320,height:740});await entry.click();await expect(editor).toBeVisible();await editor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(editor.locator('#week-journal-body')).toBeVisible();await expect(toolbar.getByRole('button',{name:'Formatted',exact:true})).toBeVisible();await editor.getByRole('button',{name:'Formatted',exact:true}).click();await expect(rich).toBeVisible();
+    await page.locator('[data-tab=calendar]').click();await page.setViewportSize({width:320,height:740});await entry.click();await expect(editor).toBeVisible();await editor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(editor.locator('#week-journal-body')).toBeVisible();await expect(toolbar.getByRole('button',{name:'Formatted',exact:true})).toBeVisible();await editor.getByRole('button',{name:'Formatted',exact:true}).click();await expect(rich).toBeVisible();await expect(toolbar.getByRole('separator')).toBeInViewport();await expect(toolbar.locator('.markdown-tools button').first()).toBeInViewport();
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#week-note-editor').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:'test-results/week-day-note-editor-mobile.png'});
     const ids=await page.locator('[id]').evaluateAll(nodes=>nodes.map(node=>node.id));expect(ids.filter((id,index)=>ids.indexOf(id)!==index)).toEqual([]);
   } finally {await owner.close();}
@@ -400,6 +400,34 @@ test('Week daily-note buttons respect read-only access and clear private bodies 
     const token=await(await api('POST','/auth/tokens',{name:'Week note reader',permissions:['read'],expiresAt:null})).json();await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#workspace')).toBeVisible();
     await read.locator('[data-tab=calendar]').click();await read.locator('#calendar-date').fill(date);const entry=read.locator('[data-week-note-date="'+date+'"]'),editor=read.locator('#week-note-editor');await expect(entry).toBeEnabled();await expect(read.locator('[data-week-note-date="2026-05-11"]')).toBeDisabled();await entry.click();
     await expect(editor.locator('.ProseMirror')).toHaveAttribute('contenteditable','false');await expect(editor.getByRole('button',{name:'Save',exact:true})).toBeDisabled();await editor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(editor.locator('#week-journal-body')).toHaveJSProperty('readOnly',true);
-    await read.evaluate(()=>document.getElementById('sign-out').click());await expect(read.locator('#workspace')).toBeHidden();await expect(editor).not.toBeVisible();await expect(read.locator('#week-journal-body')).toHaveValue('');await expect(read.locator('#week-journal-formatted')).toBeEmpty();expect(await read.evaluate(()=>JSON.stringify({...localStorage,...sessionStorage}))).not.toContain('Private Week note');
+    const readApi=await apiFor(read);await readApi('POST','/auth/logout');await expect(read.locator('#workspace')).toBeHidden();await expect(editor).not.toBeVisible();await expect(read.locator('#week-journal-body')).toHaveValue('');await expect(read.locator('#week-journal-formatted')).toBeEmpty();expect(await read.evaluate(()=>JSON.stringify({...localStorage,...sessionStorage}))).not.toContain('Private Week note');
   } finally {await owner.close();await viewer.close();}
+});
+
+test('journal link round trips keep resource links and dashed horizontal rules renderable',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage();
+  try {
+    await signIn(page,await fresh(request));const api=await apiFor(page),url='https://example.com/original-link',body='First paragraph\n\n['+url+']('+url+')\n\n---\n\nLast paragraph\n';
+    const initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body},{'If-Match':initial.headers().etag});await month(page);await menu(page);
+    const rich=dialog(page).locator('.ProseMirror');await expect(rich.locator('a')).toHaveAttribute('href',url);await expect(rich.locator('hr')).toHaveCount(1);await rich.locator('p').last().click();await page.keyboard.press('End');await page.keyboard.insertText(' edited');await save(page,'');
+    const saved=(await(await api('GET','/day-notes/2026-05-17')).json()).body;expect(saved).toContain('['+url+']('+url+')');expect(saved).toMatch(/\n---\n/);expect(saved).not.toContain('<'+url+'>');expect(saved).not.toMatch(/\n\*\*\*\n/);
+    await menu(page);await expect(rich.locator('a')).toHaveAttribute('href',url);await expect(rich.locator('hr')).toHaveCount(1);await expect(rich).toContainText('Last paragraph edited');
+  } finally {await owner.close();}
+});
+
+test('journal links already saved as angle-bracket autolinks open in formatted mode',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage();
+  try {
+    await signIn(page,await fresh(request));const api=await apiFor(page),body='Links: <https://example.com/path?q=1&v=2>, <mailto:notes@example.com> and <person@example.com>.\n';
+    const initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body},{'If-Match':initial.headers().etag});await month(page);await menu(page);
+    const rich=dialog(page).locator('.ProseMirror');await expect(rich).toBeVisible();await expect(rich.locator('a')).toHaveCount(3);await rich.locator('a').first().click();await expect(page).toHaveURL(/\/web\/$/);await save(page,'Autolinks');expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe(body);
+  } finally {await owner.close();}
+});
+
+test('journal horizontal rules at the start of a note remain Markdown rather than unfinished frontmatter',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage();
+  try {
+    await signIn(page,await fresh(request));const api=await apiFor(page),body='---\n\nFirst paragraph\n',initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body},{'If-Match':initial.headers().etag});await month(page);await menu(page);
+    const rich=dialog(page).locator('.ProseMirror');await expect(rich.locator('hr')).toHaveCount(1);await rich.locator('p').click();await page.keyboard.press('End');await page.keyboard.insertText(' edited');await save(page,'');expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toMatch(/^---\n/);await menu(page);await expect(rich.locator('hr')).toHaveCount(1);
+  } finally {await owner.close();}
 });

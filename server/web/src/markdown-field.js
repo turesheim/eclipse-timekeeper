@@ -19,7 +19,7 @@ export class MarkdownField {
   constructor(root,onChange,onState,prefix='journal'){
     Object.assign(this,{root,onChange,onState,generation:0,readOnly:true});root.classList.add('markdown-editor');
     this.modes=node('div',undefined,'markdown-modes');this.modes.setAttribute('role','group');this.modes.setAttribute('aria-label',t('markdown.mode'));
-    this.formatted=button(t('markdown.formatted'));this.source=button(t('markdown.source'));this.modes.append(this.formatted,this.source);
+    this.formatted=iconButton(button(),'file-richtext',t('markdown.formatted'));this.source=iconButton(button(),'markdown',t('markdown.source'));this.modes.append(this.formatted,this.source);
     this.status=node('p','','hint');this.status.setAttribute('role','status');
     this.normalization=node('p',t('journal.normalization'),'hint');this.normalization.id=prefix+'-markdown-normalization';
     this.metadata=node('details');this.metadata.hidden=true;this.frontmatterView=node('pre');this.metadata.append(node('summary',t('markdown.metadata')),this.frontmatterView);
