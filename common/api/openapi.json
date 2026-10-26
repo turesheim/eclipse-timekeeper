@@ -13406,6 +13406,71 @@
           }
         }
       }
+    },
+    "/task-sync/export-preview": {
+      "post": {
+        "operationId": "previewTaskSyncExport",
+        "summary": "Preview outbound provider changes",
+        "description": "Read-only capability gate against one linked provider identity and last-common baseline. The connector must still check per-item remote permissions and ETags before writing.",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskSyncExportInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "200": {
+            "description": "Outbound field changes and lossy-export warnings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSyncExportPreview"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -25065,6 +25130,119 @@
         ],
         "additionalProperties": false,
         "description": "Conditionally merge one observed task against the current ETag and last-common baseline. The item operationId is the durable receipt key."
+      },
+      "TaskSyncExportInput": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "listId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "connectionId",
+          "listId",
+          "taskId",
+          "providerId",
+          "repositoryId",
+          "externalId"
+        ],
+        "additionalProperties": false
+      },
+      "TaskSyncExportWarning": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "summary",
+              "url",
+              "body",
+              "status",
+              "scheduledDate",
+              "completedAt",
+              "start",
+              "due",
+              "priority",
+              "flagged",
+              "urgent",
+              "parentTaskId",
+              "siblingOrder",
+              "checklistItems",
+              "recurrence",
+              "reminders",
+              "metadata",
+              "taskListId",
+              "sectionId",
+              "assignment"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "NO_BASELINE",
+              "NOT_WRITABLE",
+              "CLEAR_UNSUPPORTED",
+              "INCOMPLETE_GROUP",
+              "IDENTITY_RECONCILIATION_REQUIRED"
+            ]
+          }
+        },
+        "required": [
+          "field",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "TaskSyncExportPreview": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskEtag": {
+            "type": "string"
+          },
+          "writeFields": {
+            "$ref": "#/components/schemas/TaskSyncFields"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskSyncExportWarning"
+            }
+          }
+        },
+        "required": [
+          "taskId",
+          "taskEtag",
+          "writeFields",
+          "warnings"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {

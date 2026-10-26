@@ -143,6 +143,82 @@ public class TaskSyncPreviewResource {
     }
     private static UUID uuidText(String value) {try {return UUID.fromString(value);}catch(IllegalArgumentException error){throw ApiFailure.validation();}}
 
+    /** Describe outbound changes without making a provider call or losing local-only fields. */
+    @POST @Path("/export-preview") public Response exportPreview(JsonNode body) {
+        var input=inputs.validate("TaskSyncExportInput",body);ContractInputs.queries(uri.getQueryParameters());
+        return store.authenticated(identity,() -> {
+            var connection=store.find("TASK_CONNECTION",uuid(input.get("connectionId"))).orElseThrow(ApiFailure::notFound);
+            var list=store.find("TASK_LIST",uuid(input.get("listId"))).orElseThrow(ApiFailure::notFound);
+            var task=store.find("TASK",uuid(input.get("taskId"))).orElseThrow(ApiFailure::notFound);
+            if(!list.path("connectionId").asText().equals(connection.path("id").asText())) throw ApiFailure.validation();
+            if(!connection.path("enabled").asBoolean() || !connection.path("writable").asBoolean()
+                    || !list.path("present").asBoolean() || !list.path("writable").asBoolean()) throw ApiFailure.conflict();
+            var key=new ExternalTaskReferenceKey(input.path("providerId").asText(),input.path("repositoryId").asText(),input.path("externalId").asText());
+            if(!key.providerId().equals(connection.path("providerId").asText())) throw ApiFailure.validation();
+            JsonNode reference=null;
+            for(var value:task.path("externalReferences")) if(value.path("providerId").asText().equals(key.providerId())
+                    && value.path("repositoryId").asText().equals(key.repositoryId())
+                    && value.path("externalId").asText().equals(key.externalId())) {reference=value;break;}
+            if(reference==null || !reference.path("taskListId").asText().equals(list.path("id").asText())) throw ApiFailure.notFound();
+            var baseline=reference.path("baseline").path("fields");var writes=object();var warnings=array();
+            for(var field:FIELDS.stream().sorted().toList()) {
+                var local=local(task,reference,field);
+                if(!baseline.has(field)) {
+                    if(!field.equals("taskListId") && meaningful(field,local)) warning(warnings,field,"NO_BASELINE");
+                    continue;
+                }
+                if(local.equals(baseline.get(field))) continue;
+                var cap=connection.path("capabilities").path("fields").path(field);
+                if(!cap.path("readable").asBoolean() || !cap.path("writable").asBoolean()) {
+                    warning(warnings,field,"NOT_WRITABLE");continue;
+                }
+                if(field.equals("taskListId")) {warning(warnings,field,"IDENTITY_RECONCILIATION_REQUIRED");continue;}
+                if(clearing(field,local) && !cap.path("deletable").asBoolean()) {
+                    warning(warnings,field,"CLEAR_UNSUPPORTED");continue;
+                }
+                writes.set(field,local.deepCopy());
+            }
+            for(var group:GROUPS) if(writes.has(group[0]) || writes.has(group[1])) {
+                if(!baseline.has(group[0]) || !baseline.has(group[1])
+                        || !connection.path("capabilities").path("fields").path(group[0]).path("readable").asBoolean()
+                        || !connection.path("capabilities").path("fields").path(group[1]).path("readable").asBoolean()
+                        || !connection.path("capabilities").path("fields").path(group[0]).path("writable").asBoolean()
+                        || !connection.path("capabilities").path("fields").path(group[1]).path("writable").asBoolean()
+                        || blockedClear(connection,task,reference,baseline,group[0])
+                        || blockedClear(connection,task,reference,baseline,group[1])) {
+                    writes.remove(group[0]);writes.remove(group[1]);warning(warnings,group[0],"INCOMPLETE_GROUP");
+                } else {
+                    writes.set(group[0],local(task,reference,group[0]).deepCopy());
+                    writes.set(group[1],local(task,reference,group[1]).deepCopy());
+                }
+            }
+            var result=object();result.put("taskId",task.path("id").asText());result.put("taskEtag",etag(task));
+            result.set("writeFields",writes);result.set("warnings",warnings);
+            return new ApiReplies(200,result,null,null).response();
+        });
+    }
+    private static boolean meaningful(String field,JsonNode value) {
+        if(value.isNull() || value.isMissingNode() || value.isContainerNode() && value.isEmpty() || value.isBoolean() && !value.asBoolean()
+                || value.isIntegralNumber() && value.asInt()==0 || value.isTextual() && value.asText().isBlank()) return false;
+        if(field.equals("priority") && value.asText().equals("UNSPECIFIED") || field.equals("status") && value.asText().equals("NOT_STARTED")) return false;
+        if(field.equals("body") && value.path("content").asText().isEmpty()) return false;
+        if(field.equals("recurrence") && value.path("series").isNull() && value.path("occurrences").isEmpty()) return false;
+        if(field.equals("metadata") && value.path("tags").isEmpty() && value.path("categories").isEmpty() && value.path("links").isEmpty()) return false;
+        return true;
+    }
+    private static boolean clearing(String field,JsonNode value) {
+        return value.isNull() || value.isContainerNode() && value.isEmpty() || value.isTextual() && value.asText().isEmpty()
+                || field.equals("body") && value.path("content").asText().isEmpty();
+    }
+    private static boolean blockedClear(JsonNode connection,JsonNode task,JsonNode reference,JsonNode baseline,String field) {
+        var value=local(task,reference,field);
+        return !value.equals(baseline.get(field)) && clearing(field,value)
+                && !connection.path("capabilities").path("fields").path(field).path("deletable").asBoolean();
+    }
+    private static void warning(ArrayNode warnings,String field,String reason) {
+        var row=object();row.put("field",field);row.put("reason",reason);warnings.add(row);
+    }
+
     @POST @Path("/preview") public Response preview(JsonNode body) {
         var input=inputs.validate("TaskSyncPreviewInput",body);ContractInputs.queries(uri.getQueryParameters());
         return store.authenticated(identity,() -> {

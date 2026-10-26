@@ -1243,6 +1243,20 @@ class HttpAcceptance(unittest.TestCase):
         self.call('POST','/task-sync/apply',body=conflicting,headers={'If-Match':updated_headers['ETag']},
                   status=409,code='CONFLICT')
         self.assertEqual('My edited title',self.call('GET',task_path)[0]['summary'])
+        export={'connectionId':connection['id'],'listId':task_list['id'],'taskId':created['id'],
+                **{name:item[name] for name in ('providerId','repositoryId','externalId')}}
+        self.call('POST','/task-sync/export-preview',body=export,owner='b',status=404,code='NOT_FOUND')
+        outward,_=self.call('POST','/task-sync/export-preview',body=export)
+        self.assertNotIn('summary',outward['writeFields'])
+        self.assertIn({'field':'summary','reason':'NOT_WRITABLE'},outward['warnings'])
+        _,connection_headers=self.call('GET','/task-connections/'+connection['id'])
+        writable={**capabilities,'fields':{**capabilities['fields'],'summary':
+                  {**field,'writable':True}}}
+        self.call('PUT','/task-connections/'+connection['id']+'/capabilities',body=writable,
+                  headers={'If-Match':connection_headers['ETag']})
+        outward,_=self.call('POST','/task-sync/export-preview',body=export)
+        self.assertEqual('My edited title',outward['writeFields']['summary'])
+        self.assertEqual(updated_headers['ETag'],outward['taskEtag'])
 
     def test_external_task_list_link_is_owned_guarded_and_remapped(self):
         account=self.create('task-connections',{'providerId':'google','remoteAccountId':str(uuid4()),

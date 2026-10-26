@@ -286,6 +286,16 @@ the reference baseline at the same time as the task. The operation ID is a
 durable receipt so retrying the exact request cannot apply it twice. Remote
 deletions still need a separate explicit review workflow.
 
+`POST /task-sync/export-preview` computes outbound field changes for one
+linked task/reference. It compares the current task with that reference's
+last-common baseline and includes only fields the connection declares readable
+and writable. Clearing a changed field also requires `deletable=true`.
+Unbased fields, read-only values, unsupported clears, incomplete paired groups
+and list moves produce warnings rather than approximate provider writes. The
+endpoint is read-only and returns the current task ETag. A connector must
+still enforce provider item permissions, remote ETags and rate limits before
+using the proposed fields.
+
 An external task reference can carry `taskListId` to point at an owned provider
 list. The list's connection must use the same provider. The existing
 `repositoryId` remains the provider identity namespace and must distinguish
