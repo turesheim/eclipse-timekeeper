@@ -2,7 +2,6 @@ import {captureScreenshot} from './screenshots.js';
 import {setTheme} from './navigation.js';
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
-import {readFile} from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
 import {browserRequest} from './browser-request.js';
 
@@ -223,11 +222,11 @@ test('journal saves formatted bodies independently from labels and updates separ
     await page.mouse.move(0,0);await page.locator('#track-month').focus();await expect(note(page)).toHaveCSS('opacity','1');expect(await note(page).locator('.badge .bi-journal-text').count()).toBe(0);
     await menu(page);await expect(rich.locator('strong')).toHaveText('Daily body');await captureScreenshot(page,{path:'test-results/day-notes-editor.png'});await save(page,'');await expect(note(page).locator('.badge')).toHaveCount(0);await expect(note(page).locator('.bi-journal-text')).toBeVisible();
     expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe(first.body);
-    await menu(page);await dialog(page).getByRole('button',{name:'Clear note body',exact:true}).click();await save(page,'');await expect(note(page)).toHaveClass(/is-empty/);await expect(note(page).locator('.bi-journal-plus')).toHaveCount(1);
+    await menu(page);await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('');await save(page,'');await expect(note(page)).toHaveClass(/is-empty/);await expect(note(page).locator('.bi-journal-plus')).toHaveCount(1);
     await menu(page);await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('# Body on an empty day\n\n- [ ] Follow up\n');await save(page,'Label stays');
     await menu(page);await expect(rich.locator('h1')).toHaveText('Body on an empty day');await expect(rich.getByRole('checkbox')).not.toBeChecked();await rich.getByRole('checkbox').check();await save(page,'Label stays');
     expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toContain('[x] Follow up');await expect(page.locator('#track-total')).toHaveText(total);expect((await(await api('GET','/work-sessions')).json()).items).toHaveLength(0);
-    await menu(page);await dialog(page).getByRole('button',{name:'Clear note body',exact:true}).click();await save(page,'Label stays');await expect(note(page).locator('.badge')).toHaveText('Label stays');await expect(note(page).locator('.bi-journal-plus')).toBeVisible();
+    await menu(page);await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('');await save(page,'Label stays');await expect(note(page).locator('.badge')).toHaveText('Label stays');await expect(note(page).locator('.bi-journal-plus')).toBeVisible();
   }finally{await owner.close();}
 });
 
@@ -239,10 +238,11 @@ test('journal preserves unsupported source, opaque frontmatter and exact label-o
     const external=[];page.on('request',request=>{if(request.url().includes('journal-image.invalid'))external.push(request.url());});await month(page);await menu(page);
     await expect(page.locator('#journal-body')).toBeVisible();await expect(dialog(page)).toContainText('cannot safely preserve');await expect(dialog(page).locator('img')).toHaveCount(0);
     await dialog(page).getByRole('button',{name:'Formatted',exact:true}).click();await expect(page.locator('#journal-body')).toBeVisible();
-    const waiting=page.waitForEvent('download');await dialog(page).getByRole('button',{name:'Download Markdown',exact:true}).click();const download=await waiting;expect(download.suggestedFilename()).toBe('2026-05-17.md');expect(await readFile(await download.path(),'utf8')).toBe(body);
+    await expect(dialog(page).getByRole('button',{name:'Download Markdown',exact:true})).toHaveCount(0);await expect(dialog(page).getByRole('button',{name:'Clear note body',exact:true})).toHaveCount(0);
+
     await save(page,'Separate label');expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe(body);expect(external).toEqual([]);
     await menu(page);await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('[unsafe](javascript:alert(1))');await dialog(page).getByRole('button',{name:'Formatted',exact:true}).click();await expect(dialog(page)).toContainText('cannot safely preserve');await expect(dialog(page).locator('a[href^="javascript:"]')).toHaveCount(0);
-    await dialog(page).getByRole('button',{name:'Clear note body',exact:true}).click();const rich=page.locator('#journal-formatted .ProseMirror');await expect(rich).toBeVisible();await rich.pressSequentially('[unsafe](javascript:alert(1)) ');await expect(rich.locator('a[href^="javascript:"]')).toHaveCount(0);
+    await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('');await dialog(page).getByRole('button',{name:'Formatted',exact:true}).click();const rich=page.locator('#journal-formatted .ProseMirror');await expect(rich).toBeVisible();await rich.pressSequentially('[unsafe](javascript:alert(1)) ');await expect(rich.locator('a[href^="javascript:"]')).toHaveCount(0);
     expect(await page.evaluate(()=>JSON.stringify({...localStorage,...sessionStorage}))).not.toContain('Daily link');
   }finally{await owner.close();}
 });
@@ -367,4 +367,39 @@ test('journal text-style menu supports keyboard selection and Escape without clo
     }
     await captureScreenshot(page,{path:'test-results/journal-heading-menu-mobile.png'});await choices.first().click();await expect(rich.locator('p')).toHaveCount(1);
   }finally{await owner.close();}
+});
+
+
+test('Week day headings open shared daily notes with one toolbar and right-aligned buttons',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage();
+  try {
+    await signIn(page,await fresh(request));const api=await apiFor(page),date='2026-05-17',initial=await api('GET','/day-notes/'+date);
+    await api('PUT','/day-notes/'+date,{text:'Shared Sunday',body:'# A shared note\n'},{'If-Match':initial.headers().etag});
+    const before=await(await api('GET','/work-sessions')).json();
+    await page.locator('[data-tab=calendar]').click();await page.locator('#calendar-date').fill(date);
+    const buttons=page.locator('.calendar-heading [data-week-note-date]'),entry=page.locator('[data-week-note-date="'+date+'"]'),editor=page.locator('#week-note-editor');
+    await expect(buttons).toHaveCount(7);for(const button of await buttons.all())await expect(button).toBeEnabled();await expect(entry.locator('.bi-journal-text')).toBeVisible();
+    const bounds=await entry.boundingBox(),heading=await entry.locator('xpath=ancestor::*[contains(@class,"calendar-heading")]').boundingBox();expect(Math.abs(bounds.x+bounds.width-heading.x-heading.width)).toBeLessThanOrEqual(4);
+    await entry.click();await expect(editor).toBeVisible();await expect(editor.locator('#week-journal-formatted .ProseMirror')).toHaveText('A shared note');await expect(page.locator('dialog[open]')).toHaveCount(1);
+    const toolbar=editor.locator('.markdown-toolbar');await expect(toolbar.locator('.markdown-modes button')).toHaveCount(2);await expect(toolbar.getByRole('separator')).toHaveAttribute('aria-orientation','vertical');
+    expect(await toolbar.evaluate(node=>node.querySelector('.markdown-modes').nextElementSibling.getAttribute('role')==='separator'&&node.querySelector('.markdown-tools').previousElementSibling.getAttribute('role')==='separator')).toBe(true);
+    for(const name of ['Clear note body','Download Markdown'])await expect(editor.getByRole('button',{name,exact:true})).toHaveCount(0);await expect(editor.getByText('Editing help',{exact:true})).toHaveCount(0);
+    const rich=editor.locator('.ProseMirror');await rich.fill('Edited from Week');await editor.locator('#week-note-text').fill('Week label');await editor.getByRole('button',{name:'Save',exact:true}).click();await expect(editor).not.toBeVisible();await expect(entry).toBeFocused();
+    expect((await(await api('GET','/day-notes/'+date)).json()).body).toContain('Edited from Week');expect(await(await api('GET','/work-sessions')).json()).toEqual(before);
+    await page.locator('[data-tab=track]').click();await month(page);await note(page).click();await expect(dialog(page).locator('.ProseMirror')).toHaveText('Edited from Week');await expect(page.locator('#track-note-text')).toHaveValue('Week label');await dialog(page).getByRole('button',{name:'Cancel',exact:true}).click();
+    await page.locator('[data-tab=calendar]').click();await page.setViewportSize({width:320,height:740});await entry.click();await expect(editor).toBeVisible();await editor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(editor.locator('#week-journal-body')).toBeVisible();await expect(toolbar.getByRole('button',{name:'Formatted',exact:true})).toBeVisible();await editor.getByRole('button',{name:'Formatted',exact:true}).click();await expect(rich).toBeVisible();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect((await new AxeBuilder({page}).include('#week-note-editor').analyze()).violations).toEqual([]);await captureScreenshot(page,{path:'test-results/week-day-note-editor-mobile.png'});
+    const ids=await page.locator('[id]').evaluateAll(nodes=>nodes.map(node=>node.id));expect(ids.filter((id,index)=>ids.indexOf(id)!==index)).toEqual([]);
+  } finally {await owner.close();}
+});
+
+test('Week daily-note buttons respect read-only access and clear private bodies at sign-out',async({browser,request})=>{
+  const owner=await context(browser),viewer=await context(browser),page=await owner.newPage(),read=await viewer.newPage();
+  try {
+    await signIn(page,await fresh(request));const api=await apiFor(page),date='2026-05-17',initial=await api('GET','/day-notes/'+date);await api('PUT','/day-notes/'+date,{body:'Private Week note'},{'If-Match':initial.headers().etag});
+    const token=await(await api('POST','/auth/tokens',{name:'Week note reader',permissions:['read'],expiresAt:null})).json();await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#workspace')).toBeVisible();
+    await read.locator('[data-tab=calendar]').click();await read.locator('#calendar-date').fill(date);const entry=read.locator('[data-week-note-date="'+date+'"]'),editor=read.locator('#week-note-editor');await expect(entry).toBeEnabled();await expect(read.locator('[data-week-note-date="2026-05-11"]')).toBeDisabled();await entry.click();
+    await expect(editor.locator('.ProseMirror')).toHaveAttribute('contenteditable','false');await expect(editor.getByRole('button',{name:'Save',exact:true})).toBeDisabled();await editor.getByRole('button',{name:'Markdown source',exact:true}).click();await expect(editor.locator('#week-journal-body')).toHaveJSProperty('readOnly',true);
+    await read.evaluate(()=>document.getElementById('sign-out').click());await expect(read.locator('#workspace')).toBeHidden();await expect(editor).not.toBeVisible();await expect(read.locator('#week-journal-body')).toHaveValue('');await expect(read.locator('#week-journal-formatted')).toBeEmpty();expect(await read.evaluate(()=>JSON.stringify({...localStorage,...sessionStorage}))).not.toContain('Private Week note');
+  } finally {await owner.close();await viewer.close();}
 });

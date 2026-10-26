@@ -50,3 +50,7 @@ body:has(#workspace[data-view=calendar]:not([hidden])) {
 .calendar-heading.public-holiday button{max-width:100%;min-width:0;padding-block:.15rem;color:var(--holiday-color)}
 .calendar-heading.public-holiday.today{box-shadow:inset 0 -3px var(--accent)}
 .calendar-holiday-name{display:block;max-width:100%;padding:0 .3rem;font-size:.65rem;color:var(--holiday-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.calendar-date-row { display: flex; align-items: center; width: 100%; min-width: 0; }
+.calendar-date-pick { flex: 1; min-width: 0; }
+.calendar-heading .calendar-day-note { flex: none; opacity: 1; min-width: 2.75rem; min-height: 2.75rem; margin-inline-start: auto; padding: .4rem; color: var(--accent); }

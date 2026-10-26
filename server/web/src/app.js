@@ -32,6 +32,7 @@ const displayNanos = (value) => decimalHours ? decimalHoursText(value) : nanosTe
 const displayDuration = (value) => decimalHours ? decimalHoursText(durationNanos(value)) : durationText(value);
 const calendar = new WeekCalendar($('calendar-panel'), {
   canWrite:()=>canWrite,
+  onNotesChanged:()=>void refresh().catch(()=>{}),
   onUnauthorized:error=>auth.clear(errorText(error)),
   onConvertEvent:(event,range)=>void openCalendarActivity(event,range).catch(error=>setStatus(errorText(error))),
   onDate: selectWeek,
