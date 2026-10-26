@@ -33,6 +33,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskPlanning;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskTiming;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskImportance;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskBody;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityReport;
 
@@ -50,6 +51,7 @@ public interface TimekeeperService {
 	default Task updateTaskChecklist(UpdateTaskChecklist command) { throw new UnsupportedOperationException("Task checklists are not supported"); }
 	default Task updateTaskTiming(UpdateTaskTiming command) { throw new UnsupportedOperationException("Task timing is not supported"); }
 	default Task updateTaskImportance(UpdateTaskImportance command) { throw new UnsupportedOperationException("Task importance is not supported"); }
+	default Task updateTaskBody(UpdateTaskBody command) { throw new UnsupportedOperationException("Task body is not supported"); }
 	void deleteTask(DeleteTask command);
 	Optional<Task> task(TaskId id);
 	List<Task> tasks();

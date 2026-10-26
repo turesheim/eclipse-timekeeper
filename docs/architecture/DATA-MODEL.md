@@ -392,6 +392,11 @@ are independent task values. Missing values on older payloads read as
 `UNSPECIFIED`/false/false. Ordinary task edits preserve them, and both portable
 exports and account archives retain them. Provider capabilities determine
 which of these fields a connector may write remotely.
+Task notes are an embedded `body` value with an explicit `TEXT` or `HTML`
+format. Missing values on older payloads read as empty plain text. The
+conditional body endpoint can clear notes with empty text; ordinary task edits
+preserve notes, and portable exports and account archives retain them. HTML is
+stored as source content and must be sanitized by a renderer before display.
 The account ZIP archive also includes active day labels and Markdown bodies;
 journal synchronization state and deletion tombstones are not portable account
 records.

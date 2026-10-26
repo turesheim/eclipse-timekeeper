@@ -148,6 +148,12 @@ must retain unsupported flags in Timekeeper without inventing a corresponding
 provider value. Legacy task, planning, checklist, and timing updates preserve
 importance.
 
+Task notes use a separate conditional `PUT /tasks/{id}/body` with a complete
+`{ "format": "TEXT" | "HTML", "content": "..." }` value. Empty plain text clears
+notes. The body is optional on creation and defaults to empty text. Older task
+updates and the other task section endpoints preserve it. HTML is untrusted
+source content; clients must sanitize it before rendering.
+
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
 Manual editing sets `manual=true` and cannot change activity task/owner. Creating,
