@@ -13260,6 +13260,81 @@
           }
         }
       }
+    },
+    "/task-sync/import": {
+      "post": {
+        "operationId": "importTaskSyncItem",
+        "summary": "Import one observed provider task",
+        "description": "Creates one root task with a stable provider identity and last-common baseline. Repeated command receipt or identical provider observation does not create another task. Remote hierarchy is handled by a later pass.",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskSyncImportInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "201": {
+            "description": "Created task.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Previously imported task with the same provider identity and baseline.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -24855,6 +24930,38 @@
           "items"
         ],
         "additionalProperties": false
+      },
+      "TaskSyncImportInput": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "listId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "sourceState": {
+            "type": "string",
+            "enum": [
+              "HEALTHY",
+              "UNAVAILABLE",
+              "AUTH_EXPIRED",
+              "PERMISSION_CHANGED",
+              "LIST_MISSING"
+            ]
+          },
+          "item": {
+            "$ref": "#/components/schemas/TaskSyncObservedItem"
+          }
+        },
+        "required": [
+          "connectionId",
+          "listId",
+          "sourceState",
+          "item"
+        ],
+        "additionalProperties": false,
+        "description": "Idempotent import of one provider-observed root task. The item operationId is the command receipt key."
       }
     },
     "parameters": {

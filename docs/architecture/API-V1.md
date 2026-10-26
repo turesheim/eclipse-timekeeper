@@ -262,6 +262,18 @@ incomplete scan; otherwise it requires explicit review and conflicts if the
 local task changed. Preview responses include task ETags for a later
 conditional apply step. Provider page tokens remain opaque.
 
+`POST /task-sync/import` applies one healthy, observed root task that has no
+existing provider identity. Its `operationId` is a durable command receipt; a
+retry returns the original result. A repeated observation under a new
+operation ID returns the existing task only when the accepted remote fields
+still match its baseline. Local edits remain untouched. The connection must
+declare the summary readable; other unclaimed fields are skipped and excluded
+from the baseline. This initial import accepts the normalized task fields,
+including civil schedule, completion, recurrence, reminders, checklist and
+provider list association. Remote subtasks need a later hierarchy pass before
+they can be imported. Remote changes to existing tasks go through a separate
+conditional apply workflow.
+
 An external task reference can carry `taskListId` to point at an owned provider
 list. The list's connection must use the same provider. The existing
 `repositoryId` remains the provider identity namespace and must distinguish

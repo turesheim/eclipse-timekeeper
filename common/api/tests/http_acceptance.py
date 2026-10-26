@@ -1182,6 +1182,43 @@ class HttpAcceptance(unittest.TestCase):
         unchanged,_=self.call('GET',path)
         self.assertEqual('Locally edited',unchanged['summary'])
 
+    def test_initial_task_sync_import_replays_without_overwriting_local_edits(self):
+        connection=self.create('task-connections',{'providerId':'google','remoteAccountId':str(uuid4()),
+                    'name':'Import','readable':True,'writable':True,'enabled':True})
+        task_list=self.create('task-lists',{'connectionId':connection['id'],'remoteListId':str(uuid4()),
+                    'name':'Import','kind':'STANDARD','readable':True,'writable':True,'shared':False,
+                    'owner':True,'present':True,'position':0})
+        path='/task-connections/'+connection['id']
+        _, headers=self.call('GET',path)
+        field={'readable':True,'writable':False,'deletable':False,'note':None}
+        capabilities={'version':1,'providerApiVersion':'test','fields':{name:field for name in
+                      ('summary','status','completedAt','scheduledDate')}}
+        self.call('PUT',path+'/capabilities',body=capabilities,headers={'If-Match':headers['ETag']})
+        item={'operationId':str(uuid4()),'providerId':'google',
+              'repositoryId':connection['remoteAccountId']+'/'+task_list['remoteListId'],
+              'externalId':str(uuid4()),'deleted':False,
+              'fields':{'summary':'Imported provider task','status':'NOT_STARTED','completedAt':None,
+                        'scheduledDate':'2026-10-27','reminders':[]}}
+        request={'connectionId':connection['id'],'listId':task_list['id'],'sourceState':'HEALTHY','item':item}
+        self.call('POST','/task-sync/import',body=request,owner='b',status=404,code='NOT_FOUND')
+        self.call('POST','/task-sync/import',body={**request,'sourceState':'AUTH_EXPIRED'},status=409,code='CONFLICT')
+        created,headers=self.call('POST','/task-sync/import',body=request,status=201)
+        self.created.append(('a','tasks',created['id']))
+        self.assertEqual(task_list['id'],created['externalReferences'][0]['taskListId'])
+        self.assertEqual({'summary':'Imported provider task','status':'NOT_STARTED',
+                          'completedAt':None,'scheduledDate':'2026-10-27'},
+                         created['externalReferences'][0]['baseline']['fields'])
+        same,_=self.call('POST','/task-sync/import',body=request,status=201)
+        self.assertEqual(created['id'],same['id'])
+        task_path='/tasks/'+created['id']
+        edited,_=self.call('PUT',task_path,body={'projectId':None,'parentTaskId':None,
+                            'summary':'My edited title','url':None},headers={'If-Match':headers['ETag']})
+        replay,_=self.call('POST','/task-sync/import',body={**request,'item':{**item,'operationId':str(uuid4())}},status=200)
+        self.assertEqual(edited['summary'],replay['summary'])
+        self.call('POST','/task-sync/import',body={**request,'item':{**item,'operationId':str(uuid4()),
+                  'fields':{**item['fields'],'summary':'Remote edit'}}},status=409,code='CONFLICT')
+        self.assertEqual('My edited title',self.call('GET',task_path)[0]['summary'])
+
     def test_external_task_list_link_is_owned_guarded_and_remapped(self):
         account=self.create('task-connections',{'providerId':'google','remoteAccountId':str(uuid4()),
                     'name':'Personal','readable':True,'writable':True,'enabled':True})

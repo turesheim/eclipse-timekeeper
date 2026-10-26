@@ -3,8 +3,11 @@ package net.resheim.timekeeper.server;
 import static net.resheim.timekeeper.server.JsonValues.*;
 
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.time.Instant;
+import java.time.LocalDate;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -17,6 +20,8 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.core.Context;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
+import net.resheim.eclipse.timekeeper.domain.*;
+import net.resheim.eclipse.timekeeper.service.Commands.CreateTask;
 
 /** Read-only, field-level reconciliation preview for one provider list page. */
 @Path("/api/v1/task-sync") @Blocking @Consumes("application/json") @Produces("application/json")
@@ -28,7 +33,58 @@ public class TaskSyncPreviewResource {
     @Inject ServerStore store;
     @Inject RequestIdentity identity;
     @Inject ContractInputs inputs;
+    @Inject CommandReceipts receipts;
     @Context UriInfo uri;
+
+    /** Import one fully observed root task. A receipt and provider identity prevent duplicate creates. */
+    @POST @Path("/import") public Response importTask(JsonNode body) {
+        var input=inputs.validate("TaskSyncImportInput",body);ContractInputs.queries(uri.getQueryParameters());
+        var observed=input.get("item");String operation=observed.path("operationId").asText();
+        return store.authenticated(identity,() -> receipts.execute(operation,"POST","/task-sync/import",null,input,() -> {
+            var connection=store.find("TASK_CONNECTION",uuid(input.get("connectionId"))).orElseThrow(ApiFailure::notFound);
+            var list=store.find("TASK_LIST",uuid(input.get("listId"))).orElseThrow(ApiFailure::notFound);
+            if(!list.path("connectionId").asText().equals(connection.path("id").asText())) throw ApiFailure.validation();
+            if(!input.path("sourceState").asText().equals("HEALTHY") || !connection.path("enabled").asBoolean()
+                    || !connection.path("readable").asBoolean() || !list.path("present").asBoolean()
+                    || !list.path("readable").asBoolean()) throw ApiFailure.conflict();
+            var key=new ExternalTaskReferenceKey(observed.path("providerId").asText(),observed.path("repositoryId").asText(),observed.path("externalId").asText());
+            if(!key.providerId().equals(connection.path("providerId").asText()) || observed.path("deleted").asBoolean()) throw ApiFailure.validation();
+            var accepted=object();var remote=observed.get("fields");
+            remote.fields().forEachRemaining(field -> {
+                if(connection.path("capabilities").path("fields").path(field.getKey()).path("readable").asBoolean())
+                    accepted.set(field.getKey(),field.getValue());
+            });
+            if(!accepted.hasNonNull("summary")) throw ApiFailure.validation();
+            for(var group:GROUPS) if(accepted.has(group[0])!=accepted.has(group[1])) throw ApiFailure.validation();
+            if(accepted.hasNonNull("parentTaskId")) throw ApiFailure.conflict(); // Remote hierarchy is resolved in a later pass.
+            if(accepted.hasNonNull("taskListId") && !accepted.path("taskListId").asText().equals(list.path("id").asText())) throw ApiFailure.conflict();
+            if(accepted.hasNonNull("sectionId") && !sectionInList(accepted.path("sectionId").asText(),list.path("id").asText())) throw ApiFailure.validation();
+            var old=store.byReference(key);
+            if(old.isPresent()) {
+                var task=old.orElseThrow();
+                for(var reference:task.path("externalReferences")) if(reference.path("providerId").asText().equals(key.providerId())
+                        && reference.path("repositoryId").asText().equals(key.repositoryId()) && reference.path("externalId").asText().equals(key.externalId())) {
+                    if(reference.path("taskListId").asText().equals(list.path("id").asText())
+                            && reference.path("baseline").path("fields").equals(accepted)) return ApiReplies.resource(200,task,null);
+                }
+                throw ApiFailure.conflict();
+            }
+            var baseline=new ExternalTaskBaseline(1,store.now(),accepted.toString());
+            var assignment=Optional.ofNullable(accepted.get("assignment")).filter(value -> !value.isNull()).map(JsonValues::assignment);
+            var ref=new ExternalTaskReference(key.providerId(),key.repositoryId(),key.externalId(),Optional.empty(),
+                    ExternalTaskSource.empty(),Optional.of(uuid(list.get("id"))),
+                    optionalText(accepted.get("sectionId")).map(UUID::fromString),assignment,Optional.empty(),Optional.of(baseline));
+            var planning=new TaskPlanning(optionalText(accepted.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),
+                    optionalText(accepted.get("scheduledDate")).map(LocalDate::parse),
+                    optionalText(accepted.get("completedAt")).map(Instant::parse));
+            var created=store.service().createTask(new CreateTask(Optional.empty(),Optional.empty(),accepted.path("summary").asText(),
+                    optionalText(accepted.get("url")),Set.of(ref),planning,checklist(accepted.get("checklistItems")),timing(accepted),
+                    importance(accepted),JsonValues.body(accepted),accepted.path("siblingOrder").asInt(0),Set.of(),
+                    recurrence(accepted.get("recurrence")),reminders(accepted.get("reminders")),metadata(accepted.get("metadata"))));
+            var value=snapshot(store.owner(),created);
+            return ApiReplies.resource(201,value,"/api/v1/tasks/"+value.path("id").asText());
+        }).response());
+    }
 
     @POST @Path("/preview") public Response preview(JsonNode body) {
         var input=inputs.validate("TaskSyncPreviewInput",body);ContractInputs.queries(uri.getQueryParameters());
