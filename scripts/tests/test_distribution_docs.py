@@ -84,10 +84,12 @@ class DistributionDocumentationTest(unittest.TestCase):
                          'locale-norwegian-account.png','locale-norwegian-administration.png',
                          'activities-mobile.png','project-icon-picker.png','track-project-icons.png','track-project-icons-mobile.png',
                          'compact-workweek-desktop.png','compact-workweek-mobile.png','projects-grouped-mobile.png',
+                         'project-report-desktop.png',
                          'bootstrap-work-session-desktop.png','bootstrap-work-session-narrow.png',
                          'passkeys-desktop.png','passkeys-mobile.png',
                          'account-data-review-desktop.png','account-data-review-mobile.png',
-                         'account-menu-mobile.png','work-session-labels-desktop.png','work-session-labels-mobile.png',
+                         'account-menu-mobile.png','account-labels-mobile.png','week-day-note-editor-mobile.png',
+                         'journal-heading-menu-mobile.png',
                          'track-month-desktop.png','track-month-narrow.png','track-month-picker.png',
                          'toggl-import-review.png','toggl-import-history-narrow.png'):
                 image = root/'docs/assets/screenshots'/name

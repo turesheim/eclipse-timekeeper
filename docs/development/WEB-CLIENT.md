@@ -176,6 +176,10 @@ note reads expose retry controls without blocking timed work.
 
 ![Formatted journal on a narrow screen](../assets/screenshots/journal-editor-mobile.png)
 
+![Plain text and H1–H6 in the journal heading menu](../assets/screenshots/journal-heading-menu-mobile.png)
+
+![Editing a day note from Week on a narrow screen](../assets/screenshots/week-day-note-editor-mobile.png)
+
 Hover over a daily client total to see its sessions, summaries, projects,
 local start/end times and durations in a tooltip. These details are also available
 when viewing the account with read-only access.
@@ -380,7 +384,7 @@ tokens retain the existing account zone. Use **Account menu → My Account → P
 Workweek shows overlapping sessions in a compact **Work sessions** grid grouped
 by client and project. Each daily cell contains a start/end pair for every
 session; edit a time and press Enter or leave the pair to save, or Escape to
-cancel. The details menu shows summaries and labels and provides the full editor
+cancel. The details menu shows summaries and provides the full editor
 and delete action. Running sessions remain marked. Edits preserve unchanged
 endpoint precision and metadata; stale or uncertain saves keep the proposal for
 review instead of repeating the write.
@@ -432,7 +436,7 @@ the authenticated owner and reject live token owner reassignment.
 
 ## Personal settings and independent user accounts
 
-**My Account** is a dedicated page with Profile, Password, API tokens and Import sections.
+**My Account** is a dedicated page with Profile, Password, API tokens, Labels and Import sections.
 Open it from the header’s **Account menu**, which also contains **Sign out** and,
 for administrators with write access, **Users**. Time-zone settings are in Profile.
 The menu keeps the header on one row at phone widths and supports normal Tab
@@ -507,6 +511,8 @@ Client and optional project classify a work session. Labels belong to Activities
 and are managed under **My Account → Labels**, rather than a tracking tab. The
 account page reuses the existing label editor, deletion safeguards, read-only
 permissions and live catalog updates.
+
+![Labels configured in My Account on a narrow screen](../assets/screenshots/account-labels-mobile.png)
 
 Legacy session labels remain in stored records and portable transfers. Session
 edits omit `labelIds`, preserving existing metadata. Moving, resizing, stopping,
@@ -771,6 +777,8 @@ current selection; **None** removes an icon. Icons work offline.
 ![Project icons in Calendar on a narrow screen](../assets/screenshots/track-project-icons-mobile.png)
 
 ![Projects grouped by client](../assets/screenshots/projects-grouped-mobile.png)
+
+![Project work-session report in a separate browser tab](../assets/screenshots/project-report-desktop.png)
 
 Use **Clients** to create, rename, recolor or delete a client. A client has a
 required name and hex color. Each project belongs to exactly one client; choose
