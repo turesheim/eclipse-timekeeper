@@ -12775,6 +12775,426 @@
         },
         "description": "Conditional update of owner and participant metadata. Does not grant Timekeeper access or change list permissions."
       }
+    },
+    "/tasks/{taskId}/attachments": {
+      "parameters": [
+        {
+          "name": "taskId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "listTaskAttachments",
+        "summary": "List metadata for attachments of one owned task",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskAttachmentPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createTaskAttachment",
+        "summary": "Create a verified task attachment",
+        "x-required-permission": "write",
+        "responses": {
+          "201": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskAttachment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskAttachmentInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{taskId}/attachments/{id}": {
+      "parameters": [
+        {
+          "name": "taskId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "get": {
+        "operationId": "getTaskAttachment",
+        "summary": "Get attachment metadata and Base64 content",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskAttachment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      },
+      "put": {
+        "operationId": "updateTaskAttachment",
+        "summary": "Conditionally replace attachment content and metadata",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskAttachment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskAttachmentInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteTaskAttachment",
+        "summary": "Conditionally delete a task attachment",
+        "x-required-permission": "write",
+        "responses": {
+          "204": {
+            "description": "Successful operation."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ]
+      }
+    },
+    "/tasks/{taskId}/attachments/{id}/content": {
+      "parameters": [
+        {
+          "name": "taskId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "get": {
+        "operationId": "downloadTaskAttachmentContent",
+        "summary": "Download verified attachment bytes",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -23659,6 +24079,229 @@
         },
         "required": [
           "participants"
+        ],
+        "additionalProperties": false
+      },
+      "TaskAttachmentInput": {
+        "type": "object",
+        "description": "Bounded canonical Base64 bytes with a verified SHA-256 digest. Provider identity fields are optional and must be supplied together.",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^/\\\\]+$"
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "pattern": "^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "data": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 1398104,
+            "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "remoteId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "fileName",
+          "contentType",
+          "bytes",
+          "sha256",
+          "data"
+        ],
+        "dependentRequired": {
+          "providerId": [
+            "remoteId"
+          ],
+          "remoteId": [
+            "providerId"
+          ]
+        },
+        "additionalProperties": false
+      },
+      "TaskAttachmentSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^/\\\\]+$"
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "pattern": "^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "remoteId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "taskId",
+          "version",
+          "fileName",
+          "contentType",
+          "bytes",
+          "sha256"
+        ],
+        "additionalProperties": false
+      },
+      "TaskAttachment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^/\\\\]+$"
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "pattern": "^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "remoteId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "data": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 1398104,
+            "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "taskId",
+          "version",
+          "fileName",
+          "contentType",
+          "bytes",
+          "sha256",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "TaskAttachmentPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskAttachmentSummary"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "revision"
         ],
         "additionalProperties": false
       }

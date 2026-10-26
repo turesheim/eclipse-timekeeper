@@ -5,7 +5,9 @@ Requires two test owners and a read-only token for owner A. Never run on real da
 No mock server is included; missing configuration is an error, not a skipped test.
 """
 import argparse
+import base64
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import json
 import os
 import re
@@ -1041,6 +1043,45 @@ class HttpAcceptance(unittest.TestCase):
         restored, _=self.call('GET','/task-lists/'+mappings[task_list['id']],owner='b')
         self.assertEqual(sharing,restored['sharing'])
         self.call('GET',path,owner='b',status=404,code='NOT_FOUND')
+
+    def test_task_attachments_verify_content_and_remain_owner_scoped(self):
+        path='/tasks/'+self.task['id']+'/attachments'
+        content=b'hello task attachment\n'
+        body={'fileName':'note.txt','contentType':'text/plain','bytes':len(content),
+              'sha256':hashlib.sha256(content).hexdigest(),'data':base64.b64encode(content).decode(),
+              'providerId':'apple','remoteId':'remote-1'}
+        receipt=str(uuid4())
+        self.call('POST',path,body={**body,'sha256':'0'*64},headers={'Idempotency-Key':receipt},
+                  status=422,code='VALIDATION')
+        created, headers=self.call('POST',path,body=body,headers={'Idempotency-Key':receipt},status=201)
+        replay, _=self.call('POST',path,body=body,headers={'Idempotency-Key':receipt},status=201)
+        self.assertEqual(created['id'],replay['id'])
+        self.assertEqual(body['data'],created['data'])
+        self.call('GET',path+'/'+created['id'],owner='b',status=404,code='NOT_FOUND')
+        page, _=self.call('GET',path)
+        self.assertEqual([created['id']],[item['id'] for item in page['items']])
+        self.assertNotIn('data',page['items'][0])
+        request=Request(BASE_URL+path+'/'+created['id']+'/content',
+                        headers={'Authorization':'Bearer '+TOKENS['a'],'Accept':'application/octet-stream'})
+        with build_opener(NoRedirect()).open(request,timeout=35) as response:
+            self.assertEqual(content,response.read())
+            self.assertEqual('text/plain',response.headers.get_content_type())
+            self.assertEqual('nosniff',response.headers['X-Content-Type-Options'])
+            self.assertEqual('attachment',response.headers['Content-Disposition'])
+        updated, newer=self.call('PUT',path+'/'+created['id'],body={**body,'fileName':'updated.txt'},
+                                  headers={'If-Match':headers['ETag']})
+        self.assertEqual('updated.txt',updated['fileName'])
+        self.call('DELETE',path+'/'+created['id'],headers={'If-Match':headers['ETag']},status=412,code='STALE_VERSION')
+        self.call('DELETE',path+'/'+created['id'],headers={'If-Match':newer['ETag']},status=204)
+        self.call('GET',path+'/'+created['id'],status=404,code='NOT_FOUND')
+        disposable=self.create('tasks',{'summary':'Attachment cascade','projectId':self.project['id'],
+                    'parentTaskId':None,'url':None})
+        child_path='/tasks/'+disposable['id']+'/attachments'
+        attached, _=self.call('POST',child_path,body=body,headers={'Idempotency-Key':str(uuid4())},status=201)
+        _, task_headers=self.call('GET','/tasks/'+disposable['id'])
+        self.call('DELETE','/tasks/'+disposable['id'],headers={'If-Match':task_headers['ETag']},status=204)
+        self.created.remove(('a','tasks',disposable['id']))
+        self.call('GET',child_path+'/'+attached['id'],status=404,code='NOT_FOUND')
 
     def test_sync_cursors_are_durable_opaque_and_require_explicit_rescan(self):
         account=self.create('task-connections',{'providerId':'microsoft','remoteAccountId':str(uuid4()),

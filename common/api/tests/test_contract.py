@@ -279,6 +279,15 @@ class ContractTest(unittest.TestCase):
         self.assertEqual('updateTaskListSharing',CONTRACT['paths']['/task-lists/{id}/sharing']['put']['operationId'])
         self.assertIn('sharing',CONTRACT['components']['schemas']['TransferTaskList']['properties'])
 
+    def test_task_attachments_have_bounded_content_and_separate_metadata_pages(self):
+        data={'fileName':'note.txt','contentType':'text/plain','bytes':4,
+              'sha256':'a'*64,'data':'dGVzdA==','providerId':'apple','remoteId':'attachment-1'}
+        validator('TaskAttachmentInput').validate(data)
+        self.assertFalse(validator('TaskAttachmentInput').is_valid({**data,'bytes':1048577}))
+        self.assertFalse(validator('TaskAttachmentInput').is_valid({**data,'remoteId':None}))
+        self.assertNotIn('data',CONTRACT['components']['schemas']['TaskAttachmentSummary']['properties'])
+        self.assertEqual('downloadTaskAttachmentContent',CONTRACT['paths']['/tasks/{taskId}/attachments/{id}/content']['get']['operationId'])
+
     def test_task_sibling_order_is_a_conditional_section(self):
         validator('TaskOrderInput').validate({'siblingOrder':7})
         self.assertFalse(validator('TaskOrderInput').is_valid({'siblingOrder':-1}))
@@ -442,6 +451,7 @@ class ContractTest(unittest.TestCase):
             'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors',
             'getTaskTombstone', 'listTaskTombstones', 'findTaskTombstoneByExternalReference',
             'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskMetadata', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskSyncState', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
+            'listTaskAttachments', 'createTaskAttachment', 'getTaskAttachment', 'updateTaskAttachment', 'deleteTaskAttachment', 'downloadTaskAttachmentContent',
             'linkExternalReference', 'replaceExternalReference', 'updateExternalTaskLocation', 'updateExternalTaskAssignment', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',

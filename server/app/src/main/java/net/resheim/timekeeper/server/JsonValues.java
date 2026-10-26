@@ -69,6 +69,13 @@ public final class JsonValues {
             node.put("remoteSectionId",section.remoteSectionId());node.put("name",section.name());node.put("kind",section.kind().name());
             node.put("position",section.position());node.put("present",section.present());node.put("writable",section.writable());return node;
         }
+        if (value instanceof TaskAttachment attachment) {
+            var node=base(owner,attachment.id(),attachment.version());node.put("taskId",attachment.taskId().toString());
+            node.put("fileName",attachment.fileName());node.put("contentType",attachment.contentType());
+            node.put("bytes",attachment.bytes());node.put("sha256",attachment.sha256());node.put("data",attachment.data());
+            attachment.providerId().ifPresent(id -> node.put("providerId",id));
+            attachment.remoteId().ifPresent(id -> node.put("remoteId",id));return node;
+        }
         if (value instanceof TaskSyncCursor cursor) {
             var node=base(owner,cursor.id(),cursor.version());node.put("connectionId",cursor.connectionId().toString());
             nullable(node,"listId",cursor.listId());node.put("mode",cursor.mode().name());nullable(node,"cursor",cursor.cursor());
@@ -145,6 +152,8 @@ public final class JsonValues {
                     node.get("shared").asBoolean(),node.get("owner").asBoolean(),node.get("present").asBoolean(),node.get("position").asInt(),sharing(node.get("sharing")),version);
             case "TASK_SECTION" -> new TaskListSection(id,uuid(node.get("taskListId")),node.get("remoteSectionId").asText(),node.get("name").asText(),
                     TaskListSectionKind.valueOf(node.get("kind").asText()),node.get("position").asInt(),node.get("present").asBoolean(),node.get("writable").asBoolean(),version);
+            case "TASK_ATTACHMENT" -> new TaskAttachment(id,uuid(node.get("taskId")),node.get("fileName").asText(),node.get("contentType").asText(),
+                    node.get("bytes").asInt(),node.get("sha256").asText(),node.get("data").asText(),optionalText(node.get("providerId")),optionalText(node.get("remoteId")),version);
             case "TASK_SYNC_CURSOR" -> new TaskSyncCursor(id,uuid(node.get("connectionId")),optionalText(node.get("listId")).map(UUID::fromString),
                     TaskSyncMode.valueOf(node.get("mode").asText()),optionalText(node.get("cursor")),
                     optionalText(node.get("lastObservedAt")).map(Instant::parse),optionalText(node.get("lastCompleteAt")).map(Instant::parse),version);

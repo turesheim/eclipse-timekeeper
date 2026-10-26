@@ -268,6 +268,15 @@ Legacy link updates preserve assignment data; `PUT
 clears it with explicit `null`. It survives account archives and portable
 transfer without storing connector credentials.
 
+`/tasks/{taskId}/attachments` stores up to 20 attachments per owned task.
+Create and conditional replace verify canonical Base64 bytes, declared size,
+and SHA-256 before persistence; each item is limited to 1 MiB. Optional
+provider and remote IDs travel together. The paginated list exposes metadata
+without bytes; item GET returns Base64 content, while `/content` downloads the
+verified bytes with `no-store`, `nosniff`, and forced attachment headers. An idempotency key is
+required for create. Deleting a task also deletes its attachments. Portable
+transfer and private archive support for these records is staged separately.
+
 An external reference can also hold an optional `providerData` envelope with
 `namespace`, positive schema `version`, and an opaque JSON object `payload`.
 The namespace is the provider ID or a dot-prefixed extension of it. The server
