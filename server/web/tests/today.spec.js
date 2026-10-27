@@ -80,11 +80,6 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(weekly).not.toBeVisible();
     await expect(page.locator('#today-month-grid [data-week="2025-W20"] .today-month-dot')).toHaveCount(1);
     await expect(page.locator('#today-month-grid [data-week="2025-W19"] .today-month-dot')).toHaveCount(0);
-    await page.locator('#today-month-grid [data-week="2025-W20"]').click();
-    await expect(weekly).toContainText('Saved');
-    page.once('dialog',dialog=>dialog.accept());await weekly.getByRole('button',{name:'Delete note',exact:true}).click();
-    await expect(weekly).not.toBeVisible();
-    await expect(page.locator('#today-month-grid [data-week="2025-W20"] .today-month-dot')).toHaveCount(0);
     await expect(page.locator('#today-month-grid [data-date="2025-05-17"] .today-month-dot')).toHaveCount(0);
     await page.locator('#today-note-text').fill('Review day');
     await page.locator('#today-note-editor').getByRole('button',{name:'Markdown source',exact:true}).click();
@@ -117,6 +112,11 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await page.setViewportSize({width:390,height:844});await expect(page.locator('#today-sessions [data-today-client]')).toHaveCSS('font-size','12px');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await captureScreenshot(page,{path:'test-results/today-mobile.png',fullPage:true});
+    await page.locator('#today-month-grid [data-week="2025-W20"]').click();
+    await expect(weekly).toContainText('Saved');
+    page.once('dialog',dialog=>dialog.accept());await weekly.getByRole('button',{name:'Delete note',exact:true}).click();
+    await expect(weekly).not.toBeVisible();
+    await expect(page.locator('#today-month-grid [data-week="2025-W20"] .today-month-dot')).toHaveCount(0);
   }finally{
     await page.unrouteAll({behavior:'wait'});
     const week=await api(request,'GET','/week-notes/2025-W20');if(week.ok()&&Number((await week.json()).version)>0)await api(request,'DELETE','/week-notes/2025-W20',undefined,{'If-Match':week.headers().etag});
