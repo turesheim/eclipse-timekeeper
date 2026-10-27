@@ -81,7 +81,7 @@ test('Track shows exact client session hours, local dates and independent activi
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await expect(day.locator(`[data-track-daily-client="${a.id}"] .track-client-day-time-short`)).toHaveText('26h');await expect(day.locator(`[data-track-daily-client="${a.id}"]`)).toHaveAccessibleName(new RegExp('26h 0m'));await expect(day.locator('.track-client-day-time-short').first()).toBeVisible();
     const mobile=await new AxeBuilder({page}).include('#workspace').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(mobile.violations).toEqual([]);
-    await expect(page.locator('.track-month thead th')).toHaveCount(7);await page.locator('.track-toolbar').evaluate(node=>node.scrollIntoView({block:'start',behavior:'instant'}));await captureScreenshot(page,{path:'test-results/track-mobile.png',fullPage:true});
+    await expect(page.locator('.track-month thead th')).toHaveCount(7);await page.locator('#track-panel .track-toolbar').evaluate(node=>node.scrollIntoView({block:'start',behavior:'instant'}));await captureScreenshot(page,{path:'test-results/track-mobile.png',fullPage:true});
     await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#track-clients')).toBeEmpty();await expect(page.locator('#track-total')).toBeEmpty();
     await signIn(page,process.env.TIMEKEEPER_WEB_READ_TOKEN);await page.locator('[data-tab=track]').click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
     await expect(page.locator('#track-calendar button[data-track-daily-client]')).toHaveCount(0);await expect(page.locator(`[data-track-date="2025-10-01"] [data-track-daily-client="${a.id}"]`)).toContainText('1h 0m');
@@ -99,7 +99,7 @@ test('Track month picker supports year selection, keyboard dismissal and a cente
     await signIn(page);await page.locator('[data-tab=track]').click();
     const month=page.getByLabel('Måned',{exact:true}),choose=page.getByRole('button',{name:'Velg måned og år',exact:true}),popup=page.getByRole('dialog',{name:'Velg måned og år',exact:true});
     await month.fill('2025-10');await expect(page.locator('#track-title')).toHaveText('Oktober 2025');
-    const toolbar=await page.locator('.track-toolbar').boundingBox(),heading=await page.locator('.track-heading').boundingBox(),controls=await page.locator('.track-controls').boundingBox();
+    const toolbar=await page.locator('#track-panel .track-toolbar').boundingBox(),heading=await page.locator('#track-panel .track-heading').boundingBox(),controls=await page.locator('#track-panel .track-controls').boundingBox();
     expect(Math.abs(heading.x+heading.width/2-toolbar.x-toolbar.width/2)).toBeLessThan(1);expect(controls.x+controls.width).toBeLessThanOrEqual(heading.x);
     await choose.focus();await choose.press('Enter');await expect(popup).toBeVisible();await expect(choose).toHaveAttribute('aria-expanded','true');
     await expect(popup.getByLabel('År',{exact:true})).toHaveValue('2025');await expect(popup.getByRole('button',{name:'oktober',exact:true})).toHaveAttribute('aria-pressed','true');
