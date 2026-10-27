@@ -37,6 +37,10 @@ final class DomainTransfer {
         input.path("workSessions").forEach(item -> sourceSessions.add(uuid(item.get("id"))));
         input.get("tasks").forEach(item -> sourceTasks.put(uuid(item.get("id")),item));
         for(JsonNode item:input.get("tasks")) {
+            for(JsonNode reference:item.path("externalReferences")) if(reference.path("providerData").isObject()) {
+                String namespace=reference.path("providerData").path("namespace").asText(),provider=reference.path("providerId").asText();
+                if(!namespace.equals(provider) && !namespace.startsWith(provider+".")) throw ApiFailure.validation();
+            }
             for(JsonNode reference:item.path("externalReferences")) if(reference.hasNonNull("taskListId")) {
                 var list=sourceLists.get(uuid(reference.get("taskListId")));
                 if(list==null || !sourceConnectionRecords.get(uuid(list.get("connectionId"))).path("providerId").asText().equals(reference.path("providerId").asText())) throw ApiFailure.validation();

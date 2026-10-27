@@ -9,6 +9,7 @@ import net.resheim.eclipse.timekeeper.domain.WorkSessionId;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskSource;
+import net.resheim.eclipse.timekeeper.domain.ExternalTaskProviderData;
 import net.resheim.eclipse.timekeeper.domain.LabelId;
 import net.resheim.eclipse.timekeeper.domain.OwnerId;
 import net.resheim.eclipse.timekeeper.domain.ProjectId;
@@ -18,6 +19,7 @@ import net.resheim.eclipse.timekeeper.domain.TaskPlanning;
 import net.resheim.eclipse.timekeeper.domain.TaskTiming;
 import net.resheim.eclipse.timekeeper.domain.TaskImportance;
 import net.resheim.eclipse.timekeeper.domain.TaskBody;
+import net.resheim.eclipse.timekeeper.domain.TaskSyncMode;
 
 /** Immutable inputs accepted by {@link TimekeeperService}. */
 public final class Commands {
@@ -36,6 +38,11 @@ public final class Commands {
 	public record UpdateTaskList(java.util.UUID id, long expectedVersion, String name,
 			net.resheim.eclipse.timekeeper.domain.TaskListKind kind, boolean readable, boolean writable,
 			boolean shared, boolean owner, boolean present, int position) { }
+	public record CreateTaskSyncCursor(java.util.UUID connectionId, Optional<java.util.UUID> listId,
+			TaskSyncMode mode, Optional<String> cursor, Optional<Instant> lastObservedAt,
+			Optional<Instant> lastCompleteAt) { }
+	public record UpdateTaskSyncCursor(java.util.UUID id, long expectedVersion, TaskSyncMode mode,
+			Optional<String> cursor, Optional<Instant> lastObservedAt, Optional<Instant> lastCompleteAt) { }
 
 	public record CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
 			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder) {
@@ -116,6 +123,7 @@ public final class Commands {
 	public record UpdateTaskOrder(TaskId id, long expectedVersion, int siblingOrder) { }
 	public record LinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReference reference) { }
 	public record UpdateExternalTaskSource(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference, ExternalTaskSource source) { }
+	public record UpdateExternalTaskProviderData(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference, Optional<ExternalTaskProviderData> data) { }
 	public record UnlinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference) { }
 
 	public record CreateLabel(String name, Optional<String> color) {

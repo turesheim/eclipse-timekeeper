@@ -158,6 +158,13 @@ class HttpClientIntegrationTest {
             remoteList=client.updateTaskList(new UpdateTaskList(remoteList.id(),remoteList.version(),"Tasks",TaskListKind.STANDARD,
                     true,true,false,true,false,0));
             assertFalse(client.taskList(remoteList.id()).orElseThrow().present());
+            var cursor=client.createTaskSyncCursor(new CreateTaskSyncCursor(connection.id(),Optional.of(remoteList.id()),
+                    TaskSyncMode.INITIAL,Optional.empty(),Optional.empty(),Optional.empty()));
+            var cursorId=cursor.id();assertTrue(client.taskSyncCursors(connection.id()).stream().anyMatch(value -> value.id().equals(cursorId)));
+            cursor=client.updateTaskSyncCursor(new UpdateTaskSyncCursor(cursor.id(),cursor.version(),TaskSyncMode.INCREMENTAL,
+                    Optional.of("opaque%2Bstate"),Optional.of(Instant.parse("2026-10-26T08:00:00Z")),Optional.empty()));
+            assertEquals("opaque%2Bstate",client.taskSyncCursor(cursor.id()).orElseThrow().cursor().orElseThrow());
+            client.deleteTaskSyncCursor(cursor.id(),cursor.version());
             client.deleteTaskList(remoteList.id(),remoteList.version());
             client.deleteTaskConnection(connection.id(),connection.version());
             var project=client.createProject(new CreateProject("HTTP client "+UUID.randomUUID()));
@@ -175,6 +182,11 @@ class HttpClientIntegrationTest {
                     Optional.of("\"remote-etag\""),Optional.empty());
             child=client.updateExternalTaskSource(new UpdateExternalTaskSource(child.id(),child.version(),reference.key(),source));
             assertEquals(source,client.task(child.id()).orElseThrow().externalReferences().iterator().next().source());
+            var providerData=new ExternalTaskProviderData("jira.custom",1,"{\"opaque\":{\"nested\":[1,true,null]}}");
+            child=client.updateExternalTaskProviderData(new UpdateExternalTaskProviderData(child.id(),child.version(),reference.key(),Optional.of(providerData)));
+            assertEquals(providerData,client.task(child.id()).orElseThrow().externalReferences().iterator().next().providerData().orElseThrow());
+            child=client.updateExternalTaskProviderData(new UpdateExternalTaskProviderData(child.id(),child.version(),reference.key(),Optional.empty()));
+            assertTrue(client.task(child.id()).orElseThrow().externalReferences().iterator().next().providerData().isEmpty());
             var checklist=new TaskChecklist(List.of(new TaskChecklistItem(UUID.randomUUID(),"Review",true,
                     Optional.of(Instant.parse("2026-10-26T11:12:13Z")),0)));
             child=client.updateTaskChecklist(new UpdateTaskChecklist(child.id(),child.version(),checklist));

@@ -5,7 +5,8 @@ import java.util.UUID;
 
 /** Optional identity supplied by Mylyn, Jira, GitHub or another task provider. */
 public record ExternalTaskReference(String providerId, String repositoryId, String externalId,
-		Optional<String> externalUrl, ExternalTaskSource source, Optional<UUID> taskListId) {
+		Optional<String> externalUrl, ExternalTaskSource source, Optional<UUID> taskListId,
+		Optional<ExternalTaskProviderData> providerData) {
 	public ExternalTaskReference {
 		providerId = Values.required(providerId, "providerId");
 		repositoryId = Values.required(repositoryId, "repositoryId");
@@ -14,6 +15,12 @@ public record ExternalTaskReference(String providerId, String repositoryId, Stri
 				.map(String::trim).filter(value -> !value.isEmpty());
 		source = source == null ? ExternalTaskSource.empty() : source;
 		taskListId = taskListId == null ? Optional.empty() : taskListId;
+		providerData = providerData == null ? Optional.empty() : providerData;
+	}
+
+	public ExternalTaskReference(String providerId, String repositoryId, String externalId,
+			Optional<String> externalUrl, ExternalTaskSource source, Optional<UUID> taskListId) {
+		this(providerId, repositoryId, externalId, externalUrl, source, taskListId, Optional.empty());
 	}
 
 	public ExternalTaskReference(String providerId, String repositoryId, String externalId,
@@ -34,10 +41,14 @@ public record ExternalTaskReference(String providerId, String repositoryId, Stri
 	}
 
 	public ExternalTaskReference withSource(ExternalTaskSource newSource) {
-		return new ExternalTaskReference(providerId, repositoryId, externalId, externalUrl, newSource, taskListId);
+		return new ExternalTaskReference(providerId, repositoryId, externalId, externalUrl, newSource, taskListId, providerData);
 	}
 
 	public ExternalTaskReference withTaskList(Optional<UUID> newTaskListId) {
-		return new ExternalTaskReference(providerId, repositoryId, externalId, externalUrl, source, newTaskListId);
+		return new ExternalTaskReference(providerId, repositoryId, externalId, externalUrl, source, newTaskListId, providerData);
+	}
+
+	public ExternalTaskReference withProviderData(Optional<ExternalTaskProviderData> newProviderData) {
+		return new ExternalTaskReference(providerId, repositoryId, externalId, externalUrl, source, taskListId, newProviderData);
 	}
 }

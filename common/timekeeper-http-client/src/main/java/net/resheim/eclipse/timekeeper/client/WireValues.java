@@ -31,6 +31,12 @@ public final class WireValues {
                 value.get("writable").getAsBoolean(),value.get("shared").getAsBoolean(),value.get("owner").getAsBoolean(),
                 value.get("present").getAsBoolean(),value.get("position").getAsInt(),value.get("version").getAsLong());
     }
+    public static TaskSyncCursor taskSyncCursor(JsonObject value) {
+        return new TaskSyncCursor(id(value.get("id")),id(value.get("connectionId")),text(value.get("listId")).map(UUID::fromString),
+                TaskSyncMode.valueOf(value.get("mode").getAsString()),text(value.get("cursor")),
+                text(value.get("lastObservedAt")).map(Instant::parse),text(value.get("lastCompleteAt")).map(Instant::parse),
+                value.get("version").getAsLong());
+    }
     public static Task task(JsonObject value) {
         var refs=StreamSupport.stream(value.getAsJsonArray("externalReferences").spliterator(),false).map(item -> reference(item.getAsJsonObject())).collect(Collectors.toUnmodifiableSet());
         var planning=new TaskPlanning(value.has("status")?TaskStatus.valueOf(value.get("status").getAsString()):TaskStatus.NOT_STARTED,
@@ -100,8 +106,11 @@ public final class WireValues {
         if(!session.state().name().equals(value.get("state").getAsString())) throw new IllegalArgumentException("Inconsistent work session state");
         return session;
     }
-    public static ExternalTaskReference reference(JsonObject value) {return new ExternalTaskReference(value.get("providerId").getAsString(),value.get("repositoryId").getAsString(),value.get("externalId").getAsString(),text(value.get("externalUrl")),source(value.get("source")),text(value.get("taskListId")).map(UUID::fromString));}
-    public static JsonObject reference(ExternalTaskReference value) {var out=object();out.addProperty("providerId",value.providerId());out.addProperty("repositoryId",value.repositoryId());out.addProperty("externalId",value.externalId());optional(out,"externalUrl",value.externalUrl());value.taskListId().ifPresent(list -> out.addProperty("taskListId",list.toString()));if(!value.source().equals(ExternalTaskSource.empty()))out.add("source",source(value.source()));return out;}
+    public static ExternalTaskReference reference(JsonObject value) {return new ExternalTaskReference(value.get("providerId").getAsString(),value.get("repositoryId").getAsString(),value.get("externalId").getAsString(),text(value.get("externalUrl")),source(value.get("source")),text(value.get("taskListId")).map(UUID::fromString),
+            value.has("providerData")&&!value.get("providerData").isJsonNull()?Optional.of(providerData(value.getAsJsonObject("providerData"))):Optional.empty());}
+    public static JsonObject reference(ExternalTaskReference value) {var out=object();out.addProperty("providerId",value.providerId());out.addProperty("repositoryId",value.repositoryId());out.addProperty("externalId",value.externalId());optional(out,"externalUrl",value.externalUrl());value.taskListId().ifPresent(list -> out.addProperty("taskListId",list.toString()));if(!value.source().equals(ExternalTaskSource.empty()))out.add("source",source(value.source()));value.providerData().ifPresent(data -> out.add("providerData",providerData(data)));return out;}
+    public static ExternalTaskProviderData providerData(JsonObject value) {return new ExternalTaskProviderData(value.get("namespace").getAsString(),value.get("version").getAsInt(),value.getAsJsonObject("payload").toString());}
+    public static JsonObject providerData(ExternalTaskProviderData value) {var out=object();out.addProperty("namespace",value.namespace());out.addProperty("version",value.version());out.add("payload",JsonParser.parseString(value.json()).getAsJsonObject());return out;}
     public static ExternalTaskSource source(JsonElement value) {
         if(value==null || value.isJsonNull())return ExternalTaskSource.empty();
         var item=value.getAsJsonObject();return new ExternalTaskSource(text(item.get("createdAt")).map(Instant::parse),
