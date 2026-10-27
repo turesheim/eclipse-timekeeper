@@ -339,6 +339,10 @@ database constraint is explicitly mentioned:
   the session are allowed with a warning.
 - The composite external-reference key is unique in both the service and the
   database, so the same external issue cannot be linked to two Timekeeper tasks.
+- A replaced provider identity becomes an alias of the task. Active references
+  and aliases share the owner-scoped uniqueness index; either key resolves the
+  task. Deleting the task removes both keys. Ordinary unlink removes the current
+  key without making a new alias.
 - Task updates use the physical optimistic-lock `VERSION`. Projects, activities,
   and labels use deterministic content versions because those legacy tables do
   not have version columns.
@@ -435,6 +439,12 @@ writes retain the envelope. Connector credentials never belong in task data.
 `TASK.siblingOrder` is a nonnegative local position among tasks under the same
 parent. It defaults to zero for older rows, is independent of a provider list's
 position, and survives updates from clients that do not know this field.
+`TASK.recurrence` stores a series rule with an explicit end condition and a
+bounded set of occurrence exceptions keyed by original date or wall-time slot.
+Moved, completed, and skipped occurrences remain distinct from the series
+status. Legacy task updates preserve recurrence; older rows decode as a task
+without a series or occurrence exceptions. Account archives and portable
+transfers include it.
 The account ZIP archive also includes active day labels and Markdown bodies;
 deletion tombstones are not portable account records.
 Imports also accept v1/v2 snapshots, assign their projects and sessions to the

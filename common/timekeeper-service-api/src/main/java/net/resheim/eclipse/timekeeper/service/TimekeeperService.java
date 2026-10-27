@@ -28,6 +28,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.DeleteLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteProject;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteTask;
 import net.resheim.eclipse.timekeeper.service.Commands.LinkExternalReference;
+import net.resheim.eclipse.timekeeper.service.Commands.ReplaceExternalReference;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskSource;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskProviderData;
 import net.resheim.eclipse.timekeeper.service.Commands.StartActivity;
@@ -45,6 +46,8 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskTiming;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskImportance;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskBody;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskRecurrence;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskOccurrences;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskOrder;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityReport;
@@ -79,11 +82,14 @@ public interface TimekeeperService {
 	default Task updateTaskTiming(UpdateTaskTiming command) { throw new UnsupportedOperationException("Task timing is not supported"); }
 	default Task updateTaskImportance(UpdateTaskImportance command) { throw new UnsupportedOperationException("Task importance is not supported"); }
 	default Task updateTaskBody(UpdateTaskBody command) { throw new UnsupportedOperationException("Task body is not supported"); }
+	default Task updateTaskRecurrence(UpdateTaskRecurrence command) { throw new UnsupportedOperationException("Task recurrence is not supported"); }
+	default Task updateTaskOccurrences(UpdateTaskOccurrences command) { throw new UnsupportedOperationException("Task occurrences are not supported"); }
 	default Task updateTaskOrder(UpdateTaskOrder command) { throw new UnsupportedOperationException("Task order is not supported"); }
 	void deleteTask(DeleteTask command);
 	Optional<Task> task(TaskId id);
 	List<Task> tasks();
 	Task linkExternalReference(LinkExternalReference command);
+	default Task replaceExternalReference(ReplaceExternalReference command) { throw new UnsupportedOperationException("External task identity replacement is not supported"); }
 	default Task updateExternalTaskSource(UpdateExternalTaskSource command) { throw new UnsupportedOperationException("External task source metadata is not supported"); }
 	default Task updateExternalTaskProviderData(UpdateExternalTaskProviderData command) { throw new UnsupportedOperationException("External task provider data is not supported"); }
 	Task unlinkExternalReference(UnlinkExternalReference command);

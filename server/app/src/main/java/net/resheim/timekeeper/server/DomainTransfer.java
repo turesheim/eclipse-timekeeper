@@ -144,7 +144,7 @@ final class DomainTransfer {
                 var created=service.createTask(new CreateTask(project,parentId,item.get("summary").asText(),optionalText(item.get("url")),remapReferences(item.get("externalReferences"),lists),
                         new TaskPlanning(optionalText(item.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),
                                 optionalText(item.get("scheduledDate")).map(java.time.LocalDate::parse),optionalText(item.get("completedAt")).map(java.time.Instant::parse)),
-                        checklist(item.get("checklistItems")),timing(item),importance(item),body(item),item.path("siblingOrder").asInt(0)));
+                        checklist(item.get("checklistItems")),timing(item),importance(item),body(item),item.path("siblingOrder").asInt(0),aliases(item.get("externalAliases")),recurrence(item.get("recurrence"))));
                 tasks.put(entry.getKey(),created.id());mapping(mappings,"TASK",item,created.id().value());iterator.remove();progressed=true;
             }
             if(!progressed) throw ApiFailure.validation();

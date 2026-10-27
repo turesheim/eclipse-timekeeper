@@ -39,10 +39,11 @@ public final class WireValues {
     }
     public static Task task(JsonObject value) {
         var refs=StreamSupport.stream(value.getAsJsonArray("externalReferences").spliterator(),false).map(item -> reference(item.getAsJsonObject())).collect(Collectors.toUnmodifiableSet());
+        var aliases=value.has("externalAliases") ? StreamSupport.stream(value.getAsJsonArray("externalAliases").spliterator(),false).map(item -> alias(item.getAsJsonObject())).collect(Collectors.toUnmodifiableSet()) : Set.<ExternalTaskReferenceKey>of();
         var planning=new TaskPlanning(value.has("status")?TaskStatus.valueOf(value.get("status").getAsString()):TaskStatus.NOT_STARTED,
                 text(value.get("scheduledDate")).map(LocalDate::parse),text(value.get("completedAt")).map(Instant::parse));
         var checklist=checklist(value.get("checklistItems"));
-		return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,planning,checklist,timing(value),importance(value),body(value),value.has("siblingOrder")?value.get("siblingOrder").getAsInt():0,value.get("version").getAsLong());
+		return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,aliases,planning,checklist,timing(value),importance(value),body(value),recurrence(value.get("recurrence")),value.has("siblingOrder")?value.get("siblingOrder").getAsInt():0,value.get("version").getAsLong());
     }
     public static TaskBody body(JsonObject value) {
         if(!value.has("body") || value.get("body").isJsonNull())return TaskBody.empty();
@@ -51,6 +52,34 @@ public final class WireValues {
     }
     public static void body(JsonObject value,TaskBody body) {
         var entry=object();entry.addProperty("format",body.format().name());entry.addProperty("content",body.content());value.add("body",entry);
+    }
+    public static TaskRecurrence recurrence(JsonElement value) {
+        if(value==null || value.isJsonNull())return TaskRecurrence.empty();
+        var node=value.getAsJsonObject();var raw=node.get("series");
+        Optional<TaskSeries> series=raw==null || raw.isJsonNull()?Optional.empty():Optional.of(new TaskSeries(
+                raw.getAsJsonObject().get("rule").getAsString(),TaskRecurrenceEnd.valueOf(raw.getAsJsonObject().get("end").getAsString()),
+                moment(raw.getAsJsonObject().get("until")),text(raw.getAsJsonObject().get("count")).map(Integer::parseInt)));
+        return new TaskRecurrence(series,occurrences(node.get("occurrences")));
+    }
+    public static java.util.List<TaskOccurrence> occurrences(JsonElement value) {
+        if(value==null || value.isJsonNull())return java.util.List.of();
+        return StreamSupport.stream(value.getAsJsonArray().spliterator(),false).map(item -> {
+            var node=item.getAsJsonObject();return new TaskOccurrence(moment(node.get("original")).orElseThrow(),moment(node.get("movedTo")),
+                    TaskOccurrenceState.valueOf(node.get("state").getAsString()),text(node.get("completedAt")).map(Instant::parse));
+        }).toList();
+    }
+    public static JsonObject recurrence(TaskRecurrence value) {
+        var node=object();if(value.series().isPresent()) {
+            var series=value.series().get();var entry=object();entry.addProperty("rule",series.rule());entry.addProperty("end",series.end().name());
+            moment(entry,"until",series.until());if(series.count().isPresent())entry.addProperty("count",series.count().get());else entry.add("count",JsonNull.INSTANCE);node.add("series",entry);
+        } else node.add("series",JsonNull.INSTANCE);
+        node.add("occurrences",occurrences(value.occurrences()));return node;
+    }
+    public static JsonArray occurrences(java.util.List<TaskOccurrence> values) {
+        var items=new JsonArray();values.forEach(item -> {
+            var entry=object();moment(entry,"original",Optional.of(item.original()));moment(entry,"movedTo",item.movedTo());
+            entry.addProperty("state",item.state().name());optional(entry,"completedAt",item.completedAt());items.add(entry);
+        });return items;
     }
     public static TaskImportance importance(JsonObject value) {
         return new TaskImportance(value.has("priority")?TaskPriority.valueOf(value.get("priority").getAsString()):TaskPriority.UNSPECIFIED,
@@ -109,6 +138,8 @@ public final class WireValues {
     public static ExternalTaskReference reference(JsonObject value) {return new ExternalTaskReference(value.get("providerId").getAsString(),value.get("repositoryId").getAsString(),value.get("externalId").getAsString(),text(value.get("externalUrl")),source(value.get("source")),text(value.get("taskListId")).map(UUID::fromString),
             value.has("providerData")&&!value.get("providerData").isJsonNull()?Optional.of(providerData(value.getAsJsonObject("providerData"))):Optional.empty());}
     public static JsonObject reference(ExternalTaskReference value) {var out=object();out.addProperty("providerId",value.providerId());out.addProperty("repositoryId",value.repositoryId());out.addProperty("externalId",value.externalId());optional(out,"externalUrl",value.externalUrl());value.taskListId().ifPresent(list -> out.addProperty("taskListId",list.toString()));if(!value.source().equals(ExternalTaskSource.empty()))out.add("source",source(value.source()));value.providerData().ifPresent(data -> out.add("providerData",providerData(data)));return out;}
+    public static ExternalTaskReferenceKey alias(JsonObject value) {return new ExternalTaskReferenceKey(value.get("providerId").getAsString(),value.get("repositoryId").getAsString(),value.get("externalId").getAsString());}
+    public static JsonObject alias(ExternalTaskReferenceKey value) {var out=object();out.addProperty("providerId",value.providerId());out.addProperty("repositoryId",value.repositoryId());out.addProperty("externalId",value.externalId());return out;}
     public static ExternalTaskProviderData providerData(JsonObject value) {return new ExternalTaskProviderData(value.get("namespace").getAsString(),value.get("version").getAsInt(),value.getAsJsonObject("payload").toString());}
     public static JsonObject providerData(ExternalTaskProviderData value) {var out=object();out.addProperty("namespace",value.namespace());out.addProperty("version",value.version());out.add("payload",JsonParser.parseString(value.json()).getAsJsonObject());return out;}
     public static ExternalTaskSource source(JsonElement value) {

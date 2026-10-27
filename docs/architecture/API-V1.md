@@ -163,6 +163,15 @@ Explicit null clears a value. Older link calls omit `source` and preserve state
 for an existing identity. The remote ETag is independent of the Timekeeper
 `If-Match` value.
 
+`PUT /tasks/{id}/external-references/replace` atomically changes one current
+provider identity using `previous` (provider, repository, external ID) and a
+complete `current` reference. Both identities must belong to the same provider.
+The old key becomes an `externalAliases` lookup key, so a provider rescan that
+changes a remote ID can still resolve the same Timekeeper task. Alias keys are
+unique per owner and survive ordinary task edits, archive, and portable transfer.
+The new link inherits source, list association, and provider data when omitted.
+Ordinary unlink forgets its current identity and does not create an alias.
+
 Provider accounts and lists have owner-scoped `/task-connections` and
 `/task-lists` collections. A connection holds a provider and remote account
 identity, display name, access flags, and enabled state; no OAuth or Apple
@@ -209,6 +218,18 @@ Tasks have a nonnegative `siblingOrder` for local ordering among tasks with
 the same parent. `PUT /tasks/{id}/order` changes only this value with `If-Match`;
 legacy task and other section writes preserve it. Provider ordering tokens can
 remain opaque in provider source state and are not inferred from this number.
+
+Task `recurrence` separates an RFC 5545 rule from its `NEVER`, `UNTIL`, or
+`COUNT` end condition. `UNTIL` uses the same date-only or zoned wall-time
+representation as other task moments; connectors must convert it according to
+their provider's rules. The `occurrences` array stores completed, skipped, or
+moved exceptions keyed by each original generated slot. `PUT
+/tasks/{id}/recurrence` replaces the entire series and its exceptions; `PUT
+/tasks/{id}/occurrences` replaces exceptions without changing the series.
+Both require `If-Match`. An empty series clears all exceptions, while older
+task writes preserve them. The server stores these values but does not expand
+rules or infer new due dates or alerts. A connector must report unsupported
+recurrence before writing to a provider rather than approximate its rule.
 
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
