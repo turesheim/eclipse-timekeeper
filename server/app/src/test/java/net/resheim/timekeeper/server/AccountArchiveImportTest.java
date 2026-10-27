@@ -70,7 +70,9 @@ class AccountArchiveImportTest {
         source();
         store.transaction("a",()->{var notes=new DayNotes(store);var date=DayNotes.date("2026-05-17");notes.save(date,etag(notes.get(date)),"Ferie");return null;});
         ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=AccountArchiveInput.read(file.file(),"application/zip");}
-        assertEquals(object().put("date","2026-05-17").put("text","Ferie"),archive.path("dayNotes").get(0));
+        assertEquals("Ferie",archive.path("dayNotes").get(0).path("text").asText());
+        assertEquals("",archive.path("dayNotes").get(0).path("body").asText());
+        assertTrue(archive.path("dayNotes").get(0).path("markdown").asText().contains("timekeeper-label: Ferie"));
         assertEquals(1,archive.path("dayNotes").size());inputs.validate("AccountArchiveSnapshot",archive);
         // A note-only archive remains useful when there are no timed records.
         for(String name:DomainTransfer.TYPES.keySet())((ObjectNode)archive.path("work")).putArray(name);
@@ -79,7 +81,9 @@ class AccountArchiveImportTest {
         store.transaction("b",()->{assertTrue(store.list(DayNotes.TYPE).isEmpty());return null;});
         store.transaction("b",()->importer().apply(id,false,review.etag()));
         store.transaction("b",()->{assertEquals("Ferie",new DayNotes(store).get(DayNotes.date("2026-05-17")).path("text").asText());assertTrue(store.list("WORK_SESSION").isEmpty());return null;});
-        var conflicting=archive.deepCopy().put("archiveId",UUID.randomUUID().toString());((ObjectNode)conflicting.path("dayNotes").get(0)).put("text","Avspasering");
+        var conflicting=archive.deepCopy().put("archiveId",UUID.randomUUID().toString());
+        ((ObjectNode)conflicting.path("dayNotes").get(0)).put("text","Avspasering")
+                .put("markdown","---\ntimekeeper-label: Avspasering\n---\n");
         UUID conflictId=stage(conflicting);var rejected=store.transaction("b",()->importer().preview(conflictId,false));assertFalse(rejected.body().path("canImport").asBoolean());
         store.transaction("b",()->{assertEquals("Ferie",new DayNotes(store).get(DayNotes.date("2026-05-17")).path("text").asText());return null;});
         var duplicate=archive.deepCopy().put("archiveId",UUID.randomUUID().toString());((com.fasterxml.jackson.databind.node.ArrayNode)duplicate.path("dayNotes")).add(duplicate.path("dayNotes").get(0).deepCopy());UUID duplicateId=stage(duplicate);
@@ -95,8 +99,10 @@ class AccountArchiveImportTest {
             var date=DayNotes.date("2026-10-04");notes.save(date,etag(notes.get(date)),object().put("body","Removed"));notes.save(date,etag(notes.get(date)),object().put("body",""));return null;
         });
         ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-read"))){archive=AccountArchiveInput.read(file.file(),"application/zip");}
-        inputs.validate("AccountArchiveSnapshot",archive);assertEquals(3,archive.path("dayNotes").size());
-        assertEquals(markdown,archive.path("dayNotes").get(0).path("body").asText());assertEquals("",archive.path("dayNotes").get(1).path("text").asText());assertEquals("\n \t\n",archive.path("dayNotes").get(1).path("body").asText());assertFalse(archive.path("dayNotes").get(2).has("body"));
+        inputs.validate("AccountArchiveSnapshot",archive);assertEquals(4,archive.path("dayNotes").size());
+        assertEquals(markdown,archive.path("dayNotes").get(0).path("body").asText());assertEquals("",archive.path("dayNotes").get(1).path("text").asText());assertEquals("\n \t\n",archive.path("dayNotes").get(1).path("body").asText());
+        assertEquals("",archive.path("dayNotes").get(2).path("body").asText());
+        assertEquals("",archive.path("dayNotes").get(3).path("markdown").asText());
         for(String name:DomainTransfer.TYPES.keySet())((ObjectNode)archive.path("work")).putArray(name);
         UUID id=stage(archive);var review=store.transaction("b",()->importer().preview(id,false));assertTrue(review.body().path("canImport").asBoolean());
         store.transaction("b",()->{assertTrue(store.list(DayNotes.TYPE).isEmpty());return null;});
@@ -104,9 +110,40 @@ class AccountArchiveImportTest {
         store.transaction("b",()->{var notes=new DayNotes(store);assertEquals(markdown,notes.get(DayNotes.date("2026-10-01")).path("body").asText());assertEquals("Planning",notes.get(DayNotes.date("2026-10-01")).path("text").asText());assertEquals(3,notes.list(DayNotes.date("2026-10-01"),DayNotes.date("2026-10-04")).path("items").size());return null;});
         var legacy=archive.deepCopy().put("archiveId",UUID.randomUUID().toString());var legacyNotes=legacy.putArray("dayNotes");legacyNotes.add(object().put("date","2026-10-01").put("text","Planning"));legacyNotes.add(object().put("date","2026-10-03").put("text","Legacy label"));
         UUID legacyId=stage(legacy);var legacyReview=store.transaction("b",()->importer().preview(legacyId,false));assertTrue(legacyReview.body().path("canImport").asBoolean());store.transaction("b",()->importer().apply(legacyId,false,legacyReview.etag()));
-        var conflict=archive.deepCopy().put("archiveId",UUID.randomUUID().toString());((ObjectNode)conflict.path("dayNotes").get(0)).put("body","Different private journal");UUID conflictId=stage(conflict);
+        var conflict=archive.deepCopy().put("archiveId",UUID.randomUUID().toString());
+        ((ObjectNode)conflict.path("dayNotes").get(0)).put("body","Different private journal")
+                .put("markdown",archive.path("dayNotes").get(0).path("markdown").asText().replace(markdown,"Different private journal"));
+        UUID conflictId=stage(conflict);
         assertFalse(store.transaction("b",()->importer().preview(conflictId,false)).body().path("canImport").asBoolean());
         store.transaction("b",()->{assertEquals(markdown,new DayNotes(store).get(DayNotes.date("2026-10-01")).path("body").asText());return null;});
+    }
+    @Test void canonicalMarkdownAndAttachmentsRoundTripWithoutReplacingTargetFiles() throws Exception {
+        source();
+        String markdown="---\r\ncustom: original\r\n---\r\n![Photo](assets/photo.png)\r\n";
+        byte[] image={(byte)0x89,'P','N','G',13,10,26,10,1,2,3,4};
+        store.transaction("a",()->{
+            var notes=new DayNotes(store);var date=DayNotes.date("2026-10-25");
+            notes.saveDocument(date,etag(notes.get(date)),markdown.getBytes(StandardCharsets.UTF_8));
+            new JournalAssets(store).save("photo.png",null,image);return null;
+        });
+        ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=AccountArchiveInput.read(file.file(),"application/zip");}
+        assertEquals(markdown,archive.path("dayNotes").get(0).path("markdown").asText());
+        assertEquals(1,archive.path("journalAssets").size());
+        assertArrayEquals(image,Base64.getDecoder().decode(archive.path("journalAssets").get(0).path("data").asText()));
+        for(String name:DomainTransfer.TYPES.keySet())((ObjectNode)archive.path("work")).putArray(name);
+        UUID id=stage(archive);var review=store.transaction("b",()->importer().preview(id,false));
+        assertTrue(review.body().path("canImport").asBoolean());
+        assertEquals(1,review.body().path("counts").path("journalAssets").asInt());
+        store.transaction("b",()->importer().apply(id,false,review.etag()));
+        store.transaction("b",()->{
+            assertEquals(markdown,new String(new DayNotes(store).document(DayNotes.date("2026-10-25")),StandardCharsets.UTF_8));
+            assertArrayEquals(image,JournalAssets.bytes(new JournalAssets(store).get("photo.png")));return null;
+        });
+        var conflicting=archive.deepCopy().put("archiveId",UUID.randomUUID().toString());
+        ((ObjectNode)conflicting.path("journalAssets").get(0)).put("data",Base64.getEncoder().encodeToString(new byte[]{4,5,6}));
+        UUID conflictId=stage(conflicting);
+        assertFalse(store.transaction("b",()->importer().preview(conflictId,false)).body().path("canImport").asBoolean());
+        store.transaction("b",()->{assertArrayEquals(image,JournalAssets.bytes(new JournalAssets(store).get("photo.png")));return null;});
     }
     @Test void reviewedRoundTripRemapsTheWholeGraphAndNeverRestoresIdentityOrImportAuthority() throws Exception {
         var archive=source();UUID id=stage(archive);var before=work();

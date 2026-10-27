@@ -48,7 +48,12 @@ public class JournalDavResource {
         return tx(()->{
             int level=depth(depth);var xml=new StringBuilder("<?xml version=\"1.0\" encoding=\"utf-8\"?><D:multistatus xmlns:D=\"DAV:\">");
             collection(xml);
-            if(level!=0){var notes=new DayNotes(store);for(var date:notes.presentDates())file(xml,notes,date);}
+            if(level!=0){
+                xml.append("<D:response><D:href>").append(ROOT).append("assets/</D:href><D:propstat><D:prop>")
+                        .append("<D:displayname>assets</D:displayname><D:resourcetype><D:collection/></D:resourcetype>")
+                        .append("<D:supportedlock/><D:lockdiscovery/></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>");
+                var notes=new DayNotes(store);for(var date:notes.presentDates())file(xml,notes,date);
+            }
             xml.append("</D:multistatus>");return Response.status(207).type("application/xml; charset=utf-8").entity(xml.toString()).header("DAV",DAV).build();
         });
     }

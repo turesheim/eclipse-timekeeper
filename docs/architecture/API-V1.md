@@ -619,13 +619,25 @@ formatted body editing is provided by the separate editor integration.
 
 Note responses are private/no-store. Profile-style change invalidations remain
 compatible with existing clients and contain no label/body content. Account
-export streams active note records with optional `body`; label-only archives
-remain supported, and omitted legacy bodies preserve an existing matching note's
-body. A differing active note produces a review conflict and is never overwritten.
+export streams present notes with complete canonical `markdown`, `text` and
+`body`; label-only archives remain supported, and omitted legacy bodies preserve
+an existing matching note's body. A differing active note produces a review
+conflict and is never overwritten.
 Empty deletion tombstones are not portable archive deletion commands.
+
+`GET /journal-assets/{filename}` returns private attachment bytes with a strong
+ETag and safe media type. `PUT` accepts JSON `{data}` with base64 bytes, using
+`If-None-Match: *` for a new filename or `If-Match` for an existing one.
+`DELETE` requires the current `If-Match` and retains a versioned deletion marker.
+Attachment names are one safe ASCII path segment. PNG, JPEG, GIF and WebP files
+with matching signatures can display inline; every other format downloads as an
+octet-stream attachment. The browser route applies session, CSRF and owner
+binding; WebDAV provides the same files under `/dav/journal/assets/` for clients.
+The account archive includes active attachments and rejects conflicting filenames
+during review.
 
 See [journal storage protection](../operations/JOURNAL-STORAGE.md) for the
 required deployment encryption, temporary/backup storage, key management and
 readable-server trust boundary. The database and private account archive remain
-authoritative; a future Markdown-folder synchronization feature cannot bypass
-these authorization and conditional-write rules.
+authoritative. The [WebDAV collection](../operations/JOURNAL-WEBDAV.md) uses
+the same owner, authorization and conditional-write rules.

@@ -42,8 +42,10 @@ loaded only when opening an entry.
 The Markdown field keeps opaque frontmatter outside the rich document and
 retains original source bytes for no-edit and undo-to-original round trips.
 Unsupported syntax or unsafe URI schemes stay in source mode. Rich links are
-inert, pasted HTML is treated as text, images cannot load remote assets, and
-read-only views reject document-changing transactions as well as disabling
+inert, pasted HTML is treated as text, and only account-scoped `assets/` images
+load in rich mode; remote image URLs remain in exact source mode. File insertion
+uploads bounded, account-private assets before adding relative Markdown links.
+Read-only views reject document-changing transactions as well as disabling
 inputs and task checkboxes. Both English and Norwegian controls use existing
 theme and accessibility conventions; expandable help keeps the mobile writing
 surface visible.

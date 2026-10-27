@@ -127,6 +127,19 @@ final class DayNotes {
         for(var note:notes){
             LocalDate date=date(note.path("date").asText());if(!seen.add(date))throw ApiFailure.validation();
             var current=get(date);String text=note.path("text").asText().strip();String body=note.has("body")?note.path("body").asText():current.path("body").asText();
+            if(note.has("markdown")){
+                if(!note.path("markdown").isTextual())throw ApiFailure.validation();
+                if(!StandardCharsets.UTF_8.newEncoder().canEncode(note.path("markdown").asText()))throw ApiFailure.validation();
+                byte[] bytes=note.path("markdown").asText().getBytes(StandardCharsets.UTF_8);
+                final JournalMarkdown.Note parsed;
+                try{parsed=JournalMarkdown.parse(date+".md",bytes);}catch(JournalMarkdown.Invalid invalid){throw ApiFailure.validation();}
+                if(!parsed.label().equals(text)||note.has("body")&&!parsed.body().equals(body))throw ApiFailure.validation();
+                if(current.path("version").asLong()>0&&!current.path("deleted").asBoolean()){
+                    if(Arrays.equals(document(date),bytes))continue;
+                    throw ApiFailure.conflict();
+                }
+                saveDocument(date,etag(current),bytes);continue;
+            }
             if(text.isEmpty()&&note.path("body").asText().isEmpty())throw ApiFailure.validation();
             if(hasContent(current)&&(!current.path("text").asText().equals(text)||!current.path("body").asText().equals(body)))throw ApiFailure.conflict();
             var input=object().put("text",text);if(note.has("body"))input.put("body",body);

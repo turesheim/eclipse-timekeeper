@@ -129,7 +129,7 @@ jobs:
     - name: Verify email recovery through HTTPS and actual SMTP delivery
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --mail --grep 'first administrator|email recovery'
     - name: Verify Journal WebDAV account help through HTTPS
-      run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --grep 'Journal shows WebDAV|read-only accounts can view'
+      run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --grep 'Journal shows WebDAV|read-only accounts can view the WebDAV connection'
     - name: Upload browser acceptance evidence
       if: always()
       uses: actions/upload-artifact@v7.0.1
@@ -138,31 +138,6 @@ jobs:
         path: |
           server/web/test-results/
           server/web/target/server.log
-
-  Journal-SSH:
-    name: Restricted journal SSH transfer
-    needs: Server
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-    - uses: actions/checkout@v7.0.1
-    - uses: actions/setup-python@v7.0.0
-      with:
-        python-version: '3.13'
-    - uses: actions/download-artifact@v8.0.2
-      with:
-        name: server-standalone
-        path: server/target/distribution
-    - name: Verify private local client configuration and snapshots
-      run: python3 -m unittest discover -s server/journal -v
-    - name: Verify actual OpenSSH, rsync and packaged HTTPS journal exchanges
-      run: python3 server/scripts/journal_gateway_acceptance.py --distribution server/target/distribution/timekeeper-server.zip --bidirectional
-    - name: Upload private fixture evidence
-      if: always()
-      uses: actions/upload-artifact@v7.0.1
-      with:
-        name: journal-ssh-acceptance
-        path: server/target/journal-gateway-acceptance/
 
   Remote-Eclipse:
     name: Installed client tests

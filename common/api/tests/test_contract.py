@@ -41,10 +41,7 @@ class ContractTest(unittest.TestCase):
                             '/auth/passkeys/login/options', '/auth/passkeys/login/finish', '/auth/passkeys/cancel'):
                     self.assertEqual([], operation['security'])
                     continue
-                if path in ('/journal/settings', '/journal/devices') or path.startswith('/journal/devices/') and path.endswith('/revoke'):
-                    self.assertEqual([{'browserSession': []}], operation['security'])
-                else:
-                    self.assertNotIn('security', operation)
+                self.assertNotIn('security', operation)
                 self.assertEqual(('write' if path.startswith('/admin/') else 'read') if method == 'get' else ('read' if path in ('/auth/logout', '/auth/token-login') else 'write'),
                                  operation['x-required-permission'])
                 self.assertIn('401', operation['responses'])
@@ -225,7 +222,11 @@ class ContractTest(unittest.TestCase):
                 # write, and conflicting bytes return 409 instead of overwriting.
                 if method in item and path not in ('/auth/tokens/{id}', '/data/account/uploads/{id}/chunks/{index}'):
                     op = item[method]
-                    self.assertIn({'$ref': '#/components/parameters/IfMatch'}, op['parameters'])
+                    if path == '/journal-assets/{filename}' and method == 'put':
+                        self.assertIn({'$ref': '#/components/parameters/IfMatchOptional'}, op['parameters'])
+                        self.assertIn({'$ref': '#/components/parameters/IfNoneMatchStar'}, op['parameters'])
+                    else:
+                        self.assertIn({'$ref': '#/components/parameters/IfMatch'}, op['parameters'])
                     self.assertIn('412', op['responses'])
                     self.assertIn('428', op['responses'])
         for path in ['/activities/start', '/activities/{id}/stop', '/work-sessions/start', '/work-sessions/{id}/stop', '/data/import']:
@@ -309,10 +310,14 @@ class ContractTest(unittest.TestCase):
                       {'date': '2026-10-25', 'text': '', 'body': '\n\t'}]:
             validator('ArchiveDayNote').validate(value)
         self.assertFalse(validator('ArchiveDayNote').is_valid({'date': '2026-10-25', 'text': '', 'body': ''}))
+        validator('ArchiveDayNote').validate({'date': '2026-10-25', 'text': '', 'body': '', 'markdown': ''})
+        validator('ArchiveJournalAsset').validate({'filename': 'photo.png', 'data': 'AQID'})
+        self.assertFalse(validator('ArchiveJournalAsset').is_valid({'filename': '../photo.png', 'data': 'AQID'}))
 
     def test_every_reference_and_relation_workflow_is_present(self):
         expected = {
             'listDayNotes', 'getDayNote', 'saveDayNote', 'deleteDayNote',
+            'getJournalAsset', 'putJournalAsset', 'deleteJournalAsset',
             'downloadAccountArchive', 'createAccountArchiveUpload', 'listPendingAccountArchives',
             'getAccountArchiveUpload', 'writeAccountArchiveChunk', 'discardAccountArchiveUpload',
             'previewAccountArchive', 'restoreAccountArchive', 'listAccountArchiveRestores',
@@ -337,8 +342,6 @@ class ContractTest(unittest.TestCase):
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
             'getAdministrationSettings', 'updateAdministrationSettings', 'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
-            'journalStatus', 'journalSettings', 'enrollJournalDevice', 'revokeJournalDevice', 'journalDeviceProfile',
-            'rescanJournal', 'journalCandidate', 'journalCandidateSource', 'journalCalendarSource', 'resolveJournalConflict', 'discardJournalCandidate',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()
                       for key, v in item.items() if key in ('get', 'put', 'post', 'delete')}
