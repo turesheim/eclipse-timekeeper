@@ -226,27 +226,34 @@ public class ServerStore {
     }
     public Optional<JsonNode> find(String type, UUID id) {
         try (var statement = statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",owner(),type,id); var rows = statement.executeQuery()) {
-            if (!rows.next()) return Optional.empty(); return Optional.of(checkedPayload(rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));
+            if (!rows.next()) return Optional.empty(); return Optional.of(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));
         } catch (SQLException e) { throw databaseFailure(e); }
     }
     public List<JsonNode> list(String type) {
         List<JsonNode> list = new ArrayList<>();
         try (var statement = statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? ORDER BY id",owner(),type); var rows = statement.executeQuery()) {
-            while (rows.next()) list.add(checkedPayload(rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));
+            while (rows.next()) list.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));
             return List.copyOf(list);
         } catch (SQLException e) { throw databaseFailure(e); }
     }
     List<JsonNode> list(String type,UUID first,UUID last) {
         var result=new ArrayList<JsonNode>();
         try(var statement=statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? AND id>=? AND id<=? ORDER BY id",owner(),type,first,last);var rows=statement.executeQuery()) {
-            while(rows.next())result.add(checkedPayload(rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));return List.copyOf(result);
+            while(rows.next())result.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));return List.copyOf(result);
         }catch(SQLException failure){throw databaseFailure(failure);}
     }
-    private JsonNode checkedPayload(UUID id, long version, String json) {
+    private JsonNode checkedPayload(String type, UUID id, long version, String json) {
         JsonNode value = parse(json);
         if (!owner().equals(value.path("ownerId").asText()) || !id.toString().equals(value.path("id").asText()) || version!=value.path("version").asLong(-1))
             throw new IllegalStateException("Stored resource identity/version mismatch");
-        if (value instanceof com.fasterxml.jackson.databind.node.ObjectNode node) node.remove("workSessionId");
+        if (value instanceof com.fasterxml.jackson.databind.node.ObjectNode node) {
+            node.remove("workSessionId");
+            if(type.equals("TASK")) {
+                if(!node.has("status"))node.put("status",TaskStatus.NOT_STARTED.name());
+                if(!node.has("scheduledDate"))node.putNull("scheduledDate");
+                if(!node.has("completedAt"))node.putNull("completedAt");
+            }
+        }
         return value;
     }
     /** Retire only obsolete metadata; keep IDs, versions, timers and recorded work untouched. */

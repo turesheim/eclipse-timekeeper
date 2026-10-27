@@ -696,7 +696,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Replaces legacy project, parent, summary and URL fields. Preserves status, scheduledDate, completedAt and external references when omitted by older clients."
       },
       "delete": {
         "operationId": "deleteTask",
@@ -757,6 +758,101 @@
             "$ref": "#/components/parameters/Csrf"
           }
         ]
+      }
+    },
+    "/tasks/{id}/planning": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskPlanning",
+        "summary": "Replace owned task planning fields",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskPlanningInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional update of status, date-only schedule, and completion time. A legacy PUT /tasks/{id} preserves these fields."
       }
     },
     "/labels": {
@@ -10454,6 +10550,31 @@
               "$ref": "#/components/schemas/ExternalReferenceSnapshot"
             },
             "uniqueItems": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "scheduledDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Civil scheduled day without an implied time, deadline, or alert."
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -10464,7 +10585,10 @@
           "parentTaskId",
           "summary",
           "url",
-          "externalReferences"
+          "externalReferences",
+          "status",
+          "scheduledDate",
+          "completedAt"
         ],
         "additionalProperties": true
       },
@@ -10959,6 +11083,31 @@
               "$ref": "#/components/schemas/ExternalReference"
             },
             "uniqueItems": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "scheduledDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Civil scheduled day without an implied time, deadline, or alert."
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -11399,6 +11548,31 @@
             "uniqueItems": true,
             "maxItems": 500,
             "default": []
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "scheduledDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Civil scheduled day without an implied time, deadline, or alert."
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -18624,6 +18798,54 @@
           "health",
           "items"
         ]
+      },
+      "TaskStatus": {
+        "type": "string",
+        "enum": [
+          "NOT_STARTED",
+          "IN_PROGRESS",
+          "COMPLETED",
+          "WAITING",
+          "DEFERRED"
+        ],
+        "description": "Provider-neutral progress. completedAt is only set with COMPLETED."
+      },
+      "TaskPlanningInput": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "scheduledDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Civil scheduled day without an implied time, deadline, or alert."
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "scheduledDate",
+          "completedAt"
+        ],
+        "additionalProperties": false,
+        "description": "Replace only planning fields. Null clears a scheduled day or completion timestamp. Existing task fields and external references are preserved."
       }
     },
     "parameters": {

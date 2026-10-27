@@ -153,6 +153,9 @@ class HttpClientIntegrationTest {
             var project=client.createProject(new CreateProject("HTTP client "+UUID.randomUUID()));
             var parent=client.createTask(new CreateTask(Optional.of(project.id()),"Parent",Optional.empty()));
             var child=client.createTask(new CreateTask(Optional.of(project.id()),Optional.of(parent.id()),"Child",Optional.empty()));
+            var planning=new TaskPlanning(TaskStatus.NOT_STARTED,Optional.of(LocalDate.parse("2026-10-26")),Optional.empty());
+            child=client.updateTaskPlanning(new UpdateTaskPlanning(child.id(),child.version(),planning));
+            assertEquals(planning,client.task(child.id()).orElseThrow().planning());
             var label=client.createLabel(new CreateLabel("Client label",Optional.of("10,20,30")));
             assertEquals("10,20,30",label.color().orElseThrow());
             var reference=new ExternalTaskReference("jira","https://jira.invalid",UUID.randomUUID().toString(),Optional.empty());

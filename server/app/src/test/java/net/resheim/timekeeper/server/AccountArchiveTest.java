@@ -101,6 +101,22 @@ class AccountArchiveTest {
         }
         assertFalse(Files.exists(path));assertFalse(Files.exists(path.getParent()));
     }
+    @Test void taskPlanningIsPresentInPortableJsonAndCsv() throws Exception {
+        var principal=tokens.authenticate("Bearer test-read");
+        var planning=new net.resheim.eclipse.timekeeper.domain.TaskPlanning(net.resheim.eclipse.timekeeper.domain.TaskStatus.COMPLETED,
+                Optional.of(java.time.LocalDate.parse("2026-10-26")),Optional.of(java.time.Instant.parse("2026-10-26T11:12:13Z")));
+        var task=store.transaction(principal.owner(),()->store.service().createTask(new net.resheim.eclipse.timekeeper.service.Commands.CreateTask(
+                Optional.empty(),Optional.empty(),"Portable scheduled task",Optional.empty(),Set.of(),planning)));
+        try(var download=archives.download(principal);var zip=new ZipFile(download.file().toFile())) {
+            var archive=parse(new String(zip.getInputStream(zip.getEntry("archive.json")).readAllBytes(),StandardCharsets.UTF_8));
+            var restored=java.util.stream.StreamSupport.stream(archive.path("work").path("tasks").spliterator(),false)
+                    .filter(value->value.path("id").asText().equals(task.id().value().toString())).findFirst().orElseThrow();
+            assertEquals("COMPLETED",restored.path("status").asText());assertEquals("2026-10-26",restored.path("scheduledDate").asText());
+            assertEquals("2026-10-26T11:12:13Z",restored.path("completedAt").asText());
+            String csv=new String(zip.getInputStream(zip.getEntry("tasks.csv")).readAllBytes(),StandardCharsets.UTF_8);
+            assertTrue(csv.contains("scheduledDate"));assertTrue(csv.contains("2026-10-26T11:12:13Z"));
+        }
+    }
     @Test void downloadIncludesMoreThanTenThousandRecordsAndTwentyMebibytesWithoutPagination() throws Exception {
         var principal=tokens.authenticate("Bearer test-read");int count=11001;
         var actual=io.quarkus.arc.ClientProxy.unwrap(store);actual.stopMaintenance();

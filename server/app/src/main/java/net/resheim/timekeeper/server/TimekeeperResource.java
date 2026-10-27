@@ -33,6 +33,11 @@ public class TimekeeperResource {
     private JsonNode required(String type,UUID id) { return store.find(type,id).orElseThrow(ApiFailure::notFound); }
     private static Optional<ProjectId> project(JsonNode input) { return optionalText(input.get("projectId")).map(UUID::fromString).map(ProjectId::new); }
     private static Optional<TaskId> parent(JsonNode input) { return optionalText(input.get("parentTaskId")).map(UUID::fromString).map(TaskId::new); }
+    private static TaskPlanning planning(JsonNode input) {
+        try {return new TaskPlanning(optionalText(input.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),
+                optionalText(input.get("scheduledDate")).map(LocalDate::parse),optionalText(input.get("completedAt")).map(Instant::parse));}
+        catch(IllegalArgumentException error) {throw ApiFailure.validation();}
+    }
     @GET @Path("/openapi.json") public JsonNode openApi() { return inputs.contract(); }
     @GET @Path("/{collection}/{id}") public Response get(@PathParam("collection") String collection,@PathParam("id") String id) {
         String type=ContractInputs.type(collection);UUID key=ContractInputs.pathId(id);
@@ -45,13 +50,19 @@ public class TimekeeperResource {
             if(type.equals("CLIENT")) {var node=store.createClient(input);return ApiReplies.resource(201,node,"/api/v1/clients/"+node.get("id").asText());}
             var service=store.service();Object value=switch(type) {
                 case "PROJECT" -> service.createProject(new CreateProject(input.get("name").asText()));
-                case "TASK" -> service.createTask(new CreateTask(project(input),parent(input),input.get("summary").asText(),optionalText(input.get("url")),references(input.get("externalReferences"))));
+                case "TASK" -> service.createTask(new CreateTask(project(input),parent(input),input.get("summary").asText(),optionalText(input.get("url")),references(input.get("externalReferences")),planning(input)));
                 case "LABEL" -> service.createLabel(new CreateLabel(input.get("name").asText(),optionalText(input.get("color"))));
                 case "ACTIVITY" -> service.createActivity(new CreateActivity(optionalText(input.get("taskId")).map(UUID::fromString).map(TaskId::new).orElse(null),new OwnerId(store.owner()),Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),input.get("summary").asText(),labels(input.get("labelIds")),optionalText(input.get("workSessionId")).map(UUID::fromString).map(WorkSessionId::new),project(input)));
                 case "WORK_SESSION" -> store.workSessionService().createWorkSession(new CreateWorkSession(new OwnerId(store.owner()),Instant.parse(input.get("start").asText()),optionalText(input.get("end")).map(Instant::parse),WorkSessionDescriptions.summary(input)));
                 default -> throw ApiFailure.notFound();
             };
             JsonNode snapshot=stored(type,value,input);return ApiReplies.resource(201,snapshot,"/api/v1/"+collection+"/"+snapshot.get("id").asText());
+        });
+    }
+    @PUT @Path("/tasks/{id}/planning") public Response planTask(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
+        UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskPlanningInput",body);ContractInputs.queries(uri.getQueryParameters());
+        return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
+            return ApiReplies.resource(200,snapshot(store.owner(),store.service().updateTaskPlanning(new UpdateTaskPlanning(new TaskId(key),version,planning(input)))),null);
         });
     }
     @PUT @Path("/{collection}/{id}") public Response update(@PathParam("collection") String collection,@PathParam("id") String id,@HeaderParam("If-Match") String match,@HeaderParam("X-Timekeeper-Undo") String undo,JsonNode body) {

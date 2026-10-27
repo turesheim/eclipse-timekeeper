@@ -39,6 +39,20 @@ class AccountStoreTest {
         }
     }
     @AfterEach void reset() {io.quarkus.arc.ClientProxy.unwrap(accounts).setupFile="NONE";}
+    @Test void olderTaskPayloadsReadWithPlanningDefaultsAndKeepThemOnUpdate() throws Exception {
+        String owner="legacy-task-"+UUID.randomUUID();
+        var created=store.transaction(owner,()->store.service().createTask(new net.resheim.eclipse.timekeeper.service.Commands.CreateTask(Optional.empty(),"Existing task",Optional.empty())));
+        var actual=io.quarkus.arc.ClientProxy.unwrap(store);
+        try(var connection=actual.datasource.getConnection();var statement=connection.prepareStatement("UPDATE tk_resource SET payload=? WHERE owner_id=? AND entity_type='TASK' AND id=?")) {
+            var legacy=(com.fasterxml.jackson.databind.node.ObjectNode)store.transaction(owner,()->store.find("TASK",created.id().value()).orElseThrow()).deepCopy();
+            legacy.remove(List.of("status","scheduledDate","completedAt"));
+            statement.setString(1,legacy.toString());statement.setString(2,owner);statement.setObject(3,created.id().value());assertEquals(1,statement.executeUpdate());
+        }
+        var read=store.transaction(owner,()->store.find("TASK",created.id().value()).orElseThrow());
+        assertEquals("NOT_STARTED",read.get("status").asText());assertTrue(read.get("scheduledDate").isNull());assertTrue(read.get("completedAt").isNull());
+        var updated=store.transaction(owner,()->store.service().updateTask(new net.resheim.eclipse.timekeeper.service.Commands.UpdateTask(created.id(),created.version(),Optional.empty(),"Renamed task",Optional.empty())));
+        assertEquals(net.resheim.eclipse.timekeeper.domain.TaskPlanning.unplanned(),updated.planning());
+    }
     @Test void oneUseSetupMultipleAccountsAndTokensRetainOwnershipAndRevokeAcrossReplicas() throws Exception {
         String owner="existing-owner-"+UUID.randomUUID();
         store.transaction(owner,()->store.service().createProject(new net.resheim.eclipse.timekeeper.service.Commands.CreateProject("Existing private project")));
