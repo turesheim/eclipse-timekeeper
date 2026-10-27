@@ -8,9 +8,12 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import io.restassured.response.Response;
+import jakarta.inject.Inject;
+import static net.resheim.timekeeper.server.JsonValues.*;
 
 @QuarkusTest @TestProfile(WeekNoteHttpTest.Profile.class)
 class WeekNoteHttpTest {
+    @Inject ServerStore store;
     public static class Profile implements QuarkusTestProfile {
         public Map<String,String> getConfigOverrides(){return Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:week_note_http");}
     }
@@ -43,5 +46,9 @@ class WeekNoteHttpTest {
         String week="2027-W01";var first=get("test-a",week);
         assertEquals(400,given().header("Authorization","Bearer test-a").header("If-Match",first.header("ETag")).contentType("application/json").body("{}").put("/api/v1/week-notes/"+week).statusCode());
         assertEquals(422,put("test-a",week,first.header("ETag"),"ø".repeat(100001)).statusCode());
+        store.transaction("a",()->{
+            var malformed=array().add(object().put("week","2027-W02").put("filename","2027-W02.md").put("markdown",new String(new char[]{(char)0xd800})));
+            assertThrows(ApiFailure.class,()->new WeekNotes(store).restore(malformed));return null;
+        });
     }
 }

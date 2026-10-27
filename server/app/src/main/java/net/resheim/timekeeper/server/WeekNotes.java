@@ -92,7 +92,8 @@ final class WeekNotes {
     void restore(JsonNode notes){
         var seen=new HashSet<String>();for(var note:notes){
             Week week=week(note.path("week").asText());if(!seen.add(week.name())||!week.filename().equals(note.path("filename").asText())||!note.path("markdown").isTextual())throw ApiFailure.validation();
-            byte[] bytes=note.path("markdown").asText().getBytes(StandardCharsets.UTF_8);
+            String markdown=note.path("markdown").asText();if(!StandardCharsets.UTF_8.newEncoder().canEncode(markdown))throw ApiFailure.validation();
+            byte[] bytes=markdown.getBytes(StandardCharsets.UTF_8);
             if(bytes.length>DayNotes.BODY_BYTES)throw ApiFailure.validation();
             var current=get(week);if(current.path("version").asLong()>0&&!current.path("deleted").asBoolean()){
                 if(Arrays.equals(document(week),bytes))continue;throw ApiFailure.conflict();

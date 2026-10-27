@@ -17,6 +17,18 @@ import org.junit.jupiter.api.Test;
 
 @QuarkusTest @TestProfile(AccountArchiveHttpTest.Profile.class)
 class AccountArchiveHttpTest {
+    @Test void concurrentSessionRefreshesDoNotInterruptPrivateArchives() throws Exception {
+        var login=given().header("Authorization","Bearer test-a").post("/api/v1/auth/token-login");login.then().statusCode(200);
+        String cookie=login.header("Set-Cookie").split(";",2)[0];
+        try(var workers=java.util.concurrent.Executors.newFixedThreadPool(12)){
+            for(int round=0;round<3;round++){
+                var start=new java.util.concurrent.CountDownLatch(1);var replies=new ArrayList<java.util.concurrent.Future<Integer>>();
+                for(int index=0;index<12;index++){final String route=index%2==0?"/data/account/export":"/auth/session";
+                    replies.add(workers.submit(()->{start.await();return given().header("Cookie",cookie).get("/api/v1"+route).statusCode();}));}
+                start.countDown();for(var reply:replies)assertEquals(200,reply.get());
+            }
+        }
+    }
     public static class Profile implements QuarkusTestProfile {
         public Map<String,String> getConfigOverrides() {return ArchiveTestDatabase.configuration("http","jdbc:h2:mem:account_archive_http_tests");}
     }

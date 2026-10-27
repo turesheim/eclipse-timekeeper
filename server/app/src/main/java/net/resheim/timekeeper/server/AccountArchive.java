@@ -39,11 +39,13 @@ class AccountArchive {
         for(int attempt=0;;attempt++) {
             try {return snapshot(principal);}
             catch(RuntimeException failure) {
-                if(attempt>=4 || !snapshotConflict(failure)) throw failure;
+                if(attempt>=15 || !snapshotConflict(failure)) throw failure;
                 // A concurrent authenticated read can update last-seen metadata
                 // after this repeatable-read snapshot starts. Retry the complete
                 // private export, with fresh authorization, before streaming bytes.
-                try {Thread.sleep(5L*(attempt+1));}
+                // Leave enough time for a burst of session refreshes and other
+                // exports to finish; a short retry window can starve one export.
+                try {Thread.sleep(Math.min(100L,10L*(attempt+1)));}
                 catch(InterruptedException stopped) {Thread.currentThread().interrupt();throw failure;}
             }
         }
