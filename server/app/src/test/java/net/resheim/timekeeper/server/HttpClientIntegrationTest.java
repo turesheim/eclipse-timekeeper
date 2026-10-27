@@ -161,6 +161,10 @@ class HttpClientIntegrationTest {
             var reference=new ExternalTaskReference("jira","https://jira.invalid",UUID.randomUUID().toString(),Optional.empty());
             child=client.linkExternalReference(new LinkExternalReference(child.id(),child.version(),reference));
             assertEquals(child.id(),client.findTask(reference.key()).orElseThrow().id());
+            var source=new ExternalTaskSource(Optional.of(Instant.parse("2026-10-01T10:00:00Z")),Optional.empty(),
+                    Optional.of("\"remote-etag\""),Optional.empty());
+            child=client.updateExternalTaskSource(new UpdateExternalTaskSource(child.id(),child.version(),reference.key(),source));
+            assertEquals(source,client.task(child.id()).orElseThrow().externalReferences().iterator().next().source());
             var checklist=new TaskChecklist(List.of(new TaskChecklistItem(UUID.randomUUID(),"Review",true,
                     Optional.of(Instant.parse("2026-10-26T11:12:13Z")),0)));
             child=client.updateTaskChecklist(new UpdateTaskChecklist(child.id(),child.version(),checklist));

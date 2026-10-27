@@ -141,6 +141,14 @@ public class TimekeeperResource {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalReference",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> { long version=ApiReplies.match(required("TASK",key),match);return ApiReplies.resource(200,snapshot(store.owner(),store.service().linkExternalReference(new LinkExternalReference(new TaskId(key),version,reference(input)))),null); });
     }
+    @PUT @Path("/tasks/{id}/external-references/source") public Response updateExternalTaskSource(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
+        UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalTaskSourceInput",body);ContractInputs.queries(uri.getQueryParameters());
+        return tx(() -> {long version=ApiReplies.match(required("TASK",key),match);
+            var reference=new ExternalTaskReferenceKey(input.get("providerId").asText(),input.get("repositoryId").asText(),input.get("externalId").asText());
+            var updated=store.service().updateExternalTaskSource(new UpdateExternalTaskSource(new TaskId(key),version,reference,source(input.get("source"))));
+            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+        });
+    }
     @DELETE @Path("/tasks/{id}/external-references") public Response unlink(@PathParam("id") String id,@HeaderParam("If-Match") String match) {
         UUID key=ContractInputs.pathId(id);ContractInputs.queries(uri.getQueryParameters(),"providerId","repositoryId","externalId");var reference=referenceQuery(uri.getQueryParameters());
         return tx(() -> { long version=ApiReplies.match(required("TASK",key),match);return ApiReplies.resource(200,snapshot(store.owner(),store.service().unlinkExternalReference(new UnlinkExternalReference(new TaskId(key),version,reference))),null); });
