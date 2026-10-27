@@ -118,12 +118,15 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .today-month, .today-summary { padding: .85rem; }
 .today-month-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; }
 .today-month-heading h3, .today-summary h3 { margin: 0; font-size: 1rem; }
-.today-month-heading button { min-width: 2rem; }
+.today-month-heading button { width: 2.25rem; height: 2.25rem; min-height: 2.25rem; font-size: .85rem; }
+.week-note-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+.week-note-heading h2 { margin: 0; }
+.week-note-heading .icon-button { flex-shrink: 0; }
 .today-month-grid { display: grid; grid-template-columns: 1.25rem repeat(7,minmax(0,1fr)); gap: .1rem; }
 .today-weekday { text-align: center; color: var(--muted); font-size: .75rem; font-weight: 650; }
-.today-week-number { min-width: 0; min-height: 2.25rem; padding: .15rem 0; color: var(--muted); font-size: .7rem; white-space: nowrap; }
+.today-week-number { position: relative; min-width: 0; min-height: 2rem; padding: .15rem 0; color: var(--muted); font-size: .7rem; white-space: nowrap; }
 .today-week-number:hover, .today-week-number:focus-visible { color: var(--accent); text-decoration: underline; }
-.today-month-day { position: relative; min-width: 0; min-height: 2.25rem; padding: .15rem 0; border: 1px solid transparent; font-size: .8rem; white-space: nowrap; }
+.today-month-day { position: relative; min-width: 0; min-height: 2rem; padding: .15rem 0; border: 1px solid transparent; font-size: .8rem; white-space: nowrap; }
 .today-month-day.outside { color: var(--muted); }
 .today-month-day.current { border-color: var(--accent); }
 .today-month-day.selected { background: var(--accent); color: #fff; }

@@ -120,6 +120,10 @@ The inline journal uses the same saved day note and conflict handling as
 Calendar and Week. Unsaved changes require confirmation before selecting
 another date. On narrow screens the sidebar follows the journal.
 
+The mini calendar uses compact rows and navigation buttons. Dots beneath day and
+week numbers indicate saved notes. The weekly editor has a top-right close button
+and no download action; weekly Markdown remains available through export and sync.
+
 Today’s work-session cards use Calendar’s font sizes. Calendar event cards show
 the title, time, and client name with a client-coloured edge. Select an event to
 open its full date/time, calendar, location, and description in a dialog.

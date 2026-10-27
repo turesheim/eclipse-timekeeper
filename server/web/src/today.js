@@ -18,7 +18,7 @@ export class TodayView {
     this.weekEditor=new WeekNoteEditor(root,callbacks);
     this.eventDetails=node('dialog',undefined,'app-dialog shadow-lg calendar-event-details');this.eventDetails.id='today-event-details';this.eventDetails.setAttribute('aria-labelledby','today-event-title');root.append(this.eventDetails);
     this.eventDetails.addEventListener('close',()=>{const origin=this.eventOrigin;this.eventOrigin=null;this.eventDetails.replaceChildren();if(this.visible&&origin?.isConnected)origin.focus();});
-    this.events=[];this.generation=0;this.visible=false;this.daySessions=new Map();this.noteDates=new Set();this.noteGeneration=0;this.monthNoteKey=null;
+    this.events=[];this.generation=0;this.visible=false;this.daySessions=new Map();this.noteDates=new Set();this.noteWeeks=new Set();this.noteGeneration=0;this.monthNoteKey=null;
     this.picker=node('dialog',undefined,'app-dialog shadow-lg');this.picker.id='today-session-picker';
     const pickerTitle=node('h2',t('ui.choose_work_session'));pickerTitle.id='today-session-picker-title';this.picker.setAttribute('aria-labelledby',pickerTitle.id);
     this.pickerContext=node('p');this.choices=node('div',undefined,'d-grid gap-2');
@@ -40,7 +40,7 @@ export class TodayView {
     window.addEventListener('resize',()=>this.sizeEditor());
   }
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
-  reset(){++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.noteDates.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.close(true);this.journal.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
+  reset(){++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.noteDates.clear();this.noteWeeks.clear();this.daySessions.clear();this.closePicker();this.closeEvent();this.weekEditor.close(true);this.journal.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
   show(){this.visible=true;this.sizeEditor();if(this.data){this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
   hide(){this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.closeEvent();this.weekEditor.close();}
   update(data,connected,scope){
@@ -79,7 +79,7 @@ export class TodayView {
     for(let day=0;day<7;day++)this.grid.append(node('span',dateTimeFormat(getLocale(),{weekday:'narrow',timeZone:'UTC'}).format(new Date(calendar.days[day].date+'T12:00:00Z')),'today-weekday'));
     for(let index=0;index<calendar.days.length;index++){
       const day=calendar.days[index];
-      if(index%7===0){const week=isoWeek(day.date),pick=node('button',String(Number(week.slice(-2))),'btn today-week-number');pick.type='button';pick.dataset.week=week;pick.setAttribute('aria-label',t('today.week_note',{week}));pick.title=t('today.week_note',{week});pick.addEventListener('click',()=>void this.weekEditor.open(week,this.scope,this.connected&&this.callbacks.canWrite()));this.grid.append(pick);}
+      if(index%7===0){const week=isoWeek(day.date),pick=node('button',String(Number(week.slice(-2))),'btn today-week-number');pick.type='button';pick.dataset.week=week;pick.setAttribute('aria-label',t('today.week_note',{week}));pick.title=t('today.week_note',{week});if(this.noteWeeks.has(week))pick.append(node('span',undefined,'today-month-dot'));pick.addEventListener('click',()=>void this.weekEditor.open(week,this.scope,this.connected&&this.callbacks.canWrite()));this.grid.append(pick);}
       const pick=node('button',String(Number(day.date.slice(-2))),'btn today-month-day');pick.type='button';pick.dataset.date=day.date;
       pick.classList.toggle('outside',!day.inMonth);pick.classList.toggle('selected',day.date===this.date);pick.classList.toggle('current',day.date===today);
       pick.setAttribute('aria-label',dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(day.date+'T12:00:00Z')));
@@ -91,13 +91,13 @@ export class TodayView {
   async loadMonthNotes(){
     if(!this.visible||!this.scope||!this.data||!this.month)return;
     const key=this.month+'|'+this.data.revision;if(key===this.monthNoteKey)return;
-    this.monthNoteKey=key;this.noteDates.clear();this.paintMonth();
+    this.monthNoteKey=key;this.noteDates.clear();this.noteWeeks.clear();this.paintMonth();
     const generation=++this.noteGeneration,scope=this.scope,calendar=monthCalendar(this.month,this.data.profile.data.zoneId);
     const first=calendar.days[0].date,last=calendar.days.at(-1).date;
     try{
-      const reply=await scope.request('/day-notes?'+new URLSearchParams({fromDate:first,toDate:last}));
+      const [reply,weeks]=await Promise.all([scope.request('/day-notes?'+new URLSearchParams({fromDate:first,toDate:last})),scope.request('/week-notes?'+new URLSearchParams({fromWeek:isoWeek(first),toWeek:isoWeek(last)}))]);
       if(generation!==this.noteGeneration||scope!==this.scope)return;
-      this.noteDates=new Set(reply.data.items.filter(note=>note.text||note.hasBody).map(note=>note.date));this.paintMonth();
+      this.noteDates=new Set(reply.data.items.filter(note=>note.text||note.hasBody).map(note=>note.date));this.noteWeeks=new Set(weeks.data.items.filter(note=>note.hasBody).map(note=>note.week));this.paintMonth();
     }catch(error){
       if(generation!==this.noteGeneration||scope!==this.scope)return;
       if(error.status===401)this.callbacks.onUnauthorized(error);

@@ -1,5 +1,6 @@
 import {monday} from './model.js';
 import {t} from './i18n.js';
+import {iconButton} from './icons.js';
 import {MarkdownField} from './markdown-field.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
@@ -18,17 +19,19 @@ export class WeekNoteEditor {
     this.callbacks=callbacks;this.generation=0;
     this.dialog=node('dialog',undefined,'app-dialog journal-dialog shadow-lg');this.dialog.id='today-week-note-editor';
     this.title=node('h2');this.title.id='today-week-note-title';this.dialog.setAttribute('aria-labelledby',this.title.id);
+    this.closeButton=iconButton(button('','btn btn-outline-secondary'),'close',t('ui.close'));this.closeButton.addEventListener('click',()=>this.close());
+    const heading=node('div',undefined,'week-note-heading');heading.append(this.title,this.closeButton);
     this.error=node('p','', 'alert alert-danger');this.error.setAttribute('role','alert');this.error.hidden=true;
     this.status=node('p','', 'hint');this.status.setAttribute('role','status');
     const host=node('div');this.markdown=new MarkdownField(host,()=>this.changed(),()=>this.controls(),'weekly-journal');
     const actions=node('div',undefined,'dialog-actions');
     this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.cancel.addEventListener('click',()=>this.close());
-    this.download=button(t('today.download_week_note'),'btn btn-outline-secondary');this.download.addEventListener('click',()=>this.export());
     this.delete=button(t('journal.delete_note'),'btn btn-outline-secondary');this.delete.addEventListener('click',()=>void this.remove());
     this.save=button(t('ui.save'),'btn btn-primary');this.save.addEventListener('click',()=>void this.commit());
-    actions.append(this.status,this.cancel,this.download,this.delete,this.save);
-    this.dialog.append(this.title,this.error,host,actions);root.append(this.dialog);
+    actions.append(this.status,this.cancel,this.delete,this.save);
+    this.dialog.append(heading,this.error,host,actions);root.append(this.dialog);
     this.dialog.addEventListener('cancel',event=>{event.preventDefault();this.close();});
+    this.dialog.addEventListener('close',()=>{if(!root.closest('[hidden]'))root.querySelector(`[data-week="${this.week}"]`)?.focus();});
   }
   dirty(){return this.note&&this.markdown.value()!==this.note.body;}
   controls(){
@@ -37,7 +40,7 @@ export class WeekNoteEditor {
     if(this.markdown.readOnly===write)this.markdown.setReadOnly(!write);
     this.save.disabled=!write||this.markdown.loading;
     this.delete.disabled=!write||!this.note?.version||this.note?.deleted;
-    this.download.disabled=!ready||this.markdown.loading;
+    this.closeButton.disabled=!!this.busy;
     this.cancel.disabled=!!this.busy;
   }
   changed(){this.status.textContent='';this.controls();}
@@ -85,10 +88,5 @@ export class WeekNoteEditor {
       this.busy=false;this.close();
     }catch(error){if(generation===this.generation){this.stale=true;this.error.textContent=error.uncertain?t('day_notes.uncertain'):error.message;this.error.hidden=false;if(error.status===401)this.callbacks.onUnauthorized(error);}}
     finally{if(generation===this.generation){this.busy=false;this.controls();}}
-  }
-  export(){
-    if(!this.note)return;
-    const url=URL.createObjectURL(new Blob([this.markdown.value()],{type:'text/markdown;charset=utf-8'}));
-    const link=node('a');link.href=url;link.download=this.week+'.md';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
 }
