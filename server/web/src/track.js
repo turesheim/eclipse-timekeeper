@@ -90,7 +90,7 @@ export class MonthTrack {
       const choice = node('button', undefined, 'btn btn-outline-secondary text-start text-break w-100');choice.type = 'button';choice.dataset.trackSessionChoice = session.id;
       choice.append(node('strong', session.summary || i18nText("ui.work_session_21aa04"), 'd-block'));
       const project = this.snapshot.projects.find((project) => project.id === session.projectId);
-      if (project) choice.append(node('span', project.name, 'd-block text-body-secondary'));
+      if (project) {const line=node('span',undefined,'d-flex align-items-center gap-2 text-body-secondary'),glyph=projectIcon(project);if(glyph){glyph.setAttribute('aria-hidden','true');line.append(glyph);}line.append(node('span',project.name));choice.append(line);}
       choice.append(node('small', `${instantText(session.start, this.snapshot.profile.data.zoneId)} → ${session.end ? instantText(session.end, this.snapshot.profile.data.zoneId) : i18nText("ui.in_progress")}`, 'd-block text-body-secondary'));
       choice.addEventListener('click', () => {
         if (!this.writable || !this.sessions(date, clientId).some((value) => value.id === session.id)) return;

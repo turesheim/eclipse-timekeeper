@@ -14,7 +14,7 @@ export class TrackDayNotes {
     this.status=node('p',undefined,'hint '+this.prefix+'-note-status');this.status.setAttribute('role','status');this.message=node('span');
     this.retry=button(t('ui.retry'),'btn btn-link btn-sm');this.retry.hidden=true;this.retry.addEventListener('click',()=>{this.key=null;this.load();});this.status.append(this.message,' ',this.retry);if(this.statusAnchor)this.statusAnchor.before(this.status);else grid.after(this.status);this.status.hidden=true;
     this.dialog=node(this.inline?'section':'dialog',undefined,this.inline?'card journal-inline':'app-dialog journal-dialog shadow-lg');this.dialog.id=this.prefix+'-note-editor';this.dialog.setAttribute('aria-labelledby',this.prefix+'-note-title');
-    this.form=node('form');this.title=node('h2');this.title.id=this.prefix+'-note-title';
+    this.form=node('form');this.title=node('h2');this.title.id=this.prefix+'-note-title';if(this.inline)this.title.classList.add('visually-hidden');
     const label=node('label',t('day_notes.text'),'form-label');label.htmlFor=this.prefix+'-note-text';this.text=node('input',undefined,'form-control journal-note-label');this.text.id=this.prefix+'-note-text';this.text.maxLength=80;this.text.autocomplete='off';
     this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');
     this.savedStatus=node('p','','hint');this.savedStatus.setAttribute('role','status');
@@ -179,7 +179,7 @@ export class TrackDayNotes {
   async open(date){
     if(!this.session||this.editor||!this.inline&&!this.cells?.has(date))return;
     const editor={date,session:this.session,loading:true,busy:false,uncertain:false};this.editor=editor;this.error.textContent='';this.text.value=this.notes.get(date)||'';
-    this.title.textContent=t('day_notes.title',{date:this.dateLabel(date)});this.controls();if(!this.inline)this.dialog.showModal();this.content.scrollTop=0;
+    this.title.textContent=this.inline?t('day_notes.count'):t('day_notes.title',{date:this.dateLabel(date)});this.controls();if(!this.inline)this.dialog.showModal();this.content.scrollTop=0;
     await this.loadEditor(editor);
   }
   async loadEditor(editor){

@@ -13,14 +13,14 @@ async function signIn(page,credential=token) {
   await page.locator('#login-form button[type=submit]').click();
   await expect(page.locator('#status')).toHaveText((await page.locator('html').getAttribute('lang'))==='nb-NO'?'Oppdatert':'Up to date');
 }
-test('Track is the default month overview with exact client session hours, local dates and independent activities',async({browser,request})=> {
+test('Track shows exact client session hours, local dates and independent activities',async({browser,request})=> {
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,timezoneId:'America/Los_Angeles',locale:'en-GB',ignoreHTTPSErrors:true}),page=await context.newPage();
   const original=await (await api(request,'GET','/me')).json(),records=[];
   async function create(collection,data){const record=await (await api(request,'POST','/'+collection,data)).json();records.unshift([collection,record.id]);return record;}
   try {
     const profile=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:'Europe/Oslo'},{'If-Match':profile.headers().etag});
     const a=await create('clients',{name:'Monthly client A '+randomUUID().slice(0,6),color:'#6750a4'}),b=await create('clients',{name:'Monthly client B',color:'#176653'});
-    const project=await create('projects',{name:'Independent tracked work',clientId:a.id});
+    const project=await create('projects',{name:'Independent tracked work',clientId:a.id,icon:'code'});
     await create('activities',{taskId:null,projectId:project.id,summary:'Activity time must not enter session totals',labelIds:[],start:'2025-10-15T06:00:00Z',end:'2025-10-15T14:00:00Z'});
     const left=await create('work-sessions',{clientId:a.id,summary:'Month boundary',start:'2025-09-30T21:00:00Z',end:'2025-09-30T23:00:00Z'});
     const fall=await create('work-sessions',{clientId:a.id,summary:'Clock change',start:'2025-10-25T22:00:00Z',end:'2025-10-26T23:00:00Z'});
@@ -28,7 +28,8 @@ test('Track is the default month overview with exact client session hours, local
     await create('work-sessions',{clientId:b.id,summary:'Other client session',start:'2025-10-26T15:00:00Z',end:'2025-10-26T17:00:00Z'});
     await create('work-sessions',{clientId:b.id,summary:'Next month boundary',start:'2025-10-31T22:00:00Z',end:'2025-11-01T02:00:00Z'});
     await signIn(page);
-    await expect(page.locator('[data-tab]').first()).toHaveAccessibleName('Today');await expect(page.locator('[data-tab=track]')).toHaveAttribute('aria-current','page');
+    await expect(page.locator('[data-tab]').first()).toHaveAccessibleName('Today');await expect(page.locator('[data-tab=today]')).toHaveAttribute('aria-current','page');
+    await page.locator('[data-tab=track]').click();await expect(page.locator('[data-tab=track]')).toHaveAttribute('aria-current','page');
     await expect(page.locator('#track-panel')).toBeVisible();await expect(page.locator('#week-panel')).not.toBeVisible();
     await page.getByLabel('Month',{exact:true}).fill('2025-10');
     await expect(page.locator('#track-title')).toContainText('2025');await expect(page.locator('#track-zone')).toHaveCount(0);
@@ -55,6 +56,7 @@ test('Track is the default month overview with exact client session hours, local
     await expect(multiple).toBeEnabled();await multiple.focus();await multiple.press('Enter');await expect(picker).toBeVisible();await expect(picker.locator('[data-track-session-choice]')).toHaveCount(2);
     await expect(picker).toContainText('Clock change');await expect(picker).toContainText('Another session for the same client');await expect(picker).not.toContainText('Other client session');await expect(picker).not.toContainText('Month boundary');
     await expect(picker).toContainText('13:00:00');await expect(picker).toContainText(project.name);
+    await expect(picker.locator(`[data-track-session-choice="${extra.id}"] .bi-code`)).toBeVisible();
     const pickerAudit=await new AxeBuilder({page}).include('#track-session-picker').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(pickerAudit.violations).toEqual([]);
     await page.keyboard.press('Escape');await expect(picker).not.toBeVisible();await expect(multiple).toBeFocused();await expect(page.locator('#editor')).not.toBeVisible();
     await multiple.click();await picker.locator(`[data-track-session-choice="${extra.id}"]`).focus();
@@ -81,7 +83,7 @@ test('Track is the default month overview with exact client session hours, local
     const mobile=await new AxeBuilder({page}).include('#workspace').withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(mobile.violations).toEqual([]);
     await expect(page.locator('.track-month thead th')).toHaveCount(7);await page.locator('.track-toolbar').evaluate(node=>node.scrollIntoView({block:'start',behavior:'instant'}));await captureScreenshot(page,{path:'test-results/track-mobile.png',fullPage:true});
     await openAccountMenu(page);await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page.locator('#track-clients')).toBeEmpty();await expect(page.locator('#track-total')).toBeEmpty();
-    await signIn(page,process.env.TIMEKEEPER_WEB_READ_TOKEN);await page.getByLabel('Month',{exact:true}).fill('2025-10');
+    await signIn(page,process.env.TIMEKEEPER_WEB_READ_TOKEN);await page.locator('[data-tab=track]').click();await page.getByLabel('Month',{exact:true}).fill('2025-10');
     await expect(page.locator('#track-calendar button[data-track-daily-client]')).toHaveCount(0);await expect(page.locator(`[data-track-date="2025-10-01"] [data-track-daily-client="${a.id}"]`)).toContainText('1h 0m');
     await expect(page.locator(`[data-track-date="2025-10-01"] [data-track-daily-client="${a.id}"]`)).toHaveAttribute('title',/Edited boundary\n\nPreserved notes/);
     await expect(page.locator(`#track-clients [data-track-client="${a.id}"]`)).toContainText('27h 0m');
@@ -94,7 +96,7 @@ test('Track is the default month overview with exact client session hours, local
 test('Track month picker supports year selection, keyboard dismissal and a centered localized heading',async({browser})=>{
   const context=await browser.newContext({baseURL:process.env.TIMEKEEPER_WEB_URL,locale:'nb-NO',viewport:{width:1280,height:900},ignoreHTTPSErrors:true}),page=await context.newPage();
   try {
-    await signIn(page);
+    await signIn(page);await page.locator('[data-tab=track]').click();
     const month=page.getByLabel('Måned',{exact:true}),choose=page.getByRole('button',{name:'Velg måned og år',exact:true}),popup=page.getByRole('dialog',{name:'Velg måned og år',exact:true});
     await month.fill('2025-10');await expect(page.locator('#track-title')).toHaveText('Oktober 2025');
     const toolbar=await page.locator('.track-toolbar').boundingBox(),heading=await page.locator('.track-heading').boundingBox(),controls=await page.locator('.track-controls').boundingBox();
@@ -134,7 +136,7 @@ test('Track updates running session hours without stealing focus and reconciles 
   try {
     expect((await api(request,'GET','/work-sessions/active')).status()).toBe(204);
     session=await (await api(request,'POST','/work-sessions',{clientId:client.id,summary:'Live month overview',start:new Date(Date.now()-120000).toISOString(),end:null})).json();
-    await signIn(page);await expect(page.locator('[data-tab=track]')).toHaveAttribute('aria-current','page');
+    await signIn(page);await page.locator('[data-tab=track]').click();await expect(page.locator('[data-tab=track]')).toHaveAttribute('aria-current','page');
     const card=page.locator(`[data-track-daily-client="${client.id}"]`).last(),duration=card.locator('.track-client-day-time'),focus=page.getByLabel('Month',{exact:true});
     const total=page.locator(`[data-track-client="${client.id}"] strong`);
     await focus.focus();const before=await duration.textContent(),monthBefore=await total.textContent();

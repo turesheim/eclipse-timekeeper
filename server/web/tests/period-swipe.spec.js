@@ -5,6 +5,7 @@ import {addDays} from '../src/model.js';
 async function signIn(page,token=process.env.TIMEKEEPER_WEB_TOKEN) {
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);
   await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
+  await page.locator('[data-tab=track]').click();
 }
 // WebKit and Chromium both exercise the DOM integration. The second test also
 // uses native browser input to cover scrolling and compatibility-click behavior.

@@ -39,7 +39,7 @@ async function apiFor(page){
 const note=(page,date='2026-05-17')=>page.locator(`[data-track-note-date="${date}"]`);
 const day=(page,date='2026-05-17')=>page.locator(`[data-track-date="${date}"]`);
 const dialog=page=>page.locator('#track-note-editor');
-async function month(page){await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#track-month').fill('2026-05');await expect(note(page)).toBeEnabled();}
+async function month(page){await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-05');await expect(note(page)).toBeEnabled();}
 async function save(page,text){await page.locator('#track-note-text').fill(text);await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page)).not.toBeVisible();}
 async function discard(page,action){page.once('dialog',prompt=>prompt.accept());await action();}
 async function menu(page,date='2026-05-17'){
@@ -178,7 +178,7 @@ test('calendar summaries expose body presence while label-only edits preserve pr
     const viewport=page.viewportSize();
     for(const width of [1280,390,320]){
       await page.setViewportSize({width,height:740});
-      await expect.poll(async()=>note(page).evaluate(button=>{const row=button.closest('.track-date-row').getBoundingClientRect(),glyph=button.querySelector('.icon').getBoundingClientRect();return Math.abs(row.right-glyph.right);})).toBeLessThan(4);
+      await expect.poll(async()=>note(page).evaluate(button=>{const row=button.closest('.track-date-row'),glyph=button.querySelector('.icon');return row&&glyph?Math.abs(row.getBoundingClientRect().right-glyph.getBoundingClientRect().right):Infinity;})).toBeLessThan(4);
     }
     await page.setViewportSize(viewport);
     await expect(note(page)).not.toHaveClass(/is-empty/);await expect(note(page)).toHaveAttribute('title','Markdown note');
@@ -207,7 +207,7 @@ test('day notes are private, persist across sessions and remain viewable without
   try{
     const page=await owner.newPage();await signIn(page,user);const api=await apiFor(page);await put(api,'2026-05-17','Ferie');
     const token=await(await api('POST','/auth/tokens',{name:'Day notes viewer',permissions:['read'],expiresAt:null})).json();
-    const read=await viewer.newPage();await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#workspace')).toBeVisible();await expect(read.locator('#status')).toHaveText('Up to date');await read.locator('#track-month').fill('2026-05');await expect(note(read)).toHaveText('Ferie');expect(await note(read).evaluate(node=>node.tagName)).toBe('SPAN');expect(await read.locator('button[data-track-note-date]').count()).toBe(0);
+    const read=await viewer.newPage();await read.goto('/web/');await read.locator('#auth-mode').selectOption('token');await read.locator('#token').fill(token.token);await read.locator('#login-form button[type=submit]').click();await expect(read.locator('#workspace')).toBeVisible();await expect(read.locator('#status')).toHaveText('Up to date');await read.locator('[data-tab=track]').click();await read.locator('#track-month').fill('2026-05');await expect(note(read)).toHaveText('Ferie');expect(await note(read).evaluate(node=>node.tagName)).toBe('SPAN');expect(await read.locator('button[data-track-note-date]').count()).toBe(0);
     await note(read).dblclick();expect(await read.evaluate(()=>getSelection().toString())).toBe('');
     await day(read).dispatchEvent('contextmenu',{bubbles:true,cancelable:true,clientX:100,clientY:100});await expect(read.getByRole('menu')).not.toBeVisible();
     const isolated=await other.newPage();await signIn(isolated,await fresh(request));await month(isolated);await expect(note(isolated)).toHaveClass(/is-empty/);
@@ -226,7 +226,7 @@ test('day notes fit all themes and narrow screens, and failed reads leave work a
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await note(page).click();await expect(page.locator('#track-note-text')).toBeEnabled();const edit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(edit.violations.map(value=>value.id)).toEqual([]);await page.keyboard.press('Escape');
     }
     await page.setViewportSize({width:320,height:740});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await captureScreenshot(page,{path:'test-results/day-notes-mobile.png',fullPage:true});
-    let failed=true;await page.route('**/api/v1/day-notes?*',route=>failed?route.fulfill({status:503,contentType:'application/problem+json',body:JSON.stringify({code:'UNAVAILABLE'})}):route.continue());await page.reload();await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('#track-month').fill('2026-05');await expect(page.locator('.track-note-status')).toContainText('could not be loaded');await expect(page.locator('#session-new')).toBeEnabled();await expect(note(page)).toBeDisabled();
+    let failed=true;await page.route('**/api/v1/day-notes?*',route=>failed?route.fulfill({status:503,contentType:'application/problem+json',body:JSON.stringify({code:'UNAVAILABLE'})}):route.continue());await page.reload();await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#status')).toHaveText('Up to date');await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-05');await expect(page.locator('.track-note-status')).toContainText('could not be loaded');await expect(page.locator('#session-new')).toBeEnabled();await expect(note(page)).toBeDisabled();
     failed=false;await page.locator('.track-note-status').getByRole('button',{name:'Retry'}).click();await expect(note(page)).toContainText('<Ferie>');await expect(note(page)).toBeEnabled();
   }finally{await owner.close();}
 });
@@ -364,8 +364,8 @@ test('journal formatted editing fits narrow screens and all themes with accessib
 test('journal keeps source usable after an editor load failure and protects a draft from account navigation',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage();
   try{
-    await signIn(page,await fresh(request));const api=await apiFor(page),initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body:'Original source'},{'If-Match':initial.headers().etag});
     let fail=true,failRead=true;await page.route('**/assets/milkdown/milkdown.js*',route=>fail?route.abort('failed'):route.continue());
+    await signIn(page,await fresh(request));const api=await apiFor(page),initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body:'Original source'},{'If-Match':initial.headers().etag});
     await page.route('**/api/v1/day-notes/2026-05-17',route=>failRead&&route.request().method()==='GET'?route.fulfill({status:503,contentType:'application/problem+json',body:JSON.stringify({code:'UNAVAILABLE'})}):route.continue());
     await month(page);await note(page).click();await expect(dialog(page).getByRole('alert')).toBeVisible();await expect(page.locator('#track-note-text')).toBeDisabled();await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeDisabled();failRead=false;
     await dialog(page).getByRole('button',{name:'Reload saved note',exact:true}).click();await expect(dialog(page)).toContainText('could not be loaded');await expect(page.locator('#journal-body')).toHaveValue('Original source');
@@ -377,8 +377,9 @@ test('journal keeps source usable after an editor load failure and protects a dr
 test('journal clears a private source before a delayed editor bundle can finish after logout',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage();let release=()=>{};
   try{
+    let seen=false;const waiting=new Promise(resolve=>{release=resolve;});await page.route('**/assets/milkdown/milkdown.js*',async route=>{seen=true;await waiting;await route.continue().catch(()=>{});});
     await signIn(page,await fresh(request));const api=await apiFor(page),initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body:'Private delayed journal marker'},{'If-Match':initial.headers().etag});
-    let seen=false;const waiting=new Promise(resolve=>{release=resolve;});await page.route('**/assets/milkdown/milkdown.js*',async route=>{seen=true;await waiting;await route.continue().catch(()=>{});});await month(page);await menu(page);await expect.poll(()=>seen).toBe(true);await expect(page.locator('#journal-body')).toHaveValue('Private delayed journal marker');
+    await month(page);await menu(page);await expect.poll(()=>seen).toBe(true);await expect(page.locator('#journal-body')).toHaveValue('Private delayed journal marker');
     await api('POST','/auth/logout');await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#journal-body')).toHaveValue('');release();await expect(page.locator('#journal-formatted .ProseMirror')).toHaveCount(0);expect(await page.locator('#track-note-editor').textContent()).not.toContain('Private delayed journal marker');
   }finally{release();await owner.close();}
 });
@@ -386,7 +387,7 @@ test('journal clears a private source before a delayed editor bundle can finish 
 test('journal controls use the account language and reject oversized UTF-8 drafts without losing them',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage();
   try{
-    await signIn(page,await fresh(request));const api=await apiFor(page),profile=await api('GET','/me');await api('PUT','/me',{zoneId:(await profile.json()).zoneId,locale:'nb-NO'},{'If-Match':profile.headers().etag});await page.reload();await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#status')).toHaveText('Oppdatert');await page.locator('#track-month').fill('2026-05');await expect(note(page)).toBeEnabled();await note(page).click();
+    await signIn(page,await fresh(request));const api=await apiFor(page),profile=await api('GET','/me');await api('PUT','/me',{zoneId:(await profile.json()).zoneId,locale:'nb-NO'},{'If-Match':profile.headers().etag});await page.reload();await expect(page.locator('#workspace')).toBeVisible();await expect(page.locator('#status')).toHaveText('Oppdatert');await page.locator('[data-tab=track]').click();await page.locator('#track-month').fill('2026-05');await expect(note(page)).toBeEnabled();await note(page).click();
     await expect(page.locator('#journal-formatted .ProseMirror')).toBeVisible();await expect(dialog(page).getByRole('button',{name:'Tøm notatteksten',exact:true})).toHaveCount(0);await expect(dialog(page).getByRole('button',{name:'Last ned Markdown',exact:true})).toHaveCount(0);await expect(dialog(page).getByRole('button',{name:'Formatert',exact:true})).toHaveAttribute('title','Formatert');
     await dialog(page).getByRole('button',{name:'Markdown-kilde',exact:true}).click();const value='ø'.repeat(100001);await page.locator('#journal-body').fill(value);await dialog(page).getByRole('button',{name:'Lagre',exact:true}).click();await expect(dialog(page).getByRole('alert')).toContainText('200 000');await expect(page.locator('#journal-body')).toHaveValue(value);
     const saved=await api('GET','/day-notes/2026-05-17');expect((await saved.json()).version).toBe(0);

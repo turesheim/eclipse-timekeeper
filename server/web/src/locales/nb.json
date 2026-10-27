@@ -1032,6 +1032,7 @@
   "markdown.mermaid_external": "Forhåndsvisning av diagrammer kan ikke inneholde eksterne ressurser. Markdown-kilden er uendret.",
   "today.title": "Dagen din",
   "today.date": "Dato",
+  "today.choose_date": "Velg dato",
   "today.previous_day": "Forrige dag",
   "today.next_day": "Neste dag",
   "today.overview": "Dagsoversikt",

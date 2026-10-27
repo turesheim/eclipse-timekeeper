@@ -1032,6 +1032,7 @@
   "markdown.mermaid_external": "Diagram previews cannot contain external resources. The Markdown source is unchanged.",
   "today.title": "Your day",
   "today.date": "Date",
+  "today.choose_date": "Choose date",
   "today.previous_day": "Previous day",
   "today.next_day": "Next day",
   "today.overview": "Day overview",
