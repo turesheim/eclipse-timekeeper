@@ -13,6 +13,7 @@ async function fixture(page,request) {
   const client=await(await call('POST','/clients',{name:'Editor deletion client',color:'#176653'})).json();
   const work=await(await call('POST','/work-sessions',{clientId:client.id,summary:'Saved work session',start:'2026-05-17T08:00:00.123456789Z',end:'2026-05-17T09:00:00.987654321Z',labelIds:[]})).json();
   await page.goto('/web/');await expect(page.locator('#status')).toHaveText('Up to date');
+  await page.locator('[data-tab=track]').click();
   await page.locator('#track-month').fill('2026-05');await page.locator('[data-track-date="2026-05-17"] button[data-track-daily-client]').click();
   await expect(page.locator('#editor')).toBeVisible();return {call,work,path:'/work-sessions/'+work.id};
 }

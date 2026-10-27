@@ -161,6 +161,7 @@ const auth = authentication({
     if (localeForPreference(profile.locale) !== getLocale()) {location.reload();return false;}
     $('week-date').value = dateInZone(Date.now(), profile.zoneId);
     today.initialize(dateInZone(Date.now(),profile.zoneId));
+    tab('today');
     $('startup').hidden = true;$('login').hidden = true;$('workspace').hidden = false;$('session').hidden = false;$('sync-status').hidden = false;
     await refresh();startWatch(session);
   },
@@ -182,7 +183,7 @@ const auth = authentication({
     for (const id of ['clients', 'projects', 'labels', 'activities', 'days']) $(id).replaceChildren();
     for (const id of ['owner', 'status', 'active-title', 'active-details', 'work-session-current', 'work-session-state', 'work-session-elapsed', 'zone-caption', 'week-total']) $(id).textContent = '';
     $('startup').hidden = !restoring;$('login').hidden = restoring;$('workspace').hidden = true;$('session').hidden = true;$('sync-status').hidden = true;$('account-menu').open = false;$('remember-notice').textContent = '';
-    tab('track');
+    tab('today');
   }
 });
 $('refresh').addEventListener('click', () => {const session = api;setStatus(i18nText("ui.refreshing"), 'working');void refresh().then(() => {if (session === api) startWatch(session);}).catch(() => {});});

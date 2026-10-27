@@ -11,12 +11,14 @@ async function api(request,method,path,data,headers={}){
 
 test('Today shows the selected journal, mini calendar, work sessions and imported all-day plans',async({page,request})=>{
   const original=await(await api(request,'GET','/me')).json(),date='2025-05-17',next='2025-05-18';
-  let client,session,task;
+  let client,project,session,secondSession,task;
   try{
     const profile=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:'Europe/Oslo'},{'If-Match':profile.headers().etag});
     client=await(await api(request,'POST','/clients',{name:'Today client '+randomUUID().slice(0,8),color:'#176653'})).json();
+    project=await(await api(request,'POST','/projects',{name:'Today project',clientId:client.id,icon:'code'})).json();
     task=await(await api(request,'POST','/tasks',{summary:'Scheduled review',projectId:null,parentTaskId:null,url:null})).json();
     session=await(await api(request,'POST','/work-sessions',{clientId:client.id,projectId:null,summary:'Today review',start:'2025-05-17T08:00:00Z',end:'2025-05-17T09:30:00Z'})).json();
+    secondSession=await(await api(request,'POST','/work-sessions',{clientId:client.id,projectId:project.id,summary:'Today follow-up',start:'2025-05-17T09:45:00Z',end:'2025-05-17T10:30:00Z'})).json();
     await page.route('**/api/v1/tasks?**',async route=>{
       const response=await api(request,'GET','/tasks?limit=500'),body=await response.json();
       await route.fulfill({status:200,headers:{'X-Timekeeper-Owner':response.headers()['x-timekeeper-owner']},contentType:'application/json',json:{...body,items:body.items.map(value=>value.id===task.id?{...value,status:'IN_PROGRESS',scheduledDate:date}:value)}});
@@ -27,9 +29,23 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     });
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);
     await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
-    await page.locator('[data-tab=today]').click();await expect(page.locator('#today-panel')).toBeVisible();
-    await page.locator('#today-date').fill(date);await expect(page.locator('#today-note-editor')).toContainText('Saturday');
-    await expect(page.locator('#today-sessions')).toContainText('Today review');await expect(page.locator('#today-sessions')).toContainText('1h 30m');
+    await expect(page.locator('[data-tab=today]')).toHaveAttribute('aria-current','page');await expect(page.locator('#today-panel')).toBeVisible();
+    await page.locator('#today-date').fill(date);await expect(page.locator('#today-note-editor')).toBeVisible();
+    await expect(page.locator('#today-title')).toContainText('Saturday');await expect(page.locator('#today-title')).toContainText('2025');
+    await expect(page.locator('#today-zone')).toHaveText('Europe/Oslo');
+    await expect(page.locator('#today-note-title')).toHaveClass(/visually-hidden/);
+    await expect(page.locator('#today-date-choose')).toHaveAccessibleName('Choose date');
+    await expect(page.locator('#today-previous')).toHaveAccessibleName('Previous day');
+    await expect(page.locator('#today-current')).toHaveAccessibleName('Today');
+    await expect(page.locator('#today-next')).toHaveAccessibleName('Next day');
+    await expect(page.locator('#today-sessions [data-today-client]')).toHaveCount(1);
+    await expect(page.locator('#today-sessions')).toContainText(client.name);await expect(page.locator('#today-sessions')).toContainText('2h 15m');
+    await page.locator('#today-sessions [data-today-client]').click();
+    const picker=page.locator('#today-session-picker');await expect(picker).toBeVisible();await expect(picker.locator('[data-today-session-choice]')).toHaveCount(2);
+    await expect(picker).toContainText('Today review');await expect(picker).toContainText('Today follow-up');
+    await expect(picker.locator(`[data-today-session-choice="${secondSession.id}"] .bi-code`)).toBeVisible();
+    await picker.locator(`[data-today-session-choice="${secondSession.id}"]`).click();await expect(page.locator('#editor')).toBeVisible();
+    await expect(page.getByLabel('Summary',{exact:true})).toHaveValue('Today follow-up');await page.locator('#cancel').click();
     await expect(page.locator('#today-plans')).toContainText('All-day planning');
     await expect(page.locator('#today-planned-tasks')).toContainText('Scheduled review');
     await expect(page.locator('#today-active-tasks')).toContainText('Scheduled review');
@@ -46,11 +62,19 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(page.locator('#today-note-text')).toHaveValue('Unsaved change');
     page.once('dialog',dialog=>dialog.accept());
     await page.locator('#today-next').click();await expect(page.locator('#today-date')).toHaveValue(next);
+    await expect(page.locator('#today-title')).toContainText('Sunday');
+    await page.locator('#today-previous').click();await expect(page.locator('#today-date')).toHaveValue(date);
+    await page.locator('#today-next').click();await expect(page.locator('#today-date')).toHaveValue(next);
     await expect(page.locator('#today-sessions')).toContainText('No work sessions');
     await expect(page.locator('#today-planned-tasks')).toContainText('No tasks planned for this day');
     await expect(page.locator('#today-active-tasks')).toContainText('Scheduled review');
     await page.locator('#today-month-grid [data-date="2025-05-17"]').click();await expect(page.locator('#today-date')).toHaveValue(date);
     await expect(page.locator('#today-note-text')).toHaveValue('Review day');
+    await page.setViewportSize({width:1440,height:1200});
+    await expect.poll(()=>page.evaluate(()=>document.querySelector('#workspace-navigation').getBoundingClientRect().top-document.querySelector('#today-note-editor').getBoundingClientRect().bottom)).toBeLessThan(24);
+    expect(await page.evaluate(()=>document.querySelector('#workspace-navigation').getBoundingClientRect().top-document.querySelector('#today-note-editor').getBoundingClientRect().bottom)).toBeGreaterThanOrEqual(0);
+    expect(await page.locator('.today-month-day').evaluateAll(days=>days.every(day=>day.scrollHeight<=day.clientHeight+1))).toBe(true);
+    await expect(page.locator('#today-note-editor .dialog-actions')).toHaveCSS('border-top-width','0px');
     await captureScreenshot(page,{path:'test-results/today-desktop.png'});
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
@@ -58,7 +82,9 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
   }finally{
     const note=await api(request,'GET','/day-notes/'+date);await api(request,'PUT','/day-notes/'+date,{text:'',body:''},{'If-Match':note.headers().etag});
     if(session){const current=await api(request,'GET','/work-sessions/'+session.id);await api(request,'DELETE','/work-sessions/'+session.id,undefined,{'If-Match':current.headers().etag});}
+    if(secondSession){const current=await api(request,'GET','/work-sessions/'+secondSession.id);await api(request,'DELETE','/work-sessions/'+secondSession.id,undefined,{'If-Match':current.headers().etag});}
     if(task){const current=await api(request,'GET','/tasks/'+task.id);await api(request,'DELETE','/tasks/'+task.id,undefined,{'If-Match':current.headers().etag});}
+    if(project){const current=await api(request,'GET','/projects/'+project.id);await api(request,'DELETE','/projects/'+project.id,undefined,{'If-Match':current.headers().etag});}
     if(client){const current=await api(request,'GET','/clients/'+client.id);await api(request,'DELETE','/clients/'+client.id,undefined,{'If-Match':current.headers().etag});}
     const current=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:original.zoneId},{'If-Match':current.headers().etag});
   }

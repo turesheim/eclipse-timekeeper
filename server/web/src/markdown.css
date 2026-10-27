@@ -61,13 +61,15 @@
 .journal-dialog .dialog-actions { flex: none; flex-wrap: wrap; background: var(--bs-body-bg); border-top: 1px solid var(--bs-border-color); padding-block: .75rem 0; margin: 0; }
 .journal-dialog .dialog-actions [role="status"] { margin-inline-end: auto; text-align: start; }
 @media(max-width: 480px) { .journal-dialog .dialog-actions [role="status"] { flex-basis: 100%; margin: 0; } }
-.journal-inline { padding: clamp(.75rem,2vw,1.25rem); }
-.journal-inline form { display: flex; flex-direction: column; min-width: 0; }
-.journal-inline .journal-content { overflow: visible; }
+.journal-inline { display: flex; flex: 1; padding: clamp(.75rem,2vw,1.25rem); }
+.journal-inline form { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.journal-inline .journal-content { display: flex; flex-direction: column; flex: 1; overflow: visible; }
+.journal-inline .markdown-editor { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.journal-inline :is(.journal-formatted,.journal-source):not([hidden]) { display: flex; flex: 1; flex-direction: column; }
 .journal-inline h2 { font-size: 1.2rem; }
 .journal-inline .journal-note-label { max-width: 36rem; }
 .journal-inline .journal-formatted { border: 1px solid var(--bs-border-color); border-radius: .5rem; background: var(--bs-body-bg); }
-.journal-inline .ProseMirror, .journal-inline textarea { min-height: clamp(22rem,55dvh,44rem); }
+.journal-inline .ProseMirror, .journal-inline textarea { flex: 1; min-height: 22rem; }
 .journal-inline textarea { font-family: var(--bs-font-monospace); resize: vertical; }
-.journal-inline .dialog-actions { position: sticky; bottom: var(--workspace-nav-height); z-index: 1; flex-wrap: wrap; padding-block: .75rem; margin-top: .75rem; background: var(--bs-body-bg); border-top: 1px solid var(--bs-border-color); }
+.journal-inline .dialog-actions { position: sticky; bottom: var(--workspace-nav-height); z-index: 1; flex-wrap: wrap; padding-block: .75rem; margin-top: .75rem; background: var(--bs-body-bg); border-top: 0; }
 .journal-inline .dialog-actions [role="status"] { margin-inline-end: auto; }
