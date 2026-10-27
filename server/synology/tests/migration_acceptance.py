@@ -232,7 +232,7 @@ def main():
                     helper('prestart')
                 from native_server import verify
                 native=verify(command,target,folder,args.server_image)
-            print(json.dumps({'source':'postgres:18.6-bookworm' ,'target':'postgres:17.11-bookworm','sourceSchema':args.source_schema,'targetSchema':6,'sourceTablesCompared':len(compared),'backupTablesCompared':len(exporter.TABLES),
+            print(json.dumps({'source':'postgres:18.6-bookworm' ,'target':'postgres:17.11-bookworm','sourceSchema':args.source_schema,'targetSchema':7,'sourceTablesCompared':len(compared),'backupTablesCompared':len(exporter.TABLES),
                 'allTableFingerprintsMatch':True,'twoOwnersWithSharedResourceIds':True,'exactNanosecondTimestampsAndLargeRevisions':True,
                 'beyondJavaScriptIntegerRange':not bool(args.server_image),
                 'schemaMetadataUpgraded':args.source_schema<6,'verifiedAndPendingRecoveryAddressesPreserved':args.source_schema>=3,
