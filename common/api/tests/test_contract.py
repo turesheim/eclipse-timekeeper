@@ -199,6 +199,16 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('ExternalTaskSourceInput').is_valid({**value,'source':{'createdAt':None}}))
         self.assertEqual('updateExternalTaskSource',CONTRACT['paths']['/tasks/{id}/external-references/source']['put']['operationId'])
 
+    def test_last_common_baseline_is_versioned_and_scoped_to_normalized_fields(self):
+        source={'createdAt':None,'modifiedAt':None,'remoteEtag':'"r1"','remoteRevision':None}
+        baseline={'version':1,'capturedAt':'2026-10-26T10:00:00Z','fields':{'summary':'Call customer','status':'NOT_STARTED'}}
+        value={'providerId':'google','repositoryId':'account/list','externalId':'item','source':source,'baseline':baseline}
+        validator('ExternalTaskSyncStateInput').validate(value)
+        validator('ExternalTaskSyncStateInput').validate({**value,'baseline':None})
+        self.assertFalse(validator('ExternalTaskSyncStateInput').is_valid({**value,'baseline':{**baseline,'version':0}}))
+        self.assertFalse(validator('ExternalTaskSyncStateInput').is_valid({**value,'baseline':{**baseline,'fields':{'accessToken':'secret'}}}))
+        self.assertEqual('updateExternalTaskSyncState',CONTRACT['paths']['/tasks/{id}/external-references/sync-state']['put']['operationId'])
+
     def test_provider_connections_and_lists_keep_remote_identity_separate_from_projects(self):
         connection={'providerId':'google','remoteAccountId':'account-1','name':'Personal',
                     'readable':True,'writable':False,'enabled':True}
@@ -375,7 +385,7 @@ class ContractTest(unittest.TestCase):
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'deleteTaskList', 'getTaskList', 'listTaskLists',
             'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors',
-            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskMetadata', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
+            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskMetadata', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskSyncState', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
             'linkExternalReference', 'replaceExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',

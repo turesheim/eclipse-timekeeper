@@ -153,6 +153,7 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		if (previous != null && reference.source().equals(ExternalTaskSource.empty())) reference = reference.withSource(previous.source());
 		if (previous != null && reference.taskListId().isEmpty()) reference = reference.withTaskList(previous.taskListId());
 		if (previous != null && reference.providerData().isEmpty()) reference = reference.withProviderData(previous.providerData());
+		if (previous != null && reference.baseline().isEmpty()) reference = reference.withBaseline(previous.baseline());
 		updated.removeIf(candidate -> candidate.key().equals(key));
 		updated.add(reference);
 		Set<ExternalTaskReferenceKey> aliases = new LinkedHashSet<>(externalAliases);aliases.remove(key);
@@ -173,6 +174,7 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		if (current.source().equals(ExternalTaskSource.empty())) current = current.withSource(old.source());
 		if (current.taskListId().isEmpty()) current = current.withTaskList(old.taskListId());
 		if (current.providerData().isEmpty()) current = current.withProviderData(old.providerData());
+		if (current.baseline().isEmpty()) current = current.withBaseline(old.baseline());
 		Set<ExternalTaskReference> updated = new LinkedHashSet<>(externalReferences);
 		updated.removeIf(reference -> reference.key().equals(previous));updated.add(current);
 		Set<ExternalTaskReferenceKey> aliases = new LinkedHashSet<>(externalAliases);
@@ -191,6 +193,18 @@ public record Task(TaskId id, Optional<ProjectId> projectId, Optional<TaskId> pa
 		}
 		if (!found) throw new DomainValidationException("externalReference", "reference is not linked to task");
 		return new Task(id, projectId, parentTaskId, summary, url, updated, externalAliases, planning, checklist, timing, importance, body, recurrence, reminders, metadata, siblingOrder, version + 1);
+	}
+
+	public Task withExternalSyncState(ExternalTaskReferenceKey key, ExternalTaskSource source,
+			Optional<ExternalTaskBaseline> baseline) {
+		Values.required(key,"externalReference");Values.required(source,"externalSource");
+		Set<ExternalTaskReference> updated=new LinkedHashSet<>();boolean found=false;
+		for(ExternalTaskReference reference:externalReferences) {
+			if(reference.key().equals(key)) {updated.add(reference.withSource(source).withBaseline(baseline));found=true;}
+			else updated.add(reference);
+		}
+		if(!found) throw new DomainValidationException("externalReference","reference is not linked to task");
+		return new Task(id,projectId,parentTaskId,summary,url,updated,externalAliases,planning,checklist,timing,importance,body,recurrence,reminders,metadata,siblingOrder,version+1);
 	}
 
 	public Task withExternalProviderData(ExternalTaskReferenceKey key, Optional<ExternalTaskProviderData> data) {

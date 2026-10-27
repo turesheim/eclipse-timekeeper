@@ -94,6 +94,7 @@ public final class JsonValues {
                     var envelope=ref.putObject("providerData");envelope.put("namespace",data.namespace());envelope.put("version",data.version());
                     envelope.set("payload",parse(data.json()));
                 });
+                reference.baseline().ifPresent(saved -> ref.set("baseline",baseline(saved)));
                 var source=ref.putObject("source");nullable(source,"createdAt",reference.source().createdAt());nullable(source,"modifiedAt",reference.source().modifiedAt());
                 nullable(source,"remoteEtag",reference.source().remoteEtag());nullable(source,"remoteRevision",reference.source().remoteRevision());refs.add(ref);
             });
@@ -142,13 +143,26 @@ public final class JsonValues {
     }
     public static ExternalTaskReference reference(JsonNode node) {
         return new ExternalTaskReference(node.get("providerId").asText(),node.get("repositoryId").asText(),node.get("externalId").asText(),optionalText(node.get("externalUrl")),source(node.get("source")),optionalText(node.get("taskListId")).map(UUID::fromString),
-                Optional.ofNullable(node.get("providerData")).filter(value -> !value.isNull()).map(JsonValues::providerData));
+                Optional.ofNullable(node.get("providerData")).filter(value -> !value.isNull()).map(JsonValues::providerData),
+                Optional.ofNullable(node.get("baseline")).filter(value -> !value.isNull()).map(JsonValues::baseline));
     }
     public static ExternalTaskProviderData providerData(JsonNode value) {
         if(value==null || !value.isObject() || !value.path("payload").isObject()) throw ApiFailure.validation();
         rejectCredentials(value.get("payload"));
         String json=value.get("payload").toString();if(json.length()>65536) throw ApiFailure.validation();
         return new ExternalTaskProviderData(value.get("namespace").asText(),value.get("version").asInt(),json);
+    }
+    private static final Set<String> BASELINE_FIELDS = Set.of("summary","url","body","status","scheduledDate","completedAt","start","due","priority","flagged","urgent","parentTaskId","siblingOrder","checklistItems","recurrence","reminders","metadata","taskListId");
+    public static ExternalTaskBaseline baseline(JsonNode value) {
+        if(value==null || !value.isObject() || !value.path("fields").isObject()) throw ApiFailure.validation();
+        var fields=value.get("fields");
+        fields.fieldNames().forEachRemaining(name -> {if(!BASELINE_FIELDS.contains(name)) throw ApiFailure.validation();});
+        rejectCredentials(fields);
+        String json=canonical(fields).toString();if(json.length()>65536) throw ApiFailure.validation();
+        return new ExternalTaskBaseline(value.path("version").asInt(),Instant.parse(value.path("capturedAt").asText()),json);
+    }
+    public static ObjectNode baseline(ExternalTaskBaseline value) {
+        var node=object();node.put("version",value.version());node.put("capturedAt",value.capturedAt().toString());node.set("fields",parse(value.json()));return node;
     }
     private static void rejectCredentials(JsonNode value) {
         if(value.isObject()) value.fields().forEachRemaining(entry -> {

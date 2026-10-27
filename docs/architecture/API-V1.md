@@ -163,13 +163,23 @@ Explicit null clears a value. Older link calls omit `source` and preserve state
 for an existing identity. The remote ETag is independent of the Timekeeper
 `If-Match` value.
 
+Each reference may also carry a versioned `baseline` containing `capturedAt`
+and the normalized `fields` last agreed with that provider. The field map is
+sparse: absence means unsupported or unknown, not a request to erase a value.
+After a successful provider exchange, use conditional `PUT
+/tasks/{id}/external-references/sync-state` to replace `source` and `baseline`
+in one task write. A null baseline clears it. Keep credentials and transport
+state out of the field map. Ordinary task edits and legacy link updates retain
+the baseline; identity replacement inherits it until a new exchange completes.
+The snapshot is the comparison base for a later field-level three-way merge.
+
 `PUT /tasks/{id}/external-references/replace` atomically changes one current
 provider identity using `previous` (provider, repository, external ID) and a
 complete `current` reference. Both identities must belong to the same provider.
 The old key becomes an `externalAliases` lookup key, so a provider rescan that
 changes a remote ID can still resolve the same Timekeeper task. Alias keys are
 unique per owner and survive ordinary task edits, archive, and portable transfer.
-The new link inherits source, list association, and provider data when omitted.
+The new link inherits source, list association, provider data, and baseline when omitted.
 Ordinary unlink forgets its current identity and does not create an alias.
 
 Provider accounts and lists have owner-scoped `/task-connections` and
