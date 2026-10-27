@@ -9,36 +9,49 @@ const button=(text,className)=>{const value=node('button',text,className);value.
 /** Optional web metadata has its own read state and never changes timed work. */
 export class TrackDayNotes {
   constructor(root,grid,monthInput,callbacks,options={}){
-    Object.assign(this,{prefix:'track',headingSelector:'.track-date-row',alwaysShow:false,compact:false},options,{root,grid,monthInput,callbacks,notes:new Map(),bodyDates:new Set(),generation:0});
+    Object.assign(this,{prefix:'track',headingSelector:'.track-date-row',alwaysShow:false,compact:false,inline:false},options,{root,grid,monthInput,callbacks,notes:new Map(),bodyDates:new Set(),generation:0});
     this.noteAttr='data-'+this.prefix+'-note-date';this.cellAttr='data-'+this.prefix+'-date';
     this.status=node('p',undefined,'hint '+this.prefix+'-note-status');this.status.setAttribute('role','status');this.message=node('span');
     this.retry=button(t('ui.retry'),'btn btn-link btn-sm');this.retry.hidden=true;this.retry.addEventListener('click',()=>{this.key=null;this.load();});this.status.append(this.message,' ',this.retry);if(this.statusAnchor)this.statusAnchor.before(this.status);else grid.after(this.status);this.status.hidden=true;
-    this.dialog=node('dialog',undefined,'app-dialog journal-dialog shadow-lg');this.dialog.id=this.prefix+'-note-editor';this.dialog.setAttribute('aria-labelledby',this.prefix+'-note-title');
+    this.dialog=node(this.inline?'section':'dialog',undefined,this.inline?'card journal-inline':'app-dialog journal-dialog shadow-lg');this.dialog.id=this.prefix+'-note-editor';this.dialog.setAttribute('aria-labelledby',this.prefix+'-note-title');
     this.form=node('form');this.title=node('h2');this.title.id=this.prefix+'-note-title';
     const label=node('label',t('day_notes.text'),'form-label');label.htmlFor=this.prefix+'-note-text';this.text=node('input',undefined,'form-control journal-note-label');this.text.id=this.prefix+'-note-text';this.text.maxLength=80;this.text.autocomplete='off';
     this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');
     this.savedStatus=node('p','','hint');this.savedStatus.setAttribute('role','status');
-    const markdown=node('div');this.markdown=new MarkdownField(markdown,()=>this.changed(),()=>this.controls(),this.prefix==='track'?'journal':this.prefix+'-journal');
+    const markdown=node('div');this.markdown=new MarkdownField(markdown,()=>this.changed(),()=>this.controls(),
+      this.prefix==='track'?'journal':this.prefix+'-journal',(file,image)=>this.uploadAsset(file,image));
     this.reload=button(t('journal.reload'),'btn btn-outline-secondary');this.reload.addEventListener('click',()=>void this.reloadEditor());
-    const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.savedStatus,this.cancel,this.save);
+    const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.delete=button(t('journal.delete_note'),'btn btn-outline-secondary');this.delete.addEventListener('click',()=>void this.deleteNote());this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.savedStatus,this.cancel,this.delete,this.save);
     this.recovery=node('div',undefined,'journal-recovery');this.recovery.append(this.reload);
     this.content=node('div',undefined,'journal-content');this.content.append(this.title,label,this.text,this.error,markdown,this.recovery);this.form.append(this.content,actions);this.dialog.append(this.form);root.append(this.dialog);
     this.text.addEventListener('input',()=>this.changed());
     this.cancel.addEventListener('click',()=>this.requestClose());
     // Focus returns before the native close event is delivered. Release editor
     // state synchronously so the next keyboard action can open the day menu.
-    this.dialog.addEventListener('cancel',event=>{event.preventDefault();this.requestClose();});
-    this.dialog.addEventListener('close',()=>this.finishEditor());
+    if(!this.inline){this.dialog.addEventListener('cancel',event=>{event.preventDefault();this.requestClose();});this.dialog.addEventListener('close',()=>this.finishEditor());}
     this.form.addEventListener('submit',event=>{event.preventDefault();void this.commit();});
     window.addEventListener('beforeunload',event=>{if(this.editor&&(this.dirty()||this.editor.busy||this.editor.uncertain)){event.preventDefault();event.returnValue='';}});
-    this.buildMenu();
+    if(!this.inline)this.buildMenu();
   }
   dirty(){return !!this.editor?.etag&&(this.text.value.trim()!==this.editor.originalText||this.markdown.value()!==this.editor.originalBody);}
+  async uploadAsset(file,image){
+    const editor=this.editor;
+    if(!editor||!this.writable||file.size>5_000_000||image&&!['image/png','image/jpeg','image/gif','image/webp'].includes(file.type))throw new Error('Invalid attachment');
+    const imageExtensions={'image/png':'png','image/jpeg':'jpg','image/gif':'gif','image/webp':'webp'};
+    const extension=image?imageExtensions[file.type]:(file.name.match(/\.([a-zA-Z0-9]{1,10})$/)?.[1]||'bin').toLowerCase();
+    const filename=crypto.randomUUID()+'.'+extension;
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    if(this.editor!==editor)throw new Error('Editor closed');
+    let binary='';for(let offset=0;offset<bytes.length;offset+=8192)binary+=String.fromCharCode(...bytes.subarray(offset,offset+8192));
+    await editor.session.request('/journal-assets/'+filename,{method:'PUT',noneMatch:'*',body:{data:btoa(binary)},emptyResponse:true,timeout:60000});
+    if(this.editor!==editor)throw new Error('Editor closed');
+    return 'assets/'+filename;
+  }
   changed(){if(this.editor)this.savedStatus.textContent=t(this.dirty()?'journal.unsaved':'journal.saved');}
-  requestClose(){if(!this.editor?.busy&&(!this.dirty()||confirm(t('journal.discard'))))this.closeEditor();}
-  closeEditor(){this.dialog.close();this.finishEditor();}
+  requestClose(){if(this.editor?.busy||this.dirty()&&!confirm(t('journal.discard')))return;if(this.inline){if(this.editor)void this.loadEditor(this.editor);}else this.closeEditor();}
+  closeEditor(){if(!this.inline)this.dialog.close();this.finishEditor();}
   finishEditor(){
-    if(this.dialog.open)return;
+    if(!this.inline&&this.dialog.open)return;
     const date=this.editor?.date,uncertain=this.editor?.uncertain;this.editor=null;this.text.value='';this.error.textContent='';this.savedStatus.textContent='';this.markdown.clear();
     if(date)this.focusDate(date);
     if(uncertain&&this.session){this.key=null;this.load();}
@@ -94,9 +107,18 @@ export class TrackDayNotes {
     this.menu.style.left=Math.max(8,Math.min(x,innerWidth-this.menu.offsetWidth-8))+'px';
     this.menu.style.top=Math.max(8,Math.min(y,innerHeight-this.menu.offsetHeight-8))+'px';if(focus)this.menuItem.focus({preventScroll:true});
   }
-  closeMenu(){if(this.menu.matches(':popover-open'))this.menu.hidePopover();}
+  closeMenu(){if(this.menu?.matches(':popover-open'))this.menu.hidePopover();}
   focusDate(date){if(!this.root.hidden)(this.grid.querySelector(`button[${this.noteAttr}="${date}"]`)||this.monthInput).focus();}
   dateLabel(date){return dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));}
+  canLeaveInline(){return !this.editor?.busy&&(!this.dirty()||confirm(t('journal.discard')));}
+  showInline(date,session,writable){
+    if(!this.inline)return;
+    if(session!==this.session){this.reset();this.session=session;}
+    this.writable=writable;
+    if(this.editor?.date===date){this.controls();return;}
+    if(this.editor)this.closeEditor();
+    void this.open(date);
+  }
   update(calendar,cells,session,revision,writable,focused){
     if(session!==this.session){this.reset();this.session=session;}
     Object.assign(this,{calendar,cells,revision,writable});
@@ -109,6 +131,7 @@ export class TrackDayNotes {
     const readOnly=editor.loading||editor.busy||editor.uncertain||!editor.etag||!this.writable;
     if(this.markdown&&this.markdown.readOnly!==readOnly)this.markdown.setReadOnly(readOnly);
     this.save.disabled=editor.loading||editor.failedRead||editor.busy||this.markdown?.loading||editor.uncertain||editor.stale||!editor.etag||!this.writable;
+    this.delete.disabled=editor.loading||editor.failedRead||editor.busy||this.markdown?.loading||editor.uncertain||editor.stale||!editor.etag||!editor.present||!this.writable;
     this.cancel.disabled=editor.busy;
     if(this.reload){this.reload.hidden=!(editor.failedRead||editor.stale||editor.uncertain);this.reload.disabled=editor.loading||editor.busy||this.markdown.loading;this.reload.textContent=t(editor.uncertain?'journal.check_result':'journal.reload');}
     if(this.recovery){
@@ -154,9 +177,9 @@ export class TrackDayNotes {
     if(focused&&!this.root.hidden)this.grid.querySelector(`button[${this.noteAttr}="${focused}"]`)?.focus({preventScroll:true});
   }
   async open(date){
-    if(!this.session||this.editor||!this.cells?.has(date))return;
+    if(!this.session||this.editor||!this.inline&&!this.cells?.has(date))return;
     const editor={date,session:this.session,loading:true,busy:false,uncertain:false};this.editor=editor;this.error.textContent='';this.text.value=this.notes.get(date)||'';
-    this.title.textContent=t('day_notes.title',{date:this.dateLabel(date)});this.controls();this.dialog.showModal();this.content.scrollTop=0;
+    this.title.textContent=t('day_notes.title',{date:this.dateLabel(date)});this.controls();if(!this.inline)this.dialog.showModal();this.content.scrollTop=0;
     await this.loadEditor(editor);
   }
   async loadEditor(editor){
@@ -164,8 +187,8 @@ export class TrackDayNotes {
     try{
       const reply=await editor.session.request('/day-notes/'+editor.date);
       if(this.editor!==editor||editor.session!==this.session)return;
-      this.text.value=reply.data.text;editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;editor.loading=false;editor.failedRead=false;editor.stale=false;editor.uncertain=false;
-      this.markdown.setValue(reply.data.body);this.error.textContent='';this.savedStatus.textContent=t(this.writable?'journal.saved':'journal.read_only');this.controls();this.content.scrollTop=0;this.text.focus({preventScroll:true});void this.markdown.showFormatted(false);
+      this.text.value=reply.data.text;editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;editor.present=reply.data.version>0&&!reply.data.deleted;editor.loading=false;editor.failedRead=false;editor.stale=false;editor.uncertain=false;
+      this.markdown.setValue(reply.data.body);this.error.textContent='';this.savedStatus.textContent=t(this.writable?'journal.saved':'journal.read_only');this.controls();this.content.scrollTop=0;if(!this.inline)this.text.focus({preventScroll:true});void this.markdown.showFormatted(false);
     }catch(error){
       if(this.editor!==editor||editor.session!==this.session)return;
       editor.loading=false;editor.failedRead=true;this.error.textContent=error.message;this.savedStatus.textContent='';this.controls();this.error.scrollIntoView({block:'nearest'});if(error.status===401)this.callbacks.onUnauthorized(error);
@@ -177,7 +200,7 @@ export class TrackDayNotes {
       editor.loading=true;this.controls();
       try{
         const reply=await editor.session.request('/day-notes/'+editor.date);if(this.editor!==editor||editor.session!==this.session)return;
-        if(reply.data.text===editor.sent.text&&reply.data.body===editor.sent.body){this.acceptSaved(reply,editor);return;}
+        if(editor.sent?.delete?reply.data.deleted:reply.data.text===editor.sent.text&&reply.data.body===editor.sent.body){this.acceptSaved(reply,editor);return;}
         editor.uncertain=false;editor.stale=true;this.error.textContent=t('journal.review_saved');
       }catch(error){if(this.editor===editor){this.error.textContent=error.message;if(error.status===401)this.callbacks.onUnauthorized(error);}}
       finally{if(this.editor===editor){editor.loading=false;this.controls();if(this.error.textContent)this.error.scrollIntoView({block:'nearest'});}}
@@ -190,7 +213,10 @@ export class TrackDayNotes {
     ++this.generation;this.key=null;
     if(reply.data.hasBody)this.bodyDates.add(editor.date);else this.bodyDates.delete(editor.date);
     if(reply.data.text||reply.data.hasBody)this.notes.set(editor.date,reply.data.text);else this.notes.delete(editor.date);
-    this.paint();this.closeEditor();this.callbacks.onChanged();
+    this.paint();
+    if(this.inline){editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;this.savedStatus.textContent=t('journal.saved');this.controls();}
+    else this.closeEditor();
+    this.callbacks.onChanged();
   }
   async commit(){
     const editor=this.editor;if(!editor||editor.busy||editor.loading||editor.failedRead||editor.uncertain||editor.stale||!editor.etag||!this.writable||editor.session!==this.session)return;
@@ -201,6 +227,20 @@ export class TrackDayNotes {
       const reply=await editor.session.request('/day-notes/'+editor.date,{method:'PUT',etag:editor.etag,body:editor.sent});
       if(this.editor!==editor||editor.session!==this.session)return;
       this.acceptSaved(reply,editor);
+    }catch(error){
+      if(this.editor!==editor||editor.session!==this.session)return;
+      if(error.status===401){this.callbacks.onUnauthorized(error);return;}
+      editor.uncertain=error.uncertain;editor.stale=error.status===412;this.error.textContent=error.uncertain?t('day_notes.uncertain'):error.message;this.savedStatus.textContent=t('journal.unsaved');
+    }finally{if(this.editor===editor){editor.busy=false;this.controls();if(this.error.textContent)this.error.scrollIntoView({block:'nearest'});}}
+  }
+  async deleteNote(){
+    const editor=this.editor;if(!editor||editor.busy||editor.loading||editor.failedRead||editor.uncertain||editor.stale||!editor.present||!editor.etag||!this.writable||editor.session!==this.session)return;
+    if(!confirm(t('journal.delete_confirm',{date:this.dateLabel(editor.date)})))return;
+    editor.sent={delete:true};editor.busy=true;this.error.textContent='';this.savedStatus.textContent=t('journal.deleting');this.controls();
+    try{
+      await editor.session.request('/day-notes/'+editor.date,{method:'DELETE',etag:editor.etag});
+      if(this.editor!==editor||editor.session!==this.session)return;
+      this.acceptSaved({data:{text:'',hasBody:false,deleted:true}},editor);
     }catch(error){
       if(this.editor!==editor||editor.session!==this.session)return;
       if(error.status===401){this.callbacks.onUnauthorized(error);return;}

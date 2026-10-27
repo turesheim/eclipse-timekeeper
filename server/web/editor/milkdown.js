@@ -12,14 +12,15 @@ import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
 
 const commands={bold:toggleStrongCommand,italic:toggleEmphasisCommand,strike:toggleStrikethroughCommand,inline_code:toggleInlineCodeCommand,code_block:createCodeBlockCommand,paragraph:turnIntoTextCommand,heading:wrapInHeadingCommand,list:wrapInBulletListCommand,ordered:wrapInOrderedListCommand,quote:wrapInBlockquoteCommand,table:insertTableCommand,hr:insertHrCommand,undo:undoCommand,redo:redoCommand};
-const sourceNodes=new Set(['html','image','imageReference','linkReference','definition','footnoteReference','footnoteDefinition']);
+const sourceNodes=new Set(['html','imageReference','linkReference','definition','footnoteReference','footnoteDefinition']);
+const safeAsset=url=>typeof url==='string'&&/^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(url);
 const safeLink=url=>{if(typeof url!=='string'||!url.trim())return false;try{return ['https:','http:','mailto:'].includes(new URL(url,location.origin).protocol);}catch{return false;}};
 const safeDocument=doc=>{
   let safe=true;
-  doc.descendants(node=>{if(node.type.name==='image'||node.marks.some(mark=>mark.type.name==='link'&&!safeLink(mark.attrs.href)))safe=false;return safe;});
+  doc.descendants(node=>{if(node.type.name==='image'&&!safeAsset(node.attrs.src)||node.marks.some(mark=>mark.type.name==='link'&&!safeLink(mark.attrs.href)))safe=false;return safe;});
   return safe;
 };
-const unsupported=node=>!['code','inlineCode'].includes(node.type)&&(sourceNodes.has(node.type)||node.type==='link'&&!safeLink(node.url)||node.type==='text'&&hasUnsupportedSyntax(node.value)||Boolean(node.children?.some(unsupported)));
+const unsupported=node=>!['code','inlineCode'].includes(node.type)&&(sourceNodes.has(node.type)||node.type==='image'&&!safeAsset(node.url)||node.type==='link'&&!safeLink(node.url)||node.type==='text'&&hasUnsupportedSyntax(node.value)||Boolean(node.children?.some(unsupported)));
 // Presentation choices (blank-line spacing, bullet markers) can normalize on an
 // actual rich edit. All semantic fields must survive the initial round trip.
 const semantic=value=>{
@@ -80,7 +81,12 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       attributes:()=>({role:'textbox','aria-label':label,'aria-multiline':'true','aria-readonly':String(readOnly),...(!readOnly&&description?{'aria-describedby':description}:{}),tabindex:'0',spellcheck:'true'}),
       editable:()=>!readOnly,
       handleKeyDown:(_view,event)=>{if(event.key==='Escape'){escape();return true;}return false;},
-      nodeViews:{list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),code_block:node=>String(node.attrs.language).toLowerCase()==='mermaid'?mermaidBlock(node):null,image:node=>{const dom=document.createElement('span');dom.textContent=node.attrs.alt||'';return {dom};}},
+      nodeViews:{list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),code_block:node=>String(node.attrs.language).toLowerCase()==='mermaid'?mermaidBlock(node):null,image:node=>{
+        const dom=document.createElement(safeAsset(node.attrs.src)?'img':'span');
+        if(dom.tagName==='IMG'){dom.src='/api/v1/journal-assets/'+node.attrs.src.slice(7);dom.alt=node.attrs.alt||'';dom.loading='lazy';}
+        else dom.textContent=node.attrs.alt||'';
+        return {dom};
+      }},
       // Links are text-editable; clicking never navigates or executes a URI.
       handleClick:(_view,_pos,event)=>Boolean(event.target.closest('a')&&(event.preventDefault(),true)),
       // Prototype accepts pasted text only, so HTML/images cannot fetch remote
@@ -104,6 +110,13 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
           const {from,empty}=view.state.selection;
           if(empty)view.dispatch(view.state.tr.insertText(payload,from).addMark(from,from+payload.length,view.state.schema.marks.link.create({href:payload})));
           else editor.action(callCommand(toggleLinkCommand.key,{href:payload}));
+        }
+      }else if(name==='image'||name==='asset_link'){
+        if(!safeAsset(payload?.path))return false;
+        if(name==='image')view.dispatch(view.state.tr.replaceSelectionWith(view.state.schema.nodes.image.create({src:payload.path,alt:payload.label})));
+        else{
+          const {from,to}=view.state.selection,label=payload.label||payload.path;
+          view.dispatch(view.state.tr.insertText(label,from,to).addMark(from,from+label.length,view.state.schema.marks.link.create({href:payload.path})));
         }
       }else if(name==='tasks'){
         editor.action(callCommand(wrapInBulletListCommand.key));

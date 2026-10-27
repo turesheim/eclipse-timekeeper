@@ -103,6 +103,55 @@ test('day notes can be added from the day menu, edited, canceled and removed wit
   }finally{await owner.close();}
 });
 
+test('deleting a day note is explicit, guarded, and distinct from clearing it',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage(),date='2026-05-17';
+  try{
+    await signIn(page,await fresh(request));const api=await apiFor(page);await month(page);
+    await menu(page);await save(page,'First note');
+    await note(page).click();const remove=dialog(page).getByRole('button',{name:'Delete note'});
+    await expect(remove).toBeEnabled();page.once('dialog',prompt=>prompt.dismiss());await remove.click();
+    await expect(dialog(page)).toBeVisible();expect((await(await api('GET','/day-notes/'+date)).json()).deleted).toBe(false);
+    page.once('dialog',prompt=>prompt.accept());await remove.click();await expect(dialog(page)).toBeHidden();
+    const deleted=await api('GET','/day-notes/'+date),deletedValue=await deleted.json();expect(deletedValue.deleted).toBe(true);expect(deletedValue.text).toBe('');
+    await note(page).click();await expect(dialog(page).getByRole('button',{name:'Delete note'})).toBeDisabled();
+    await save(page,'Restored note');const restored=await(await api('GET','/day-notes/'+date)).json();expect(restored.deleted).toBe(false);expect(restored.version).toBeGreaterThan(deletedValue.version);
+    await note(page).click();const current=await api('GET','/day-notes/'+date);await api('PUT','/day-notes/'+date,{text:'Changed elsewhere'},{'If-Match':current.headers().etag});
+    page.once('dialog',prompt=>prompt.accept());await dialog(page).getByRole('button',{name:'Delete note'}).click();
+    await expect(dialog(page).getByRole('alert')).toBeVisible();await expect(dialog(page).getByRole('button',{name:'Delete note'})).toBeDisabled();
+    expect((await(await api('GET','/day-notes/'+date)).json()).text).toBe('Changed elsewhere');
+  }finally{await owner.close();}
+});
+
+test('journal images and file attachments survive editing and remain available over WebDAV',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage();
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9o9u4AAAAASUVORK5CYII=','base64');
+  try{
+    await signIn(page,await fresh(request));await month(page);await menu(page);
+    await dialog(page).getByRole('button',{name:'Formatted'}).click();
+    await expect(dialog(page).locator('.ProseMirror')).toBeVisible();
+    const upload=page.waitForResponse(response=>response.url().includes('/api/v1/journal-assets/')&&response.request().method()==='PUT');
+    await dialog(page).locator('input[type=file][accept]').setInputFiles({name:'photo.png',mimeType:'image/png',buffer:png});
+    const uploaded=await upload;expect(uploaded.status()).toBe(201);
+    const image=dialog(page).locator('.ProseMirror img[src^="/api/v1/journal-assets/"]');await expect(image).toBeVisible();
+    const src=await image.getAttribute('src');expect(src).toMatch(/^\/api\/v1\/journal-assets\/[a-f0-9-]+\.png$/);
+    await dialog(page).locator('input[type=file]:not([accept])').setInputFiles({name:'notes.txt',mimeType:'text/plain',buffer:Buffer.from('attached text')});
+    await expect(dialog(page).locator('.ProseMirror a')).toContainText('notes.txt');
+    await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page)).toBeHidden();
+    const api=await apiFor(page),saved=await(await api('GET','/day-notes/2026-05-17')).json();
+    const imagePath=saved.body.match(/!\[[^\]]*\]\((assets\/[a-f0-9-]+\.png)\)/)?.[1];
+    const filePath=saved.body.match(/\[notes\.txt\]\((assets\/[a-f0-9-]+\.txt)\)/)?.[1];
+    expect(imagePath).toBeTruthy();expect(filePath).toBeTruthy();
+    const imageReply=await api('GET','/journal-assets/'+imagePath.slice(7));expect(Buffer.from(await imageReply.body())).toEqual(png);
+    const attachment=await api('GET','/journal-assets/'+filePath.slice(7));expect(await attachment.text()).toBe('attached text');
+    await note(page).click();await dialog(page).getByRole('button',{name:'Formatted'}).click();
+    await expect(dialog(page).locator('.ProseMirror img[src^="/api/v1/journal-assets/"]')).toBeVisible();
+    const token=await(await api('POST','/auth/tokens',{name:'Attachment browser test',permissions:['read'],expiresAt:null})).json();
+    const basic=Buffer.from('webdav:'+token.token).toString('base64');
+    const dav=await request.get('/dav/journal/'+imagePath,{headers:{Authorization:'Basic '+basic}});
+    expect(dav.status()).toBe(200);expect(Buffer.from(await dav.body())).toEqual(png);
+  }finally{await owner.close();}
+});
+
 test('Escape immediately releases the day-note editor before its queued close event',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage();
   try{
@@ -194,7 +243,7 @@ test('a long press opens the day note menu while movement, release and multiple 
     await start();await cell.dispatchEvent('pointermove',{...point,clientX:point.clientX+20,pointerType:'touch',pointerId:7,bubbles:true});await page.waitForTimeout(650);await expect(page.getByRole('menu')).not.toBeVisible();
     await start();await cell.dispatchEvent('pointerup',{pointerType:'touch',pointerId:7,bubbles:true});await page.waitForTimeout(650);await expect(page.getByRole('menu')).not.toBeVisible();
     await start();await cell.evaluate(node=>{const event=new Event('touchstart',{bubbles:true});Object.assign(event,{touches:[{},{}]});node.dispatchEvent(event);});await page.waitForTimeout(650);await expect(page.getByRole('menu')).not.toBeVisible();
-    await start();await page.waitForTimeout(500);await cell.dispatchEvent('pointerup',{pointerType:'touch',pointerId:7,bubbles:true});await expectMenuAt(page,{x:point.clientX,y:point.clientY});expect(await page.evaluate(()=>getSelection().toString())).toBe('');await page.keyboard.press('Escape');
+    await start();await expect(page.getByRole('menuitem')).toBeVisible();await cell.dispatchEvent('pointerup',{pointerType:'touch',pointerId:7,bubbles:true});await expectMenuAt(page,{x:point.clientX,y:point.clientY});expect(await page.evaluate(()=>getSelection().toString())).toBe('');await page.keyboard.press('Escape');
     await start();await expect(page.getByRole('menuitem')).toBeVisible();await cell.dispatchEvent('pointerup',{pointerType:'touch',pointerId:7,bubbles:true});await expect(page.locator('#track-month')).toHaveValue('2026-05');await expect(dialog(page)).not.toBeVisible();await page.getByRole('menuitem').tap();await expect(dialog(page)).toBeVisible();await expect(page.locator('#track-note-text')).toBeEnabled();await save(page,'Ferie');await expect(note(page,'2026-05-10')).toHaveText('Ferie');
     await expect(note(page,'2026-05-10')).toHaveCSS('opacity','1');
     if(browserName==='chromium'){

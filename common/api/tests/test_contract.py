@@ -41,10 +41,7 @@ class ContractTest(unittest.TestCase):
                             '/auth/passkeys/login/options', '/auth/passkeys/login/finish', '/auth/passkeys/cancel'):
                     self.assertEqual([], operation['security'])
                     continue
-                if path in ('/journal/settings', '/journal/devices') or path.startswith('/journal/devices/') and path.endswith('/revoke'):
-                    self.assertEqual([{'browserSession': []}], operation['security'])
-                else:
-                    self.assertNotIn('security', operation)
+                self.assertNotIn('security', operation)
                 self.assertEqual(('write' if path.startswith('/admin/') else 'read') if method == 'get' else ('read' if path in ('/auth/logout', '/auth/token-login') else 'write'),
                                  operation['x-required-permission'])
                 self.assertIn('401', operation['responses'])
@@ -104,6 +101,98 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskInput').is_valid({**body, 'externalReferences': [reference]}))
         self.assertFalse(validator('TaskCreateInput').is_valid({**body, 'ownerId': 'other'}))
 
+    def test_task_planning_has_a_date_only_schedule_and_conditional_update_contract(self):
+        body = {'summary': 'Review', 'projectId': None, 'parentTaskId': None, 'url': None,
+                'status': 'COMPLETED', 'scheduledDate': '2026-10-26', 'completedAt': '2026-10-26T11:12:13Z'}
+        validator('TaskCreateInput').validate(body)
+        validator('TaskPlanningInput').validate({key: body[key] for key in ('status', 'scheduledDate', 'completedAt')})
+        self.assertFalse(validator('TaskPlanningInput').is_valid({'status': 'COMPLETED', 'scheduledDate': None}))
+        self.assertFalse(validator('TaskPlanningInput').is_valid({'status': 'UNKNOWN', 'scheduledDate': None, 'completedAt': None}))
+        self.assertFalse(validator('TaskPlanningInput').is_valid({'status': 'NOT_STARTED', 'scheduledDate': '2026-02-30', 'completedAt': None}))
+        self.assertEqual('updateTaskPlanning', CONTRACT['paths']['/tasks/{id}/planning']['put']['operationId'])
+
+    def test_task_checklist_items_are_distinct_from_subtasks(self):
+        item={'id':'e5fb0a24-7713-4e73-9e5c-bdf80a0180a5','text':'Review','completed':False,'completedAt':None,'position':0}
+        validator('TaskChecklistInput').validate({'items':[item]})
+        self.assertFalse(validator('TaskChecklistInput').is_valid({'items':[{**item,'completedAt':'2026-10-26T11:12:13Z','position':-1}]}))
+        self.assertFalse(validator('TaskChecklistInput').is_valid({'items':[{**item,'parentTaskId':item['id']}]}))
+        self.assertEqual('updateTaskChecklist',CONTRACT['paths']['/tasks/{id}/checklist']['put']['operationId'])
+
+    def test_task_timing_distinguishes_civil_dates_from_zoned_wall_times(self):
+        date={'kind':'DATE','date':'2026-03-29'}
+        wall={'kind':'DATE_TIME','date':'2026-03-29','time':'02:30','timeZone':'Europe/Oslo'}
+        validator('TaskTimingInput').validate({'start':date,'due':wall})
+        self.assertFalse(validator('TaskTimingInput').is_valid({'start':date,'due':{**wall,'timeZone':None}}))
+        self.assertFalse(validator('TaskTimingInput').is_valid({'start':{**date,'time':'00:00'},'due':None}))
+        self.assertFalse(validator('TaskTimingInput').is_valid({'start':date}))
+        self.assertEqual('updateTaskTiming',CONTRACT['paths']['/tasks/{id}/timing']['put']['operationId'])
+
+    def test_task_importance_keeps_priority_flag_and_urgency_separate(self):
+        value={'priority':'HIGH','flagged':True,'urgent':False}
+        validator('TaskImportanceInput').validate(value)
+        self.assertFalse(validator('TaskImportanceInput').is_valid({**value,'priority':'URGENT'}))
+        self.assertFalse(validator('TaskImportanceInput').is_valid({**value,'flagged':None}))
+        self.assertFalse(validator('TaskImportanceInput').is_valid({'priority':'HIGH','flagged':True}))
+        self.assertEqual('updateTaskImportance',CONTRACT['paths']['/tasks/{id}/importance']['put']['operationId'])
+
+    def test_task_body_has_explicit_format_and_clear_content(self):
+        validator('TaskBodyInput').validate({'format':'TEXT','content':''})
+        validator('TaskBodyInput').validate({'format':'HTML','content':'<p>Notes</p>'})
+        self.assertFalse(validator('TaskBodyInput').is_valid({'format':'MARKDOWN','content':'Notes'}))
+        self.assertFalse(validator('TaskBodyInput').is_valid({'format':'HTML','content':None}))
+        self.assertFalse(validator('TaskBodyInput').is_valid({'format':'TEXT'}))
+        self.assertEqual('updateTaskBody',CONTRACT['paths']['/tasks/{id}/body']['put']['operationId'])
+
+    def test_external_source_has_per_reference_timestamps_and_remote_versions(self):
+        source={'createdAt':'2026-10-01T10:00:00Z','modifiedAt':None,'remoteEtag':'"remote"','remoteRevision':None}
+        value={'providerId':'google','repositoryId':'account/list','externalId':'item','source':source}
+        validator('ExternalTaskSourceInput').validate(value)
+        self.assertFalse(validator('ExternalTaskSourceInput').is_valid({**value,'source':{**source,'remoteEtag':42}}))
+        self.assertFalse(validator('ExternalTaskSourceInput').is_valid({**value,'source':{**source,'remoteRevision':''}}))
+        self.assertFalse(validator('ExternalTaskSourceInput').is_valid({**value,'source':{'createdAt':None}}))
+        self.assertEqual('updateExternalTaskSource',CONTRACT['paths']['/tasks/{id}/external-references/source']['put']['operationId'])
+
+    def test_provider_connections_and_lists_keep_remote_identity_separate_from_projects(self):
+        connection={'providerId':'google','remoteAccountId':'account-1','name':'Personal',
+                    'readable':True,'writable':False,'enabled':True}
+        task_list={'connectionId':ID,'remoteListId':'list-1','name':'Tasks','kind':'STANDARD',
+                   'readable':True,'writable':False,'shared':False,'owner':True,'present':True,'position':0}
+        validator('TaskConnectionCreateInput').validate(connection)
+        validator('TaskListCreateInput').validate(task_list)
+        self.assertFalse(validator('TaskListCreateInput').is_valid({**task_list,'kind':'PROJECT'}))
+        self.assertFalse(validator('TaskListCreateInput').is_valid({**task_list,'position':-1}))
+        self.assertFalse(validator('TaskConnectionCreateInput').is_valid({**connection,'accessToken':'secret'}))
+        self.assertEqual('listTaskLists',CONTRACT['paths']['/task-lists']['get']['operationId'])
+        reference={'providerId':'google','repositoryId':'account/list','externalId':'task-1',
+                   'externalUrl':None,'taskListId':ID}
+        validator('ExternalReference').validate(reference)
+        self.assertFalse(validator('ExternalReference').is_valid({**reference,'taskListId':'not-a-uuid'}))
+
+    def test_task_sibling_order_is_a_conditional_section(self):
+        validator('TaskOrderInput').validate({'siblingOrder':7})
+        self.assertFalse(validator('TaskOrderInput').is_valid({'siblingOrder':-1}))
+        self.assertFalse(validator('TaskOrderInput').is_valid({'siblingOrder':7,'unknown':True}))
+        self.assertEqual('updateTaskOrder',CONTRACT['paths']['/tasks/{id}/order']['put']['operationId'])
+
+    def test_provider_data_is_versioned_and_explicitly_clearable(self):
+        envelope={'namespace':'google.tasks','version':1,'payload':{'future':{'nested':[1,True,None]}}}
+        validator('ExternalTaskProviderData').validate(envelope)
+        self.assertFalse(validator('ExternalTaskProviderData').is_valid({**envelope,'version':0}))
+        self.assertFalse(validator('ExternalTaskProviderData').is_valid({**envelope,'namespace':'Google Tasks'}))
+        command={'providerId':'google','repositoryId':'account/list','externalId':'item','providerData':envelope}
+        validator('ExternalTaskProviderDataInput').validate(command)
+        validator('ExternalTaskProviderDataInput').validate({**command,'providerData':None})
+        self.assertEqual('updateExternalTaskProviderData',CONTRACT['paths']['/tasks/{id}/external-references/provider-data']['put']['operationId'])
+
+    def test_sync_cursors_are_opaque_per_connection_or_list(self):
+        value={'connectionId':ID,'listId':None,'mode':'INITIAL','cursor':None,
+               'lastObservedAt':None,'lastCompleteAt':None}
+        validator('TaskSyncCursorCreateInput').validate(value)
+        validator('TaskSyncCursorCreateInput').validate({**value,'listId':ID,'mode':'INCREMENTAL','cursor':'opaque-state'})
+        self.assertFalse(validator('TaskSyncCursorCreateInput').is_valid({**value,'cursor':'x'*32769}))
+        self.assertFalse(validator('TaskSyncCursorCreateInput').is_valid({**value,'mode':'DELETE_ALL'}))
+        self.assertEqual('listTaskSyncCursors',CONTRACT['paths']['/task-sync-cursors']['get']['operationId'])
+
     def test_timestamp_precision_and_zone_boundary(self):
         for value in ['2026-03-29T00:00:00Z', '2026-03-29T00:00:00.123456789Z']:
             validator('Instant').validate(value)
@@ -133,7 +222,11 @@ class ContractTest(unittest.TestCase):
                 # write, and conflicting bytes return 409 instead of overwriting.
                 if method in item and path not in ('/auth/tokens/{id}', '/data/account/uploads/{id}/chunks/{index}'):
                     op = item[method]
-                    self.assertIn({'$ref': '#/components/parameters/IfMatch'}, op['parameters'])
+                    if path == '/journal-assets/{filename}' and method == 'put':
+                        self.assertIn({'$ref': '#/components/parameters/IfMatchOptional'}, op['parameters'])
+                        self.assertIn({'$ref': '#/components/parameters/IfNoneMatchStar'}, op['parameters'])
+                    else:
+                        self.assertIn({'$ref': '#/components/parameters/IfMatch'}, op['parameters'])
                     self.assertIn('412', op['responses'])
                     self.assertIn('428', op['responses'])
         for path in ['/activities/start', '/activities/{id}/stop', '/work-sessions/start', '/work-sessions/{id}/stop', '/data/import']:
@@ -217,10 +310,14 @@ class ContractTest(unittest.TestCase):
                       {'date': '2026-10-25', 'text': '', 'body': '\n\t'}]:
             validator('ArchiveDayNote').validate(value)
         self.assertFalse(validator('ArchiveDayNote').is_valid({'date': '2026-10-25', 'text': '', 'body': ''}))
+        validator('ArchiveDayNote').validate({'date': '2026-10-25', 'text': '', 'body': '', 'markdown': ''})
+        validator('ArchiveJournalAsset').validate({'filename': 'photo.png', 'data': 'AQID'})
+        self.assertFalse(validator('ArchiveJournalAsset').is_valid({'filename': '../photo.png', 'data': 'AQID'}))
 
     def test_every_reference_and_relation_workflow_is_present(self):
         expected = {
             'listDayNotes', 'getDayNote', 'saveDayNote', 'deleteDayNote',
+            'getJournalAsset', 'putJournalAsset', 'deleteJournalAsset',
             'downloadAccountArchive', 'createAccountArchiveUpload', 'listPendingAccountArchives',
             'getAccountArchiveUpload', 'writeAccountArchiveChunk', 'discardAccountArchiveUpload',
             'previewAccountArchive', 'restoreAccountArchive', 'listAccountArchiveRestores',
@@ -228,7 +325,10 @@ class ContractTest(unittest.TestCase):
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'convertCalendarEvent',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
-            'createTask', 'updateTask', 'deleteTask', 'getTask', 'listTasks',
+            'createTaskConnection', 'updateTaskConnection', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
+            'createTaskList', 'updateTaskList', 'deleteTaskList', 'getTaskList', 'listTaskLists',
+            'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors',
+            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
             'linkExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
@@ -242,8 +342,6 @@ class ContractTest(unittest.TestCase):
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
             'getAdministrationSettings', 'updateAdministrationSettings', 'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
-            'journalStatus', 'journalSettings', 'enrollJournalDevice', 'revokeJournalDevice', 'journalDeviceProfile',
-            'rescanJournal', 'journalCandidate', 'journalCandidateSource', 'journalCalendarSource', 'resolveJournalConflict', 'discardJournalCandidate',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()
                       for key, v in item.items() if key in ('get', 'put', 'post', 'delete')}

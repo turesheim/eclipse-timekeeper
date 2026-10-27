@@ -56,7 +56,7 @@ def package(output, tag, commit):
               'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
               'docs/operations/ACCOUNT-DATA.md': 'ACCOUNT-DATA.md',
               'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
-              'docs/operations/JOURNAL-SYNC.md': 'JOURNAL-SYNC.md',
+              'docs/operations/JOURNAL-WEBDAV.md': 'JOURNAL-WEBDAV.md',
               'docs/operations/JOURNAL-STORAGE.md': 'JOURNAL-STORAGE.md',
               'docs/development/WEB-CLIENT.md': 'WEB-CLIENT.md'}
     illustrations = {
@@ -91,6 +91,8 @@ def package(output, tag, commit):
         'docs/assets/screenshots/passkeys-mobile.png': 'images/passkeys-mobile.png',
         'docs/assets/screenshots/bootstrap-work-session-desktop.png': 'images/work-session-desktop.png',
         'docs/assets/screenshots/bootstrap-work-session-narrow.png': 'images/work-session-narrow.png',
+        'docs/assets/screenshots/today-desktop.png': 'images/today-desktop.png',
+        'docs/assets/screenshots/today-mobile.png': 'images/today-mobile.png',
         'docs/assets/screenshots/track-month-desktop.png': 'images/track-month-desktop.png',
         'docs/assets/screenshots/track-month-narrow.png': 'images/track-month-narrow.png',
         'docs/assets/screenshots/track-month-picker.png': 'images/track-month-picker.png',

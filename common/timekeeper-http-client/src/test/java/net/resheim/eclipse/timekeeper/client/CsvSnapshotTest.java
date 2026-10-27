@@ -15,6 +15,34 @@ import com.google.gson.JsonParser;
 class CsvSnapshotTest {
     @TempDir Path temporary;
 
+    @Test void taskExtrasPreservePlanningTimingNotesAndSiblingOrderInMixedRows() throws Exception {
+        var data=JsonParser.parseString("""
+            {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[],"projects":[],"labels":[],"activities":[],"workSessions":[],
+             "tasks":[{"id":"new","projectId":null,"parentTaskId":null,"summary":"Future","url":null,"externalReferences":[],
+                       "status":"NOT_STARTED","scheduledDate":"2026-10-26","completedAt":null,"checklistItems":[],
+                       "start":null,"due":{"kind":"DATE","date":"2026-10-27"},"priority":"HIGH","flagged":true,"urgent":false,
+                       "body":{"format":"TEXT","content":"Keep me"},"siblingOrder":7},
+                      {"id":"old","projectId":null,"parentTaskId":null,"summary":"Earlier","url":null,"externalReferences":[]}]}
+            """).getAsJsonObject();
+        var folder=temporary.resolve("task-extras");assertEquals(2,CsvSnapshot.write(data,folder));assertEquals(data,CsvSnapshot.read(folder));
+        assertTrue(Files.readString(folder.resolve("tasks.csv")).contains("taskExtras"));
+        Files.writeString(folder.resolve("tasks.csv"),Files.readString(folder.resolve("tasks.csv")).replace(",\"taskExtras\"", ""));
+        assertThrows(IOException.class,()->CsvSnapshot.read(folder));
+    }
+
+    @Test void providerAccountsAndListsRoundTripWithoutChangingOlderCsvExports() throws Exception {
+        var data=JsonParser.parseString("""
+            {"format":"timekeeper-domain-v3","zoneId":"UTC","clients":[],"projects":[],"tasks":[],"labels":[],"activities":[],"workSessions":[],
+             "taskConnections":[{"id":"account","providerId":"google","remoteAccountId":"user@example.com","name":"Personal","readable":true,"writable":false,"enabled":true}],
+             "taskLists":[{"id":"list","connectionId":"account","remoteListId":"remote","name":"Tasks","kind":"BUILT_IN","readable":true,"writable":false,"shared":false,"owner":true,"present":true,"position":3}]}
+            """).getAsJsonObject();
+        var folder=temporary.resolve("providers");assertEquals(2,CsvSnapshot.write(data,folder));assertEquals(data,CsvSnapshot.read(folder));
+        Files.delete(folder.resolve("taskLists.csv"));assertThrows(IOException.class,()->CsvSnapshot.read(folder));
+        Files.delete(folder.resolve("taskConnections.csv"));assertThrows(IOException.class,()->CsvSnapshot.read(folder));
+        data.remove("taskConnections");data.remove("taskLists");
+        var legacy=temporary.resolve("legacy");CsvSnapshot.write(data,legacy);assertEquals(data,CsvSnapshot.read(legacy));
+    }
+
     @Test void v3CsvRetainsTheClientGraphAndCannotBeSilentlyDowngraded() throws Exception {
         var data=JsonParser.parseString("""
             {"format":"timekeeper-domain-v3","zoneId":"UTC",

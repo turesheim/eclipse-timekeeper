@@ -370,9 +370,73 @@ require the corresponding work-session file.
 The server's portable domain-v3 JSON and CSV formats include clients, projects,
 tasks, labels, activities and independent work sessions. They preserve mandatory
 project/session client links and session summaries, and remap identifiers on import.
+Server task payloads now include a provider-neutral status, optional date-only
+`scheduledDate`, and optional UTC `completedAt`. Older task payloads read with
+`NOT_STARTED` and null date defaults. These fields live in the existing
+owner-scoped `tk_resource` JSON payload in both H2 and PostgreSQL, so they need
+no new table or schema-version change. Legacy task updates and reference changes
+carry planning forward; account export/import retains it.
+The same task payload also contains ordered `checklistItems`, each with its own
+UUID, text, completion state and time, and position. These are embedded task
+values and are never independent tasks or activity targets. Older payloads read
+with an empty checklist; legacy task and planning updates retain existing items.
+Portable exports and account archives preserve checklist contents and item IDs.
+Tasks also carry independent optional `start` and `due` values. Each value is
+either a date-only civil day or a local wall time plus its original IANA or
+Windows time-zone identifier. These values are not inferred from the Google
+Tasks scheduled day, and no instant is invented at DST gaps or overlaps.
+Older task payloads read with null start/due; legacy edits preserve them, and
+portable exports and account archives retain their exact date/time kind.
+`priority` (`UNSPECIFIED`, `LOW`, `NORMAL`, `HIGH`), `flagged`, and `urgent`
+are independent task values. Missing values on older payloads read as
+`UNSPECIFIED`/false/false. Ordinary task edits preserve them, and both portable
+exports and account archives retain them. Provider capabilities determine
+which of these fields a connector may write remotely.
+Task notes are an embedded `body` value with an explicit `TEXT` or `HTML`
+format. Missing values on older payloads read as empty plain text. The
+conditional body endpoint can clear notes with empty text; ordinary task edits
+preserve notes, and portable exports and account archives retain them. HTML is
+stored as source content and must be sanitized by a renderer before display.
+Each external task reference may carry provider-supplied creation/modification
+instants plus opaque remote ETag and revision values. These values belong to the
+provider identity, since one task can have several links with different source
+times and revisions. Older references read with empty source state. Legacy link
+updates keep existing source state, while a conditional source update can
+replace or clear it. Remote ETags are never Timekeeper task versions.
+Provider account mappings are separate `TASK_CONNECTION` records with an owned
+UUID, provider ID, remote account ID, display name, read/write permissions, and
+enabled state. `TASK_LIST` records have their own UUID, connection ID, remote
+list ID, name, kind, permissions, sharing/ownership flags, presence, and order.
+A list is independent of a Timekeeper project. Both record types use the
+owner-scoped `tk_resource` payload in H2 and PostgreSQL, and a relation links
+each list to its connection. Marking a connection disabled or a list absent
+retains the records and associated tasks. Explicit deletion is conditional and
+rejects a connection with lists or a list with linked tasks. Account archives
+and portable transfers include these records; older archives import without
+them.
+An external task reference may include the stable Timekeeper `taskListId`.
+Task-to-list relations protect referenced lists from deletion, while portable
+imports remap the list ID. The reference's provider must match the list's
+connection provider. `repositoryId` remains the remote identity namespace;
+connectors must include the account/list scope when remote task IDs can repeat.
+
+`TASK_SYNC_CURSOR` is owner-scoped durable connector state linked to one
+connection and optionally one list. Its mode is `INITIAL`, `INCREMENTAL`, or
+`RESCAN_REQUIRED`; only incremental mode carries an opaque cursor. A cursor
+is not a task version and is intentionally excluded from account archives and
+portable domain transfers, which require a fresh provider scan after restore.
+
+Each external reference may contain one namespaced, versioned provider-data
+envelope. Its JSON object preserves exposed provider fields that are not yet
+normalized. The envelope belongs to that reference, so links to other
+providers cannot overwrite it. Conditional replacement and explicit clearing
+are separate from the source timestamp/revision update; older task and link
+writes retain the envelope. Connector credentials never belong in task data.
+`TASK.siblingOrder` is a nonnegative local position among tasks under the same
+parent. It defaults to zero for older rows, is independent of a provider list's
+position, and survives updates from clients that do not know this field.
 The account ZIP archive also includes active day labels and Markdown bodies;
-journal synchronization state and deletion tombstones are not portable account
-records.
+deletion tombstones are not portable account records.
 Imports also accept v1/v2 snapshots, assign their projects and sessions to the
 General client, and ignore retired activity/session links. Native table CSV and
 portable server CSV are distinct formats; see the
@@ -425,10 +489,10 @@ This diagram shows client ownership links. Activities are not children of work
 sessions; session reports find overlapping activities within the same account.
 The time-overlap calculation does not create a persistent association.
 
-## Server day notes and journal synchronization
+## Server day notes and WebDAV
 
 The server has a separate physical schema from embedded Eclipse storage
-(`ServerSchema.CURRENT` is 6). Day notes and journal synchronization reuse
+(`ServerSchema.CURRENT` is 6). Day notes and their deletion markers reuse
 `tk_resource(owner_id, entity_type, id, version, payload)` in both H2 and
 PostgreSQL. Its primary key is `(owner_id, entity_type, id)`; `payload` is JSON.
 These are logical row types, not extra SQL tables or Eclipse JPA entities.
@@ -437,30 +501,29 @@ their JSON payloads and are validated within owner-scoped server transactions.
 
 | `entity_type` | Identity and purpose |
 | --- | --- |
-| `DAY_NOTE` | One deterministic UUID per civil `YYYY-MM-DD` date and owner. Stores `date`, the short `text` label, exact UTF-8 Markdown `body`, and an optimistic `version`. A note is independent of activities and work sessions. An untouched date has no row and reads as version zero. |
+| `DAY_NOTE` | One deterministic UUID per civil `YYYY-MM-DD` date and owner. Stores `date`, a canonical complete UTF-8 `markdown` document, derived short `text` label and Markdown `body`, an internal `modifiedAt` timestamp, and an optimistic `version`. A note is independent of activities and work sessions. An untouched date has no row and reads as version zero. |
 | `JOURNAL_DELETE` | Date-keyed deletion marker with the `DAY_NOTE` version it applies to. Deleting keeps an empty, versioned note row so stale editors cannot recreate it with an old ETag. |
-| `JOURNAL_CFG` | One fixed-ID settings row per owner: enabled/bidirectional state and an epoch that invalidates earlier authorization. |
-| `JOURNAL_DEVICE` | Enrolled device ID, label, public SSH key/fingerprint, direction permission, revocation state, sequence and sync timestamps. Private SSH keys stay on the client. |
-| `JOURNAL_LEASE` | Transport authorization and state for an in-progress or completed gateway exchange, bound to a device. |
-| `JOURNAL_BATCH` and `JOURNAL_ITEM` | Sealed import/exchange batches and per-file results, including sequence, filename, processing state and conflict/error metadata. |
-| `JOURNAL_SOURCE` | Temporary private candidate bytes for an item or offer, stored base64 in the payload until processing, acknowledgement or explicit discard. |
-| `JOURNAL_FILE` | One-way import baseline per device and filename: accepted sequence, source hash and note version. |
-| `JOURNAL_COMMON` | Bidirectional common base per device and filename. It records the acknowledged token, sequence, file hash/existence, remote note version/deletion state and retry receipt. It advances only after acknowledgement. |
-| `JOURNAL_OFFER` | Bidirectional proposed per-file exchange, conditional parent token, target hash/version, authorization epochs, state and acknowledgement/conflict information. |
-| `JOURNAL_DOCUMENT` | Original Markdown file bytes and hash per filename, retained to preserve frontmatter and formatting not represented by the note's label/body fields. |
-| `JOURNAL_AUDIT` | Account-scoped device and synchronization security events, without note content. |
+| `JOURNAL_ASSET` | One deterministic UUID per account and safe filename under `assets/`. The JSON payload contains the filename, base64 binary data, byte length, derived safe media type, modification time, deletion flag and optimistic version. Deleted rows retain their version so old ETags cannot be reused. |
 
 `DAY_NOTE` writes use conditional versions and publish a content-free profile
 invalidation through `tk_change`. Calendar range reads return only the label
 and `hasBody`, not the Markdown body. Active notes are included in account
-archives; empty deletion markers, device credentials and synchronization
-baselines are not. The gateway's private incoming spool and the client's local
-file/state directory are filesystem storage outside this SQL model.
+archives, including canonical Markdown even for empty but present notes.
+Active journal assets are also included; empty deletion markers are not.
+Historical rows from the retired SSH synchronization
+implementation are ignored; no data migration is required.
 
-The note bodies, original Markdown documents and pending source bytes are
-readable to the server; base64 is an encoding, not encryption. Protect their
-database, spool, temporary files, backups and exports as described in
+Calendar and REST responses omit the internal `markdown` field. Existing
+`DAY_NOTE` rows without that field are reconstructed with `JournalMarkdown.render`
+when a complete document is requested; reading does not change their version.
+An actual edit stores the complete document and its label/body projections in
+one row update. A change only to unknown YAML metadata still increments the
+same version. An explicitly empty document is stored as `markdown: ""`; an
+absent property identifies a legacy row.
+
+The note bodies and complete Markdown documents are readable to the server.
+Protect their database, temporary files, backups and exports as described in
 [journal storage protection](../operations/JOURNAL-STORAGE.md). See the
 [day-note API](API-V1.md#private-day-labels-and-markdown-bodies) and
-[journal synchronization guide](../operations/JOURNAL-SYNC.md) for write,
+[WebDAV guide](../operations/JOURNAL-WEBDAV.md) for write,
 conflict and authorization behavior.

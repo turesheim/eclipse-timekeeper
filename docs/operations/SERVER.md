@@ -91,10 +91,10 @@ storage is suitable for tests; production uses durable file/server storage.
 
 ## Journal synchronization
 
-Daily Markdown import uses a separately provisioned restricted SSH gateway.
-Follow the [journal synchronization guide](JOURNAL-SYNC.md) for operator account
-bindings, client prerequisites, host-key pinning, scheduling and recovery.
-Users manage their own devices and conflicts under **My account → Journal**.
+Daily Markdown notes are available at the server's WebDAV collection. Follow
+the [WebDAV guide](JOURNAL-WEBDAV.md) for authentication, conditional writes,
+deletion and tested client compatibility. Users find the collection URL under
+**My account → Journal** and create personal API tokens under **My account → API tokens**.
 The [journal storage policy](JOURNAL-STORAGE.md) covers encryption and backup-key
 custody; the server processes readable Markdown.
 

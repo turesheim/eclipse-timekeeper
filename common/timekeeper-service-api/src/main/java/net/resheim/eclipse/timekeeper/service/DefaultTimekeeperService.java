@@ -40,6 +40,8 @@ import net.resheim.eclipse.timekeeper.service.Commands.DeleteLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteProject;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteTask;
 import net.resheim.eclipse.timekeeper.service.Commands.LinkExternalReference;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskSource;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskProviderData;
 import net.resheim.eclipse.timekeeper.service.Commands.StartActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.StopActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.UnlinkExternalReference;
@@ -47,6 +49,12 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskPlanning;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskTiming;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskImportance;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskBody;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskOrder;
 import net.resheim.eclipse.timekeeper.service.Ports.ServicePorts;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityReport;
@@ -127,9 +135,81 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			}
 			Task created = ports.tasks().save(new Task(ports.identifiers().newTaskId(), command.projectId(),
 					command.parentTaskId(),
-					command.summary(), command.url(), command.externalReferences(), 0));
+					command.summary(), command.url(), command.externalReferences(), command.planning(), command.checklist(), command.timing(), command.importance(), command.body(), command.siblingOrder(), 0));
 			publish(TASK, CREATED, created.id().value().toString());
 			return created;
+		});
+	}
+
+	@Override
+	public Task updateTaskPlanning(UpdateTaskPlanning command) {
+		return tx(() -> {
+			required(command, "command");
+			Task current = requiredTask(command.id());
+			version(current.version(), command.expectedVersion(), "task");
+			Task updated = ports.tasks().save(current.plan(required(command.planning(), "planning")));
+			publish(TASK, UPDATED, updated.id().value().toString());
+			return updated;
+		});
+	}
+
+	@Override
+	public Task updateTaskChecklist(UpdateTaskChecklist command) {
+		return tx(() -> {
+			required(command, "command");
+			Task current = requiredTask(command.id());
+			version(current.version(), command.expectedVersion(), "task");
+			Task updated = ports.tasks().save(current.withChecklist(required(command.checklist(), "checklist")));
+			publish(TASK, UPDATED, updated.id().value().toString());
+			return updated;
+		});
+	}
+
+	@Override
+	public Task updateTaskTiming(UpdateTaskTiming command) {
+		return tx(() -> {
+			required(command, "command");
+			Task current = requiredTask(command.id());
+			version(current.version(), command.expectedVersion(), "task");
+			Task updated = ports.tasks().save(current.withTiming(required(command.timing(), "timing")));
+			publish(TASK, UPDATED, updated.id().value().toString());
+			return updated;
+		});
+	}
+
+	@Override
+	public Task updateTaskImportance(UpdateTaskImportance command) {
+		return tx(() -> {
+			required(command, "command");
+			Task current = requiredTask(command.id());
+			version(current.version(), command.expectedVersion(), "task");
+			Task updated = ports.tasks().save(current.withImportance(required(command.importance(), "importance")));
+			publish(TASK, UPDATED, updated.id().value().toString());
+			return updated;
+		});
+	}
+
+	@Override
+	public Task updateTaskBody(UpdateTaskBody command) {
+		return tx(() -> {
+			required(command, "command");
+			Task current = requiredTask(command.id());
+			version(current.version(), command.expectedVersion(), "task");
+			Task updated = ports.tasks().save(current.withBody(required(command.body(), "body")));
+			publish(TASK, UPDATED, updated.id().value().toString());
+			return updated;
+		});
+	}
+
+	@Override
+	public Task updateTaskOrder(UpdateTaskOrder command) {
+		return tx(() -> {
+			required(command, "command");
+			Task current = requiredTask(command.id());
+			version(current.version(), command.expectedVersion(), "task");
+			Task updated = ports.tasks().save(current.withSiblingOrder(command.siblingOrder()));
+			publish(TASK, UPDATED, updated.id().value().toString());
+			return updated;
 		});
 	}
 
@@ -209,6 +289,36 @@ public class DefaultTimekeeperService implements TimekeeperService {
 				}
 			});
 			Task updated = ports.tasks().save(current.link(reference));
+			publish(TASK, UPDATED, updated.id().value().toString());
+			return updated;
+		});
+	}
+
+	@Override
+	public Task updateExternalTaskSource(UpdateExternalTaskSource command) {
+		return tx(() -> {
+			required(command, "command");
+			Task current = requiredTask(command.taskId());
+			version(current.version(), command.expectedVersion(), "task");
+			ExternalTaskReferenceKey key = required(command.reference(), "externalReference");
+			if (current.externalReferences().stream().noneMatch(reference -> reference.key().equals(key)))
+				throw ServiceException.notFound("externalReference", key);
+			Task updated = ports.tasks().save(current.withExternalSource(key, required(command.source(), "source")));
+			publish(TASK, UPDATED, updated.id().value().toString());
+			return updated;
+		});
+	}
+
+	@Override
+	public Task updateExternalTaskProviderData(UpdateExternalTaskProviderData command) {
+		return tx(() -> {
+			required(command, "command");
+			Task current = requiredTask(command.taskId());
+			version(current.version(), command.expectedVersion(), "task");
+			ExternalTaskReferenceKey key = required(command.reference(), "externalReference");
+			if (current.externalReferences().stream().noneMatch(reference -> reference.key().equals(key)))
+				throw ServiceException.notFound("externalReference", key);
+			Task updated = ports.tasks().save(current.withExternalProviderData(key, command.data()));
 			publish(TASK, UPDATED, updated.id().value().toString());
 			return updated;
 		});

@@ -696,7 +696,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Replaces legacy project, parent, summary and URL fields. Preserves status, scheduledDate, completedAt and external references when omitted by older clients."
       },
       "delete": {
         "operationId": "deleteTask",
@@ -9091,24 +9092,40 @@
         "description": "Retain a versioned tombstone distinct from clearing content. Repeated deletion with its current ETag is a no-op; a later conditional save deliberately restores the note."
       }
     },
-    "/journal": {
-      "get": {
-        "operationId": "journalStatus",
-        "summary": "Read private journal setup, devices and content-free import health",
-        "x-required-permission": "read",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/OwnerBinding"
-          }
-        ],
+    "/tasks/{id}/planning": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskPlanning",
+        "summary": "Replace owned task planning fields",
+        "x-required-permission": "write",
         "responses": {
           "200": {
-            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "description": "Successful operation.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JournalStatus"
+                  "$ref": "#/components/schemas/Task"
                 }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -9130,9 +9147,6 @@
           "412": {
             "$ref": "#/components/responses/412"
           },
-          "413": {
-            "$ref": "#/components/responses/413"
-          },
           "415": {
             "$ref": "#/components/responses/415"
           },
@@ -9142,120 +9156,795 @@
           "428": {
             "$ref": "#/components/responses/428"
           },
-          "429": {
-            "$ref": "#/components/responses/429"
-          },
           "503": {
             "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
           }
-        }
-      }
-    },
-    "/journal/settings": {
-      "put": {
-        "operationId": "journalSettings",
-        "summary": "Enable or disable synchronization with fresh account password proof",
-        "x-required-permission": "write",
+        },
         "parameters": [
           {
-            "$ref": "#/components/parameters/OwnerBinding"
+            "$ref": "#/components/parameters/IfMatch"
           },
           {
-            "$ref": "#/components/parameters/IfMatch"
+            "$ref": "#/components/parameters/OwnerBinding"
           },
           {
             "$ref": "#/components/parameters/Csrf"
           }
         ],
-        "responses": {
-          "200": {
-            "description": "Private account-scoped result; Cache-Control: private, no-store.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JournalStatus"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/400"
-          },
-          "401": {
-            "$ref": "#/components/responses/401"
-          },
-          "403": {
-            "$ref": "#/components/responses/403"
-          },
-          "404": {
-            "$ref": "#/components/responses/404"
-          },
-          "409": {
-            "$ref": "#/components/responses/409"
-          },
-          "412": {
-            "$ref": "#/components/responses/412"
-          },
-          "413": {
-            "$ref": "#/components/responses/413"
-          },
-          "415": {
-            "$ref": "#/components/responses/415"
-          },
-          "422": {
-            "$ref": "#/components/responses/422"
-          },
-          "428": {
-            "$ref": "#/components/responses/428"
-          },
-          "429": {
-            "$ref": "#/components/responses/429"
-          },
-          "503": {
-            "$ref": "#/components/responses/503"
-          }
-        },
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/JournalSettingsInput"
+                "$ref": "#/components/schemas/TaskPlanningInput"
               }
             }
           }
         },
-        "security": [
-          {
-            "browserSession": []
-          }
-        ]
+        "description": "Conditional update of status, date-only schedule, and completion time. A legacy PUT /tasks/{id} preserves these fields."
       }
     },
-    "/journal/devices": {
-      "post": {
-        "operationId": "enrollJournalDevice",
-        "summary": "Enroll a public SSH key or atomically rotate an active device; private keys are rejected",
+    "/tasks/{id}/checklist": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskChecklist",
+        "summary": "Replace owned task checklist items",
         "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
         "parameters": [
           {
-            "$ref": "#/components/parameters/OwnerBinding"
+            "$ref": "#/components/parameters/IfMatch"
           },
           {
-            "$ref": "#/components/parameters/IdempotencyKey"
+            "$ref": "#/components/parameters/OwnerBinding"
           },
           {
             "$ref": "#/components/parameters/Csrf"
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskChecklistInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of the checklist only. A legacy PUT /tasks/{id} and PUT /tasks/{id}/planning preserve the checklist."
+      }
+    },
+    "/tasks/{id}/timing": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskTiming",
+        "summary": "Replace owned task start and due values",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskTimingInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of start and due only. Date-only values stay date-only; timed values retain their local time and time-zone ID. Legacy task, planning, and checklist updates preserve timing."
+      }
+    },
+    "/tasks/{id}/importance": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskImportance",
+        "summary": "Replace owned task importance fields",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskImportanceInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of priority, flag, and urgency only. Legacy task, planning, checklist, and timing updates preserve these fields."
+      }
+    },
+    "/tasks/{id}/body": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskBody",
+        "summary": "Replace owned task notes",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskBodyInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of task notes only. Legacy task and other section updates preserve the body. HTML is untrusted source markup; clients must sanitize before rendering."
+      }
+    },
+    "/tasks/{id}/order": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskOrder",
+        "summary": "Replace task sibling order",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskOrderInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional update of a task position among its siblings. Legacy task and section updates preserve the order."
+      }
+    },
+    "/tasks/{id}/external-references/source": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateExternalTaskSource",
+        "summary": "Replace per-provider task source metadata",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalTaskSourceInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of source timestamps and opaque remote versions for one linked identity. Legacy link updates preserve this source state; a remote version never substitutes for the Timekeeper If-Match ETag."
+      }
+    },
+    "/tasks/{id}/external-references/provider-data": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateExternalTaskProviderData",
+        "summary": "Replace versioned provider task data",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalTaskProviderDataInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement or explicit clearing of one linked identity’s provider-data envelope. Legacy link and source updates preserve the envelope."
+      }
+    },
+    "/task-connections": {
+      "get": {
+        "operationId": "listTaskConnections",
+        "summary": "List owned task-connections",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskConnectionPage"
+                }
+              }
+            },
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Query"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createTaskConnection",
+        "summary": "Create owned taskconnection",
+        "x-required-permission": "write",
         "responses": {
           "201": {
-            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "description": "Successful operation.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JournalDevice"
+                  "$ref": "#/components/schemas/TaskConnection"
                 }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -9274,26 +9963,49 @@
           "409": {
             "$ref": "#/components/responses/409"
           },
-          "412": {
-            "$ref": "#/components/responses/412"
-          },
-          "413": {
-            "$ref": "#/components/responses/413"
-          },
           "415": {
             "$ref": "#/components/responses/415"
           },
           "422": {
             "$ref": "#/components/responses/422"
           },
-          "428": {
-            "$ref": "#/components/responses/428"
-          },
-          "429": {
-            "$ref": "#/components/responses/429"
-          },
           "503": {
             "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "200": {
+            "description": "Existing identical provider identity returned for idempotent discovery.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskConnection"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
           }
         },
         "requestBody": {
@@ -9301,34 +10013,11 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/JournalDeviceInput"
+                "$ref": "#/components/schemas/TaskConnectionCreateInput"
               }
             }
           }
         },
-        "security": [
-          {
-            "browserSession": []
-          }
-        ]
-      }
-    },
-    "/journal/devices/{id}/revoke": {
-      "parameters": [
-        {
-          "name": "id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      ],
-      "post": {
-        "operationId": "revokeJournalDevice",
-        "summary": "Revoke a journal device with fresh account password proof",
-        "x-required-permission": "write",
         "parameters": [
           {
             "$ref": "#/components/parameters/OwnerBinding"
@@ -9337,14 +10026,96 @@
             "$ref": "#/components/parameters/Csrf"
           }
         ],
+        "description": "A repeated identical provider account/list identity returns the existing resource. A conflicting representation returns 409."
+      }
+    },
+    "/task-connections/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "get": {
+        "operationId": "getTaskConnection",
+        "summary": "Read owned taskconnection",
+        "x-required-permission": "read",
         "responses": {
           "200": {
-            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "description": "Successful operation.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JournalDevice"
+                  "$ref": "#/components/schemas/TaskConnection"
                 }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      },
+      "put": {
+        "operationId": "updateTaskConnection",
+        "summary": "Replace owned taskconnection metadata",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskConnection"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -9366,8 +10137,78 @@
           "412": {
             "$ref": "#/components/responses/412"
           },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
           "413": {
             "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskConnectionUpdateInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteTaskConnection",
+        "summary": "Delete unused owned provider connection",
+        "x-required-permission": "write",
+        "responses": {
+          "204": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
           },
           "415": {
             "$ref": "#/components/responses/415"
@@ -9378,11 +10219,187 @@
           "428": {
             "$ref": "#/components/responses/428"
           },
-          "429": {
-            "$ref": "#/components/responses/429"
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "description": "Explicit deletion only; remote disappearance should update enabled/present instead. A connection with lists or a list with linked tasks returns 409."
+      }
+    },
+    "/task-lists": {
+      "get": {
+        "operationId": "listTaskLists",
+        "summary": "List owned task-lists",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskListPage"
+                }
+              }
+            },
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
           },
           "503": {
             "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Query"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "connectionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "Filter lists for one owned provider connection."
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createTaskList",
+        "summary": "Create owned tasklist",
+        "x-required-permission": "write",
+        "responses": {
+          "201": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskList"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "200": {
+            "description": "Existing identical provider identity returned for idempotent discovery.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskList"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
           }
         },
         "requestBody": {
@@ -9390,47 +10407,301 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/JournalProofInput"
+                "$ref": "#/components/schemas/TaskListCreateInput"
               }
             }
           }
         },
-        "security": [
+        "parameters": [
           {
-            "browserSession": []
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "description": "A repeated identical provider account/list identity returns the existing resource. A conflicting representation returns 409."
+      }
+    },
+    "/task-sync-cursors": {
+      "get": {
+        "operationId": "listTaskSyncCursors",
+        "summary": "List owned task sync cursors",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSyncCursorPage"
+                }
+              }
+            },
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "connectionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "Filter lists for one owned provider connection."
+          },
+          {
+            "name": "listId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "Filter cursor state for one owned provider list."
           }
         ]
+      },
+      "post": {
+        "operationId": "createTaskSyncCursor",
+        "summary": "Create owned task sync cursor",
+        "x-required-permission": "write",
+        "responses": {
+          "201": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSyncCursor"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "200": {
+            "description": "Existing identical provider identity returned for idempotent discovery.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSyncCursor"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskSyncCursorCreateInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "description": "One cursor per connection/list pair. Repeating an identical create returns the existing cursor; a changed state requires a conditional update."
       }
     },
-    "/journal/devices/{id}/profile": {
+    "/task-lists/{id}": {
       "parameters": [
         {
-          "name": "id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "string",
-            "format": "uuid"
-          }
+          "$ref": "#/components/parameters/Id"
         }
       ],
       "get": {
-        "operationId": "journalDeviceProfile",
-        "summary": "Download public SSH connection configuration with pinned host key",
+        "operationId": "getTaskList",
+        "summary": "Read owned tasklist",
         "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskList"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
         "parameters": [
           {
             "$ref": "#/components/parameters/OwnerBinding"
           }
-        ],
+        ]
+      },
+      "put": {
+        "operationId": "updateTaskList",
+        "summary": "Replace owned tasklist metadata",
+        "x-required-permission": "write",
         "responses": {
           "200": {
-            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "description": "Successful operation.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JournalProfile"
+                  "$ref": "#/components/schemas/TaskList"
                 }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -9452,9 +10723,6 @@
           "412": {
             "$ref": "#/components/responses/412"
           },
-          "413": {
-            "$ref": "#/components/responses/413"
-          },
           "415": {
             "$ref": "#/components/responses/415"
           },
@@ -9464,44 +10732,49 @@
           "428": {
             "$ref": "#/components/responses/428"
           },
-          "429": {
-            "$ref": "#/components/responses/429"
-          },
           "503": {
             "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
           }
-        }
-      }
-    },
-    "/journal/items/{id}": {
-      "parameters": [
-        {
-          "name": "id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      ],
-      "get": {
-        "operationId": "journalCandidate",
-        "summary": "Review a conflict and the current database version",
-        "x-required-permission": "read",
+        },
         "parameters": [
           {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
             "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskListUpdateInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteTaskList",
+        "summary": "Delete unused owned provider task list",
+        "x-required-permission": "write",
         "responses": {
-          "200": {
-            "description": "Private account-scoped result; Cache-Control: private, no-store.",
-            "content": {
-              "application/json": {
+          "204": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
                 "schema": {
-                  "$ref": "#/components/schemas/JournalCandidate"
-                }
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
               }
             }
           },
@@ -9523,8 +10796,140 @@
           "412": {
             "$ref": "#/components/responses/412"
           },
-          "413": {
-            "$ref": "#/components/responses/413"
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "description": "Explicit deletion only; remote disappearance should update enabled/present instead. A connection with lists or a list with linked tasks returns 409."
+      }
+    },
+    "/task-sync-cursors/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "get": {
+        "operationId": "getTaskSyncCursor",
+        "summary": "Read owned task sync cursor",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSyncCursor"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      },
+      "put": {
+        "operationId": "updateTaskSyncCursor",
+        "summary": "Update owned task sync cursor",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSyncCursor"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
           },
           "415": {
             "$ref": "#/components/responses/415"
@@ -9535,39 +10940,129 @@
           "428": {
             "$ref": "#/components/responses/428"
           },
-          "429": {
-            "$ref": "#/components/responses/429"
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskSyncCursorUpdateInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional update of opaque connector state. RESCAN_REQUIRED clears the cursor; provider outages and missing lists must not imply task deletion."
+      },
+      "delete": {
+        "operationId": "deleteTaskSyncCursor",
+        "summary": "Delete owned task sync cursor",
+        "x-required-permission": "write",
+        "responses": {
+          "204": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
           },
           "503": {
             "$ref": "#/components/responses/503"
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "description": "Explicit deletion only; remote disappearance should update enabled/present instead. A connection with lists or a list with linked tasks returns 409."
       }
     },
-    "/journal/items/{id}/source": {
+    "/journal-assets/{filename}": {
       "parameters": [
         {
-          "name": "id",
+          "name": "filename",
           "in": "path",
           "required": true,
           "schema": {
             "type": "string",
-            "format": "uuid"
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
           }
         }
       ],
       "get": {
-        "operationId": "journalCandidateSource",
-        "summary": "Download an owned original pending or conflict copy without internal metadata",
+        "operationId": "getJournalAsset",
+        "summary": "Read one private journal attachment",
         "x-required-permission": "read",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/OwnerBinding"
-          }
-        ],
         "responses": {
           "200": {
-            "description": "Private account-scoped result; Cache-Control: private, no-store.",
+            "description": "Exact attachment bytes. Recognized raster images are served with their image media type; other files are downloads.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "const": "nosniff"
+                }
+              }
+            },
             "content": {
               "application/octet-stream": {
                 "schema": {
@@ -9577,82 +11072,8 @@
               }
             }
           },
-          "400": {
-            "$ref": "#/components/responses/400"
-          },
-          "401": {
-            "$ref": "#/components/responses/401"
-          },
-          "403": {
-            "$ref": "#/components/responses/403"
-          },
-          "404": {
-            "$ref": "#/components/responses/404"
-          },
-          "409": {
-            "$ref": "#/components/responses/409"
-          },
-          "412": {
-            "$ref": "#/components/responses/412"
-          },
-          "413": {
-            "$ref": "#/components/responses/413"
-          },
-          "415": {
-            "$ref": "#/components/responses/415"
-          },
-          "422": {
-            "$ref": "#/components/responses/422"
-          },
-          "428": {
-            "$ref": "#/components/responses/428"
-          },
-          "429": {
-            "$ref": "#/components/responses/429"
-          },
-          "503": {
-            "$ref": "#/components/responses/503"
-          }
-        }
-      }
-    },
-    "/journal/items/{id}/resolve": {
-      "parameters": [
-        {
-          "name": "id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      ],
-      "post": {
-        "operationId": "resolveJournalConflict",
-        "summary": "Resolve a conflict conditionally against candidate and calendar versions",
-        "x-required-permission": "write",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/OwnerBinding"
-          },
-          {
-            "$ref": "#/components/parameters/IfMatch"
-          },
-          {
-            "$ref": "#/components/parameters/Csrf"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Private account-scoped result; Cache-Control: private, no-store.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JournalItem"
-                }
-              }
-            }
+          "304": {
+            "description": "The requested ETag is current."
           },
           "400": {
             "$ref": "#/components/responses/400"
@@ -9665,254 +11086,140 @@
           },
           "404": {
             "$ref": "#/components/responses/404"
-          },
-          "409": {
-            "$ref": "#/components/responses/409"
-          },
-          "412": {
-            "$ref": "#/components/responses/412"
-          },
-          "413": {
-            "$ref": "#/components/responses/413"
-          },
-          "415": {
-            "$ref": "#/components/responses/415"
-          },
-          "422": {
-            "$ref": "#/components/responses/422"
-          },
-          "428": {
-            "$ref": "#/components/responses/428"
-          },
-          "429": {
-            "$ref": "#/components/responses/429"
           },
           "503": {
             "$ref": "#/components/responses/503"
           }
         },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putJournalAsset",
+        "summary": "Create or replace a private journal attachment conditionally",
+        "x-required-permission": "write",
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "Updated.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatchOptional"
+          },
+          {
+            "$ref": "#/components/parameters/IfNoneMatchStar"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/JournalResolutionInput"
+                "$ref": "#/components/schemas/JournalAssetUploadInput"
               }
             }
           }
         }
-      }
-    },
-    "/journal/items/{id}/discard": {
-      "parameters": [
-        {
-          "name": "id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      ],
-      "post": {
-        "operationId": "discardJournalCandidate",
-        "summary": "Discard an external conflict or aborted copy without deleting the database note",
+      },
+      "delete": {
+        "operationId": "deleteJournalAsset",
+        "summary": "Delete a private journal attachment with its current ETag",
         "x-required-permission": "write",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/OwnerBinding"
+        "responses": {
+          "204": {
+            "description": "Deleted; the versioned marker prevents ETag reuse.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
           {
             "$ref": "#/components/parameters/IfMatch"
           },
           {
-            "$ref": "#/components/parameters/Csrf"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Private account-scoped result; Cache-Control: private, no-store.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JournalItem"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/400"
-          },
-          "401": {
-            "$ref": "#/components/responses/401"
-          },
-          "403": {
-            "$ref": "#/components/responses/403"
-          },
-          "404": {
-            "$ref": "#/components/responses/404"
-          },
-          "409": {
-            "$ref": "#/components/responses/409"
-          },
-          "412": {
-            "$ref": "#/components/responses/412"
-          },
-          "413": {
-            "$ref": "#/components/responses/413"
-          },
-          "415": {
-            "$ref": "#/components/responses/415"
-          },
-          "422": {
-            "$ref": "#/components/responses/422"
-          },
-          "428": {
-            "$ref": "#/components/responses/428"
-          },
-          "429": {
-            "$ref": "#/components/responses/429"
-          },
-          "503": {
-            "$ref": "#/components/responses/503"
-          }
-        }
-      }
-    },
-    "/journal/rescan": {
-      "post": {
-        "operationId": "rescanJournal",
-        "summary": "Retry completed pending imports and refresh private synchronization health",
-        "x-required-permission": "write",
-        "parameters": [
-          {
             "$ref": "#/components/parameters/OwnerBinding"
           },
           {
             "$ref": "#/components/parameters/Csrf"
           }
-        ],
-        "responses": {
-          "200": {
-            "description": "Private account-scoped result; Cache-Control: private, no-store.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JournalStatus"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/400"
-          },
-          "401": {
-            "$ref": "#/components/responses/401"
-          },
-          "403": {
-            "$ref": "#/components/responses/403"
-          },
-          "404": {
-            "$ref": "#/components/responses/404"
-          },
-          "409": {
-            "$ref": "#/components/responses/409"
-          },
-          "412": {
-            "$ref": "#/components/responses/412"
-          },
-          "413": {
-            "$ref": "#/components/responses/413"
-          },
-          "415": {
-            "$ref": "#/components/responses/415"
-          },
-          "422": {
-            "$ref": "#/components/responses/422"
-          },
-          "428": {
-            "$ref": "#/components/responses/428"
-          },
-          "429": {
-            "$ref": "#/components/responses/429"
-          },
-          "503": {
-            "$ref": "#/components/responses/503"
-          }
-        }
-      }
-    },
-    "/journal/items/{id}/calendar-source": {
-      "parameters": [
-        {
-          "name": "id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      ],
-      "get": {
-        "operationId": "journalCalendarSource",
-        "summary": "Download the private Calendar snapshot preserved with a bidirectional conflict",
-        "x-required-permission": "read",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/OwnerBinding"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Private account-scoped result; Cache-Control: private, no-store.",
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/400"
-          },
-          "401": {
-            "$ref": "#/components/responses/401"
-          },
-          "403": {
-            "$ref": "#/components/responses/403"
-          },
-          "404": {
-            "$ref": "#/components/responses/404"
-          },
-          "409": {
-            "$ref": "#/components/responses/409"
-          },
-          "412": {
-            "$ref": "#/components/responses/412"
-          },
-          "413": {
-            "$ref": "#/components/responses/413"
-          },
-          "415": {
-            "$ref": "#/components/responses/415"
-          },
-          "422": {
-            "$ref": "#/components/responses/422"
-          },
-          "428": {
-            "$ref": "#/components/responses/428"
-          },
-          "429": {
-            "$ref": "#/components/responses/429"
-          },
-          "503": {
-            "$ref": "#/components/responses/503"
-          }
-        }
+        ]
       }
     }
   },
@@ -10011,6 +11318,18 @@
                 "type": "null"
               }
             ]
+          },
+          "taskListId": {
+            "$ref": "#/components/schemas/Id",
+            "description": "Optional owner-scoped provider list association. Omission on an existing link preserves its list."
+          },
+          "source": {
+            "$ref": "#/components/schemas/ExternalTaskSource",
+            "description": "Optional when linking. Omission preserves existing source state for the same identity."
+          },
+          "providerData": {
+            "$ref": "#/components/schemas/ExternalTaskProviderData",
+            "description": "Optional on link. Omission preserves previously stored provider data."
           }
         },
         "required": [
@@ -10454,6 +11773,77 @@
               "$ref": "#/components/schemas/ExternalReferenceSnapshot"
             },
             "uniqueItems": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "scheduledDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Civil scheduled day without an implied time, deadline, or alert."
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checklistItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskChecklistItem"
+            },
+            "maxItems": 1000,
+            "description": "Ordered checklist items distinct from parentTaskId subtasks."
+          },
+          "start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "due": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priority": {
+            "$ref": "#/components/schemas/TaskPriority"
+          },
+          "flagged": {
+            "type": "boolean"
+          },
+          "urgent": {
+            "type": "boolean"
+          },
+          "siblingOrder": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Position among sibling tasks. This is independent of provider list order."
+          },
+          "body": {
+            "$ref": "#/components/schemas/TaskBodyInput"
           }
         },
         "required": [
@@ -10464,7 +11854,18 @@
           "parentTaskId",
           "summary",
           "url",
-          "externalReferences"
+          "externalReferences",
+          "status",
+          "scheduledDate",
+          "completedAt",
+          "checklistItems",
+          "start",
+          "due",
+          "priority",
+          "flagged",
+          "urgent",
+          "body",
+          "siblingOrder"
         ],
         "additionalProperties": true
       },
@@ -10842,7 +12243,10 @@
               "LABEL",
               "PROFILE",
               "WORK_SESSION",
-              "CLIENT"
+              "CLIENT",
+              "TASK_CONNECTION",
+              "TASK_LIST",
+              "TASK_SYNC_CURSOR"
             ]
           },
           "changeType": {
@@ -10959,6 +12363,78 @@
               "$ref": "#/components/schemas/ExternalReference"
             },
             "uniqueItems": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "scheduledDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Civil scheduled day without an implied time, deadline, or alert."
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checklistItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskChecklistItem"
+            },
+            "maxItems": 1000,
+            "description": "Optional for older portable archives."
+          },
+          "start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "due": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priority": {
+            "$ref": "#/components/schemas/TaskPriority"
+          },
+          "flagged": {
+            "type": "boolean"
+          },
+          "urgent": {
+            "type": "boolean"
+          },
+          "siblingOrder": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Position among sibling tasks. This is independent of provider list order."
+          },
+          "body": {
+            "$ref": "#/components/schemas/TaskBodyInput",
+            "description": "Optional for older portable archives; absence imports as empty text."
           }
         },
         "required": [
@@ -11130,6 +12606,22 @@
               "$ref": "#/components/schemas/TransferClient"
             },
             "maxItems": 10000
+          },
+          "taskConnections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskConnection"
+            },
+            "maxItems": 10000,
+            "description": "Optional for archives predating provider account/list support."
+          },
+          "taskLists": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskList"
+            },
+            "maxItems": 10000,
+            "description": "Optional for archives predating provider account/list support."
           }
         },
         "required": [
@@ -11287,7 +12779,9 @@
                     "ACTIVITY",
                     "LABEL",
                     "WORK_SESSION",
-                    "CLIENT"
+                    "CLIENT",
+                    "TASK_CONNECTION",
+                    "TASK_LIST"
                   ]
                 },
                 "sourceId": {
@@ -11345,6 +12839,16 @@
                 "type": "null"
               }
             ]
+          },
+          "taskListId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ExternalTaskSource"
+          },
+          "providerData": {
+            "$ref": "#/components/schemas/ExternalTaskProviderData",
+            "description": "Optional on link. Omission preserves previously stored provider data."
           }
         },
         "required": [
@@ -11399,6 +12903,77 @@
             "uniqueItems": true,
             "maxItems": 500,
             "default": []
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "scheduledDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Civil scheduled day without an implied time, deadline, or alert."
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checklistItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskChecklistItem"
+            },
+            "maxItems": 1000,
+            "description": "Ordered checklist items distinct from parentTaskId subtasks."
+          },
+          "start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "due": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priority": {
+            "$ref": "#/components/schemas/TaskPriority"
+          },
+          "flagged": {
+            "type": "boolean"
+          },
+          "urgent": {
+            "type": "boolean"
+          },
+          "siblingOrder": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Position among sibling tasks. This is independent of provider list order."
+          },
+          "body": {
+            "$ref": "#/components/schemas/TaskBodyInput"
           }
         },
         "required": [
@@ -14289,6 +15864,22 @@
               "$ref": "#/components/schemas/TransferClient"
             },
             "maxItems": 250000
+          },
+          "taskConnections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskConnection"
+            },
+            "maxItems": 250000,
+            "description": "Optional for archives predating provider account/list support."
+          },
+          "taskLists": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskList"
+            },
+            "maxItems": 250000,
+            "description": "Optional for archives predating provider account/list support."
           }
         },
         "required": [
@@ -14494,6 +16085,14 @@
               "$ref": "#/components/schemas/ArchiveDayNote"
             },
             "description": "Optional private civil-date labels and Markdown bodies, independent of timed work. Body is optional for legacy label-only archives. Empty tombstones are not exported."
+          },
+          "journalAssets": {
+            "type": "array",
+            "maxItems": 10000,
+            "items": {
+              "$ref": "#/components/schemas/ArchiveJournalAsset"
+            },
+            "description": "Optional private journal attachments. Deleted assets are excluded."
           }
         },
         "required": [
@@ -14601,6 +16200,19 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 250000
+          },
+          "taskConnections": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "taskLists": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "journalAssets": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
           }
         },
         "required": [
@@ -15041,6 +16653,14 @@
             "minimum": 0
           },
           "workSessionLabels": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "listConnections": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "externalReferenceLists": {
             "type": "integer",
             "minimum": 0
           }
@@ -17940,6 +19560,11 @@
             "type": "string",
             "maxLength": 200000,
             "description": "Exact UTF-8 Markdown, limited to 200,000 encoded bytes. Whitespace and line endings are preserved. Empty string clears only the body; omission preserves it. Null and invalid Unicode are rejected."
+          },
+          "markdown": {
+            "type": "string",
+            "maxLength": 220000,
+            "description": "Complete canonical UTF-8 Markdown, including YAML metadata and exact whitespace. Present on new exports; optional for legacy archives."
           }
         },
         "anyOf": [
@@ -17959,671 +19584,1119 @@
                 "minLength": 1
               }
             }
-          }
-        ]
-      },
-      "JournalProofInput": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "currentPassword": {
-            "type": "string",
-            "maxLength": 1024
-          }
-        },
-        "required": [
-          "currentPassword"
-        ]
-      },
-      "JournalSettingsInput": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "currentPassword": {
-            "type": "string",
-            "maxLength": 1024
           },
-          "enabled": {
-            "type": "boolean"
-          },
-          "bidirectional": {
-            "type": "boolean",
-            "description": "Explicitly enable bidirectional exchanges; existing device keys remain write-only unless registered with this capability."
-          }
-        },
-        "required": [
-          "currentPassword",
-          "enabled"
-        ]
-      },
-      "JournalDeviceInput": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "currentPassword": {
-            "type": "string",
-            "maxLength": 1024
-          },
-          "label": {
-            "type": "string",
-            "maxLength": 80,
-            "minLength": 1
-          },
-          "publicKey": {
-            "type": "string",
-            "maxLength": 4096,
-            "minLength": 1
-          },
-          "rotateDeviceId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "bidirectional": {
-            "type": "boolean",
-            "default": true,
-            "description": "New clients use two-way synchronization by default, enabling synchronization for this account. Explicit false preserves the legacy upload-only scope; existing keys keep their permissions."
-          }
-        },
-        "required": [
-          "label",
-          "publicKey"
-        ]
-      },
-      "JournalResolutionInput": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "action": {
-            "type": "string",
-            "enum": [
-              "INCOMING",
-              "CALENDAR"
+          {
+            "required": [
+              "markdown"
             ]
+          }
+        ]
+      },
+      "TaskStatus": {
+        "type": "string",
+        "enum": [
+          "NOT_STARTED",
+          "IN_PROGRESS",
+          "COMPLETED",
+          "WAITING",
+          "DEFERRED"
+        ],
+        "description": "Provider-neutral progress. completedAt is only set with COMPLETED."
+      },
+      "TaskPlanningInput": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
           },
-          "currentEtag": {
-            "type": "string",
-            "maxLength": 130
+          "scheduledDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Civil scheduled day without an implied time, deadline, or alert."
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
-          "action",
-          "currentEtag"
-        ]
-      },
-      "JournalDevice": {
-        "type": "object",
+          "status",
+          "scheduledDate",
+          "completedAt"
+        ],
         "additionalProperties": false,
+        "description": "Replace only planning fields. Null clears a scheduled day or completion timestamp. Existing task fields and external references are preserved."
+      },
+      "TaskChecklistItem": {
+        "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "version": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "label": {
-            "type": "string",
-            "maxLength": 80
-          },
-          "fingerprint": {
-            "type": "string",
-            "maxLength": 100
-          },
-          "revoked": {
-            "type": "boolean"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "revokedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "lastVerifiedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "lastTransferAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "lastImportAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "bidirectional": {
-            "type": "boolean",
-            "readOnly": true,
-            "description": "Explicit permission for prepared outbound journal exchanges. Existing write-only devices default to false."
-          },
-          "lastSyncAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "version",
-          "label",
-          "fingerprint",
-          "revoked",
-          "createdAt"
-        ]
-      },
-      "JournalItem": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "candidateEtag": {
-            "type": "string",
-            "maxLength": 130
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "version": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "batchId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "deviceId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "filename": {
-            "type": "string",
-            "maxLength": 13,
-            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}\\.md$"
-          },
-          "state": {
-            "type": "string",
-            "enum": [
-              "PENDING",
-              "CONFLICT",
-              "ERROR",
-              "ABORTED",
-              "IMPORTED",
-              "UNCHANGED",
-              "SUPERSEDED",
-              "KEPT_CALENDAR",
-              "DISCARDED",
-              "OFFERED",
-              "ACKNOWLEDGED"
-            ]
-          },
-          "error": {
-            "type": "string",
-            "maxLength": 100
-          },
-          "processedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "canDownload": {
-            "type": "boolean"
-          },
-          "kind": {
-            "const": "BIDIRECTIONAL"
-          },
-          "canDiscard": {
-            "type": "boolean"
-          },
-          "canDownloadCalendar": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "candidateEtag",
-          "id",
-          "version",
-          "batchId",
-          "deviceId",
-          "filename",
-          "state"
-        ]
-      },
-      "JournalCandidate": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "candidateEtag": {
-            "type": "string",
-            "maxLength": 130
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "version": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "batchId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "deviceId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "filename": {
-            "type": "string",
-            "maxLength": 13,
-            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}\\.md$"
-          },
-          "state": {
-            "type": "string",
-            "enum": [
-              "PENDING",
-              "CONFLICT",
-              "ERROR",
-              "ABORTED",
-              "IMPORTED",
-              "UNCHANGED",
-              "SUPERSEDED",
-              "KEPT_CALENDAR",
-              "DISCARDED",
-              "OFFERED",
-              "ACKNOWLEDGED"
-            ]
-          },
-          "error": {
-            "type": "string",
-            "maxLength": 100
-          },
-          "processedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "canDownload": {
-            "type": "boolean"
+            "$ref": "#/components/schemas/Id"
           },
           "text": {
             "type": "string",
-            "maxLength": 80
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "\\S"
           },
-          "body": {
-            "type": "string",
-            "maxLength": 200000
-          },
-          "current": {
-            "$ref": "#/components/schemas/DayNote"
-          },
-          "currentEtag": {
-            "type": "string",
-            "maxLength": 130
-          },
-          "kind": {
-            "const": "BIDIRECTIONAL"
-          },
-          "canDiscard": {
+          "completed": {
             "type": "boolean"
           },
-          "canDownloadCalendar": {
-            "type": "boolean"
-          },
-          "incomingExists": {
-            "type": "boolean"
-          },
-          "incoming": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "exists": {
-                "type": "boolean"
+          "completedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
               },
-              "deleted": {
-                "type": "boolean"
-              },
-              "text": {
-                "type": "string",
-                "maxLength": 80
-              },
-              "body": {
-                "type": "string",
-                "maxLength": 200000
+              {
+                "type": "null"
               }
-            },
-            "required": [
-              "exists",
-              "deleted"
             ]
           },
-          "remote": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "exists": {
-                "type": "boolean"
-              },
-              "deleted": {
-                "type": "boolean"
-              },
-              "text": {
-                "type": "string",
-                "maxLength": 80
-              },
-              "body": {
-                "type": "string",
-                "maxLength": 200000
-              }
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "completed",
+          "completedAt",
+          "position"
+        ],
+        "additionalProperties": false,
+        "description": "Stable Timekeeper checklist item. Position is zero based and contiguous in array order; this is not a task or a subtask."
+      },
+      "TaskChecklistInput": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskChecklistItem"
             },
-            "required": [
-              "exists",
-              "deleted"
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false,
+        "description": "Replace only checklist items. An empty array clears the checklist. Existing task fields and external references are preserved."
+      },
+      "TaskDateOnly": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "const": "DATE"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "kind",
+          "date"
+        ],
+        "additionalProperties": false,
+        "description": "Civil calendar date with no implied time, deadline instant, or time zone."
+      },
+      "TaskZonedDateTime": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "const": "DATE_TIME"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "time": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9](?::[0-5][0-9](?:\\.[0-9]{1,9})?)?$"
+          },
+          "timeZone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "kind",
+          "date",
+          "time",
+          "timeZone"
+        ],
+        "additionalProperties": false,
+        "description": "Local wall time and the original IANA or Windows time-zone ID. The API does not invent or resolve an instant at DST gaps or overlaps."
+      },
+      "TaskMoment": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TaskDateOnly"
+          },
+          {
+            "$ref": "#/components/schemas/TaskZonedDateTime"
+          }
+        ]
+      },
+      "TaskTimingInput": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "due": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
         "required": [
-          "candidateEtag",
-          "id",
-          "version",
-          "batchId",
-          "deviceId",
-          "filename",
-          "state",
-          "text",
-          "body",
-          "current",
-          "currentEtag"
-        ]
-      },
-      "JournalProfile": {
-        "type": "object",
+          "start",
+          "due"
+        ],
         "additionalProperties": false,
+        "description": "Replace only start and due values. Null clears a value. Scheduled day and reminders are separate concepts."
+      },
+      "TaskPriority": {
+        "type": "string",
+        "enum": [
+          "UNSPECIFIED",
+          "LOW",
+          "NORMAL",
+          "HIGH"
+        ],
+        "description": "UNSPECIFIED preserves absence of a provider priority; NORMAL is an explicit normal/medium value."
+      },
+      "TaskImportanceInput": {
+        "type": "object",
+        "properties": {
+          "priority": {
+            "$ref": "#/components/schemas/TaskPriority"
+          },
+          "flagged": {
+            "type": "boolean"
+          },
+          "urgent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "priority",
+          "flagged",
+          "urgent"
+        ],
+        "additionalProperties": false,
+        "description": "Replace priority, flag, and urgency independently of planning, timing, and provider list membership."
+      },
+      "TaskBodyFormat": {
+        "type": "string",
+        "enum": [
+          "TEXT",
+          "HTML"
+        ],
+        "description": "TEXT is plain text. HTML is source markup and must be sanitized before rendering."
+      },
+      "TaskBodyInput": {
+        "type": "object",
         "properties": {
           "format": {
-            "enum": [
-              1,
-              2
-            ]
+            "$ref": "#/components/schemas/TaskBodyFormat"
           },
-          "mechanism": {
-            "const": "RSYNC_SSH"
-          },
-          "direction": {
-            "enum": [
-              "CLIENT_TO_SERVER",
-              "BIDIRECTIONAL"
-            ]
-          },
-          "deviceId": {
+          "content": {
             "type": "string",
-            "format": "uuid"
-          },
-          "minimumRsyncVersion": {
-            "const": "3.5.1"
-          },
-          "hostname": {
-            "type": "string",
-            "maxLength": 253
-          },
-          "port": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 65535
-          },
-          "username": {
-            "type": "string",
-            "maxLength": 32
-          },
-          "remotePath": {
-            "const": "."
-          },
-          "hostKey": {
-            "type": "string",
-            "maxLength": 1024
-          },
-          "hostKeyFingerprint": {
-            "type": "string",
-            "maxLength": 100
-          },
-          "hostAlias": {
-            "type": "string",
-            "maxLength": 80
-          },
-          "knownHostsEntry": {
-            "type": "string",
-            "maxLength": 1200
-          },
-          "localFolder": {
-            "type": "string",
-            "maxLength": 4096
-          },
-          "identityFile": {
-            "type": "string",
-            "maxLength": 4096
-          },
-          "exchangeProtocol": {
-            "const": 1
-          },
-          "uploadPrefix": {
-            "const": "incoming/"
-          },
-          "downloadPrefix": {
-            "const": "outgoing/"
-          },
-          "maxExchangeFiles": {
-            "const": 50
+            "maxLength": 65536
           }
         },
         "required": [
           "format",
-          "mechanism",
-          "direction",
-          "deviceId",
-          "minimumRsyncVersion",
-          "hostname",
-          "port",
-          "username",
-          "remotePath",
-          "hostKey",
-          "hostKeyFingerprint",
-          "hostAlias",
-          "knownHostsEntry",
-          "localFolder",
-          "identityFile"
+          "content"
         ],
-        "allOf": [
-          {
-            "if": {
-              "properties": {
-                "format": {
-                  "const": 2
-                }
-              }
-            },
-            "then": {
-              "properties": {
-                "direction": {
-                  "const": "BIDIRECTIONAL"
-                }
-              },
-              "required": [
-                "exchangeProtocol",
-                "uploadPrefix",
-                "downloadPrefix",
-                "maxExchangeFiles"
-              ]
-            },
-            "else": {
-              "properties": {
-                "direction": {
-                  "const": "CLIENT_TO_SERVER"
-                }
-              }
-            }
-          }
-        ]
-      },
-      "JournalStatus": {
-        "type": "object",
         "additionalProperties": false,
+        "description": "Replace task notes. Empty TEXT content clears notes. HTML remains untrusted source content until sanitized by a renderer."
+      },
+      "ExternalTaskSource": {
+        "type": "object",
         "properties": {
-          "mechanism": {
-            "const": "RSYNC_SSH"
-          },
-          "direction": {
-            "enum": [
-              "CLIENT_TO_SERVER",
-              "BIDIRECTIONAL"
-            ]
-          },
-          "canManage": {
-            "type": "boolean"
-          },
-          "settings": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "enabled": {
-                "type": "boolean"
+          "createdAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
               },
-              "etag": {
-                "type": "string",
-                "maxLength": 130
-              },
-              "bidirectional": {
-                "type": "boolean"
+              {
+                "type": "null"
               }
-            },
-            "required": [
-              "enabled",
-              "etag"
             ]
           },
-          "deployment": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "ready": {
-                "type": "boolean"
+          "modifiedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
               },
-              "code": {
-                "type": "string",
-                "maxLength": 100
-              },
-              "hostname": {
-                "type": "string",
-                "maxLength": 253
-              },
-              "port": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 65535
-              },
-              "username": {
-                "type": "string",
-                "maxLength": 32
-              },
-              "remotePath": {
-                "const": "."
-              },
-              "hostKey": {
-                "type": "string",
-                "maxLength": 1024
-              },
-              "hostKeyFingerprint": {
-                "type": "string",
-                "maxLength": 100
-              },
-              "hostAlias": {
-                "type": "string",
-                "maxLength": 80
-              },
-              "knownHostsEntry": {
-                "type": "string",
-                "maxLength": 1200
+              {
+                "type": "null"
               }
-            },
-            "required": [
-              "ready"
             ]
           },
-          "devices": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/JournalDevice"
-            },
-            "maxItems": 1000
+          "remoteEtag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 4096
           },
-          "health": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "pending": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "conflicts": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "errors": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "aborted": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "receiving": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "lastVerifiedAt": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "lastTransferAt": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "lastImportAt": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "outgoing": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "lastSyncAt": {
-                "type": "string",
-                "format": "date-time"
-              }
-            },
-            "required": [
-              "pending",
-              "conflicts",
-              "errors",
-              "aborted",
-              "receiving"
-            ]
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/JournalItem"
-            },
-            "maxItems": 1000
+          "remoteRevision": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 4096
           }
         },
         "required": [
-          "mechanism",
-          "direction",
-          "canManage",
-          "settings",
-          "deployment",
-          "devices",
-          "health",
-          "items"
+          "createdAt",
+          "modifiedAt",
+          "remoteEtag",
+          "remoteRevision"
+        ],
+        "additionalProperties": false,
+        "description": "Provider-supplied timestamps and opaque remote versions for one linked identity. Remote versions are never Timekeeper ETags."
+      },
+      "ExternalTaskProviderData": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]{0,99}$"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "namespace",
+          "version",
+          "payload"
+        ],
+        "additionalProperties": false,
+        "description": "Versioned provider-owned fields. The namespace must equal the reference provider ID or start with that ID and a dot. No credentials or private tokens."
+      },
+      "ExternalTaskProviderDataInput": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "providerData": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExternalTaskProviderData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "providerId",
+          "repositoryId",
+          "externalId",
+          "providerData"
+        ],
+        "additionalProperties": false
+      },
+      "ExternalTaskSourceInput": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ExternalTaskSource"
+          }
+        },
+        "required": [
+          "providerId",
+          "repositoryId",
+          "externalId",
+          "source"
+        ],
+        "additionalProperties": false,
+        "description": "Replace source metadata for one linked provider identity. Explicit null clears a value."
+      },
+      "TaskConnectionCreateInput": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "remoteAccountId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "\\S"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "readable": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "providerId",
+          "remoteAccountId",
+          "name",
+          "readable",
+          "writable",
+          "enabled"
+        ],
+        "additionalProperties": false,
+        "description": "Owner-scoped provider account mapping; OAuth tokens and Apple authorization never appear here."
+      },
+      "TaskConnectionUpdateInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "readable": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "readable",
+          "writable",
+          "enabled"
+        ],
+        "additionalProperties": false,
+        "description": "Replace mutable connection metadata; disabling preserves lists and tasks."
+      },
+      "TaskConnection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "remoteAccountId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "\\S"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "readable": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "version",
+          "providerId",
+          "remoteAccountId",
+          "name",
+          "readable",
+          "writable",
+          "enabled"
+        ],
+        "additionalProperties": true
+      },
+      "TaskListKind": {
+        "type": "string",
+        "enum": [
+          "STANDARD",
+          "BUILT_IN",
+          "SMART"
+        ],
+        "description": "Provider list classification; sharing and ownership are independent."
+      },
+      "TaskListCreateInput": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "remoteListId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "\\S"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TaskListKind"
+          },
+          "readable": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "owner": {
+            "type": "boolean"
+          },
+          "present": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          }
+        },
+        "required": [
+          "connectionId",
+          "remoteListId",
+          "name",
+          "kind",
+          "readable",
+          "writable",
+          "shared",
+          "owner",
+          "present",
+          "position"
+        ],
+        "additionalProperties": false,
+        "description": "A provider list under one Timekeeper connection, independent of a Timekeeper project."
+      },
+      "TaskListUpdateInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TaskListKind"
+          },
+          "readable": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "owner": {
+            "type": "boolean"
+          },
+          "present": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "readable",
+          "writable",
+          "shared",
+          "owner",
+          "present",
+          "position"
+        ],
+        "additionalProperties": false,
+        "description": "Replace mutable list state. Mark a missing remote list present=false; do not delete its tasks."
+      },
+      "TaskList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "connectionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "remoteListId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "\\S"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TaskListKind"
+          },
+          "readable": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "owner": {
+            "type": "boolean"
+          },
+          "present": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "version",
+          "connectionId",
+          "remoteListId",
+          "name",
+          "kind",
+          "readable",
+          "writable",
+          "shared",
+          "owner",
+          "present",
+          "position"
+        ],
+        "additionalProperties": true
+      },
+      "TaskConnectionPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskConnection"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "revision"
+        ],
+        "additionalProperties": true
+      },
+      "TaskListPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskList"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "revision"
+        ],
+        "additionalProperties": true
+      },
+      "TaskSyncMode": {
+        "type": "string",
+        "enum": [
+          "INITIAL",
+          "INCREMENTAL",
+          "RESCAN_REQUIRED"
         ]
+      },
+      "TaskSyncCursorCreateInput": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "listId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mode": {
+            "$ref": "#/components/schemas/TaskSyncMode"
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 32768,
+            "description": "Opaque provider cursor or delta URL. Never a Timekeeper task version."
+          },
+          "lastObservedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastCompleteAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "connectionId",
+          "listId",
+          "mode",
+          "cursor",
+          "lastObservedAt",
+          "lastCompleteAt"
+        ],
+        "additionalProperties": false
+      },
+      "TaskSyncCursorUpdateInput": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/TaskSyncMode"
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 32768,
+            "description": "Opaque provider cursor or delta URL. Never a Timekeeper task version."
+          },
+          "lastObservedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastCompleteAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "mode",
+          "cursor",
+          "lastObservedAt",
+          "lastCompleteAt"
+        ],
+        "additionalProperties": false
+      },
+      "TaskSyncCursor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "connectionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "listId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mode": {
+            "$ref": "#/components/schemas/TaskSyncMode"
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 32768,
+            "description": "Opaque provider cursor or delta URL. Never a Timekeeper task version."
+          },
+          "lastObservedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastCompleteAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "version",
+          "connectionId",
+          "listId",
+          "mode",
+          "cursor",
+          "lastObservedAt",
+          "lastCompleteAt"
+        ],
+        "additionalProperties": true
+      },
+      "TaskSyncCursorPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskSyncCursor"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "revision"
+        ],
+        "additionalProperties": true
+      },
+      "TransferTaskConnection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "remoteAccountId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "\\S"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "readable": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "providerId",
+          "remoteAccountId",
+          "name",
+          "readable",
+          "writable",
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "TransferTaskList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "connectionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "remoteListId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "\\S"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TaskListKind"
+          },
+          "readable": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "owner": {
+            "type": "boolean"
+          },
+          "present": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          }
+        },
+        "required": [
+          "id",
+          "connectionId",
+          "remoteListId",
+          "name",
+          "kind",
+          "readable",
+          "writable",
+          "shared",
+          "owner",
+          "present",
+          "position"
+        ],
+        "additionalProperties": false
+      },
+      "TaskOrderInput": {
+        "type": "object",
+        "properties": {
+          "siblingOrder": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Position among sibling tasks. This is independent of provider list order."
+          }
+        },
+        "required": [
+          "siblingOrder"
+        ],
+        "additionalProperties": false
+      },
+      "JournalAssetUploadInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 6666672,
+            "description": "At most 5,000,000 decoded bytes."
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ArchiveJournalAsset": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "filename",
+          "data"
+        ],
+        "properties": {
+          "filename": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+          },
+          "data": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 6666672,
+            "description": "Exact attachment bytes, at most 5,000,000 after decoding."
+          }
+        }
       }
     },
     "parameters": {
@@ -18726,6 +20799,24 @@
           ]
         },
         "description": "Request a ten-minute undo offer for this work-session edit or deletion."
+      },
+      "IfMatchOptional": {
+        "name": "If-Match",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Use the current strong ETag to replace an existing asset. Exactly one of If-Match or If-None-Match: * is required."
+      },
+      "IfNoneMatchStar": {
+        "name": "If-None-Match",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "const": "*"
+        },
+        "description": "Create only when the asset is absent; use this instead of If-Match for new uploads."
       }
     },
     "responses": {

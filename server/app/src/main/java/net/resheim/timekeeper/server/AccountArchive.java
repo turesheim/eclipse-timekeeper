@@ -85,12 +85,16 @@ class AccountArchive {
         String archiveId=UUID.randomUUID().toString(),generatedAt=Instant.now().toString();
         ObjectNode counts=object();for(var entry:WORK.entrySet()) counts.put(entry.getKey(),count(c,owner,entry.getValue()));
         long auditCount=0;for(var type:HISTORY) auditCount+=count(c,owner,type);counts.put("importAuditRecords",auditCount);
-        final long[] noteCount={0};records(c,owner,DayNotes.TYPE,value->{if(DayNotes.hasContent(value))noteCount[0]++;});
+        var deletedNotes=new HashMap<String,Long>();
+        records(c,owner,JournalState.Kind.JOURNAL_DELETE.name(),value->deletedNotes.put(value.path("id").asText(),value.path("noteVersion").asLong()));
+        final long[] noteCount={0};records(c,owner,DayNotes.TYPE,value->{if(presentNote(value,deletedNotes))noteCount[0]++;});
         if(noteCount[0]>0)counts.put("dayNotes",noteCount[0]);
+        final long[] assetCount={0};records(c,owner,JournalAssets.TYPE,value->{if(!value.path("deleted").asBoolean())assetCount[0]++;});
+        if(assetCount[0]>0)counts.put("journalAssets",assetCount[0]);
         var profile=profile(c,owner);var metadata=metadata(c,owner);
         var manifest=object().put("format",FORMAT).put("archiveId",archiveId).put("generatedAt",generatedAt);
         manifest.set("counts",counts);var files=manifest.putObject("files");
-        files.put("archive.json","Complete private account snapshot. Restore work and selected preferences; account and credential metadata are informational.");
+        files.put("archive.json","Complete private account snapshot, including canonical journal Markdown and attachments. Restore work and selected preferences; account and credential metadata are informational.");
         files.put("README.txt","Format, privacy and CSV notes.");
         for(String name:new TreeSet<>(WORK.keySet())) files.put(name+".csv","Spreadsheet-safe "+name+"; exact stored instants and JSON-encoded collection fields.");
         try(var zip=new ZipOutputStream(Files.newOutputStream(target),StandardCharsets.UTF_8)) {
@@ -100,9 +104,18 @@ class AccountArchive {
             json.writeStartObject();json.writeStringField("format",FORMAT);json.writeStringField("archiveId",archiveId);json.writeStringField("generatedAt",generatedAt);
             if(noteCount[0]>0){
                 json.writeArrayFieldStart("dayNotes");
-                records(c,owner,DayNotes.TYPE,value->{if(DayNotes.hasContent(value)){
+                records(c,owner,DayNotes.TYPE,value->{if(presentNote(value,deletedNotes)){
                     var note=object().put("date",value.path("date").asText()).put("text",value.path("text").asText());
-                    if(!value.path("body").asText().isEmpty())note.put("body",value.path("body").asText());json.writeTree(note);
+                    note.put("body",value.path("body").asText());
+                    note.put("markdown",value.has("markdown")?value.path("markdown").asText():new String(
+                            JournalMarkdown.render(value.path("date").asText()+".md",null,value.path("text").asText(),value.path("body").asText()),StandardCharsets.UTF_8));
+                    json.writeTree(note);
+                }});json.writeEndArray();
+            }
+            if(assetCount[0]>0){
+                json.writeArrayFieldStart("journalAssets");
+                records(c,owner,JournalAssets.TYPE,value->{if(!value.path("deleted").asBoolean()){
+                    json.writeTree(object().put("filename",value.path("filename").asText()).put("data",value.path("data").asText()));
                 }});json.writeEndArray();
             }
             json.writeObjectField("account",metadata);json.writeObjectField("preferences",profile);
@@ -133,7 +146,7 @@ class AccountArchive {
             }
             entry(zip,"README.txt");zip.write(("Timekeeper private account archive\n\n"
                 +"archive.json is the authoritative, versioned JSON snapshot for account import. manifest.json lists record counts and files.\n"
-                +"Optional dayNotes in archive.json contain private civil-date labels and Markdown bodies, including days without recorded work. Markdown is preserved as UTF-8 text.\n"
+                +"Optional dayNotes in archive.json contain complete canonical Markdown, including days without recorded work. Optional journalAssets contain account-private attachments as base64.\n"
                 +"This ZIP is not encrypted. Protect downloads and temporary files on encrypted private storage; see the journal storage and key-management deployment requirements.\n"
                 +"All records belong to the signed-in account. Administrator access does not include another account's data.\n"
                 +"Account identity, recovery addresses and credential-management metadata are informational and are not restored.\n"
@@ -144,6 +157,9 @@ class AccountArchive {
         }
     }
     private static void entry(ZipOutputStream zip,String name) throws IOException {zip.putNextEntry(new ZipEntry(name));}
+    private static boolean presentNote(ObjectNode value,Map<String,Long> deleted){
+        return !(deleted.getOrDefault(value.path("id").asText(),-1L)==value.path("version").asLong()&&!DayNotes.hasContent(value));
+    }
     private static Set<String> fieldNames(ObjectNode value) {var names=new HashSet<String>();value.fieldNames().forEachRemaining(names::add);return names;}
     static String csvCell(String value) {
         int offset=0;

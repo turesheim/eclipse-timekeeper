@@ -111,6 +111,105 @@ separately from the editable task fields. A reference conflict at creation must
 not leave an orphan task. After an ambiguous provider-linked create, reconcile
 through the external-reference lookup instead of creating a duplicate.
 
+Task planning is a separate conditional `PUT /tasks/{id}/planning` resource.
+Its `status` is `NOT_STARTED`, `IN_PROGRESS`, `COMPLETED`, `WAITING`, or
+`DEFERRED`; `scheduledDate` is a date-only civil day, and `completedAt` is a UTC
+instant or null. The request supplies all three fields, and `completedAt` is
+only valid with `COMPLETED`. A missing planning field on task creation uses
+`NOT_STARTED`/null defaults. Existing `PUT /tasks/{id}` clients update the
+legacy fields while preserving task planning. The scheduled day never implies
+a midnight deadline, reminder, or time zone conversion. Further provider task
+metadata and synchronization behavior are tracked in #413.
+
+Task checklist items are distinct from child tasks linked by `parentTaskId`.
+Each item has a stable Timekeeper UUID, text, completion state, optional
+completion instant, and zero-based position matching its array order. Clients
+may include `checklistItems` when creating a task. A conditional
+`PUT /tasks/{id}/checklist` with `{ "items": [...] }` replaces only that list;
+an empty list clears it. IDs and positions must be unique, positions must be
+contiguous, and a completion instant requires `completed: true`. The ordinary
+task and planning updates preserve checklist items they do not understand.
+
+Task start and due values are separate from `scheduledDate`. A conditional
+`PUT /tasks/{id}/timing` supplies both `start` and `due`; `null` clears one.
+`{ "kind": "DATE", "date": "2026-03-29" }` is a civil day without a time
+or time zone. A `DATE_TIME` also carries `time` and the original `timeZone`
+identifier, which may use IANA or Windows naming. Timekeeper preserves that
+wall time and identifier, including at DST gaps and overlaps, without deriving
+an instant or converting it to midnight. Neither form creates a reminder.
+Omitting timing fields on task creation uses null defaults. Ordinary task,
+planning, and checklist updates preserve existing timing.
+
+Task importance has separate `priority`, `flagged`, and `urgent` fields.
+`priority` is `UNSPECIFIED`, `LOW`, `NORMAL`, or `HIGH`; an explicit `NORMAL`
+is distinct from no priority. A conditional `PUT /tasks/{id}/importance`
+supplies all three fields and changes no other task data. A provider connector
+must retain unsupported flags in Timekeeper without inventing a corresponding
+provider value. Legacy task, planning, checklist, and timing updates preserve
+importance.
+
+Task notes use a separate conditional `PUT /tasks/{id}/body` with a complete
+`{ "format": "TEXT" | "HTML", "content": "..." }` value. Empty plain text clears
+notes. The body is optional on creation and defaults to empty text. Older task
+updates and the other task section endpoints preserve it. HTML is untrusted
+source content; clients must sanitize it before rendering.
+
+External task references have optional `source` metadata: `createdAt`,
+`modifiedAt`, `remoteEtag`, and `remoteRevision`. The timestamps are provider
+instants, and the version strings are opaque. A conditional
+`PUT /tasks/{id}/external-references/source` addresses one existing reference by
+provider, repository, and external ID and replaces its complete source state.
+Explicit null clears a value. Older link calls omit `source` and preserve state
+for an existing identity. The remote ETag is independent of the Timekeeper
+`If-Match` value.
+
+Provider accounts and lists have owner-scoped `/task-connections` and
+`/task-lists` collections. A connection holds a provider and remote account
+identity, display name, access flags, and enabled state; no OAuth or Apple
+credentials are stored in these resources. A list holds a stable Timekeeper ID,
+remote list ID, connection ID, name, `STANDARD`/`BUILT_IN`/`SMART` kind,
+read/write and sharing/ownership flags, presence, and order. Lists are separate
+from Timekeeper projects. Repeating an identical create returns the existing
+resource; a conflicting representation of the same remote identity returns
+409. Updates require `If-Match`. Mark a missing list `present=false` or a
+disconnected account `enabled=false`; remote disappearance must not trigger
+deletion of local tasks.
+
+`/task-sync-cursors` holds durable, owner-scoped connector progress separately
+from task payloads. A connection-level cursor tracks list discovery; a
+list-level cursor tracks tasks in that owned list. `INITIAL` has no cursor,
+`INCREMENTAL` has an opaque provider cursor or delta URL, and
+`RESCAN_REQUIRED` deliberately clears it. Creates are idempotent for an
+identical connection/list state; updates and deletes require `If-Match`.
+Disabling a connection or marking a list absent retains cursor state and
+tasks. Cursors are excluded from portable transfers and account archives:
+after restoration, a connector must perform a full scan before interpreting
+remote absence as deletion. The opaque cursor is never a Timekeeper version.
+
+An external task reference can carry `taskListId` to point at an owned provider
+list. The list's connection must use the same provider. The existing
+`repositoryId` remains the provider identity namespace and must distinguish
+accounts and lists when remote item IDs are only unique within a list. A legacy
+link update that omits `taskListId` preserves the association. Portable import
+remaps list IDs with the rest of the owned graph; deleting a referenced list is
+rejected. The Timekeeper project remains independent of this association.
+
+An external reference can also hold an optional `providerData` envelope with
+`namespace`, positive schema `version`, and an opaque JSON object `payload`.
+The namespace is the provider ID or a dot-prefixed extension of it. The server
+retains unknown payload fields through reads, unrelated and legacy writes,
+portable transfers, and account archives. `PUT
+/tasks/{id}/external-references/provider-data` conditionally replaces the
+whole envelope for one linked identity; explicit `null` clears it. Connectors
+must store only fields they can actually read, must keep their own OAuth or
+Apple authorization material outside task data, and must not write an
+approximation of an unsupported field to another provider.
+
+Tasks have a nonnegative `siblingOrder` for local ordering among tasks with
+the same parent. `PUT /tasks/{id}/order` changes only this value with `If-Match`;
+legacy task and other section writes preserve it. Provider ordering tokens can
+remain opaque in provider source state and are not inferred from this number.
+
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
 Manual editing sets `manual=true` and cannot change activity task/owner. Creating,
@@ -143,10 +242,18 @@ Portable interchange exports `timekeeper-domain-v3` JSON, including clients, man
 project/session client links, session summaries and optional task, direct-project
 assignments. Import also accepts older `timekeeper-domain-v1` and
 `timekeeper-domain-v2` snapshots, assigning their projects/sessions to General.
-The formats contain no SQL/JPA table names. CSV v3 adds `clients.csv` and client/summary
-columns; v2 includes `workSessions.csv`. Every declared
-file must be present. Older CSV clients reject the new format instead of silently
-discarding independent sessions or client metadata.
+The formats contain no SQL/JPA table names. CSV v3 includes client/summary
+columns and writes `taskConnections.csv` and `taskLists.csv` together when
+provider collections are present. The descriptor marks these files as required,
+so deleting both cannot silently discard them. Earlier v3 CSV exports without
+either file remain readable; an export with only one provider file is invalid. v2 includes
+`workSessions.csv`. Every declared file must be present. Older CSV clients
+reject the new format instead of silently discarding independent sessions or
+client metadata.
+Portable task CSV adds a `taskExtras` JSON object column when tasks contain
+planning, timing, importance, notes, or sibling order. This preserves optional
+fields, including absent fields in mixed older and newer rows. Its descriptor
+marks the column as required, so an incomplete export is rejected.
 Export reads a consistent owned snapshot. Import validates the entire graph,
 then generates fresh UUIDs and rewrites references in one transaction; it never
 updates existing records. Source IDs are correlation keys only. A failure leaves
@@ -512,13 +619,25 @@ formatted body editing is provided by the separate editor integration.
 
 Note responses are private/no-store. Profile-style change invalidations remain
 compatible with existing clients and contain no label/body content. Account
-export streams active note records with optional `body`; label-only archives
-remain supported, and omitted legacy bodies preserve an existing matching note's
-body. A differing active note produces a review conflict and is never overwritten.
+export streams present notes with complete canonical `markdown`, `text` and
+`body`; label-only archives remain supported, and omitted legacy bodies preserve
+an existing matching note's body. A differing active note produces a review
+conflict and is never overwritten.
 Empty deletion tombstones are not portable archive deletion commands.
+
+`GET /journal-assets/{filename}` returns private attachment bytes with a strong
+ETag and safe media type. `PUT` accepts JSON `{data}` with base64 bytes, using
+`If-None-Match: *` for a new filename or `If-Match` for an existing one.
+`DELETE` requires the current `If-Match` and retains a versioned deletion marker.
+Attachment names are one safe ASCII path segment. PNG, JPEG, GIF and WebP files
+with matching signatures can display inline; every other format downloads as an
+octet-stream attachment. The browser route applies session, CSRF and owner
+binding; WebDAV provides the same files under `/dav/journal/assets/` for clients.
+The account archive includes active attachments and rejects conflicting filenames
+during review.
 
 See [journal storage protection](../operations/JOURNAL-STORAGE.md) for the
 required deployment encryption, temporary/backup storage, key management and
 readable-server trust boundary. The database and private account archive remain
-authoritative; a future Markdown-folder synchronization feature cannot bypass
-these authorization and conditional-write rules.
+authoritative. The [WebDAV collection](../operations/JOURNAL-WEBDAV.md) uses
+the same owner, authorization and conditional-write rules.

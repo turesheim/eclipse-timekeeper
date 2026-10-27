@@ -3,12 +3,15 @@ package net.resheim.timekeeper.server;
 import java.util.Locale;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 import net.resheim.eclipse.timekeeper.domain.TimekeeperException;
 
 @Provider
 public class ProblemMapper implements ExceptionMapper<Exception> {
+    @Context UriInfo uri;
     @Override public Response toResponse(Exception error) {
         int status=503; String code="UNAVAILABLE";
         if (error instanceof ApiFailure failure) { status=failure.status; code=failure.code; }
@@ -25,7 +28,8 @@ public class ProblemMapper implements ExceptionMapper<Exception> {
         var problem=JsonValues.object(); problem.put("type","urn:timekeeper:problem:"+code.toLowerCase(Locale.ROOT).replace('_','-'));
         problem.put("title",code.replace('_',' ')); problem.put("status",status); problem.put("code",code);
         var response=Response.status(status).type("application/problem+json").entity(problem).header("Cache-Control","no-store");
-        if (status==401) response.header("WWW-Authenticate","Bearer realm=\"timekeeper\""+(error instanceof ApiFailure failure && failure.invalidToken ? ", error=\"invalid_token\"" : ""));
+        if (status==401) response.header("WWW-Authenticate",uri!=null&&uri.getPath().replaceFirst("^/","").startsWith("dav/journal")
+                ?"Basic realm=\"Timekeeper journal\"":"Bearer realm=\"timekeeper\""+(error instanceof ApiFailure failure && failure.invalidToken ? ", error=\"invalid_token\"" : ""));
         return response.build();
     }
 }

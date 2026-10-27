@@ -16,8 +16,8 @@ async function loadEngine(){if(!engine)engine=await import('./assets/milkdown/mi
 
 /** One in-memory Markdown field. Neither drafts nor bodies enter browser storage. */
 export class MarkdownField {
-  constructor(root,onChange,onState,prefix='journal'){
-    Object.assign(this,{root,onChange,onState,generation:0,readOnly:true});root.classList.add('markdown-editor');
+  constructor(root,onChange,onState,prefix='journal',onUpload){
+    Object.assign(this,{root,onChange,onState,onUpload,generation:0,readOnly:true});root.classList.add('markdown-editor');
     this.modes=node('div',undefined,'markdown-modes');this.modes.setAttribute('role','group');this.modes.setAttribute('aria-label',t('markdown.mode'));
     this.formatted=iconButton(button(),'file-richtext',t('markdown.formatted'));this.source=iconButton(button(),'markdown',t('markdown.source'));this.modes.append(this.formatted,this.source);
     this.status=node('p','','hint');this.status.setAttribute('role','status');
@@ -63,16 +63,44 @@ export class MarkdownField {
         }else this.editor.command(name);
       });this.tools.append(action);
     }
+    this.image=iconButton(button(),'image',t('markdown.insert_image'));
+    this.attachment=iconButton(button(),'paperclip',t('markdown.attach_file'));
+    this.imagePicker=node('input');this.imagePicker.type='file';this.imagePicker.accept='image/png,image/jpeg,image/gif,image/webp';this.imagePicker.hidden=true;
+    this.attachmentPicker=node('input');this.attachmentPicker.type='file';this.attachmentPicker.hidden=true;
+    this.image.addEventListener('click',()=>this.imagePicker.click());
+    this.attachment.addEventListener('click',()=>this.attachmentPicker.click());
+    this.imagePicker.addEventListener('change',()=>void this.upload(this.imagePicker,true));
+    this.attachmentPicker.addEventListener('change',()=>void this.upload(this.attachmentPicker,false));
+    this.tools.insertBefore(this.image,this.tools.children[9]);this.tools.insertBefore(this.attachment,this.tools.children[10]);
     this.rich=node('div',undefined,'journal-formatted');this.rich.id=prefix+'-formatted';
     this.plain=node('div',undefined,'journal-source');const label=node('label',t('markdown.body'),'form-label');label.htmlFor=prefix+'-body';
     this.text=node('textarea',undefined,'form-control');this.text.id=prefix+'-body';this.text.rows=14;this.text.spellcheck=false;this.plain.append(label,this.text);
     this.formatted.setAttribute('aria-controls',this.rich.id);this.source.setAttribute('aria-controls',this.text.id);
     this.toolbar=node('div',undefined,'markdown-toolbar');this.separator=node('span',undefined,'markdown-toolbar-separator');this.separator.setAttribute('role','separator');this.separator.setAttribute('aria-orientation','vertical');this.toolbar.append(this.modes,this.separator,this.tools);
-    root.append(this.metadata,this.toolbar,this.normalization,this.status,this.rich,this.plain,this.blockMenu);
+    root.append(this.metadata,this.toolbar,this.normalization,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu);
     this.source.addEventListener('click',()=>void this.showSource());this.formatted.addEventListener('click',()=>void this.showFormatted());
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();});this.clear();
   }
   rawBody(){return this.text.value===this.displayedBody?this.raw:this.text.value;}
+  async upload(picker,image){
+    const file=picker.files?.[0];picker.value='';
+    if(!file||!this.onUpload||this.readOnly||this.loading)return;
+    if(file.size>5_000_000){this.status.textContent=t('markdown.asset_too_large');return;}
+    const generation=this.generation;this.loading=true;this.controls();this.status.textContent=t('markdown.uploading');
+    try{
+      const path=await this.onUpload(file,image);
+      if(generation!==this.generation)return;
+      const label=file.name.replace(/[\[\]()\\\r\n]/g,' ').trim()||t('markdown.attachment');
+      if(this.editor)this.editor.command(image?'image':'asset_link',{path,label});
+      else{
+        const start=this.text.selectionStart,end=this.text.selectionEnd;
+        this.text.setRangeText(image?`![${label}](${path})`:`[${label}](${path})`,start,end,'end');
+        this.onChange();this.text.focus();
+      }
+      this.status.textContent='';
+    }catch{if(generation===this.generation)this.status.textContent=t('markdown.upload_failed');}
+    finally{if(generation===this.generation){this.loading=false;this.controls();}}
+  }
   setRaw(value){this.raw=value;this.text.value=value;this.displayedBody=this.text.value;}
   value(){return (this.frontmatter||'')+(this.editor?this.editor.markdown():this.rawBody());}
   setReadOnly(value){this.readOnly=value;this.editor?.setReadOnly(value);this.controls();}
@@ -98,7 +126,7 @@ export class MarkdownField {
   closeBlockMenu(){if(this.blockMenu.matches(':popover-open'))this.blockMenu.hidePopover();}
   controls(){
     this.text.readOnly=this.readOnly||this.loading;
-    for(const action of this.tools.children)action.disabled=this.readOnly||this.loading;
+    for(const action of this.tools.children)action.disabled=this.readOnly||this.loading||(!this.onUpload&&(action===this.image||action===this.attachment));
     for(const choice of this.blockMenu.children)choice.disabled=this.readOnly||this.loading;
     if(this.readOnly||this.loading||this.rich.hidden)this.closeBlockMenu();
     this.tools.hidden=this.rich.hidden||this.readOnly;this.separator.hidden=this.tools.hidden;

@@ -90,6 +90,7 @@ class DistributionDocumentationTest(unittest.TestCase):
                          'account-data-review-desktop.png','account-data-review-mobile.png',
                          'account-menu-mobile.png','account-labels-mobile.png','week-day-note-editor-mobile.png',
                          'journal-heading-menu-mobile.png',
+                         'today-desktop.png','today-mobile.png',
                          'track-month-desktop.png','track-month-narrow.png','track-month-picker.png',
                          'toggl-import-review.png','toggl-import-history-narrow.png'):
                 image = root/'docs/assets/screenshots'/name

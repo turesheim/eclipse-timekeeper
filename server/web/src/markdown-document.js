@@ -20,7 +20,8 @@ const withoutAutolinks=value=>value.replace(/<([^<>\s]+)>/g,(match,target)=>{
   if(!email&&!/^(?:https?:\/\/|mailto:)/i.test(target))return match;
   try{return ['https:','http:','mailto:'].includes(new URL(email?'mailto:'+target:target).protocol)?'':match;}catch{return match;}
 }).replace(/\b(?:https?:\/\/|mailto:)[^\s<>()\[\]]+/gi,'');
-export const hasUnsupportedSyntax=value=>/\[\[|\]\]|\[![^\]]+\]|==|%%|\$|<|!\[|\[\^|^ {0,3}\[[^\]]+\]:|(?:^|\s)\^[\w-]+|^ {0,3}:::/m.test(withoutAutolinks(value));
+export const hasUnsupportedSyntax=value=>/\[\[|\]\]|\[![^\]]+\]|==|%%|\$|<|!\[|\[\^|^ {0,3}\[[^\]]+\]:|(?:^|\s)\^[\w-]+|^ {0,3}:::/m.test(
+  withoutAutolinks(value).replace(/!\[[^\]\n]*\]\(assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\)/g,''));
 export function needsSource(body) {
   let fence=null,text='';
   for(const line of body.split(/\r?\n/)){

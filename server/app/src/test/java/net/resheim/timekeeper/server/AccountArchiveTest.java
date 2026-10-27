@@ -101,6 +101,35 @@ class AccountArchiveTest {
         }
         assertFalse(Files.exists(path));assertFalse(Files.exists(path.getParent()));
     }
+    @Test void taskPlanningIsPresentInPortableJsonAndCsv() throws Exception {
+        var principal=tokens.authenticate("Bearer test-read");
+        var planning=new net.resheim.eclipse.timekeeper.domain.TaskPlanning(net.resheim.eclipse.timekeeper.domain.TaskStatus.COMPLETED,
+                Optional.of(java.time.LocalDate.parse("2026-10-26")),Optional.of(java.time.Instant.parse("2026-10-26T11:12:13Z")));
+        var checklist=new net.resheim.eclipse.timekeeper.domain.TaskChecklist(List.of(
+                new net.resheim.eclipse.timekeeper.domain.TaskChecklistItem(UUID.randomUUID(),"Review archive",true,
+                        Optional.of(java.time.Instant.parse("2026-10-26T11:12:13Z")),0)));
+        var timing=new net.resheim.eclipse.timekeeper.domain.TaskTiming(
+                Optional.of(net.resheim.eclipse.timekeeper.domain.TaskMoment.dateOnly(java.time.LocalDate.parse("2026-10-26"))),
+                Optional.of(net.resheim.eclipse.timekeeper.domain.TaskMoment.zoned(java.time.LocalDate.parse("2026-10-27"),
+                        java.time.LocalTime.parse("09:15"),"Pacific Standard Time")));
+        var importance=new net.resheim.eclipse.timekeeper.domain.TaskImportance(
+                net.resheim.eclipse.timekeeper.domain.TaskPriority.HIGH,true,true);
+        var task=store.transaction(principal.owner(),()->store.service().createTask(new net.resheim.eclipse.timekeeper.service.Commands.CreateTask(
+                Optional.empty(),Optional.empty(),"Portable scheduled task",Optional.empty(),Set.of(),planning,checklist,timing,importance)));
+        try(var download=archives.download(principal);var zip=new ZipFile(download.file().toFile())) {
+            var archive=parse(new String(zip.getInputStream(zip.getEntry("archive.json")).readAllBytes(),StandardCharsets.UTF_8));
+            var restored=java.util.stream.StreamSupport.stream(archive.path("work").path("tasks").spliterator(),false)
+                    .filter(value->value.path("id").asText().equals(task.id().value().toString())).findFirst().orElseThrow();
+            assertEquals("COMPLETED",restored.path("status").asText());assertEquals("2026-10-26",restored.path("scheduledDate").asText());
+            assertEquals("2026-10-26T11:12:13Z",restored.path("completedAt").asText());
+            assertEquals(checklist.items().get(0).id().toString(),restored.path("checklistItems").get(0).path("id").asText());
+            assertEquals("DATE",restored.path("start").path("kind").asText());
+            assertEquals("Pacific Standard Time",restored.path("due").path("timeZone").asText());
+            assertEquals("HIGH",restored.path("priority").asText());assertTrue(restored.path("flagged").asBoolean());assertTrue(restored.path("urgent").asBoolean());
+            String csv=new String(zip.getInputStream(zip.getEntry("tasks.csv")).readAllBytes(),StandardCharsets.UTF_8);
+            assertTrue(csv.contains("scheduledDate"));assertTrue(csv.contains("2026-10-26T11:12:13Z"));assertTrue(csv.contains("Review archive"));assertTrue(csv.contains("Pacific Standard Time"));assertTrue(csv.contains("flagged"));
+        }
+    }
     @Test void downloadIncludesMoreThanTenThousandRecordsAndTwentyMebibytesWithoutPagination() throws Exception {
         var principal=tokens.authenticate("Bearer test-read");int count=11001;
         var actual=io.quarkus.arc.ClientProxy.unwrap(store);actual.stopMaintenance();
