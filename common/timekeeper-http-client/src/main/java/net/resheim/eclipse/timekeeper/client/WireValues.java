@@ -20,6 +20,17 @@ public final class WireValues {
     public static UUID id(JsonElement value) {return UUID.fromString(value.getAsString());}
     public static JsonArray labels(Set<LabelId> ids) {var array=new JsonArray();ids.stream().map(LabelId::value).sorted().forEach(id -> array.add(id.toString()));return array;}
     public static Project project(JsonObject value) {return new Project(new ProjectId(id(value.get("id"))),value.get("name").getAsString(),value.get("version").getAsLong());}
+    public static TaskConnection taskConnection(JsonObject value) {
+        return new TaskConnection(id(value.get("id")),value.get("providerId").getAsString(),value.get("remoteAccountId").getAsString(),
+                value.get("name").getAsString(),value.get("readable").getAsBoolean(),value.get("writable").getAsBoolean(),
+                value.get("enabled").getAsBoolean(),value.get("version").getAsLong());
+    }
+    public static TaskList taskList(JsonObject value) {
+        return new TaskList(id(value.get("id")),id(value.get("connectionId")),value.get("remoteListId").getAsString(),
+                value.get("name").getAsString(),TaskListKind.valueOf(value.get("kind").getAsString()),value.get("readable").getAsBoolean(),
+                value.get("writable").getAsBoolean(),value.get("shared").getAsBoolean(),value.get("owner").getAsBoolean(),
+                value.get("present").getAsBoolean(),value.get("position").getAsInt(),value.get("version").getAsLong());
+    }
     public static Task task(JsonObject value) {
         var refs=StreamSupport.stream(value.getAsJsonArray("externalReferences").spliterator(),false).map(item -> reference(item.getAsJsonObject())).collect(Collectors.toUnmodifiableSet());
         var planning=new TaskPlanning(value.has("status")?TaskStatus.valueOf(value.get("status").getAsString()):TaskStatus.NOT_STARTED,

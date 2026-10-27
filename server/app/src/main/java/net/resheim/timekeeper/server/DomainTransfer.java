@@ -14,13 +14,17 @@ import net.resheim.eclipse.timekeeper.service.Commands.*;
 final class DomainTransfer {
     private final ServerStore store;
     DomainTransfer(ServerStore store) {this.store=store;}
-    static final Map<String,String> TYPES=Map.of("clients","CLIENT","projects","PROJECT","tasks","TASK","labels","LABEL","activities","ACTIVITY","workSessions","WORK_SESSION");
+    static final Map<String,String> TYPES=Map.of("clients","CLIENT","projects","PROJECT","tasks","TASK","labels","LABEL","activities","ACTIVITY","workSessions","WORK_SESSION",
+            "taskConnections","TASK_CONNECTION","taskLists","TASK_LIST");
     ApiReplies importRecords(JsonNode input) {
         Map<UUID,UUID> clients=new HashMap<>();
+        Map<UUID,UUID> connections=new HashMap<>();
         Map<UUID,ProjectId> projects=new HashMap<>();Map<UUID,TaskId> tasks=new HashMap<>();Map<UUID,LabelId> labels=new HashMap<>();Map<UUID,WorkSessionId> sessions=new HashMap<>();Set<UUID> sourceIds=new HashSet<>();
         var result=object();var mappings=result.putArray("ids");var service=store.service();
         // Validate source identity uniqueness before any record is created.
         TYPES.forEach((name,type) -> {for(JsonNode item:input.path(name)) if(!sourceIds.add(uuid(item.get("id")))) throw ApiFailure.validation();});
+        Set<UUID> sourceConnections=new HashSet<>();input.path("taskConnections").forEach(item->sourceConnections.add(uuid(item.get("id"))));
+        for(JsonNode item:input.path("taskLists")) if(!sourceConnections.contains(uuid(item.get("connectionId")))) throw ApiFailure.validation();
         Map<UUID,JsonNode> sourceProjectRecords=new HashMap<>();
         input.get("projects").forEach(item -> sourceProjectRecords.put(uuid(item.get("id")),item));
         Set<UUID> sourceProjects=new HashSet<>(),sourceLabels=new HashSet<>(),sourceSessions=new HashSet<>();Map<UUID,JsonNode> sourceTasks=new HashMap<>();
@@ -56,6 +60,28 @@ final class DomainTransfer {
         for(var item:input.path("clients")) {
             var fields=object();fields.put("name",item.get("name").asText());fields.put("color",item.get("color").asText());
             var created=store.createClient(fields);clients.put(uuid(item.get("id")),uuid(created.get("id")));mapping(mappings,"CLIENT",item,uuid(created.get("id")));
+        }
+        Set<String> accountKeys=new HashSet<>();
+        for(JsonNode item:input.path("taskConnections")) {
+            String key=item.get("providerId").asText()+"\u0000"+item.get("remoteAccountId").asText();
+            if(!accountKeys.add(key)) throw ApiFailure.validation();
+            for(var existing:store.list("TASK_CONNECTION")) if(existing.get("providerId").asText().equals(item.get("providerId").asText())
+                    && existing.get("remoteAccountId").asText().equals(item.get("remoteAccountId").asText())) throw ApiFailure.conflict();
+            var created=new TaskConnection(UUID.randomUUID(),item.get("providerId").asText(),item.get("remoteAccountId").asText(),
+                    item.get("name").asText(),item.get("readable").asBoolean(),item.get("writable").asBoolean(),item.get("enabled").asBoolean(),0);
+            store.save("TASK_CONNECTION",created);store.change("TASK_CONNECTION","CREATED",created.id().toString());
+            connections.put(uuid(item.get("id")),created.id());mapping(mappings,"TASK_CONNECTION",item,created.id());
+        }
+        Set<String> listKeys=new HashSet<>();
+        for(JsonNode item:input.path("taskLists")) {
+            UUID sourceConnection=uuid(item.get("connectionId"));String key=sourceConnection+"\u0000"+item.get("remoteListId").asText();
+            if(!listKeys.add(key)) throw ApiFailure.validation();
+            var created=new TaskList(UUID.randomUUID(),required(connections,sourceConnection),item.get("remoteListId").asText(),
+                    item.get("name").asText(),TaskListKind.valueOf(item.get("kind").asText()),item.get("readable").asBoolean(),
+                    item.get("writable").asBoolean(),item.get("shared").asBoolean(),item.get("owner").asBoolean(),
+                    item.get("present").asBoolean(),item.get("position").asInt(),0);
+            store.save("TASK_LIST",created);store.change("TASK_LIST","CREATED",created.id().toString());
+            mapping(mappings,"TASK_LIST",item,created.id());
         }
         int openSessions=0;
         for(JsonNode item:input.path("workSessions")) {

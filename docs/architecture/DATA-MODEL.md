@@ -403,6 +403,17 @@ provider identity, since one task can have several links with different source
 times and revisions. Older references read with empty source state. Legacy link
 updates keep existing source state, while a conditional source update can
 replace or clear it. Remote ETags are never Timekeeper task versions.
+Provider account mappings are separate `TASK_CONNECTION` records with an owned
+UUID, provider ID, remote account ID, display name, read/write permissions, and
+enabled state. `TASK_LIST` records have their own UUID, connection ID, remote
+list ID, name, kind, permissions, sharing/ownership flags, presence, and order.
+A list is independent of a Timekeeper project. Both record types use the
+owner-scoped `tk_resource` payload in H2 and PostgreSQL, and a relation links
+each list to its connection. Marking a connection disabled or a list absent
+retains the records and associated tasks. Explicit deletion is conditional and
+rejects a connection with lists or a list with linked tasks. Account archives
+and portable transfers include these records; older archives import without
+them.
 The account ZIP archive also includes active day labels and Markdown bodies;
 journal synchronization state and deletion tombstones are not portable account
 records.

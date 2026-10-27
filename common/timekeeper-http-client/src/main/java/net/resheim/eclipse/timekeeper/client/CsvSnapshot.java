@@ -39,6 +39,10 @@ public final class CsvSnapshot {
         }
         return columns;
     }
+    private static void providerColumns(Map<String,List<String>> columns) {
+        columns.put("taskConnections",List.of("id","providerId","remoteAccountId","name","readable","writable","enabled"));
+        columns.put("taskLists",List.of("id","connectionId","remoteListId","name","kind","readable","writable","shared","owner","present","position"));
+    }
     private CsvSnapshot() { }
 
     /** Writes into a new subfolder chosen by the UI; never replaces an earlier export. */
@@ -60,9 +64,12 @@ public final class CsvSnapshot {
             }
         }
         ZoneId.of(snapshot.get("zoneId").getAsString());
+        var tables=columns(sessions,clients);
+        if(clients && snapshot.has("taskConnections") && snapshot.has("taskLists")) providerColumns(tables);
+        else if(snapshot.has("taskConnections") || snapshot.has("taskLists")) throw invalid();
         Files.createDirectory(folder);
         int count = 0;
-        for (var table : columns(sessions,clients).entrySet()) {
+        for (var table : tables.entrySet()) {
             checkCancelled();
             JsonArray items = snapshot.getAsJsonArray(table.getKey());
             var names=new ArrayList<>(table.getValue());
@@ -87,6 +94,7 @@ public final class CsvSnapshot {
         }
         JsonObject metadata = new JsonObject();metadata.addProperty("format", clients ? "timekeeper-domain-csv-v3" : sessions ? "timekeeper-domain-csv-v2" : "timekeeper-domain-csv-v1");
         metadata.add("zoneId", snapshot.get("zoneId"));
+        if(tables.containsKey("taskConnections")) metadata.addProperty("providerCollections",true);
         // The descriptor is last: incomplete/cancelled exports cannot be imported.
         Files.writeString(folder.resolve("timekeeper.csv.json"), metadata.toString(), StandardCharsets.UTF_8);
         return count;
@@ -102,7 +110,14 @@ public final class CsvSnapshot {
             ZoneId.of(metadata.get("zoneId").getAsString());
             JsonObject snapshot = new JsonObject();snapshot.addProperty("format", clients ? "timekeeper-domain-v3" : sessions ? "timekeeper-domain-v2" : "timekeeper-domain-v1");
             snapshot.add("zoneId", metadata.get("zoneId"));
-            for (var table : columns(sessions,clients).entrySet()) {
+            var tables=columns(sessions,clients);
+            boolean connections=Files.exists(folder.resolve("taskConnections.csv")),lists=Files.exists(folder.resolve("taskLists.csv"));
+            if(connections!=lists || (!clients && connections)) throw invalid();
+            if(metadata.has("providerCollections") && (!metadata.get("providerCollections").isJsonPrimitive()
+                    || !metadata.get("providerCollections").getAsJsonPrimitive().isBoolean()
+                    || metadata.get("providerCollections").getAsBoolean()!=connections)) throw invalid();
+            if(connections) providerColumns(tables);
+            for (var table : tables.entrySet()) {
                 checkCancelled();
                 List<List<String>> rows = parse(readFile(folder.resolve(table.getKey() + ".csv"), remaining));
                 if(rows.isEmpty()) throw invalid();
@@ -122,8 +137,11 @@ public final class CsvSnapshot {
                         if (value == null) item.add(column, JsonNull.INSTANCE);
                         else if (column.equals("externalReferences") || column.equals("labelIds")) {
                             JsonElement array = JsonParser.parseString(value);if (!array.isJsonArray()) throw invalid();item.add(column, array);
-                        } else if (column.equals("manual")) {
+                        } else if (column.equals("manual") || (List.of("taskConnections","taskLists").contains(table.getKey())
+                                && List.of("readable","writable","enabled","shared","owner","present").contains(column))) {
                             if (!value.equals("true") && !value.equals("false")) throw invalid();item.addProperty(column, Boolean.parseBoolean(value));
+                        } else if (table.getKey().equals("taskLists") && column.equals("position")) {
+                            try {item.addProperty(column,Integer.parseInt(value));} catch(NumberFormatException error) {throw invalid();}
                         } else item.addProperty(column, value);
                     }
                     items.add(item);
