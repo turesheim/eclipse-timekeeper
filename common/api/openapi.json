@@ -10010,6 +10010,101 @@
           }
         }
       }
+    },
+    "/tasks/{id}/checklist": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskChecklist",
+        "summary": "Replace owned task checklist items",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskChecklistInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of the checklist only. A legacy PUT /tasks/{id} and PUT /tasks/{id}/planning preserve the checklist."
+      }
     }
   },
   "components": {
@@ -10575,6 +10670,14 @@
                 "type": "null"
               }
             ]
+          },
+          "checklistItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskChecklistItem"
+            },
+            "maxItems": 1000,
+            "description": "Ordered checklist items distinct from parentTaskId subtasks."
           }
         },
         "required": [
@@ -10588,7 +10691,8 @@
           "externalReferences",
           "status",
           "scheduledDate",
-          "completedAt"
+          "completedAt",
+          "checklistItems"
         ],
         "additionalProperties": true
       },
@@ -11108,6 +11212,14 @@
                 "type": "null"
               }
             ]
+          },
+          "checklistItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskChecklistItem"
+            },
+            "maxItems": 1000,
+            "description": "Optional for older portable archives."
           }
         },
         "required": [
@@ -11573,6 +11685,14 @@
                 "type": "null"
               }
             ]
+          },
+          "checklistItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskChecklistItem"
+            },
+            "maxItems": 1000,
+            "description": "Ordered checklist items distinct from parentTaskId subtasks."
           }
         },
         "required": [
@@ -18846,6 +18966,64 @@
         ],
         "additionalProperties": false,
         "description": "Replace only planning fields. Null clears a scheduled day or completion timestamp. Existing task fields and external references are preserved."
+      },
+      "TaskChecklistItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "\\S"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "completed",
+          "completedAt",
+          "position"
+        ],
+        "additionalProperties": false,
+        "description": "Stable Timekeeper checklist item. Position is zero based and contiguous in array order; this is not a task or a subtask."
+      },
+      "TaskChecklistInput": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskChecklistItem"
+            },
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false,
+        "description": "Replace only checklist items. An empty array clears the checklist. Existing task fields and external references are preserved."
       }
     },
     "parameters": {

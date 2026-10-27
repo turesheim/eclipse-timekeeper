@@ -23,7 +23,23 @@ public final class WireValues {
         var refs=StreamSupport.stream(value.getAsJsonArray("externalReferences").spliterator(),false).map(item -> reference(item.getAsJsonObject())).collect(Collectors.toUnmodifiableSet());
         var planning=new TaskPlanning(value.has("status")?TaskStatus.valueOf(value.get("status").getAsString()):TaskStatus.NOT_STARTED,
                 text(value.get("scheduledDate")).map(LocalDate::parse),text(value.get("completedAt")).map(Instant::parse));
-        return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,planning,value.get("version").getAsLong());
+        var checklist=checklist(value.get("checklistItems"));
+        return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,planning,checklist,value.get("version").getAsLong());
+    }
+    public static TaskChecklist checklist(JsonElement value) {
+        if(value==null || value.isJsonNull())return TaskChecklist.empty();
+        var items=StreamSupport.stream(value.getAsJsonArray().spliterator(),false).map(entry -> {
+            var item=entry.getAsJsonObject();
+            return new TaskChecklistItem(id(item.get("id")),item.get("text").getAsString(),item.get("completed").getAsBoolean(),
+                    text(item.get("completedAt")).map(Instant::parse),item.get("position").getAsInt());
+        }).toList();
+        return new TaskChecklist(items);
+    }
+    public static JsonArray checklist(TaskChecklist value) {
+        var items=new JsonArray();
+        value.items().forEach(item -> {var entry=object();entry.addProperty("id",item.id().toString());entry.addProperty("text",item.text());
+            entry.addProperty("completed",item.completed());optional(entry,"completedAt",item.completedAt());entry.addProperty("position",item.position());items.add(entry);});
+        return items;
     }
     public static Label label(JsonObject value) {return new Label(new LabelId(id(value.get("id"))),value.get("name").getAsString(),text(value.get("color")).map(WireValues::rgb),value.get("version").getAsLong());}
     public static Activity activity(JsonObject value) {

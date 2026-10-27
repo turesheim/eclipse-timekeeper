@@ -121,6 +121,15 @@ legacy fields while preserving task planning. The scheduled day never implies
 a midnight deadline, reminder, or time zone conversion. Further provider task
 metadata and synchronization behavior are tracked in #413.
 
+Task checklist items are distinct from child tasks linked by `parentTaskId`.
+Each item has a stable Timekeeper UUID, text, completion state, optional
+completion instant, and zero-based position matching its array order. Clients
+may include `checklistItems` when creating a task. A conditional
+`PUT /tasks/{id}/checklist` with `{ "items": [...] }` replaces only that list;
+an empty list clears it. IDs and positions must be unique, positions must be
+contiguous, and a completion instant requires `completed: true`. The ordinary
+task and planning updates preserve checklist items they do not understand.
+
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
 Manual editing sets `manual=true` and cannot change activity task/owner. Creating,

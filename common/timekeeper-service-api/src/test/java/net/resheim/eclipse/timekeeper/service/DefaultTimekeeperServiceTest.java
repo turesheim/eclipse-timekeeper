@@ -34,6 +34,8 @@ import net.resheim.eclipse.timekeeper.domain.Project;
 import net.resheim.eclipse.timekeeper.domain.ProjectId;
 import net.resheim.eclipse.timekeeper.domain.Task;
 import net.resheim.eclipse.timekeeper.domain.TaskId;
+import net.resheim.eclipse.timekeeper.domain.TaskChecklist;
+import net.resheim.eclipse.timekeeper.domain.TaskChecklistItem;
 import net.resheim.eclipse.timekeeper.domain.TaskPlanning;
 import net.resheim.eclipse.timekeeper.domain.TaskStatus;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateActivity;
@@ -53,6 +55,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskPlanning;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
 import net.resheim.eclipse.timekeeper.service.Ports.ActivityRepository;
 import net.resheim.eclipse.timekeeper.service.Ports.IdentifierSource;
 import net.resheim.eclipse.timekeeper.service.Ports.LabelRepository;
@@ -137,6 +140,28 @@ class DefaultTimekeeperServiceTest {
 		Task stale=task;
 		assertThrows(ServiceException.class,()->service.updateTaskPlanning(new UpdateTaskPlanning(stale.id(),stale.version(),planning)));
 		assertThrows(DomainValidationException.class,()->new TaskPlanning(TaskStatus.NOT_STARTED,Optional.empty(),completed.completedAt()));
+	}
+
+	@Test
+	void checklistItemsHaveStableIdsAndSurviveUnrelatedTaskEdits() {
+		var first=new TaskChecklistItem(UUID.randomUUID(),"Write tests",false,Optional.empty(),0);
+		var second=new TaskChecklistItem(UUID.randomUUID(),"Review result",true,Optional.of(Instant.parse("2026-10-26T11:12:13Z")),1);
+		var checklist=new TaskChecklist(List.of(first,second));
+		Task task=service.createTask(new CreateTask(Optional.empty(),Optional.empty(),"Sync work",Optional.empty(),Set.of(),TaskPlanning.unplanned(),checklist));
+		assertEquals(checklist,task.checklist());
+		task=service.updateTask(new UpdateTask(task.id(),task.version(),Optional.empty(),"Renamed",Optional.empty()));
+		assertEquals(checklist,task.checklist());
+		task=service.updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),TaskPlanning.unplanned()));
+		assertEquals(checklist,task.checklist());
+		var reordered=new TaskChecklist(List.of(new TaskChecklistItem(second.id(),second.text(),true,second.completedAt(),0),
+				new TaskChecklistItem(first.id(),first.text(),false,Optional.empty(),1)));
+		Task updated=service.updateTaskChecklist(new UpdateTaskChecklist(task.id(),task.version(),reordered));
+		assertEquals(reordered,updated.checklist());
+		assertEquals("Renamed",updated.summary());
+		Task stale=task;
+		assertThrows(ServiceException.class,()->service.updateTaskChecklist(new UpdateTaskChecklist(stale.id(),stale.version(),checklist)));
+		assertThrows(DomainValidationException.class,()->new TaskChecklist(List.of(first,first)));
+		assertThrows(DomainValidationException.class,()->new TaskChecklistItem(UUID.randomUUID(),"Unchecked",false,second.completedAt(),0));
 	}
 
 	@Test
