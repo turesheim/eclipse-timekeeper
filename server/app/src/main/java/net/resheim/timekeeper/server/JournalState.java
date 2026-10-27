@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /** Private day-note deletion markers; callers hold the account's owner transaction. */
 final class JournalState {
-    enum Kind { JOURNAL_DELETE }
+    enum Kind { JOURNAL_DELETE, WEEK_NOTE_DELETE }
     private final ServerStore store;
     JournalState(ServerStore store){this.store=store;}
     Optional<ObjectNode> find(Kind kind,UUID id){return store.find(kind.name(),id).map(value->((ObjectNode)value).deepCopy());}

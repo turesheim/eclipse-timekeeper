@@ -22,6 +22,19 @@ class JournalDavHttpTest {
         String basic=Base64.getEncoder().encodeToString(("any-user:"+token).getBytes(StandardCharsets.UTF_8));
         return given().header("Authorization","Basic "+basic);
     }
+    @Test void weeklyDocumentsUseIsoFilenamesAndConditionalWebDavWrites(){
+        String file=ROOT+"2026-W44.md",body="# Weekly plan\r\n- [ ] Ship  \r\n";
+        assertEquals(404,client("test-a").body("bad").put(ROOT+"2025-W53.md").statusCode());
+        var created=client("test-a").header("If-None-Match","*").contentType("text/markdown").body(body).put(file);
+        assertEquals(201,created.statusCode());String tag=created.header("ETag");
+        assertEquals(body,client("test-a").get(file).asString());
+        assertTrue(client("test-a").header("Depth","1").request("PROPFIND",ROOT).asString().contains("2026-W44.md"));
+        assertEquals(body,given().header("Authorization","Bearer test-a").get("/api/v1/week-notes/2026-W44").jsonPath().getString("body"));
+        assertEquals(428,client("test-a").body("unguarded").put(file).statusCode());
+        assertEquals(412,client("test-a").header("If-Match","\"stale\"").body("stale").put(file).statusCode());
+        assertEquals(204,client("test-a").header("If-Match",tag).delete(file).statusCode());
+        assertEquals(404,client("test-a").get(file).statusCode());
+    }
     @Test void accountScopedDocumentsRoundTripWithStrongConditionalVersions(){
         String filename="2026-09-20.md",day="2026-09-20",file=ROOT+filename;
         String source="---\r\ntimekeeper-label: Planning\r\ncustom: first\r\n---\r\n# Body\r\n  spaces  \r\n";

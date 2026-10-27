@@ -89,6 +89,10 @@ class AccountArchive {
         records(c,owner,JournalState.Kind.JOURNAL_DELETE.name(),value->deletedNotes.put(value.path("id").asText(),value.path("noteVersion").asLong()));
         final long[] noteCount={0};records(c,owner,DayNotes.TYPE,value->{if(presentNote(value,deletedNotes))noteCount[0]++;});
         if(noteCount[0]>0)counts.put("dayNotes",noteCount[0]);
+        var deletedWeeks=new HashMap<String,Long>();
+        records(c,owner,JournalState.Kind.WEEK_NOTE_DELETE.name(),value->deletedWeeks.put(value.path("id").asText(),value.path("noteVersion").asLong()));
+        final long[] weekCount={0};records(c,owner,WeekNotes.TYPE,value->{if(presentWeek(value,deletedWeeks))weekCount[0]++;});
+        if(weekCount[0]>0)counts.put("weekNotes",weekCount[0]);
         final long[] assetCount={0};records(c,owner,JournalAssets.TYPE,value->{if(!value.path("deleted").asBoolean())assetCount[0]++;});
         if(assetCount[0]>0)counts.put("journalAssets",assetCount[0]);
         var profile=profile(c,owner);var metadata=metadata(c,owner);
@@ -110,6 +114,13 @@ class AccountArchive {
                     note.put("markdown",value.has("markdown")?value.path("markdown").asText():new String(
                             JournalMarkdown.render(value.path("date").asText()+".md",null,value.path("text").asText(),value.path("body").asText()),StandardCharsets.UTF_8));
                     json.writeTree(note);
+                }});json.writeEndArray();
+            }
+            if(weekCount[0]>0){
+                json.writeArrayFieldStart("weekNotes");
+                records(c,owner,WeekNotes.TYPE,value->{if(presentWeek(value,deletedWeeks)){
+                    String week=value.path("week").asText();
+                    json.writeTree(object().put("week",week).put("filename",week+".md").put("markdown",value.path("body").asText()));
                 }});json.writeEndArray();
             }
             if(assetCount[0]>0){
@@ -146,7 +157,7 @@ class AccountArchive {
             }
             entry(zip,"README.txt");zip.write(("Timekeeper private account archive\n\n"
                 +"archive.json is the authoritative, versioned JSON snapshot for account import. manifest.json lists record counts and files.\n"
-                +"Optional dayNotes in archive.json contain complete canonical Markdown, including days without recorded work. Optional journalAssets contain account-private attachments as base64.\n"
+                +"Optional dayNotes and weekNotes in archive.json contain complete canonical Markdown, including notes without recorded work. Weekly files use ISO week names such as 2026-W44.md. Optional journalAssets contain account-private attachments as base64.\n"
                 +"This ZIP is not encrypted. Protect downloads and temporary files on encrypted private storage; see the journal storage and key-management deployment requirements.\n"
                 +"All records belong to the signed-in account. Administrator access does not include another account's data.\n"
                 +"Account identity, recovery addresses and credential-management metadata are informational and are not restored.\n"
@@ -159,6 +170,9 @@ class AccountArchive {
     private static void entry(ZipOutputStream zip,String name) throws IOException {zip.putNextEntry(new ZipEntry(name));}
     private static boolean presentNote(ObjectNode value,Map<String,Long> deleted){
         return !(deleted.getOrDefault(value.path("id").asText(),-1L)==value.path("version").asLong()&&!DayNotes.hasContent(value));
+    }
+    private static boolean presentWeek(ObjectNode value,Map<String,Long> deleted){
+        return !(deleted.getOrDefault(value.path("id").asText(),-1L)==value.path("version").asLong()&&value.path("body").asText().isEmpty());
     }
     private static Set<String> fieldNames(ObjectNode value) {var names=new HashSet<String>();value.fieldNames().forEachRemaining(names::add);return names;}
     static String csvCell(String value) {

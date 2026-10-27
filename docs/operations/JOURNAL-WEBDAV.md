@@ -1,7 +1,7 @@
 # Journal WebDAV endpoint
 
 The journal collection is `/dav/journal/` on the Timekeeper server. Each
-`YYYY-MM-DD.md` resource belongs to the account identified by the API token,
+`YYYY-MM-DD.md` day note or `YYYY-Www.md` ISO weekly note belongs to the account identified by the API token,
 independent of the supplied WebDAV username. Use an API token with `read` and
 `write` permissions as the HTTP Basic password. A read-only token can list and
 download notes. The endpoint requires HTTPS outside loopback development.
@@ -9,7 +9,8 @@ Timekeeper also accepts the private HTTP hop behind a TLS reverse proxy when
 `TIMEKEEPER_PUBLIC_ORIGIN` names its exact HTTPS authority. Restrict direct
 access to that backend network, as in the supported Synology deployment.
 
-The collection supports `OPTIONS` and `PROPFIND`; note files support those
+Week numbers use the ISO week-based year, so dates around New Year may belong to
+the previous or following year's weekly file. The collection supports `OPTIONS` and `PROPFIND`; note files support those
 methods plus `GET`, `HEAD`, `PUT`, and `DELETE`. A present empty note is listed
 as a zero-byte file. A deleted note is absent. Calendar and REST edits share
 the same version as WebDAV edits, so their changes invalidate previously issued

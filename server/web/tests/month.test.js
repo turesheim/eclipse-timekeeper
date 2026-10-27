@@ -1,8 +1,16 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {monthCalendar,monthSessions,shiftMonth} from '../src/month-model.js';
+import {isoWeek} from '../src/week-note-editor.js';
 const hour=3600000000000n;
 const session=(id,clientId,start,end)=>({id,clientId,start,end,title:id});
+
+test('ISO week names use the week-based year across New Year',()=>{
+  assert.equal(isoWeek('2026-10-27'),'2026-W44');
+  assert.equal(isoWeek('2026-12-31'),'2026-W53');
+  assert.equal(isoWeek('2027-01-01'),'2026-W53');
+  assert.equal(isoWeek('2027-01-04'),'2027-W01');
+});
 
 test('month grid has Monday columns and vertical weeks across year/leap boundaries',()=> {
   const calendar=monthCalendar('2024-02','Europe/Oslo');

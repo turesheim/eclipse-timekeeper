@@ -797,6 +797,14 @@ an existing matching note's body. A differing active note produces a review
 conflict and is never overwritten.
 Empty deletion tombstones are not portable archive deletion commands.
 
+`GET /week-notes?fromWeek=YYYY-Www&toWeek=YYYY-Www` lists private weekly
+note summaries for up to nine ISO weeks. `GET /week-notes/{week}` returns the
+exact Markdown body and ETag. `PUT` with `{ "body": "..." }` and the current
+`If-Match` saves it; `DELETE` with `If-Match` leaves a versioned tombstone.
+`GET /week-notes/{week}/markdown` downloads `YYYY-Www.md`. ISO week-based
+years are used at New Year. Account archives include these notes in the
+optional `weekNotes` array, and WebDAV exposes them at `/dav/journal/`.
+
 `GET /journal-assets/{filename}` returns private attachment bytes with a strong
 ETag and safe media type. `PUT` accepts JSON `{data}` with base64 bytes, using
 `If-None-Match: *` for a new filename or `If-Match` for an existing one.
