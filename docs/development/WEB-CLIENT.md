@@ -120,6 +120,10 @@ The inline journal uses the same saved day note and conflict handling as
 Calendar and Week. Unsaved changes require confirmation before selecting
 another date. On narrow screens the sidebar follows the journal.
 
+Today’s work-session cards use Calendar’s font sizes. Calendar event cards show
+the title, time, and client name with a client-coloured edge. Select an event to
+open its full date/time, calendar, location, and description in a dialog.
+
 ![Today view with journal and day overview](../assets/screenshots/today-desktop.png)
 
 ![Today view on a narrow screen](../assets/screenshots/today-mobile.png)

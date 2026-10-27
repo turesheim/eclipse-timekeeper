@@ -25,7 +25,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     });
     await page.route('**/api/v1/calendar-events?**',async route=>{
       const response=await route.fetch(),body=await response.json(),from=new URL(route.request().url()).searchParams.get('fromDate');
-      await route.fulfill({response,json:{...body,items:from===date?[{key:'today-plan',subscriptionId:randomUUID(),eventVersion:1,title:'All-day planning',description:'From an imported calendar',allDay:true,firstDate:date,endDate:next,clientName:client.name,calendarName:'Team plan',clientId:client.id,activityIds:[]},{key:'today-meeting',subscriptionId:randomUUID(),eventVersion:1,title:'Team meeting',description:'Timed calendar event',allDay:false,start:'2025-05-17T12:00:00Z',end:'2025-05-17T13:00:00Z',firstDate:date,endDate:next,clientName:client.name,calendarName:'Team plan',clientId:client.id,activityIds:[]}]:[]}});
+      await route.fulfill({response,json:{...body,items:from===date?[{key:'today-plan',subscriptionId:randomUUID(),eventVersion:1,title:'All-day planning',description:'From an imported calendar',allDay:true,firstDate:date,endDate:next,clientName:client.name,calendarName:'Team plan',clientId:client.id,activityIds:[]},{key:'today-meeting',subscriptionId:randomUUID(),eventVersion:1,title:'Team meeting',description:'Timed calendar event',location:'Meeting room A',allDay:false,start:'2025-05-17T12:00:00Z',end:'2025-05-17T13:00:00Z',firstDate:date,endDate:next,clientName:client.name,calendarName:'Team plan',clientId:client.id,activityIds:[]}]:[]}});
     });
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);
     await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
@@ -49,6 +49,21 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(page.locator('#today-events')).toContainText('All-day planning');
     await expect(page.locator('#today-events')).toContainText('Team meeting');
     await expect(page.locator('#today-events')).toContainText(/14:00|2:00\s*PM/);
+    await expect(page.locator('#today-events')).not.toContainText('Team plan');
+    await expect(page.locator('#today-events')).not.toContainText('Timed calendar event');
+    const meeting=page.locator('[data-today-event="today-meeting"]');
+    await expect(meeting).toContainText(client.name);
+    await expect(meeting).toHaveCSS('border-left-color','rgb(23, 102, 83)');
+    await meeting.focus();await page.keyboard.press('Enter');
+    const eventDetails=page.getByRole('dialog',{name:'Team meeting',exact:true});
+    await expect(eventDetails).toBeVisible();await expect(eventDetails).toContainText('Team plan');
+    await expect(eventDetails).toContainText('Meeting room A');await expect(eventDetails).toContainText('Timed calendar event');
+    await page.keyboard.press('Escape');await expect(eventDetails).not.toBeVisible();await expect(meeting).toBeFocused();
+    await page.locator('[data-today-event="today-plan"]').click();
+    await expect(page.locator('#today-event-details')).toContainText('From an imported calendar');
+    await expect(page.locator('#today-event-details')).toContainText('All day');
+    await page.locator('#today-event-details').getByRole('button',{name:'Close',exact:true}).click();
+    await expect(page.locator('#today-sessions [data-today-client]')).toHaveCSS('font-size','12.8px');
     await expect(page.locator('#today-planned-tasks')).toContainText('Scheduled review');
     await expect(page.locator('#today-active-tasks')).toHaveCount(0);
     await expect(page.locator('#today-month-grid [data-date]')).toHaveCount(35);
@@ -91,7 +106,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     expect(await page.locator('.today-month-day').evaluateAll(days=>days.every(day=>day.scrollHeight<=day.clientHeight+1))).toBe(true);
     await expect(page.locator('#today-note-editor .dialog-actions')).toHaveCSS('border-top-width','0px');
     await captureScreenshot(page,{path:'test-results/today-desktop.png'});
-    await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.setViewportSize({width:390,height:844});await expect(page.locator('#today-sessions [data-today-client]')).toHaveCSS('font-size','12px');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await captureScreenshot(page,{path:'test-results/today-mobile.png',fullPage:true});
   }finally{
