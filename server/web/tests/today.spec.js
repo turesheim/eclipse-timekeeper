@@ -95,6 +95,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await captureScreenshot(page,{path:'test-results/today-mobile.png',fullPage:true});
   }finally{
+    await page.unrouteAll({behavior:'wait'});
     const week=await api(request,'GET','/week-notes/2025-W20');if(week.ok()&&Number((await week.json()).version)>0)await api(request,'DELETE','/week-notes/2025-W20',undefined,{'If-Match':week.headers().etag});
     const note=await api(request,'GET','/day-notes/'+date);await api(request,'PUT','/day-notes/'+date,{text:'',body:''},{'If-Match':note.headers().etag});
     if(session){const current=await api(request,'GET','/work-sessions/'+session.id);await api(request,'DELETE','/work-sessions/'+session.id,undefined,{'If-Match':current.headers().etag});}
