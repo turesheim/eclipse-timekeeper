@@ -317,6 +317,7 @@ public class ServerStore {
         }
         if (value instanceof TaskList list) relation(type,id,"connection","TASK_CONNECTION",list.connectionId());
         if (value instanceof TaskListSection section) relation(type,id,"list","TASK_LIST",section.taskListId());
+        if (value instanceof TaskAttachment attachment) relation(type,id,"attachment","TASK",attachment.taskId());
         if (value instanceof TaskSyncCursor cursor) {
             relation(type,id,"connection","TASK_CONNECTION",cursor.connectionId());
             cursor.listId().ifPresent(list -> relation(type,id,"list","TASK_LIST",list));
@@ -516,6 +517,10 @@ public class ServerStore {
                 check();var task=get("TASK",id.value(),Task.class).orElseThrow(ApiFailure::notFound);
                 var identities=new HashSet<ExternalTaskReferenceKey>(task.externalAliases());
                 task.externalReferences().forEach(reference -> identities.add(reference.key()));
+                for(var attachment:ServerStore.this.list("TASK_ATTACHMENT")) if(attachment.path("taskId").asText().equals(id.value().toString())) {
+                    UUID attachmentId=uuid(attachment.get("id"));ServerStore.this.delete("TASK_ATTACHMENT",attachmentId);
+                    change("TASK_ATTACHMENT","DELETED",attachmentId.toString());
+                }
                 ServerStore.this.delete("TASK",id.value());
                 if(!identities.isEmpty()) {
                     ServerStore.this.save("TASK_TOMBSTONE",new TaskTombstone(id.value(),now(),task.version(),identities));

@@ -442,6 +442,11 @@ both IDs without changing the provider identity or other task fields.
 and read-only source context independently of the task's primary URL. It is
 retained through legacy writes, identity replacement, and transfer. A
 conditional assignment update can clear it explicitly.
+`TASK_ATTACHMENT` is an owner-scoped resource attached to one task by a
+relation. It stores file name, media type, byte count, SHA-256, bounded Base64
+content, and optional provider/remote identity. Content is verified before
+storage, and deleting the task cascades attachment deletion. Portable transfer
+and account archives retain the verified bytes and remap the parent task ID.
 
 `TASK_SYNC_CURSOR` is owner-scoped durable connector state linked to one
 connection and optionally one list. Its mode is `INITIAL`, `INCREMENTAL`, or

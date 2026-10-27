@@ -72,6 +72,9 @@ public final class CsvSnapshot {
         if(clients && snapshot.has("taskListSections") && tables.containsKey("taskLists"))
             tables.put("taskListSections",List.of("id","taskListId","remoteSectionId","name","kind","position","present","writable"));
         else if(snapshot.has("taskListSections")) throw invalid();
+        if(clients && snapshot.has("taskAttachments"))
+            tables.put("taskAttachments",List.of("id","taskId","fileName","contentType","bytes","sha256","data","providerId","remoteId"));
+        else if(snapshot.has("taskAttachments")) throw invalid();
         if(clients && snapshot.has("taskTombstones")) tables.put("taskTombstones",List.of("id","taskId","deletedAt","taskVersion","reason","externalReferences"));
         else if(snapshot.has("taskTombstones")) throw invalid();
         Files.createDirectory(folder);
@@ -101,7 +104,8 @@ public final class CsvSnapshot {
                         value=extras;
                     }
                     if(value==null && table.getKey().equals("workSessions") && column.equals("labelIds")) value=new JsonArray();
-                    if (value == null && !List.of("workSessionId","projectId","title","icon","capabilities","sharing").contains(column)) throw invalid();
+                    if (value == null && !List.of("workSessionId","projectId","title","icon","capabilities","sharing").contains(column)
+                            && !(table.getKey().equals("taskAttachments") && List.of("providerId","remoteId").contains(column))) throw invalid();
                     if(value==null) value=JsonNull.INSTANCE;
                     fields.add(value.isJsonNull() ? null : value.isJsonPrimitive() ? value.getAsString() : value.toString());
                 }
@@ -113,6 +117,7 @@ public final class CsvSnapshot {
         metadata.add("zoneId", snapshot.get("zoneId"));
         if(tables.containsKey("taskConnections")) metadata.addProperty("providerCollections",true);
         if(tables.containsKey("taskListSections")) metadata.addProperty("sectionCollections",true);
+        if(tables.containsKey("taskAttachments")) metadata.addProperty("taskAttachments",true);
         if(tables.containsKey("taskTombstones")) metadata.addProperty("taskTombstones",true);
         if(snapshot.getAsJsonArray("tasks").asList().stream().anyMatch(item -> TASK_EXTRAS.stream().anyMatch(item.getAsJsonObject()::has)))
             metadata.addProperty("taskExtras",true);
@@ -143,6 +148,11 @@ public final class CsvSnapshot {
             if(sections && (!metadata.get("sectionCollections").isJsonPrimitive() || !metadata.get("sectionCollections").getAsJsonPrimitive().isBoolean()
                     || !metadata.get("sectionCollections").getAsBoolean())) throw invalid();
             if(sections) tables.put("taskListSections",List.of("id","taskListId","remoteSectionId","name","kind","position","present","writable"));
+            boolean attachments=Files.exists(folder.resolve("taskAttachments.csv"));
+            if(attachments && !clients || metadata.has("taskAttachments") != attachments) throw invalid();
+            if(attachments && (!metadata.get("taskAttachments").isJsonPrimitive() || !metadata.get("taskAttachments").getAsJsonPrimitive().isBoolean()
+                    || !metadata.get("taskAttachments").getAsBoolean())) throw invalid();
+            if(attachments) tables.put("taskAttachments",List.of("id","taskId","fileName","contentType","bytes","sha256","data","providerId","remoteId"));
             boolean tombstones=Files.exists(folder.resolve("taskTombstones.csv"));
             if(tombstones && !clients || metadata.has("taskTombstones") != tombstones) throw invalid();
             if(tombstones && (!metadata.get("taskTombstones").isJsonPrimitive() || !metadata.get("taskTombstones").getAsJsonPrimitive().isBoolean()
@@ -171,7 +181,8 @@ public final class CsvSnapshot {
                     JsonObject item = new JsonObject();
                     for (int i = 0; i < fields.size(); i++) {
                         String column = names.get(i), value = fields.get(i);
-                        if ((column.equals("title") || column.equals("icon") || column.equals("capabilities") || column.equals("sharing")) && value == null) continue; // Optional metadata in mixed exports.
+                        if ((column.equals("title") || column.equals("icon") || column.equals("capabilities") || column.equals("sharing")
+                                || table.getKey().equals("taskAttachments") && List.of("providerId","remoteId").contains(column)) && value == null) continue; // Optional metadata in mixed exports.
                         if (value == null) item.add(column, JsonNull.INSTANCE);
                         else if (column.equals("taskExtras")) {
                             JsonElement extras=JsonParser.parseString(value);if(!extras.isJsonObject()) throw invalid();
@@ -187,6 +198,8 @@ public final class CsvSnapshot {
                             JsonElement array = JsonParser.parseString(value);if (!array.isJsonArray()) throw invalid();item.add(column, array);
                         } else if (table.getKey().equals("taskTombstones") && column.equals("taskVersion")) {
                             try {item.addProperty(column,Long.parseLong(value));} catch(NumberFormatException error) {throw invalid();}
+                        } else if (table.getKey().equals("taskAttachments") && column.equals("bytes")) {
+                            try {item.addProperty(column,Integer.parseInt(value));} catch(NumberFormatException error) {throw invalid();}
                         } else if (column.equals("manual") || (List.of("taskConnections","taskLists","taskListSections").contains(table.getKey())
                                 && List.of("readable","writable","enabled","shared","owner","present").contains(column))) {
                             if (!value.equals("true") && !value.equals("false")) throw invalid();item.addProperty(column, Boolean.parseBoolean(value));

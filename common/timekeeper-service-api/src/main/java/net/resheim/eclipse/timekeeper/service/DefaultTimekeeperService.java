@@ -309,7 +309,7 @@ public class DefaultTimekeeperService implements TimekeeperService {
 		if (taskId != null && parent.id().equals(taskId)) {
 			throw conflict("parentTaskId", "a task cannot be its own parent");
 		}
-		if (projectId.isEmpty() || !projectId.equals(parent.projectId())) {
+		if (!projectId.equals(parent.projectId())) {
 			throw conflict("parentTaskId", "a subtask must belong to the same project as its parent");
 		}
 		for (Optional<TaskId> ancestor = parent.parentTaskId(); ancestor.isPresent();) {

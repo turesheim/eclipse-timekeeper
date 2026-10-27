@@ -5,7 +5,9 @@ Requires two test owners and a read-only token for owner A. Never run on real da
 No mock server is included; missing configuration is an error, not a skipped test.
 """
 import argparse
+import base64
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import json
 import os
 import re
@@ -1042,6 +1044,56 @@ class HttpAcceptance(unittest.TestCase):
         self.assertEqual(sharing,restored['sharing'])
         self.call('GET',path,owner='b',status=404,code='NOT_FOUND')
 
+    def test_task_attachments_verify_content_and_remain_owner_scoped(self):
+        path='/tasks/'+self.task['id']+'/attachments'
+        content=b'hello task attachment\n'
+        body={'fileName':'note.txt','contentType':'text/plain','bytes':len(content),
+              'sha256':hashlib.sha256(content).hexdigest(),'data':base64.b64encode(content).decode(),
+              'providerId':'apple','remoteId':'remote-1'}
+        receipt=str(uuid4())
+        self.call('POST',path,body={**body,'sha256':'0'*64},headers={'Idempotency-Key':receipt},
+                  status=422,code='VALIDATION')
+        created, headers=self.call('POST',path,body=body,headers={'Idempotency-Key':receipt},status=201)
+        replay, _=self.call('POST',path,body=body,headers={'Idempotency-Key':receipt},status=201)
+        self.assertEqual(created['id'],replay['id'])
+        self.assertEqual(body['data'],created['data'])
+        self.call('GET',path+'/'+created['id'],owner='b',status=404,code='NOT_FOUND')
+        page, _=self.call('GET',path)
+        self.assertEqual([created['id']],[item['id'] for item in page['items']])
+        self.assertNotIn('data',page['items'][0])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
+               'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists',
+               'TASK_SECTION':'task-list-sections'}
+        mappings={item['sourceId']:item['id'] for item in imported['ids']}
+        for item in imported['ids']:
+            if item['entityType'] in kinds:self.created.append(('b',kinds[item['entityType']],item['id']))
+        copied, _=self.call('GET','/tasks/'+mappings[self.task['id']]+'/attachments/'+mappings[created['id']],owner='b')
+        self.assertEqual(mappings[self.task['id']],copied['taskId'])
+        self.assertEqual(body['data'],copied['data'])
+        request=Request(BASE_URL+path+'/'+created['id']+'/content',
+                        headers={'Authorization':'Bearer '+TOKENS['a'],'Accept':'application/octet-stream'})
+        with build_opener(NoRedirect()).open(request,timeout=35) as response:
+            self.assertEqual(content,response.read())
+            self.assertEqual('text/plain',response.headers.get_content_type())
+            self.assertEqual('nosniff',response.headers['X-Content-Type-Options'])
+            self.assertEqual('attachment',response.headers['Content-Disposition'])
+        updated, newer=self.call('PUT',path+'/'+created['id'],body={**body,'fileName':'updated.txt'},
+                                  headers={'If-Match':headers['ETag']})
+        self.assertEqual('updated.txt',updated['fileName'])
+        self.call('DELETE',path+'/'+created['id'],headers={'If-Match':headers['ETag']},status=412,code='STALE_VERSION')
+        self.call('DELETE',path+'/'+created['id'],headers={'If-Match':newer['ETag']},status=204)
+        self.call('GET',path+'/'+created['id'],status=404,code='NOT_FOUND')
+        disposable=self.create('tasks',{'summary':'Attachment cascade','projectId':self.project['id'],
+                    'parentTaskId':None,'url':None})
+        child_path='/tasks/'+disposable['id']+'/attachments'
+        attached, _=self.call('POST',child_path,body=body,headers={'Idempotency-Key':str(uuid4())},status=201)
+        _, task_headers=self.call('GET','/tasks/'+disposable['id'])
+        self.call('DELETE','/tasks/'+disposable['id'],headers={'If-Match':task_headers['ETag']},status=204)
+        self.created.remove(('a','tasks',disposable['id']))
+        self.call('GET',child_path+'/'+attached['id'],status=404,code='NOT_FOUND')
+
     def test_sync_cursors_are_durable_opaque_and_require_explicit_rescan(self):
         account=self.create('task-connections',{'providerId':'microsoft','remoteAccountId':str(uuid4()),
                     'name':'Personal','readable':True,'writable':True,'enabled':True})
@@ -1076,6 +1128,182 @@ class HttpAcceptance(unittest.TestCase):
         rescan, _=self.call('PUT',path,body={**incremental,'mode':'RESCAN_REQUIRED','cursor':None},
                             headers={'If-Match':headers['ETag']})
         self.assertEqual(('RESCAN_REQUIRED',None),(rescan['mode'],rescan['cursor']))
+
+    def test_task_sync_preview_is_owner_scoped_and_preserves_conflicts(self):
+        connection=self.create('task-connections',{'providerId':'google','remoteAccountId':str(uuid4()),
+                    'name':'Preview','readable':True,'writable':True,'enabled':True})
+        task_list=self.create('task-lists',{'connectionId':connection['id'],'remoteListId':str(uuid4()),
+                    'name':'Preview','kind':'STANDARD','readable':True,'writable':True,'shared':False,
+                    'owner':True,'present':True,'position':0})
+        path='/task-connections/'+connection['id']
+        _, headers=self.call('GET',path)
+        field={'readable':True,'writable':True,'deletable':False,'note':None}
+        capabilities={'version':1,'providerApiVersion':'test','fields':{name:field for name in
+                      ('summary','status','completedAt')}}
+        self.call('PUT',path+'/capabilities',body=capabilities,headers={'If-Match':headers['ETag']})
+        ref={'providerId':'google','repositoryId':connection['remoteAccountId']+'/'+task_list['remoteListId'],
+             'externalId':str(uuid4()),'externalUrl':None,'taskListId':task_list['id']}
+        path='/tasks/'+self.task['id']
+        _, headers=self.call('GET',path)
+        _, headers=self.call('PUT',path+'/external-references',body=ref,headers={'If-Match':headers['ETag']})
+        key={name:ref[name] for name in ('providerId','repositoryId','externalId')}
+        baseline={'version':1,'capturedAt':'2026-10-26T10:01:00Z',
+                  'fields':{'summary':'Agreed','status':'NOT_STARTED','completedAt':None}}
+        source={'createdAt':None,'modifiedAt':None,'remoteEtag':None,'remoteRevision':None}
+        _, headers=self.call('PUT',path+'/external-references/sync-state',body={**key,'baseline':baseline,'source':source},
+                            headers={'If-Match':headers['ETag']})
+        task,_=self.call('GET',path)
+        self.call('PUT',path,body={'projectId':task['projectId'],'parentTaskId':task['parentTaskId'],
+                  'summary':'Locally edited','url':task['url']},headers={'If-Match':headers['ETag']})
+        observed={'operationId':str(uuid4()),**key,'deleted':False,
+                  'fields':{'summary':'Remotely edited','status':'COMPLETED',
+                            'completedAt':'2026-10-26T12:00:00Z','reminders':[]}}
+        new={'operationId':str(uuid4()),**{**key,'externalId':str(uuid4())},
+             'deleted':False,'fields':{'summary':'New provider task'}}
+        request={'connectionId':connection['id'],'listId':task_list['id'],'sourceState':'HEALTHY',
+                 'scanComplete':False,'items':[observed,new]}
+        self.call('POST','/task-sync/preview',owner='b',body=request,status=404,code='NOT_FOUND')
+        result,_=self.call('POST','/task-sync/preview',body=request)
+        self.assertEqual(['CONFLICT','CREATE'],[item['status'] for item in result['items']])
+        self.assertEqual({'summary':'CONFLICT','status':'REMOTE_ONLY','completedAt':'REMOTE_ONLY',
+                          'reminders':'UNSUPPORTED'},
+                         {item['field']:item['outcome'] for item in result['items'][0]['decisions']})
+        self.assertEqual(self.task['id'],result['items'][0]['taskId'])
+        deleted={**observed,'deleted':True,'fields':{}}
+        result,_=self.call('POST','/task-sync/preview',body={**request,'items':[deleted]})
+        self.assertEqual('DELETE_DEFERRED',result['items'][0]['status'])
+        self.create('task-sync-cursors',{'connectionId':connection['id'],'listId':task_list['id'],
+                    'mode':'INCREMENTAL','cursor':'opaque-next-page','lastObservedAt':'2026-10-26T12:00:00Z',
+                    'lastCompleteAt':'2026-10-26T12:00:00Z'})
+        result,_=self.call('POST','/task-sync/preview',body={**request,'scanComplete':True,'items':[deleted]})
+        self.assertEqual('DELETE_CONFLICT',result['items'][0]['status'])
+        result,_=self.call('POST','/task-sync/preview',body={**request,'sourceState':'AUTH_EXPIRED','items':[observed]})
+        self.assertEqual('DEFERRED',result['items'][0]['status'])
+        unchanged,_=self.call('GET',path)
+        self.assertEqual('Locally edited',unchanged['summary'])
+        _, task_headers=self.call('GET',path)
+        self.call('PUT',path+'/planning',body={'status':'IN_PROGRESS','scheduledDate':None,'completedAt':None},
+                  headers={'If-Match':task_headers['ETag']})
+        split={**observed,'fields':{'status':'NOT_STARTED','completedAt':'2026-10-26T12:00:00Z'}}
+        result,_=self.call('POST','/task-sync/preview',body={**request,'items':[split]})
+        self.assertEqual('CONFLICT',result['items'][0]['status'])
+        self.assertEqual({'status':'CONFLICT','completedAt':'CONFLICT'},
+                         {item['field']:item['outcome'] for item in result['items'][0]['decisions']})
+
+    def test_initial_task_sync_import_replays_without_overwriting_local_edits(self):
+        connection=self.create('task-connections',{'providerId':'google','remoteAccountId':str(uuid4()),
+                    'name':'Import','readable':True,'writable':True,'enabled':True})
+        task_list=self.create('task-lists',{'connectionId':connection['id'],'remoteListId':str(uuid4()),
+                    'name':'Import','kind':'STANDARD','readable':True,'writable':True,'shared':False,
+                    'owner':True,'present':True,'position':0})
+        path='/task-connections/'+connection['id']
+        _, headers=self.call('GET',path)
+        field={'readable':True,'writable':False,'deletable':False,'note':None}
+        capabilities={'version':1,'providerApiVersion':'test','fields':{name:field for name in
+                      ('summary','status','completedAt','scheduledDate')}}
+        self.call('PUT',path+'/capabilities',body=capabilities,headers={'If-Match':headers['ETag']})
+        item={'operationId':str(uuid4()),'providerId':'google',
+              'repositoryId':connection['remoteAccountId']+'/'+task_list['remoteListId'],
+              'externalId':str(uuid4()),'deleted':False,
+              'fields':{'summary':'Imported provider task','status':'NOT_STARTED','completedAt':None,
+                        'scheduledDate':'2026-10-27','reminders':[]}}
+        request={'connectionId':connection['id'],'listId':task_list['id'],'sourceState':'HEALTHY','item':item}
+        self.call('POST','/task-sync/import',body=request,owner='b',status=404,code='NOT_FOUND')
+        self.call('POST','/task-sync/import',body={**request,'sourceState':'AUTH_EXPIRED'},status=409,code='CONFLICT')
+        created,headers=self.call('POST','/task-sync/import',body=request,status=201)
+        self.created.append(('a','tasks',created['id']))
+        self.assertEqual(task_list['id'],created['externalReferences'][0]['taskListId'])
+        self.assertEqual({'summary':'Imported provider task','status':'NOT_STARTED',
+                          'completedAt':None,'scheduledDate':'2026-10-27'},
+                         created['externalReferences'][0]['baseline']['fields'])
+        same,_=self.call('POST','/task-sync/import',body=request,status=201)
+        self.assertEqual(created['id'],same['id'])
+        task_path='/tasks/'+created['id']
+        edited,edited_headers=self.call('PUT',task_path,body={'projectId':None,'parentTaskId':None,
+                            'summary':'My edited title','url':None},headers={'If-Match':headers['ETag']})
+        replay,_=self.call('POST','/task-sync/import',body={**request,'item':{**item,'operationId':str(uuid4())}},status=200)
+        self.assertEqual(edited['summary'],replay['summary'])
+        self.call('POST','/task-sync/import',body={**request,'item':{**item,'operationId':str(uuid4()),
+                  'fields':{**item['fields'],'summary':'Remote edit'}}},status=409,code='CONFLICT')
+        self.assertEqual('My edited title',self.call('GET',task_path)[0]['summary'])
+        remote={**item,'operationId':str(uuid4()),'fields':{**item['fields'],
+                'status':'COMPLETED','completedAt':'2026-10-26T12:00:00Z'}}
+        apply={'connectionId':connection['id'],'listId':task_list['id'],'sourceState':'HEALTHY','item':remote}
+        self.call('POST','/task-sync/apply',body=apply,headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        updated,updated_headers=self.call('POST','/task-sync/apply',body=apply,
+                                            headers={'If-Match':edited_headers['ETag']})
+        self.assertEqual(('My edited title','COMPLETED','2026-10-26T12:00:00Z'),
+                         (updated['summary'],updated['status'],updated['completedAt']))
+        self.assertEqual('COMPLETED',updated['externalReferences'][0]['baseline']['fields']['status'])
+        self.assertEqual('Imported provider task',updated['externalReferences'][0]['baseline']['fields']['summary'])
+        replay,_=self.call('POST','/task-sync/apply',body=apply,headers={'If-Match':edited_headers['ETag']})
+        self.assertEqual(updated['version'],replay['version'])
+        conflicting={**apply,'item':{**remote,'operationId':str(uuid4()),
+                     'fields':{**remote['fields'],'summary':'Conflicting remote title'}}}
+        self.call('POST','/task-sync/apply',body=conflicting,headers={'If-Match':updated_headers['ETag']},
+                  status=409,code='CONFLICT')
+        self.assertEqual('My edited title',self.call('GET',task_path)[0]['summary'])
+        export={'connectionId':connection['id'],'listId':task_list['id'],'taskId':created['id'],
+                **{name:item[name] for name in ('providerId','repositoryId','externalId')}}
+        self.call('POST','/task-sync/export-preview',body=export,owner='b',status=404,code='NOT_FOUND')
+        outward,_=self.call('POST','/task-sync/export-preview',body=export)
+        self.assertNotIn('summary',outward['writeFields'])
+        self.assertIn({'field':'summary','reason':'NOT_WRITABLE'},outward['warnings'])
+        _,connection_headers=self.call('GET','/task-connections/'+connection['id'])
+        writable={**capabilities,'fields':{**capabilities['fields'],'summary':
+                  {**field,'writable':True}}}
+        self.call('PUT','/task-connections/'+connection['id']+'/capabilities',body=writable,
+                  headers={'If-Match':connection_headers['ETag']})
+        outward,_=self.call('POST','/task-sync/export-preview',body=export)
+        self.assertEqual('My edited title',outward['writeFields']['summary'])
+        self.assertEqual(updated_headers['ETag'],outward['taskEtag'])
+        _,latest_headers=self.call('GET',task_path)
+        self.call('DELETE',task_path,headers={'If-Match':latest_headers['ETag']},status=204)
+        self.created.remove(('a','tasks',created['id']))
+        self.call('POST','/task-sync/import',body={**request,'item':{**item,'operationId':str(uuid4())}},
+                  status=409,code='CONFLICT')
+
+    def test_provider_subtasks_import_under_an_unassigned_parent(self):
+        connection=self.create('task-connections',{'providerId':'google','remoteAccountId':str(uuid4()),
+                    'name':'Hierarchy','readable':True,'writable':True,'enabled':True})
+        task_list=self.create('task-lists',{'connectionId':connection['id'],'remoteListId':str(uuid4()),
+                    'name':'Hierarchy','kind':'STANDARD','readable':True,'writable':True,'shared':False,
+                    'owner':True,'present':True,'position':0})
+        field={'readable':True,'writable':True,'deletable':False,'note':None}
+        path='/task-connections/'+connection['id']
+        _,headers=self.call('GET',path)
+        capabilities={'version':1,'providerApiVersion':'test','fields':{name:field for name in
+                      ('summary','parentTaskId','siblingOrder')}}
+        self.call('PUT',path+'/capabilities',body=capabilities,headers={'If-Match':headers['ETag']})
+        key={'providerId':'google','repositoryId':connection['remoteAccountId']+'/'+task_list['remoteListId']}
+        parent_item={'operationId':str(uuid4()),**key,'externalId':str(uuid4()),'deleted':False,
+                     'fields':{'summary':'Remote parent'}}
+        base={'connectionId':connection['id'],'listId':task_list['id'],'sourceState':'HEALTHY'}
+        parent,_=self.call('POST','/task-sync/import',body={**base,'item':parent_item},status=201)
+        self.created.append(('a','tasks',parent['id']))
+        child_item={'operationId':str(uuid4()),**key,'externalId':str(uuid4()),'deleted':False,
+                    'fields':{'summary':'Remote child','parentTaskId':parent['id'],'siblingOrder':2}}
+        child,child_headers=self.call('POST','/task-sync/import',body={**base,'item':child_item},status=201)
+        self.created.append(('a','tasks',child['id']))
+        self.assertIsNone(child['projectId'])
+        self.assertEqual((parent['id'],2),(child['parentTaskId'],child['siblingOrder']))
+        self.assertEqual(parent['id'],child['externalReferences'][0]['baseline']['fields']['parentTaskId'])
+        replay,_=self.call('POST','/task-sync/import',body={**base,'item':{**child_item,
+                           'operationId':str(uuid4())}},status=200)
+        self.assertEqual(child['id'],replay['id'])
+        self.call('POST','/task-sync/import',body={**base,'item':{**child_item,
+                  'operationId':str(uuid4()),'fields':{**child_item['fields'],'parentTaskId':str(uuid4())}}},
+                  status=409,code='CONFLICT')
+        second_item={**parent_item,'operationId':str(uuid4()),'externalId':str(uuid4()),
+                     'fields':{'summary':'Second provider parent'}}
+        second,_=self.call('POST','/task-sync/import',body={**base,'item':second_item},status=201)
+        self.created.append(('a','tasks',second['id']))
+        moved={**child_item,'operationId':str(uuid4()),'fields':{'parentTaskId':second['id'],'siblingOrder':3}}
+        updated,_=self.call('POST','/task-sync/apply',body={**base,'item':moved},
+                            headers={'If-Match':child_headers['ETag']})
+        self.assertEqual((second['id'],3),(updated['parentTaskId'],updated['siblingOrder']))
+        self.created.remove(('a','tasks',child['id']))
+        self.created.append(('a','tasks',child['id']))
 
     def test_external_task_list_link_is_owned_guarded_and_remapped(self):
         account=self.create('task-connections',{'providerId':'google','remoteAccountId':str(uuid4()),

@@ -323,6 +323,18 @@ class DefaultTimekeeperServiceTest {
 	}
 
 	@Test
+	void providerSubtasksCanShareAnUnassignedParentWithoutInventingAProject() {
+		Task parent = service.createTask(new CreateTask(Optional.empty(), Optional.empty(),
+				"Provider parent", Optional.empty()));
+		Task child = service.createTask(new CreateTask(Optional.empty(), Optional.of(parent.id()),
+				"Provider child", Optional.empty()));
+		assertEquals(Optional.empty(), child.projectId());
+		assertEquals(parent.id(), child.parentTaskId().orElseThrow());
+		service.deleteTask(new DeleteTask(child.id(), child.version()));
+		service.deleteTask(new DeleteTask(parent.id(), parent.version()));
+	}
+
+	@Test
 	void manualActivityCanBeReportedEditedAndDeleted() {
 		Project project = service.createProject(new CreateProject("Server"));
 		Task task = service.createTask(new CreateTask(Optional.of(project.id()), "REST API", Optional.empty()));

@@ -12775,6 +12775,702 @@
         },
         "description": "Conditional update of owner and participant metadata. Does not grant Timekeeper access or change list permissions."
       }
+    },
+    "/tasks/{taskId}/attachments": {
+      "parameters": [
+        {
+          "name": "taskId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "listTaskAttachments",
+        "summary": "List metadata for attachments of one owned task",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskAttachmentPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createTaskAttachment",
+        "summary": "Create a verified task attachment",
+        "x-required-permission": "write",
+        "responses": {
+          "201": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskAttachment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskAttachmentInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{taskId}/attachments/{id}": {
+      "parameters": [
+        {
+          "name": "taskId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "get": {
+        "operationId": "getTaskAttachment",
+        "summary": "Get attachment metadata and Base64 content",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskAttachment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      },
+      "put": {
+        "operationId": "updateTaskAttachment",
+        "summary": "Conditionally replace attachment content and metadata",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskAttachment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskAttachmentInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteTaskAttachment",
+        "summary": "Conditionally delete a task attachment",
+        "x-required-permission": "write",
+        "responses": {
+          "204": {
+            "description": "Successful operation."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ]
+      }
+    },
+    "/tasks/{taskId}/attachments/{id}/content": {
+      "parameters": [
+        {
+          "name": "taskId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "get": {
+        "operationId": "downloadTaskAttachmentContent",
+        "summary": "Download verified attachment bytes",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      }
+    },
+    "/task-sync/preview": {
+      "post": {
+        "operationId": "previewTaskSync",
+        "summary": "Preview one provider task page against local tasks",
+        "description": "Read-only, owner-scoped three-way field comparison. Never deletes or imports tasks. Deletion always requires explicit review and a healthy complete scan.",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskSyncPreviewInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "200": {
+            "description": "Per-task preview decisions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSyncPreviewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-sync/import": {
+      "post": {
+        "operationId": "importTaskSyncItem",
+        "summary": "Import one observed provider task",
+        "description": "Creates one root task with a stable provider identity and last-common baseline. Repeated command receipt or identical provider observation does not create another task. Remote hierarchy is handled by a later pass.",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskSyncImportInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "201": {
+            "description": "Created task.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Previously imported task with the same provider identity and baseline.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-sync/apply": {
+      "post": {
+        "operationId": "applyTaskSyncItem",
+        "summary": "Apply non-conflicting provider task fields",
+        "description": "Requires the current task ETag. Recomputes field decisions inside the owner transaction, applies remote-only values, advances per-reference baselines, and preserves local-only fields. Conflicts require manual resolution. Remote deletion is not supported here.",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskSyncApplyInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "200": {
+            "description": "Updated or unchanged task.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-sync/export-preview": {
+      "post": {
+        "operationId": "previewTaskSyncExport",
+        "summary": "Preview outbound provider changes",
+        "description": "Read-only capability gate against one linked provider identity and last-common baseline. The connector must still check per-item remote permissions and ETags before writing.",
+        "x-required-permission": "write",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskSyncExportInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "200": {
+            "description": "Outbound field changes and lossy-export warnings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSyncExportPreview"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -14254,6 +14950,13 @@
             },
             "maxItems": 10000,
             "description": "Optional for older transfers and archives. Section list IDs are remapped with provider lists."
+          },
+          "taskAttachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskAttachment"
+            },
+            "maxItems": 10000
           }
         },
         "required": [
@@ -14415,7 +15118,8 @@
                     "TASK_CONNECTION",
                     "TASK_LIST",
                     "TASK_TOMBSTONE",
-                    "TASK_SECTION"
+                    "TASK_SECTION",
+                    "TASK_ATTACHMENT"
                   ]
                 },
                 "sourceId": {
@@ -17557,6 +18261,13 @@
             },
             "maxItems": 250000,
             "description": "Optional for older transfers and archives. Section list IDs are remapped with provider lists."
+          },
+          "taskAttachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskAttachment"
+            },
+            "maxItems": 10000
           }
         },
         "required": [
@@ -17900,6 +18611,10 @@
             "type": "integer",
             "minimum": 0,
             "description": "Optional for older archives."
+          },
+          "taskAttachments": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -18355,6 +19070,10 @@
             "type": "integer",
             "minimum": 0,
             "description": "Optional for older archives."
+          },
+          "attachmentTasks": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -23659,6 +24378,869 @@
         },
         "required": [
           "participants"
+        ],
+        "additionalProperties": false
+      },
+      "TaskAttachmentInput": {
+        "type": "object",
+        "description": "Bounded canonical Base64 bytes with a verified SHA-256 digest. Provider identity fields are optional and must be supplied together.",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^/\\\\]+$"
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "pattern": "^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "data": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 1398104,
+            "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "remoteId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "fileName",
+          "contentType",
+          "bytes",
+          "sha256",
+          "data"
+        ],
+        "dependentRequired": {
+          "providerId": [
+            "remoteId"
+          ],
+          "remoteId": [
+            "providerId"
+          ]
+        },
+        "additionalProperties": false
+      },
+      "TaskAttachmentSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^/\\\\]+$"
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "pattern": "^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "remoteId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "taskId",
+          "version",
+          "fileName",
+          "contentType",
+          "bytes",
+          "sha256"
+        ],
+        "additionalProperties": false
+      },
+      "TaskAttachment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^/\\\\]+$"
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "pattern": "^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "remoteId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "data": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 1398104,
+            "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+          }
+        },
+        "required": [
+          "id",
+          "ownerId",
+          "taskId",
+          "version",
+          "fileName",
+          "contentType",
+          "bytes",
+          "sha256",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "TaskAttachmentPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskAttachmentSummary"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "revision"
+        ],
+        "additionalProperties": false
+      },
+      "TransferTaskAttachment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^/\\\\]+$"
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "pattern": "^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "remoteId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "data": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 1398104,
+            "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+          }
+        },
+        "required": [
+          "id",
+          "taskId",
+          "fileName",
+          "contentType",
+          "bytes",
+          "sha256",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "TaskSyncFields": {
+        "type": "object",
+        "description": "Presence is the field mask; explicit null clears nullable fields. Unobserved fields are omitted.",
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Url"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body": {
+            "$ref": "#/components/schemas/TaskBodyInput"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "scheduledDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Civil scheduled day without an implied time, deadline, or alert."
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "due": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskPriority"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flagged": {
+            "type": "boolean"
+          },
+          "urgent": {
+            "type": "boolean"
+          },
+          "parentTaskId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "siblingOrder": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Position among sibling tasks. This is independent of provider list order."
+          },
+          "checklistItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskChecklistItem"
+            },
+            "maxItems": 1000,
+            "description": "Ordered checklist items distinct from parentTaskId subtasks."
+          },
+          "recurrence": {
+            "$ref": "#/components/schemas/TaskRecurrence"
+          },
+          "reminders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskReminder"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/TaskMetadata"
+          },
+          "taskListId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sectionId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assignment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskAssignment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "maxProperties": 20
+      },
+      "TaskSyncObservedItem": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "fields": {
+            "$ref": "#/components/schemas/TaskSyncFields"
+          }
+        },
+        "required": [
+          "operationId",
+          "providerId",
+          "repositoryId",
+          "externalId",
+          "deleted",
+          "fields"
+        ],
+        "additionalProperties": false
+      },
+      "TaskSyncPreviewInput": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "listId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "sourceState": {
+            "type": "string",
+            "enum": [
+              "HEALTHY",
+              "UNAVAILABLE",
+              "AUTH_EXPIRED",
+              "PERMISSION_CHANGED",
+              "LIST_MISSING"
+            ]
+          },
+          "scanComplete": {
+            "type": "boolean"
+          },
+          "pageToken": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 32768
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskSyncObservedItem"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "connectionId",
+          "listId",
+          "sourceState",
+          "scanComplete",
+          "items"
+        ],
+        "additionalProperties": false,
+        "description": "Read-only comparison of one provider page with the saved last-common snapshot. The provider cursor and page token are opaque."
+      },
+      "TaskSyncFieldDecision": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "summary",
+              "url",
+              "body",
+              "status",
+              "scheduledDate",
+              "completedAt",
+              "start",
+              "due",
+              "priority",
+              "flagged",
+              "urgent",
+              "parentTaskId",
+              "siblingOrder",
+              "checklistItems",
+              "recurrence",
+              "reminders",
+              "metadata",
+              "taskListId",
+              "sectionId",
+              "assignment"
+            ]
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "UNSUPPORTED",
+              "INCOMPLETE_GROUP",
+              "OTHER_LIST",
+              "NO_BASELINE",
+              "UNCHANGED",
+              "REMOTE_ONLY",
+              "LOCAL_ONLY",
+              "CONVERGED",
+              "CONFLICT"
+            ]
+          }
+        },
+        "required": [
+          "field",
+          "outcome"
+        ],
+        "additionalProperties": false
+      },
+      "TaskSyncPreviewItem": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "operationId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "taskEtag": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DEFERRED",
+              "IGNORE_DELETED",
+              "CREATE",
+              "INCOMPLETE",
+              "RECONCILE_ID",
+              "DELETE_DEFERRED",
+              "DELETE_CONFLICT",
+              "DELETE_REVIEW",
+              "CONFLICT",
+              "UPDATE",
+              "UNSUPPORTED",
+              "KEEP_LOCAL",
+              "UNCHANGED"
+            ]
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskSyncFieldDecision"
+            }
+          }
+        },
+        "required": [
+          "providerId",
+          "repositoryId",
+          "externalId",
+          "operationId",
+          "taskId",
+          "taskEtag",
+          "reason",
+          "status",
+          "decisions"
+        ],
+        "additionalProperties": false
+      },
+      "TaskSyncPreviewResponse": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pageToken": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskSyncPreviewItem"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "revision",
+          "pageToken",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "TaskSyncImportInput": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "listId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "sourceState": {
+            "type": "string",
+            "enum": [
+              "HEALTHY",
+              "UNAVAILABLE",
+              "AUTH_EXPIRED",
+              "PERMISSION_CHANGED",
+              "LIST_MISSING"
+            ]
+          },
+          "item": {
+            "$ref": "#/components/schemas/TaskSyncObservedItem"
+          }
+        },
+        "required": [
+          "connectionId",
+          "listId",
+          "sourceState",
+          "item"
+        ],
+        "additionalProperties": false,
+        "description": "Idempotent import of one provider-observed root task. The item operationId is the command receipt key."
+      },
+      "TaskSyncApplyInput": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "listId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "sourceState": {
+            "type": "string",
+            "enum": [
+              "HEALTHY",
+              "UNAVAILABLE",
+              "AUTH_EXPIRED",
+              "PERMISSION_CHANGED",
+              "LIST_MISSING"
+            ]
+          },
+          "item": {
+            "$ref": "#/components/schemas/TaskSyncObservedItem"
+          }
+        },
+        "required": [
+          "connectionId",
+          "listId",
+          "sourceState",
+          "item"
+        ],
+        "additionalProperties": false,
+        "description": "Conditionally merge one observed task against the current ETag and last-common baseline. The item operationId is the durable receipt key."
+      },
+      "TaskSyncExportInput": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "listId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "connectionId",
+          "listId",
+          "taskId",
+          "providerId",
+          "repositoryId",
+          "externalId"
+        ],
+        "additionalProperties": false
+      },
+      "TaskSyncExportWarning": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "summary",
+              "url",
+              "body",
+              "status",
+              "scheduledDate",
+              "completedAt",
+              "start",
+              "due",
+              "priority",
+              "flagged",
+              "urgent",
+              "parentTaskId",
+              "siblingOrder",
+              "checklistItems",
+              "recurrence",
+              "reminders",
+              "metadata",
+              "taskListId",
+              "sectionId",
+              "assignment"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "NO_BASELINE",
+              "NOT_WRITABLE",
+              "CLEAR_UNSUPPORTED",
+              "INCOMPLETE_GROUP",
+              "IDENTITY_RECONCILIATION_REQUIRED"
+            ]
+          }
+        },
+        "required": [
+          "field",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "TaskSyncExportPreview": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskEtag": {
+            "type": "string"
+          },
+          "writeFields": {
+            "$ref": "#/components/schemas/TaskSyncFields"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskSyncExportWarning"
+            }
+          }
+        },
+        "required": [
+          "taskId",
+          "taskEtag",
+          "writeFields",
+          "warnings"
         ],
         "additionalProperties": false
       }

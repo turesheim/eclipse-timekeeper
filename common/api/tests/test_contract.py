@@ -139,6 +139,40 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskCapabilities').is_valid({**body,'fields':{'linkedResources':{**field,'ownerId':'other'}}}))
         self.assertEqual('updateTaskConnectionCapabilities',CONTRACT['paths']['/task-connections/{id}/capabilities']['put']['operationId'])
 
+    def test_sync_preview_is_bounded_and_uses_field_presence(self):
+        identity={'operationId':ID,'providerId':'google','repositoryId':'account/list',
+                  'externalId':'remote-1','deleted':False}
+        body={'connectionId':ID,'listId':ID,'sourceState':'HEALTHY','scanComplete':False,
+              'items':[{**identity,'fields':{'summary':'Import','completedAt':None}}]}
+        validator('TaskSyncPreviewInput').validate(body)
+        self.assertFalse(validator('TaskSyncPreviewInput').is_valid({**body,'items':[{**identity,'fields':{'accessToken':'secret'}}]}))
+        self.assertFalse(validator('TaskSyncPreviewInput').is_valid({**body,'items':body['items']*101}))
+        self.assertFalse(validator('TaskSyncPreviewInput').is_valid({**body,'ownerId':'other'}))
+        self.assertEqual('previewTaskSync',CONTRACT['paths']['/task-sync/preview']['post']['operationId'])
+
+    def test_sync_import_uses_stable_provider_identity_and_operation_receipt(self):
+        item={'operationId':ID,'providerId':'google','repositoryId':'account/list','externalId':'remote-1',
+              'deleted':False,'fields':{'summary':'Imported','status':'NOT_STARTED','completedAt':None}}
+        body={'connectionId':ID,'listId':ID,'sourceState':'HEALTHY','item':item}
+        validator('TaskSyncImportInput').validate(body)
+        self.assertFalse(validator('TaskSyncImportInput').is_valid({**body,'item':{**item,'fields':{'token':'secret'}}}))
+        self.assertEqual('importTaskSyncItem',CONTRACT['paths']['/task-sync/import']['post']['operationId'])
+
+    def test_sync_apply_requires_conditional_task_version(self):
+        item={'operationId':ID,'providerId':'google','repositoryId':'account/list','externalId':'remote-1',
+              'deleted':False,'fields':{'status':'COMPLETED','completedAt':'2026-10-26T12:00:00Z'}}
+        validator('TaskSyncApplyInput').validate({'connectionId':ID,'listId':ID,'sourceState':'HEALTHY','item':item})
+        operation=CONTRACT['paths']['/task-sync/apply']['post']
+        self.assertEqual('applyTaskSyncItem',operation['operationId'])
+        self.assertIn({'$ref':'#/components/parameters/IfMatch'},operation['parameters'])
+
+    def test_sync_export_preview_reports_capability_gaps(self):
+        body={'connectionId':ID,'listId':ID,'taskId':ID,'providerId':'google',
+              'repositoryId':'account/list','externalId':'remote-1'}
+        validator('TaskSyncExportInput').validate(body)
+        self.assertFalse(validator('TaskSyncExportInput').is_valid({**body,'ownerId':'other'}))
+        self.assertEqual('previewTaskSyncExport',CONTRACT['paths']['/task-sync/export-preview']['post']['operationId'])
+
     def test_task_tags_categories_and_provider_links_are_distinct(self):
         link={'id':ID,'kind':'PROVIDER_SOURCE','url':'https://tasks.google.com/task/1',
               'title':'Original task','providerId':'google','remoteId':None}
@@ -278,6 +312,19 @@ class ContractTest(unittest.TestCase):
             {'remotePrincipalId':'member-2','role':'ADMIN'}]}))
         self.assertEqual('updateTaskListSharing',CONTRACT['paths']['/task-lists/{id}/sharing']['put']['operationId'])
         self.assertIn('sharing',CONTRACT['components']['schemas']['TransferTaskList']['properties'])
+
+    def test_task_attachments_have_bounded_content_and_separate_metadata_pages(self):
+        data={'fileName':'note.txt','contentType':'text/plain','bytes':4,
+              'sha256':'a'*64,'data':'dGVzdA==','providerId':'apple','remoteId':'attachment-1'}
+        validator('TaskAttachmentInput').validate(data)
+        self.assertFalse(validator('TaskAttachmentInput').is_valid({**data,'bytes':1048577}))
+        self.assertFalse(validator('TaskAttachmentInput').is_valid({**data,'remoteId':None}))
+        self.assertNotIn('data',CONTRACT['components']['schemas']['TaskAttachmentSummary']['properties'])
+        self.assertEqual('downloadTaskAttachmentContent',CONTRACT['paths']['/tasks/{taskId}/attachments/{id}/content']['get']['operationId'])
+        transferred={'id':ID,'taskId':ID,**data}
+        validator('TransferTaskAttachment').validate(transferred)
+        self.assertIn('taskAttachments',CONTRACT['components']['schemas']['TransferSnapshot']['properties'])
+        self.assertNotIn('taskAttachments',CONTRACT['components']['schemas']['TransferSnapshot']['required'])
 
     def test_task_sibling_order_is_a_conditional_section(self):
         validator('TaskOrderInput').validate({'siblingOrder':7})
@@ -439,9 +486,10 @@ class ContractTest(unittest.TestCase):
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'deleteTaskList', 'getTaskList', 'listTaskLists',
             'createTaskListSection', 'updateTaskListSection', 'deleteTaskListSection', 'getTaskListSection', 'listTaskListSections',
-            'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors',
+            'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors', 'previewTaskSync', 'importTaskSyncItem', 'applyTaskSyncItem', 'previewTaskSyncExport',
             'getTaskTombstone', 'listTaskTombstones', 'findTaskTombstoneByExternalReference',
             'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskMetadata', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskSyncState', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
+            'listTaskAttachments', 'createTaskAttachment', 'getTaskAttachment', 'updateTaskAttachment', 'deleteTaskAttachment', 'downloadTaskAttachmentContent',
             'linkExternalReference', 'replaceExternalReference', 'updateExternalTaskLocation', 'updateExternalTaskAssignment', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',

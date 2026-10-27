@@ -246,6 +246,60 @@ tasks. Cursors are excluded from portable transfers and account archives:
 after restoration, a connector must perform a full scan before interpreting
 remote absence as deletion. The opaque cursor is never a Timekeeper version.
 
+`POST /task-sync/preview` compares up to 100 observed items from one owned
+connection/list page with linked tasks and each reference's last-common
+baseline. The endpoint does not write. Each item has a unique operation ID and
+typed provider identity; field presence is the observation mask, while a JSON
+null explicitly clears a nullable field. `REMOTE_ONLY` is a candidate local
+update, `LOCAL_ONLY` preserves the user's edit, and two different edits to one
+field produce `CONFLICT`. A missing baseline produces `NO_BASELINE`, not a
+guess. Completion, hierarchy/order, and list/section are paired to prevent
+partial changes. The connection capability declaration gates all observed
+fields. Unknown or unreadable fields are `UNSUPPORTED` and remain local.
+Opposing local-only and remote-only edits within a paired field group are
+reported as a conflict, so an apply cannot combine mismatched halves.
+Alias matches require identity reconciliation. Existing links must belong to
+the requested list. A deleted item is deferred for an unhealthy source or an
+incomplete scan; otherwise it requires explicit review and conflicts if the
+local task changed. Preview responses include task ETags for a later
+conditional apply step. Provider page tokens remain opaque.
+
+`POST /task-sync/import` applies one healthy, observed root task that has no
+existing provider identity. Its `operationId` is a durable command receipt; a
+retry returns the original result. A repeated observation under a new
+operation ID returns the existing task only when the accepted remote fields
+still match its baseline. Local edits remain untouched. The connection must
+declare the summary readable; other unclaimed fields are skipped and excluded
+from the baseline. This initial import accepts the normalized task fields,
+including civil schedule, completion, recurrence, reminders, checklist and
+provider list association. A connector resolves a remote parent to its owned
+Timekeeper task ID and imports parents before children. The child inherits the
+parent's Timekeeper project, including no project. Remote changes to existing
+tasks go through a separate
+conditional apply workflow.
+
+`POST /task-sync/apply` conditionally merges one existing provider observation.
+The caller supplies the current task ETag through `If-Match`; the server
+recomputes the three-way comparison inside the owner transaction. A remote-only
+change updates the task, a local-only change stays local, and a converged
+change advances the baseline. Conflicting, unbased, incomplete, cross-list,
+alias and deleted observations are rejected. Supported remote fields update
+the reference baseline at the same time as the task. The operation ID is a
+durable receipt so retrying the exact request cannot apply it twice. Remote
+deletions still need a separate explicit review workflow.
+
+`POST /task-sync/export-preview` computes outbound field changes for one
+linked task/reference. It compares the current task with that reference's
+last-common baseline and includes only fields the connection declares readable
+and writable. Clearing a changed field also requires `deletable=true`.
+Unbased fields, read-only values, unsupported clears, incomplete paired groups
+and list moves produce warnings rather than approximate provider writes. The
+endpoint is read-only and returns the current task ETag. A connector must
+still enforce provider item permissions, remote ETags and rate limits before
+using the proposed fields.
+The [connector protocol](TASK-SYNC-PROTOCOL.md) documents page commits,
+stable retries, authorization, recovery, and reviewed deletion.
+
 An external task reference can carry `taskListId` to point at an owned provider
 list. The list's connection must use the same provider. The existing
 `repositoryId` remains the provider identity namespace and must distinguish
@@ -267,6 +321,18 @@ Legacy link updates preserve assignment data; `PUT
 /tasks/{id}/external-references/assignment` conditionally replaces it or
 clears it with explicit `null`. It survives account archives and portable
 transfer without storing connector credentials.
+
+`/tasks/{taskId}/attachments` stores up to 20 attachments per owned task.
+Create and conditional replace verify canonical Base64 bytes, declared size,
+and SHA-256 before persistence; each item is limited to 1 MiB. Optional
+provider and remote IDs travel together. The paginated list exposes metadata
+without bytes; item GET returns Base64 content, while `/content` downloads the
+verified bytes with `no-store`, `nosniff`, and forced attachment headers. An idempotency key is
+required for create. Deleting a task also deletes its attachments. Portable
+JSON/CSV transfer and private archives include content and remap the parent
+task ID; older snapshots without attachments remain accepted. Portable JSON
+import retains its 20 MiB request limit, so larger backups use the private
+chunked account archive.
 
 An external reference can also hold an optional `providerData` envelope with
 `namespace`, positive schema `version`, and an opaque JSON object `payload`.
