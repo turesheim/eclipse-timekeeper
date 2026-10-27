@@ -791,8 +791,9 @@ formatted body editing is provided by the separate editor integration.
 
 Note responses are private/no-store. Profile-style change invalidations remain
 compatible with existing clients and contain no label/body content. Account
-export streams present notes with complete canonical `markdown`, `text` and
-`body`; label-only archives remain supported, and omitted legacy bodies preserve
+export streams present notes as separate canonical Markdown ZIP files, indexed
+by path, byte length and SHA-256 in a version 2 snapshot. Version 1 inline
+Markdown and label-only archives remain supported, and omitted legacy bodies preserve
 an existing matching note's body. A differing active note produces a review
 conflict and is never overwritten.
 Empty deletion tombstones are not portable archive deletion commands.
@@ -802,8 +803,8 @@ note summaries for up to nine ISO weeks. `GET /week-notes/{week}` returns the
 exact Markdown body and ETag. `PUT` with `{ "body": "..." }` and the current
 `If-Match` saves it; `DELETE` with `If-Match` leaves a versioned tombstone.
 `GET /week-notes/{week}/markdown` downloads `YYYY-Www.md`. ISO week-based
-years are used at New Year. Account archives include these notes in the
-optional `weekNotes` array, and WebDAV exposes them at `/dav/journal/`.
+years are used at New Year. Account archives include these notes as separate
+`YYYY-Www.md` files, and WebDAV exposes them at `/dav/journal/`.
 
 `GET /journal-assets/{filename}` returns private attachment bytes with a strong
 ETag and safe media type. `PUT` accepts JSON `{data}` with base64 bytes, using
@@ -813,8 +814,11 @@ Attachment names are one safe ASCII path segment. PNG, JPEG, GIF and WebP files
 with matching signatures can display inline; every other format downloads as an
 octet-stream attachment. The browser route applies session, CSRF and owner
 binding; WebDAV provides the same files under `/dav/journal/assets/` for clients.
-The account archive includes active attachments and rejects conflicting filenames
-during review.
+The account archive includes active attachments as binary files under `assets/`
+and rejects conflicting filenames during review. Task attachment binary files
+use `assets/task attachments/<id>.bin`, referenced by `archiveFile` in version 2 work metadata.
+The complete ZIP is required when its `journalFiles` index is nonempty; older
+version 1 ZIP and standalone JSON imports retain their inline content support.
 
 See [journal storage protection](../operations/JOURNAL-STORAGE.md) for the
 required deployment encryption, temporary/backup storage, key management and

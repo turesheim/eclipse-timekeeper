@@ -20,6 +20,9 @@ final class DomainTransfer {
             Map.entry("taskLists","TASK_LIST"),Map.entry("taskListSections","TASK_SECTION"),Map.entry("taskTombstones","TASK_TOMBSTONE"),
             Map.entry("taskAttachments","TASK_ATTACHMENT"));
     ApiReplies importRecords(JsonNode input) {
+        return importRecords(input,item->item.get("data").asText());
+    }
+    ApiReplies importRecords(JsonNode input,java.util.function.Function<JsonNode,String> attachmentData) {
         Map<UUID,UUID> clients=new HashMap<>();
         Map<UUID,UUID> connections=new HashMap<>();
         Map<UUID,UUID> lists=new HashMap<>();
@@ -181,7 +184,7 @@ final class DomainTransfer {
         for(JsonNode item:input.path("taskAttachments")) {
             UUID targetTask=required(tasks,uuid(item.get("taskId"))).value();
             var created=new TaskAttachment(UUID.randomUUID(),targetTask,item.get("fileName").asText(),
-                    item.get("contentType").asText(),item.get("bytes").asInt(),item.get("sha256").asText(),item.get("data").asText(),
+                    item.get("contentType").asText(),item.get("bytes").asInt(),item.get("sha256").asText(),attachmentData.apply(item),
                     optionalText(item.get("providerId")),optionalText(item.get("remoteId")),0);
             store.save("TASK_ATTACHMENT",created);store.change("TASK_ATTACHMENT","CREATED",created.id().toString());
             mapping(mappings,"TASK_ATTACHMENT",item,created.id());

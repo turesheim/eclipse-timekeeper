@@ -7,20 +7,27 @@ signed-in account. Administrator access does not include anyone else's records.
 
 **Download my data** creates a private ZIP containing:
 
-- `archive.json`: a versioned snapshot for restoring work and preferences.
+- `archive.json`: a versioned snapshot for restoring work and preferences, with a checksummed file index.
 - `manifest.json`: archive identity, generation time, record counts and file descriptions.
 - CSV files for clients, projects, tasks, labels, activities and work sessions.
 - `README.txt`: format and privacy notes.
 
 The snapshot includes all work records, project/client links, task relationships,
 labels, descriptions, external references, exact timestamps, running intervals,
-time-zone preferences and import audit history. Web day notes are included as
-optional `dayNotes` in `archive.json`, including their complete canonical
-Markdown documents even on dates with no timed work or visible Calendar label.
-Weekly notes are optional `weekNotes` entries with exact Markdown and ISO week
-filenames such as `2026-W44.md`.
-The optional `journalAssets` array contains image and file attachments as base64.
-It also includes your account
+time-zone preferences and import audit history. Version 2 archives keep day notes
+as separate `YYYY-MM-DD.md` files and weekly notes as `YYYY-Www.md`, including
+notes without timed work or a visible Calendar label. Markdown and frontmatter
+are preserved exactly. Journal attachments are binary files under `assets/`, so
+relative Markdown links work after extraction. Task attachments are binary files
+under `assets/task attachments/<attachment-id>.bin`; their original filenames and metadata
+remain in the task attachment records. Their JSON records and CSV entries
+reference these files instead of embedding binary content.
+
+The `journalFiles` index in `archive.json` records each separate file's path,
+byte length and SHA-256 checksum. Restore verifies every indexed file and rejects
+missing, altered, duplicate or unexpected entries. Files are read one at a time
+without extracting ZIP paths to disk or assembling all bodies into one JSON object.
+The snapshot also includes your account
 identity, recovery addresses and credential-management metadata for reference.
 Passwords and hashes, API/session token material, passkey keys/credential IDs,
 recovery codes/links and deployment settings or SMTP secrets are excluded.
@@ -34,7 +41,9 @@ management](JOURNAL-STORAGE.md) for database, temporary-file and backup protecti
 
 ## Review and restore
 
-1. Select the original Timekeeper ZIP or its extracted `archive.json`.
+1. Select the original Timekeeper ZIP. A version 2 archive with separate files
+   requires the complete ZIP; its extracted `archive.json` alone is rejected.
+   Legacy version 1 ZIPs and standalone JSON archives remain supported.
 2. Choose whether to restore the archived time zone. The default keeps your
    current preference.
 3. Select **Review archive**. Check the record counts, source account, time zone

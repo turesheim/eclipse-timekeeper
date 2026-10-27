@@ -65,6 +65,22 @@ class AccountArchiveImportTest {
             return id;
         });
     }
+    /** Retain coverage of v1 inline-note imports after exports move to separate files. */
+    private ObjectNode legacySnapshot(java.nio.file.Path file) throws Exception {
+        var archive=AccountArchiveInput.read(file,"application/zip");
+        try(var zip=new java.util.zip.ZipFile(file.toFile())){
+            for(var entry:archive.path("journalFiles")){
+                String path=entry.path("path").asText();byte[] bytes;try(var input=zip.getInputStream(zip.getEntry(path))){bytes=input.readAllBytes();}
+                switch(ArchiveJournalFiles.kind(path)){
+                    case DAY->{var note=JournalMarkdown.parse(path,bytes);archive.withArray("dayNotes").add(object().put("date",note.date().toString()).put("text",note.label()).put("body",note.body()).put("markdown",new String(bytes,StandardCharsets.UTF_8)));}
+                    case WEEK->archive.withArray("weekNotes").add(object().put("week",path.substring(0,8)).put("filename",path).put("markdown",new String(bytes,StandardCharsets.UTF_8)));
+                    case ASSET->archive.withArray("journalAssets").add(object().put("filename",path.substring(7)).put("data",Base64.getEncoder().encodeToString(bytes)));
+                    case TASK_ASSET->{for(var item:archive.path("work").path("taskAttachments"))if(item.path("archiveFile").asText().equals(path)){((ObjectNode)item).put("data",Base64.getEncoder().encodeToString(bytes)).remove("archiveFile");}}
+                }
+            }
+        }
+        archive.remove("journalFiles");return archive.put("format",AccountArchive.LEGACY_FORMAT);
+    }
     private ObjectNode work() {return store.transaction("b",()->{var value=object();for(var entry:DomainTransfer.TYPES.entrySet()) {var items=value.putArray(entry.getKey());store.list(entry.getValue()).forEach(items::add);}value.set("profile",store.profile());return value;});}
     @Test void linkedTaskTombstonesSurvivePrivateArchiveRestore() throws Exception {
         source();
@@ -90,7 +106,7 @@ class AccountArchiveImportTest {
     @Test void dayNotesRoundTripWithoutWorkAndNeverOverwriteAnExistingDate() throws Exception {
         source();
         store.transaction("a",()->{var notes=new DayNotes(store);var date=DayNotes.date("2026-05-17");notes.save(date,etag(notes.get(date)),"Ferie");return null;});
-        ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=AccountArchiveInput.read(file.file(),"application/zip");}
+        ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=legacySnapshot(file.file());}
         assertEquals("Ferie",archive.path("dayNotes").get(0).path("text").asText());
         assertEquals("",archive.path("dayNotes").get(0).path("body").asText());
         assertTrue(archive.path("dayNotes").get(0).path("markdown").asText().contains("timekeeper-label: Ferie"));
@@ -119,7 +135,7 @@ class AccountArchiveImportTest {
             }
             var date=DayNotes.date("2026-10-04");notes.save(date,etag(notes.get(date)),object().put("body","Removed"));notes.save(date,etag(notes.get(date)),object().put("body",""));return null;
         });
-        ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-read"))){archive=AccountArchiveInput.read(file.file(),"application/zip");}
+        ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-read"))){archive=legacySnapshot(file.file());}
         inputs.validate("AccountArchiveSnapshot",archive);assertEquals(4,archive.path("dayNotes").size());
         assertEquals(markdown,archive.path("dayNotes").get(0).path("body").asText());assertEquals("",archive.path("dayNotes").get(1).path("text").asText());assertEquals("\n \t\n",archive.path("dayNotes").get(1).path("body").asText());
         assertEquals("",archive.path("dayNotes").get(2).path("body").asText());
@@ -147,7 +163,7 @@ class AccountArchiveImportTest {
             notes.saveDocument(date,etag(notes.get(date)),markdown.getBytes(StandardCharsets.UTF_8));
             new JournalAssets(store).save("photo.png",null,image);return null;
         });
-        ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=AccountArchiveInput.read(file.file(),"application/zip");}
+        ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=legacySnapshot(file.file());}
         assertEquals(markdown,archive.path("dayNotes").get(0).path("markdown").asText());
         assertEquals(1,archive.path("journalAssets").size());
         assertArrayEquals(image,Base64.getDecoder().decode(archive.path("journalAssets").get(0).path("data").asText()));
@@ -204,7 +220,7 @@ class AccountArchiveImportTest {
         });
         store.transaction("a",()->{store.save("TASK_ATTACHMENT",new TaskAttachment(sourceAttachment,sourceTask,"note.txt","text/plain",4,
                 "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","dGVzdA==",Optional.empty(),Optional.empty(),0));return null;});
-        ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=AccountArchiveInput.read(file.file(),"application/zip");}
+        ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=legacySnapshot(file.file());}
         assertEquals(1,archive.path("work").path("taskConnections").size());
         assertEquals(1,archive.path("work").path("taskLists").size());
         assertEquals(1,archive.path("work").path("taskListSections").size());
@@ -228,7 +244,7 @@ class AccountArchiveImportTest {
         });
     }
     @Test void olderAccountArchiveWithoutProviderCollectionsStillRestores() throws Exception {
-        var archive=source();var work=(ObjectNode)archive.path("work");
+        var archive=source().put("format",AccountArchive.LEGACY_FORMAT);archive.remove("journalFiles");var work=(ObjectNode)archive.path("work");
         work.remove("taskConnections");work.remove("taskLists");work.remove("taskListSections");work.remove("taskAttachments");
         inputs.validate("AccountArchiveSnapshot",archive);
         UUID id=stage(archive);var review=store.transaction("b",()->importer().preview(id,false));

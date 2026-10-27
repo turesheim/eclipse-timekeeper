@@ -20,7 +20,8 @@ import jakarta.inject.Inject;
 /** Explicit account-data allowlist; neither database dumps nor authentication authority are portable. */
 @ApplicationScoped
 class AccountArchive {
-    static final String FORMAT="timekeeper-account-v1";
+    static final String FORMAT="timekeeper-account-v2";
+    static final String LEGACY_FORMAT="timekeeper-account-v1";
     static final Map<String,String> WORK=DomainTransfer.TYPES;
     private static final List<String> HISTORY=List.of("IMPORT_JOB","IMPORT_BATCH","IMPORT_ITEM","IMPORT_MAP","IMPORT_KEY","IMPORT_ORIGIN","IMPORT_UNDO","IMPORT_USE","ARCHIVE_AUDIT","ARCHIVE_IMPORT","CAL_LINK");
     @Inject AgroalDataSource datasource;
@@ -100,7 +101,10 @@ class AccountArchive {
         var profile=profile(c,owner);var metadata=metadata(c,owner);
         var manifest=object().put("format",FORMAT).put("archiveId",archiveId).put("generatedAt",generatedAt);
         manifest.set("counts",counts);var files=manifest.putObject("files");
-        files.put("archive.json","Complete private account snapshot, including canonical journal Markdown and attachments. Restore work and selected preferences; account and credential metadata are informational.");
+        files.put("archive.json","Private account snapshot and checksummed journal file index. Restore work and selected preferences; account and credential metadata are informational.");
+        files.put("YYYY-MM-DD.md","Exact daily Markdown files, including calendar labels in frontmatter.");
+        files.put("YYYY-Www.md","Exact ISO weekly Markdown files.");
+        files.put("assets/*","Binary journal attachments referenced by Markdown.");
         files.put("README.txt","Format, privacy and CSV notes.");
         for(String name:new TreeSet<>(WORK.keySet())) files.put(name+".csv","Spreadsheet-safe "+name+"; exact stored instants and JSON-encoded collection fields.");
         try(var zip=new ZipOutputStream(Files.newOutputStream(target),StandardCharsets.UTF_8)) {
@@ -108,34 +112,14 @@ class AccountArchive {
             // Closing the JSON writer must not close the surrounding ZIP stream.
             var json=MAPPER.getFactory().createGenerator(zip).disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
             json.writeStartObject();json.writeStringField("format",FORMAT);json.writeStringField("archiveId",archiveId);json.writeStringField("generatedAt",generatedAt);
-            if(noteCount[0]>0){
-                json.writeArrayFieldStart("dayNotes");
-                records(c,owner,DayNotes.TYPE,value->{if(presentNote(value,deletedNotes)){
-                    var note=object().put("date",value.path("date").asText()).put("text",value.path("text").asText());
-                    note.put("body",value.path("body").asText());
-                    note.put("markdown",value.has("markdown")?value.path("markdown").asText():new String(
-                            JournalMarkdown.render(value.path("date").asText()+".md",null,value.path("text").asText(),value.path("body").asText()),StandardCharsets.UTF_8));
-                    json.writeTree(note);
-                }});json.writeEndArray();
-            }
-            if(weekCount[0]>0){
-                json.writeArrayFieldStart("weekNotes");
-                records(c,owner,WeekNotes.TYPE,value->{if(presentWeek(value,deletedWeeks)){
-                    String week=value.path("week").asText();
-                    json.writeTree(object().put("week",week).put("filename",week+".md").put("markdown",value.path("body").asText()));
-                }});json.writeEndArray();
-            }
-            if(assetCount[0]>0){
-                json.writeArrayFieldStart("journalAssets");
-                records(c,owner,JournalAssets.TYPE,value->{if(!value.path("deleted").asBoolean()){
-                    json.writeTree(object().put("filename",value.path("filename").asText()).put("data",value.path("data").asText()));
-                }});json.writeEndArray();
-            }
+            json.writeArrayFieldStart("journalFiles");
+            journalFiles(c,owner,deletedNotes,deletedWeeks,(path,bytes)->json.writeTree(ArchiveJournalFiles.metadata(path,bytes)));
+            json.writeEndArray();
             json.writeObjectField("account",metadata);json.writeObjectField("preferences",profile);
             json.writeFieldName("work");json.writeStartObject();json.writeStringField("format","timekeeper-domain-v3");json.writeStringField("zoneId",profile.path("zoneId").asText());
             for(String name:new TreeSet<>(WORK.keySet())) {
                 json.writeArrayFieldStart(name);
-                records(c,owner,WORK.get(name),value->{var copy=value.deepCopy();copy.remove(List.of("ownerId","version","state"));json.writeTree(copy);});
+                records(c,owner,WORK.get(name),value->{var copy=workRecord(name,value);copy.remove(List.of("ownerId","version","state"));json.writeTree(copy);});
                 json.writeEndArray();
             }
             json.writeEndObject();json.writeArrayFieldStart("importHistory");
@@ -146,20 +130,21 @@ class AccountArchive {
                 json.writeStartObject();json.writeStringField("entityType",type.equals("CAL_LINK")?"ARCHIVE_AUDIT":type);json.writeObjectField("data",audit);json.writeEndObject();
             });
             json.writeEndArray();json.writeEndObject();json.close();zip.closeEntry();
+            journalFiles(c,owner,deletedNotes,deletedWeeks,(path,bytes)->{entry(zip,path);zip.write(bytes);zip.closeEntry();});
             entry(zip,"manifest.json");zip.write(MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(manifest));zip.closeEntry();
             for(String name:new TreeSet<>(WORK.keySet())) {
                 entry(zip,name+".csv");
                 // Include every stored business field, without assuming a fixed frontend schema.
-                var columns=new TreeSet<String>();records(c,owner,WORK.get(name),value->columns.addAll(fieldNames(value)));
+                var columns=new TreeSet<String>();records(c,owner,WORK.get(name),value->columns.addAll(fieldNames(workRecord(name,value))));
                 columns.removeAll(List.of("ownerId","state"));var ordered=new ArrayList<>(columns);
                 csv(zip,ordered);
-                records(c,owner,WORK.get(name),value->{var cells=new ArrayList<String>();for(String column:ordered) {
+                records(c,owner,WORK.get(name),stored->{var value=workRecord(name,stored);var cells=new ArrayList<String>();for(String column:ordered) {
                     JsonNode item=value.get(column);cells.add(item==null || item.isNull() ? "" : item.isTextual() ? item.asText():item.toString());
                 }csv(zip,cells);});zip.closeEntry();
             }
             entry(zip,"README.txt");zip.write(("Timekeeper private account archive\n\n"
-                +"archive.json is the authoritative, versioned JSON snapshot for account import. manifest.json lists record counts and files.\n"
-                +"Optional dayNotes and weekNotes in archive.json contain complete canonical Markdown, including notes without recorded work. Weekly files use ISO week names such as 2026-W44.md. Optional journalAssets contain account-private attachments as base64.\n"
+                +"Keep this ZIP intact for account import. archive.json contains the versioned work snapshot and a journalFiles index with byte lengths and SHA-256 checksums. manifest.json describes record counts and file groups.\n"
+                +"Daily notes are separate YYYY-MM-DD.md files; weekly notes use ISO names such as 2026-W44.md. Exact Markdown and frontmatter are preserved. Binary attachments are under assets/, so relative Markdown links remain usable after extraction.\n"
                 +"This ZIP is not encrypted. Protect downloads and temporary files on encrypted private storage; see the journal storage and key-management deployment requirements.\n"
                 +"All records belong to the signed-in account. Administrator access does not include another account's data.\n"
                 +"Account identity, recovery addresses and credential-management metadata are informational and are not restored.\n"
@@ -168,6 +153,21 @@ class AccountArchive {
                 +"CSV files use UTF-8, quoted cells and exact stored timestamps. Arrays/objects use JSON. Potential spreadsheet formulas are prefixed with an apostrophe; JSON retains the original values.\n")
                 .getBytes(StandardCharsets.UTF_8));zip.closeEntry();
         }
+    }
+    @FunctionalInterface private interface JournalFile {void accept(String path,byte[] bytes) throws IOException;}
+    private static void journalFiles(Connection c,String owner,Map<String,Long> deletedNotes,Map<String,Long> deletedWeeks,JournalFile output) throws SQLException,IOException {
+        records(c,owner,DayNotes.TYPE,value->{if(presentNote(value,deletedNotes)){
+            String path=value.path("date").asText()+".md";
+            byte[] bytes=value.has("markdown")?value.path("markdown").asText().getBytes(StandardCharsets.UTF_8)
+                    :JournalMarkdown.render(path,null,value.path("text").asText(),value.path("body").asText());
+            output.accept(path,bytes);
+        }});
+        records(c,owner,WeekNotes.TYPE,value->{if(presentWeek(value,deletedWeeks))output.accept(value.path("week").asText()+".md",value.path("body").asText().getBytes(StandardCharsets.UTF_8));});
+        records(c,owner,JournalAssets.TYPE,value->{if(!value.path("deleted").asBoolean())output.accept("assets/"+value.path("filename").asText(),JournalAssets.bytes(value));});
+        records(c,owner,"TASK_ATTACHMENT",value->output.accept(ArchiveJournalFiles.taskPath(value.path("id").asText()),Base64.getDecoder().decode(value.path("data").asText())));
+    }
+    private static ObjectNode workRecord(String name,ObjectNode value){
+        var result=value.deepCopy();if(name.equals("taskAttachments")){result.remove("data");result.put("archiveFile",ArchiveJournalFiles.taskPath(value.path("id").asText()));}return result;
     }
     private static void entry(ZipOutputStream zip,String name) throws IOException {zip.putNextEntry(new ZipEntry(name));}
     private static boolean presentNote(ObjectNode value,Map<String,Long> deleted){

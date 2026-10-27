@@ -471,6 +471,10 @@ class ContractTest(unittest.TestCase):
         validator('ArchiveDayNote').validate({'date': '2026-10-25', 'text': '', 'body': '', 'markdown': ''})
         validator('ArchiveJournalAsset').validate({'filename': 'photo.png', 'data': 'AQID'})
         self.assertFalse(validator('ArchiveJournalAsset').is_valid({'filename': '../photo.png', 'data': 'AQID'}))
+        for path in ['2026-10-27.md', '2026-W44.md', 'assets/photo.png', f'assets/task attachments/{ID}.bin']:
+            validator('ArchiveJournalFile').validate({'path': path, 'bytes': 0, 'sha256': 'a' * 64})
+        for path in ['../outside', '/absolute.md', 'assets/../outside', 'assets/nested/file.png']:
+            self.assertFalse(validator('ArchiveJournalFile').is_valid({'path': path, 'bytes': 0, 'sha256': 'a' * 64}))
 
     def test_every_reference_and_relation_workflow_is_present(self):
         expected = {
