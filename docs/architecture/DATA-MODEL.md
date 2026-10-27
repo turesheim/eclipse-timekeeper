@@ -576,8 +576,11 @@ their JSON payloads and are validated within owner-scoped server transactions.
 invalidation through `tk_change`. Calendar range reads return only the label
 and `hasBody`, not the Markdown body. Active notes are included in account
 archives, including canonical Markdown even for empty but present notes.
-Weekly notes are included as `weekNotes` with a `YYYY-Www.md` filename and
-exact UTF-8 Markdown body. Daily and weekly notes are independent.
+Version 2 account archives store daily and weekly notes as separate
+`YYYY-MM-DD.md` and `YYYY-Www.md` files, with a checksummed `journalFiles` index.
+Journal assets use `assets/`; task attachment bytes use `assets/task attachments/` and
+retain their metadata in the task graph. Legacy version 1 archives with inline
+`dayNotes`, `weekNotes` and `journalAssets` remain readable. Daily and weekly notes are independent.
 Active journal assets are also included; empty deletion markers are not.
 Historical rows from the retired SSH synchronization
 implementation are ignored; no data migration is required.

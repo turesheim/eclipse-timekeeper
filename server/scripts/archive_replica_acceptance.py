@@ -42,7 +42,7 @@ class ArchiveReplicas(Replicas):
         raise RuntimeError('Disposable archive replica did not restart; see its private failure log')
 
 
-def download(system,index,browser,*,token=None,owner=None):
+def download(system,index,browser,*,token=None,owner=None,with_zip=False):
     selected={'Origin':system.origins[index],'Accept':'application/zip','X-Timekeeper-Owner':encoded((owner or browser.owner).encode())}
     if token:selected['Authorization']='Bearer '+token
     else:selected['Cookie']='; '.join(key+'='+value for key,value in browser.cookies.items())
@@ -57,7 +57,7 @@ def download(system,index,browser,*,token=None,owner=None):
             with io.TextIOWrapper(archive.open(name+'.csv'),encoding='utf-8',newline='') as stream:
                 if sum(1 for _ in csv.reader(stream))-1!=manifest['counts'][name]:raise AssertionError('CSV omitted an owned work record')
         if value['account']['ownerId']!=(owner or browser.owner):raise AssertionError('Archive exposed another owner')
-    return value,source
+    return (value,source,binary) if with_zip else (value,source)
 
 
 def exercise(system):
@@ -157,6 +157,32 @@ def exercise(system):
     downloaded,_=download(system,2,Browser(),token=read_token,owner=bob.owner)
     if downloaded['account']['ownerId']!=bob.owner:raise AssertionError('Read-only download changed owner')
     passed('reselection, malformed graphs and read-only access preserve one private, atomic restore outcome')
+
+    day='2026-10-27';week='2026-W44';day_body='# Private replica day\r\n[Report](assets/replica.bin)\r\n';week_body='# Private replica week\r\n'
+    attachment=b'private replica attachment\x00bytes'
+    for route,body in (('/day-notes/'+day,day_body),('/week-notes/'+week,week_body)):
+        current=system.request(1,alice,route);expect(current,200,'Read empty note before ZIP fixture')
+        expect(system.request(2,alice,route,{'body':body},method='PUT',headers={'If-Match':current[2]['ETag']}),200,'Save exact note for ZIP fixture')
+    expect(system.request(1,alice,'/journal-assets/replica.bin',{'data':base64.b64encode(attachment).decode()},method='PUT',headers={'If-None-Match':'*'}),201,'Save binary journal ZIP fixture')
+    task=post(2,alice,'/tasks',{'projectId':None,'parentTaskId':None,'summary':'Separate binary task attachment','url':None})
+    post(1,alice,'/tasks/'+task['id']+'/attachments',{'fileName':'original.bin','contentType':'application/octet-stream','bytes':len(attachment),'sha256':hashlib.sha256(attachment).hexdigest(),'data':base64.b64encode(attachment).decode()})
+    snapshot,metadata,packed=download(system,2,alice,with_zip=True)
+    if snapshot['format']!='timekeeper-account-v2' or day_body.encode() in metadata or base64.b64encode(attachment) in metadata:raise AssertionError('New archive still embeds file bodies in JSON')
+    expect(system.request(1,alice,'/admin/users',{'username':'carol','password':PASSWORD,'displayName':'Carol','administrator':False,'email':'carol@example.invalid'}),201,'Fresh target for complete ZIP restore')
+    carol=system.password_login('carol',index=2)
+    upload=post(1,carol,'/data/account/uploads',{'fileName':'account.zip','mediaType':'application/zip','bytes':len(packed),'sha256':hashlib.sha256(packed).hexdigest()})
+    route='/data/account/uploads/'+upload['id']
+    for offset in range(0,len(packed),upload['chunkBytes']):
+        expect(system.request(2,carol,route+'/chunks/'+str(offset//upload['chunkBytes']),{'data':base64.b64encode(packed[offset:offset+upload['chunkBytes']]).decode()},method='PUT'),200,'Upload separate-file ZIP on other JVM')
+    review=system.request(1,carol,route+'/preview',{'restoreTimeZone':False})
+    if not expect(review,200,'Review separate-file ZIP')['canImport']:raise AssertionError('Separate files failed valid ZIP review')
+    expect(system.request(2,carol,route+'/import',{'restoreTimeZone':False},headers={'If-Match':review[2]['ETag']}),201,'Restore separate-file ZIP on other JVM')
+    if expect(system.request(1,carol,'/day-notes/'+day),200,'Restored daily note')['body']!=day_body or expect(system.request(2,carol,'/week-notes/'+week),200,'Restored weekly note')['body']!=week_body:raise AssertionError('ZIP restore changed exact note bodies')
+    restored,_,restored_zip=download(system,1,carol,with_zip=True)
+    task_file=next(value['archiveFile'] for value in restored['work']['taskAttachments'] if value['fileName']=='original.bin')
+    with zipfile.ZipFile(io.BytesIO(restored_zip)) as archive:
+        if archive.read(day+'.md')!=day_body.encode() or archive.read(week+'.md')!=week_body.encode() or archive.read('assets/replica.bin')!=attachment or archive.read(task_file)!=attachment:raise AssertionError('Cross-JVM ZIP restore changed separate Markdown or binary files')
+    passed('separate daily/weekly Markdown and binary journal/task attachments restore exactly across PostgreSQL JVMs')
     return checks
 
 

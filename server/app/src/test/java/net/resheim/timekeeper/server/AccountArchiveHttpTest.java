@@ -44,17 +44,27 @@ class AccountArchiveHttpTest {
         String date="2026-08-06",journal="Private account journal\r\n  preserve this spacing  \n";
         var empty=call("test-a","GET","/day-notes/"+date,null,null,null);
         call("test-a","PUT","/day-notes/"+date,object().put("body",journal),empty.header("ETag"),null).then().statusCode(200);
+        String canonical="---\r\ntimekeeper-label: Planning\r\ncustom: preserved\r\n---\r\n"+journal;
+        store.transaction("a",()->{var notes=new DayNotes(store);var day=DayNotes.date(date);notes.saveDocument(day,etag(notes.get(day)),canonical.getBytes(StandardCharsets.UTF_8));return null;});
         String week="2026-W32",weekly="# Weekly private plan\r\n";
         var emptyWeek=call("test-a","GET","/week-notes/"+week,null,null,null);
         call("test-a","PUT","/week-notes/"+week,object().put("body",weekly),emptyWeek.header("ETag"),null).then().statusCode(200);
+        byte[] attachment={0,1,2,3,(byte)255};store.transaction("a",()->{new JournalAssets(store).save("report.bin",null,attachment);return null;});
+        var task=call("test-a","POST","/tasks",object().put("summary","Task with a binary attachment").putNull("projectId").putNull("parentTaskId").putNull("url"),null,UUID.randomUUID().toString());task.then().statusCode(201);
+        UUID attachmentId=UUID.randomUUID();String attachmentPath=ArchiveJournalFiles.taskPath(attachmentId.toString());
+        store.transaction("a",()->{store.save("TASK_ATTACHMENT",new net.resheim.eclipse.timekeeper.domain.TaskAttachment(attachmentId,uuid(parse(task.asString()).path("id")),"Original report.bin","application/octet-stream",attachment.length,ArchiveJournalFiles.digest(attachment),Base64.getEncoder().encodeToString(attachment),Optional.empty(),Optional.empty(),0));return null;});
         store.transaction("a",()->{store.update("UPDATE tk_account SET administrator=TRUE WHERE owner_id=?",store.owner());return null;});
         byte[] bytes=call("test-read","GET","/data/account/export",null,null,null).then().statusCode(200).header("Cache-Control","no-store").contentType("application/zip").extract().asByteArray();
-        JsonNode source=null;
-        try(var zip=new ZipInputStream(new ByteArrayInputStream(bytes))) {for(var entry=zip.getNextEntry();entry!=null;entry=zip.getNextEntry()) if(entry.getName().equals("archive.json")) source=parse(new String(zip.readAllBytes(),StandardCharsets.UTF_8));}
+        JsonNode source=null;var entries=new HashMap<String,byte[]>();
+        try(var zip=new ZipInputStream(new ByteArrayInputStream(bytes))) {for(var entry=zip.getNextEntry();entry!=null;entry=zip.getNextEntry()) {var content=zip.readAllBytes();entries.put(entry.getName(),content);if(entry.getName().equals("archive.json"))source=parse(new String(content,StandardCharsets.UTF_8));}}
         assertNotNull(source);assertEquals("a",source.path("account").path("ownerId").asText());assertEquals(1,source.path("work").path("projects").size());
-        assertEquals(journal,source.path("dayNotes").get(0).path("body").asText());
-        assertEquals(week+".md",source.path("weekNotes").get(0).path("filename").asText());
-        assertEquals(weekly,source.path("weekNotes").get(0).path("markdown").asText());
+        assertEquals(AccountArchive.FORMAT,source.path("format").asText());assertEquals(4,source.path("journalFiles").size());
+        assertFalse(source.has("dayNotes"));assertFalse(source.has("weekNotes"));assertFalse(source.has("journalAssets"));assertFalse(source.toString().contains("Weekly private plan"));
+        assertEquals(canonical,new String(entries.get(date+".md"),StandardCharsets.UTF_8));
+        assertEquals(weekly,new String(entries.get(week+".md"),StandardCharsets.UTF_8));assertArrayEquals(attachment,entries.get("assets/report.bin"));
+        assertArrayEquals(attachment,entries.get(attachmentPath));assertFalse(source.path("work").path("taskAttachments").get(0).has("data"));
+        assertEquals(attachmentPath,source.path("work").path("taskAttachments").get(0).path("archiveFile").asText());
+        assertFalse(new String(entries.get("taskAttachments.csv"),StandardCharsets.UTF_8).contains("AAECA/8="));
         byte[] foreign=call("test-b","GET","/data/account/export",null,null,null).then().statusCode(200).extract().asByteArray();
         try(var zip=new ZipInputStream(new ByteArrayInputStream(foreign))){for(var entry=zip.getNextEntry();entry!=null;entry=zip.getNextEntry())if(entry.getName().equals("archive.json"))assertFalse(new String(zip.readAllBytes(),StandardCharsets.UTF_8).contains("Private account journal"));}
         given().get("/api/v1/data/account/export").then().statusCode(401);
@@ -84,15 +94,16 @@ class AccountArchiveHttpTest {
         assertEquals(0,parse(call("test-a","GET","/data/account/imports",null,null,null).asString()).path("items").size());
         assertEquals(1,parse(call("test-a","GET","/projects",null,null,null).asString()).path("items").size());
         assertEquals(journal,parse(call("test-b","GET","/day-notes/"+date,null,null,null).asString()).path("body").asText());
+        store.transaction("b",()->{assertEquals(canonical,new String(new DayNotes(store).document(DayNotes.date(date)),StandardCharsets.UTF_8));return null;});
         assertEquals(weekly,parse(call("test-b","GET","/week-notes/"+week,null,null,null).asString()).path("body").asText());
-        // The extracted JSON and its original ZIP are one archive, even though
-        // the upload bytes/hash and preference choice differ.
+        store.transaction("b",()->{assertArrayEquals(attachment,JournalAssets.bytes(new JournalAssets(store).get("report.bin")));return null;});
+        store.transaction("b",()->{var restoredAttachment=store.list("TASK_ATTACHMENT").getFirst();assertEquals("Original report.bin",restoredAttachment.path("fileName").asText());assertArrayEquals(attachment,Base64.getDecoder().decode(restoredAttachment.path("data").asText()));return null;});
+        // A v2 JSON index alone cannot restore the separate journal files.
         byte[] extracted=source.toString().getBytes(StandardCharsets.UTF_8);
         var jsonInput=object().put("fileName","archive.json").put("mediaType","application/json").put("bytes",extracted.length).put("sha256",HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(extracted)));
         var second=call("test-b","POST","/data/account/uploads",jsonInput,null,UUID.randomUUID().toString());second.then().statusCode(201);
         String jsonUpload="/data/account/uploads/"+parse(second.asString()).path("id").asText();call("test-b","PUT",jsonUpload+"/chunks/0",object().put("data",Base64.getEncoder().encodeToString(extracted)),null,null).then().statusCode(200);
-        var duplicate=call("test-b","POST",jsonUpload+"/preview",object().put("restoreTimeZone",true),null,null);duplicate.then().statusCode(200);
-        assertTrue(parse(duplicate.asString()).path("alreadyImported").asBoolean());
+        call("test-b","POST",jsonUpload+"/preview",object().put("restoreTimeZone",true),null,null).then().statusCode(422);
         assertEquals(1,parse(call("test-b","GET","/projects",null,null,null).asString()).path("items").size());
     }
 }

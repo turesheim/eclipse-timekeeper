@@ -31,20 +31,28 @@ final class AccountArchiveInput {
     static Verified readVerified(Path file,String mediaType) {
         try {
             if(Files.size(file)>AccountUploads.MAX_BYTES) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
-            if(mediaType.equals("application/json")) try(var input=Files.newInputStream(file)) {return verified(input);}
+            if(mediaType.equals("application/json")) try(var input=Files.newInputStream(file)) {
+                var result=verified(input);if(result.data().path("journalFiles").size()>0||result.data().path("format").asText().equals(AccountArchive.FORMAT)&&result.data().path("work").path("taskAttachments").size()>0)throw ApiFailure.validation();return result;
+            }
             if(!mediaType.equals("application/zip")) throw ApiFailure.validation();
             try(var zip=new ZipFile(file.toFile())) {
-                var seen=new HashSet<String>();var entries=zip.entries();long declared=0;
+                var seen=new HashSet<String>();var journalPaths=new HashSet<String>();var entries=zip.entries();long declared=0;
                 while(entries.hasMoreElements()) {
                     var entry=entries.nextElement();
-                    if(entry.isDirectory() || !FILES.contains(entry.getName()) || !seen.add(entry.getName())) throw ApiFailure.validation();
+                    if(entry.isDirectory() || !seen.add(entry.getName())) throw ApiFailure.validation();
+                    if(!FILES.contains(entry.getName())){ArchiveJournalFiles.kind(entry.getName());journalPaths.add(entry.getName());}
+                    if(seen.size()>760000+FILES.size())throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
                     if(entry.getSize()<0 || entry.getSize()>AccountUploads.MAX_BYTES) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
                     declared+=entry.getSize();if(declared>3*AccountUploads.MAX_BYTES) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
                 }
-                if(!seen.equals(FILES) && !seen.equals(SECTION_FILES) && !seen.equals(TOMBSTONE_FILES) && !seen.equals(PREVIOUS_FILES) && !seen.equals(LEGACY_FILES)) throw ApiFailure.validation();
+                var rootPaths=new HashSet<>(seen);rootPaths.removeAll(journalPaths);
+                if(!rootPaths.equals(FILES) && !rootPaths.equals(SECTION_FILES) && !rootPaths.equals(TOMBSTONE_FILES) && !rootPaths.equals(PREVIOUS_FILES) && !rootPaths.equals(LEGACY_FILES)) throw ApiFailure.validation();
                 Verified verified;
                 try(var input=zip.getInputStream(zip.getEntry("archive.json"))) {verified=verified(input);}
                 var archive=verified.data();
+                if(archive.path("format").asText().equals(AccountArchive.FORMAT)){
+                    if(!rootPaths.equals(FILES)||!ArchiveJournalFiles.verify(zip,archive.path("journalFiles"),archive.path("work").path("taskAttachments")).equals(journalPaths))throw ApiFailure.validation();
+                }else if(!journalPaths.isEmpty())throw ApiFailure.validation();
                 try(var input=zip.getInputStream(zip.getEntry("manifest.json"))) {
                     JsonNode manifest=json(input,64*1024);
                     for(String name:List.of("format","archiveId","generatedAt")) if(!archive.path(name).equals(manifest.path(name))) throw ApiFailure.validation();
@@ -61,7 +69,10 @@ final class AccountArchiveInput {
     }
     private static ObjectNode document(InputStream input) throws IOException {
         JsonNode value=json(input,AccountUploads.MAX_BYTES);
-        if(!value.isObject() || !fields(value).equals(FIELDS) || !value.path("format").asText().equals(AccountArchive.FORMAT)) throw ApiFailure.validation();
+        if(!value.isObject() || !fields(value).equals(FIELDS) || !Set.of(AccountArchive.FORMAT,AccountArchive.LEGACY_FORMAT).contains(value.path("format").asText())) throw ApiFailure.validation();
+        if(value.path("format").asText().equals(AccountArchive.FORMAT)){
+            if(!value.path("journalFiles").isArray()||value.has("dayNotes")||value.has("weekNotes")||value.has("journalAssets"))throw ApiFailure.validation();
+        }else if(value.has("journalFiles"))throw ApiFailure.validation();
         try {ContractInputs.pathId(value.path("archiveId").asText());Instant.parse(value.path("generatedAt").asText());}
         catch(RuntimeException invalid) {throw ApiFailure.validation();}
         if(!value.path("account").isObject() || !value.path("preferences").isObject() || !value.path("work").isObject() || !value.path("importHistory").isArray()) throw ApiFailure.validation();
@@ -72,7 +83,7 @@ final class AccountArchiveInput {
         // before preview or commit; this layer only establishes safe framing.
         return (ObjectNode)value;
     }
-    private static Set<String> fields(JsonNode value) {var fields=names(value);fields.remove("dayNotes");fields.remove("weekNotes");fields.remove("journalAssets");return fields;}
+    private static Set<String> fields(JsonNode value) {var fields=names(value);fields.removeAll(Set.of("dayNotes","weekNotes","journalAssets","journalFiles"));return fields;}
     static ObjectNode counts(JsonNode archive) {
         var result=object();for(String name:AccountArchive.WORK.keySet()) {
             var values=archive.path("work").path(name);
@@ -82,7 +93,12 @@ final class AccountArchiveInput {
         result.put("importAuditRecords",archive.path("importHistory").size());
         if(archive.has("dayNotes"))result.put("dayNotes",archive.path("dayNotes").size());
         if(archive.has("weekNotes"))result.put("weekNotes",archive.path("weekNotes").size());
-        if(archive.has("journalAssets"))result.put("journalAssets",archive.path("journalAssets").size());return result;
+        if(archive.has("journalAssets"))result.put("journalAssets",archive.path("journalAssets").size());
+        if(archive.has("journalFiles")){
+            int days=0,weeks=0,assets=0;for(var file:archive.path("journalFiles"))switch(ArchiveJournalFiles.kind(file.path("path").asText())){case DAY->days++;case WEEK->weeks++;case ASSET->assets++;case TASK_ASSET->{}}
+            if(days>0)result.put("dayNotes",days);if(weeks>0)result.put("weekNotes",weeks);if(assets>0)result.put("journalAssets",assets);
+        }
+        return result;
     }
     static ObjectNode relationships(JsonNode archive) {
         var result=object();var work=archive.path("work");
