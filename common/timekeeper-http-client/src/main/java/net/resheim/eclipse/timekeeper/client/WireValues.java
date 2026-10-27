@@ -25,7 +25,15 @@ public final class WireValues {
         var planning=new TaskPlanning(value.has("status")?TaskStatus.valueOf(value.get("status").getAsString()):TaskStatus.NOT_STARTED,
                 text(value.get("scheduledDate")).map(LocalDate::parse),text(value.get("completedAt")).map(Instant::parse));
         var checklist=checklist(value.get("checklistItems"));
-        return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,planning,checklist,timing(value),importance(value),value.get("version").getAsLong());
+		return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,planning,checklist,timing(value),importance(value),body(value),value.get("version").getAsLong());
+    }
+    public static TaskBody body(JsonObject value) {
+        if(!value.has("body") || value.get("body").isJsonNull())return TaskBody.empty();
+        var body=value.getAsJsonObject("body");
+        return new TaskBody(TaskBodyFormat.valueOf(body.get("format").getAsString()),body.get("content").getAsString());
+    }
+    public static void body(JsonObject value,TaskBody body) {
+        var entry=object();entry.addProperty("format",body.format().name());entry.addProperty("content",body.content());value.add("body",entry);
     }
     public static TaskImportance importance(JsonObject value) {
         return new TaskImportance(value.has("priority")?TaskPriority.valueOf(value.get("priority").getAsString()):TaskPriority.UNSPECIFIED,

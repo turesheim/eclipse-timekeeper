@@ -172,6 +172,9 @@ class HttpClientIntegrationTest {
             var importance=new TaskImportance(TaskPriority.HIGH,true,false);
             child=client.updateTaskImportance(new UpdateTaskImportance(child.id(),child.version(),importance));
             assertEquals(importance,client.task(child.id()).orElseThrow().importance());
+            var body=new TaskBody(TaskBodyFormat.HTML,"<p>Review <strong>draft</strong></p>");
+            child=client.updateTaskBody(new UpdateTaskBody(child.id(),child.version(),body));
+            assertEquals(body,client.task(child.id()).orElseThrow().body());
             var first=client.activate(child.id(),"Tracked",Set.of(label.id()),Optional.empty());
             assertEquals(client.profile().owner(),first.ownerId());
             var second=client.activate(parent.id(),"Successor",Set.of(),Optional.of(first));
