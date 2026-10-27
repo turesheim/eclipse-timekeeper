@@ -158,6 +158,12 @@ by a vertical divider. Mode buttons use icons with localized tooltips. Editing
 help and the separate clear/download actions are omitted. Safe angle-bracket
 autolinks remain renderable, rich edits retain resource-link syntax, and
 horizontal rules are saved as `---`.
+Fenced `mermaid` blocks retain editable source and show a diagram preview in
+Formatted mode. The renderer is loaded only when a diagram is present, runs
+without third-party requests, and displays its SVG as an inert image. Invalid
+diagrams leave their Markdown source intact.
+
+![Mermaid diagram in the formatted Markdown editor](../assets/screenshots/mermaid-editor.png)
 The [layout evaluation](JOURNAL-EDITOR.md) records why this keeps the existing
 Calendar navigation rather than introducing a separate Journal tab.
 Clear the text and save to remove a label;
@@ -295,7 +301,7 @@ Open **About** in the account menu for Timekeeper copyright, the Eclipse Public
 License, project website, source and issue tracker. Server version, SPK version,
 commit and build, deployment and start times remain available. Expand **Web
 components and licenses** for the exact bundled Bootstrap, Bootstrap Icons,
-i18next and date-holidays versions, upstream copyright and complete local license
+i18next, Mermaid and date-holidays versions, upstream copyright and complete local license
 texts, including date-holidays data and dependency notices. External project
 links open separately; viewing About and its license texts needs no third-party
 requests. Close the dialog with its button or Escape.

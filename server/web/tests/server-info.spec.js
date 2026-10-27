@@ -33,7 +33,7 @@ test('About identifies the project and bundled libraries with complete local lic
   await expect(page.locator('#server-version')).toHaveText(server.version);
   await page.locator('#about-notices summary').click();
   const manifest=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
-  for(const [name,pkg,directory=pkg] of [['Milkdown','@milkdown/kit','milkdown'],['Bootstrap','bootstrap'],['Bootstrap Icons','bootstrap-icons'],['i18next','i18next'],['date-holidays','date-holidays']]) {
+  for(const [name,pkg,directory=pkg] of [['Milkdown','@milkdown/kit','milkdown'],['Mermaid','mermaid'],['Bootstrap','bootstrap'],['Bootstrap Icons','bootstrap-icons'],['i18next','i18next'],['date-holidays','date-holidays']]) {
     const row=page.locator('#about-components li').filter({has:page.getByRole('link',{name,exact:true})});
     await expect(row).toContainText(manifest.devDependencies[pkg]);await expect(row).toContainText('Copyright');
     const response=await request.get(await row.getByRole('link',{name:new RegExp('^'+name+' license:','i')}).getAttribute('href'));

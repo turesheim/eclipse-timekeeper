@@ -7,6 +7,7 @@ import {history,undoCommand,redoCommand} from '@milkdown/kit/plugin/history';
 import {getMarkdown,callCommand,$prose} from '@milkdown/kit/utils';
 import {Plugin,TextSelection} from '@milkdown/kit/prose/state';
 import {hasUnsupportedSyntax,normalizeEditorMarkdown} from '../src/markdown-document.js';
+import {t} from '../src/i18n.js';
 import '@milkdown/kit/prose/view/style/prosemirror.css';
 import '@milkdown/kit/prose/tables/style/tables.css';
 
@@ -41,6 +42,33 @@ function taskItem(node,view,getPos,taskLabel){
   });
   return {dom,contentDOM,update(value){if(value.type!==node.type)return false;paint(value);return true;},stopEvent:event=>event.target===checkbox,ignoreMutation:mutation=>mutation.type==='attributes'&&(mutation.target===checkbox||mutation.target===dom)};
 }
+let diagrams;
+function mermaidBlock(node){
+  const dom=document.createElement('div'),pre=document.createElement('pre'),code=document.createElement('code'),preview=document.createElement('div'),status=document.createElement('p'),image=document.createElement('img');
+  dom.className='markdown-mermaid-block';pre.dataset.language=node.attrs.language;pre.append(code);
+  preview.className='markdown-mermaid-preview';status.setAttribute('role','status');
+  image.alt=t('markdown.mermaid_diagram');image.hidden=true;
+  preview.append(status,image);dom.append(pre,preview);
+  let timer,generation=0,source;
+  const schedule=value=>{
+    if(value===source)return;source=value;const current=++generation;clearTimeout(timer);image.hidden=true;image.removeAttribute('src');
+    if(!value.trim()){status.textContent='';return;}
+    if(new TextEncoder().encode(value).length>10000){status.textContent=t('markdown.mermaid_too_large');return;}
+    if(/(?:https?:\/\/|data:|file:|javascript:)/i.test(value)){status.textContent=t('markdown.mermaid_external');return;}
+    status.textContent=t('markdown.mermaid_loading');
+    timer=setTimeout(async()=>{
+      try{
+        diagrams??=import(new URL('../mermaid/mermaid.js',import.meta.url).href);
+        const {renderDiagram}=await diagrams,svg=await renderDiagram(value);
+        if(current!==generation)return;
+        image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+        image.hidden=false;status.textContent='';
+      }catch{if(current===generation)status.textContent=t('markdown.mermaid_invalid');}
+    },300);
+  };
+  schedule(node.textContent);
+  return {dom,contentDOM:code,update(value){if(value.type!==node.type||String(value.attrs.language).toLowerCase()!=='mermaid')return false;schedule(value.textContent);return true;},destroy(){++generation;clearTimeout(timer);image.removeAttribute('src');},ignoreMutation:mutation=>preview.contains(mutation.target),stopEvent:event=>preview.contains(event.target)};
+}
 export async function createMarkdownEditor({root,value,label,taskLabel,escape,changed,stateChanged,description,readOnly=false}){
   const changePlugin=$prose(()=>new Plugin({filterTransaction:transaction=>!transaction.docChanged||!readOnly&&safeDocument(transaction.doc),view:()=>({update:(view,previous)=>{
     const documentChanged=!view.state.doc.eq(previous.doc);if(documentChanged)changed?.();
@@ -53,7 +81,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       attributes:()=>({role:'textbox','aria-label':label,'aria-multiline':'true','aria-readonly':String(readOnly),...(!readOnly&&description?{'aria-describedby':description}:{}),tabindex:'0',spellcheck:'true'}),
       editable:()=>!readOnly,
       handleKeyDown:(_view,event)=>{if(event.key==='Escape'){escape();return true;}return false;},
-      nodeViews:{list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),image:node=>{
+      nodeViews:{list_item:(node,view,getPos)=>taskItem(node,view,getPos,taskLabel),code_block:node=>String(node.attrs.language).toLowerCase()==='mermaid'?mermaidBlock(node):null,image:node=>{
         const dom=document.createElement(safeAsset(node.attrs.src)?'img':'span');
         if(dom.tagName==='IMG'){dom.src='/api/v1/journal-assets/'+node.attrs.src.slice(7);dom.alt=node.attrs.alt||'';dom.loading='lazy';}
         else dom.textContent=node.attrs.alt||'';

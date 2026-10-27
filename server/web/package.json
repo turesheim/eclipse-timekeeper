@@ -4,10 +4,11 @@
   "license": "EPL-2.0",
   "type": "module",
   "scripts": {
-    "test": "node scripts/vendor-bootstrap.mjs --check && node scripts/vendor-icons.mjs --check && node scripts/vendor-i18n.mjs --check && node scripts/vendor-holidays.mjs --check && node scripts/vendor-notices.mjs --check && node scripts/vendor-editor.mjs --check && node --test tests/model.test.js tests/api.test.js tests/credentials.test.js tests/calendar.test.js tests/month.test.js tests/workweek-session-model.test.js tests/toggl-csv.test.js tests/import-model.test.js tests/webauthn.test.js tests/icons.test.js tests/i18n.test.js tests/holidays.test.js tests/markdown-document.test.js",
+    "test": "node scripts/vendor-bootstrap.mjs --check && node scripts/vendor-icons.mjs --check && node scripts/vendor-i18n.mjs --check && node scripts/vendor-holidays.mjs --check && node scripts/vendor-notices.mjs --check && node scripts/vendor-editor.mjs --check && node scripts/vendor-mermaid.mjs --check && node --test tests/model.test.js tests/api.test.js tests/credentials.test.js tests/calendar.test.js tests/month.test.js tests/workweek-session-model.test.js tests/toggl-csv.test.js tests/import-model.test.js tests/webauthn.test.js tests/icons.test.js tests/i18n.test.js tests/holidays.test.js tests/markdown-document.test.js",
     "test:browser": "playwright test",
     "vendor:bootstrap": "node scripts/vendor-bootstrap.mjs",
-    "check:assets": "node scripts/vendor-bootstrap.mjs --check && node scripts/vendor-icons.mjs --check && node scripts/vendor-i18n.mjs --check && node scripts/vendor-holidays.mjs --check && node scripts/vendor-notices.mjs --check && node scripts/vendor-editor.mjs --check",
+    "check:assets": "node scripts/vendor-bootstrap.mjs --check && node scripts/vendor-icons.mjs --check && node scripts/vendor-i18n.mjs --check && node scripts/vendor-holidays.mjs --check && node scripts/vendor-notices.mjs --check && node scripts/vendor-editor.mjs --check && node scripts/vendor-mermaid.mjs --check",
+    "vendor:mermaid": "node scripts/vendor-mermaid.mjs",
     "vendor:icons": "node scripts/vendor-icons.mjs",
     "vendor:i18n": "node scripts/vendor-i18n.mjs",
     "vendor:holidays": "node scripts/vendor-holidays.mjs",
@@ -22,6 +23,7 @@
     "bootstrap-icons": "1.13.2",
     "date-holidays": "3.37.0",
     "esbuild": "0.28.2",
-    "i18next": "26.5.2"
+    "i18next": "26.5.2",
+    "mermaid": "12.2.0"
   }
 }

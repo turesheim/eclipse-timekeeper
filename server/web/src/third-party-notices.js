@@ -10,6 +10,15 @@ export const thirdPartyNotices=[
     "licenseUrl": "/web/assets/notices/milkdown-LICENSE.txt"
   },
   {
+    "name": "Mermaid",
+    "homepage": "https://mermaid.js.org/",
+    "license": "MIT",
+    "notices": "/web/assets/mermaid/THIRD-PARTY-LICENSES.txt",
+    "version": "12.2.0",
+    "copyright": "Copyright (c) 2014 - 2022 Knut Sveidqvist",
+    "licenseUrl": "/web/assets/notices/mermaid-LICENSE.txt"
+  },
+  {
     "name": "Bootstrap",
     "homepage": "https://getbootstrap.com/",
     "license": "MIT",

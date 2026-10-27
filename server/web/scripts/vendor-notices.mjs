@@ -4,6 +4,7 @@ const root=new URL('../',import.meta.url),check=process.argv.includes('--check')
 const manifest=JSON.parse(await readFile(new URL('package.json',root)));
 const components=[
   {id:'@milkdown/kit',name:'Milkdown',homepage:'https://milkdown.dev/',license:'MIT',directory:'milkdown',notices:'/web/assets/milkdown/THIRD-PARTY-LICENSES.txt'},
+  {id:'mermaid',name:'Mermaid',homepage:'https://mermaid.js.org/',license:'MIT',directory:'mermaid',notices:'/web/assets/mermaid/THIRD-PARTY-LICENSES.txt'},
   {id:'bootstrap',name:'Bootstrap',homepage:'https://getbootstrap.com/',license:'MIT',directory:'bootstrap'},
   {id:'bootstrap-icons',name:'Bootstrap Icons',homepage:'https://icons.getbootstrap.com/',license:'MIT',directory:'bootstrap-icons'},
   {id:'i18next',name:'i18next',homepage:'https://www.i18next.com/',license:'MIT',directory:'i18next'},

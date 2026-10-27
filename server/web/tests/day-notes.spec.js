@@ -284,6 +284,19 @@ test('journal saves formatted bodies independently from labels and updates separ
   }finally{await owner.close();}
 });
 
+test('saved day notes reopen Mermaid previews without changing the fenced source',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage();
+  try{
+    await signIn(page,await fresh(request));const api=await apiFor(page);await month(page);await menu(page);
+    const body='```mermaid\nflowchart LR\n  Plan --> Done\n```\n';
+    await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill(body);await save(page,'Diagram');
+    expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe(body);
+    await menu(page);const image=dialog(page).getByRole('img',{name:'Mermaid diagram preview'});
+    await expect(image).toBeVisible();await expect.poll(()=>image.evaluate(element=>element.complete?element.naturalWidth:0)).toBeGreaterThan(0);
+    await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await expect(page.locator('#journal-body')).toHaveValue(body);
+  }finally{await owner.close();}
+});
+
 test('journal preserves unsupported source, opaque frontmatter and exact label-only updates without unsafe rendering',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage();
   try{
