@@ -15,6 +15,17 @@ as a zero-byte file. A deleted note is absent. Calendar and REST edits share
 the same version as WebDAV edits, so their changes invalidate previously issued
 WebDAV ETags.
 
+The `assets/` child collection holds images and other files referenced by
+Markdown. For example, an image link to `assets/photo.png` in `2026-10-25.md` resolves
+to `/dav/journal/assets/photo.png`. Files have one account-scoped name each and
+are visible only with that account's token. `assets/` supports listing,
+`GET`/`HEAD`, `PUT` and `DELETE`; existing files require `If-Match` for changes
+and deletion. New files can use `If-None-Match: *`. Only PNG, JPEG, GIF and WebP
+with matching file signatures are displayed inline; other files download as
+attachments. The web editor creates unique names when inserting an image or
+attachment. Each file is limited to 5 MB, with at most 1,000 active files and
+100 MB total per account. The root collection and `assets/` cannot be deleted.
+
 For an existing file, send its strong ETag in `If-Match` when replacing or
 deleting it. A stale ETag receives `412 Precondition Failed`. For creation,
 `If-None-Match: *` prevents replacing an existing file. An unconditional `PUT`
@@ -29,8 +40,8 @@ recreation from a stale client's upload after a delete; clients must track
 their local deletions and issue `DELETE` deliberately.
 
 [Milton's usual server entry point](https://github.com/miltonio/milton2/blob/master/milton-server-ce/src/main/java/io/milton/servlet/MiltonFilter.java)
-is a Servlet filter. Timekeeper uses Quarkus REST, so this bounded one-level
-collection uses [Quarkus REST custom HTTP methods](https://quarkus.io/version/3.40/guides/rest/#declaring-endpoints-http-methods)
+is a Servlet filter. Timekeeper uses Quarkus REST, so these bounded journal
+collections use [Quarkus REST custom HTTP methods](https://quarkus.io/version/3.40/guides/rest/#declaring-endpoints-http-methods)
 without adding a Servlet stack or another authentication path.
 
 ## Client compatibility

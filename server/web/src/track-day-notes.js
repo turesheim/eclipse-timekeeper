@@ -18,7 +18,8 @@ export class TrackDayNotes {
     const label=node('label',t('day_notes.text'),'form-label');label.htmlFor=this.prefix+'-note-text';this.text=node('input',undefined,'form-control journal-note-label');this.text.id=this.prefix+'-note-text';this.text.maxLength=80;this.text.autocomplete='off';
     this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');
     this.savedStatus=node('p','','hint');this.savedStatus.setAttribute('role','status');
-    const markdown=node('div');this.markdown=new MarkdownField(markdown,()=>this.changed(),()=>this.controls(),this.prefix==='track'?'journal':this.prefix+'-journal');
+    const markdown=node('div');this.markdown=new MarkdownField(markdown,()=>this.changed(),()=>this.controls(),
+      this.prefix==='track'?'journal':this.prefix+'-journal',(file,image)=>this.uploadAsset(file,image));
     this.reload=button(t('journal.reload'),'btn btn-outline-secondary');this.reload.addEventListener('click',()=>void this.reloadEditor());
     const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.delete=button(t('journal.delete_note'),'btn btn-outline-secondary');this.delete.addEventListener('click',()=>void this.deleteNote());this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.savedStatus,this.cancel,this.delete,this.save);
     this.recovery=node('div',undefined,'journal-recovery');this.recovery.append(this.reload);
@@ -33,6 +34,19 @@ export class TrackDayNotes {
     if(!this.inline)this.buildMenu();
   }
   dirty(){return !!this.editor?.etag&&(this.text.value.trim()!==this.editor.originalText||this.markdown.value()!==this.editor.originalBody);}
+  async uploadAsset(file,image){
+    const editor=this.editor;
+    if(!editor||!this.writable||file.size>5_000_000||image&&!['image/png','image/jpeg','image/gif','image/webp'].includes(file.type))throw new Error('Invalid attachment');
+    const imageExtensions={'image/png':'png','image/jpeg':'jpg','image/gif':'gif','image/webp':'webp'};
+    const extension=image?imageExtensions[file.type]:(file.name.match(/\.([a-zA-Z0-9]{1,10})$/)?.[1]||'bin').toLowerCase();
+    const filename=crypto.randomUUID()+'.'+extension;
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    if(this.editor!==editor)throw new Error('Editor closed');
+    let binary='';for(let offset=0;offset<bytes.length;offset+=8192)binary+=String.fromCharCode(...bytes.subarray(offset,offset+8192));
+    await editor.session.request('/journal-assets/'+filename,{method:'PUT',noneMatch:'*',body:{data:btoa(binary)},emptyResponse:true,timeout:60000});
+    if(this.editor!==editor)throw new Error('Editor closed');
+    return 'assets/'+filename;
+  }
   changed(){if(this.editor)this.savedStatus.textContent=t(this.dirty()?'journal.unsaved':'journal.saved');}
   requestClose(){if(this.editor?.busy||this.dirty()&&!confirm(t('journal.discard')))return;if(this.inline){if(this.editor)void this.loadEditor(this.editor);}else this.closeEditor();}
   closeEditor(){if(!this.inline)this.dialog.close();this.finishEditor();}

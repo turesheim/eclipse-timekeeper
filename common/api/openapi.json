@@ -11031,6 +11031,196 @@
         ],
         "description": "Explicit deletion only; remote disappearance should update enabled/present instead. A connection with lists or a list with linked tasks returns 409."
       }
+    },
+    "/journal-assets/{filename}": {
+      "parameters": [
+        {
+          "name": "filename",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getJournalAsset",
+        "summary": "Read one private journal attachment",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Exact attachment bytes. Recognized raster images are served with their image media type; other files are downloads.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "const": "nosniff"
+                }
+              }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The requested ETag is current."
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putJournalAsset",
+        "summary": "Create or replace a private journal attachment conditionally",
+        "x-required-permission": "write",
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "Updated.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatchOptional"
+          },
+          {
+            "$ref": "#/components/parameters/IfNoneMatchStar"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JournalAssetUploadInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteJournalAsset",
+        "summary": "Delete a private journal attachment with its current ETag",
+        "x-required-permission": "write",
+        "responses": {
+          "204": {
+            "description": "Deleted; the versioned marker prevents ETag reuse.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -15895,6 +16085,14 @@
               "$ref": "#/components/schemas/ArchiveDayNote"
             },
             "description": "Optional private civil-date labels and Markdown bodies, independent of timed work. Body is optional for legacy label-only archives. Empty tombstones are not exported."
+          },
+          "journalAssets": {
+            "type": "array",
+            "maxItems": 10000,
+            "items": {
+              "$ref": "#/components/schemas/ArchiveJournalAsset"
+            },
+            "description": "Optional private journal attachments. Deleted assets are excluded."
           }
         },
         "required": [
@@ -16010,6 +16208,11 @@
           "taskLists": {
             "type": "integer",
             "minimum": 0
+          },
+          "journalAssets": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
           }
         },
         "required": [
@@ -19357,6 +19560,11 @@
             "type": "string",
             "maxLength": 200000,
             "description": "Exact UTF-8 Markdown, limited to 200,000 encoded bytes. Whitespace and line endings are preserved. Empty string clears only the body; omission preserves it. Null and invalid Unicode are rejected."
+          },
+          "markdown": {
+            "type": "string",
+            "maxLength": 220000,
+            "description": "Complete canonical UTF-8 Markdown, including YAML metadata and exact whitespace. Present on new exports; optional for legacy archives."
           }
         },
         "anyOf": [
@@ -19376,6 +19584,11 @@
                 "minLength": 1
               }
             }
+          },
+          {
+            "required": [
+              "markdown"
+            ]
           }
         ]
       },
@@ -20449,6 +20662,41 @@
           "siblingOrder"
         ],
         "additionalProperties": false
+      },
+      "JournalAssetUploadInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 6666672,
+            "description": "At most 5,000,000 decoded bytes."
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ArchiveJournalAsset": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "filename",
+          "data"
+        ],
+        "properties": {
+          "filename": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+          },
+          "data": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 6666672,
+            "description": "Exact attachment bytes, at most 5,000,000 after decoding."
+          }
+        }
       }
     },
     "parameters": {
@@ -20551,6 +20799,24 @@
           ]
         },
         "description": "Request a ten-minute undo offer for this work-session edit or deletion."
+      },
+      "IfMatchOptional": {
+        "name": "If-Match",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Use the current strong ETag to replace an existing asset. Exactly one of If-Match or If-None-Match: * is required."
+      },
+      "IfNoneMatchStar": {
+        "name": "If-None-Match",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "const": "*"
+        },
+        "description": "Create only when the asset is absent; use this instead of If-Match for new uploads."
       }
     },
     "responses": {

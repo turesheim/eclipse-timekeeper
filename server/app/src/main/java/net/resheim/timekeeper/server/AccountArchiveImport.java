@@ -20,7 +20,8 @@ final class AccountArchiveImport {
         try(var file=uploads.materialize(id)) {
             var parsed=AccountArchiveInput.readVerified(file.file(),upload.path("mediaType").asText());var value=parsed.data();
             for(String name:DomainTransfer.TYPES.keySet()) if(value.path("work").path(name).size()>250000) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
-            if(value.path("dayNotes").size()>250000 || value.path("importHistory").size()>1000000) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
+            if(value.path("dayNotes").size()>250000 || value.path("journalAssets").size()>10000
+                    || value.path("importHistory").size()>1000000) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
             inputs.validate("AccountArchiveSnapshot",value);
             upload.put("verifiedArchiveId",value.path("archiveId").asText()).put("verifiedArchiveDigest",parsed.sha256());return value;
         }
@@ -59,8 +60,9 @@ final class AccountArchiveImport {
         if(conflicts.isEmpty()) {
             try {
                 var c=store.current().connection();var savepoint=c.setSavepoint();
-                try {restoreZone(archive,restoreZone);new DomainTransfer(store).importRecords(archive.path("work"));new DayNotes(store).restore(archive.path("dayNotes"));}
-                catch(ApiFailure invalid) {if(invalid.status!=409) throw invalid;conflicts.add("Existing work records or day notes conflict with this archive. Resolve the conflict before importing.");}
+                try {restoreZone(archive,restoreZone);new DomainTransfer(store).importRecords(archive.path("work"));
+                    new DayNotes(store).restore(archive.path("dayNotes"));new JournalAssets(store).restore(archive.path("journalAssets"));}
+                catch(ApiFailure invalid) {if(invalid.status!=409) throw invalid;conflicts.add("Existing work records, day notes or journal attachments conflict with this archive. Resolve the conflict before importing.");}
                 finally {c.rollback(savepoint);c.releaseSavepoint(savepoint);}
             }catch(SQLException unavailable) {throw new ApiFailure(503,"UNAVAILABLE");}
         }
@@ -77,7 +79,8 @@ final class AccountArchiveImport {
             if(!upload.path("state").asText().equals("REVIEWED") || !review.path("summary").path("canImport").asBoolean()
                     || review.path("restoreTimeZone").asBoolean()!=restoreZone) throw ApiFailure.conflict();
             if(review.path("revision").asLong(-1)!=store.revision() || review.path("profileVersion").asLong(-1)!=store.profile().path("version").asLong()) throw new ApiFailure(412,"STALE_VERSION");
-            var archive=document(id,upload);restoreZone(archive,restoreZone);new DomainTransfer(store).importRecords(archive.path("work"));new DayNotes(store).restore(archive.path("dayNotes"));
+            var archive=document(id,upload);restoreZone(archive,restoreZone);new DomainTransfer(store).importRecords(archive.path("work"));
+            new DayNotes(store).restore(archive.path("dayNotes"));new JournalAssets(store).restore(archive.path("journalAssets"));
             // Keep old import ledgers as inert audit copies. Their replay keys,
             // mappings and Undo versions are never effective in this account.
             for(var audit:archive.path("importHistory")) {

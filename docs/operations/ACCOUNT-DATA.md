@@ -15,8 +15,10 @@ signed-in account. Administrator access does not include anyone else's records.
 The snapshot includes all work records, project/client links, task relationships,
 labels, descriptions, external references, exact timestamps, running intervals,
 time-zone preferences and import audit history. Web day notes are included as
-optional `dayNotes` in `archive.json`, including labels and exact Markdown bodies
-on dates with no timed work. It also includes your account
+optional `dayNotes` in `archive.json`, including their complete canonical
+Markdown documents even on dates with no timed work or visible Calendar label.
+The optional `journalAssets` array contains image and file attachments as base64.
+It also includes your account
 identity, recovery addresses and credential-management metadata for reference.
 Passwords and hashes, API/session token material, passkey keys/credential IDs,
 recovery codes/links and deployment settings or SMTP secrets are excluded.
@@ -47,6 +49,8 @@ Day notes retain their calendar dates. Matching notes can be restored again; a
 different existing note on the same date is reported as a conflict during review
 and is never overwritten. Legacy label-only notes and archives created before day notes remain supported.
 An omitted legacy body never erases the Markdown of an existing matching note.
+Attachments keep their filenames. A different existing attachment with the same
+name is a review conflict; no file is silently replaced.
 
 Closed intervals retain exact instants and nanoseconds. A source running activity
 or work session can be restored when the corresponding timer is available in this

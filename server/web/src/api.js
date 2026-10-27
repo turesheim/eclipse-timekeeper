@@ -76,7 +76,7 @@ export class Api {
   constructor(token = null, fetcher = (...args) => globalThis.fetch(...args), context = {}) {this.#token = token?.trim() ?? null;this.#csrf = context.csrf;this.#owner = context.ownerId ?? null;this.fetcher = fetcher;}
   get owner() {return this.#owner;}
   close() {this.#closed = true;this.#token = '';this.#csrf = null;for (const request of this.#requests) request.abort();}
-  async request(path, { method = 'GET', body, etag, key, timeout = 15000, binary = false, undo = false, signal } = {}) {
+  async request(path, { method = 'GET', body, etag, noneMatch, key, timeout = 15000, binary = false, emptyResponse = false, undo = false, signal } = {}) {
     if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);
     if (this.#token && (this.#token.length > 4096 || !/^[A-Za-z0-9._~+/-]+=*$/.test(this.#token))) throw new ApiError('INVALID_TOKEN', 401);
     const controller = new AbortController();this.#requests.add(controller);
@@ -91,11 +91,12 @@ export class Api {
       if (this.#owner !== null) headers['X-Timekeeper-Owner'] = ownerHeader(this.#owner);
       if (body !== undefined) headers['Content-Type'] = 'application/json';
       if (etag) headers["If-Match"] = etag;
+      if (noneMatch) headers["If-None-Match"] = noneMatch;
       if (key) headers["Idempotency-Key"] = key;
       if (undo) headers["X-Timekeeper-Undo"] = 'true';
       const response = await this.fetcher(`/api/v1${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal, redirect: 'error', referrerPolicy: 'origin', credentials: this.#token && path !== '/auth/token-login' ? 'omit' : 'same-origin', cache: 'no-store' });
       if (binary && response.ok && (response.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase()!==binaryType) throw new ApiError('UNAVAILABLE');
-      const data = response.status === 204 ? null : binary && response.ok ? await response.blob() : await response.json();
+      const data = response.status === 204 || emptyResponse && response.ok ? null : binary && response.ok ? await response.blob() : await response.json();
       if (!response.ok) throw new ApiError(typeof data?.code === 'string' ? data.code : 'UNAVAILABLE', response.status);
       if (this.#closed) throw new ApiError('UNAUTHENTICATED', 401);
       const owner = decodeOwner(response.headers.get('X-Timekeeper-Owner'));

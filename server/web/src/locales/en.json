@@ -1048,5 +1048,11 @@
   "markdown.heading_level": "Heading {{level}}",
   "markdown.plain_text": "Plain text",
   "markdown.hr": "Horizontal rule",
+  "markdown.insert_image": "Insert image",
+  "markdown.attach_file": "Attach file",
+  "markdown.attachment": "Attachment",
+  "markdown.uploading": "Uploading attachment…",
+  "markdown.upload_failed": "The attachment could not be uploaded. Try again.",
+  "markdown.asset_too_large": "Attachments can be at most 5 MB.",
   "ui.manage_labels_in_my_account": "Manage labels in My Account → Labels."
 }

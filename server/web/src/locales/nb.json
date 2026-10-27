@@ -1048,5 +1048,11 @@
   "markdown.heading_level": "Overskrift {{level}}",
   "markdown.plain_text": "Vanlig tekst",
   "markdown.hr": "Horisontal linje",
+  "markdown.insert_image": "Sett inn bilde",
+  "markdown.attach_file": "Legg ved fil",
+  "markdown.attachment": "Vedlegg",
+  "markdown.uploading": "Laster opp vedlegg…",
+  "markdown.upload_failed": "Vedlegget kunne ikke lastes opp. Prøv igjen.",
+  "markdown.asset_too_large": "Vedlegg kan være opptil 5 MB.",
   "ui.manage_labels_in_my_account": "Administrer etiketter under Min konto → Etiketter."
 }
