@@ -20,7 +20,7 @@ final class AccountArchiveInput {
     private static ObjectMapper reader() {
         var mapper=new ObjectMapper();mapper.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
         mapper.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
-        mapper.getFactory().setStreamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(64).maxStringLength(1024*1024).maxNumberLength(32).build());
+        mapper.getFactory().setStreamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(64).maxStringLength(7*1024*1024).maxNumberLength(32).build());
         return mapper;
     }
     record Verified(ObjectNode data,String sha256) { }
@@ -69,14 +69,16 @@ final class AccountArchiveInput {
         // before preview or commit; this layer only establishes safe framing.
         return (ObjectNode)value;
     }
-    private static Set<String> fields(JsonNode value) {var fields=names(value);fields.remove("dayNotes");return fields;}
+    private static Set<String> fields(JsonNode value) {var fields=names(value);fields.remove("dayNotes");fields.remove("journalAssets");return fields;}
     static ObjectNode counts(JsonNode archive) {
         var result=object();for(String name:AccountArchive.WORK.keySet()) {
             var values=archive.path("work").path(name);
             if(values.isMissingNode() && Set.of("taskConnections","taskLists").contains(name)) continue;
             if(!values.isArray()) throw ApiFailure.validation();result.put(name,values.size());
         }
-        result.put("importAuditRecords",archive.path("importHistory").size());if(archive.has("dayNotes"))result.put("dayNotes",archive.path("dayNotes").size());return result;
+        result.put("importAuditRecords",archive.path("importHistory").size());
+        if(archive.has("dayNotes"))result.put("dayNotes",archive.path("dayNotes").size());
+        if(archive.has("journalAssets"))result.put("journalAssets",archive.path("journalAssets").size());return result;
     }
     static ObjectNode relationships(JsonNode archive) {
         var result=object();var work=archive.path("work");

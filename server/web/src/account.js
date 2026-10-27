@@ -14,7 +14,7 @@ export async function renderAccount(view, part) {
   if (!view.valid()) return;
   const account = loaded.data,zone = profile.data.zoneId;
   if (part === 'data') {await renderAccountData(view, zone);return;}
-  if (part === 'journal') {await renderJournal(view, zone);return;}
+  if (part === 'journal') {renderJournal(view);return;}
   if (part === 'passkeys') {await renderPasskeys(view, zone);return;}
   if (part === 'import') {await renderImports(view, zone);return;}
   if (part === 'tokens') {await renderTokens(view, zone);return;}

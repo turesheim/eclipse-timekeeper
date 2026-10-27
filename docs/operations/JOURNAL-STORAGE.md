@@ -47,11 +47,10 @@ storage and restrictive service permissions **before** storing journal data:
   a named Docker volume and a private shared-folder name do not themselves
   provide encryption. Verify the mount is actually unlocked and available at
   service startup, and preserve the existing unprivileged service ownership.
-- Incoming journal files, conflict copies and synchronization state must
-  use the same encrypted/private storage policy. Their paths must remain outside
-  public web assets and must have account/transport confinement in addition to
-  host permissions. Follow the [synchronization guide](JOURNAL-SYNC.md) for
-  the dedicated gateway, private incoming mount and account mapping.
+- External WebDAV clients may keep local copies and their own synchronization
+  state. Protect those files and client backups with the same encrypted/private
+  storage policy. Follow the [WebDAV guide](JOURNAL-WEBDAV.md) for account
+  authentication and conditional writes.
 
 The operating system/storage platform manages volume unlock keys. Keep recovery
 key material in a separately protected operator-controlled store, outside the
@@ -79,4 +78,4 @@ contain account notes. Account exports remain subject to the normal private
 account boundary and explicitly include note bodies, so protect downloaded
 copies and their destination backups as carefully as the database itself.
 
-The rich editor and SSH synchronization retain the at-rest trust boundary above.
+The rich editor and WebDAV endpoint retain the at-rest trust boundary above.
