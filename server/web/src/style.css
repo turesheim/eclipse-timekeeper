@@ -92,7 +92,7 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 #workspace { padding-block-end: calc(var(--workspace-nav-height) + 1rem); }
 .workspace-nav { --bs-navbar-color: #3f554c; --bs-navbar-hover-color: #104e3f; height: var(--workspace-nav-height); padding: .35rem max(env(safe-area-inset-left, 0px), .25rem) calc(.35rem + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -.25rem 1rem #233b380d; }
 .workspace-nav .container-fluid { max-width: 1332px; }
-.workspace-nav .navbar-nav { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); width: 100%; }
+.workspace-nav .navbar-nav { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; }
 /* Switching text and background colors together must not pass through low contrast. */
 .workspace-nav .nav-link { display: flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.75rem; min-width: 0; padding: .5rem .25rem; border-radius: var(--bs-border-radius); font-weight: 600; transition: none; }
 .workspace-nav .nav-link:not(.active):hover { background: #e4ede7; }
@@ -103,6 +103,44 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .toolbar h2, .toolbar .hint { margin-bottom: .25rem; }
 .toolbar label { margin-block: 0; }
 .toolbar > * { min-width: 0; }
+.today-toolbar { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: end; }
+.today-toolbar > #today-zone { justify-self: end; text-align: end; }
+.today-date-controls { min-width: 0; }
+.today-date-navigation { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
+.today-date-navigation input { width: 11rem; }
+.today-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(17rem,20rem); align-items: start; gap: 1rem; }
+.today-journal, .today-sidebar { min-width: 0; }
+.today-sidebar { display: grid; gap: .75rem; }
+.today-month, .today-summary { padding: .85rem; }
+.today-month-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; }
+.today-month-heading h3, .today-summary h3 { margin: 0; font-size: 1rem; }
+.today-month-heading button { min-width: 2rem; }
+.today-month-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: .15rem; }
+.today-weekday { text-align: center; color: var(--muted); font-size: .75rem; font-weight: 650; }
+.today-month-day { position: relative; min-width: 0; min-height: 2.25rem; padding: .25rem; border: 1px solid transparent; }
+.today-month-day.outside { color: var(--muted); }
+.today-month-day.current { border-color: var(--accent); }
+.today-month-day.selected { background: var(--accent); color: #fff; }
+.today-month-dot { position: absolute; inset: auto calc(50% - .13rem) .12rem; width: .26rem; height: .26rem; border-radius: 50%; background: currentColor; }
+.today-list { list-style: none; padding: 0; margin: .5rem 0 0; display: grid; gap: .5rem; }
+.today-list > li { display: grid; min-width: 0; gap: .1rem; padding-block: .35rem; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.today-list .hint { margin: 0; font-size: .8rem; }
+.today-summary > .hint { margin: .5rem 0 0; }
+.today-session-action { display: grid; text-align: start; gap: .1rem; width: 100%; border-inline-start: .25rem solid var(--today-client-color); }
+.today-session-action strong { white-space: normal; }
+.today-duration { font-weight: 650; }
+.today-plan-description { white-space: pre-wrap; margin: .25rem 0 0; font-size: .85rem; }
+@media(max-width: 1050px) {
+  .today-toolbar { grid-template-columns: minmax(0,1fr) auto; }
+  .today-toolbar > #today-zone { grid-column: 1 / -1; justify-self: start; text-align: start; }
+  .today-layout { grid-template-columns: minmax(0,1fr); }
+  .today-sidebar { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media(max-width: 650px) {
+  .today-toolbar { display: flex; flex-direction: column; align-items: stretch; }
+  .today-toolbar > h2 { order: -1; }
+  .today-sidebar { grid-template-columns: minmax(0,1fr); }
+}
 .table-wrap { overflow: auto; max-width: 100%; }
 .table { font-size: .9rem; --bs-table-border-color: var(--line); --bs-table-hover-bg: #edf3ef; --bs-table-hover-color: #233b38; }
 .table > :not(caption) > * > * { padding: .75rem 1rem; }

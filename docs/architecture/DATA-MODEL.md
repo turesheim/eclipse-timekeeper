@@ -370,6 +370,58 @@ require the corresponding work-session file.
 The server's portable domain-v3 JSON and CSV formats include clients, projects,
 tasks, labels, activities and independent work sessions. They preserve mandatory
 project/session client links and session summaries, and remap identifiers on import.
+Server task payloads now include a provider-neutral status, optional date-only
+`scheduledDate`, and optional UTC `completedAt`. Older task payloads read with
+`NOT_STARTED` and null date defaults. These fields live in the existing
+owner-scoped `tk_resource` JSON payload in both H2 and PostgreSQL, so they need
+no new table or schema-version change. Legacy task updates and reference changes
+carry planning forward; account export/import retains it.
+The same task payload also contains ordered `checklistItems`, each with its own
+UUID, text, completion state and time, and position. These are embedded task
+values and are never independent tasks or activity targets. Older payloads read
+with an empty checklist; legacy task and planning updates retain existing items.
+Portable exports and account archives preserve checklist contents and item IDs.
+Tasks also carry independent optional `start` and `due` values. Each value is
+either a date-only civil day or a local wall time plus its original IANA or
+Windows time-zone identifier. These values are not inferred from the Google
+Tasks scheduled day, and no instant is invented at DST gaps or overlaps.
+Older task payloads read with null start/due; legacy edits preserve them, and
+portable exports and account archives retain their exact date/time kind.
+`priority` (`UNSPECIFIED`, `LOW`, `NORMAL`, `HIGH`), `flagged`, and `urgent`
+are independent task values. Missing values on older payloads read as
+`UNSPECIFIED`/false/false. Ordinary task edits preserve them, and both portable
+exports and account archives retain them. Provider capabilities determine
+which of these fields a connector may write remotely.
+Task notes are an embedded `body` value with an explicit `TEXT` or `HTML`
+format. Missing values on older payloads read as empty plain text. The
+conditional body endpoint can clear notes with empty text; ordinary task edits
+preserve notes, and portable exports and account archives retain them. HTML is
+stored as source content and must be sanitized by a renderer before display.
+Each external task reference may carry provider-supplied creation/modification
+instants plus opaque remote ETag and revision values. These values belong to the
+provider identity, since one task can have several links with different source
+times and revisions. Older references read with empty source state. Legacy link
+updates keep existing source state, while a conditional source update can
+replace or clear it. Remote ETags are never Timekeeper task versions.
+Provider account mappings are separate `TASK_CONNECTION` records with an owned
+UUID, provider ID, remote account ID, display name, read/write permissions, and
+enabled state. `TASK_LIST` records have their own UUID, connection ID, remote
+list ID, name, kind, permissions, sharing/ownership flags, presence, and order.
+A list is independent of a Timekeeper project. Both record types use the
+owner-scoped `tk_resource` payload in H2 and PostgreSQL, and a relation links
+each list to its connection. Marking a connection disabled or a list absent
+retains the records and associated tasks. Explicit deletion is conditional and
+rejects a connection with lists or a list with linked tasks. Account archives
+and portable transfers include these records; older archives import without
+them.
+An external task reference may include the stable Timekeeper `taskListId`.
+Task-to-list relations protect referenced lists from deletion, while portable
+imports remap the list ID. The reference's provider must match the list's
+connection provider. `repositoryId` remains the remote identity namespace;
+connectors must include the account/list scope when remote task IDs can repeat.
+`TASK.siblingOrder` is a nonnegative local position among tasks under the same
+parent. It defaults to zero for older rows, is independent of a provider list's
+position, and survives updates from clients that do not know this field.
 The account ZIP archive also includes active day labels and Markdown bodies;
 journal synchronization state and deletion tombstones are not portable account
 records.

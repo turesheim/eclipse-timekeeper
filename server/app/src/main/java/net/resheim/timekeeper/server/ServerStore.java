@@ -9,8 +9,10 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -226,27 +228,40 @@ public class ServerStore {
     }
     public Optional<JsonNode> find(String type, UUID id) {
         try (var statement = statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? AND id=?",owner(),type,id); var rows = statement.executeQuery()) {
-            if (!rows.next()) return Optional.empty(); return Optional.of(checkedPayload(rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));
+            if (!rows.next()) return Optional.empty(); return Optional.of(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));
         } catch (SQLException e) { throw databaseFailure(e); }
     }
     public List<JsonNode> list(String type) {
         List<JsonNode> list = new ArrayList<>();
         try (var statement = statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? ORDER BY id",owner(),type); var rows = statement.executeQuery()) {
-            while (rows.next()) list.add(checkedPayload(rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));
+            while (rows.next()) list.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));
             return List.copyOf(list);
         } catch (SQLException e) { throw databaseFailure(e); }
     }
     List<JsonNode> list(String type,UUID first,UUID last) {
         var result=new ArrayList<JsonNode>();
         try(var statement=statement("SELECT id,version,payload FROM tk_resource WHERE owner_id=? AND entity_type=? AND id>=? AND id<=? ORDER BY id",owner(),type,first,last);var rows=statement.executeQuery()) {
-            while(rows.next())result.add(checkedPayload(rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));return List.copyOf(result);
+            while(rows.next())result.add(checkedPayload(type,rows.getObject(1,UUID.class),rows.getLong(2),rows.getString(3)));return List.copyOf(result);
         }catch(SQLException failure){throw databaseFailure(failure);}
     }
-    private JsonNode checkedPayload(UUID id, long version, String json) {
+    private JsonNode checkedPayload(String type, UUID id, long version, String json) {
         JsonNode value = parse(json);
         if (!owner().equals(value.path("ownerId").asText()) || !id.toString().equals(value.path("id").asText()) || version!=value.path("version").asLong(-1))
             throw new IllegalStateException("Stored resource identity/version mismatch");
-        if (value instanceof com.fasterxml.jackson.databind.node.ObjectNode node) node.remove("workSessionId");
+        if (value instanceof com.fasterxml.jackson.databind.node.ObjectNode node) {
+            node.remove("workSessionId");
+            if(type.equals("TASK")) {
+                if(!node.has("status"))node.put("status",TaskStatus.NOT_STARTED.name());
+                if(!node.has("scheduledDate"))node.putNull("scheduledDate");
+                if(!node.has("completedAt"))node.putNull("completedAt");
+                if(!node.has("checklistItems"))node.putArray("checklistItems");
+                if(!node.has("start"))node.putNull("start");
+                if(!node.has("due"))node.putNull("due");
+                if(!node.has("priority"))node.put("priority",TaskPriority.UNSPECIFIED.name());
+                if(!node.has("flagged"))node.put("flagged",false);
+                if(!node.has("urgent"))node.put("urgent",false);
+            }
+        }
         return value;
     }
     /** Retire only obsolete metadata; keep IDs, versions, timers and recorded work untouched. */
@@ -282,6 +297,8 @@ public class ServerStore {
         if (value instanceof Task task) {
             task.projectId().ifPresent(project -> relation(type,id,"project","PROJECT",project.value()));
             task.parentTaskId().ifPresent(parent -> relation(type,id,"parent","TASK",parent.value()));
+            Set<UUID> lists=new HashSet<>();task.externalReferences().forEach(reference -> reference.taskListId().ifPresent(lists::add));
+            lists.forEach(list -> relation(type,id,"list","TASK_LIST",list));
             update("DELETE FROM tk_external_reference WHERE owner_id=? AND entity_type='TASK' AND task_id=?",owner(),id);
             task.externalReferences().forEach(reference -> {
                 if (postgres()) update("INSERT INTO tk_external_reference(owner_id,provider_id,repository_id,external_id,entity_type,task_id,reference_key) VALUES(?,?,?,?,'TASK',?,?)",
@@ -291,6 +308,7 @@ public class ServerStore {
                         owner(),reference.providerId(),reference.repositoryId(),reference.externalId(),id);
             });
         }
+        if (value instanceof TaskList list) relation(type,id,"connection","TASK_CONNECTION",list.connectionId());
         if (value instanceof Activity activity) {
             activity.task().ifPresent(task -> relation(type,id,"task","TASK",task.value()));
             activity.projectId().ifPresent(project -> relation(type,id,"project","PROJECT",project.value()));

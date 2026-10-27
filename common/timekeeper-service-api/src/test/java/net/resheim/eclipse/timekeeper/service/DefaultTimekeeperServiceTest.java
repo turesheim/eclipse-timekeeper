@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,6 +27,7 @@ import net.resheim.eclipse.timekeeper.domain.ActivityId;
 import net.resheim.eclipse.timekeeper.domain.DomainValidationException;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
+import net.resheim.eclipse.timekeeper.domain.ExternalTaskSource;
 import net.resheim.eclipse.timekeeper.domain.FailureCode;
 import net.resheim.eclipse.timekeeper.domain.Label;
 import net.resheim.eclipse.timekeeper.domain.LabelId;
@@ -33,6 +36,16 @@ import net.resheim.eclipse.timekeeper.domain.Project;
 import net.resheim.eclipse.timekeeper.domain.ProjectId;
 import net.resheim.eclipse.timekeeper.domain.Task;
 import net.resheim.eclipse.timekeeper.domain.TaskId;
+import net.resheim.eclipse.timekeeper.domain.TaskChecklist;
+import net.resheim.eclipse.timekeeper.domain.TaskChecklistItem;
+import net.resheim.eclipse.timekeeper.domain.TaskMoment;
+import net.resheim.eclipse.timekeeper.domain.TaskTiming;
+import net.resheim.eclipse.timekeeper.domain.TaskImportance;
+import net.resheim.eclipse.timekeeper.domain.TaskPriority;
+import net.resheim.eclipse.timekeeper.domain.TaskBody;
+import net.resheim.eclipse.timekeeper.domain.TaskBodyFormat;
+import net.resheim.eclipse.timekeeper.domain.TaskPlanning;
+import net.resheim.eclipse.timekeeper.domain.TaskStatus;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateProject;
@@ -49,6 +62,12 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateActivity;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskPlanning;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskTiming;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskImportance;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskBody;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskSource;
 import net.resheim.eclipse.timekeeper.service.Ports.ActivityRepository;
 import net.resheim.eclipse.timekeeper.service.Ports.IdentifierSource;
 import net.resheim.eclipse.timekeeper.service.Ports.LabelRepository;
@@ -116,6 +135,127 @@ class DefaultTimekeeperServiceTest {
 		assertEquals(9, events.size());
 		assertEquals(new EventShape(EntityType.PROJECT, ChangeType.CREATED), shape(events.get(0)));
 		assertEquals(new EventShape(EntityType.LABEL, ChangeType.DELETED), shape(events.get(events.size() - 1)));
+	}
+
+	@Test
+	void taskPlanningKeepsDateOnlyMeaningAndSurvivesLegacyUpdates() {
+		var day=LocalDate.parse("2026-10-26");
+		var planning=new TaskPlanning(TaskStatus.NOT_STARTED,Optional.of(day),Optional.empty());
+		Task task=service.createTask(new CreateTask(Optional.empty(),Optional.empty(),"Plan review",Optional.empty(),Set.of(),planning));
+		assertEquals(planning,task.planning());
+		task=service.updateTask(new UpdateTask(task.id(),task.version(),Optional.empty(),"Review plan",Optional.empty()));
+		assertEquals(planning,task.planning());
+		var completed=new TaskPlanning(TaskStatus.COMPLETED,Optional.of(day),Optional.of(Instant.parse("2026-10-26T11:12:13Z")));
+		Task updated=service.updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),completed));
+		assertEquals(completed,updated.planning());
+		assertEquals("Review plan",updated.summary());
+		Task stale=task;
+		assertThrows(ServiceException.class,()->service.updateTaskPlanning(new UpdateTaskPlanning(stale.id(),stale.version(),planning)));
+		assertThrows(DomainValidationException.class,()->new TaskPlanning(TaskStatus.NOT_STARTED,Optional.empty(),completed.completedAt()));
+	}
+
+	@Test
+	void checklistItemsHaveStableIdsAndSurviveUnrelatedTaskEdits() {
+		var first=new TaskChecklistItem(UUID.randomUUID(),"Write tests",false,Optional.empty(),0);
+		var second=new TaskChecklistItem(UUID.randomUUID(),"Review result",true,Optional.of(Instant.parse("2026-10-26T11:12:13Z")),1);
+		var checklist=new TaskChecklist(List.of(first,second));
+		Task task=service.createTask(new CreateTask(Optional.empty(),Optional.empty(),"Sync work",Optional.empty(),Set.of(),TaskPlanning.unplanned(),checklist));
+		assertEquals(checklist,task.checklist());
+		task=service.updateTask(new UpdateTask(task.id(),task.version(),Optional.empty(),"Renamed",Optional.empty()));
+		assertEquals(checklist,task.checklist());
+		task=service.updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),TaskPlanning.unplanned()));
+		assertEquals(checklist,task.checklist());
+		var reordered=new TaskChecklist(List.of(new TaskChecklistItem(second.id(),second.text(),true,second.completedAt(),0),
+				new TaskChecklistItem(first.id(),first.text(),false,Optional.empty(),1)));
+		Task updated=service.updateTaskChecklist(new UpdateTaskChecklist(task.id(),task.version(),reordered));
+		assertEquals(reordered,updated.checklist());
+		assertEquals("Renamed",updated.summary());
+		Task stale=task;
+		assertThrows(ServiceException.class,()->service.updateTaskChecklist(new UpdateTaskChecklist(stale.id(),stale.version(),checklist)));
+		assertThrows(DomainValidationException.class,()->new TaskChecklist(List.of(first,first)));
+		assertThrows(DomainValidationException.class,()->new TaskChecklistItem(UUID.randomUUID(),"Unchecked",false,second.completedAt(),0));
+	}
+
+	@Test
+	void taskTimingRetainsCivilDatesAndProviderWallTimesThroughEdits() {
+		var day=LocalDate.parse("2026-03-29");
+		var timing=new TaskTiming(Optional.of(TaskMoment.dateOnly(day)),Optional.of(TaskMoment.zoned(day,LocalTime.of(2,30),"Europe/Oslo")));
+		Task task=service.createTask(new CreateTask(Optional.empty(),Optional.empty(),"DST plan",Optional.empty(),Set.of(),
+				TaskPlanning.unplanned(),TaskChecklist.empty(),timing));
+		assertEquals(timing,task.timing());
+		task=service.updateTask(new UpdateTask(task.id(),task.version(),Optional.empty(),"DST review",Optional.empty()));
+		assertEquals(timing,task.timing());
+		task=service.updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),TaskPlanning.unplanned()));
+		assertEquals(timing,task.timing());
+		task=service.updateTaskChecklist(new UpdateTaskChecklist(task.id(),task.version(),TaskChecklist.empty()));
+		assertEquals(timing,task.timing());
+		var replacement=new TaskTiming(Optional.empty(),Optional.of(TaskMoment.zoned(day,LocalTime.of(9,15),"Pacific Standard Time")));
+		Task updated=service.updateTaskTiming(new UpdateTaskTiming(task.id(),task.version(),replacement));
+		assertEquals(replacement,updated.timing());
+		Task stale=task;
+		assertThrows(ServiceException.class,()->service.updateTaskTiming(new UpdateTaskTiming(stale.id(),stale.version(),timing)));
+		assertThrows(DomainValidationException.class,()->new TaskMoment(day,Optional.of(LocalTime.NOON),Optional.empty()));
+	}
+
+	@Test
+	void taskImportanceKeepsPriorityFlagsAndUrgencyIndependent() {
+		var importance=new TaskImportance(TaskPriority.NORMAL,true,false);
+		Task task=service.createTask(new CreateTask(Optional.empty(),Optional.empty(),"Important review",Optional.empty(),Set.of(),
+				TaskPlanning.unplanned(),TaskChecklist.empty(),TaskTiming.empty(),importance));
+		assertEquals(importance,task.importance());
+		task=service.updateTask(new UpdateTask(task.id(),task.version(),Optional.empty(),"Renamed review",Optional.empty()));
+		assertEquals(importance,task.importance());
+		task=service.updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),TaskPlanning.unplanned()));
+		assertEquals(importance,task.importance());
+		task=service.updateTaskChecklist(new UpdateTaskChecklist(task.id(),task.version(),TaskChecklist.empty()));
+		assertEquals(importance,task.importance());
+		task=service.updateTaskTiming(new UpdateTaskTiming(task.id(),task.version(),TaskTiming.empty()));
+		assertEquals(importance,task.importance());
+		var replacement=new TaskImportance(TaskPriority.HIGH,false,true);
+		Task updated=service.updateTaskImportance(new UpdateTaskImportance(task.id(),task.version(),replacement));
+		assertEquals(replacement,updated.importance());
+		Task stale=task;
+		assertThrows(ServiceException.class,()->service.updateTaskImportance(new UpdateTaskImportance(stale.id(),stale.version(),importance)));
+		assertThrows(DomainValidationException.class,()->new TaskImportance(null,false,false));
+	}
+
+	@Test
+	void taskBodyKeepsMarkupAndSurvivesLegacyEdits() {
+		var body=new TaskBody(TaskBodyFormat.HTML,"<p>Review <strong>draft</strong></p>");
+		Task task=service.createTask(new CreateTask(Optional.empty(),Optional.empty(),"Review",Optional.empty(),Set.of(),
+				TaskPlanning.unplanned(),TaskChecklist.empty(),TaskTiming.empty(),TaskImportance.ordinary(),body));
+		assertEquals(body,task.body());
+		task=service.updateTask(new UpdateTask(task.id(),task.version(),Optional.empty(),"Renamed",Optional.empty()));
+		task=service.updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),TaskPlanning.unplanned()));
+		task=service.updateTaskChecklist(new UpdateTaskChecklist(task.id(),task.version(),TaskChecklist.empty()));
+		task=service.updateTaskTiming(new UpdateTaskTiming(task.id(),task.version(),TaskTiming.empty()));
+		task=service.updateTaskImportance(new UpdateTaskImportance(task.id(),task.version(),TaskImportance.ordinary()));
+		assertEquals(body,task.body());
+		Task stale=task;
+		Task cleared=service.updateTaskBody(new UpdateTaskBody(task.id(),task.version(),TaskBody.empty()));
+		assertEquals(TaskBody.empty(),cleared.body());
+		assertThrows(ServiceException.class,()->service.updateTaskBody(new UpdateTaskBody(stale.id(),stale.version(),body)));
+		assertThrows(DomainValidationException.class,()->new TaskBody(null,"text"));
+	}
+
+	@Test
+	void externalSourceStateBelongsToOneProviderIdentity() {
+		var first=new ExternalTaskReference("google","account/list","remote-1",Optional.empty());
+		var second=new ExternalTaskReference("microsoft","account/list","remote-2",Optional.empty());
+		Task task=service.createTask(new CreateTask(Optional.empty(),Optional.empty(),"Shared task",Optional.empty(),Set.of(first,second)));
+		var source=new ExternalTaskSource(Optional.of(Instant.parse("2026-10-01T10:00:00Z")),
+				Optional.of(Instant.parse("2026-10-26T10:00:00Z")),Optional.of("\"etag\""),Optional.of("revision-1"));
+		task=service.updateExternalTaskSource(new UpdateExternalTaskSource(task.id(),task.version(),first.key(),source));
+		assertEquals(source,task.externalReferences().stream().filter(value->value.key().equals(first.key())).findFirst().orElseThrow().source());
+		assertEquals(ExternalTaskSource.empty(),task.externalReferences().stream().filter(value->value.key().equals(second.key())).findFirst().orElseThrow().source());
+		task=service.linkExternalReference(new LinkExternalReference(task.id(),task.version(),first));
+		assertEquals(source,task.externalReferences().stream().filter(value->value.key().equals(first.key())).findFirst().orElseThrow().source());
+		Task stale=task;
+		task=service.updateExternalTaskSource(new UpdateExternalTaskSource(task.id(),task.version(),first.key(),ExternalTaskSource.empty()));
+		assertEquals(ExternalTaskSource.empty(),task.externalReferences().stream().filter(value->value.key().equals(first.key())).findFirst().orElseThrow().source());
+		assertThrows(ServiceException.class,()->service.updateExternalTaskSource(new UpdateExternalTaskSource(stale.id(),stale.version(),first.key(),source)));
+		Task current=task;
+		assertThrows(ServiceException.class,()->service.updateExternalTaskSource(new UpdateExternalTaskSource(current.id(),current.version(),new ExternalTaskReferenceKey("apple","account","missing"),source)));
 	}
 
 	@Test

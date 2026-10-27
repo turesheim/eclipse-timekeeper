@@ -66,6 +66,7 @@
       <section class="card tracking"><div><p class="eyebrow"><span data-i18n="ui.in_progress_6a506b">IN PROGRESS</span></p><h2 id="active-title"><span data-i18n="ui.ready_when_you_are">Ready when you are</span></h2><p id="active-details" class="hint"><span data-i18n="ui.choose_a_task_below_to_start_tracking">Choose a task below to start tracking.</span></p></div><button class="btn btn-primary" id="stop" hidden=""><span data-i18n="ui.stop_tracking">Stop tracking</span></button></section>
       <nav id="workspace-navigation" class="navbar fixed-bottom bg-body border-top workspace-nav" aria-label="Time tracking views" tabindex="-1" data-i18n-aria-label="ui.time_tracking_views">
         <div class="container-fluid px-0"><div class="navbar-nav">
+        <button class="nav-link" data-tab="today" aria-label="Today" title="Today" data-i18n-aria-label="ui.today" data-i18n-title="ui.today"><span class="icon bi bi-calendar-event" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.today">Today</span></span></button>
         <button class="nav-link active" data-tab="track" aria-current="page" aria-label="Calendar" title="Calendar" data-i18n-aria-label="ui.track" data-i18n-title="ui.track"><span class="icon bi bi-calendar3" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.track">Calendar</span></span></button>
         <button class="nav-link" data-tab="calendar" aria-label="Week" title="Week" data-i18n-aria-label="ui.calendar" data-i18n-title="ui.calendar"><span class="icon bi bi-calendar3-week" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.calendar">Week</span></span></button>
         <button class="nav-link" data-tab="week" aria-label="Workweek" title="Workweek" data-i18n-aria-label="ui.workweek" data-i18n-title="ui.workweek"><span class="icon bi bi-calendar3-range" aria-hidden="true"></span><span class="nav-label"><span data-i18n="ui.workweek">Workweek</span></span></button>
@@ -75,6 +76,22 @@
         </div></div>
       </nav>
       <p id="period-announcement" class="visually-hidden" role="status" aria-live="polite"></p>
+      <section id="today-panel" hidden aria-labelledby="today-title">
+        <div class="toolbar today-toolbar">
+          <div class="today-date-controls"><label class="form-label" for="today-date"><span data-i18n="today.date">Date</span></label><div class="today-date-navigation"><input class="form-control" id="today-date" type="date" required><button class="btn btn-outline-secondary" id="today-previous" type="button" data-i18n="today.previous_day">Previous day</button><button class="btn btn-outline-secondary" id="today-current" type="button" data-i18n="ui.today">Today</button><button class="btn btn-outline-secondary" id="today-next" type="button" data-i18n="today.next_day">Next day</button></div></div>
+          <h2 id="today-title" data-i18n="today.title">Your day</h2><p id="today-zone" class="hint"></p>
+        </div>
+        <div class="today-layout">
+          <div id="today-journal" class="today-journal"><span id="today-note-status-anchor" hidden></span></div>
+          <aside class="today-sidebar" aria-label="Day overview" data-i18n-aria-label="today.overview">
+            <section class="card today-month" aria-labelledby="today-month-title"><div class="today-month-heading"><button id="today-month-previous" class="btn btn-outline-secondary btn-sm" type="button" data-i18n-aria-label="ui.previous_month" aria-label="Previous month"></button><h3 id="today-month-title"></h3><button id="today-month-next" class="btn btn-outline-secondary btn-sm" type="button" data-i18n-aria-label="ui.next_month" aria-label="Next month"></button></div><div id="today-month-grid" class="today-month-grid"></div></section>
+            <section class="card today-summary" aria-labelledby="today-sessions-title"><h3 id="today-sessions-title" data-i18n="ui.work_sessions">Work sessions</h3><div id="today-sessions"></div></section>
+            <section class="card today-summary" aria-labelledby="today-plans-title"><h3 id="today-plans-title" data-i18n="calendar.all_day_plans">All-day plans</h3><div id="today-plans"></div></section>
+            <section class="card today-summary" aria-labelledby="today-planned-tasks-title"><h3 id="today-planned-tasks-title" data-i18n="today.planned_tasks">Planned tasks</h3><div id="today-planned-tasks"></div></section>
+            <section class="card today-summary" aria-labelledby="today-active-tasks-title"><h3 id="today-active-tasks-title" data-i18n="today.active_tasks">Active tasks</h3><div id="today-active-tasks"></div></section>
+          </aside>
+        </div>
+      </section>
       <section id="track-panel" aria-labelledby="track-title">
         <div class="toolbar track-toolbar">
           <div class="track-controls">

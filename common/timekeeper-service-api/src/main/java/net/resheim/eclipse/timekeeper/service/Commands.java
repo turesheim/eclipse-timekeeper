@@ -8,10 +8,16 @@ import net.resheim.eclipse.timekeeper.domain.ActivityId;
 import net.resheim.eclipse.timekeeper.domain.WorkSessionId;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReference;
 import net.resheim.eclipse.timekeeper.domain.ExternalTaskReferenceKey;
+import net.resheim.eclipse.timekeeper.domain.ExternalTaskSource;
 import net.resheim.eclipse.timekeeper.domain.LabelId;
 import net.resheim.eclipse.timekeeper.domain.OwnerId;
 import net.resheim.eclipse.timekeeper.domain.ProjectId;
 import net.resheim.eclipse.timekeeper.domain.TaskId;
+import net.resheim.eclipse.timekeeper.domain.TaskChecklist;
+import net.resheim.eclipse.timekeeper.domain.TaskPlanning;
+import net.resheim.eclipse.timekeeper.domain.TaskTiming;
+import net.resheim.eclipse.timekeeper.domain.TaskImportance;
+import net.resheim.eclipse.timekeeper.domain.TaskBody;
 
 /** Immutable inputs accepted by {@link TimekeeperService}. */
 public final class Commands {
@@ -20,23 +26,69 @@ public final class Commands {
 	public record CreateProject(String name) { }
 	public record UpdateProject(ProjectId id, long expectedVersion, String name) { }
 	public record DeleteProject(ProjectId id, long expectedVersion) { }
+	public record CreateTaskConnection(String providerId, String remoteAccountId, String name,
+			boolean readable, boolean writable, boolean enabled) { }
+	public record UpdateTaskConnection(java.util.UUID id, long expectedVersion, String name,
+			boolean readable, boolean writable, boolean enabled) { }
+	public record CreateTaskList(java.util.UUID connectionId, String remoteListId, String name,
+			net.resheim.eclipse.timekeeper.domain.TaskListKind kind, boolean readable, boolean writable,
+			boolean shared, boolean owner, boolean present, int position) { }
+	public record UpdateTaskList(java.util.UUID id, long expectedVersion, String name,
+			net.resheim.eclipse.timekeeper.domain.TaskListKind kind, boolean readable, boolean writable,
+			boolean shared, boolean owner, boolean present, int position) { }
 
 	public record CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
-			Optional<String> url, Set<ExternalTaskReference> externalReferences) {
+			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder) {
 		public CreateTask {
 			projectId = optional(projectId);
 			parentTaskId = optional(parentTaskId);
 			url = optional(url);
 			externalReferences = copy(externalReferences);
+			planning = planning == null ? TaskPlanning.unplanned() : planning;
+			checklist = checklist == null ? TaskChecklist.empty() : checklist;
+			timing = timing == null ? TaskTiming.empty() : timing;
+			importance = importance == null ? TaskImportance.ordinary() : importance;
+			body = body == null ? TaskBody.empty() : body;
+		}
+
+		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
+				Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning,
+				TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body) {
+			this(projectId, parentTaskId, summary, url, externalReferences, planning, checklist, timing, importance, body, 0);
+		}
+
+		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
+				Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance) {
+			this(projectId, parentTaskId, summary, url, externalReferences, planning, checklist, timing, importance, TaskBody.empty());
+		}
+
+		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
+				Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing) {
+			this(projectId, parentTaskId, summary, url, externalReferences, planning, checklist, timing, TaskImportance.ordinary(), TaskBody.empty());
+		}
+
+		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
+				Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist) {
+			this(projectId, parentTaskId, summary, url, externalReferences, planning, checklist, TaskTiming.empty(), TaskImportance.ordinary(), TaskBody.empty());
+		}
+
+		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
+				Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning) {
+			this(projectId, parentTaskId, summary, url, externalReferences, planning, TaskChecklist.empty(), TaskTiming.empty(), TaskImportance.ordinary(), TaskBody.empty());
+		}
+
+		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
+				Optional<String> url, Set<ExternalTaskReference> externalReferences) {
+			this(projectId, parentTaskId, summary, url, externalReferences, TaskPlanning.unplanned(), TaskChecklist.empty(), TaskTiming.empty(), TaskImportance.ordinary(), TaskBody.empty());
 		}
 
 		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
 				Optional<String> url) {
-			this(projectId, parentTaskId, summary, url, Set.of());
+			this(projectId, parentTaskId, summary, url, Set.of(), TaskPlanning.unplanned(), TaskChecklist.empty(), TaskTiming.empty(), TaskImportance.ordinary(), TaskBody.empty());
 		}
 
 		public CreateTask(Optional<ProjectId> projectId, String summary, Optional<String> url) {
-			this(projectId, Optional.empty(), summary, url, Set.of());
+			this(projectId, Optional.empty(), summary, url, Set.of(), TaskPlanning.unplanned(), TaskChecklist.empty(), TaskTiming.empty(), TaskImportance.ordinary(), TaskBody.empty());
 		}
 	}
 
@@ -56,7 +108,14 @@ public final class Commands {
 	}
 
 	public record DeleteTask(TaskId id, long expectedVersion) { }
+	public record UpdateTaskPlanning(TaskId id, long expectedVersion, TaskPlanning planning) { }
+	public record UpdateTaskChecklist(TaskId id, long expectedVersion, TaskChecklist checklist) { }
+	public record UpdateTaskTiming(TaskId id, long expectedVersion, TaskTiming timing) { }
+	public record UpdateTaskImportance(TaskId id, long expectedVersion, TaskImportance importance) { }
+	public record UpdateTaskBody(TaskId id, long expectedVersion, TaskBody body) { }
+	public record UpdateTaskOrder(TaskId id, long expectedVersion, int siblingOrder) { }
 	public record LinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReference reference) { }
+	public record UpdateExternalTaskSource(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference, ExternalTaskSource source) { }
 	public record UnlinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference) { }
 
 	public record CreateLabel(String name, Optional<String> color) {
