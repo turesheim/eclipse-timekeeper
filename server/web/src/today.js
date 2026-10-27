@@ -61,7 +61,7 @@ export class TodayView {
   }
   sizeEditor(){
     if(!this.visible||!this.root.offsetParent)return;
-    const top=this.journalRoot.getBoundingClientRect().top,navHeight=byId('workspace-navigation').getBoundingClientRect().height;
+    const top=this.journalRoot.getBoundingClientRect().top+scrollY,navHeight=byId('workspace-navigation').getBoundingClientRect().height;
     this.journalRoot.style.setProperty('--today-editor-min-height',Math.max(0,innerHeight-top-navHeight-16)+'px');
   }
   paintMonth(){

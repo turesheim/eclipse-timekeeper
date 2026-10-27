@@ -364,8 +364,8 @@ test('journal formatted editing fits narrow screens and all themes with accessib
 test('journal keeps source usable after an editor load failure and protects a draft from account navigation',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage();
   try{
-    await signIn(page,await fresh(request));const api=await apiFor(page),initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body:'Original source'},{'If-Match':initial.headers().etag});
     let fail=true,failRead=true;await page.route('**/assets/milkdown/milkdown.js*',route=>fail?route.abort('failed'):route.continue());
+    await signIn(page,await fresh(request));const api=await apiFor(page),initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body:'Original source'},{'If-Match':initial.headers().etag});
     await page.route('**/api/v1/day-notes/2026-05-17',route=>failRead&&route.request().method()==='GET'?route.fulfill({status:503,contentType:'application/problem+json',body:JSON.stringify({code:'UNAVAILABLE'})}):route.continue());
     await month(page);await note(page).click();await expect(dialog(page).getByRole('alert')).toBeVisible();await expect(page.locator('#track-note-text')).toBeDisabled();await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeDisabled();failRead=false;
     await dialog(page).getByRole('button',{name:'Reload saved note',exact:true}).click();await expect(dialog(page)).toContainText('could not be loaded');await expect(page.locator('#journal-body')).toHaveValue('Original source');
@@ -377,8 +377,9 @@ test('journal keeps source usable after an editor load failure and protects a dr
 test('journal clears a private source before a delayed editor bundle can finish after logout',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage();let release=()=>{};
   try{
+    let seen=false;const waiting=new Promise(resolve=>{release=resolve;});await page.route('**/assets/milkdown/milkdown.js*',async route=>{seen=true;await waiting;await route.continue().catch(()=>{});});
     await signIn(page,await fresh(request));const api=await apiFor(page),initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body:'Private delayed journal marker'},{'If-Match':initial.headers().etag});
-    let seen=false;const waiting=new Promise(resolve=>{release=resolve;});await page.route('**/assets/milkdown/milkdown.js*',async route=>{seen=true;await waiting;await route.continue().catch(()=>{});});await month(page);await menu(page);await expect.poll(()=>seen).toBe(true);await expect(page.locator('#journal-body')).toHaveValue('Private delayed journal marker');
+    await month(page);await menu(page);await expect.poll(()=>seen).toBe(true);await expect(page.locator('#journal-body')).toHaveValue('Private delayed journal marker');
     await api('POST','/auth/logout');await expect(page.locator('#workspace')).toBeHidden();await expect(page.locator('#journal-body')).toHaveValue('');release();await expect(page.locator('#journal-formatted .ProseMirror')).toHaveCount(0);expect(await page.locator('#track-note-editor').textContent()).not.toContain('Private delayed journal marker');
   }finally{release();await owner.close();}
 });

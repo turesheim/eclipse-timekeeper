@@ -70,7 +70,8 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(page.locator('#today-active-tasks')).toContainText('Scheduled review');
     await page.locator('#today-month-grid [data-date="2025-05-17"]').click();await expect(page.locator('#today-date')).toHaveValue(date);
     await expect(page.locator('#today-note-text')).toHaveValue('Review day');
-    await page.setViewportSize({width:1440,height:1200});
+    await page.evaluate(()=>window.scrollTo(0,50));
+    await page.setViewportSize({width:1440,height:1200});await page.evaluate(()=>window.scrollTo(0,0));
     await expect.poll(()=>page.evaluate(()=>document.querySelector('#workspace-navigation').getBoundingClientRect().top-document.querySelector('#today-note-editor').getBoundingClientRect().bottom)).toBeLessThan(24);
     expect(await page.evaluate(()=>document.querySelector('#workspace-navigation').getBoundingClientRect().top-document.querySelector('#today-note-editor').getBoundingClientRect().bottom)).toBeGreaterThanOrEqual(0);
     expect(await page.locator('.today-month-day').evaluateAll(days=>days.every(day=>day.scrollHeight<=day.clientHeight+1))).toBe(true);
