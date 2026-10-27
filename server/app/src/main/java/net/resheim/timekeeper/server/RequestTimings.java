@@ -38,10 +38,19 @@ public class RequestTimings implements ContainerRequestFilter, ContainerResponse
     }
     @Override public void filter(ContainerRequestContext request,ContainerResponseContext response) {
         if(!(request.getProperty(PROPERTY) instanceof Timing timing))return;
-        timing.finished().set(true);vertx.get().cancelTimer(timing.timer());response.getHeaders().putSingle(HEADER,timing.id());
+        timing.finished().set(true);vertx.get().cancelTimer(timing.timer());
+        int status;
+        try {
+            response.getHeaders().putSingle(HEADER,timing.id());
+            status=response.getStatus();
+        } catch(NullPointerException noResponse) {
+            // RESTEasy Reactive may run this filter after a client disconnects,
+            // before it has created a response to decorate or inspect.
+            return;
+        }
         long elapsed=(System.nanoTime()-timing.start())/1_000_000;
-        if(response.getStatus()>=500 || elapsed>=timing.allowance()+Math.max(0,slowMillis))
-            LOG.warnf("API request completed request_id=%s method=%s route=%s status=%d elapsed_ms=%d",timing.id(),timing.method(),timing.route(),response.getStatus(),elapsed);
+        if(status>=500 || elapsed>=timing.allowance()+Math.max(0,slowMillis))
+            LOG.warnf("API request completed request_id=%s method=%s route=%s status=%d elapsed_ms=%d",timing.id(),timing.method(),timing.route(),status,elapsed);
     }
     static String route(ResourceInfo resource) {
         if(resource.getResourceClass()==null || resource.getResourceMethod()==null)return "";
