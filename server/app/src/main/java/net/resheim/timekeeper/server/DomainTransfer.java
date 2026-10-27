@@ -15,17 +15,21 @@ final class DomainTransfer {
     private final ServerStore store;
     DomainTransfer(ServerStore store) {this.store=store;}
     static final Map<String,String> TYPES=Map.of("clients","CLIENT","projects","PROJECT","tasks","TASK","labels","LABEL","activities","ACTIVITY","workSessions","WORK_SESSION",
-            "taskConnections","TASK_CONNECTION","taskLists","TASK_LIST");
+            "taskConnections","TASK_CONNECTION","taskLists","TASK_LIST","taskListSections","TASK_SECTION","taskTombstones","TASK_TOMBSTONE");
     ApiReplies importRecords(JsonNode input) {
         Map<UUID,UUID> clients=new HashMap<>();
         Map<UUID,UUID> connections=new HashMap<>();
         Map<UUID,UUID> lists=new HashMap<>();
+        Map<UUID,UUID> sections=new HashMap<>();
         Map<UUID,ProjectId> projects=new HashMap<>();Map<UUID,TaskId> tasks=new HashMap<>();Map<UUID,LabelId> labels=new HashMap<>();Map<UUID,WorkSessionId> sessions=new HashMap<>();Set<UUID> sourceIds=new HashSet<>();
         var result=object();var mappings=result.putArray("ids");var service=store.service();
         // Validate source identity uniqueness before any record is created.
         TYPES.forEach((name,type) -> {for(JsonNode item:input.path(name)) if(!sourceIds.add(uuid(item.get("id")))) throw ApiFailure.validation();});
         Set<UUID> sourceConnections=new HashSet<>();input.path("taskConnections").forEach(item->sourceConnections.add(uuid(item.get("id"))));
         for(JsonNode item:input.path("taskLists")) if(!sourceConnections.contains(uuid(item.get("connectionId")))) throw ApiFailure.validation();
+        Set<UUID> sourceListIds=new HashSet<>();input.path("taskLists").forEach(item -> sourceListIds.add(uuid(item.get("id"))));
+        for(JsonNode item:input.path("taskListSections")) if(!sourceListIds.contains(uuid(item.get("taskListId")))) throw ApiFailure.validation();
+        Map<UUID,JsonNode> sourceSections=new HashMap<>();input.path("taskListSections").forEach(item -> sourceSections.put(uuid(item.get("id")),item));
         Map<UUID,JsonNode> sourceLists=new HashMap<>(),sourceConnectionRecords=new HashMap<>();
         input.path("taskLists").forEach(item->sourceLists.put(uuid(item.get("id")),item));
         input.path("taskConnections").forEach(item->sourceConnectionRecords.put(uuid(item.get("id")),item));
@@ -44,6 +48,10 @@ final class DomainTransfer {
             for(JsonNode reference:item.path("externalReferences")) if(reference.hasNonNull("taskListId")) {
                 var list=sourceLists.get(uuid(reference.get("taskListId")));
                 if(list==null || !sourceConnectionRecords.get(uuid(list.get("connectionId"))).path("providerId").asText().equals(reference.path("providerId").asText())) throw ApiFailure.validation();
+            }
+            for(JsonNode reference:item.path("externalReferences")) if(reference.hasNonNull("sectionId")) {
+                var section=sourceSections.get(uuid(reference.get("sectionId")));
+                if(section==null || !section.path("taskListId").asText().equals(reference.path("taskListId").asText())) throw ApiFailure.validation();
             }
             var project=optionalText(item.get("projectId")).map(UUID::fromString);
             if(project.isPresent() && !sourceProjects.contains(project.get())) throw ApiFailure.validation();
@@ -91,10 +99,21 @@ final class DomainTransfer {
             var created=new TaskList(UUID.randomUUID(),required(connections,sourceConnection),item.get("remoteListId").asText(),
                     item.get("name").asText(),TaskListKind.valueOf(item.get("kind").asText()),item.get("readable").asBoolean(),
                     item.get("writable").asBoolean(),item.get("shared").asBoolean(),item.get("owner").asBoolean(),
-                    item.get("present").asBoolean(),item.get("position").asInt(),0);
+                    item.get("present").asBoolean(),item.get("position").asInt(),sharing(item.get("sharing")),0);
             store.save("TASK_LIST",created);store.change("TASK_LIST","CREATED",created.id().toString());
             lists.put(uuid(item.get("id")),created.id());
             mapping(mappings,"TASK_LIST",item,created.id());
+        }
+        Set<String> sectionKeys=new HashSet<>();
+        for(JsonNode item:input.path("taskListSections")) {
+            UUID sourceList=uuid(item.get("taskListId"));String key=sourceList+"\u0000"+item.get("remoteSectionId").asText();
+            if(!sectionKeys.add(key)) throw ApiFailure.validation();
+            var created=new TaskListSection(UUID.randomUUID(),required(lists,sourceList),item.get("remoteSectionId").asText(),
+                    item.get("name").asText(),TaskListSectionKind.valueOf(item.get("kind").asText()),item.get("position").asInt(),
+                    item.get("present").asBoolean(),item.get("writable").asBoolean(),0);
+            store.save("TASK_SECTION",created);store.change("TASK_SECTION","CREATED",created.id().toString());
+            sections.put(uuid(item.get("id")),created.id());
+            mapping(mappings,"TASK_SECTION",item,created.id());
         }
         int openSessions=0;
         for(JsonNode item:input.path("workSessions")) {
@@ -141,7 +160,7 @@ final class DomainTransfer {
                 }
                 var project=optionalText(item.get("projectId")).map(UUID::fromString).map(id -> required(projects,id));
                 var parentId=parent.map(id -> required(tasks,id));
-                var created=service.createTask(new CreateTask(project,parentId,item.get("summary").asText(),optionalText(item.get("url")),remapReferences(item.get("externalReferences"),lists),
+                var created=service.createTask(new CreateTask(project,parentId,item.get("summary").asText(),optionalText(item.get("url")),remapReferences(item.get("externalReferences"),lists,sections),
                         new TaskPlanning(optionalText(item.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),
                                 optionalText(item.get("scheduledDate")).map(java.time.LocalDate::parse),optionalText(item.get("completedAt")).map(java.time.Instant::parse)),
                         checklist(item.get("checklistItems")),timing(item),importance(item),body(item),item.path("siblingOrder").asInt(0),aliases(item.get("externalAliases")),recurrence(item.get("recurrence")),reminders(item.get("reminders")),metadata(item.get("metadata"))));
@@ -157,6 +176,13 @@ final class DomainTransfer {
             Activity created=new Activity(new ActivityId(UUID.randomUUID()),task,new OwnerId(store.owner()),start,end,item.get("summary").asText(),assigned,item.get("manual").asBoolean(),0,Optional.empty(),optionalText(item.get("projectId")).map(UUID::fromString).map(id -> required(projects,id)));
             store.save("ACTIVITY",created);store.change("ACTIVITY","CREATED",created.id().value().toString());mapping(mappings,"ACTIVITY",item,created.id().value());
         }
+        for(JsonNode item:input.path("taskTombstones")) {
+            UUID tombstoneId=UUID.randomUUID();Set<ExternalTaskReferenceKey> keys=aliases(item.get("externalReferences"));
+            var tombstone=new TaskTombstone(tombstoneId,uuid(item.get("taskId")),Instant.parse(item.get("deletedAt").asText()),
+                    item.get("taskVersion").asLong(),keys);
+            store.save("TASK_TOMBSTONE",tombstone);store.change("TASK_TOMBSTONE","CREATED",tombstoneId.toString());
+            mapping(mappings,"TASK_TOMBSTONE",item,tombstoneId);
+        }
         service.rolloverActivities(new OwnerId(store.owner()));
         result.put("revision",store.revision());return new ApiReplies(201,result,null,null);
     }
@@ -167,9 +193,9 @@ final class DomainTransfer {
         if(!fields.isEmpty()) store.clientDetails(type,id,fields);
     }
     private static <T> T required(Map<UUID,T> values,UUID id) {T value=values.get(id);if(value==null) throw ApiFailure.validation();return value;}
-    private static Set<ExternalTaskReference> remapReferences(JsonNode values,Map<UUID,UUID> lists) {
+    private static Set<ExternalTaskReference> remapReferences(JsonNode values,Map<UUID,UUID> lists,Map<UUID,UUID> sections) {
         Set<ExternalTaskReference> result=new LinkedHashSet<>();
-        for(var reference:references(values)) result.add(reference.withTaskList(reference.taskListId().map(id -> required(lists,id))));
+        for(var reference:references(values)) result.add(reference.withLocation(reference.taskListId().map(id -> required(lists,id)),reference.sectionId().map(id -> required(sections,id))));
         return result;
     }
     private static void mapping(com.fasterxml.jackson.databind.node.ArrayNode mappings,String type,JsonNode source,UUID id) {

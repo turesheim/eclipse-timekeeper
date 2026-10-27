@@ -5,6 +5,7 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.Optional;
@@ -60,12 +61,27 @@ public final class JsonValues {
             var node=base(owner,list.id(),list.version());
             node.put("connectionId",list.connectionId().toString());node.put("remoteListId",list.remoteListId());node.put("name",list.name());
             node.put("kind",list.kind().name());node.put("readable",list.readable());node.put("writable",list.writable());
-            node.put("shared",list.shared());node.put("owner",list.owner());node.put("present",list.present());node.put("position",list.position());return node;
+            node.put("shared",list.shared());node.put("owner",list.owner());node.put("present",list.present());node.put("position",list.position());
+            node.set("sharing",sharing(list.sharing()));return node;
+        }
+        if (value instanceof TaskListSection section) {
+            var node=base(owner,section.id(),section.version());node.put("taskListId",section.taskListId().toString());
+            node.put("remoteSectionId",section.remoteSectionId());node.put("name",section.name());node.put("kind",section.kind().name());
+            node.put("position",section.position());node.put("present",section.present());node.put("writable",section.writable());return node;
         }
         if (value instanceof TaskSyncCursor cursor) {
             var node=base(owner,cursor.id(),cursor.version());node.put("connectionId",cursor.connectionId().toString());
             nullable(node,"listId",cursor.listId());node.put("mode",cursor.mode().name());nullable(node,"cursor",cursor.cursor());
             nullable(node,"lastObservedAt",cursor.lastObservedAt());nullable(node,"lastCompleteAt",cursor.lastCompleteAt());return node;
+        }
+        if (value instanceof TaskTombstone tombstone) {
+            var node=base(owner,tombstone.id(),0);node.put("deletedAt",tombstone.deletedAt().toString());
+            node.put("taskId",tombstone.taskId().toString());node.put("taskVersion",tombstone.taskVersion());node.put("reason","LOCAL_DELETED");
+            var refs=node.putArray("externalReferences");
+            tombstone.externalReferences().stream().sorted(Comparator.comparing(ExternalTaskReferenceKey::providerId)
+                    .thenComparing(ExternalTaskReferenceKey::repositoryId).thenComparing(ExternalTaskReferenceKey::externalId))
+                    .forEach(key -> {var ref=object();ref.put("providerId",key.providerId());ref.put("repositoryId",key.repositoryId());ref.put("externalId",key.externalId());refs.add(ref);});
+            return node;
         }
         if (value instanceof Project project) { var node = base(owner, project.id().value(), project.version()); node.put("name", project.name()); return node; }
         if (value instanceof Label label) { var node = base(owner, label.id().value(), label.version()); node.put("name", label.name()); nullable(node,"color",label.color()); return node; }
@@ -90,6 +106,8 @@ public final class JsonValues {
             task.externalReferences().stream().sorted(Comparator.comparing(ExternalTaskReference::providerId).thenComparing(ExternalTaskReference::repositoryId).thenComparing(ExternalTaskReference::externalId)).forEach(reference -> {
                 var ref = object(); ref.put("providerId",reference.providerId()); ref.put("repositoryId",reference.repositoryId()); ref.put("externalId",reference.externalId()); nullable(ref,"externalUrl",reference.externalUrl());
                 reference.taskListId().ifPresent(list -> ref.put("taskListId",list.toString()));
+                reference.sectionId().ifPresent(section -> ref.put("sectionId",section.toString()));
+                reference.assignment().ifPresent(assigned -> ref.set("assignment",assignment(assigned)));
                 reference.providerData().ifPresent(data -> {
                     var envelope=ref.putObject("providerData");envelope.put("namespace",data.namespace());envelope.put("version",data.version());
                     envelope.set("payload",parse(data.json()));
@@ -124,7 +142,9 @@ public final class JsonValues {
                     node.get("readable").asBoolean(),node.get("writable").asBoolean(),node.get("enabled").asBoolean(),capabilities(node.get("capabilities")),version);
             case "TASK_LIST" -> new TaskList(id,uuid(node.get("connectionId")),node.get("remoteListId").asText(),node.get("name").asText(),
                     TaskListKind.valueOf(node.get("kind").asText()),node.get("readable").asBoolean(),node.get("writable").asBoolean(),
-                    node.get("shared").asBoolean(),node.get("owner").asBoolean(),node.get("present").asBoolean(),node.get("position").asInt(),version);
+                    node.get("shared").asBoolean(),node.get("owner").asBoolean(),node.get("present").asBoolean(),node.get("position").asInt(),sharing(node.get("sharing")),version);
+            case "TASK_SECTION" -> new TaskListSection(id,uuid(node.get("taskListId")),node.get("remoteSectionId").asText(),node.get("name").asText(),
+                    TaskListSectionKind.valueOf(node.get("kind").asText()),node.get("position").asInt(),node.get("present").asBoolean(),node.get("writable").asBoolean(),version);
             case "TASK_SYNC_CURSOR" -> new TaskSyncCursor(id,uuid(node.get("connectionId")),optionalText(node.get("listId")).map(UUID::fromString),
                     TaskSyncMode.valueOf(node.get("mode").asText()),optionalText(node.get("cursor")),
                     optionalText(node.get("lastObservedAt")).map(Instant::parse),optionalText(node.get("lastCompleteAt")).map(Instant::parse),version);
@@ -142,9 +162,39 @@ public final class JsonValues {
         };
     }
     public static ExternalTaskReference reference(JsonNode node) {
-        return new ExternalTaskReference(node.get("providerId").asText(),node.get("repositoryId").asText(),node.get("externalId").asText(),optionalText(node.get("externalUrl")),source(node.get("source")),optionalText(node.get("taskListId")).map(UUID::fromString),
+        return new ExternalTaskReference(node.get("providerId").asText(),node.get("repositoryId").asText(),node.get("externalId").asText(),optionalText(node.get("externalUrl")),source(node.get("source")),optionalText(node.get("taskListId")).map(UUID::fromString),optionalText(node.get("sectionId")).map(UUID::fromString),
+                Optional.ofNullable(node.get("assignment")).filter(value -> !value.isNull()).map(JsonValues::assignment),
                 Optional.ofNullable(node.get("providerData")).filter(value -> !value.isNull()).map(JsonValues::providerData),
                 Optional.ofNullable(node.get("baseline")).filter(value -> !value.isNull()).map(JsonValues::baseline));
+    }
+    public static TaskAssignment assignment(JsonNode value) {
+        return new TaskAssignment(optionalText(value.get("assigneeId")),optionalText(value.get("assigneeName")),
+                optionalText(value.get("assignedById")),optionalText(value.get("assignedByName")),
+                optionalText(value.get("sourceId")),optionalText(value.get("sourceUrl")),value.path("writable").asBoolean());
+    }
+    public static TaskListSharing sharing(JsonNode value) {
+        if(value==null || value.isNull()) return TaskListSharing.empty();
+        var participants=new ArrayList<TaskListParticipant>();
+        for(var item:value.path("participants")) participants.add(new TaskListParticipant(item.path("remotePrincipalId").asText(),
+                optionalText(item.get("displayName")),TaskListMemberRole.valueOf(item.path("role").asText())));
+        return new TaskListSharing(optionalText(value.get("remoteOwnerId")),participants);
+    }
+    public static ObjectNode sharing(TaskListSharing value) {
+        var node=object();value.remoteOwnerId().ifPresent(id -> node.put("remoteOwnerId",id));
+        var members=node.putArray("participants");for(var item:value.participants()) {
+            var member=object();member.put("remotePrincipalId",item.remotePrincipalId());
+            item.displayName().ifPresent(name -> member.put("displayName",name));member.put("role",item.role().name());members.add(member);
+        }
+        return node;
+    }
+    public static ObjectNode assignment(TaskAssignment value) {
+        var node=object();value.assigneeId().ifPresent(text -> node.put("assigneeId",text));
+        value.assigneeName().ifPresent(text -> node.put("assigneeName",text));
+        value.assignedById().ifPresent(text -> node.put("assignedById",text));
+        value.assignedByName().ifPresent(text -> node.put("assignedByName",text));
+        value.sourceId().ifPresent(text -> node.put("sourceId",text));
+        value.sourceUrl().ifPresent(text -> node.put("sourceUrl",text));
+        node.put("writable",value.writable());return node;
     }
     public static ExternalTaskProviderData providerData(JsonNode value) {
         if(value==null || !value.isObject() || !value.path("payload").isObject()) throw ApiFailure.validation();
@@ -152,7 +202,7 @@ public final class JsonValues {
         String json=value.get("payload").toString();if(json.length()>65536) throw ApiFailure.validation();
         return new ExternalTaskProviderData(value.get("namespace").asText(),value.get("version").asInt(),json);
     }
-    private static final Set<String> BASELINE_FIELDS = Set.of("summary","url","body","status","scheduledDate","completedAt","start","due","priority","flagged","urgent","parentTaskId","siblingOrder","checklistItems","recurrence","reminders","metadata","taskListId");
+    private static final Set<String> BASELINE_FIELDS = Set.of("summary","url","body","status","scheduledDate","completedAt","start","due","priority","flagged","urgent","parentTaskId","siblingOrder","checklistItems","recurrence","reminders","metadata","taskListId","sectionId","assignment");
     public static ExternalTaskBaseline baseline(JsonNode value) {
         if(value==null || !value.isObject() || !value.path("fields").isObject()) throw ApiFailure.validation();
         var fields=value.get("fields");

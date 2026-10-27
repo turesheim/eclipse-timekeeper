@@ -158,6 +158,9 @@ class HttpClientIntegrationTest {
             remoteList=client.updateTaskList(new UpdateTaskList(remoteList.id(),remoteList.version(),"Tasks",TaskListKind.STANDARD,
                     true,true,false,true,false,0));
             assertFalse(client.taskList(remoteList.id()).orElseThrow().present());
+            var sharing=new TaskListSharing(Optional.of("owner-1"),List.of(new TaskListParticipant("owner-1",Optional.of("Alex"),TaskListMemberRole.OWNER)));
+            remoteList=client.updateTaskListSharing(new UpdateTaskListSharing(remoteList.id(),remoteList.version(),sharing));
+            assertEquals(sharing,client.taskList(remoteList.id()).orElseThrow().sharing());
             var cursor=client.createTaskSyncCursor(new CreateTaskSyncCursor(connection.id(),Optional.of(remoteList.id()),
                     TaskSyncMode.INITIAL,Optional.empty(),Optional.empty(),Optional.empty()));
             var cursorId=cursor.id();assertTrue(client.taskSyncCursors(connection.id()).stream().anyMatch(value -> value.id().equals(cursorId)));
@@ -182,6 +185,12 @@ class HttpClientIntegrationTest {
                     Optional.of("\"remote-etag\""),Optional.empty());
             child=client.updateExternalTaskSource(new UpdateExternalTaskSource(child.id(),child.version(),reference.key(),source));
             assertEquals(source,client.task(child.id()).orElseThrow().externalReferences().iterator().next().source());
+            var assignment=new TaskAssignment(Optional.of("person-1"),Optional.of("Alex"),Optional.empty(),Optional.empty(),
+                    Optional.of("document-1"),Optional.of("https://example.test/documents/1"),false);
+            child=client.updateExternalTaskAssignment(new UpdateExternalTaskAssignment(child.id(),child.version(),reference.key(),Optional.of(assignment)));
+            assertEquals(assignment,client.task(child.id()).orElseThrow().externalReferences().iterator().next().assignment().orElseThrow());
+            child=client.updateExternalTaskAssignment(new UpdateExternalTaskAssignment(child.id(),child.version(),reference.key(),Optional.empty()));
+            assertTrue(client.task(child.id()).orElseThrow().externalReferences().iterator().next().assignment().isEmpty());
             var providerData=new ExternalTaskProviderData("jira.custom",1,"{\"opaque\":{\"nested\":[1,true,null]}}");
             child=client.updateExternalTaskProviderData(new UpdateExternalTaskProviderData(child.id(),child.version(),reference.key(),Optional.of(providerData)));
             assertEquals(providerData,client.task(child.id()).orElseThrow().externalReferences().iterator().next().providerData().orElseThrow());

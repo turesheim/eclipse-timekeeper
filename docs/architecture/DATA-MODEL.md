@@ -418,11 +418,30 @@ retains the records and associated tasks. Explicit deletion is conditional and
 rejects a connection with lists or a list with linked tasks. Account archives
 and portable transfers include these records; older archives import without
 them.
+`TaskList.sharing` optionally records a provider owner principal and disclosed
+participant IDs, display names, and roles. This data is separate from
+Timekeeper account access and from the list's current permission flags. Older
+list writes preserve it, and portable transfers retain it.
+`TASK_SECTION` records are optional children of one provider list. They
+store a provider section identity, name, standard or grocery-category kind,
+position, presence, and section write permission. A relation prevents
+deleting a list while sections remain. The section catalog does not change
+Timekeeper projects or infer sections for providers that lack them. Archive and
+portable transfer include sections and remap their list IDs; older snapshots
+without sections remain valid.
 An external task reference may include the stable Timekeeper `taskListId`.
 Task-to-list relations protect referenced lists from deletion, while portable
 imports remap the list ID. The reference's provider must match the list's
 connection provider. `repositoryId` remains the remote identity namespace;
 connectors must include the account/list scope when remote task IDs can repeat.
+The optional `sectionId` is valid only with a `taskListId` and must identify a
+section in that list. Task-to-section relations guard deletion, and portable
+imports remap section IDs. A conditional location update can explicitly clear
+both IDs without changing the provider identity or other task fields.
+`ExternalTaskReference.assignment` holds provider assignee/assigner identity
+and read-only source context independently of the task's primary URL. It is
+retained through legacy writes, identity replacement, and transfer. A
+conditional assignment update can clear it explicitly.
 
 `TASK_SYNC_CURSOR` is owner-scoped durable connector state linked to one
 connection and optionally one list. Its mode is `INITIAL`, `INCREMENTAL`, or
@@ -442,6 +461,15 @@ is updated atomically with source revision metadata after an accepted exchange.
 Older records decode without one; legacy task and link writes preserve it.
 The field map excludes credentials, provider transport state, and unsupported
 fields. It supplies the base for later field-level three-way conflict handling.
+
+`TASK_TOMBSTONE` is an owner-scoped, append-only record created when a locally
+deleted task has provider identities. Its initial ID is the deleted task ID;
+portable transfer remaps the record ID and retains historical `taskId`. It stores deletion
+time, previous task version, and every former active or alias provider key.
+The task row is removed while this record and both change-feed entries remain.
+It distinguishes an intentional local deletion from a never-imported remote
+identity. It survives account archive and portable transfer. It says nothing
+about whether the provider deleted its own item.
 
 Each external reference may contain one namespaced, versioned provider-data
 envelope. Its JSON object preserves exposed provider fields that are not yet

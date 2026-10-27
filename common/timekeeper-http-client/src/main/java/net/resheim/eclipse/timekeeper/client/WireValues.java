@@ -3,6 +3,7 @@ package net.resheim.eclipse.timekeeper.client;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -29,7 +30,26 @@ public final class WireValues {
         return new TaskList(id(value.get("id")),id(value.get("connectionId")),value.get("remoteListId").getAsString(),
                 value.get("name").getAsString(),TaskListKind.valueOf(value.get("kind").getAsString()),value.get("readable").getAsBoolean(),
                 value.get("writable").getAsBoolean(),value.get("shared").getAsBoolean(),value.get("owner").getAsBoolean(),
-                value.get("present").getAsBoolean(),value.get("position").getAsInt(),value.get("version").getAsLong());
+                value.get("present").getAsBoolean(),value.get("position").getAsInt(),sharing(value.get("sharing")),value.get("version").getAsLong());
+    }
+    public static TaskListSharing sharing(JsonElement value) {
+        if(value==null || value.isJsonNull()) return TaskListSharing.empty();
+        var node=value.getAsJsonObject();var members=new ArrayList<TaskListParticipant>();
+        for(var item:node.getAsJsonArray("participants")) {var participant=item.getAsJsonObject();members.add(new TaskListParticipant(
+                participant.get("remotePrincipalId").getAsString(),text(participant.get("displayName")),
+                TaskListMemberRole.valueOf(participant.get("role").getAsString())));}
+        return new TaskListSharing(text(node.get("remoteOwnerId")),members);
+    }
+    public static JsonObject sharing(TaskListSharing value) {
+        var node=object();value.remoteOwnerId().ifPresent(id -> node.addProperty("remoteOwnerId",id));
+        var members=new JsonArray();for(var item:value.participants()) {var member=object();member.addProperty("remotePrincipalId",item.remotePrincipalId());
+            item.displayName().ifPresent(name -> member.addProperty("displayName",name));member.addProperty("role",item.role().name());members.add(member);}
+        node.add("participants",members);return node;
+    }
+    public static TaskListSection taskListSection(JsonObject value) {
+        return new TaskListSection(id(value.get("id")),id(value.get("taskListId")),value.get("remoteSectionId").getAsString(),
+                value.get("name").getAsString(),TaskListSectionKind.valueOf(value.get("kind").getAsString()),
+                value.get("position").getAsInt(),value.get("present").getAsBoolean(),value.get("writable").getAsBoolean(),value.get("version").getAsLong());
     }
     public static TaskSyncCursor taskSyncCursor(JsonObject value) {
         return new TaskSyncCursor(id(value.get("id")),id(value.get("connectionId")),text(value.get("listId")).map(UUID::fromString),
@@ -189,10 +209,13 @@ public final class WireValues {
         if(!session.state().name().equals(value.get("state").getAsString())) throw new IllegalArgumentException("Inconsistent work session state");
         return session;
     }
-    public static ExternalTaskReference reference(JsonObject value) {return new ExternalTaskReference(value.get("providerId").getAsString(),value.get("repositoryId").getAsString(),value.get("externalId").getAsString(),text(value.get("externalUrl")),source(value.get("source")),text(value.get("taskListId")).map(UUID::fromString),
+    public static ExternalTaskReference reference(JsonObject value) {return new ExternalTaskReference(value.get("providerId").getAsString(),value.get("repositoryId").getAsString(),value.get("externalId").getAsString(),text(value.get("externalUrl")),source(value.get("source")),text(value.get("taskListId")).map(UUID::fromString),text(value.get("sectionId")).map(UUID::fromString),
+            value.has("assignment")&&!value.get("assignment").isJsonNull()?Optional.of(assignment(value.getAsJsonObject("assignment"))):Optional.empty(),
             value.has("providerData")&&!value.get("providerData").isJsonNull()?Optional.of(providerData(value.getAsJsonObject("providerData"))):Optional.empty(),
             value.has("baseline")&&!value.get("baseline").isJsonNull()?Optional.of(baseline(value.getAsJsonObject("baseline"))):Optional.empty());}
-    public static JsonObject reference(ExternalTaskReference value) {var out=object();out.addProperty("providerId",value.providerId());out.addProperty("repositoryId",value.repositoryId());out.addProperty("externalId",value.externalId());optional(out,"externalUrl",value.externalUrl());value.taskListId().ifPresent(list -> out.addProperty("taskListId",list.toString()));if(!value.source().equals(ExternalTaskSource.empty()))out.add("source",source(value.source()));value.providerData().ifPresent(data -> out.add("providerData",providerData(data)));value.baseline().ifPresent(data -> out.add("baseline",baseline(data)));return out;}
+    public static JsonObject reference(ExternalTaskReference value) {var out=object();out.addProperty("providerId",value.providerId());out.addProperty("repositoryId",value.repositoryId());out.addProperty("externalId",value.externalId());optional(out,"externalUrl",value.externalUrl());value.taskListId().ifPresent(list -> out.addProperty("taskListId",list.toString()));value.sectionId().ifPresent(section -> out.addProperty("sectionId",section.toString()));value.assignment().ifPresent(data -> out.add("assignment",assignment(data)));if(!value.source().equals(ExternalTaskSource.empty()))out.add("source",source(value.source()));value.providerData().ifPresent(data -> out.add("providerData",providerData(data)));value.baseline().ifPresent(data -> out.add("baseline",baseline(data)));return out;}
+    public static TaskAssignment assignment(JsonObject value) {return new TaskAssignment(text(value.get("assigneeId")),text(value.get("assigneeName")),text(value.get("assignedById")),text(value.get("assignedByName")),text(value.get("sourceId")),text(value.get("sourceUrl")),value.get("writable").getAsBoolean());}
+    public static JsonObject assignment(TaskAssignment value) {var out=object();value.assigneeId().ifPresent(text -> out.addProperty("assigneeId",text));value.assigneeName().ifPresent(text -> out.addProperty("assigneeName",text));value.assignedById().ifPresent(text -> out.addProperty("assignedById",text));value.assignedByName().ifPresent(text -> out.addProperty("assignedByName",text));value.sourceId().ifPresent(text -> out.addProperty("sourceId",text));value.sourceUrl().ifPresent(text -> out.addProperty("sourceUrl",text));out.addProperty("writable",value.writable());return out;}
     public static ExternalTaskReferenceKey alias(JsonObject value) {return new ExternalTaskReferenceKey(value.get("providerId").getAsString(),value.get("repositoryId").getAsString(),value.get("externalId").getAsString());}
     public static JsonObject alias(ExternalTaskReferenceKey value) {var out=object();out.addProperty("providerId",value.providerId());out.addProperty("repositoryId",value.repositoryId());out.addProperty("externalId",value.externalId());return out;}
     public static ExternalTaskProviderData providerData(JsonObject value) {return new ExternalTaskProviderData(value.get("namespace").getAsString(),value.get("version").getAsInt(),value.getAsJsonObject("payload").toString());}

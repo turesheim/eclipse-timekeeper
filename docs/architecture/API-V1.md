@@ -173,6 +173,20 @@ state out of the field map. Ordinary task edits and legacy link updates retain
 the baseline; identity replacement inherits it until a new exchange completes.
 The snapshot is the comparison base for a later field-level three-way merge.
 
+An explicit local deletion of a task with external identities writes a durable,
+owner-scoped tombstone with the deleted task ID, deletion time, prior task
+version, and all active and alias
+provider identities. `GET /task-tombstones` is paginated;
+`GET /task-tombstones/by-external-reference` resolves a former identity. A
+tombstone means Timekeeper deleted its local task. It does not mean the provider
+deleted its remote item, and a temporary missing provider response must never
+be treated as this deletion. The task's `DELETED` change and the tombstone's
+`CREATED` change are emitted in the same transaction for retrying connectors.
+Tombstones are included in portable transfer and private account archives.
+Their record IDs are remapped when imported into another owner, while the
+historical deleted task ID remains visible as `taskId`. Older transfers without
+the collection still import.
+
 `PUT /tasks/{id}/external-references/replace` atomically changes one current
 provider identity using `previous` (provider, repository, external ID) and a
 complete `current` reference. Both identities must belong to the same provider.
@@ -193,6 +207,25 @@ resource; a conflicting representation of the same remote identity returns
 409. Updates require `If-Match`. Mark a missing list `present=false` or a
 disconnected account `enabled=false`; remote disappearance must not trigger
 deletion of local tasks.
+
+A provider list may include `sharing` with a remote owner ID and disclosed
+participants and roles. This context is distinct from the list's `shared`,
+`owner`, `readable`, and `writable` flags and does not grant Timekeeper access.
+Providers may expose only the flags, leaving participant details empty.
+`PUT /task-lists/{id}/sharing` replaces the context with `If-Match`; ordinary
+list updates preserve it. Portable JSON/CSV and account archives retain it.
+
+`/task-list-sections` stores optional, owner-scoped provider groupings inside
+one task list. A section has a stable Timekeeper ID, remote section ID, name,
+`STANDARD` or `GROCERY_CATEGORY` kind, order, presence, and section write
+permission. Discovery is idempotent by list and remote ID. Missing sections
+can be marked `present=false`; a list with sections cannot be deleted. These
+rows do not create Timekeeper projects or imply that Google Tasks or Microsoft
+To Do expose Apple section behavior. An external task reference can point to
+a section only when that section belongs to its provider list.
+Sections are included in portable JSON/CSV transfer and private account
+archives. Their list IDs are remapped with the owned provider list; older
+transfers without sections remain accepted.
 
 Each connection also has a versioned `capabilities` declaration. Connectors
 replace it conditionally through `PUT /task-connections/{id}/capabilities`.
@@ -220,6 +253,20 @@ accounts and lists when remote item IDs are only unique within a list. A legacy
 link update that omits `taskListId` preserves the association. Portable import
 remaps list IDs with the rest of the owned graph; deleting a referenced list is
 rejected. The Timekeeper project remains independent of this association.
+`sectionId` optionally identifies a section inside that list. Legacy link
+updates preserve it when the list stays the same; moving a link to another list
+clears the old section. `PUT /tasks/{id}/external-references/location` sets or
+clears both IDs with `If-Match` and explicit nulls. Portable imports remap both
+IDs, and deleting a referenced section is rejected.
+
+An external reference may also carry `assignment` with an assignee, assigner,
+and read-only provider source context. `sourceUrl` is separate from the task's
+editable `url` and from linked resources. `writable=false` records that a
+connector cannot edit the assignment even when the task itself is writable.
+Legacy link updates preserve assignment data; `PUT
+/tasks/{id}/external-references/assignment` conditionally replaces it or
+clears it with explicit `null`. It survives account archives and portable
+transfer without storing connector credentials.
 
 An external reference can also hold an optional `providerData` envelope with
 `namespace`, positive schema `version`, and an opaque JSON object `payload`.

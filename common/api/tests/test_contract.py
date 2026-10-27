@@ -209,6 +209,22 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('ExternalTaskSyncStateInput').is_valid({**value,'baseline':{**baseline,'fields':{'accessToken':'secret'}}}))
         self.assertEqual('updateExternalTaskSyncState',CONTRACT['paths']['/tasks/{id}/external-references/sync-state']['put']['operationId'])
 
+    def test_explicit_local_task_deletions_have_reconcilable_tombstones(self):
+        tombstone={'ownerId':'owner','id':ID,'taskId':ID,'version':0,'taskVersion':2,'deletedAt':'2026-10-26T10:00:00Z',
+                   'reason':'LOCAL_DELETED','externalReferences':[{'providerId':'google','repositoryId':'account/list','externalId':'item'}]}
+        validator('TaskTombstone').validate(tombstone)
+        self.assertFalse(validator('TaskTombstone').is_valid({**tombstone,'reason':'REMOTE_DELETED'}))
+        self.assertEqual('listTaskTombstones',CONTRACT['paths']['/task-tombstones']['get']['operationId'])
+        self.assertEqual('findTaskTombstoneByExternalReference',CONTRACT['paths']['/task-tombstones/by-external-reference']['get']['operationId'])
+
+    def test_linked_task_tombstones_are_optional_in_legacy_transfers(self):
+        tombstone={'id':ID,'taskId':ID,'taskVersion':2,'deletedAt':'2026-10-26T10:00:00Z',
+                   'reason':'LOCAL_DELETED','externalReferences':[{'providerId':'google','repositoryId':'account/list','externalId':'item'}]}
+        validator('TransferTaskTombstone').validate(tombstone)
+        self.assertFalse(validator('TransferTaskTombstone').is_valid({**tombstone,'externalReferences':[]}))
+        self.assertIn('taskTombstones',CONTRACT['components']['schemas']['TransferSnapshot']['properties'])
+        self.assertNotIn('taskTombstones',CONTRACT['components']['schemas']['TransferSnapshot']['required'])
+
     def test_provider_connections_and_lists_keep_remote_identity_separate_from_projects(self):
         connection={'providerId':'google','remoteAccountId':'account-1','name':'Personal',
                     'readable':True,'writable':False,'enabled':True}
@@ -224,6 +240,44 @@ class ContractTest(unittest.TestCase):
                    'externalUrl':None,'taskListId':ID}
         validator('ExternalReference').validate(reference)
         self.assertFalse(validator('ExternalReference').is_valid({**reference,'taskListId':'not-a-uuid'}))
+        validator('ExternalReference').validate({**reference,'sectionId':ID})
+        self.assertFalse(validator('ExternalReference').is_valid({**reference,'sectionId':'not-a-uuid'}))
+        location={'providerId':'google','repositoryId':'account/list','externalId':'task-1',
+                  'taskListId':ID,'sectionId':ID}
+        validator('ExternalTaskLocationInput').validate(location)
+        validator('ExternalTaskLocationInput').validate({**location,'taskListId':None,'sectionId':None})
+        self.assertFalse(validator('ExternalTaskLocationInput').is_valid({**location,'sectionId':'invalid'}))
+        self.assertEqual('updateExternalTaskLocation',CONTRACT['paths']['/tasks/{id}/external-references/location']['put']['operationId'])
+        assignment={'assigneeId':'person-1','sourceId':'document-1','sourceUrl':'https://example.test/1','writable':False}
+        validator('TaskAssignment').validate(assignment)
+        self.assertFalse(validator('TaskAssignment').is_valid({'writable':False}))
+        validator('ExternalReference').validate({**reference,'assignment':assignment})
+        validator('ExternalTaskAssignmentInput').validate({'providerId':'google','repositoryId':'account/list',
+            'externalId':'task-1','assignment':None})
+        self.assertEqual('updateExternalTaskAssignment',CONTRACT['paths']['/tasks/{id}/external-references/assignment']['put']['operationId'])
+
+    def test_provider_list_sections_are_distinct_from_projects_and_grocery_categories(self):
+        section={'taskListId':ID,'remoteSectionId':'produce','name':'Produce','kind':'GROCERY_CATEGORY',
+                 'position':2,'present':True,'writable':False}
+        validator('TaskListSectionCreateInput').validate(section)
+        self.assertFalse(validator('TaskListSectionCreateInput').is_valid({**section,'kind':'PROJECT'}))
+        self.assertFalse(validator('TaskListSectionCreateInput').is_valid({**section,'position':-1}))
+        self.assertEqual('createTaskListSection',CONTRACT['paths']['/task-list-sections']['post']['operationId'])
+        self.assertEqual('listTaskListSections',CONTRACT['paths']['/task-list-sections']['get']['operationId'])
+        transferred={'id':ID,**section}
+        validator('TransferTaskListSection').validate(transferred)
+        self.assertIn('taskListSections',CONTRACT['components']['schemas']['TransferSnapshot']['properties'])
+        self.assertNotIn('taskListSections',CONTRACT['components']['schemas']['TransferSnapshot']['required'])
+
+    def test_shared_list_participants_are_distinct_from_account_access(self):
+        sharing={'remoteOwnerId':'owner-1','participants':[
+            {'remotePrincipalId':'owner-1','displayName':'Alex','role':'OWNER'},
+            {'remotePrincipalId':'member-2','role':'VIEWER'}]}
+        validator('TaskListSharing').validate(sharing)
+        self.assertFalse(validator('TaskListSharing').is_valid({'participants':[
+            {'remotePrincipalId':'member-2','role':'ADMIN'}]}))
+        self.assertEqual('updateTaskListSharing',CONTRACT['paths']['/task-lists/{id}/sharing']['put']['operationId'])
+        self.assertIn('sharing',CONTRACT['components']['schemas']['TransferTaskList']['properties'])
 
     def test_task_sibling_order_is_a_conditional_section(self):
         validator('TaskOrderInput').validate({'siblingOrder':7})
@@ -383,10 +437,12 @@ class ContractTest(unittest.TestCase):
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'convertCalendarEvent',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'updateTaskConnectionCapabilities', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
-            'createTaskList', 'updateTaskList', 'deleteTaskList', 'getTaskList', 'listTaskLists',
+            'createTaskList', 'updateTaskList', 'updateTaskListSharing', 'deleteTaskList', 'getTaskList', 'listTaskLists',
+            'createTaskListSection', 'updateTaskListSection', 'deleteTaskListSection', 'getTaskListSection', 'listTaskListSections',
             'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors',
+            'getTaskTombstone', 'listTaskTombstones', 'findTaskTombstoneByExternalReference',
             'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskReminders', 'updateTaskMetadata', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskSyncState', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
-            'linkExternalReference', 'replaceExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',
+            'linkExternalReference', 'replaceExternalReference', 'updateExternalTaskLocation', 'updateExternalTaskAssignment', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',
             'getActiveActivity', 'startActivity', 'stopActivity', 'reportActivities',

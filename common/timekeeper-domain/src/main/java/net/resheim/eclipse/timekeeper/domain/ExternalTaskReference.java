@@ -6,6 +6,7 @@ import java.util.UUID;
 /** Optional identity supplied by Mylyn, Jira, GitHub or another task provider. */
 public record ExternalTaskReference(String providerId, String repositoryId, String externalId,
 		Optional<String> externalUrl, ExternalTaskSource source, Optional<UUID> taskListId,
+		Optional<UUID> sectionId,Optional<TaskAssignment> assignment,
 		Optional<ExternalTaskProviderData> providerData, Optional<ExternalTaskBaseline> baseline) {
 	public ExternalTaskReference {
 		providerId = Values.required(providerId, "providerId");
@@ -15,8 +16,24 @@ public record ExternalTaskReference(String providerId, String repositoryId, Stri
 				.map(String::trim).filter(value -> !value.isEmpty());
 		source = source == null ? ExternalTaskSource.empty() : source;
 		taskListId = taskListId == null ? Optional.empty() : taskListId;
+		sectionId = sectionId == null ? Optional.empty() : sectionId;
+		if (sectionId.isPresent() && taskListId.isEmpty())
+			throw new DomainValidationException("sectionId", "a section requires a provider task list");
+		assignment = assignment == null ? Optional.empty() : assignment;
 		providerData = providerData == null ? Optional.empty() : providerData;
 		baseline = baseline == null ? Optional.empty() : baseline;
+	}
+
+	public ExternalTaskReference(String providerId, String repositoryId, String externalId,
+			Optional<String> externalUrl, ExternalTaskSource source, Optional<UUID> taskListId,
+			Optional<UUID> sectionId,Optional<ExternalTaskProviderData> providerData,Optional<ExternalTaskBaseline> baseline) {
+		this(providerId,repositoryId,externalId,externalUrl,source,taskListId,sectionId,Optional.empty(),providerData,baseline);
+	}
+
+	public ExternalTaskReference(String providerId, String repositoryId, String externalId,
+			Optional<String> externalUrl, ExternalTaskSource source, Optional<UUID> taskListId,
+			Optional<ExternalTaskProviderData> providerData, Optional<ExternalTaskBaseline> baseline) {
+		this(providerId,repositoryId,externalId,externalUrl,source,taskListId,Optional.empty(),Optional.empty(),providerData,baseline);
 	}
 
 	public ExternalTaskReference(String providerId, String repositoryId, String externalId,
@@ -48,18 +65,26 @@ public record ExternalTaskReference(String providerId, String repositoryId, Stri
 	}
 
 	public ExternalTaskReference withSource(ExternalTaskSource newSource) {
-		return new ExternalTaskReference(providerId, repositoryId, externalId, externalUrl, newSource, taskListId, providerData, baseline);
+		return new ExternalTaskReference(providerId, repositoryId, externalId, externalUrl, newSource, taskListId, sectionId, assignment, providerData, baseline);
 	}
 
 	public ExternalTaskReference withTaskList(Optional<UUID> newTaskListId) {
-		return new ExternalTaskReference(providerId, repositoryId, externalId, externalUrl, source, newTaskListId, providerData, baseline);
+		return withLocation(newTaskListId,taskListId.equals(newTaskListId) ? sectionId : Optional.empty());
+	}
+
+	public ExternalTaskReference withLocation(Optional<UUID> newTaskListId,Optional<UUID> newSectionId) {
+		return new ExternalTaskReference(providerId,repositoryId,externalId,externalUrl,source,newTaskListId,newSectionId,assignment,providerData,baseline);
+	}
+
+	public ExternalTaskReference withAssignment(Optional<TaskAssignment> newAssignment) {
+		return new ExternalTaskReference(providerId,repositoryId,externalId,externalUrl,source,taskListId,sectionId,newAssignment,providerData,baseline);
 	}
 
 	public ExternalTaskReference withProviderData(Optional<ExternalTaskProviderData> newProviderData) {
-		return new ExternalTaskReference(providerId, repositoryId, externalId, externalUrl, source, taskListId, newProviderData, baseline);
+		return new ExternalTaskReference(providerId, repositoryId, externalId, externalUrl, source, taskListId, sectionId, assignment, newProviderData, baseline);
 	}
 
 	public ExternalTaskReference withBaseline(Optional<ExternalTaskBaseline> newBaseline) {
-		return new ExternalTaskReference(providerId,repositoryId,externalId,externalUrl,source,taskListId,providerData,newBaseline);
+		return new ExternalTaskReference(providerId,repositoryId,externalId,externalUrl,source,taskListId,sectionId,assignment,providerData,newBaseline);
 	}
 }

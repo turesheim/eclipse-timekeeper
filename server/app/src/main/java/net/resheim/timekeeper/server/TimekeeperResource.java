@@ -33,12 +33,20 @@ public class TimekeeperResource {
     private JsonNode required(String type,UUID id) { return store.find(type,id).orElseThrow(ApiFailure::notFound); }
     private ExternalTaskReference checkedReference(ExternalTaskReference reference) {
         reference.providerData().ifPresent(data -> checkedProviderData(reference.providerId(),data));
-        reference.taskListId().ifPresent(id -> {
+        checkedLocation(reference.providerId(),reference.taskListId(),reference.sectionId());
+        return reference;
+    }
+    private void checkedLocation(String providerId,Optional<UUID> listId,Optional<UUID> sectionId) {
+        if(sectionId.isPresent() && listId.isEmpty()) throw ApiFailure.validation();
+        listId.ifPresent(id -> {
             var list=required("TASK_LIST",id);
             var connection=required("TASK_CONNECTION",uuid(list.get("connectionId")));
-            if(!connection.get("providerId").asText().equals(reference.providerId())) throw ApiFailure.validation();
+            if(!connection.get("providerId").asText().equals(providerId)) throw ApiFailure.validation();
         });
-        return reference;
+        sectionId.ifPresent(id -> {
+            var section=required("TASK_SECTION",id);
+            if(!section.path("taskListId").asText().equals(listId.orElseThrow().toString())) throw ApiFailure.validation();
+        });
     }
     private static ExternalTaskProviderData checkedProviderData(String providerId,ExternalTaskProviderData data) {
         if(!data.namespace().equals(providerId) && !data.namespace().startsWith(providerId+".")) throw ApiFailure.validation();
@@ -57,7 +65,11 @@ public class TimekeeperResource {
     private static TaskList taskList(JsonNode input,UUID id,long version) {
         return new TaskList(id,uuid(input.get("connectionId")),input.get("remoteListId").asText(),input.get("name").asText(),
                 TaskListKind.valueOf(input.get("kind").asText()),input.get("readable").asBoolean(),input.get("writable").asBoolean(),
-                input.get("shared").asBoolean(),input.get("owner").asBoolean(),input.get("present").asBoolean(),input.get("position").asInt(),version);
+                input.get("shared").asBoolean(),input.get("owner").asBoolean(),input.get("present").asBoolean(),input.get("position").asInt(),sharing(input.get("sharing")),version);
+    }
+    private static TaskListSection taskListSection(JsonNode input,UUID id,long version) {
+        return new TaskListSection(id,uuid(input.get("taskListId")),input.get("remoteSectionId").asText(),input.get("name").asText(),
+                TaskListSectionKind.valueOf(input.get("kind").asText()),input.get("position").asInt(),input.get("present").asBoolean(),input.get("writable").asBoolean(),version);
     }
     private static TaskSyncCursor taskSyncCursor(JsonNode input,UUID id,long version) {
         return new TaskSyncCursor(id,uuid(input.get("connectionId")),optionalText(input.get("listId")).map(UUID::fromString),
@@ -103,12 +115,25 @@ public class TimekeeperResource {
                 for(var existing:store.list(type)) if(existing.get("connectionId").asText().equals(candidate.connectionId().toString()) && existing.get("remoteListId").asText().equals(candidate.remoteListId())) {
                     var old=(TaskList)decode(type,existing);
                     if(old.name().equals(candidate.name()) && old.kind()==candidate.kind() && old.readable()==candidate.readable() && old.writable()==candidate.writable()
-                            && old.shared()==candidate.shared() && old.owner()==candidate.owner() && old.present()==candidate.present() && old.position()==candidate.position())
+                            && old.shared()==candidate.shared() && old.owner()==candidate.owner() && old.present()==candidate.present() && old.position()==candidate.position()
+                            && old.sharing().equals(candidate.sharing()))
                         return ApiReplies.resource(200,existing,null);
                     throw ApiFailure.conflict();
                 }
                 store.save(type,candidate);store.change(type,"CREATED",candidate.id().toString());
                 return ApiReplies.resource(201,snapshot(store.owner(),candidate),"/api/v1/task-lists/"+candidate.id());
+            }
+            if(type.equals("TASK_SECTION")) {
+                var candidate=taskListSection(input,UUID.randomUUID(),0);required("TASK_LIST",candidate.taskListId());
+                for(var existing:store.list(type)) if(existing.path("taskListId").asText().equals(candidate.taskListId().toString())
+                        && existing.path("remoteSectionId").asText().equals(candidate.remoteSectionId())) {
+                    var old=(TaskListSection)decode(type,existing);
+                    if(old.name().equals(candidate.name()) && old.kind()==candidate.kind() && old.position()==candidate.position()
+                            && old.present()==candidate.present() && old.writable()==candidate.writable()) return ApiReplies.resource(200,existing,null);
+                    throw ApiFailure.conflict();
+                }
+                store.save(type,candidate);store.change(type,"CREATED",candidate.id().toString());
+                return ApiReplies.resource(201,snapshot(store.owner(),candidate),"/api/v1/task-list-sections/"+candidate.id());
             }
             if(type.equals("TASK_SYNC_CURSOR")) {
                 var candidate=taskSyncCursor(input,UUID.randomUUID(),0);validateCursorParent(candidate);
@@ -139,6 +164,14 @@ public class TimekeeperResource {
         return tx(() -> {var before=required("TASK_CONNECTION",key);ApiReplies.match(before,match);
             var current=(TaskConnection)decode("TASK_CONNECTION",before);
             var updated=current.withCapabilities(capabilities(input));store.save("TASK_CONNECTION",updated);store.change("TASK_CONNECTION","UPDATED",key.toString());
+            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+        });
+    }
+    @PUT @Path("/task-lists/{id}/sharing") public Response updateTaskListSharing(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
+        UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("TaskListSharing",body);ContractInputs.queries(uri.getQueryParameters());
+        return tx(() -> {var before=required("TASK_LIST",key);ApiReplies.match(before,match);
+            var updated=((TaskList)decode("TASK_LIST",before)).withSharing(sharing(input));
+            store.save("TASK_LIST",updated);store.change("TASK_LIST","UPDATED",key.toString());
             return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
         });
     }
@@ -222,6 +255,12 @@ public class TimekeeperResource {
                         input.get("present").asBoolean(),input.get("position").asInt());
                 store.save(type,updated);store.change(type,"UPDATED",key.toString());return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
             }
+            if(type.equals("TASK_SECTION")) {
+                var old=(TaskListSection)decode(type,before);
+                var updated=old.update(input.get("name").asText(),TaskListSectionKind.valueOf(input.get("kind").asText()),
+                        input.get("position").asInt(),input.get("present").asBoolean(),input.get("writable").asBoolean());
+                store.save(type,updated);store.change(type,"UPDATED",key.toString());return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+            }
             if(type.equals("TASK_SYNC_CURSOR")) {
                 var old=(TaskSyncCursor)decode(type,before);
                 var updated=old.update(TaskSyncMode.valueOf(input.get("mode").asText()),optionalText(input.get("cursor")),
@@ -248,6 +287,7 @@ public class TimekeeperResource {
                 case "CLIENT" -> {store.delete(type,key);store.change(type,"DELETED",key.toString());}
                 case "TASK_CONNECTION" -> {if(store.related("connection",type,key)) throw ApiFailure.conflict();store.delete(type,key);store.change(type,"DELETED",key.toString());}
                 case "TASK_LIST" -> {if(store.related("list",type,key)) throw ApiFailure.conflict();store.delete(type,key);store.change(type,"DELETED",key.toString());}
+                case "TASK_SECTION" -> {if(store.related("section",type,key)) throw ApiFailure.conflict();store.delete(type,key);store.change(type,"DELETED",key.toString());}
                 case "TASK_SYNC_CURSOR" -> {store.delete(type,key);store.change(type,"DELETED",key.toString());}
                 case "PROJECT" -> service.deleteProject(new DeleteProject(new ProjectId(key),version));
                 case "TASK" -> service.deleteTask(new DeleteTask(new TaskId(key),version));
@@ -267,6 +307,21 @@ public class TimekeeperResource {
         ContractInputs.queries(uri.getQueryParameters(),"providerId","repositoryId","externalId");var query=uri.getQueryParameters();
         var ref=referenceQuery(query);return tx(() -> ApiReplies.resource(200,snapshot(store.owner(),store.service().findTask(ref).orElseThrow(ApiFailure::notFound)),null));
     }
+    @GET @Path("/task-tombstones/by-external-reference") public Response deletedExternal() {
+        ContractInputs.queries(uri.getQueryParameters(),"providerId","repositoryId","externalId");
+        var key=referenceQuery(uri.getQueryParameters());
+        return tx(() -> {
+            JsonNode newest=null;
+            for(var tombstone:store.list("TASK_TOMBSTONE")) for(var ref:tombstone.path("externalReferences"))
+                if(ref.path("providerId").asText().equals(key.providerId()) && ref.path("repositoryId").asText().equals(key.repositoryId())
+                        && ref.path("externalId").asText().equals(key.externalId()))
+                    if(newest==null || Instant.parse(tombstone.path("deletedAt").asText()).isAfter(Instant.parse(newest.path("deletedAt").asText()))
+                            || tombstone.path("deletedAt").asText().equals(newest.path("deletedAt").asText())
+                            && tombstone.path("id").asText().compareTo(newest.path("id").asText())>0) newest=tombstone;
+            if(newest==null) throw ApiFailure.notFound();
+            return ApiReplies.resource(200,newest,null);
+        });
+    }
     private ExternalTaskReferenceKey referenceQuery(MultivaluedMap<String,String> query) {
         var value=object();for(String key:List.of("providerId","repositoryId","externalId")) { if(query.getFirst(key)==null) throw ApiFailure.badRequest();value.put(key,query.getFirst(key)); }
         value.putNull("externalUrl");inputs.validate("ExternalReference",value);return reference(value).key();
@@ -274,6 +329,28 @@ public class TimekeeperResource {
     @PUT @Path("/tasks/{id}/external-references") public Response link(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalReference",body);ContractInputs.queries(uri.getQueryParameters());
         return tx(() -> { long version=ApiReplies.match(required("TASK",key),match);return ApiReplies.resource(200,snapshot(store.owner(),store.service().linkExternalReference(new LinkExternalReference(new TaskId(key),version,checkedReference(reference(input))))),null); });
+    }
+    @PUT @Path("/tasks/{id}/external-references/location") public Response updateExternalTaskLocation(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
+        UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalTaskLocationInput",body);ContractInputs.queries(uri.getQueryParameters());
+        return tx(() -> {
+            long version=ApiReplies.match(required("TASK",key),match);
+            var reference=alias(input);
+            var listId=optionalText(input.get("taskListId")).map(UUID::fromString);
+            var sectionId=optionalText(input.get("sectionId")).map(UUID::fromString);
+            checkedLocation(reference.providerId(),listId,sectionId);
+            var updated=store.service().updateExternalTaskLocation(new UpdateExternalTaskLocation(new TaskId(key),version,reference,listId,sectionId));
+            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+        });
+    }
+    @PUT @Path("/tasks/{id}/external-references/assignment") public Response updateExternalTaskAssignment(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
+        UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalTaskAssignmentInput",body);ContractInputs.queries(uri.getQueryParameters());
+        return tx(() -> {
+            long version=ApiReplies.match(required("TASK",key),match);
+            var reference=alias(input);
+            var assignment=Optional.ofNullable(input.get("assignment")).filter(value -> !value.isNull()).map(JsonValues::assignment);
+            var updated=store.service().updateExternalTaskAssignment(new UpdateExternalTaskAssignment(new TaskId(key),version,reference,assignment));
+            return ApiReplies.resource(200,snapshot(store.owner(),updated),null);
+        });
     }
     @PUT @Path("/tasks/{id}/external-references/replace") public Response replaceExternalReference(@PathParam("id") String id,@HeaderParam("If-Match") String match,JsonNode body) {
         UUID key=ContractInputs.pathId(id);JsonNode input=inputs.validate("ExternalReferenceReplacementInput",body);ContractInputs.queries(uri.getQueryParameters());
@@ -391,17 +468,21 @@ public class TimekeeperResource {
         else if(type.equals("WORK_SESSION")) ContractInputs.queries(query,"q","clientId","projectId","labelId","limit","cursor");
         else if(type.equals("PROJECT")) ContractInputs.queries(query,"q","clientId","limit","cursor");
         else if(type.equals("TASK_LIST")) ContractInputs.queries(query,"q","connectionId","limit","cursor");
+        else if(type.equals("TASK_SECTION")) ContractInputs.queries(query,"q","listId","limit","cursor");
         else if(type.equals("TASK_SYNC_CURSOR")) ContractInputs.queries(query,"connectionId","listId","limit","cursor");
+        else if(type.equals("TASK_TOMBSTONE")) ContractInputs.queries(query,"limit","cursor");
         else ContractInputs.queries(query,"q","limit","cursor");
         int limit=ContractInputs.number(query.getFirst("limit"),100,1,500);String q=Optional.ofNullable(query.getFirst("q")).orElse("").trim().toLowerCase(Locale.ROOT);if(q.codePointCount(0,q.length())>200) throw ApiFailure.validation();
         return tx(() -> {
             validateFilters(query);List<JsonNode> values;
             if(type.equals("ACTIVITY")) values=activities(query).stream().map(value -> (JsonNode)snapshot(store.owner(),value)).toList();
             else values=store.list(type).stream().filter(value -> {
+                if(type.equals("TASK_TOMBSTONE")) return true;
                 if(!value.path(Set.of("WORK_SESSION","TASK").contains(type) ? "summary" : type.equals("TASK_SYNC_CURSOR") ? "mode" : "name").asText().toLowerCase(Locale.ROOT).contains(q)) return false;
                 if(query.containsKey("clientId") && !value.path("clientId").asText().equals(ContractInputs.pathId(query.getFirst("clientId")).toString())) return false;
                 if(query.containsKey("connectionId") && !value.path("connectionId").asText().equals(ContractInputs.pathId(query.getFirst("connectionId")).toString())) return false;
-                if(query.containsKey("listId") && !value.path("listId").asText().equals(ContractInputs.pathId(query.getFirst("listId")).toString())) return false;
+                if(type.equals("TASK_SYNC_CURSOR") && query.containsKey("listId") && !value.path("listId").asText().equals(ContractInputs.pathId(query.getFirst("listId")).toString())) return false;
+                if(type.equals("TASK_SECTION") && query.containsKey("listId") && !value.path("taskListId").asText().equals(ContractInputs.pathId(query.getFirst("listId")).toString())) return false;
                 if(query.containsKey("labelId") && !labels(value.path("labelIds")).contains(new LabelId(ContractInputs.pathId(query.getFirst("labelId"))))) return false;
                 if(type.equals("WORK_SESSION") && query.containsKey("projectId") && !value.path("projectId").asText().equals(ContractInputs.pathId(query.getFirst("projectId")).toString())) return false;
                 if(type.equals("TASK")) {

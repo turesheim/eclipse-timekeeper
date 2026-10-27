@@ -41,6 +41,8 @@ import net.resheim.eclipse.timekeeper.service.Commands.DeleteLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteProject;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteTask;
 import net.resheim.eclipse.timekeeper.service.Commands.LinkExternalReference;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskLocation;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskAssignment;
 import net.resheim.eclipse.timekeeper.service.Commands.ReplaceExternalReference;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskSource;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskSyncState;
@@ -343,6 +345,32 @@ public class DefaultTimekeeperService implements TimekeeperService {
 			Task updated = ports.tasks().save(current.link(reference));
 			publish(TASK, UPDATED, updated.id().value().toString());
 			return updated;
+		});
+	}
+
+	@Override
+	public Task updateExternalTaskLocation(UpdateExternalTaskLocation command) {
+		return tx(() -> {
+			required(command,"command");Task current=requiredTask(command.taskId());
+			version(current.version(),command.expectedVersion(),"task");
+			ExternalTaskReferenceKey key=required(command.reference(),"externalReference");
+			if(current.externalReferences().stream().noneMatch(reference -> reference.key().equals(key)))
+				throw ServiceException.notFound("externalReference",key);
+			Task updated=ports.tasks().save(current.withExternalLocation(key,command.taskListId(),command.sectionId()));
+			publish(TASK,UPDATED,updated.id().value().toString());return updated;
+		});
+	}
+
+	@Override
+	public Task updateExternalTaskAssignment(UpdateExternalTaskAssignment command) {
+		return tx(() -> {
+			required(command,"command");Task current=requiredTask(command.taskId());
+			version(current.version(),command.expectedVersion(),"task");
+			ExternalTaskReferenceKey key=required(command.reference(),"externalReference");
+			if(current.externalReferences().stream().noneMatch(reference -> reference.key().equals(key)))
+				throw ServiceException.notFound("externalReference",key);
+			Task updated=ports.tasks().save(current.withExternalAssignment(key,command.assignment()));
+			publish(TASK,UPDATED,updated.id().value().toString());return updated;
 		});
 	}
 

@@ -46,6 +46,12 @@ public final class Commands {
 	public record UpdateTaskList(java.util.UUID id, long expectedVersion, String name,
 			net.resheim.eclipse.timekeeper.domain.TaskListKind kind, boolean readable, boolean writable,
 			boolean shared, boolean owner, boolean present, int position) { }
+	public record UpdateTaskListSharing(java.util.UUID id,long expectedVersion,
+			net.resheim.eclipse.timekeeper.domain.TaskListSharing sharing) { }
+	public record CreateTaskListSection(java.util.UUID taskListId,String remoteSectionId,String name,
+			net.resheim.eclipse.timekeeper.domain.TaskListSectionKind kind,int position,boolean present,boolean writable) { }
+	public record UpdateTaskListSection(java.util.UUID id,long expectedVersion,String name,
+			net.resheim.eclipse.timekeeper.domain.TaskListSectionKind kind,int position,boolean present,boolean writable) { }
 	public record CreateTaskSyncCursor(java.util.UUID connectionId, Optional<java.util.UUID> listId,
 			TaskSyncMode mode, Optional<String> cursor, Optional<Instant> lastObservedAt,
 			Optional<Instant> lastCompleteAt) { }
@@ -165,6 +171,10 @@ public final class Commands {
 	public record UpdateTaskMetadata(TaskId id, long expectedVersion, TaskMetadata metadata) { }
 	public record UpdateTaskOrder(TaskId id, long expectedVersion, int siblingOrder) { }
 	public record LinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReference reference) { }
+	public record UpdateExternalTaskLocation(TaskId taskId,long expectedVersion,ExternalTaskReferenceKey reference,
+			Optional<java.util.UUID> taskListId,Optional<java.util.UUID> sectionId) { }
+	public record UpdateExternalTaskAssignment(TaskId taskId,long expectedVersion,ExternalTaskReferenceKey reference,
+			Optional<net.resheim.eclipse.timekeeper.domain.TaskAssignment> assignment) { }
 	public record ReplaceExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey previous, ExternalTaskReference current) { }
 	public record UpdateExternalTaskSource(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference, ExternalTaskSource source) { }
 	public record UpdateExternalTaskSyncState(TaskId taskId,long expectedVersion,ExternalTaskReferenceKey reference,

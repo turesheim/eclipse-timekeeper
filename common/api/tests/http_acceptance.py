@@ -113,8 +113,8 @@ class HttpAcceptance(unittest.TestCase):
             self.assertIsNone(page.get('nextCursor'), 'Fixture cleanup must include every daily record')
             self.created.extend((owner,'activities',value['id']) for value in page['items'])
         # Clean only records created by this suite, including commands/imports.
-        order = {'activities': 0, 'work-sessions': 1, 'tasks': 2, 'task-sync-cursors': 3, 'task-lists': 4,
-                 'task-connections': 5, 'labels': 6, 'projects': 7, 'clients': 8}
+        order = {'activities': 0, 'work-sessions': 1, 'tasks': 2, 'task-sync-cursors': 3, 'task-list-sections': 4, 'task-lists': 5,
+                 'task-connections': 6, 'labels': 7, 'projects': 8, 'clients': 9}
         unique = list(dict.fromkeys(reversed(self.created)))
         for owner, resource, identifier in sorted(unique, key=lambda row: order[row[1]]):
             value, headers = self.call('GET', f'/{resource}/{identifier}', owner=owner)
@@ -195,7 +195,8 @@ class HttpAcceptance(unittest.TestCase):
         kinds = {'CLIENT': 'clients', 'PROJECT': 'projects', 'WORK_SESSION': 'work-sessions'}
         remapped = {item['sourceId']: item['id'] for item in result['ids']}
         for item in result['ids']:
-            self.created.append(('b', kinds[item['entityType']], item['id']))
+            if item['entityType'] in kinds:
+                self.created.append(('b', kinds[item['entityType']], item['id']))
         copied, _ = self.call('GET', '/work-sessions/' + remapped[session['id']], owner='b')
         copied_project, _ = self.call('GET', '/projects/' + remapped[second['id']], owner='b')
         self.assertEqual(remapped[client['id']], copied['clientId'])
@@ -506,7 +507,8 @@ class HttpAcceptance(unittest.TestCase):
         imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
         resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
         for item in imported['ids']:
-            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType'] in resources:
+                self.created.append(('b',resources[item['entityType']],item['id']))
             if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
                 restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
                 self.assertEqual(('COMPLETED','2026-10-26','2026-10-26T11:12:13Z'),
@@ -537,7 +539,8 @@ class HttpAcceptance(unittest.TestCase):
         imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
         resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
         for item in imported['ids']:
-            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType'] in resources:
+                self.created.append(('b',resources[item['entityType']],item['id']))
             if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
                 restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
                 self.assertEqual(body['items'],restored['checklistItems'])
@@ -568,7 +571,8 @@ class HttpAcceptance(unittest.TestCase):
         imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
         resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
         for item in imported['ids']:
-            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType'] in resources:
+                self.created.append(('b',resources[item['entityType']],item['id']))
             if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
                 restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
                 self.assertEqual((start,due),(restored['start'],restored['due']))
@@ -601,7 +605,8 @@ class HttpAcceptance(unittest.TestCase):
         imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
         resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
         for item in imported['ids']:
-            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType'] in resources:
+                self.created.append(('b',resources[item['entityType']],item['id']))
             if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
                 restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
                 self.assertEqual(important,{key:restored[key] for key in important})
@@ -631,7 +636,8 @@ class HttpAcceptance(unittest.TestCase):
         imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
         resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
         for item in imported['ids']:
-            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType'] in resources:
+                self.created.append(('b',resources[item['entityType']],item['id']))
             if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
                 restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
                 self.assertEqual(note,restored['body'])
@@ -664,7 +670,8 @@ class HttpAcceptance(unittest.TestCase):
         imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
         resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
         for item in imported['ids']:
-            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType'] in resources:
+                self.created.append(('b',resources[item['entityType']],item['id']))
             if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
                 restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
                 self.assertEqual(replacement,restored['externalReferences'][0]['source'])
@@ -672,6 +679,45 @@ class HttpAcceptance(unittest.TestCase):
         cleared_result, _=self.call('PUT',path+'/external-references/source',body={**body,'source':cleared},
                                     headers={'If-Match':headers['ETag']})
         self.assertEqual(cleared,cleared_result['externalReferences'][0]['source'])
+
+    def test_explicit_task_deletion_retains_provider_identity_tombstone(self):
+        ref={'providerId':'google','repositoryId':self.prefix+'/list','externalId':'old','externalUrl':None}
+        task=self.create('tasks',{'summary':self.prefix+' deleted','projectId':None,'parentTaskId':None,'url':None,'externalReferences':[ref]})
+        path='/tasks/'+task['id']
+        replacement={'previous':{key:ref[key] for key in ('providerId','repositoryId','externalId')},'current':{**ref,'externalId':'new'}}
+        _, headers=self.call('GET',path)
+        _, headers=self.call('PUT',path+'/external-references/replace',body=replacement,headers={'If-Match':headers['ETag']})
+        self.call('DELETE',path,headers={'If-Match':headers['ETag']},status=204)
+        self.created.remove(('a','tasks',task['id']))
+        tombstone, _=self.call('GET','/task-tombstones/'+task['id'])
+        self.assertEqual('LOCAL_DELETED',tombstone['reason'])
+        self.assertEqual(task['id'],tombstone['id'])
+        self.assertEqual(task['id'],tombstone['taskId'])
+        self.assertEqual({'old','new'},{item['externalId'] for item in tombstone['externalReferences']})
+        query=urlencode({key:ref[key] for key in ('providerId','repositoryId','externalId')})
+        found, _=self.call('GET','/task-tombstones/by-external-reference?'+query)
+        self.assertEqual(tombstone,found)
+        second=self.create('tasks',{'summary':self.prefix+' recreated','projectId':None,'parentTaskId':None,'url':None,'externalReferences':[ref]})
+        _, second_headers=self.call('GET','/tasks/'+second['id'])
+        self.call('DELETE','/tasks/'+second['id'],headers={'If-Match':second_headers['ETag']},status=204)
+        self.created.remove(('a','tasks',second['id']))
+        latest, _=self.call('GET','/task-tombstones/by-external-reference?'+query)
+        self.assertEqual(second['id'],latest['taskId'])
+        self.call('GET','/task-tombstones/'+task['id'],owner='b',status=404,code='NOT_FOUND')
+        page, _=self.call('GET','/task-tombstones?limit=500')
+        self.assertIn(task['id'],{item['id'] for item in page['items']})
+        exported, _=self.call('GET','/data/export')
+        self.assertIn(task['id'],{item['taskId'] for item in exported['taskTombstones']})
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            if item['entityType'] in resources:
+                self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK_TOMBSTONE' and item['sourceId']==task['id']:
+                restored, _=self.call('GET','/task-tombstones/'+item['id'],owner='b')
+                self.assertEqual(task['id'],restored['taskId'])
+                self.assertEqual(tombstone['externalReferences'],restored['externalReferences'])
+        self.call('GET',path,status=404,code='NOT_FOUND')
 
     def test_external_sync_baseline_is_atomic_preserved_and_clearable(self):
         path='/tasks/'+self.task['id']
@@ -696,7 +742,8 @@ class HttpAcceptance(unittest.TestCase):
         imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
         resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
         for item in imported['ids']:
-            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType'] in resources:
+                self.created.append(('b',resources[item['entityType']],item['id']))
             if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
                 restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
                 self.assertEqual(baseline,restored['externalReferences'][0]['baseline'])
@@ -731,7 +778,8 @@ class HttpAcceptance(unittest.TestCase):
         imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
         resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
         for item in imported['ids']:
-            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType'] in resources:
+                self.created.append(('b',resources[item['entityType']],item['id']))
             if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
                 restored,_=self.call('GET','/tasks/'+item['id'],owner='b')
                 self.assertEqual([old],restored['externalAliases'])
@@ -768,7 +816,8 @@ class HttpAcceptance(unittest.TestCase):
         imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
         resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
         for item in imported['ids']:
-            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType'] in resources:
+                self.created.append(('b',resources[item['entityType']],item['id']))
             if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
                 restored,_=self.call('GET','/tasks/'+item['id'],owner='b')
                 self.assertEqual(updated['recurrence'],restored['recurrence'])
@@ -798,7 +847,8 @@ class HttpAcceptance(unittest.TestCase):
         imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
         resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
         for item in imported['ids']:
-            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType'] in resources:
+                self.created.append(('b',resources[item['entityType']],item['id']))
             if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
                 restored,_=self.call('GET','/tasks/'+item['id'],owner='b')
                 self.assertEqual(reminders,restored['reminders'])
@@ -825,7 +875,8 @@ class HttpAcceptance(unittest.TestCase):
         imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
         resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
         for item in imported['ids']:
-            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType'] in resources:
+                self.created.append(('b',resources[item['entityType']],item['id']))
             if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
                 restored,_=self.call('GET','/tasks/'+item['id'],owner='b')
                 self.assertEqual(metadata,restored['metadata'])
@@ -855,10 +906,68 @@ class HttpAcceptance(unittest.TestCase):
         imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
         resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
         for item in imported['ids']:
-            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType'] in resources:
+                self.created.append(('b',resources[item['entityType']],item['id']))
             if item['entityType']=='TASK_CONNECTION' and item['sourceId']==connection['id']:
                 restored,_=self.call('GET','/task-connections/'+item['id'],owner='b')
                 self.assertEqual(body,restored['capabilities'])
+
+    def test_provider_list_sections_are_owned_and_idempotent(self):
+        connection=self.create('task-connections',{'providerId':'apple','remoteAccountId':str(uuid4()),'name':'iCloud',
+                  'readable':True,'writable':False,'enabled':True})
+        task_list=self.create('task-lists',{'connectionId':connection['id'],'remoteListId':str(uuid4()),'name':'Groceries',
+                  'kind':'STANDARD','readable':True,'writable':False,'shared':False,'owner':True,'present':True,'position':0})
+        source={'taskListId':task_list['id'],'remoteSectionId':'produce','name':'Produce','kind':'GROCERY_CATEGORY',
+                'position':1,'present':True,'writable':False}
+        section=self.create('task-list-sections',source)
+        repeated, _=self.call('POST','/task-list-sections',body=source,status=200)
+        self.assertEqual(section['id'],repeated['id'])
+        self.call('POST','/task-list-sections',body={**source,'name':'Vegetables'},status=409,code='CONFLICT')
+        listed, _=self.call('GET','/task-list-sections?'+urlencode({'listId':task_list['id']}))
+        self.assertEqual([section['id']],[item['id'] for item in listed['items']])
+        self.call('GET','/task-list-sections/'+section['id'],owner='b',status=404,code='NOT_FOUND')
+        reference={'providerId':'apple','repositoryId':connection['remoteAccountId']+'/'+task_list['remoteListId'],
+                   'externalId':str(uuid4()),'externalUrl':None,'taskListId':task_list['id'],'sectionId':section['id']}
+        task_path='/tasks/'+self.task['id']
+        _, task_headers=self.call('GET',task_path)
+        self.call('PUT',task_path+'/external-references',body={**reference,'sectionId':str(uuid4())},
+                  headers={'If-Match':task_headers['ETag']},status=404,code='NOT_FOUND')
+        linked, task_headers=self.call('PUT',task_path+'/external-references',body=reference,
+                                       headers={'If-Match':task_headers['ETag']})
+        self.assertEqual(section['id'],linked['externalReferences'][0]['sectionId'])
+        legacy={key:reference[key] for key in ('providerId','repositoryId','externalId','externalUrl')}
+        linked, task_headers=self.call('PUT',task_path+'/external-references',body=legacy,
+                                       headers={'If-Match':task_headers['ETag']})
+        self.assertEqual(section['id'],linked['externalReferences'][0]['sectionId'])
+        _, list_headers=self.call('GET','/task-lists/'+task_list['id'])
+        self.call('DELETE','/task-lists/'+task_list['id'],headers={'If-Match':list_headers['ETag']},status=409,code='CONFLICT')
+        _, headers=self.call('GET','/task-list-sections/'+section['id'])
+        self.call('DELETE','/task-list-sections/'+section['id'],headers={'If-Match':headers['ETag']},status=409,code='CONFLICT')
+        replacement={key:source[key] for key in ('name','kind','position','present','writable')}
+        self.call('PUT','/task-list-sections/'+section['id'],body=replacement,owner='read',headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        changed, headers=self.call('PUT','/task-list-sections/'+section['id'],body={**replacement,'present':False},headers={'If-Match':headers['ETag']})
+        self.assertFalse(changed['present'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
+               'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists',
+               'TASK_SECTION':'task-list-sections'}
+        mappings={item['sourceId']:item['id'] for item in imported['ids']}
+        for item in imported['ids']:
+            if item['entityType'] in kinds:self.created.append(('b',kinds[item['entityType']],item['id']))
+        restored, _=self.call('GET','/task-list-sections/'+mappings[section['id']],owner='b')
+        self.assertEqual(mappings[task_list['id']],restored['taskListId'])
+        self.assertFalse(restored['present'])
+        copied, _=self.call('GET','/tasks/'+mappings[self.task['id']],owner='b')
+        self.assertEqual(mappings[section['id']],copied['externalReferences'][0]['sectionId'])
+        location={key:reference[key] for key in ('providerId','repositoryId','externalId')}
+        location.update({'taskListId':None,'sectionId':None})
+        unlinked, _=self.call('PUT',task_path+'/external-references/location',body=location,
+                              headers={'If-Match':task_headers['ETag']})
+        self.assertNotIn('sectionId',unlinked['externalReferences'][0])
+        self.assertNotIn('taskListId',unlinked['externalReferences'][0])
+        self.call('DELETE','/task-list-sections/'+section['id'],headers={'If-Match':headers['ETag']},status=204)
+        self.created.remove(('a','task-list-sections',section['id']))
 
     def test_provider_accounts_and_lists_are_owned_idempotent_and_portable(self):
         account={'providerId':'microsoft','remoteAccountId':str(uuid4()),'name':'Personal',
@@ -893,10 +1002,45 @@ class HttpAcceptance(unittest.TestCase):
         kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
                'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
         mappings={item['sourceId']:item['id'] for item in imported['ids']}
-        for item in imported['ids']:self.created.append(('b',kinds[item['entityType']],item['id']))
+        for item in imported['ids']:
+            if item['entityType'] in kinds:
+                self.created.append(('b',kinds[item['entityType']],item['id']))
         restored, _=self.call('GET','/task-lists/'+mappings[linked['id']],owner='b')
         self.assertEqual(mappings[connection['id']],restored['connectionId'])
         self.assertFalse(restored['present'])
+
+    def test_provider_list_sharing_survives_legacy_writes_and_transfer(self):
+        connection=self.create('task-connections',{'providerId':'microsoft','remoteAccountId':str(uuid4()),
+            'name':'Work','readable':True,'writable':True,'enabled':True})
+        fields={'connectionId':connection['id'],'remoteListId':str(uuid4()),'name':'Team tasks',
+                'kind':'STANDARD','readable':True,'writable':True,'shared':True,'owner':False,
+                'present':True,'position':0}
+        task_list=self.create('task-lists',fields)
+        sharing={'remoteOwnerId':'owner-1','participants':[
+            {'remotePrincipalId':'owner-1','displayName':'Alex','role':'OWNER'},
+            {'remotePrincipalId':'member-2','displayName':'Sam','role':'EDITOR'}]}
+        path='/task-lists/'+task_list['id']
+        _, headers=self.call('GET',path)
+        self.call('PUT',path+'/sharing',body=sharing,owner='read',headers={'If-Match':headers['ETag']},
+                  status=403,code='FORBIDDEN')
+        self.call('PUT',path+'/sharing',body={**sharing,'participants':[sharing['participants'][0]]*2},
+                  headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        updated, headers=self.call('PUT',path+'/sharing',body=sharing,headers={'If-Match':headers['ETag']})
+        self.assertEqual(sharing,updated['sharing'])
+        updated, _=self.call('PUT',path,body={key:fields[key] for key in
+            ('name','kind','readable','writable','shared','owner','present','position')},
+            headers={'If-Match':headers['ETag']})
+        self.assertEqual(sharing,updated['sharing'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
+               'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
+        mappings={item['sourceId']:item['id'] for item in imported['ids']}
+        for item in imported['ids']:
+            if item['entityType'] in kinds:self.created.append(('b',kinds[item['entityType']],item['id']))
+        restored, _=self.call('GET','/task-lists/'+mappings[task_list['id']],owner='b')
+        self.assertEqual(sharing,restored['sharing'])
+        self.call('GET',path,owner='b',status=404,code='NOT_FOUND')
 
     def test_sync_cursors_are_durable_opaque_and_require_explicit_rescan(self):
         account=self.create('task-connections',{'providerId':'microsoft','remoteAccountId':str(uuid4()),
@@ -940,7 +1084,9 @@ class HttpAcceptance(unittest.TestCase):
                     'name':'Tasks','kind':'STANDARD','readable':True,'writable':True,'shared':False,
                     'owner':True,'present':True,'position':0})
         ref={'providerId':'google','repositoryId':account['remoteAccountId']+'/'+task_list['remoteListId'],
-             'externalId':str(uuid4()),'externalUrl':None,'taskListId':task_list['id']}
+             'externalId':str(uuid4()),'externalUrl':None,'taskListId':task_list['id'],
+             'assignment':{'assigneeId':'person-1','assigneeName':'Alex','sourceId':'document-1',
+                           'sourceUrl':'https://example.test/documents/1','writable':False}}
         path='/tasks/'+self.task['id']
         _, headers=self.call('GET',path)
         self.call('PUT',path+'/external-references',body={**ref,'providerId':'microsoft'},
@@ -950,6 +1096,8 @@ class HttpAcceptance(unittest.TestCase):
         linked, headers=self.call('PUT',path+'/external-references',body=ref,
                                   headers={'If-Match':headers['ETag']})
         self.assertEqual(task_list['id'],linked['externalReferences'][0]['taskListId'])
+        self.assertEqual(ref['assignment'],linked['externalReferences'][0]['assignment'])
+        self.assertIsNone(linked['url'])
         self.call('DELETE','/task-lists/'+task_list['id'],
                   headers={'If-Match':self.call('GET','/task-lists/'+task_list['id'])[1]['ETag']},
                   status=409,code='CONFLICT')
@@ -957,14 +1105,23 @@ class HttpAcceptance(unittest.TestCase):
         linked, headers=self.call('PUT',path+'/external-references',body=legacy,
                                   headers={'If-Match':headers['ETag']})
         self.assertEqual(task_list['id'],linked['externalReferences'][0]['taskListId'])
+        self.assertEqual(ref['assignment'],linked['externalReferences'][0]['assignment'])
         exported, _=self.call('GET','/data/export')
         imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
         kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
                'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
         mappings={item['sourceId']:item['id'] for item in imported['ids']}
-        for item in imported['ids']:self.created.append(('b',kinds[item['entityType']],item['id']))
+        for item in imported['ids']:
+            if item['entityType'] in kinds:
+                self.created.append(('b',kinds[item['entityType']],item['id']))
         copied, _=self.call('GET','/tasks/'+mappings[self.task['id']],owner='b')
         self.assertEqual(mappings[task_list['id']],copied['externalReferences'][0]['taskListId'])
+        self.assertEqual(ref['assignment'],copied['externalReferences'][0]['assignment'])
+        assignment_input={key:ref[key] for key in ('providerId','repositoryId','externalId')}
+        assignment_input['assignment']=None
+        cleared, _=self.call('PUT',path+'/external-references/assignment',body=assignment_input,
+                             headers={'If-Match':headers['ETag']})
+        self.assertNotIn('assignment',cleared['externalReferences'][0])
         self.call('GET','/task-lists/'+task_list['id'],owner='b',status=404,code='NOT_FOUND')
 
     def test_task_sibling_order_survives_legacy_writes_and_transfer(self):
@@ -990,7 +1147,9 @@ class HttpAcceptance(unittest.TestCase):
         kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
                'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
         mappings={item['sourceId']:item['id'] for item in imported['ids']}
-        for item in imported['ids']:self.created.append(('b',kinds[item['entityType']],item['id']))
+        for item in imported['ids']:
+            if item['entityType'] in kinds:
+                self.created.append(('b',kinds[item['entityType']],item['id']))
         copied, _=self.call('GET','/tasks/'+mappings[self.task['id']],owner='b')
         self.assertEqual(12,copied['siblingOrder'])
 
@@ -1018,7 +1177,9 @@ class HttpAcceptance(unittest.TestCase):
         kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
                'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
         mappings={item['sourceId']:item['id'] for item in imported['ids']}
-        for item in imported['ids']:self.created.append(('b',kinds[item['entityType']],item['id']))
+        for item in imported['ids']:
+            if item['entityType'] in kinds:
+                self.created.append(('b',kinds[item['entityType']],item['id']))
         copied, _=self.call('GET','/tasks/'+mappings[self.task['id']],owner='b')
         self.assertEqual(envelope,copied['externalReferences'][0]['providerData'])
         cleared, _=self.call('PUT',path+'/external-references/provider-data',body={**identity,'providerData':None},

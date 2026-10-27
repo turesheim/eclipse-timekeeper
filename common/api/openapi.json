@@ -11886,6 +11886,895 @@
         },
         "description": "Conditional atomic replacement of provider source state and last-common field snapshot. Use after an accepted provider exchange; Timekeeper If-Match still protects the local task version."
       }
+    },
+    "/task-tombstones": {
+      "get": {
+        "operationId": "listTaskTombstones",
+        "summary": "List durable local task deletion tombstones",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskTombstonePage"
+                }
+              }
+            },
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "description": "Owner-scoped, paginated deletion history. A missing task is not proof of remote deletion; use these records to reconcile explicit local deletes."
+      }
+    },
+    "/task-tombstones/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "get": {
+        "operationId": "getTaskTombstone",
+        "summary": "Get a local task deletion tombstone",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskTombstone"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      }
+    },
+    "/task-tombstones/by-external-reference": {
+      "get": {
+        "operationId": "findTaskTombstoneByExternalReference",
+        "summary": "Find a deleted local task by former external identity",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskTombstone"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "providerId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "\\S"
+            }
+          },
+          {
+            "name": "repositoryId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096,
+              "pattern": "\\S"
+            }
+          },
+          {
+            "name": "externalId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000,
+              "pattern": "\\S"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "description": "Matches a deleted task’s former active identity or alias within the authenticated owner. Does not claim the remote provider deleted the task."
+      }
+    },
+    "/task-list-sections": {
+      "get": {
+        "operationId": "listTaskListSections",
+        "summary": "List owned task-list-sections",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskListSectionPage"
+                }
+              }
+            },
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Query"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "listId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "description": "Filter sections for one owned provider task list."
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createTaskListSection",
+        "summary": "Discover an owned provider list section",
+        "x-required-permission": "write",
+        "responses": {
+          "201": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskListSection"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "200": {
+            "description": "Existing identical provider identity returned for idempotent discovery.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskListSection"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Relative or same-origin /api/v1 resource URL."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskListSectionCreateInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "description": "A repeated identical section identity within one list returns the existing resource. Conflicting metadata returns 409."
+      }
+    },
+    "/task-list-sections/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "get": {
+        "operationId": "getTaskListSection",
+        "summary": "Read an owned provider list section",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskListSection"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      },
+      "put": {
+        "operationId": "updateTaskListSection",
+        "summary": "Replace provider list section metadata",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskListSection"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskListSectionUpdateInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteTaskListSection",
+        "summary": "Delete an unused provider list section",
+        "x-required-permission": "write",
+        "responses": {
+          "204": {
+            "description": "Successful operation.",
+            "headers": {
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "description": "Explicit deletion only; mark a missing remote section present=false. A section with linked tasks returns 409."
+      }
+    },
+    "/tasks/{id}/external-references/location": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateExternalTaskLocation",
+        "summary": "Set or clear the list and section of a linked provider task",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalTaskLocationInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional location update. The provider identity and all other task fields are preserved."
+      }
+    },
+    "/tasks/{id}/external-references/assignment": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateExternalTaskAssignment",
+        "summary": "Set or clear provider assignment context",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalTaskAssignmentInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional assignment update. Null clears the recorded assignment; the provider identity and task URL are unchanged."
+      }
+    },
+    "/task-lists/{id}/sharing": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskListSharing",
+        "summary": "Replace provider-disclosed sharing context for a task list",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskList"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskListSharing"
+              }
+            }
+          }
+        },
+        "description": "Conditional update of owner and participant metadata. Does not grant Timekeeper access or change list permissions."
+      }
     }
   },
   "components": {
@@ -11999,6 +12888,14 @@
           "baseline": {
             "$ref": "#/components/schemas/ExternalTaskBaseline",
             "description": "Optional last-common snapshot; omitted on links that have not completed a sync."
+          },
+          "sectionId": {
+            "$ref": "#/components/schemas/Id",
+            "description": "Optional owner-scoped section within taskListId. Omission on an existing link preserves the section if its list is unchanged."
+          },
+          "assignment": {
+            "$ref": "#/components/schemas/TaskAssignment",
+            "description": "Provider assignment metadata. Omission on an existing link preserves it; use the conditional assignment endpoint to clear it."
           }
         },
         "required": [
@@ -12941,7 +13838,9 @@
               "CLIENT",
               "TASK_CONNECTION",
               "TASK_LIST",
-              "TASK_SYNC_CURSOR"
+              "TASK_SYNC_CURSOR",
+              "TASK_TOMBSTONE",
+              "TASK_SECTION"
             ]
           },
           "changeType": {
@@ -13339,6 +14238,22 @@
             },
             "maxItems": 10000,
             "description": "Optional for archives predating provider account/list support."
+          },
+          "taskTombstones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskTombstone"
+            },
+            "maxItems": 10000,
+            "description": "Optional for older transfers and archives. Deleted task IDs are historical and are not live task relationships."
+          },
+          "taskListSections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskListSection"
+            },
+            "maxItems": 10000,
+            "description": "Optional for older transfers and archives. Section list IDs are remapped with provider lists."
           }
         },
         "required": [
@@ -13498,7 +14413,9 @@
                     "WORK_SESSION",
                     "CLIENT",
                     "TASK_CONNECTION",
-                    "TASK_LIST"
+                    "TASK_LIST",
+                    "TASK_TOMBSTONE",
+                    "TASK_SECTION"
                   ]
                 },
                 "sourceId": {
@@ -16624,6 +17541,22 @@
             },
             "maxItems": 250000,
             "description": "Optional for archives predating provider account/list support."
+          },
+          "taskTombstones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskTombstone"
+            },
+            "maxItems": 250000,
+            "description": "Optional for older transfers and archives. Deleted task IDs are historical and are not live task relationships."
+          },
+          "taskListSections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferTaskListSection"
+            },
+            "maxItems": 250000,
+            "description": "Optional for older transfers and archives. Section list IDs are remapped with provider lists."
           }
         },
         "required": [
@@ -16957,6 +17890,16 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 10000
+          },
+          "taskTombstones": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Optional for older archives."
+          },
+          "taskListSections": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Optional for older archives."
           }
         },
         "required": [
@@ -17407,6 +18350,11 @@
           "externalReferenceLists": {
             "type": "integer",
             "minimum": 0
+          },
+          "sectionLists": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Optional for older archives."
           }
         },
         "required": [
@@ -20903,6 +21851,10 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 2147483647
+          },
+          "sharing": {
+            "$ref": "#/components/schemas/TaskListSharing",
+            "description": "Optional provider-disclosed owner and participant details. Ordinary list updates preserve this field."
           }
         },
         "required": [
@@ -21009,6 +21961,10 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 2147483647
+          },
+          "sharing": {
+            "$ref": "#/components/schemas/TaskListSharing",
+            "description": "Optional provider-disclosed owner and participant details. Ordinary list updates preserve this field."
           }
         },
         "required": [
@@ -21385,6 +22341,10 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 2147483647
+          },
+          "sharing": {
+            "$ref": "#/components/schemas/TaskListSharing",
+            "description": "Optional provider-disclosed owner and participant details. Ordinary list updates preserve this field."
           }
         },
         "required": [
@@ -21677,41 +22637,6 @@
           "occurrences"
         ],
         "additionalProperties": false
-      },
-      "JournalAssetUploadInput": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "data": {
-            "type": "string",
-            "contentEncoding": "base64",
-            "maxLength": 6666672,
-            "description": "At most 5,000,000 decoded bytes."
-          }
-        },
-        "required": [
-          "data"
-        ]
-      },
-      "ArchiveJournalAsset": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "filename",
-          "data"
-        ],
-        "properties": {
-          "filename": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
-          },
-          "data": {
-            "type": "string",
-            "contentEncoding": "base64",
-            "maxLength": 6666672,
-            "description": "Exact attachment bytes, at most 5,000,000 after decoding."
-          }
-        }
       },
       "TaskReminderAbsolute": {
         "type": "object",
@@ -22098,11 +23023,13 @@
                 "recurrence",
                 "reminders",
                 "metadata",
-                "taskListId"
+                "taskListId",
+                "sectionId",
+                "assignment"
               ]
             },
             "additionalProperties": true,
-            "maxProperties": 18
+            "maxProperties": 20
           }
         },
         "required": [
@@ -22156,6 +23083,584 @@
         ],
         "additionalProperties": false,
         "description": "Atomically replace a linked identity’s source revision and last-common field snapshot. Null baseline clears the snapshot."
+      },
+      "TaskTombstone": {
+        "type": "object",
+        "description": "Owner-scoped deletion record for a task linked to at least one provider identity. Its own ID can be remapped on transfer; taskId retains the historical deleted task ID.",
+        "properties": {
+          "ownerId": {
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "version": {
+            "type": "integer",
+            "const": 0
+          },
+          "taskVersion": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "deletedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "reason": {
+            "type": "string",
+            "const": "LOCAL_DELETED"
+          },
+          "externalReferences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalReferenceKey"
+            },
+            "uniqueItems": true
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Id",
+            "description": "ID of the task that was deleted. May differ from tombstone ID after cross-owner transfer."
+          }
+        },
+        "required": [
+          "ownerId",
+          "id",
+          "version",
+          "taskVersion",
+          "deletedAt",
+          "reason",
+          "externalReferences",
+          "taskId"
+        ],
+        "additionalProperties": false
+      },
+      "TaskTombstonePage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskTombstone"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "revision"
+        ],
+        "additionalProperties": true
+      },
+      "JournalAssetUploadInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 6666672,
+            "description": "At most 5,000,000 decoded bytes."
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ArchiveJournalAsset": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "filename",
+          "data"
+        ],
+        "properties": {
+          "filename": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+          },
+          "data": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 6666672,
+            "description": "Exact attachment bytes, at most 5,000,000 after decoding."
+          }
+        }
+      },
+      "TransferTaskTombstone": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskVersion": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "deletedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "reason": {
+            "type": "string",
+            "const": "LOCAL_DELETED"
+          },
+          "externalReferences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalReferenceKey"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "id",
+          "taskId",
+          "taskVersion",
+          "deletedAt",
+          "reason",
+          "externalReferences"
+        ],
+        "additionalProperties": false
+      },
+      "TaskListSectionKind": {
+        "type": "string",
+        "enum": [
+          "STANDARD",
+          "GROCERY_CATEGORY"
+        ],
+        "description": "Provider-owned standard section or grocery category. Neither is a Timekeeper project."
+      },
+      "TaskListSectionCreateInput": {
+        "type": "object",
+        "properties": {
+          "taskListId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "remoteSectionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "\\S"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TaskListSectionKind"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "present": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "taskListId",
+          "remoteSectionId",
+          "name",
+          "kind",
+          "position",
+          "present",
+          "writable"
+        ],
+        "additionalProperties": false,
+        "description": "Discover one section inside an owned provider task list. Repeating the same identity and metadata is idempotent."
+      },
+      "TaskListSectionUpdateInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TaskListSectionKind"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "present": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "position",
+          "present",
+          "writable"
+        ],
+        "additionalProperties": false,
+        "description": "Replace mutable section metadata. Identity and parent list cannot change."
+      },
+      "TaskListSection": {
+        "type": "object",
+        "properties": {
+          "ownerId": {
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "taskListId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "remoteSectionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "\\S"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TaskListSectionKind"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "present": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ownerId",
+          "id",
+          "version",
+          "taskListId",
+          "remoteSectionId",
+          "name",
+          "kind",
+          "position",
+          "present",
+          "writable"
+        ],
+        "additionalProperties": false
+      },
+      "TaskListSectionPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskListSection"
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "revision"
+        ],
+        "additionalProperties": true
+      },
+      "TransferTaskListSection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "taskListId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "remoteSectionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "\\S"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TaskListSectionKind"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "present": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "taskListId",
+          "remoteSectionId",
+          "name",
+          "kind",
+          "position",
+          "present",
+          "writable"
+        ],
+        "additionalProperties": false
+      },
+      "ExternalTaskLocationInput": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "taskListId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sectionId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "providerId",
+          "repositoryId",
+          "externalId",
+          "taskListId",
+          "sectionId"
+        ],
+        "additionalProperties": false,
+        "description": "Conditionally set or clear a provider reference location. A section requires a list and must belong to it. Null clears the association."
+      },
+      "TaskAssignment": {
+        "type": "object",
+        "description": "Provider-specific assignment and read-only source context, separate from task URL and editable task links. No connector credentials are stored.",
+        "properties": {
+          "assigneeId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "assigneeName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "assignedById": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "assignedByName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "sourceUrl": {
+            "$ref": "#/components/schemas/Url"
+          },
+          "writable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "writable"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "assigneeId"
+            ]
+          },
+          {
+            "required": [
+              "assigneeName"
+            ]
+          },
+          {
+            "required": [
+              "sourceId"
+            ]
+          },
+          {
+            "required": [
+              "sourceUrl"
+            ]
+          }
+        ],
+        "additionalProperties": false
+      },
+      "ExternalTaskAssignmentInput": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "repositoryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "assignment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskAssignment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "providerId",
+          "repositoryId",
+          "externalId",
+          "assignment"
+        ],
+        "additionalProperties": false,
+        "description": "Conditionally set or clear provider assignment and source context for an already linked task."
+      },
+      "TaskListMemberRole": {
+        "type": "string",
+        "enum": [
+          "OWNER",
+          "EDITOR",
+          "VIEWER",
+          "UNKNOWN"
+        ]
+      },
+      "TaskListParticipant": {
+        "type": "object",
+        "properties": {
+          "remotePrincipalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "role": {
+            "$ref": "#/components/schemas/TaskListMemberRole"
+          }
+        },
+        "required": [
+          "remotePrincipalId",
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "TaskListSharing": {
+        "type": "object",
+        "description": "Provider-disclosed sharing context. Missing members mean the provider did not expose them; this is not a Timekeeper access grant.",
+        "properties": {
+          "remoteOwnerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskListParticipant"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "participants"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {
