@@ -107,24 +107,24 @@ editing for unsupported Obsidian syntax. It does not save calendar notes. See
 the [evaluation and preservation contract](MARKDOWN-EDITOR.md) for the editor
 choice, dependency licenses, bundle measurements, tests and integration limits.
 
-## Calendar month view
+## Today and Calendar views
 
-**Today** opens a selected day with its Markdown journal in the main column.
-The date field and adjacent buttons move between days; the mini calendar selects
-any visible date and has separate month controls. The sidebar shows work
-sessions clipped to that day in the account time zone, imported all-day calendar
-plans, tasks scheduled for the selected date, and tasks in progress or tied to
-the active activity. Scheduled dates and task status come from the task model in
-issue #413; older servers show empty task sections. Selecting a work
-session opens its editor. The inline journal uses the same saved day note and
-conflict handling as Calendar and Week. Unsaved changes require confirmation
-before selecting another date. On narrow screens the sidebar follows the journal.
+**Today** is the default workspace tab. It opens a selected day with its Markdown
+journal in the main column. The date field and adjacent buttons move between
+days. The mini calendar selects any visible date, marks dates containing day
+notes, and opens a weekly Markdown note from each ISO week number. Weekly notes
+sync and export as `YYYY-Www.md`, using the ISO week-based year. The sidebar
+groups work sessions by client and lists all-day and timed calendar events plus
+tasks scheduled for the selected date. Selecting a work session opens its editor.
+The inline journal uses the same saved day note and conflict handling as
+Calendar and Week. Unsaved changes require confirmation before selecting
+another date. On narrow screens the sidebar follows the journal.
 
 ![Today view with journal and day overview](../assets/screenshots/today-desktop.png)
 
 ![Today view on a narrow screen](../assets/screenshots/today-mobile.png)
 
-**Calendar** is the default workspace tab. Its Monday-to-Sunday month grid shows
+**Calendar** has a Monday-to-Sunday month grid that shows
 one client-coloured summary per client and day, with recorded session hours per
 client above it. Only clients with logged time in the selected month are shown.
 Multiple sessions for the same client are combined. Use the controls on the left

@@ -17,6 +17,18 @@ import org.junit.jupiter.api.Test;
 
 @QuarkusTest @TestProfile(AccountArchiveHttpTest.Profile.class)
 class AccountArchiveHttpTest {
+    @Test void concurrentSessionRefreshesDoNotInterruptPrivateArchives() throws Exception {
+        var login=given().header("Authorization","Bearer test-a").post("/api/v1/auth/token-login");login.then().statusCode(200);
+        String cookie=login.header("Set-Cookie").split(";",2)[0];
+        try(var workers=java.util.concurrent.Executors.newFixedThreadPool(12)){
+            for(int round=0;round<3;round++){
+                var start=new java.util.concurrent.CountDownLatch(1);var replies=new ArrayList<java.util.concurrent.Future<Integer>>();
+                for(int index=0;index<12;index++){final String route=index%2==0?"/data/account/export":"/auth/session";
+                    replies.add(workers.submit(()->{start.await();return given().header("Cookie",cookie).get("/api/v1"+route).statusCode();}));}
+                start.countDown();for(var reply:replies)assertEquals(200,reply.get());
+            }
+        }
+    }
     public static class Profile implements QuarkusTestProfile {
         public Map<String,String> getConfigOverrides() {return ArchiveTestDatabase.configuration("http","jdbc:h2:mem:account_archive_http_tests");}
     }
@@ -32,12 +44,17 @@ class AccountArchiveHttpTest {
         String date="2026-08-06",journal="Private account journal\r\n  preserve this spacing  \n";
         var empty=call("test-a","GET","/day-notes/"+date,null,null,null);
         call("test-a","PUT","/day-notes/"+date,object().put("body",journal),empty.header("ETag"),null).then().statusCode(200);
+        String week="2026-W32",weekly="# Weekly private plan\r\n";
+        var emptyWeek=call("test-a","GET","/week-notes/"+week,null,null,null);
+        call("test-a","PUT","/week-notes/"+week,object().put("body",weekly),emptyWeek.header("ETag"),null).then().statusCode(200);
         store.transaction("a",()->{store.update("UPDATE tk_account SET administrator=TRUE WHERE owner_id=?",store.owner());return null;});
         byte[] bytes=call("test-read","GET","/data/account/export",null,null,null).then().statusCode(200).header("Cache-Control","no-store").contentType("application/zip").extract().asByteArray();
         JsonNode source=null;
         try(var zip=new ZipInputStream(new ByteArrayInputStream(bytes))) {for(var entry=zip.getNextEntry();entry!=null;entry=zip.getNextEntry()) if(entry.getName().equals("archive.json")) source=parse(new String(zip.readAllBytes(),StandardCharsets.UTF_8));}
         assertNotNull(source);assertEquals("a",source.path("account").path("ownerId").asText());assertEquals(1,source.path("work").path("projects").size());
         assertEquals(journal,source.path("dayNotes").get(0).path("body").asText());
+        assertEquals(week+".md",source.path("weekNotes").get(0).path("filename").asText());
+        assertEquals(weekly,source.path("weekNotes").get(0).path("markdown").asText());
         byte[] foreign=call("test-b","GET","/data/account/export",null,null,null).then().statusCode(200).extract().asByteArray();
         try(var zip=new ZipInputStream(new ByteArrayInputStream(foreign))){for(var entry=zip.getNextEntry();entry!=null;entry=zip.getNextEntry())if(entry.getName().equals("archive.json"))assertFalse(new String(zip.readAllBytes(),StandardCharsets.UTF_8).contains("Private account journal"));}
         given().get("/api/v1/data/account/export").then().statusCode(401);
@@ -67,6 +84,7 @@ class AccountArchiveHttpTest {
         assertEquals(0,parse(call("test-a","GET","/data/account/imports",null,null,null).asString()).path("items").size());
         assertEquals(1,parse(call("test-a","GET","/projects",null,null,null).asString()).path("items").size());
         assertEquals(journal,parse(call("test-b","GET","/day-notes/"+date,null,null,null).asString()).path("body").asText());
+        assertEquals(weekly,parse(call("test-b","GET","/week-notes/"+week,null,null,null).asString()).path("body").asText());
         // The extracted JSON and its original ZIP are one archive, even though
         // the upload bytes/hash and preference choice differ.
         byte[] extracted=source.toString().getBytes(StandardCharsets.UTF_8);

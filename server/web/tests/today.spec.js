@@ -25,7 +25,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     });
     await page.route('**/api/v1/calendar-events?**',async route=>{
       const response=await route.fetch(),body=await response.json(),from=new URL(route.request().url()).searchParams.get('fromDate');
-      await route.fulfill({response,json:{...body,items:from===date?[{key:'today-plan',subscriptionId:randomUUID(),eventVersion:1,title:'All-day planning',description:'From an imported calendar',allDay:true,firstDate:date,endDate:next,clientName:client.name,calendarName:'Team plan',clientId:client.id,activityIds:[]}]:[]}});
+      await route.fulfill({response,json:{...body,items:from===date?[{key:'today-plan',subscriptionId:randomUUID(),eventVersion:1,title:'All-day planning',description:'From an imported calendar',allDay:true,firstDate:date,endDate:next,clientName:client.name,calendarName:'Team plan',clientId:client.id,activityIds:[]},{key:'today-meeting',subscriptionId:randomUUID(),eventVersion:1,title:'Team meeting',description:'Timed calendar event',allDay:false,start:'2025-05-17T12:00:00Z',end:'2025-05-17T13:00:00Z',firstDate:date,endDate:next,clientName:client.name,calendarName:'Team plan',clientId:client.id,activityIds:[]}]:[]}});
     });
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);
     await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
@@ -46,16 +46,30 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(picker.locator(`[data-today-session-choice="${secondSession.id}"] .bi-code`)).toBeVisible();
     await picker.locator(`[data-today-session-choice="${secondSession.id}"]`).click();await expect(page.locator('#editor')).toBeVisible();
     await expect(page.getByLabel('Summary',{exact:true})).toHaveValue('Today follow-up');await page.locator('#cancel').click();
-    await expect(page.locator('#today-plans')).toContainText('All-day planning');
+    await expect(page.locator('#today-events')).toContainText('All-day planning');
+    await expect(page.locator('#today-events')).toContainText('Team meeting');
+    await expect(page.locator('#today-events')).toContainText(/14:00|2:00\s*PM/);
     await expect(page.locator('#today-planned-tasks')).toContainText('Scheduled review');
-    await expect(page.locator('#today-active-tasks')).toContainText('Scheduled review');
+    await expect(page.locator('#today-active-tasks')).toHaveCount(0);
     await expect(page.locator('#today-month-grid [data-date]')).toHaveCount(35);
+    await expect(page.locator('#today-month-grid [data-week]')).toHaveCount(5);
+    await page.locator('#today-month-grid [data-week="2025-W20"]').click();
+    const weekly=page.locator('#today-week-note-editor');await expect(weekly).toBeVisible();
+    await weekly.getByRole('button',{name:'Markdown source',exact:true}).click();
+    await page.locator('#weekly-journal-body').fill('# Weekly review\n');
+    await weekly.getByRole('button',{name:'Save',exact:true}).click();await expect(weekly).toContainText('Saved');
+    const weekSaved=await(await api(request,'GET','/week-notes/2025-W20')).json();expect(weekSaved.body).toBe('# Weekly review\n');
+    const downloadPromise=page.waitForEvent('download');await weekly.getByRole('button',{name:'Download Markdown'}).click();
+    expect((await downloadPromise).suggestedFilename()).toBe('2025-W20.md');
+    await weekly.getByRole('button',{name:'Cancel'}).click();
+    await expect(page.locator('#today-month-grid [data-date="2025-05-17"] .today-month-dot')).toHaveCount(0);
     await page.locator('#today-note-text').fill('Review day');
     await page.locator('#today-note-editor').getByRole('button',{name:'Markdown source',exact:true}).click();
     await page.locator('#today-journal-body').fill('# Today\n\nPlan the release.\n');
     await page.locator('#today-note-editor').getByRole('button',{name:'Save',exact:true}).click();
     await expect(page.locator('#today-note-editor')).toContainText('Saved');
     const saved=await(await api(request,'GET','/day-notes/'+date)).json();expect(saved.text).toBe('Review day');expect(saved.body).toContain('Plan the release.');
+    await expect(page.locator('#today-month-grid [data-date="2025-05-17"] .today-month-dot')).toHaveCount(1);
     await page.locator('#today-note-text').fill('Unsaved change');
     page.once('dialog',dialog=>dialog.dismiss());
     await page.locator('#today-next').click();await expect(page.locator('#today-date')).toHaveValue(date);
@@ -67,7 +81,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await page.locator('#today-next').click();await expect(page.locator('#today-date')).toHaveValue(next);
     await expect(page.locator('#today-sessions')).toContainText('No work sessions');
     await expect(page.locator('#today-planned-tasks')).toContainText('No tasks planned for this day');
-    await expect(page.locator('#today-active-tasks')).toContainText('Scheduled review');
+    await expect(page.locator('#today-events')).toContainText('No calendar events');
     await page.locator('#today-month-grid [data-date="2025-05-17"]').click();await expect(page.locator('#today-date')).toHaveValue(date);
     await expect(page.locator('#today-note-text')).toHaveValue('Review day');
     await page.evaluate(()=>window.scrollTo(0,50));
@@ -81,6 +95,8 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     expect((await new AxeBuilder({page}).include('#today-panel').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
     await captureScreenshot(page,{path:'test-results/today-mobile.png',fullPage:true});
   }finally{
+    await page.unrouteAll({behavior:'wait'});
+    const week=await api(request,'GET','/week-notes/2025-W20');if(week.ok()&&Number((await week.json()).version)>0)await api(request,'DELETE','/week-notes/2025-W20',undefined,{'If-Match':week.headers().etag});
     const note=await api(request,'GET','/day-notes/'+date);await api(request,'PUT','/day-notes/'+date,{text:'',body:''},{'If-Match':note.headers().etag});
     if(session){const current=await api(request,'GET','/work-sessions/'+session.id);await api(request,'DELETE','/work-sessions/'+session.id,undefined,{'If-Match':current.headers().etag});}
     if(secondSession){const current=await api(request,'GET','/work-sessions/'+secondSession.id);await api(request,'DELETE','/work-sessions/'+secondSession.id,undefined,{'If-Match':current.headers().etag});}

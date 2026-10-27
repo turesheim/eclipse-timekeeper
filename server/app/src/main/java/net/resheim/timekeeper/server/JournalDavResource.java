@@ -9,6 +9,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.smallrye.common.annotation.Blocking;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -16,7 +17,7 @@ import jakarta.ws.rs.core.Response;
 
 @Retention(RetentionPolicy.RUNTIME) @HttpMethod("PROPFIND") @interface PROPFIND {}
 
-/** Account-scoped WebDAV view of the canonical DAY_NOTE Markdown documents. */
+/** Account-scoped WebDAV view of daily and ISO-week Markdown documents. */
 @Path("/dav/journal") @Blocking
 public class JournalDavResource {
     private static final String ROOT="/dav/journal/";
@@ -30,19 +31,53 @@ public class JournalDavResource {
     private Response tx(Supplier<Response> action){
         return store.authenticated(identity,()->Response.fromResponse(action.get()).header("Cache-Control","private, no-store").build());
     }
-    private static java.time.LocalDate date(String filename){
-        try{return JournalMarkdown.date(filename);}catch(JournalMarkdown.Invalid invalid){throw ApiFailure.notFound();}
+    private interface NoteFile {
+        String filename();
+        ObjectNode get();
+        byte[] document();
+        Instant modifiedAt();
+        ObjectNode save(String match,byte[] bytes);
+        ObjectNode delete(String match);
+    }
+    private NoteFile file(String filename){
+        if(filename!=null&&filename.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}\\.md")){
+            final java.time.LocalDate date;
+            try{date=JournalMarkdown.date(filename);}catch(JournalMarkdown.Invalid invalid){throw ApiFailure.notFound();}
+            var notes=new DayNotes(store);
+            return new NoteFile(){
+                public String filename(){return filename;}
+                public ObjectNode get(){return notes.get(date);}
+                public byte[] document(){return notes.document(date);}
+                public Instant modifiedAt(){return notes.modifiedAt(date);}
+                public ObjectNode save(String match,byte[] bytes){return notes.saveDocument(date,match,bytes);}
+                public ObjectNode delete(String match){return notes.delete(date,match);}
+            };
+        }
+        if(filename!=null&&filename.matches("[0-9]{4}-W[0-9]{2}\\.md")){
+            final WeekNotes.Week week;
+            try{week=WeekNotes.filename(filename);}catch(ApiFailure invalid){throw ApiFailure.notFound();}
+            var notes=new WeekNotes(store);
+            return new NoteFile(){
+                public String filename(){return filename;}
+                public ObjectNode get(){return notes.get(week);}
+                public byte[] document(){return notes.document(week);}
+                public Instant modifiedAt(){return notes.modifiedAt(week);}
+                public ObjectNode save(String match,byte[] bytes){return notes.saveDocument(week,match,bytes);}
+                public ObjectNode delete(String match){return notes.delete(week,match);}
+            };
+        }
+        throw ApiFailure.notFound();
     }
     private static Response missing(){throw ApiFailure.notFound();}
-    private static boolean present(DayNotes notes,java.time.LocalDate date){
-        var value=notes.get(date);return value.path("version").asLong()>0&&!value.path("deleted").asBoolean();
+    private static boolean present(NoteFile file){
+        var value=file.get();return value.path("version").asLong()>0&&!value.path("deleted").asBoolean();
     }
     private static boolean containsEtag(String header,String tag){
         return List.of(header.split(",")).stream().map(String::trim).anyMatch(tag::equals);
     }
     @OPTIONS public Response options(){return tx(()->Response.ok().header("DAV",DAV).header("Allow",ROOT_ALLOW).build());}
     @OPTIONS @Path("/{filename}") public Response fileOptions(@PathParam("filename")String filename){
-        date(filename);return tx(()->Response.ok().header("DAV",DAV).header("Allow",FILE_ALLOW).build());
+        file(filename);return tx(()->Response.ok().header("DAV",DAV).header("Allow",FILE_ALLOW).build());
     }
     @PROPFIND @Produces("application/xml") public Response collection(@HeaderParam("Depth")String depth){
         return tx(()->{
@@ -52,17 +87,18 @@ public class JournalDavResource {
                 xml.append("<D:response><D:href>").append(ROOT).append("assets/</D:href><D:propstat><D:prop>")
                         .append("<D:displayname>assets</D:displayname><D:resourcetype><D:collection/></D:resourcetype>")
                         .append("<D:supportedlock/><D:lockdiscovery/></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>");
-                var notes=new DayNotes(store);for(var date:notes.presentDates())file(xml,notes,date);
+                var notes=new DayNotes(store);for(var date:notes.presentDates())file(xml,file(date+".md"));
+                var weeks=new WeekNotes(store);for(var week:weeks.presentWeeks())file(xml,file(week.filename()));
             }
             xml.append("</D:multistatus>");return Response.status(207).type("application/xml; charset=utf-8").entity(xml.toString()).header("DAV",DAV).build();
         });
     }
     @PROPFIND @Path("/{filename}") @Produces("application/xml") public Response fileProperties(@PathParam("filename")String filename,@HeaderParam("Depth")String depth){
-        var date=date(filename);depth(depth);
+        var file=file(filename);depth(depth);
         return tx(()->{
-            var notes=new DayNotes(store);if(!present(notes,date))return missing();
+            if(!present(file))return missing();
             var xml=new StringBuilder("<?xml version=\"1.0\" encoding=\"utf-8\"?><D:multistatus xmlns:D=\"DAV:\">");
-            file(xml,notes,date);xml.append("</D:multistatus>");
+            file(xml,file);xml.append("</D:multistatus>");
             return Response.status(207).type("application/xml; charset=utf-8").entity(xml.toString()).header("DAV",DAV).build();
         });
     }
@@ -76,13 +112,13 @@ public class JournalDavResource {
                 .append("<D:displayname>journal</D:displayname><D:resourcetype><D:collection/></D:resourcetype>")
                 .append("<D:supportedlock/><D:lockdiscovery/></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>");
     }
-    private static void file(StringBuilder xml,DayNotes notes,java.time.LocalDate date){
-        byte[] bytes=notes.document(date);if(bytes==null)return;
-        Instant modified=notes.modifiedAt(date);
-        xml.append("<D:response><D:href>").append(ROOT).append(date).append(".md</D:href><D:propstat><D:prop>")
-                .append("<D:displayname>").append(date).append(".md</D:displayname><D:resourcetype/>")
+    private static void file(StringBuilder xml,NoteFile file){
+        byte[] bytes=file.document();if(bytes==null)return;
+        Instant modified=file.modifiedAt();
+        xml.append("<D:response><D:href>").append(ROOT).append(file.filename()).append("</D:href><D:propstat><D:prop>")
+                .append("<D:displayname>").append(file.filename()).append("</D:displayname><D:resourcetype/>")
                 .append("<D:getcontenttype>text/markdown</D:getcontenttype><D:getcontentlength>").append(bytes.length).append("</D:getcontentlength>")
-                .append("<D:getetag>").append(etag(notes.get(date))).append("</D:getetag>")
+                .append("<D:getetag>").append(etag(file.get())).append("</D:getetag>")
                 .append("<D:getlastmodified>").append(HTTP_DATE.format(modified)).append("</D:getlastmodified>")
                 .append("<D:creationdate>").append(modified).append("</D:creationdate>")
                 .append("<D:supportedlock/><D:lockdiscovery/></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>");
@@ -96,50 +132,50 @@ public class JournalDavResource {
         return retrieve(filename,none,match,true);
     }
     private Response retrieve(String filename,String none,String match,boolean head){
-        var date=date(filename);
+        var file=file(filename);
         return tx(()->{
-            var notes=new DayNotes(store);if(!present(notes,date))return missing();
-            var value=notes.get(date);String tag=etag(value);
+            if(!present(file))return missing();
+            var value=file.get();String tag=etag(value);
             if(match!=null&&!match.equals("*")&&!containsEtag(match,tag))return Response.status(412).build();
             if(none!=null&&(none.equals("*")||containsEtag(none,tag)))
                 return Response.status(304).header("ETag",tag).build();
-            byte[] bytes=notes.document(date);
+            byte[] bytes=file.document();
             return Response.ok(head?null:bytes).type("text/markdown; charset=utf-8").header("Content-Length",bytes.length)
-                    .header("ETag",tag).header("Last-Modified",HTTP_DATE.format(notes.modifiedAt(date))).build();
+                    .header("ETag",tag).header("Last-Modified",HTTP_DATE.format(file.modifiedAt())).build();
         });
     }
     @PUT @Path("/{filename}") @Consumes("*/*") public Response put(@PathParam("filename")String filename,
             @HeaderParam("If-Match")String match,@HeaderParam("If-None-Match")String none,byte[] body){
-        var date=date(filename);
+        var file=file(filename);
         if(none!=null&&!"*".equals(none))throw ApiFailure.badRequest();
         if(match!=null&&none!=null)throw ApiFailure.badRequest();
         return tx(()->{
-            var notes=new DayNotes(store);boolean existed=present(notes,date);byte[] bytes=body==null?new byte[0]:body;
+            boolean existed=present(file);byte[] bytes=body==null?new byte[0]:body;
             if(none!=null&&existed)return Response.status(412).build();
-            var previous=notes.get(date);
+            var previous=file.get();
             String current=etag(previous);
             if("*".equals(match))throw new ApiFailure(428,"PRECONDITION_REQUIRED");
             if(match!=null&&!containsEtag(match,current))return Response.status(412).build();
             // An unconditional create cannot overwrite another writer. A byte-identical
             // retry is also safe after a lost response; changed content needs an ETag.
             if(match==null&&none==null&&existed){
-                if(Arrays.equals(notes.document(date),bytes))return Response.noContent().header("ETag",current).build();
+                if(Arrays.equals(file.document(),bytes))return Response.noContent().header("ETag",current).build();
                 throw new ApiFailure(428,"PRECONDITION_REQUIRED");
             }
-            var value=notes.saveDocument(date,current,bytes);
+            var value=file.save(current,bytes);
             var response=Response.status(existed?204:201).header("ETag",etag(value));
             if(!existed)response.header("Location",ROOT+filename);
             return response.build();
         });
     }
     @DELETE @Path("/{filename}") public Response delete(@PathParam("filename")String filename,@HeaderParam("If-Match")String match){
-        var date=date(filename);if(match==null)throw new ApiFailure(428,"PRECONDITION_REQUIRED");
+        var file=file(filename);if(match==null)throw new ApiFailure(428,"PRECONDITION_REQUIRED");
         return tx(()->{
-            var notes=new DayNotes(store);if(!present(notes,date))return missing();
-            String current=etag(notes.get(date));
+            if(!present(file))return missing();
+            String current=etag(file.get());
             if("*".equals(match))throw new ApiFailure(428,"PRECONDITION_REQUIRED");
             if(!containsEtag(match,current))return Response.status(412).build();
-            return Response.noContent().header("ETag",etag(notes.delete(date,current))).build();
+            return Response.noContent().header("ETag",etag(file.delete(current))).build();
         });
     }
 }

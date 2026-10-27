@@ -17,6 +17,8 @@ labels, descriptions, external references, exact timestamps, running intervals,
 time-zone preferences and import audit history. Web day notes are included as
 optional `dayNotes` in `archive.json`, including their complete canonical
 Markdown documents even on dates with no timed work or visible Calendar label.
+Weekly notes are optional `weekNotes` entries with exact Markdown and ISO week
+filenames such as `2026-W44.md`.
 The optional `journalAssets` array contains image and file attachments as base64.
 It also includes your account
 identity, recovery addresses and credential-management metadata for reference.
@@ -49,6 +51,8 @@ Day notes retain their calendar dates. Matching notes can be restored again; a
 different existing note on the same date is reported as a conflict during review
 and is never overwritten. Legacy label-only notes and archives created before day notes remain supported.
 An omitted legacy body never erases the Markdown of an existing matching note.
+Weekly notes retain their ISO week keys and are restored only when an existing
+weekly note is identical or absent.
 Attachments keep their filenames. A different existing attachment with the same
 name is a review conflict; no file is silently replaced.
 

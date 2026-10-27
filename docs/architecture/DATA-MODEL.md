@@ -568,12 +568,16 @@ their JSON payloads and are validated within owner-scoped server transactions.
 | --- | --- |
 | `DAY_NOTE` | One deterministic UUID per civil `YYYY-MM-DD` date and owner. Stores `date`, a canonical complete UTF-8 `markdown` document, derived short `text` label and Markdown `body`, an internal `modifiedAt` timestamp, and an optimistic `version`. A note is independent of activities and work sessions. An untouched date has no row and reads as version zero. |
 | `JOURNAL_DELETE` | Date-keyed deletion marker with the `DAY_NOTE` version it applies to. Deleting keeps an empty, versioned note row so stale editors cannot recreate it with an old ETag. |
+| `WEEK_NOTE` | One deterministic UUID per ISO week Monday and owner. Stores the ISO week key (`YYYY-Www`), exact Markdown `body`, an internal modification time and optimistic `version`. The ISO week-based year may differ from the calendar year at New Year. |
+| `WEEK_NOTE_DELETE` | Week-keyed deletion marker tied to the `WEEK_NOTE` version. A deleted weekly file remains versioned so stale writes fail. |
 | `JOURNAL_ASSET` | One deterministic UUID per account and safe filename under `assets/`. The JSON payload contains the filename, base64 binary data, byte length, derived safe media type, modification time, deletion flag and optimistic version. Deleted rows retain their version so old ETags cannot be reused. |
 
 `DAY_NOTE` writes use conditional versions and publish a content-free profile
 invalidation through `tk_change`. Calendar range reads return only the label
 and `hasBody`, not the Markdown body. Active notes are included in account
 archives, including canonical Markdown even for empty but present notes.
+Weekly notes are included as `weekNotes` with a `YYYY-Www.md` filename and
+exact UTF-8 Markdown body. Daily and weekly notes are independent.
 Active journal assets are also included; empty deletion markers are not.
 Historical rows from the retired SSH synchronization
 implementation are ignored; no data migration is required.

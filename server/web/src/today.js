@@ -1,9 +1,10 @@
 import {dateTimeFormat} from './formatters.js';
 import {getLocale,t} from './i18n.js';
-import {addDays,dateInZone,instantText,nanosText,taskPresentation} from './model.js';
+import {addDays,dateInZone,instantNanos,instantText,nanosText,taskPresentation} from './model.js';
 import {monthCalendar,monthSessions,shiftMonth} from './month-model.js';
 import {iconButton,isProjectIcon,projectIcon} from './icons.js';
 import {TrackDayNotes} from './track-day-notes.js';
+import {WeekNoteEditor,isoWeek} from './week-note-editor.js';
 
 const node=(tag,text,className)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;if(className)value.className=className;return value;};
 const byId=id=>document.getElementById(id);
@@ -13,7 +14,8 @@ export class TodayView {
   constructor(root,callbacks){
     this.root=root;this.callbacks=callbacks;this.dateInput=byId('today-date');this.grid=byId('today-month-grid');this.monthTitle=byId('today-month-title');this.journalRoot=byId('today-journal');
     this.journal=new TrackDayNotes(byId('today-journal'),this.grid,this.dateInput,{onUnauthorized:callbacks.onUnauthorized,onChanged:callbacks.onNotesChanged},{inline:true,prefix:'today',statusAnchor:byId('today-note-status-anchor')});
-    this.events=[];this.generation=0;this.visible=false;this.daySessions=new Map();
+    this.weekEditor=new WeekNoteEditor(root,callbacks);
+    this.events=[];this.generation=0;this.visible=false;this.daySessions=new Map();this.noteDates=new Set();this.noteGeneration=0;this.monthNoteKey=null;
     this.picker=node('dialog',undefined,'app-dialog shadow-lg');this.picker.id='today-session-picker';
     const pickerTitle=node('h2',t('ui.choose_work_session'));pickerTitle.id='today-session-picker-title';this.picker.setAttribute('aria-labelledby',pickerTitle.id);
     this.pickerContext=node('p');this.choices=node('div',undefined,'d-grid gap-2');
@@ -30,14 +32,14 @@ export class TodayView {
     byId('today-current').addEventListener('click',()=>this.select(dateInZone(Date.now(),this.data.profile.data.zoneId)));
     for(const [id,months] of [['today-month-previous',-1],['today-month-next',1]]){
       iconButton(byId(id),months<0?'chevron-left':'chevron-right',t(months<0?'ui.previous_month':'ui.next_month'));
-      byId(id).addEventListener('click',()=>{this.month=shiftMonth(this.month,months);this.paintMonth();});
+      byId(id).addEventListener('click',()=>{this.month=shiftMonth(this.month,months);this.paintMonth();void this.loadMonthNotes();});
     }
     window.addEventListener('resize',()=>this.sizeEditor());
   }
   initialize(date){this.date=date;this.month=date.slice(0,7);this.dateInput.value=date;}
-  reset(){++this.generation;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.daySessions.clear();this.closePicker();this.journal.reset();for(const id of ['today-sessions','today-plans','today-planned-tasks','today-active-tasks'])byId(id).replaceChildren();}
+  reset(){++this.generation;++this.noteGeneration;this.visible=false;this.scope=null;this.data=null;this.events=[];this.eventKey=null;this.monthNoteKey=null;this.noteDates.clear();this.daySessions.clear();this.closePicker();this.weekEditor.close(true);this.journal.reset();for(const id of ['today-sessions','today-events','today-planned-tasks'])byId(id).replaceChildren();}
   show(){this.visible=true;this.sizeEditor();if(this.data){this.paint();this.eventKey=this.date+'|'+this.data.revision;void this.loadEvents();}}
-  hide(){this.visible=false;++this.generation;this.closePicker();}
+  hide(){this.visible=false;++this.generation;++this.noteGeneration;this.monthNoteKey=null;this.closePicker();this.weekEditor.close();}
   update(data,connected,scope){
     if(scope!==this.scope){const visible=this.visible;this.reset();this.visible=visible;this.scope=scope;}
     this.data=data;this.connected=connected;
@@ -56,7 +58,7 @@ export class TodayView {
     const zone=this.data.profile.data.zoneId;
     byId('today-title').textContent=dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(this.date+'T12:00:00Z'));
     byId('today-zone').textContent=zone;
-    this.paintMonth();this.paintSessions();this.paintPlans();this.paintTasks();
+    this.paintMonth();void this.loadMonthNotes();this.paintSessions();this.paintEvents();this.paintTasks();
     this.journal.showInline(this.date,this.scope,this.connected&&this.callbacks.canWrite());this.sizeEditor();
   }
   sizeEditor(){
@@ -67,19 +69,36 @@ export class TodayView {
   paintMonth(){
     if(!this.data||!this.month)return;
     const calendar=monthCalendar(this.month,this.data.profile.data.zoneId),today=dateInZone(Date.now(),this.data.profile.data.zoneId);
-    const totals=monthSessions(calendar,this.data.workSessions,this.data.report.generatedAt);
     this.monthTitle.textContent=dateTimeFormat(getLocale(),{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(this.month+'-15T12:00:00Z'));
     const focus=this.grid.contains(document.activeElement)?document.activeElement.dataset.date:null;
     this.grid.replaceChildren();
+    this.grid.append(node('span',t('today.week_short'),'today-weekday'));
     for(let day=0;day<7;day++)this.grid.append(node('span',dateTimeFormat(getLocale(),{weekday:'narrow',timeZone:'UTC'}).format(new Date(calendar.days[day].date+'T12:00:00Z')),'today-weekday'));
-    for(const day of totals.days){
+    for(let index=0;index<calendar.days.length;index++){
+      const day=calendar.days[index];
+      if(index%7===0){const week=isoWeek(day.date),pick=node('button',String(Number(week.slice(-2))),'btn today-week-number');pick.type='button';pick.dataset.week=week;pick.setAttribute('aria-label',t('today.week_note',{week}));pick.title=t('today.week_note',{week});pick.addEventListener('click',()=>void this.weekEditor.open(week,this.scope,this.connected&&this.callbacks.canWrite()));this.grid.append(pick);}
       const pick=node('button',String(Number(day.date.slice(-2))),'btn today-month-day');pick.type='button';pick.dataset.date=day.date;
       pick.classList.toggle('outside',!day.inMonth);pick.classList.toggle('selected',day.date===this.date);pick.classList.toggle('current',day.date===today);
       pick.setAttribute('aria-label',dateTimeFormat(getLocale(),{dateStyle:'full',timeZone:'UTC'}).format(new Date(day.date+'T12:00:00Z')));
-      pick.setAttribute('aria-pressed',String(day.date===this.date));if(day.total>0n)pick.append(node('span',undefined,'today-month-dot'));
+      pick.setAttribute('aria-pressed',String(day.date===this.date));if(this.noteDates.has(day.date))pick.append(node('span',undefined,'today-month-dot'));
       pick.addEventListener('click',()=>this.select(day.date));this.grid.append(pick);
     }
     if(focus)this.grid.querySelector(`[data-date="${focus}"]`)?.focus({preventScroll:true});
+  }
+  async loadMonthNotes(){
+    if(!this.visible||!this.scope||!this.data||!this.month)return;
+    const key=this.month+'|'+this.data.revision;if(key===this.monthNoteKey)return;
+    this.monthNoteKey=key;this.noteDates.clear();this.paintMonth();
+    const generation=++this.noteGeneration,scope=this.scope,calendar=monthCalendar(this.month,this.data.profile.data.zoneId);
+    const first=calendar.days[0].date,last=calendar.days.at(-1).date;
+    try{
+      const reply=await scope.request('/day-notes?'+new URLSearchParams({fromDate:first,toDate:last}));
+      if(generation!==this.noteGeneration||scope!==this.scope)return;
+      this.noteDates=new Set(reply.data.items.filter(note=>note.text||note.hasBody).map(note=>note.date));this.paintMonth();
+    }catch(error){
+      if(generation!==this.noteGeneration||scope!==this.scope)return;
+      if(error.status===401)this.callbacks.onUnauthorized(error);
+    }
   }
   paintSessions(){
     const root=byId('today-sessions'),zone=this.data.profile.data.zoneId,calendar=monthCalendar(this.date.slice(0,7),zone);
@@ -132,18 +151,24 @@ export class TodayView {
     }
     if(focused)([...this.choices.children].find(choice=>choice.dataset.todaySessionChoice===focused)||this.choices.firstElementChild)?.focus();
   }
-  paintPlans(){
-    const root=byId('today-plans');root.replaceChildren();
-    const events=this.events.filter(value=>value.allDay&&value.firstDate<=this.date&&this.date<value.endDate);
-    if(!events.length){root.append(node('p',t('today.no_plans'),'hint'));return;}
-    const list=node('ul',undefined,'today-list');for(const event of events){const item=node('li',undefined,'today-plan');item.append(node('strong',event.title||t('calendar.untitled')),node('span',event.clientName+' · '+event.calendarName,'hint'));if(event.description)item.append(node('p',event.description,'today-plan-description'));list.append(item);}root.append(list);
+  paintEvents(){
+    const root=byId('today-events');root.replaceChildren();
+    const zone=this.data.profile.data.zoneId,day=monthCalendar(this.date.slice(0,7),zone).days.find(value=>value.date===this.date);
+    const events=this.events.filter(value=>value.allDay?value.firstDate<=this.date&&this.date<value.endDate:instantNanos(value.start)<day.to&&instantNanos(value.end)>=day.from)
+      .sort((a,b)=>Number(b.allDay)-Number(a.allDay)||(a.start||'').localeCompare(b.start||''));
+    if(!events.length){root.append(node('p',t('today.no_events'),'hint'));return;}
+    const time=value=>dateTimeFormat(getLocale(),{hour:'2-digit',minute:'2-digit',timeZone:zone}).format(new Date(value));
+    const list=node('ul',undefined,'today-list');for(const event of events){
+      const item=node('li',undefined,'today-plan');item.append(node('strong',event.title||t('calendar.untitled')));
+      item.append(node('span',event.allDay?t('calendar.all_day'):`${time(event.start)}–${time(event.end)}`,'hint'));
+      item.append(node('span',[event.clientName,event.calendarName].filter(Boolean).join(' · '),'hint'));
+      if(event.description)item.append(node('p',event.description,'today-plan-description'));list.append(item);
+    }root.append(list);
   }
   paintTasks(){
-    const planned=byId('today-planned-tasks'),active=byId('today-active-tasks');planned.replaceChildren();active.replaceChildren();
+    const planned=byId('today-planned-tasks');planned.replaceChildren();
     const tasks=this.data.tasks.filter(task=>task.status!=='COMPLETED');
     this.taskList(planned,tasks.filter(task=>task.scheduledDate===this.date),t('today.no_planned_tasks'));
-    const currentId=this.data.active.data?.taskId;
-    this.taskList(active,tasks.filter(task=>task.status==='IN_PROGRESS'||task.id===currentId),t('today.no_active_tasks'));
   }
   taskList(root,tasks,empty){
     if(!tasks.length){root.append(node('p',empty,'hint'));return;}
@@ -152,15 +177,15 @@ export class TodayView {
   async loadEvents(){
     if(!this.visible||!this.scope||!this.date)return;
     const generation=++this.generation,scope=this.scope,date=this.date;
-    byId('today-plans').replaceChildren(node('p',t('calendar.loading'),'hint'));
+    byId('today-events').replaceChildren(node('p',t('calendar.loading'),'hint'));
     try{
       const reply=await scope.request('/calendar-events?'+new URLSearchParams({fromDate:date,toDate:addDays(date,1)}));
       if(generation!==this.generation||scope!==this.scope||date!==this.date)return;
-      this.events=reply.data.items;this.paintPlans();
+      this.events=reply.data.items;this.paintEvents();
     }catch(error){
       if(generation!==this.generation||scope!==this.scope)return;
       if(error.status===401){this.callbacks.onUnauthorized(error);return;}
-      byId('today-plans').replaceChildren(node('p',error.message,'alert alert-warning'));
+      byId('today-events').replaceChildren(node('p',error.message,'alert alert-warning'));
     }
   }
 }

@@ -13471,6 +13471,360 @@
           }
         }
       }
+    },
+    "/week-notes": {
+      "get": {
+        "operationId": "listWeekNotes",
+        "summary": "Read private ISO week note summaries",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Present weekly notes in the inclusive ISO week range, without Markdown bodies.",
+            "headers": {},
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeekNoteList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "name": "fromWeek",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-W[0-9]{2}$"
+            },
+            "description": "Inclusive ISO week boundary; ranges contain at most nine weeks."
+          },
+          {
+            "name": "toWeek",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-W[0-9]{2}$"
+            },
+            "description": "Inclusive ISO week boundary; ranges contain at most nine weeks."
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      }
+    },
+    "/week-notes/{week}": {
+      "parameters": [
+        {
+          "name": "week",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-W[0-9]{2}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getWeekNote",
+        "summary": "Read a private weekly Markdown note",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "The week note, including an empty version-zero note for an untouched week.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeekNote"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      },
+      "put": {
+        "operationId": "saveWeekNote",
+        "summary": "Conditionally save a private weekly Markdown note",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "The week note, including an empty version-zero note for an untouched week.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeekNote"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeekNoteInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteWeekNote",
+        "summary": "Conditionally delete a private weekly Markdown note",
+        "x-required-permission": "write",
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "204": {
+            "description": "The note is empty. Its retained ETag prevents stale recreation; an already empty note is unchanged.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "description": "Retain a versioned tombstone distinct from clearing content. Repeated deletion with its current ETag is a no-op; a later conditional save deliberately restores the note."
+      }
+    },
+    "/week-notes/{week}/markdown": {
+      "parameters": [
+        {
+          "name": "week",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-W[0-9]{2}$"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "downloadWeekNote",
+        "summary": "Download the weekly note as YYYY-Www.md",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "UTF-8 Markdown attachment",
+            "headers": {
+              "Content-Disposition": {
+                "description": "Attachment filename YYYY-Www.md",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Current note version",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -18481,6 +18835,14 @@
               "$ref": "#/components/schemas/ArchiveJournalAsset"
             },
             "description": "Optional private journal attachments. Deleted assets are excluded."
+          },
+          "weekNotes": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchiveWeekNote"
+            },
+            "description": "Private weekly Markdown files. Deleted files are excluded."
           }
         },
         "required": [
@@ -18615,6 +18977,11 @@
           "taskAttachments": {
             "type": "integer",
             "minimum": 0
+          },
+          "weekNotes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 250000
           }
         },
         "required": [
@@ -25243,6 +25610,139 @@
           "warnings"
         ],
         "additionalProperties": false
+      },
+      "WeekNoteInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "type": "string",
+            "maxLength": 200000,
+            "description": "Exact UTF-8 Markdown; at most 200,000 encoded bytes."
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "WeekNote": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ownerId",
+          "week",
+          "body",
+          "version",
+          "hasBody"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "week": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-W[0-9]{2}$",
+            "description": "ISO week-based year and two-digit week number."
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 200000,
+            "description": "Exact UTF-8 Markdown; at most 200,000 encoded bytes."
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "hasBody": {
+            "type": "boolean"
+          },
+          "deleted": {
+            "type": "boolean",
+            "readOnly": true
+          }
+        }
+      },
+      "WeekNoteSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ownerId",
+          "week",
+          "version",
+          "hasBody"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "week": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-W[0-9]{2}$",
+            "description": "ISO week-based year and two-digit week number."
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "hasBody": {
+            "type": "boolean"
+          },
+          "deleted": {
+            "type": "boolean",
+            "readOnly": true
+          }
+        }
+      },
+      "WeekNoteList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "revision"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 9,
+            "items": {
+              "$ref": "#/components/schemas/WeekNoteSummary"
+            }
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Version"
+          }
+        }
+      },
+      "ArchiveWeekNote": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "week",
+          "filename",
+          "markdown"
+        ],
+        "properties": {
+          "week": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-W[0-9]{2}$",
+            "description": "ISO week-based year and two-digit week number."
+          },
+          "filename": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-W[0-9]{2}\\.md$"
+          },
+          "markdown": {
+            "type": "string",
+            "maxLength": 200000,
+            "description": "Exact UTF-8 Markdown; at most 200,000 encoded bytes."
+          }
+        }
       }
     },
     "parameters": {
