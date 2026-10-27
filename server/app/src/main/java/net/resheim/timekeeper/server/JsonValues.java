@@ -64,6 +64,7 @@ public final class JsonValues {
                 nullable(entry,"completedAt",item.completedAt());entry.put("position",item.position());checklist.add(entry);
             });
             moment(node,"start",task.timing().start());moment(node,"due",task.timing().due());
+            node.put("priority",task.importance().priority().name());node.put("flagged",task.importance().flagged());node.put("urgent",task.importance().urgent());
             ArrayNode refs = node.putArray("externalReferences");
             task.externalReferences().stream().sorted(Comparator.comparing(ExternalTaskReference::providerId).thenComparing(ExternalTaskReference::repositoryId).thenComparing(ExternalTaskReference::externalId)).forEach(reference -> {
                 var ref = object(); ref.put("providerId",reference.providerId()); ref.put("repositoryId",reference.repositoryId()); ref.put("externalId",reference.externalId()); nullable(ref,"externalUrl",reference.externalUrl()); refs.add(ref);
@@ -91,7 +92,7 @@ public final class JsonValues {
             case "TASK" -> new Task(new TaskId(id), optionalText(node.get("projectId")).map(UUID::fromString).map(ProjectId::new),
                     optionalText(node.get("parentTaskId")).map(UUID::fromString).map(TaskId::new), node.get("summary").asText(), optionalText(node.get("url")), references(node.get("externalReferences")),
                     new TaskPlanning(optionalText(node.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),optionalText(node.get("scheduledDate")).map(java.time.LocalDate::parse),optionalText(node.get("completedAt")).map(Instant::parse)),
-                    checklist(node.get("checklistItems")),timing(node),version);
+                    checklist(node.get("checklistItems")),timing(node),importance(node),version);
             case "ACTIVITY" -> new Activity(new ActivityId(id), optionalText(node.get("taskId")).map(UUID::fromString).map(TaskId::new).orElse(null), new OwnerId(node.get("ownerId").asText()),
                     Instant.parse(node.get("start").asText()), optionalText(node.get("end")).map(Instant::parse),node.get("summary").asText(), labels(node.get("labelIds")),node.get("manual").asBoolean(),version,Optional.empty(),optionalText(node.get("projectId")).map(UUID::fromString).map(ProjectId::new));
             case "WORK_SESSION" -> new WorkSession(new WorkSessionId(id),new OwnerId(node.get("ownerId").asText()),
@@ -134,5 +135,10 @@ public final class JsonValues {
     public static TaskTiming timing(JsonNode value) {
         if(value==null || value.isNull())return TaskTiming.empty();
         return new TaskTiming(moment(value.get("start")),moment(value.get("due")));
+    }
+    public static TaskImportance importance(JsonNode value) {
+        if(value==null || value.isNull())return TaskImportance.ordinary();
+        return new TaskImportance(optionalText(value.get("priority")).map(TaskPriority::valueOf).orElse(TaskPriority.UNSPECIFIED),
+                value.path("flagged").asBoolean(false),value.path("urgent").asBoolean(false));
     }
 }

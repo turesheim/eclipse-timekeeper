@@ -140,6 +140,14 @@ an instant or converting it to midnight. Neither form creates a reminder.
 Omitting timing fields on task creation uses null defaults. Ordinary task,
 planning, and checklist updates preserve existing timing.
 
+Task importance has separate `priority`, `flagged`, and `urgent` fields.
+`priority` is `UNSPECIFIED`, `LOW`, `NORMAL`, or `HIGH`; an explicit `NORMAL`
+is distinct from no priority. A conditional `PUT /tasks/{id}/importance`
+supplies all three fields and changes no other task data. A provider connector
+must retain unsupported flags in Timekeeper without inventing a corresponding
+provider value. Legacy task, planning, checklist, and timing updates preserve
+importance.
+
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
 Manual editing sets `manual=true` and cannot change activity task/owner. Creating,
