@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -36,6 +37,8 @@ import net.resheim.eclipse.timekeeper.domain.Task;
 import net.resheim.eclipse.timekeeper.domain.TaskId;
 import net.resheim.eclipse.timekeeper.domain.TaskChecklist;
 import net.resheim.eclipse.timekeeper.domain.TaskChecklistItem;
+import net.resheim.eclipse.timekeeper.domain.TaskMoment;
+import net.resheim.eclipse.timekeeper.domain.TaskTiming;
 import net.resheim.eclipse.timekeeper.domain.TaskPlanning;
 import net.resheim.eclipse.timekeeper.domain.TaskStatus;
 import net.resheim.eclipse.timekeeper.service.Commands.CreateActivity;
@@ -56,6 +59,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskPlanning;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskChecklist;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskTiming;
 import net.resheim.eclipse.timekeeper.service.Ports.ActivityRepository;
 import net.resheim.eclipse.timekeeper.service.Ports.IdentifierSource;
 import net.resheim.eclipse.timekeeper.service.Ports.LabelRepository;
@@ -162,6 +166,27 @@ class DefaultTimekeeperServiceTest {
 		assertThrows(ServiceException.class,()->service.updateTaskChecklist(new UpdateTaskChecklist(stale.id(),stale.version(),checklist)));
 		assertThrows(DomainValidationException.class,()->new TaskChecklist(List.of(first,first)));
 		assertThrows(DomainValidationException.class,()->new TaskChecklistItem(UUID.randomUUID(),"Unchecked",false,second.completedAt(),0));
+	}
+
+	@Test
+	void taskTimingRetainsCivilDatesAndProviderWallTimesThroughEdits() {
+		var day=LocalDate.parse("2026-03-29");
+		var timing=new TaskTiming(Optional.of(TaskMoment.dateOnly(day)),Optional.of(TaskMoment.zoned(day,LocalTime.of(2,30),"Europe/Oslo")));
+		Task task=service.createTask(new CreateTask(Optional.empty(),Optional.empty(),"DST plan",Optional.empty(),Set.of(),
+				TaskPlanning.unplanned(),TaskChecklist.empty(),timing));
+		assertEquals(timing,task.timing());
+		task=service.updateTask(new UpdateTask(task.id(),task.version(),Optional.empty(),"DST review",Optional.empty()));
+		assertEquals(timing,task.timing());
+		task=service.updateTaskPlanning(new UpdateTaskPlanning(task.id(),task.version(),TaskPlanning.unplanned()));
+		assertEquals(timing,task.timing());
+		task=service.updateTaskChecklist(new UpdateTaskChecklist(task.id(),task.version(),TaskChecklist.empty()));
+		assertEquals(timing,task.timing());
+		var replacement=new TaskTiming(Optional.empty(),Optional.of(TaskMoment.zoned(day,LocalTime.of(9,15),"Pacific Standard Time")));
+		Task updated=service.updateTaskTiming(new UpdateTaskTiming(task.id(),task.version(),replacement));
+		assertEquals(replacement,updated.timing());
+		Task stale=task;
+		assertThrows(ServiceException.class,()->service.updateTaskTiming(new UpdateTaskTiming(stale.id(),stale.version(),timing)));
+		assertThrows(DomainValidationException.class,()->new TaskMoment(day,Optional.of(LocalTime.NOON),Optional.empty()));
 	}
 
 	@Test

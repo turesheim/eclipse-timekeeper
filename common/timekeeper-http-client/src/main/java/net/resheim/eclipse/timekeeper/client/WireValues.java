@@ -2,6 +2,7 @@ package net.resheim.eclipse.timekeeper.client;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -24,7 +25,28 @@ public final class WireValues {
         var planning=new TaskPlanning(value.has("status")?TaskStatus.valueOf(value.get("status").getAsString()):TaskStatus.NOT_STARTED,
                 text(value.get("scheduledDate")).map(LocalDate::parse),text(value.get("completedAt")).map(Instant::parse));
         var checklist=checklist(value.get("checklistItems"));
-        return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,planning,checklist,value.get("version").getAsLong());
+        return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,planning,checklist,timing(value),value.get("version").getAsLong());
+    }
+    public static TaskTiming timing(JsonObject value) {
+        return new TaskTiming(moment(value.get("start")),moment(value.get("due")));
+    }
+    private static Optional<TaskMoment> moment(JsonElement value) {
+        if(value==null || value.isJsonNull())return Optional.empty();
+        var entry=value.getAsJsonObject();LocalDate date=LocalDate.parse(entry.get("date").getAsString());
+        return Optional.of(switch(entry.get("kind").getAsString()) {
+            case "DATE" -> TaskMoment.dateOnly(date);
+            case "DATE_TIME" -> TaskMoment.zoned(date,LocalTime.parse(entry.get("time").getAsString()),entry.get("timeZone").getAsString());
+            default -> throw new IllegalArgumentException("Invalid task date/time kind");
+        });
+    }
+    public static void timing(JsonObject body,TaskTiming value) {
+        moment(body,"start",value.start());moment(body,"due",value.due());
+    }
+    private static void moment(JsonObject body,String field,Optional<TaskMoment> value) {
+        if(value.isEmpty()) {body.add(field,JsonNull.INSTANCE);return;}
+        TaskMoment moment=value.get();var entry=object();entry.addProperty("kind",moment.dateOnly()?"DATE":"DATE_TIME");entry.addProperty("date",moment.date().toString());
+        if(!moment.dateOnly()) {entry.addProperty("time",moment.time().orElseThrow().toString());entry.addProperty("timeZone",moment.timeZone().orElseThrow());}
+        body.add(field,entry);
     }
     public static TaskChecklist checklist(JsonElement value) {
         if(value==null || value.isJsonNull())return TaskChecklist.empty();
