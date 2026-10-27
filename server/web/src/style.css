@@ -112,7 +112,8 @@ main { max-width: 1380px; padding: 1.5rem; margin: auto; }
 .today-date-field input::-webkit-calendar-picker-indicator { display: none; }
 .today-layout { display: grid; grid-template-columns: minmax(0,1fr) 14rem; align-items: start; gap: 1rem; }
 .today-journal, .today-sidebar { min-width: 0; }
-.today-journal { display: flex; flex-direction: column; min-height: var(--today-editor-min-height, 0px); }
+.today-journal { display: flex; flex-direction: column; }
+.today-journal > .journal-inline { min-height: var(--today-editor-min-height, 0px); }
 .today-sidebar { display: grid; gap: .75rem; }
 .today-month, .today-summary { padding: .85rem; }
 .today-month-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; }

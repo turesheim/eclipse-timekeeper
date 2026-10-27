@@ -178,7 +178,7 @@ test('calendar summaries expose body presence while label-only edits preserve pr
     const viewport=page.viewportSize();
     for(const width of [1280,390,320]){
       await page.setViewportSize({width,height:740});
-      await expect.poll(async()=>note(page).evaluate(button=>{const row=button.closest('.track-date-row').getBoundingClientRect(),glyph=button.querySelector('.icon').getBoundingClientRect();return Math.abs(row.right-glyph.right);})).toBeLessThan(4);
+      await expect.poll(async()=>note(page).evaluate(button=>{const row=button.closest('.track-date-row'),glyph=button.querySelector('.icon');return row&&glyph?Math.abs(row.getBoundingClientRect().right-glyph.getBoundingClientRect().right):Infinity;})).toBeLessThan(4);
     }
     await page.setViewportSize(viewport);
     await expect(note(page)).not.toHaveClass(/is-empty/);await expect(note(page)).toHaveAttribute('title','Markdown note');
