@@ -11950,6 +11950,196 @@
         },
         "description": "Conditional replacement of a current provider identity. The previous key remains owner-scoped for lookup; ordinary unlink removes the current key without creating an alias."
       }
+    },
+    "/tasks/{id}/recurrence": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskRecurrence",
+        "summary": "Replace task recurrence series and occurrence exceptions",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRecurrence"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement using the Timekeeper If-Match ETag. Ordinary task updates preserve recurrence state."
+      }
+    },
+    "/tasks/{id}/occurrences": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskOccurrences",
+        "summary": "Replace only task occurrence exceptions",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskOccurrencesInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement using the Timekeeper If-Match ETag. Ordinary task updates preserve recurrence state."
+      }
     }
   },
   "components": {
@@ -12581,6 +12771,9 @@
             },
             "uniqueItems": true,
             "description": "Former provider identities retained for stable task lookup after a remote ID changes."
+          },
+          "recurrence": {
+            "$ref": "#/components/schemas/TaskRecurrence"
           }
         },
         "required": [
@@ -12603,7 +12796,8 @@
           "urgent",
           "body",
           "siblingOrder",
-          "externalAliases"
+          "externalAliases",
+          "recurrence"
         ],
         "additionalProperties": true
       },
@@ -13181,6 +13375,9 @@
             },
             "uniqueItems": true,
             "description": "Former provider identities retained for stable task lookup after a remote ID changes."
+          },
+          "recurrence": {
+            "$ref": "#/components/schemas/TaskRecurrence"
           }
         },
         "required": [
@@ -13729,6 +13926,9 @@
             "uniqueItems": true,
             "maxItems": 500,
             "description": "Former provider identities retained for stable task lookup after a remote ID changes."
+          },
+          "recurrence": {
+            "$ref": "#/components/schemas/TaskRecurrence"
           }
         },
         "required": [
@@ -22103,6 +22303,221 @@
         ],
         "additionalProperties": false,
         "description": "Atomically replace a current provider identity while retaining its old key as a lookup alias."
+      },
+      "TaskSeries": {
+        "type": "object",
+        "properties": {
+          "rule": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 4096,
+            "pattern": "^FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)(;(?!COUNT=|UNTIL=)[A-Z]+=[A-Z0-9,+-]+)*$",
+            "description": "RFC 5545 recurrence rule parts without UNTIL or COUNT; end is separate."
+          },
+          "end": {
+            "type": "string",
+            "enum": [
+              "NEVER",
+              "UNTIL",
+              "COUNT"
+            ]
+          },
+          "until": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "rule",
+          "end",
+          "until",
+          "count"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "end": {
+                  "const": "NEVER"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "until": {
+                  "type": "null"
+                },
+                "count": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "end": {
+                  "const": "UNTIL"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "until": {
+                  "$ref": "#/components/schemas/TaskMoment"
+                },
+                "count": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "end": {
+                  "const": "COUNT"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "until": {
+                  "type": "null"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        ]
+      },
+      "TaskOccurrence": {
+        "type": "object",
+        "properties": {
+          "original": {
+            "$ref": "#/components/schemas/TaskMoment",
+            "description": "Stable identity of the original generated slot."
+          },
+          "movedTo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskMoment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "SCHEDULED",
+              "COMPLETED",
+              "SKIPPED"
+            ]
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Instant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "original",
+          "movedTo",
+          "state",
+          "completedAt"
+        ],
+        "additionalProperties": false
+      },
+      "TaskRecurrence": {
+        "type": "object",
+        "properties": {
+          "series": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskSeries"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "occurrences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskOccurrence"
+            },
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "series",
+          "occurrences"
+        ],
+        "additionalProperties": false,
+        "description": "Series definition and occurrence exceptions. A null series requires an empty occurrences array.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "series": {
+                  "type": "null"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "occurrences": {
+                  "maxItems": 0
+                }
+              }
+            }
+          }
+        ]
+      },
+      "TaskOccurrencesInput": {
+        "type": "object",
+        "properties": {
+          "occurrences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskOccurrence"
+            },
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "occurrences"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {

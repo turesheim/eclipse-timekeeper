@@ -112,6 +112,16 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskCreateInput').is_valid({'summary': 'Task', 'projectId': None, 'parentTaskId': None, 'url': None, 'externalAliases': [old, old]}))
         self.assertEqual('replaceExternalReference', CONTRACT['paths']['/tasks/{id}/external-references/replace']['put']['operationId'])
 
+    def test_recurrence_rule_and_occurrence_edits_are_distinct(self):
+        day={'kind':'DATE','date':'2026-10-26'}
+        series={'rule':'FREQ=WEEKLY;BYDAY=MO','end':'COUNT','until':None,'count':8}
+        occurrence={'original':day,'movedTo':None,'state':'COMPLETED','completedAt':'2026-10-26T12:00:00Z'}
+        validator('TaskRecurrence').validate({'series':series,'occurrences':[occurrence]})
+        self.assertFalse(validator('TaskSeries').is_valid({**series,'until':day}))
+        self.assertFalse(validator('TaskSeries').is_valid({**series,'rule':'FREQ=WEEKLY;COUNT=8'}))
+        self.assertEqual('updateTaskRecurrence',CONTRACT['paths']['/tasks/{id}/recurrence']['put']['operationId'])
+        self.assertEqual('updateTaskOccurrences',CONTRACT['paths']['/tasks/{id}/occurrences']['put']['operationId'])
+
     def test_task_planning_has_a_date_only_schedule_and_conditional_update_contract(self):
         body = {'summary': 'Review', 'projectId': None, 'parentTaskId': None, 'url': None,
                 'status': 'COMPLETED', 'scheduledDate': '2026-10-26', 'completedAt': '2026-10-26T11:12:13Z'}
@@ -331,7 +341,7 @@ class ContractTest(unittest.TestCase):
             'createTaskConnection', 'updateTaskConnection', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'deleteTaskList', 'getTaskList', 'listTaskLists',
             'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors',
-            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
+            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskRecurrence', 'updateTaskOccurrences', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
             'linkExternalReference', 'replaceExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',

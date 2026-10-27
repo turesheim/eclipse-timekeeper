@@ -19,6 +19,8 @@ import net.resheim.eclipse.timekeeper.domain.TaskPlanning;
 import net.resheim.eclipse.timekeeper.domain.TaskTiming;
 import net.resheim.eclipse.timekeeper.domain.TaskImportance;
 import net.resheim.eclipse.timekeeper.domain.TaskBody;
+import net.resheim.eclipse.timekeeper.domain.TaskRecurrence;
+import net.resheim.eclipse.timekeeper.domain.TaskOccurrence;
 import net.resheim.eclipse.timekeeper.domain.TaskSyncMode;
 
 /** Immutable inputs accepted by {@link TimekeeperService}. */
@@ -45,7 +47,7 @@ public final class Commands {
 			Optional<String> cursor, Optional<Instant> lastObservedAt, Optional<Instant> lastCompleteAt) { }
 
 	public record CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
-			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder, Set<ExternalTaskReferenceKey> externalAliases) {
+			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder, Set<ExternalTaskReferenceKey> externalAliases, TaskRecurrence recurrence) {
 		public CreateTask {
 			projectId = optional(projectId);
 			parentTaskId = optional(parentTaskId);
@@ -57,6 +59,14 @@ public final class Commands {
 			timing = timing == null ? TaskTiming.empty() : timing;
 			importance = importance == null ? TaskImportance.ordinary() : importance;
 			body = body == null ? TaskBody.empty() : body;
+			recurrence = recurrence == null ? TaskRecurrence.empty() : recurrence;
+		}
+
+		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
+				Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning,
+				TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder,
+				Set<ExternalTaskReferenceKey> externalAliases) {
+			this(projectId, parentTaskId, summary, url, externalReferences, planning, checklist, timing, importance, body, siblingOrder, externalAliases, TaskRecurrence.empty());
 		}
 
 		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
@@ -127,6 +137,8 @@ public final class Commands {
 	public record UpdateTaskTiming(TaskId id, long expectedVersion, TaskTiming timing) { }
 	public record UpdateTaskImportance(TaskId id, long expectedVersion, TaskImportance importance) { }
 	public record UpdateTaskBody(TaskId id, long expectedVersion, TaskBody body) { }
+	public record UpdateTaskRecurrence(TaskId id, long expectedVersion, TaskRecurrence recurrence) { }
+	public record UpdateTaskOccurrences(TaskId id, long expectedVersion, java.util.List<TaskOccurrence> occurrences) { }
 	public record UpdateTaskOrder(TaskId id, long expectedVersion, int siblingOrder) { }
 	public record LinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReference reference) { }
 	public record ReplaceExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey previous, ExternalTaskReference current) { }

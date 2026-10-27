@@ -83,6 +83,7 @@ public final class JsonValues {
             node.put("priority",task.importance().priority().name());node.put("flagged",task.importance().flagged());node.put("urgent",task.importance().urgent());
             node.put("siblingOrder",task.siblingOrder());
             var body=node.putObject("body");body.put("format",task.body().format().name());body.put("content",task.body().content());
+            node.set("recurrence",recurrence(task.recurrence()));
             ArrayNode refs = node.putArray("externalReferences");
             task.externalReferences().stream().sorted(Comparator.comparing(ExternalTaskReference::providerId).thenComparing(ExternalTaskReference::repositoryId).thenComparing(ExternalTaskReference::externalId)).forEach(reference -> {
                 var ref = object(); ref.put("providerId",reference.providerId()); ref.put("repositoryId",reference.repositoryId()); ref.put("externalId",reference.externalId()); nullable(ref,"externalUrl",reference.externalUrl());
@@ -129,7 +130,7 @@ public final class JsonValues {
             case "TASK" -> new Task(new TaskId(id), optionalText(node.get("projectId")).map(UUID::fromString).map(ProjectId::new),
                     optionalText(node.get("parentTaskId")).map(UUID::fromString).map(TaskId::new), node.get("summary").asText(), optionalText(node.get("url")), references(node.get("externalReferences")),aliases(node.get("externalAliases")),
                     new TaskPlanning(optionalText(node.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),optionalText(node.get("scheduledDate")).map(java.time.LocalDate::parse),optionalText(node.get("completedAt")).map(Instant::parse)),
-                    checklist(node.get("checklistItems")),timing(node),importance(node),body(node),node.path("siblingOrder").asInt(0),version);
+                    checklist(node.get("checklistItems")),timing(node),importance(node),body(node),recurrence(node.get("recurrence")),node.path("siblingOrder").asInt(0),version);
             case "ACTIVITY" -> new Activity(new ActivityId(id), optionalText(node.get("taskId")).map(UUID::fromString).map(TaskId::new).orElse(null), new OwnerId(node.get("ownerId").asText()),
                     Instant.parse(node.get("start").asText()), optionalText(node.get("end")).map(Instant::parse),node.get("summary").asText(), labels(node.get("labelIds")),node.get("manual").asBoolean(),version,Optional.empty(),optionalText(node.get("projectId")).map(UUID::fromString).map(ProjectId::new));
             case "WORK_SESSION" -> new WorkSession(new WorkSessionId(id),new OwnerId(node.get("ownerId").asText()),
@@ -210,5 +211,30 @@ public final class JsonValues {
         if(value==null || value.isNull() || !value.hasNonNull("body"))return TaskBody.empty();
         JsonNode body=value.get("body");
         return new TaskBody(TaskBodyFormat.valueOf(body.get("format").asText()),body.get("content").asText());
+    }
+    public static ObjectNode recurrence(TaskRecurrence value) {
+        var node=object();
+        if(value.series().isPresent()) {
+            var series=value.series().get();var entry=node.putObject("series");entry.put("rule",series.rule());entry.put("end",series.end().name());
+            moment(entry,"until",series.until());if(series.count().isPresent())entry.put("count",series.count().get());else entry.putNull("count");
+        } else node.putNull("series");
+        var occurrences=node.putArray("occurrences");
+        value.occurrences().forEach(item -> {
+            var entry=object();moment(entry,"original",Optional.of(item.original()));moment(entry,"movedTo",item.movedTo());
+            entry.put("state",item.state().name());nullable(entry,"completedAt",item.completedAt());occurrences.add(entry);
+        });return node;
+    }
+    public static TaskRecurrence recurrence(JsonNode value) {
+        if(value==null || value.isNull())return TaskRecurrence.empty();
+        var raw=value.get("series");
+        Optional<TaskSeries> series=raw==null || raw.isNull()?Optional.empty():Optional.of(new TaskSeries(raw.get("rule").asText(),
+                TaskRecurrenceEnd.valueOf(raw.get("end").asText()),moment(raw.get("until")),optionalText(raw.get("count")).map(Integer::parseInt)));
+        return new TaskRecurrence(series,occurrences(value.get("occurrences")));
+    }
+    public static java.util.List<TaskOccurrence> occurrences(JsonNode values) {
+        if(values==null || values.isNull())return java.util.List.of();
+        return java.util.stream.StreamSupport.stream(values.spliterator(),false).map(item -> new TaskOccurrence(
+                moment(item.get("original")).orElseThrow(),moment(item.get("movedTo")),TaskOccurrenceState.valueOf(item.get("state").asText()),
+                optionalText(item.get("completedAt")).map(Instant::parse))).toList();
     }
 }
