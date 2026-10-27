@@ -150,14 +150,45 @@ class HttpClientIntegrationTest {
     }
     @Test void javaClientPerformsOwnedCrudTrackingReportsAndProviderLinking() {
         try(var client=new HttpTimekeeperService(server,()->"test-a",Duration.ofSeconds(3))) {
+            var connection=client.createTaskConnection(new CreateTaskConnection("google",UUID.randomUUID().toString(),"Personal",true,true,true));
+            var remoteList=client.createTaskList(new CreateTaskList(connection.id(),UUID.randomUUID().toString(),"Tasks",TaskListKind.STANDARD,
+                    true,true,false,true,true,0));
+            var remoteListId=remoteList.id();
+            assertTrue(client.taskLists(connection.id()).stream().anyMatch(value -> value.id().equals(remoteListId)));
+            remoteList=client.updateTaskList(new UpdateTaskList(remoteList.id(),remoteList.version(),"Tasks",TaskListKind.STANDARD,
+                    true,true,false,true,false,0));
+            assertFalse(client.taskList(remoteList.id()).orElseThrow().present());
+            client.deleteTaskList(remoteList.id(),remoteList.version());
+            client.deleteTaskConnection(connection.id(),connection.version());
             var project=client.createProject(new CreateProject("HTTP client "+UUID.randomUUID()));
             var parent=client.createTask(new CreateTask(Optional.of(project.id()),"Parent",Optional.empty()));
             var child=client.createTask(new CreateTask(Optional.of(project.id()),Optional.of(parent.id()),"Child",Optional.empty()));
+            var planning=new TaskPlanning(TaskStatus.NOT_STARTED,Optional.of(LocalDate.parse("2026-10-26")),Optional.empty());
+            child=client.updateTaskPlanning(new UpdateTaskPlanning(child.id(),child.version(),planning));
+            assertEquals(planning,client.task(child.id()).orElseThrow().planning());
             var label=client.createLabel(new CreateLabel("Client label",Optional.of("10,20,30")));
             assertEquals("10,20,30",label.color().orElseThrow());
             var reference=new ExternalTaskReference("jira","https://jira.invalid",UUID.randomUUID().toString(),Optional.empty());
             child=client.linkExternalReference(new LinkExternalReference(child.id(),child.version(),reference));
             assertEquals(child.id(),client.findTask(reference.key()).orElseThrow().id());
+            var source=new ExternalTaskSource(Optional.of(Instant.parse("2026-10-01T10:00:00Z")),Optional.empty(),
+                    Optional.of("\"remote-etag\""),Optional.empty());
+            child=client.updateExternalTaskSource(new UpdateExternalTaskSource(child.id(),child.version(),reference.key(),source));
+            assertEquals(source,client.task(child.id()).orElseThrow().externalReferences().iterator().next().source());
+            var checklist=new TaskChecklist(List.of(new TaskChecklistItem(UUID.randomUUID(),"Review",true,
+                    Optional.of(Instant.parse("2026-10-26T11:12:13Z")),0)));
+            child=client.updateTaskChecklist(new UpdateTaskChecklist(child.id(),child.version(),checklist));
+            assertEquals(checklist,client.task(child.id()).orElseThrow().checklist());
+            var timing=new TaskTiming(Optional.of(TaskMoment.dateOnly(LocalDate.parse("2026-10-26"))),
+                    Optional.of(TaskMoment.zoned(LocalDate.parse("2026-10-27"),LocalTime.parse("09:15"),"Pacific Standard Time")));
+            child=client.updateTaskTiming(new UpdateTaskTiming(child.id(),child.version(),timing));
+            assertEquals(timing,client.task(child.id()).orElseThrow().timing());
+            var importance=new TaskImportance(TaskPriority.HIGH,true,false);
+            child=client.updateTaskImportance(new UpdateTaskImportance(child.id(),child.version(),importance));
+            assertEquals(importance,client.task(child.id()).orElseThrow().importance());
+            var body=new TaskBody(TaskBodyFormat.HTML,"<p>Review <strong>draft</strong></p>");
+            child=client.updateTaskBody(new UpdateTaskBody(child.id(),child.version(),body));
+            assertEquals(body,client.task(child.id()).orElseThrow().body());
             var first=client.activate(child.id(),"Tracked",Set.of(label.id()),Optional.empty());
             assertEquals(client.profile().owner(),first.ownerId());
             var second=client.activate(parent.id(),"Successor",Set.of(),Optional.of(first));

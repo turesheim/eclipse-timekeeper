@@ -90,6 +90,8 @@ def package(output, tag, commit):
         'docs/assets/screenshots/passkeys-mobile.png': 'images/passkeys-mobile.png',
         'docs/assets/screenshots/bootstrap-work-session-desktop.png': 'images/work-session-desktop.png',
         'docs/assets/screenshots/bootstrap-work-session-narrow.png': 'images/work-session-narrow.png',
+        'docs/assets/screenshots/today-desktop.png': 'images/today-desktop.png',
+        'docs/assets/screenshots/today-mobile.png': 'images/today-mobile.png',
         'docs/assets/screenshots/track-month-desktop.png': 'images/track-month-desktop.png',
         'docs/assets/screenshots/track-month-narrow.png': 'images/track-month-narrow.png',
         'docs/assets/screenshots/track-month-picker.png': 'images/track-month-picker.png',

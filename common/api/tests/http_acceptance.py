@@ -113,7 +113,8 @@ class HttpAcceptance(unittest.TestCase):
             self.assertIsNone(page.get('nextCursor'), 'Fixture cleanup must include every daily record')
             self.created.extend((owner,'activities',value['id']) for value in page['items'])
         # Clean only records created by this suite, including commands/imports.
-        order = {'activities': 0, 'work-sessions': 1, 'tasks': 2, 'labels': 3, 'projects': 4, 'clients': 5}
+        order = {'activities': 0, 'work-sessions': 1, 'tasks': 2, 'task-lists': 3,
+                 'task-connections': 4, 'labels': 5, 'projects': 6, 'clients': 7}
         unique = list(dict.fromkeys(reversed(self.created)))
         for owner, resource, identifier in sorted(unique, key=lambda row: order[row[1]]):
             value, headers = self.call('GET', f'/{resource}/{identifier}', owner=owner)
@@ -483,6 +484,293 @@ class HttpAcceptance(unittest.TestCase):
         self.assertEqual(second, replay)
         same, _, _ = self.start(next_task, expected=second, status=200)
         self.assertEqual(second, same)
+
+    def test_task_planning_round_trips_and_legacy_writes_preserve_it(self):
+        path='/tasks/'+self.task['id']
+        original, headers=self.call('GET',path)
+        self.assertEqual(('NOT_STARTED',None,None),(original['status'],original['scheduledDate'],original['completedAt']))
+        self.call('PUT',path+'/planning',owner='read',body={'status':'NOT_STARTED','scheduledDate':'2026-10-26','completedAt':None},
+                  headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        planned, headers=self.call('PUT',path+'/planning',body={'status':'NOT_STARTED','scheduledDate':'2026-10-26','completedAt':None},
+                                   headers={'If-Match':headers['ETag']})
+        self.assertEqual('2026-10-26',planned['scheduledDate'])
+        self.call('PUT',path+'/planning',body={'status':'COMPLETED','scheduledDate':'2026-10-27','completedAt':'2026-10-27T11:12:13Z'},
+                  headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        legacy={'projectId':planned['projectId'],'parentTaskId':planned['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        updated, headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        self.assertEqual(('NOT_STARTED','2026-10-26',None),(updated['status'],updated['scheduledDate'],updated['completedAt']))
+        completed, _=self.call('PUT',path+'/planning',body={'status':'COMPLETED','scheduledDate':'2026-10-26','completedAt':'2026-10-26T11:12:13Z'},
+                               headers={'If-Match':headers['ETag']})
+        self.assertEqual('2026-10-26T11:12:13Z',completed['completedAt'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual(('COMPLETED','2026-10-26','2026-10-26T11:12:13Z'),
+                                 (restored['status'],restored['scheduledDate'],restored['completedAt']))
+
+    def test_task_checklist_is_ordered_and_survives_legacy_edits_and_export(self):
+        path='/tasks/'+self.task['id']
+        original, headers=self.call('GET',path)
+        self.assertEqual([],original['checklistItems'])
+        first={'id':str(uuid4()),'text':'Write tests','completed':False,'completedAt':None,'position':0}
+        second={'id':str(uuid4()),'text':'Review','completed':True,'completedAt':'2026-10-26T11:12:13Z','position':1}
+        body={'items':[first,second]}
+        self.call('PUT',path+'/checklist',owner='read',body=body,headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        updated, headers=self.call('PUT',path+'/checklist',body=body,headers={'If-Match':headers['ETag']})
+        self.assertEqual(body['items'],updated['checklistItems'])
+        self.call('PUT',path+'/checklist',body={'items':[]},headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        self.call('PUT',path+'/checklist',body={'items':[{**first,'completedAt':second['completedAt']}]},
+                  headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        self.call('PUT',path+'/checklist',body={'items':[first,{**second,'position':0}]},
+                  headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        legacy={'projectId':updated['projectId'],'parentTaskId':updated['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        updated, headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        self.assertEqual(body['items'],updated['checklistItems'])
+        updated, _=self.call('PUT',path+'/planning',body={'status':'NOT_STARTED','scheduledDate':'2026-10-26','completedAt':None},
+                             headers={'If-Match':headers['ETag']})
+        self.assertEqual(body['items'],updated['checklistItems'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual(body['items'],restored['checklistItems'])
+
+    def test_task_start_and_due_keep_date_and_wall_time_meaning(self):
+        path='/tasks/'+self.task['id']
+        original, headers=self.call('GET',path)
+        self.assertIsNone(original['start']);self.assertIsNone(original['due'])
+        start={'kind':'DATE','date':'2026-03-29'}
+        due={'kind':'DATE_TIME','date':'2026-03-29','time':'02:30','timeZone':'Europe/Oslo'}
+        body={'start':start,'due':due}
+        self.call('PUT',path+'/timing',owner='read',body=body,headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        timed, headers=self.call('PUT',path+'/timing',body=body,headers={'If-Match':headers['ETag']})
+        self.assertEqual(start,timed['start']);self.assertEqual(due,timed['due'])
+        self.assertIsNone(timed['scheduledDate'])
+        self.call('PUT',path+'/timing',body={'start':None,'due':None},headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        self.call('PUT',path+'/timing',body={'start':start,'due':{'kind':'DATE_TIME','date':'2026-03-29','time':'02:30'}},
+                  headers={'If-Match':headers['ETag']},status=400,code='BAD_REQUEST')
+        legacy={'projectId':timed['projectId'],'parentTaskId':timed['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        updated, headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        self.assertEqual((start,due),(updated['start'],updated['due']))
+        updated, headers=self.call('PUT',path+'/planning',body={'status':'NOT_STARTED','scheduledDate':'2026-03-29','completedAt':None},
+                                   headers={'If-Match':headers['ETag']})
+        self.assertEqual((start,due),(updated['start'],updated['due']))
+        updated, headers=self.call('PUT',path+'/checklist',body={'items':[]},headers={'If-Match':headers['ETag']})
+        self.assertEqual((start,due),(updated['start'],updated['due']))
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual((start,due),(restored['start'],restored['due']))
+        windows={'start':None,'due':{'kind':'DATE_TIME','date':'2026-11-01','time':'01:30','timeZone':'Pacific Standard Time'}}
+        windows_result, headers=self.call('PUT',path+'/timing',body=windows,headers={'If-Match':headers['ETag']})
+        self.assertEqual(windows['due'],windows_result['due'])
+        cleared, _=self.call('PUT',path+'/timing',body={'start':None,'due':None},headers={'If-Match':headers['ETag']})
+        self.assertIsNone(cleared['start']);self.assertIsNone(cleared['due'])
+
+    def test_task_priority_flag_and_urgency_remain_independent(self):
+        path='/tasks/'+self.task['id']
+        original, headers=self.call('GET',path)
+        self.assertEqual(('UNSPECIFIED',False,False),(original['priority'],original['flagged'],original['urgent']))
+        important={'priority':'HIGH','flagged':True,'urgent':False}
+        self.call('PUT',path+'/importance',owner='read',body=important,headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        updated, headers=self.call('PUT',path+'/importance',body=important,headers={'If-Match':headers['ETag']})
+        self.assertEqual(important,{key:updated[key] for key in important})
+        self.call('PUT',path+'/importance',body={'priority':'LOW','flagged':False,'urgent':True},
+                  headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        self.call('PUT',path+'/importance',body={'priority':'UNKNOWN','flagged':False,'urgent':False},
+                  headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        legacy={'projectId':updated['projectId'],'parentTaskId':updated['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        updated, headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        updated, headers=self.call('PUT',path+'/planning',body={'status':'NOT_STARTED','scheduledDate':None,'completedAt':None},
+                                   headers={'If-Match':headers['ETag']})
+        updated, headers=self.call('PUT',path+'/checklist',body={'items':[]},headers={'If-Match':headers['ETag']})
+        updated, headers=self.call('PUT',path+'/timing',body={'start':None,'due':None},headers={'If-Match':headers['ETag']})
+        self.assertEqual(important,{key:updated[key] for key in important})
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual(important,{key:restored[key] for key in important})
+        normal={'priority':'NORMAL','flagged':False,'urgent':True}
+        changed, headers=self.call('PUT',path+'/importance',body=normal,headers={'If-Match':headers['ETag']})
+        self.assertEqual(normal,{key:changed[key] for key in normal})
+        cleared, _=self.call('PUT',path+'/importance',body={'priority':'UNSPECIFIED','flagged':False,'urgent':False},
+                              headers={'If-Match':headers['ETag']})
+        self.assertEqual(('UNSPECIFIED',False,False),(cleared['priority'],cleared['flagged'],cleared['urgent']))
+
+    def test_task_notes_survive_legacy_updates_and_archive(self):
+        path='/tasks/'+self.task['id']
+        original, headers=self.call('GET',path)
+        self.assertEqual({'format':'TEXT','content':''},original['body'])
+        note={'format':'HTML','content':'<p>Review <strong>draft</strong></p>'}
+        self.call('PUT',path+'/body',owner='read',body=note,headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        updated, headers=self.call('PUT',path+'/body',body=note,headers={'If-Match':headers['ETag']})
+        self.assertEqual(note,updated['body'])
+        self.call('PUT',path+'/body',body={'format':'TEXT','content':'wrong'},headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        self.call('PUT',path+'/body',body={'format':'MARKDOWN','content':'wrong'},headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        legacy={'projectId':updated['projectId'],'parentTaskId':updated['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        updated, headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        updated, headers=self.call('PUT',path+'/planning',body={'status':'NOT_STARTED','scheduledDate':None,'completedAt':None},headers={'If-Match':headers['ETag']})
+        updated, headers=self.call('PUT',path+'/importance',body={'priority':'HIGH','flagged':True,'urgent':False},headers={'If-Match':headers['ETag']})
+        self.assertEqual(note,updated['body'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual(note,restored['body'])
+        cleared, _=self.call('PUT',path+'/body',body={'format':'TEXT','content':''},headers={'If-Match':headers['ETag']})
+        self.assertEqual({'format':'TEXT','content':''},cleared['body'])
+
+    def test_external_source_metadata_is_scoped_and_survives_legacy_link_and_archive(self):
+        path='/tasks/'+self.task['id']
+        ref={'providerId':'google','repositoryId':'account/list','externalId':str(uuid4()),'externalUrl':None}
+        source={'createdAt':'2026-10-01T10:00:00Z','modifiedAt':'2026-10-26T10:00:00Z',
+                'remoteEtag':'"remote-1"','remoteRevision':'revision-1'}
+        original, headers=self.call('GET',path)
+        linked, headers=self.call('PUT',path+'/external-references',body={**ref,'source':source},headers={'If-Match':headers['ETag']})
+        self.assertEqual(source,linked['externalReferences'][0]['source'])
+        linked, headers=self.call('PUT',path+'/external-references',body=ref,headers={'If-Match':headers['ETag']})
+        self.assertEqual(source,linked['externalReferences'][0]['source'])
+        replacement={**source,'remoteEtag':'"remote-2"','modifiedAt':None}
+        body={key:ref[key] for key in ('providerId','repositoryId','externalId')}
+        body['source']=replacement
+        self.call('PUT',path+'/external-references/source',owner='read',body=body,
+                  headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        self.call('PUT',path+'/external-references/source',body=body,
+                  headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        updated, headers=self.call('PUT',path+'/external-references/source',body=body,headers={'If-Match':headers['ETag']})
+        self.assertEqual(replacement,updated['externalReferences'][0]['source'])
+        legacy={'projectId':updated['projectId'],'parentTaskId':updated['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        updated, headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        self.assertEqual(replacement,updated['externalReferences'][0]['source'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored, _=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual(replacement,restored['externalReferences'][0]['source'])
+        cleared={key:None for key in source}
+        cleared_result, _=self.call('PUT',path+'/external-references/source',body={**body,'source':cleared},
+                                    headers={'If-Match':headers['ETag']})
+        self.assertEqual(cleared,cleared_result['externalReferences'][0]['source'])
+
+    def test_provider_accounts_and_lists_are_owned_idempotent_and_portable(self):
+        account={'providerId':'microsoft','remoteAccountId':str(uuid4()),'name':'Personal',
+                 'readable':True,'writable':True,'enabled':True}
+        connection=self.create('task-connections',account)
+        replay, _=self.call('POST','/task-connections',body=account,status=200)
+        self.assertEqual(connection['id'],replay['id'])
+        self.call('POST','/task-connections',body={**account,'name':'Changed'},status=409,code='CONFLICT')
+        task_list={'connectionId':connection['id'],'remoteListId':str(uuid4()),'name':'Flagged emails',
+                   'kind':'BUILT_IN','readable':True,'writable':False,'shared':False,'owner':True,
+                   'present':True,'position':0}
+        linked=self.create('task-lists',task_list)
+        replay, _=self.call('POST','/task-lists',body=task_list,status=200)
+        self.assertEqual(linked['id'],replay['id'])
+        listed, _=self.call('GET','/task-lists?'+urlencode({'connectionId':connection['id']}))
+        self.assertEqual([linked['id']],[item['id'] for item in listed['items']])
+        foreign, _=self.call('GET','/task-lists',owner='b')
+        self.assertNotIn(linked['id'],[item['id'] for item in foreign['items']])
+        self.call('GET','/task-lists/'+linked['id'],owner='b',status=404,code='NOT_FOUND')
+        self.call('DELETE','/task-connections/'+connection['id'],
+                  headers={'If-Match':self.call('GET','/task-connections/'+connection['id'])[1]['ETag']},status=409,code='CONFLICT')
+        _, headers=self.call('GET','/task-lists/'+linked['id'])
+        self.call('PUT','/task-lists/'+linked['id'],owner='read',body={key:task_list[key] for key in
+                  ('name','kind','readable','writable','shared','owner','present','position')},
+                  headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        updated, headers=self.call('PUT','/task-lists/'+linked['id'],body={**{key:task_list[key] for key in
+                  ('name','kind','readable','writable','shared','owner','present','position')},'present':False},
+                  headers={'If-Match':headers['ETag']})
+        self.assertFalse(updated['present'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
+               'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
+        mappings={item['sourceId']:item['id'] for item in imported['ids']}
+        for item in imported['ids']:self.created.append(('b',kinds[item['entityType']],item['id']))
+        restored, _=self.call('GET','/task-lists/'+mappings[linked['id']],owner='b')
+        self.assertEqual(mappings[connection['id']],restored['connectionId'])
+        self.assertFalse(restored['present'])
+
+    def test_external_task_list_link_is_owned_guarded_and_remapped(self):
+        account=self.create('task-connections',{'providerId':'google','remoteAccountId':str(uuid4()),
+                    'name':'Personal','readable':True,'writable':True,'enabled':True})
+        task_list=self.create('task-lists',{'connectionId':account['id'],'remoteListId':str(uuid4()),
+                    'name':'Tasks','kind':'STANDARD','readable':True,'writable':True,'shared':False,
+                    'owner':True,'present':True,'position':0})
+        ref={'providerId':'google','repositoryId':account['remoteAccountId']+'/'+task_list['remoteListId'],
+             'externalId':str(uuid4()),'externalUrl':None,'taskListId':task_list['id']}
+        path='/tasks/'+self.task['id']
+        _, headers=self.call('GET',path)
+        self.call('PUT',path+'/external-references',body={**ref,'providerId':'microsoft'},
+                  headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        self.call('PUT',path+'/external-references',body={**ref,'taskListId':str(uuid4())},
+                  headers={'If-Match':headers['ETag']},status=404,code='NOT_FOUND')
+        linked, headers=self.call('PUT',path+'/external-references',body=ref,
+                                  headers={'If-Match':headers['ETag']})
+        self.assertEqual(task_list['id'],linked['externalReferences'][0]['taskListId'])
+        self.call('DELETE','/task-lists/'+task_list['id'],
+                  headers={'If-Match':self.call('GET','/task-lists/'+task_list['id'])[1]['ETag']},
+                  status=409,code='CONFLICT')
+        legacy={key:ref[key] for key in ('providerId','repositoryId','externalId','externalUrl')}
+        linked, headers=self.call('PUT',path+'/external-references',body=legacy,
+                                  headers={'If-Match':headers['ETag']})
+        self.assertEqual(task_list['id'],linked['externalReferences'][0]['taskListId'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
+               'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
+        mappings={item['sourceId']:item['id'] for item in imported['ids']}
+        for item in imported['ids']:self.created.append(('b',kinds[item['entityType']],item['id']))
+        copied, _=self.call('GET','/tasks/'+mappings[self.task['id']],owner='b')
+        self.assertEqual(mappings[task_list['id']],copied['externalReferences'][0]['taskListId'])
+        self.call('GET','/task-lists/'+task_list['id'],owner='b',status=404,code='NOT_FOUND')
+
+    def test_task_sibling_order_survives_legacy_writes_and_transfer(self):
+        path='/tasks/'+self.task['id']
+        original, headers=self.call('GET',path)
+        self.assertEqual(0,original['siblingOrder'])
+        self.call('PUT',path+'/order',body={'siblingOrder':-1},headers={'If-Match':headers['ETag']},
+                  status=422,code='VALIDATION')
+        ordered, headers=self.call('PUT',path+'/order',body={'siblingOrder':12},
+                                  headers={'If-Match':headers['ETag']})
+        self.assertEqual(12,ordered['siblingOrder'])
+        self.call('PUT',path+'/order',body={'siblingOrder':2},headers={'If-Match':'"wrong"'},
+                  status=412,code='STALE_VERSION')
+        legacy={'projectId':ordered['projectId'],'parentTaskId':ordered['parentTaskId'],
+                'summary':self.prefix+' ordered','url':None}
+        updated, _=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        self.assertEqual(12,updated['siblingOrder'])
+        created=self.create('tasks',{'projectId':self.project['id'],'parentTaskId':None,
+                    'summary':self.prefix+' created in order','url':None,'siblingOrder':3})
+        self.assertEqual(3,created['siblingOrder'])
+        exported, _=self.call('GET','/data/export')
+        imported, _=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        kinds={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities',
+               'WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
+        mappings={item['sourceId']:item['id'] for item in imported['ids']}
+        for item in imported['ids']:self.created.append(('b',kinds[item['entityType']],item['id']))
+        copied, _=self.call('GET','/tasks/'+mappings[self.task['id']],owner='b')
+        self.assertEqual(12,copied['siblingOrder'])
 
     def test_provider_identity_is_unique_per_owner_and_history_survives_unlink(self):
         reference = {'providerId': 'jira', 'repositoryId': 'https://jira.invalid',

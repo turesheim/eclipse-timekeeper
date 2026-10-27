@@ -101,6 +101,79 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskInput').is_valid({**body, 'externalReferences': [reference]}))
         self.assertFalse(validator('TaskCreateInput').is_valid({**body, 'ownerId': 'other'}))
 
+    def test_task_planning_has_a_date_only_schedule_and_conditional_update_contract(self):
+        body = {'summary': 'Review', 'projectId': None, 'parentTaskId': None, 'url': None,
+                'status': 'COMPLETED', 'scheduledDate': '2026-10-26', 'completedAt': '2026-10-26T11:12:13Z'}
+        validator('TaskCreateInput').validate(body)
+        validator('TaskPlanningInput').validate({key: body[key] for key in ('status', 'scheduledDate', 'completedAt')})
+        self.assertFalse(validator('TaskPlanningInput').is_valid({'status': 'COMPLETED', 'scheduledDate': None}))
+        self.assertFalse(validator('TaskPlanningInput').is_valid({'status': 'UNKNOWN', 'scheduledDate': None, 'completedAt': None}))
+        self.assertFalse(validator('TaskPlanningInput').is_valid({'status': 'NOT_STARTED', 'scheduledDate': '2026-02-30', 'completedAt': None}))
+        self.assertEqual('updateTaskPlanning', CONTRACT['paths']['/tasks/{id}/planning']['put']['operationId'])
+
+    def test_task_checklist_items_are_distinct_from_subtasks(self):
+        item={'id':'e5fb0a24-7713-4e73-9e5c-bdf80a0180a5','text':'Review','completed':False,'completedAt':None,'position':0}
+        validator('TaskChecklistInput').validate({'items':[item]})
+        self.assertFalse(validator('TaskChecklistInput').is_valid({'items':[{**item,'completedAt':'2026-10-26T11:12:13Z','position':-1}]}))
+        self.assertFalse(validator('TaskChecklistInput').is_valid({'items':[{**item,'parentTaskId':item['id']}]}))
+        self.assertEqual('updateTaskChecklist',CONTRACT['paths']['/tasks/{id}/checklist']['put']['operationId'])
+
+    def test_task_timing_distinguishes_civil_dates_from_zoned_wall_times(self):
+        date={'kind':'DATE','date':'2026-03-29'}
+        wall={'kind':'DATE_TIME','date':'2026-03-29','time':'02:30','timeZone':'Europe/Oslo'}
+        validator('TaskTimingInput').validate({'start':date,'due':wall})
+        self.assertFalse(validator('TaskTimingInput').is_valid({'start':date,'due':{**wall,'timeZone':None}}))
+        self.assertFalse(validator('TaskTimingInput').is_valid({'start':{**date,'time':'00:00'},'due':None}))
+        self.assertFalse(validator('TaskTimingInput').is_valid({'start':date}))
+        self.assertEqual('updateTaskTiming',CONTRACT['paths']['/tasks/{id}/timing']['put']['operationId'])
+
+    def test_task_importance_keeps_priority_flag_and_urgency_separate(self):
+        value={'priority':'HIGH','flagged':True,'urgent':False}
+        validator('TaskImportanceInput').validate(value)
+        self.assertFalse(validator('TaskImportanceInput').is_valid({**value,'priority':'URGENT'}))
+        self.assertFalse(validator('TaskImportanceInput').is_valid({**value,'flagged':None}))
+        self.assertFalse(validator('TaskImportanceInput').is_valid({'priority':'HIGH','flagged':True}))
+        self.assertEqual('updateTaskImportance',CONTRACT['paths']['/tasks/{id}/importance']['put']['operationId'])
+
+    def test_task_body_has_explicit_format_and_clear_content(self):
+        validator('TaskBodyInput').validate({'format':'TEXT','content':''})
+        validator('TaskBodyInput').validate({'format':'HTML','content':'<p>Notes</p>'})
+        self.assertFalse(validator('TaskBodyInput').is_valid({'format':'MARKDOWN','content':'Notes'}))
+        self.assertFalse(validator('TaskBodyInput').is_valid({'format':'HTML','content':None}))
+        self.assertFalse(validator('TaskBodyInput').is_valid({'format':'TEXT'}))
+        self.assertEqual('updateTaskBody',CONTRACT['paths']['/tasks/{id}/body']['put']['operationId'])
+
+    def test_external_source_has_per_reference_timestamps_and_remote_versions(self):
+        source={'createdAt':'2026-10-01T10:00:00Z','modifiedAt':None,'remoteEtag':'"remote"','remoteRevision':None}
+        value={'providerId':'google','repositoryId':'account/list','externalId':'item','source':source}
+        validator('ExternalTaskSourceInput').validate(value)
+        self.assertFalse(validator('ExternalTaskSourceInput').is_valid({**value,'source':{**source,'remoteEtag':42}}))
+        self.assertFalse(validator('ExternalTaskSourceInput').is_valid({**value,'source':{**source,'remoteRevision':''}}))
+        self.assertFalse(validator('ExternalTaskSourceInput').is_valid({**value,'source':{'createdAt':None}}))
+        self.assertEqual('updateExternalTaskSource',CONTRACT['paths']['/tasks/{id}/external-references/source']['put']['operationId'])
+
+    def test_provider_connections_and_lists_keep_remote_identity_separate_from_projects(self):
+        connection={'providerId':'google','remoteAccountId':'account-1','name':'Personal',
+                    'readable':True,'writable':False,'enabled':True}
+        task_list={'connectionId':ID,'remoteListId':'list-1','name':'Tasks','kind':'STANDARD',
+                   'readable':True,'writable':False,'shared':False,'owner':True,'present':True,'position':0}
+        validator('TaskConnectionCreateInput').validate(connection)
+        validator('TaskListCreateInput').validate(task_list)
+        self.assertFalse(validator('TaskListCreateInput').is_valid({**task_list,'kind':'PROJECT'}))
+        self.assertFalse(validator('TaskListCreateInput').is_valid({**task_list,'position':-1}))
+        self.assertFalse(validator('TaskConnectionCreateInput').is_valid({**connection,'accessToken':'secret'}))
+        self.assertEqual('listTaskLists',CONTRACT['paths']['/task-lists']['get']['operationId'])
+        reference={'providerId':'google','repositoryId':'account/list','externalId':'task-1',
+                   'externalUrl':None,'taskListId':ID}
+        validator('ExternalReference').validate(reference)
+        self.assertFalse(validator('ExternalReference').is_valid({**reference,'taskListId':'not-a-uuid'}))
+
+    def test_task_sibling_order_is_a_conditional_section(self):
+        validator('TaskOrderInput').validate({'siblingOrder':7})
+        self.assertFalse(validator('TaskOrderInput').is_valid({'siblingOrder':-1}))
+        self.assertFalse(validator('TaskOrderInput').is_valid({'siblingOrder':7,'unknown':True}))
+        self.assertEqual('updateTaskOrder',CONTRACT['paths']['/tasks/{id}/order']['put']['operationId'])
+
     def test_timestamp_precision_and_zone_boundary(self):
         for value in ['2026-03-29T00:00:00Z', '2026-03-29T00:00:00.123456789Z']:
             validator('Instant').validate(value)
@@ -225,7 +298,9 @@ class ContractTest(unittest.TestCase):
             'listCalendarSubscriptions', 'getCalendarSubscription', 'createCalendarSubscription', 'updateCalendarSubscription',
             'deleteCalendarSubscription', 'refreshCalendarSubscription', 'listCalendarEvents', 'convertCalendarEvent',
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
-            'createTask', 'updateTask', 'deleteTask', 'getTask', 'listTasks',
+            'createTaskConnection', 'updateTaskConnection', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
+            'createTaskList', 'updateTaskList', 'deleteTaskList', 'getTaskList', 'listTaskLists',
+            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskOrder', 'updateExternalTaskSource', 'deleteTask', 'getTask', 'listTasks',
             'linkExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',

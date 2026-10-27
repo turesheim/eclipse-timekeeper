@@ -7,6 +7,7 @@ import { icon, iconButton, projectIcon } from './icons.js';
 import { WeekCalendar } from './calendar.js';
 import { sameSession } from './calendar-model.js';
 import { MonthTrack } from './track.js';
+import { TodayView } from './today.js';
 import { WorkweekSessions } from './workweek-sessions.js';
 import { createProjectIconPicker } from './project-icon-picker.js';
 import { UndoNotice } from './undo.js';
@@ -42,6 +43,12 @@ const calendar = new WeekCalendar($('calendar-panel'), {
   onChange: changeCalendarSession
 });
 const track = new MonthTrack($('track-panel'), { onUnauthorized:error=>auth.clear(errorText(error)), onChanged:()=>void refresh().catch(()=>{}), onEditSession: (id) => void openRecord('work-sessions', id).catch((error) => setStatus(errorText(error))) });
+const today = new TodayView($('today-panel'), {
+  canWrite:()=>canWrite,
+  onUnauthorized:error=>auth.clear(errorText(error)),
+  onNotesChanged:()=>void refresh().catch(()=>{}),
+  onEditSession:id=>void openRecord('work-sessions',id).catch(error=>setStatus(errorText(error)))
+});
 const undoNotice = new UndoNotice($('undo-notice'), {
   available: (session) => session === api && connected && canWrite && !editor && (!weekSessions.draft || !weekSessions.draft.busy && !weekSessions.draft.review && !Object.keys(weekSessions.draft.edits).length),
   changed: async (session) => {if (session === api) {if (weekSessions.draft && !weekSessions.draft.busy && !weekSessions.draft.review && !Object.keys(weekSessions.draft.edits).length) weekSessions.cancel();connected = false;readOnlyWhileDisconnected();await refresh().catch(() => {});}},
@@ -60,10 +67,12 @@ function selectWeek(date) {
 }
 periodSwipe($('workspace'), {
   enabled: () => snapshot && connected && !weekSessions.draft && !calendar.drag && !calendar.busy && !calendar.rangeMode &&
-  ['track', 'week', 'activities', 'calendar'].includes($('workspace').dataset.view) &&
+  ['today', 'track', 'week', 'activities', 'calendar'].includes($('workspace').dataset.view) &&
   !document.querySelector('dialog[open], [popover]:popover-open'),
   navigate: (direction) => {
-    if ($('workspace').dataset.view === 'track') {
+    if ($('workspace').dataset.view === 'today') {
+      today.select(addDays(today.date,direction));$('period-announcement').textContent=today.date;
+    } else if ($('workspace').dataset.view === 'track') {
       track.select(shiftMonth(track.currentMonth(), direction));
       $('period-announcement').textContent = $('track-title').textContent;
     } else {
@@ -119,16 +128,18 @@ function readOnlyWhileDisconnected() {
   for (const action of $('labels-panel').querySelectorAll('button')) action.disabled = !connected || !canWrite;
   calendar.setConnected(connected);
   track.setWritable(connected && canWrite);
+  today.journal.setWritable(connected && canWrite);
   weekSessions.setWritable(connected && canWrite);
   $('editor-delete').disabled = !connected || !canWrite || !!(editor?.busy || editor?.loading || editor?.uncertain || editor?.reviewRequired);
   $('editor-delete-confirm').querySelector('[value=delete]').disabled = $('editor-delete').disabled;
   updateSessionActions();
 }
 function tab(name) {
-  for (const item of ['track', 'week', 'calendar', 'activities', 'clients', 'projects']) $(`${item}-panel`).hidden = item !== name;
+  for (const item of ['today', 'track', 'week', 'calendar', 'activities', 'clients', 'projects']) $(`${item}-panel`).hidden = item !== name;
   $('week-toolbar').hidden = !['week', 'activities'].includes(name);$('week-report-title').textContent = name === 'activities' ? i18nText("ui.your_activities") : i18nText("ui.your_workweek");$('week-actions').hidden = name !== 'activities';
   $('workspace').dataset.view = name;if (name === 'calendar') calendar.show();else calendar.hide();
   if (name !== 'track') track.hide();
+  if (name === 'today') today.show();else today.hide();
   if (name !== 'week') weekSessions.hide();
   for (const item of document.querySelectorAll('[data-tab]')) {
     item.classList.toggle('active', item.dataset.tab === name);
@@ -149,6 +160,7 @@ const auth = authentication({
     if (session !== api) return;
     if (localeForPreference(profile.locale) !== getLocale()) {location.reload();return false;}
     $('week-date').value = dateInZone(Date.now(), profile.zoneId);
+    today.initialize(dateInZone(Date.now(),profile.zoneId));
     $('startup').hidden = true;$('login').hidden = true;$('workspace').hidden = false;$('session').hidden = false;$('sync-status').hidden = false;
     await refresh();startWatch(session);
   },
@@ -164,7 +176,7 @@ const auth = authentication({
     refreshing = null;reloadAgain = false;
     ++serverInfoRequest;clearServerInfo();api?.close();api = null;snapshot = null;connected = false;editor = null;selectedActivity = null;selectedDay = null;accountName = '';
     $('server-info').close();
-    calendar.reset();track.reset();collapsed.clear();expandedClients.clear();canWrite = false;
+    calendar.reset();track.reset();today.reset();collapsed.clear();expandedClients.clear();canWrite = false;
     $('period-announcement').textContent = '';
     deleteCandidate = null;$('editor-delete-confirm').close();$('editor').close();$('fields').replaceChildren();$('editor-error').textContent = '';$('editor-notice').textContent = '';
     for (const id of ['clients', 'projects', 'labels', 'activities', 'days']) $(id).replaceChildren();
@@ -333,6 +345,7 @@ function render() {
   renderWorkweek(s, zone);
   calendar.update(s, connected, api);
   track.update(s, activeAsOf, displayNanos, connected && canWrite, api);
+  today.update(s, connected, api);
 }
 function renderWorkweek(s, zone) {
   const dates = Array.from({ length: 7 }, (_, index) => addDays(s.dates.first, index));

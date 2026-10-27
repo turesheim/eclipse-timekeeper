@@ -14,13 +14,13 @@ test('bottom navigation keeps every view accessible, stationary and clear of con
     return [...document.fonts].some(font=>font.family.includes('bootstrap-icons') && font.status==='loaded');
   })).toBe(true);
   await expect(page.locator('#refresh')).toHaveClass(/\bbtn\b/);
-  const views=[['track','Calendar'],['calendar','Week'],['week','Workweek'],['activities','Activities'],['clients','Clients'],['projects','Projects']];
+  const views=[['today','Today'],['track','Calendar'],['calendar','Week'],['week','Workweek'],['activities','Activities'],['clients','Clients'],['projects','Projects']];
   await expect(page.locator('[data-tab=labels]')).toHaveCount(0);
   await expect(page.locator('[data-tab=tasks],#tasks-panel,#activity-tasks,#tasks,#add-task')).toHaveCount(0);
   expect(await bar.locator('button').evaluateAll(nodes=>nodes.map(node=>node.dataset.tab))).toEqual(views.map(([id])=>id));
   for(const width of [320,390,768,1440]) {
     await page.setViewportSize({width,height:844});
-    await expect(bar.locator('button')).toHaveCount(6);await expect(bar.locator('.bi[aria-hidden=true]')).toHaveCount(6);
+    await expect(bar.locator('button')).toHaveCount(7);await expect(bar.locator('.bi[aria-hidden=true]')).toHaveCount(7);
     const brand=await page.locator('.brand').boundingBox(),status=await page.locator('#sync-status').boundingBox();expect(status.x).toBeGreaterThanOrEqual(brand.x+brand.width);expect(Math.abs(status.y+status.height/2-brand.y-brand.height/2)).toBeLessThan(1);
     const bounds=await bar.boundingBox();expect(bounds.y+bounds.height).toBeCloseTo(844,0);
     for(const [id,label] of views) {
