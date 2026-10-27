@@ -26,7 +26,7 @@ def quote(value):return "'"+value.replace("'","''")+"'"
 
 
 def fixture_sql(schema=6, *, runtime=False):
-    if schema not in (2,3,4,5,6):raise ValueError('Unsupported fixture schema')
+    if schema not in (2,3,4,5,6,7):raise ValueError('Unsupported fixture schema')
     sql=(DB/'schema-v1-postgresql.sql').read_text()+(DB/'auth-v2.sql').read_text()
     sql+="UPDATE tk_schema SET schema_version=2,state='READY'; UPDATE tk_auth_control SET bootstrap_completed=TRUE;\n"
     now='2026-10-14T12:34:56.123456789Z'
