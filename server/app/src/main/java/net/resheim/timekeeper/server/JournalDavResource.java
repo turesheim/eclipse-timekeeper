@@ -46,11 +46,11 @@ public class JournalDavResource {
             var notes=new DayNotes(store);
             return new NoteFile(){
                 public String filename(){return filename;}
-                public ObjectNode get(){return notes.get(date);}
+                public ObjectNode get(){return notes.getContent(date);}
                 public byte[] document(){return notes.document(date);}
                 public Instant modifiedAt(){return notes.modifiedAt(date);}
                 public ObjectNode save(String match,byte[] bytes){return notes.saveDocument(date,match,bytes);}
-                public ObjectNode delete(String match){return notes.delete(date,match);}
+                public ObjectNode delete(String match){return notes.deleteContent(date,match);}
             };
         }
         if(filename!=null&&filename.matches("[0-9]{4}-W[0-9]{2}\\.md")){

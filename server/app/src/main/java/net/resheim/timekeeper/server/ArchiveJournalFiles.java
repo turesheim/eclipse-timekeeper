@@ -68,17 +68,18 @@ final class ArchiveJournalFiles {
         catch(java.nio.charset.CharacterCodingException invalid){throw ApiFailure.validation();}
     }
     private static void validate(String path,byte[] bytes){
-        try{switch(kind(path)){case DAY->JournalMarkdown.parse(path,bytes);case WEEK->utf8(bytes);case ASSET,TASK_ASSET->{}}}
+        try{switch(kind(path)){case DAY->JournalMarkdown.parseOpaque(path,bytes);case WEEK->utf8(bytes);case ASSET,TASK_ASSET->{}}}
         catch(JournalMarkdown.Invalid invalid){throw ApiFailure.validation();}
     }
-    static void restore(Path archive,JsonNode files,ServerStore store){
+    static void restore(Path archive,JsonNode files,ServerStore store,boolean independentLabels){
         try(var zip=new ZipFile(archive.toFile())){
             for(var file:files){
                 String path=file.path("path").asText();if(kind(path)==Kind.TASK_ASSET)continue;byte[] bytes=read(zip,file);
                 switch(kind(path)){
                     case DAY->{
-                        var parsed=JournalMarkdown.parse(path,bytes);
-                        new DayNotes(store).restore(array().add(object().put("date",parsed.date().toString()).put("text",parsed.label()).put("body",parsed.body()).put("markdown",utf8(bytes))));
+                        var parsed=independentLabels?JournalMarkdown.parseOpaque(path,bytes):JournalMarkdown.parse(path,bytes);
+                        if(independentLabels)new DayNotes(store).restoreDocument(parsed.date(),bytes);
+                        else new DayNotes(store).restore(array().add(object().put("date",parsed.date().toString()).put("text",parsed.label()).put("body",parsed.body()).put("markdown",utf8(bytes))));
                     }
                     case WEEK->new WeekNotes(store).restore(array().add(object().put("week",path.substring(0,8)).put("filename",path).put("markdown",utf8(bytes))));
                     case ASSET->new JournalAssets(store).restore(array().add(object().put("filename",path.substring(7)).put("data",Base64.getEncoder().encodeToString(bytes))));

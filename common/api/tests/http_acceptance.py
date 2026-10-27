@@ -156,12 +156,28 @@ class HttpAcceptance(unittest.TestCase):
         self.call('PUT', path, headers={'If-Match': labeled_headers['ETag']}, body={'body': 'ø' * 100001}, status=422)
         _, deleted = self.call('DELETE', path, headers={'If-Match': labeled_headers['ETag']}, status=204)
         summaries, _ = self.call('GET', query)
-        self.assertEqual([], summaries['items'])
+        self.assertEqual('Planning', summaries['items'][0]['text'])
+        self.assertFalse(summaries['items'][0]['hasBody'])
         self.call('PUT', path, headers={'If-Match': saved['ETag']}, body={'body': 'stale recreate'}, status=412)
         recreated, _ = self.call('PUT', path, headers={'If-Match': deleted['ETag']}, body={'body': markdown})
-        self.assertEqual('', recreated['text'])
+        self.assertEqual('Planning', recreated['text'])
         self.assertEqual(markdown, recreated['body'])
         self.assertGreater(recreated['version'], labeled['version'])
+
+    def test_day_labels_have_independent_versions_and_survive_note_deletion(self):
+        date='2070-02-04';label_path='/day-labels/'+date;note_path='/day-notes/'+date+'/content'
+        _, label_headers=self.call('GET',label_path);empty_note,note_headers=self.call('GET',note_path)
+        label, saved_label=self.call('PUT',label_path,headers={'If-Match':label_headers['ETag']},body={'text':'Independent label'})
+        _, unchanged_note=self.call('GET',note_path);self.assertEqual(note_headers['ETag'],unchanged_note['ETag'])
+        note, saved_note=self.call('PUT',note_path,headers={'If-Match':note_headers['ETag']},body={'body':'# Independent body'})
+        _, unchanged_label=self.call('GET',label_path);self.assertEqual(saved_label['ETag'],unchanged_label['ETag'])
+        self.call('PUT',label_path,owner='read',headers={'If-Match':saved_label['ETag']},body={'text':'Denied'},status=403)
+        foreign,_=self.call('GET',label_path,owner='b');self.assertEqual('',foreign['text'])
+        self.call('DELETE',note_path,headers={'If-Match':saved_note['ETag']},status=204)
+        retained,retained_headers=self.call('GET',label_path);self.assertEqual('Independent label',retained['text']);self.assertEqual(saved_label['ETag'],retained_headers['ETag'])
+        removed,_=self.call('GET',note_path);self.assertTrue(removed['deleted'])
+        self.call('DELETE',label_path,headers={'If-Match':retained_headers['ETag']},status=204)
+        blank,_=self.call('GET',label_path);self.assertEqual('',blank['text']);self.assertGreater(blank['version'],label['version'])
 
     def test_clients_own_projects_and_session_summaries_with_portable_relations(self):
         client = self.create('clients', {'name': self.prefix, 'color': '#ffee00'})

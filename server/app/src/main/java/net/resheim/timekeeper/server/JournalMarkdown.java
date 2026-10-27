@@ -40,7 +40,9 @@ final class JournalMarkdown {
     static Note parse(String filename,byte[] bytes){
         return document(filename,bytes).note();
     }
-    static Document document(String filename,byte[] bytes){
+    static Document document(String filename,byte[] bytes){return document(filename,bytes,true);}
+    static Note parseOpaque(String filename,byte[] bytes){return document(filename,bytes,false).note();}
+    private static Document document(String filename,byte[] bytes,boolean legacyLabel){
         LocalDate date=date(filename);
         if(bytes.length>FILE_BYTES)throw invalid("FILE_TOO_LARGE");
         final String source;
@@ -72,9 +74,9 @@ final class JournalMarkdown {
             if(metadata instanceof Map<?,?> map){
                 if(map.keySet().stream().anyMatch(key->!(key instanceof String)))throw invalid("INVALID_FRONTMATTER");
                 map.forEach((key,value)->properties.put((String)key,value));
-                Object value=map.get("timekeeper-label");
-                if(value!=null&&!(value instanceof String))throw invalid("INVALID_LABEL");
-                if(value instanceof String text)label=text.strip();
+                if(legacyLabel){Object value=map.get("timekeeper-label");
+                    if(value!=null&&!(value instanceof String))throw invalid("INVALID_LABEL");
+                    if(value instanceof String text)label=text.strip();}
             }
             body=source.substring(bodyStart);
         }
@@ -100,6 +102,19 @@ final class JournalMarkdown {
         byte[] bytes=source.getBytes(StandardCharsets.UTF_8);Note exported=parse(filename,bytes);
         if(!exported.label().equals(label)||!exported.body().equals(body))throw invalid("INVALID_EXPORT");
         return bytes;
+    }
+    /** Replace only the body; legacy metadata is inert and its bytes stay exact. */
+    static byte[] replaceBody(String filename,byte[] original,String body){
+        if(original==null)return render(filename,null,"",body);
+        var prior=document(filename,original,false);
+        if(prior.note().body().equals(body))return original.clone();
+        if(!prior.frontmatter())return render(filename,null,"",body);
+        byte[] suffix=body.getBytes(StandardCharsets.UTF_8);
+        int prefix=original.length-prior.note().body().getBytes(StandardCharsets.UTF_8).length;
+        byte[] result=java.util.Arrays.copyOf(original,prefix+suffix.length);
+        System.arraycopy(suffix,0,result,prefix,suffix.length);
+        if(!parseOpaque(filename,result).body().equals(body))throw invalid("INVALID_EXPORT");
+        return result;
     }
     private static int lineEnd(String text,int start){int end=text.indexOf('\n',start);return end<0?text.length():end;}
     private static String line(String text,int start,int end){return text.substring(start,end>start&&text.charAt(end-1)=='\r'?end-1:end);}

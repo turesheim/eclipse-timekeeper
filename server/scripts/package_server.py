@@ -46,7 +46,7 @@ def package(output, tag, commit):
     output.mkdir(parents=True, exist_ok=True)
     archive = output / 'timekeeper-server.zip'
     manifest = {'format': 1, 'kind': 'candidate' if tag is None else 'release', 'tag': tag, 'commit': commit, 'java': 21,
-                'quarkus': '3.40.1', 'h2': '2.4.240', 'apiMajor': 1, 'serverSchema': 6}
+                'quarkus': '3.40.1', 'h2': '2.4.240', 'apiMajor': 1, 'serverSchema': 7}
     files = [(p, 'timekeeper-server/' + p.relative_to(app).as_posix()) for p in sorted(app.rglob('*')) if p.is_file()]
     guides = {'docs/operations/SERVER.md': 'README.md',
               'docs/architecture/API-V1.md': 'API-POLICY.md',
@@ -55,6 +55,7 @@ def package(output, tag, commit):
               'docs/operations/TAILSCALE.md': 'TAILSCALE.md',
               'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
               'docs/operations/ACCOUNT-DATA.md': 'ACCOUNT-DATA.md',
+          'docs/operations/API-DIAGNOSTICS.md': 'API-DIAGNOSTICS.md',
               'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
               'docs/operations/JOURNAL-WEBDAV.md': 'JOURNAL-WEBDAV.md',
               'docs/operations/JOURNAL-STORAGE.md': 'JOURNAL-STORAGE.md',

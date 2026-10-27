@@ -476,9 +476,21 @@ class ContractTest(unittest.TestCase):
         for path in ['../outside', '/absolute.md', 'assets/../outside', 'assets/nested/file.png']:
             self.assertFalse(validator('ArchiveJournalFile').is_valid({'path': path, 'bytes': 0, 'sha256': 'a' * 64}))
 
+    def test_day_entry_commands_validate_only_independently_changed_resources(self):
+        for value in [{'text':'Label','labelVersion':0}, {'body':'','noteVersion':2},
+                      {'text':'','labelVersion':3,'body':'Note','noteVersion':4}]:
+            validator('DayEntryInput').validate(value)
+        for value in [{}, {'text':'Missing version'}, {'body':'Missing version'},
+                      {'body':'Note','noteVersion':1,'labelVersion':2}, {'text':'Label','labelVersion':None}]:
+            self.assertFalse(validator('DayEntryInput').is_valid(value))
+        validator('DayLabelInput').validate({'text':''})
+        self.assertFalse(validator('DayNoteContentInput').is_valid({'body':'Note','text':'Unrelated label'}))
+
     def test_every_reference_and_relation_workflow_is_present(self):
         expected = {
             'listDayNotes', 'getDayNote', 'saveDayNote', 'deleteDayNote',
+            'listDayLabels', 'getDayLabel', 'saveDayLabel', 'clearDayLabel',
+            'getDayNoteContent', 'saveDayNoteContent', 'deleteDayNoteContent', 'getDayEntry', 'editDayEntry',
             'listWeekNotes', 'getWeekNote', 'saveWeekNote', 'deleteWeekNote', 'downloadWeekNote',
             'getJournalAsset', 'putJournalAsset', 'deleteJournalAsset',
             'downloadAccountArchive', 'createAccountArchiveUpload', 'listPendingAccountArchives',

@@ -1045,7 +1045,7 @@
   "today.planned_tasks": "Planned tasks",
   "today.no_planned_tasks": "No tasks planned for this day.",
   "journal.delete_note": "Delete note",
-  "journal.delete_confirm": "Delete the saved note for {{date}} and discard any unsaved changes? This also removes it from WebDAV clients.",
+  "journal.delete_confirm": "Delete the saved note for {{date}} and discard unsaved note changes? The day label is kept. The note is also removed from WebDAV clients.",
   "journal.deleting": "Deleting…",
   "journal.webdav.title": "Journal",
   "journal.webdav.intro": "Connect a WebDAV client to your daily notes.",
@@ -1062,5 +1062,7 @@
   "markdown.attachment": "Attachment",
   "markdown.uploading": "Uploading attachment…",
   "markdown.upload_failed": "The attachment could not be uploaded. Try again.",
-  "markdown.asset_too_large": "Attachments can be at most 5 MB."
+  "markdown.asset_too_large": "Attachments can be at most 5 MB.",
+  "day_labels.stale": "The day label changed elsewhere. Your draft is kept; review the saved label before trying again.",
+  "week_notes.delete_confirm": "Delete the saved weekly note for {{week}} and discard unsaved note changes? This also removes it from WebDAV clients."
 }

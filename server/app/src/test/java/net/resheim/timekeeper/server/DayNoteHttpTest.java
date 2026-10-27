@@ -25,19 +25,19 @@ class DayNoteHttpTest {
     @Test void canonicalMarkdownVersionsMetadataAndStaysPrivateInRestResponses(){
         String day="2026-08-09";var date=DayNotes.date(day);
         String original="---\r\ntimekeeper-label: Planning\r\ncustom: first\r\n---\r\n# Body\r\n  spaces  \r\n";
-        store.transaction("a",()->{var notes=new DayNotes(store);var saved=notes.saveDocument(date,etag(notes.get(date)),original.getBytes(StandardCharsets.UTF_8));
+        store.transaction("a",()->{var notes=new DayNotes(store);var saved=notes.saveDocument(date,etag(notes.getContent(date)),original.getBytes(StandardCharsets.UTF_8));
             assertEquals(1,saved.path("version").asLong());assertFalse(saved.has("markdown"));assertEquals(original,new String(notes.document(date),StandardCharsets.UTF_8));return null;});
-        var response=get("test-a",day);assertEquals("Planning",response.jsonPath().getString("text"));assertEquals("# Body\r\n  spaces  \r\n",response.jsonPath().getString("body"));assertFalse(parse(response.asString()).has("markdown"));
+        var response=get("test-a",day);assertEquals("",response.jsonPath().getString("text"));assertEquals("# Body\r\n  spaces  \r\n",response.jsonPath().getString("body"));assertFalse(parse(response.asString()).has("markdown"));
         var listing=list("test-a",day,day);assertFalse(listing.asString().contains("custom"));assertFalse(parse(listing.asString()).path("items").get(0).has("markdown"));
         String metadata=original.replace("custom: first","custom: second");
-        store.transaction("a",()->{var notes=new DayNotes(store);var changed=notes.saveDocument(date,etag(notes.get(date)),metadata.getBytes(StandardCharsets.UTF_8));
-            assertEquals(2,changed.path("version").asLong());assertEquals("Planning",changed.path("text").asText());assertEquals("# Body\r\n  spaces  \r\n",changed.path("body").asText());
+        store.transaction("a",()->{var notes=new DayNotes(store);var changed=notes.saveDocument(date,etag(notes.getContent(date)),metadata.getBytes(StandardCharsets.UTF_8));
+            assertEquals(2,changed.path("version").asLong());assertFalse(changed.has("text"));assertEquals("# Body\r\n  spaces  \r\n",changed.path("body").asText());
             assertEquals(2,notes.saveDocument(date,etag(changed),metadata.getBytes(StandardCharsets.UTF_8)).path("version").asLong());return null;});
         assertEquals(412,update("test-a",day,response.header("ETag"),object().put("text","Stale")).statusCode());
-        var changed=save("test-a",day,get("test-a",day).header("ETag"),"Updated");assertEquals(3,changed.jsonPath().getLong("version"));
+        var changed=save("test-a",day,get("test-a",day).header("ETag"),"Updated");assertEquals(2,changed.jsonPath().getLong("version"));
         store.transaction("a",()->{var notes=new DayNotes(store);String document=new String(notes.document(date),StandardCharsets.UTF_8);
             assertTrue(document.contains("custom: second"));assertTrue(document.endsWith("# Body\r\n  spaces  \r\n"));
-            assertEquals(3,notes.save(date,etag(notes.get(date)),"Updated").path("version").asLong());
+            assertEquals(2,notes.save(date,etag(notes.get(date)),"Updated").path("version").asLong());
             assertEquals(document,new String(notes.document(date),StandardCharsets.UTF_8));return null;});
     }
     @Test void legacyMarkdownIsReconstructedWithoutWritingAndEmptyDocumentsRemainPresent(){
@@ -46,14 +46,14 @@ class DayNoteHttpTest {
             store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,7,?)","a",DayNotes.TYPE,DayNotes.id(date),old.toString());
             var notes=new DayNotes(store);assertEquals("Legacy",JournalMarkdown.parse(day+".md",notes.document(date)).label());
             assertEquals(7,notes.get(date).path("version").asLong());assertFalse(store.find(DayNotes.TYPE,DayNotes.id(date)).orElseThrow().has("markdown"));
-            var changed=notes.save(date,etag(notes.get(date)),"Changed");assertEquals(8,changed.path("version").asLong());
+            var changed=notes.save(date,etag(notes.get(date)),"Changed");assertEquals(7,changed.path("version").asLong());assertEquals(2,changed.path("labelVersion").asLong());
             assertTrue(store.find(DayNotes.TYPE,DayNotes.id(date)).orElseThrow().has("markdown"));return null;});
         var emptyDay=DayNotes.date("2026-08-11");
         store.transaction("a",()->{var notes=new DayNotes(store);assertNull(notes.document(emptyDay));
-            var empty=notes.saveDocument(emptyDay,etag(notes.get(emptyDay)),new byte[0]);assertEquals(1,empty.path("version").asLong());
+            var empty=notes.saveDocument(emptyDay,etag(notes.getContent(emptyDay)),new byte[0]);assertEquals(1,empty.path("version").asLong());
             assertArrayEquals(new byte[0],notes.document(emptyDay));assertEquals("",store.find(DayNotes.TYPE,DayNotes.id(emptyDay)).orElseThrow().path("markdown").asText());
             assertThrows(ApiFailure.class,()->notes.saveDocument(emptyDay,etag(empty),new byte[]{(byte)0xc3,0x28}));
-            notes.delete(emptyDay,etag(empty));assertNull(notes.document(emptyDay));return null;});
+            notes.deleteContent(emptyDay,etag(empty));assertNull(notes.document(emptyDay));return null;});
     }
     @Test void markdownIsExactIndependentAndSummariesNeverIncludeBodies(){
         String day="2026-08-01",body="\r\n# Private journal marker\r\n\r\n- [ ] Øvelse\t\r\n  trailing spaces  \r\n";
@@ -122,7 +122,7 @@ class DayNoteHttpTest {
             var second=pool.submit(()->{start.await();return update("test-a",day,match,object().put("body","# New body\n")).statusCode();});
             start.countDown();assertEquals(java.util.Set.of(200,412),java.util.Set.of(first.get(10,java.util.concurrent.TimeUnit.SECONDS),second.get(10,java.util.concurrent.TimeUnit.SECONDS)));
         }
-        var value=get("test-a",day);assertEquals(1,value.jsonPath().getLong("version"));assertTrue(value.jsonPath().getString("text").isEmpty()^value.jsonPath().getString("body").isEmpty());
+        var value=get("test-a",day);assertEquals(1,value.jsonPath().getLong("version")+value.jsonPath().getLong("labelVersion"));assertTrue(value.jsonPath().getString("text").isEmpty()^value.jsonPath().getString("body").isEmpty());
     }
     @Test void journalReadsWritesSummariesAndArchivesHonorAuthenticationRevocationAndDisabling(){
         String day="2026-08-04";var created=update("test-a",day,get("test-a",day).header("ETag"),object().put("body","Confidential journal"));assertEquals(200,created.statusCode());
@@ -159,7 +159,7 @@ class DayNoteHttpTest {
         assertEquals(412,save("test-a",day,initial.header("ETag"),"Peer").statusCode());
         var removed=save("test-a",day,first.header("ETag"),"");assertEquals(200,removed.statusCode());assertEquals(0,list("test-a",day,day).jsonPath().getList("items").size());
         assertEquals(412,save("test-a",day,initial.header("ETag"),"Old draft").statusCode());
-        var recreated=save("test-a",day,removed.header("ETag"),"Avspasering");assertEquals(200,recreated.statusCode());assertEquals(3,recreated.jsonPath().getLong("version"));
+        var recreated=save("test-a",day,removed.header("ETag"),"Avspasering");assertEquals(200,recreated.statusCode());assertEquals(3,recreated.jsonPath().getLong("labelVersion"));assertEquals(0,recreated.jsonPath().getLong("version"));
         assertEquals(412,save("test-a",day,first.header("ETag"),"Stale").statusCode());assertEquals("Avspasering",get("test-a",day).jsonPath().getString("text"));
     }
     @Test void invalidDatesTextRangesAndInjectedFieldsAreRejected(){

@@ -24,6 +24,15 @@ class ServerSchemaTest {
         }
         try(var connection=DriverManager.getConnection(url()+";IFEXISTS=TRUE")) {ServerSchema.validate(connection);}
     }
+    @Test void logicalLabelModelUpgradeRequiresOfflineAuthorization() throws Exception {
+        try(var connection=DriverManager.getConnection(url())){
+            ServerSchema.initializeOrValidate(connection);
+            try(var statement=connection.createStatement()){statement.executeUpdate("UPDATE tk_schema SET schema_version=6 WHERE id=1");}
+            assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(connection));
+            ServerSchema.initializeOrValidate(connection,true);ServerSchema.validate(connection);
+            try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT schema_version FROM tk_schema WHERE id=1")){rows.next();assertEquals(7,rows.getInt(1));}
+        }
+    }
     @ParameterizedTest @ValueSource(strings={
         "UPDATE tk_schema SET state='INITIALIZING'", "UPDATE tk_schema SET schema_version=99",
         "DELETE FROM tk_schema", "DROP TABLE tk_receipt", "DROP TABLE tk_relation",

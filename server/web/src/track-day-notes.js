@@ -185,9 +185,9 @@ export class TrackDayNotes {
   async loadEditor(editor){
     editor.loading=true;this.controls();this.savedStatus.textContent=t('day_notes.loading');
     try{
-      const reply=await editor.session.request('/day-notes/'+editor.date);
+      const reply=await editor.session.request('/day-entries/'+editor.date);
       if(this.editor!==editor||editor.session!==this.session)return;
-      this.text.value=reply.data.text;editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;editor.present=reply.data.version>0&&!reply.data.deleted;editor.loading=false;editor.failedRead=false;editor.stale=false;editor.uncertain=false;
+      this.text.value=reply.data.text;editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;editor.noteEtag=reply.data.noteEtag;editor.noteVersion=reply.data.version;editor.labelVersion=reply.data.labelVersion;editor.present=reply.data.version>0&&!reply.data.deleted;editor.loading=false;editor.failedRead=false;editor.stale=false;editor.uncertain=false;
       this.markdown.setValue(reply.data.body);this.error.textContent='';this.savedStatus.textContent=t(this.writable?'journal.saved':'journal.read_only');this.controls();this.content.scrollTop=0;if(!this.inline)this.text.focus({preventScroll:true});void this.markdown.showFormatted(false);
     }catch(error){
       if(this.editor!==editor||editor.session!==this.session)return;
@@ -199,8 +199,8 @@ export class TrackDayNotes {
     if(editor.uncertain){
       editor.loading=true;this.controls();
       try{
-        const reply=await editor.session.request('/day-notes/'+editor.date);if(this.editor!==editor||editor.session!==this.session)return;
-        if(editor.sent?.delete?reply.data.deleted:reply.data.text===editor.sent.text&&reply.data.body===editor.sent.body){this.acceptSaved(reply,editor);return;}
+        const reply=await editor.session.request('/day-entries/'+editor.date);if(this.editor!==editor||editor.session!==this.session)return;
+        if(editor.sent?.delete?reply.data.deleted:(!Object.hasOwn(editor.sent,'text')||reply.data.text===editor.sent.text)&&(!Object.hasOwn(editor.sent,'body')||reply.data.body===editor.sent.body)){this.acceptSaved(reply,editor,{preserveLabelDraft:!!editor.sent?.delete});return;}
         editor.uncertain=false;editor.stale=true;this.error.textContent=t('journal.review_saved');
       }catch(error){if(this.editor===editor){this.error.textContent=error.message;if(error.status===401)this.callbacks.onUnauthorized(error);}}
       finally{if(this.editor===editor){editor.loading=false;this.controls();if(this.error.textContent)this.error.scrollIntoView({block:'nearest'});}}
@@ -209,12 +209,19 @@ export class TrackDayNotes {
     if(this.dirty()&&!confirm(t('journal.reload_confirm')))return;
     await this.loadEditor(editor);
   }
-  acceptSaved(reply,editor){
+  acceptSaved(reply,editor,{preserveLabelDraft=false}={}){
+    const draft=preserveLabelDraft&&this.text.value.trim()!==editor.originalText?{value:this.text.value,version:editor.labelVersion,original:editor.originalText}:null;
     ++this.generation;this.key=null;
     if(reply.data.hasBody)this.bodyDates.add(editor.date);else this.bodyDates.delete(editor.date);
     if(reply.data.text||reply.data.hasBody)this.notes.set(editor.date,reply.data.text);else this.notes.delete(editor.date);
     this.paint();
-    if(this.inline){editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;this.savedStatus.textContent=t('journal.saved');this.controls();}
+    if(this.inline||draft){
+      editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;editor.noteEtag=reply.data.noteEtag;editor.noteVersion=reply.data.version;editor.labelVersion=reply.data.labelVersion;editor.present=reply.data.version>0&&!reply.data.deleted;
+      this.text.value=draft?draft.value:reply.data.text;
+      if(draft&&draft.version!==reply.data.labelVersion){editor.originalText=draft.original;editor.labelVersion=draft.version;editor.stale=true;this.error.textContent=t('day_labels.stale');}
+      if(this.markdown.value()!==reply.data.body){const formatted=!this.markdown.rich.hidden;this.markdown.setValue(reply.data.body);if(formatted)void this.markdown.showFormatted(false);}
+      this.savedStatus.textContent=t(draft?'journal.unsaved':'journal.saved');this.controls();
+    }
     else this.closeEditor();
     this.callbacks.onChanged();
   }
@@ -222,9 +229,13 @@ export class TrackDayNotes {
     const editor=this.editor;if(!editor||editor.busy||editor.loading||editor.failedRead||editor.uncertain||editor.stale||!editor.etag||!this.writable||editor.session!==this.session)return;
     if(this.markdown.loading)return;
     const body=this.markdown.value();if(new TextEncoder().encode(body).length>200000){this.error.textContent=t('journal.too_large');this.error.scrollIntoView({block:'nearest'});return;}
-    editor.sent={text:this.text.value.trim(),body};editor.busy=true;this.error.textContent='';this.savedStatus.textContent=t('journal.saving');this.controls();
+    const text=this.text.value.trim();editor.sent={};
+    if(text!==editor.originalText)Object.assign(editor.sent,{text,labelVersion:editor.labelVersion});
+    if(body!==editor.originalBody)Object.assign(editor.sent,{body,noteVersion:editor.noteVersion});
+    if(!Object.keys(editor.sent).length){this.savedStatus.textContent=t('journal.saved');if(!this.inline)this.closeEditor();return;}
+    editor.busy=true;this.error.textContent='';this.savedStatus.textContent=t('journal.saving');this.controls();
     try{
-      const reply=await editor.session.request('/day-notes/'+editor.date,{method:'PUT',etag:editor.etag,body:editor.sent});
+      const reply=await editor.session.request('/day-entries/'+editor.date,{method:'POST',body:editor.sent});
       if(this.editor!==editor||editor.session!==this.session)return;
       this.acceptSaved(reply,editor);
     }catch(error){
@@ -238,9 +249,11 @@ export class TrackDayNotes {
     if(!confirm(t('journal.delete_confirm',{date:this.dateLabel(editor.date)})))return;
     editor.sent={delete:true};editor.busy=true;this.error.textContent='';this.savedStatus.textContent=t('journal.deleting');this.controls();
     try{
-      await editor.session.request('/day-notes/'+editor.date,{method:'DELETE',etag:editor.etag});
+      await editor.session.request('/day-notes/'+editor.date+'/content',{method:'DELETE',etag:editor.noteEtag});
       if(this.editor!==editor||editor.session!==this.session)return;
-      this.acceptSaved({data:{text:'',hasBody:false,deleted:true}},editor);
+      const reply=await editor.session.request('/day-entries/'+editor.date);
+      if(this.editor!==editor||editor.session!==this.session)return;
+      this.acceptSaved(reply,editor,{preserveLabelDraft:true});
     }catch(error){
       if(this.editor!==editor||editor.session!==this.session)return;
       if(error.status===401){this.callbacks.onUnauthorized(error);return;}

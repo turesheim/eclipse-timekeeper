@@ -95,7 +95,7 @@ export class TodayView {
     try{
       const [reply,weeks]=await Promise.all([scope.request('/day-notes?'+new URLSearchParams({fromDate:first,toDate:last})),scope.request('/week-notes?'+new URLSearchParams({fromWeek:isoWeek(first),toWeek:isoWeek(last)}))]);
       if(generation!==this.noteGeneration||scope!==this.scope)return;
-      this.noteDates=new Set(reply.data.items.filter(note=>note.text||note.hasBody).map(note=>note.date));this.noteWeeks=new Set(weeks.data.items.filter(note=>note.hasBody).map(note=>note.week));this.paintMonth();
+      this.noteDates=new Set(reply.data.items.filter(note=>note.hasBody).map(note=>note.date));this.noteWeeks=new Set(weeks.data.items.filter(note=>note.hasBody).map(note=>note.week));this.paintMonth();
     }catch(error){
       if(generation!==this.noteGeneration||scope!==this.scope)return;
       if(error.status===401)this.callbacks.onUnauthorized(error);

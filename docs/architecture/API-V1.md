@@ -754,49 +754,65 @@ opt-in mutations. Undo snapshots are omitted from portable account exports.
 
 ## Private day labels and Markdown bodies
 
-`/day-notes` is account-scoped web metadata independent of all timed work and
-reports. Dates use real `YYYY-MM-DD` civil dates (years 0001–9999), independent
-of time-zone changes. No owner ID is accepted from request content or queries.
-Existing authentication, read/write permissions, CSRF, revocation, disabled-account
-checks and optional `X-Timekeeper-Owner` binding apply to every operation.
+A day label and a Markdown note are separate account-private resources keyed by
+civil `YYYY-MM-DD` date (years 0001–9999). They have separate versions, ETags,
+existence and deletion lifecycles. Neither depends on timed work or the account
+zone. The existing authentication, read/write permissions, CSRF, disabled-account
+checks, revocation and optional `X-Timekeeper-Owner` binding apply to every route.
 
-- `GET /day-notes?fromDate=...&toDate=...` returns at most 62 inclusive dates as
-  `{items,revision}`. Items are `DayNoteSummary` records with `id`, `ownerId`,
-  `date`, `version`, `text` and `hasBody`. They never include body text. A label,
-  a body, or both make a note discoverable; empty tombstones are excluded.
-- `GET /day-notes/{date}` returns the complete `DayNote`, including `body` and
-  `hasBody`, with its ETag. Untouched dates return empty strings, `hasBody:false`
-  and version zero. Fetch the full note before a conditional write; the summary
-  is not a substitute for its full-resource ETag.
-- `PUT /day-notes/{date}` requires `If-Match` and at least one of `text` or `body`.
-  An omitted field preserves its stored value. `text` remains an 80-character
-  single-line label and retains its existing trimming/validation. `body` is exact
-  valid UTF-8 Markdown, limited to **200,000 encoded bytes**; CRLF/LF, tabs,
-  leading/trailing spaces and whitespace-only bodies are preserved. Neither
-  field accepts null. `{text:""}` clears only the label, `{body:""}` clears only
-  the body, and supplying both empty clears the note. Identical updates are no-ops.
-- `DELETE /day-notes/{date}` requires `If-Match`, clears both fields and returns
-  204 with the retained ETag. Deletion preserves the version tombstone; stale
-  editors cannot recreate a removed note with an older ETag. All changed writes
-  increment the version atomically. A concurrent label/body write must reload
-  after a 412 rather than silently merging against a stale note.
+- `GET /day-labels?fromDate=...&toDate=...` lists nonempty labels for at most
+  62 inclusive dates. `GET /day-labels/{date}` returns `DayLabel` and its ETag;
+  a never-edited label reads as empty with version zero. `PUT` with `{text}` and
+  `If-Match` saves the trimmed, single-line label (up to 80 Unicode characters).
+  Empty text or conditional `DELETE` clears only the label and retains its
+  independent version. A cleared label cannot regain an old valid ETag.
+- `GET /day-notes/{date}/content` returns `DayNoteContent` without a label.
+  Conditional `PUT` accepts only `{body}`. The body is exact valid UTF-8 Markdown,
+  limited to **200,000 encoded bytes**; CRLF/LF, tabs and whitespace-only bodies
+  are preserved. An empty body leaves the label intact. Conditional `DELETE`
+  removes the Markdown document from WebDAV, retains its deletion version, and
+  leaves the day label intact. Label changes never invalidate this note ETag.
+- `GET /day-entries/{date}` is the editor read model: it includes the current
+  label, body, independent `labelVersion` and note `version`, plus `labelEtag`
+  and `noteEtag`. `POST /day-entries/{date}` is an atomic form command, containing
+  only the independently changed resources: `{text,labelVersion}`,
+  `{body,noteVersion}`, or both pairs. It checks only supplied versions. A peer
+  label edit does not block a note-only save, and a peer note edit does not block
+  a label-only save. If either supplied version is stale, the whole command
+  returns 412 with neither change committed. Missing versions and unrelated
+  fields are rejected. This command does not accept a shared `If-Match` guard.
 
-Legacy stored labels acquire an empty body on read without rewriting their
-label/version or changing the database schema. The existing owner/type/date
-index and owner transaction lock remain in use. New response fields change the
-full-resource ETag, so an editor held across an upgrade must reload after a 412.
-Existing label-only clients remain safe: omitting `body` never erases Markdown.
-The current calendar uses summary presence markers and conditional label updates;
-formatted body editing is provided by the separate editor integration.
+The existing `/day-notes` range reads and `/day-notes/{date}` routes remain as
+compatibility projections. Their `text` field is deprecated and reads the
+independent label. Their combined ETag includes `labelVersion`, so it protects
+legacy writers against changes and clear/recreate cycles in either resource.
+Legacy `PUT` updates only supplied fields. A label-only write increments the
+label version, while the response `version` still describes the note. Legacy
+`DELETE` deletes only the note and preserves the label. New clients should use
+the independent routes. Range summaries contain labels and `hasBody`, never
+body content; label-only days remain visible after a note is deleted.
 
-Note responses are private/no-store. Profile-style change invalidations remain
-compatible with existing clients and contain no label/body content. Account
-export streams present notes as separate canonical Markdown ZIP files, indexed
-by path, byte length and SHA-256 in a version 2 snapshot. Version 1 inline
-Markdown and label-only archives remain supported, and omitted legacy bodies preserve
-an existing matching note's body. A differing active note produces a review
-conflict and is never overwritten.
-Empty deletion tombstones are not portable archive deletion commands.
+Schema 7 is a compatibility fence even though no physical SQL table is added.
+After an authorized offline upgrade, the server copies old label projections
+into `DAY_LABEL` records in owner-scoped transactions before serving requests.
+Old note versions, deletion markers and existing Markdown bytes are preserved;
+virtual legacy documents are materialized without changing their note version.
+Older server binaries must remain stopped and cannot reopen schema 7.
+
+New Markdown documents contain no managed day label. An existing
+`timekeeper-label` property is now inert legacy metadata: byte-exact reads and
+body edits preserve it, but changing/removing it through WebDAV cannot change
+the independent day label. Version 3 account ZIP snapshots carry a separate `dayLabels`
+array in `archive.json`, including explicitly cleared labels, and separate
+checksummed Markdown files. The v3 format selects independent label
+restore semantics. Older v2 file archives and v1 inline archives still
+use the documented legacy label import adapter. A differing current label or
+active note causes a review conflict rather than an overwrite. Deleted notes
+are not portable deletion commands; their surviving labels are portable.
+
+All responses are private/no-store. Change notifications remain content-free
+profile invalidations. For a read-only investigation, use the
+[API diagnostics workflow](../operations/API-DIAGNOSTICS.md).
 
 `GET /week-notes?fromWeek=YYYY-Www&toWeek=YYYY-Www` lists private weekly
 note summaries for up to nine ISO weeks. `GET /week-notes/{week}` returns the
@@ -816,7 +832,7 @@ octet-stream attachment. The browser route applies session, CSRF and owner
 binding; WebDAV provides the same files under `/dav/journal/assets/` for clients.
 The account archive includes active attachments as binary files under `assets/`
 and rejects conflicting filenames during review. Task attachment binary files
-use `assets/task attachments/<id>.bin`, referenced by `archiveFile` in version 2 work metadata.
+use `assets/task attachments/<id>.bin`, referenced by `archiveFile` in version 2/3 work metadata.
 The complete ZIP is required when its `journalFiles` index is nonempty; older
 version 1 ZIP and standalone JSON imports retain their inline content support.
 

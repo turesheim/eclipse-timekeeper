@@ -160,6 +160,13 @@ def exercise(system):
 
     day='2026-10-27';week='2026-W44';day_body='# Private replica day\r\n[Report](assets/replica.bin)\r\n';week_body='# Private replica week\r\n'
     attachment=b'private replica attachment\x00bytes'
+    independent_labels={day:'Daily label','2026-10-28':'Label without note','2026-10-29':'Keep after note deletion','2026-10-30':''}
+    for date,label in independent_labels.items():
+        route='/day-labels/'+date;current=system.request(1,alice,route);expect(current,200,'Read independent label')
+        expect(system.request(2,alice,route,{'text':label},method='PUT',headers={'If-Match':current[2]['ETag']}),200,'Save independent label on other JVM')
+    deleted_route='/day-notes/2026-10-29/content';current=system.request(1,alice,deleted_route)
+    saved=system.request(2,alice,deleted_route,{'body':'Remove this note only'},method='PUT',headers={'If-Match':current[2]['ETag']});expect(saved,200,'Create removable note')
+    expect(system.request(1,alice,deleted_route,method='DELETE',headers={'If-Match':saved[2]['ETag']}),204,'Delete note while retaining label')
     for route,body in (('/day-notes/'+day,day_body),('/week-notes/'+week,week_body)):
         current=system.request(1,alice,route);expect(current,200,'Read empty note before ZIP fixture')
         expect(system.request(2,alice,route,{'body':body},method='PUT',headers={'If-Match':current[2]['ETag']}),200,'Save exact note for ZIP fixture')
@@ -167,7 +174,7 @@ def exercise(system):
     task=post(2,alice,'/tasks',{'projectId':None,'parentTaskId':None,'summary':'Separate binary task attachment','url':None})
     post(1,alice,'/tasks/'+task['id']+'/attachments',{'fileName':'original.bin','contentType':'application/octet-stream','bytes':len(attachment),'sha256':hashlib.sha256(attachment).hexdigest(),'data':base64.b64encode(attachment).decode()})
     snapshot,metadata,packed=download(system,2,alice,with_zip=True)
-    if snapshot['format']!='timekeeper-account-v2' or day_body.encode() in metadata or base64.b64encode(attachment) in metadata:raise AssertionError('New archive still embeds file bodies in JSON')
+    if snapshot['format']!='timekeeper-account-v3' or day_body.encode() in metadata or base64.b64encode(attachment) in metadata:raise AssertionError('New archive still embeds file bodies in JSON')
     expect(system.request(1,alice,'/admin/users',{'username':'carol','password':PASSWORD,'displayName':'Carol','administrator':False,'email':'carol@example.invalid'}),201,'Fresh target for complete ZIP restore')
     carol=system.password_login('carol',index=2)
     upload=post(1,carol,'/data/account/uploads',{'fileName':'account.zip','mediaType':'application/zip','bytes':len(packed),'sha256':hashlib.sha256(packed).hexdigest()})
@@ -178,10 +185,21 @@ def exercise(system):
     if not expect(review,200,'Review separate-file ZIP')['canImport']:raise AssertionError('Separate files failed valid ZIP review')
     expect(system.request(2,carol,route+'/import',{'restoreTimeZone':False},headers={'If-Match':review[2]['ETag']}),201,'Restore separate-file ZIP on other JVM')
     if expect(system.request(1,carol,'/day-notes/'+day),200,'Restored daily note')['body']!=day_body or expect(system.request(2,carol,'/week-notes/'+week),200,'Restored weekly note')['body']!=week_body:raise AssertionError('ZIP restore changed exact note bodies')
+    for date,label in independent_labels.items():
+        value=expect(system.request(2,carol,'/day-labels/'+date),200,'Restored independent day label')
+        if value['text']!=label or value['version']<1:raise AssertionError('ZIP restore changed independent label or lost explicit clear')
+    if any(value['path']=='2026-10-29.md' for value in snapshot['journalFiles']):raise AssertionError('Deleted note was recreated by its surviving label')
     restored,_,restored_zip=download(system,1,carol,with_zip=True)
     task_file=next(value['archiveFile'] for value in restored['work']['taskAttachments'] if value['fileName']=='original.bin')
     with zipfile.ZipFile(io.BytesIO(restored_zip)) as archive:
         if archive.read(day+'.md')!=day_body.encode() or archive.read(week+'.md')!=week_body.encode() or archive.read('assets/replica.bin')!=attachment or archive.read(task_file)!=attachment:raise AssertionError('Cross-JVM ZIP restore changed separate Markdown or binary files')
+    system.restart(2)
+    for date,label in independent_labels.items():
+        if expect(system.request(1,carol,'/day-labels/'+date),200,'Label after peer restart')['text']!=label:raise AssertionError('Independent label changed across restart')
+    route='/day-notes/'+day+'/content';current=system.request(1,carol,route)
+    expect(system.request(2,carol,route,{'body':''},method='PUT',headers={'If-Match':current[2]['ETag']}),200,'Clear only restored body')
+    if expect(system.request(1,carol,'/day-labels/'+day),200,'Label after body clearing')['text']!=independent_labels[day]:raise AssertionError('Clearing body removed label')
+    passed('independent labels and clears survive note deletion, ZIP restore, body clearing and actual JVM restart')
     passed('separate daily/weekly Markdown and binary journal/task attachments restore exactly across PostgreSQL JVMs')
     return checks
 
