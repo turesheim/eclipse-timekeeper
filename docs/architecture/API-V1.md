@@ -184,6 +184,14 @@ resource; a conflicting representation of the same remote identity returns
 disconnected account `enabled=false`; remote disappearance must not trigger
 deletion of local tasks.
 
+Each connection also has a versioned `capabilities` declaration. Connectors
+replace it conditionally through `PUT /task-connections/{id}/capabilities`.
+Entries state whether a field can be read, written, and deleted; an omitted
+field means unknown. Ordinary connection updates preserve the declaration.
+The initial declaration has no field claims. See
+[task sync capabilities](TASK-SYNC-CAPABILITIES.md) for the version 1 provider
+mapping and export gate.
+
 `/task-sync-cursors` holds durable, owner-scoped connector progress separately
 from task payloads. A connection-level cursor tracks list discovery; a
 list-level cursor tracks tasks in that owned list. `INITIAL` has no cursor,
@@ -230,6 +238,26 @@ Both require `If-Match`. An empty series clears all exceptions, while older
 task writes preserve them. The server stores these values but does not expand
 rules or infer new due dates or alerts. A connector must report unsupported
 recurrence before writing to a provider rather than approximate its rule.
+
+Task `reminders` is a bounded list of individually identified triggers,
+independent of scheduled, start, and due dates. `ABSOLUTE` requires a zoned
+wall time; `RELATIVE` uses signed minutes before a `START` or `DUE` anchor
+(negative means after). `LOCATION` stores a geofence and arrival/departure
+transition; `CAR` stores connect/disconnect; `MESSAGE` stores an opaque contact
+key. `PUT /tasks/{id}/reminders` conditionally replaces the whole list and
+legacy task writes preserve it. Connectors must retain unsupported trigger
+kinds locally and warn on attempted export; they must never convert them to a
+timed alert or treat a due date as an alert. Apple companion authorization and
+contact resolution remain outside task payloads.
+
+Task `metadata` stores `tags`, `categories`, and `links` separately. Tags can
+represent Apple Reminders tags; categories can represent Outlook categories.
+Links have stable IDs and `LOCAL`, `PROVIDER_SOURCE`, or `PROVIDER_LINKED` kinds.
+Provider source links, such as Google Tasks output-only links, remain separate
+from the editable primary task `url`. Provider links carry a provider ID and
+linked resources can carry a remote ID. `PUT /tasks/{id}/metadata` conditionally
+replaces the full metadata value. Legacy task writes retain it, and connectors
+must use their declared field capabilities before exporting any change.
 
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.

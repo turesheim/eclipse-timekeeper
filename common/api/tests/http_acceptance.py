@@ -744,6 +744,91 @@ class HttpAcceptance(unittest.TestCase):
         cleared,_=self.call('PUT',path+'/recurrence',body={'series':None,'occurrences':[]},headers={'If-Match':headers['ETag']})
         self.assertEqual({'series':None,'occurrences':[]},cleared['recurrence'])
 
+    def test_typed_reminders_survive_legacy_writes_and_transfer(self):
+        path='/tasks/'+self.task['id']
+        reminders=[
+            {'id':str(uuid4()),'kind':'ABSOLUTE','at':{'kind':'DATE_TIME','date':'2026-10-26','time':'09:00','timeZone':'Europe/Oslo'}},
+            {'id':str(uuid4()),'kind':'RELATIVE','anchor':'DUE','offsetMinutes':30},
+            {'id':str(uuid4()),'kind':'LOCATION','latitude':59.9,'longitude':10.7,'radiusMeters':100,'transition':'ARRIVE'},
+            {'id':str(uuid4()),'kind':'CAR','event':'DISCONNECT'},
+            {'id':str(uuid4()),'kind':'MESSAGE','contactKey':'contact-1'}]
+        original,headers=self.call('GET',path)
+        self.assertEqual([],original['reminders'])
+        self.call('PUT',path+'/reminders',owner='read',body={'reminders':reminders},headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        updated,headers=self.call('PUT',path+'/reminders',body={'reminders':reminders},headers={'If-Match':headers['ETag']})
+        self.assertEqual(reminders,updated['reminders'])
+        self.call('PUT',path+'/reminders',body={'reminders':[]},headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        self.call('PUT',path+'/reminders',body={'reminders':reminders+[reminders[0]]},headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        self.call('PUT',path+'/reminders',body={'reminders':[{'id':str(uuid4()),'kind':'ABSOLUTE','at':{'kind':'DATE','date':'2026-10-26'}}]},headers={'If-Match':headers['ETag']},status=400,code='BAD_REQUEST')
+        legacy={'projectId':updated['projectId'],'parentTaskId':updated['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        updated,headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        self.assertEqual(reminders,updated['reminders'])
+        exported,_=self.call('GET','/data/export')
+        imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored,_=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual(reminders,restored['reminders'])
+        cleared,_=self.call('PUT',path+'/reminders',body={'reminders':[]},headers={'If-Match':headers['ETag']})
+        self.assertEqual([],cleared['reminders'])
+
+    def test_task_metadata_keeps_provider_source_links_distinct(self):
+        path='/tasks/'+self.task['id']
+        links=[{'id':str(uuid4()),'kind':'LOCAL','url':'https://example.invalid/local','title':'Local link','providerId':None,'remoteId':None},
+               {'id':str(uuid4()),'kind':'PROVIDER_SOURCE','url':'https://tasks.google.com/task/1','title':'Source','providerId':'google','remoteId':None},
+               {'id':str(uuid4()),'kind':'PROVIDER_LINKED','url':'https://example.invalid/resource','title':'Linked','providerId':'microsoft','remoteId':'link-1'}]
+        metadata={'tags':['Home'],'categories':['Blue Category'],'links':links}
+        original,headers=self.call('GET',path)
+        self.assertEqual({'tags':[],'categories':[],'links':[]},original['metadata'])
+        self.call('PUT',path+'/metadata',owner='read',body=metadata,headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        updated,headers=self.call('PUT',path+'/metadata',body=metadata,headers={'If-Match':headers['ETag']})
+        self.assertEqual(metadata,updated['metadata'])
+        self.assertIsNone(updated['url'])
+        self.call('PUT',path+'/metadata',body={**metadata,'links':links+[links[0]]},headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        legacy={'projectId':updated['projectId'],'parentTaskId':updated['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        updated,headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        self.assertEqual(metadata,updated['metadata'])
+        exported,_=self.call('GET','/data/export')
+        imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored,_=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual(metadata,restored['metadata'])
+        cleared,_=self.call('PUT',path+'/metadata',body={'tags':[],'categories':[],'links':[]},headers={'If-Match':headers['ETag']})
+        self.assertEqual({'tags':[],'categories':[],'links':[]},cleared['metadata'])
+
+    def test_connection_capabilities_are_conditional_and_portable(self):
+        account={'providerId':'google','remoteAccountId':str(uuid4()),'name':'Capabilities',
+                 'readable':True,'writable':True,'enabled':True}
+        connection=self.create('task-connections',account)
+        path='/task-connections/'+connection['id']
+        self.assertEqual({'version':1,'providerApiVersion':'unknown','fields':{}},connection['capabilities'])
+        body={'version':1,'providerApiVersion':'tasks-v1',
+              'fields':{'scheduledDate':{'readable':True,'writable':True,'deletable':False,'note':None},
+                        'links':{'readable':True,'writable':False,'deletable':False,'note':'Output only'}}}
+        current,headers=self.call('GET',path)
+        self.call('PUT',path+'/capabilities',owner='read',body=body,headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        self.call('PUT',path+'/capabilities',body=body,headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        invalid={'version':1,'providerApiVersion':'tasks-v1','fields':{'links':{'readable':True,'writable':False,'deletable':True,'note':None}}}
+        self.call('PUT',path+'/capabilities',body=invalid,headers={'If-Match':headers['ETag']},status=422,code='VALIDATION')
+        updated,headers=self.call('PUT',path+'/capabilities',body=body,headers={'If-Match':headers['ETag']})
+        self.assertEqual(body,updated['capabilities'])
+        legacy={key:updated[key] for key in ('name','readable','writable','enabled')}
+        updated,headers=self.call('PUT',path,body={**legacy,'name':'Renamed'},headers={'If-Match':headers['ETag']})
+        self.assertEqual(body,updated['capabilities'])
+        exported,_=self.call('GET','/data/export')
+        imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions','TASK_CONNECTION':'task-connections','TASK_LIST':'task-lists'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK_CONNECTION' and item['sourceId']==connection['id']:
+                restored,_=self.call('GET','/task-connections/'+item['id'],owner='b')
+                self.assertEqual(body,restored['capabilities'])
+
     def test_provider_accounts_and_lists_are_owned_idempotent_and_portable(self):
         account={'providerId':'microsoft','remoteAccountId':str(uuid4()),'name':'Personal',
                  'readable':True,'writable':True,'enabled':True}

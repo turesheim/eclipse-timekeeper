@@ -23,7 +23,7 @@ public final class WireValues {
     public static TaskConnection taskConnection(JsonObject value) {
         return new TaskConnection(id(value.get("id")),value.get("providerId").getAsString(),value.get("remoteAccountId").getAsString(),
                 value.get("name").getAsString(),value.get("readable").getAsBoolean(),value.get("writable").getAsBoolean(),
-                value.get("enabled").getAsBoolean(),value.get("version").getAsLong());
+                value.get("enabled").getAsBoolean(),capabilities(value.get("capabilities")),value.get("version").getAsLong());
     }
     public static TaskList taskList(JsonObject value) {
         return new TaskList(id(value.get("id")),id(value.get("connectionId")),value.get("remoteListId").getAsString(),
@@ -43,7 +43,7 @@ public final class WireValues {
         var planning=new TaskPlanning(value.has("status")?TaskStatus.valueOf(value.get("status").getAsString()):TaskStatus.NOT_STARTED,
                 text(value.get("scheduledDate")).map(LocalDate::parse),text(value.get("completedAt")).map(Instant::parse));
         var checklist=checklist(value.get("checklistItems"));
-		return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,aliases,planning,checklist,timing(value),importance(value),body(value),recurrence(value.get("recurrence")),value.has("siblingOrder")?value.get("siblingOrder").getAsInt():0,value.get("version").getAsLong());
+		return new Task(new TaskId(id(value.get("id"))),text(value.get("projectId")).map(UUID::fromString).map(ProjectId::new),text(value.get("parentTaskId")).map(UUID::fromString).map(TaskId::new),value.get("summary").getAsString(),text(value.get("url")),refs,aliases,planning,checklist,timing(value),importance(value),body(value),recurrence(value.get("recurrence")),reminders(value.get("reminders")),metadata(value.get("metadata")),value.has("siblingOrder")?value.get("siblingOrder").getAsInt():0,value.get("version").getAsLong());
     }
     public static TaskBody body(JsonObject value) {
         if(!value.has("body") || value.get("body").isJsonNull())return TaskBody.empty();
@@ -80,6 +80,60 @@ public final class WireValues {
             var entry=object();moment(entry,"original",Optional.of(item.original()));moment(entry,"movedTo",item.movedTo());
             entry.addProperty("state",item.state().name());optional(entry,"completedAt",item.completedAt());items.add(entry);
         });return items;
+    }
+    public static JsonArray reminders(java.util.List<TaskReminder> values) {
+        var array=new JsonArray();values.forEach(value -> {
+            var entry=object();entry.addProperty("id",value.id().toString());
+            if(value instanceof TaskReminder.Absolute alert) {entry.addProperty("kind","ABSOLUTE");moment(entry,"at",Optional.of(alert.at()));}
+            else if(value instanceof TaskReminder.Relative alert) {entry.addProperty("kind","RELATIVE");entry.addProperty("anchor",alert.anchor().name());entry.addProperty("offsetMinutes",alert.offsetMinutes());}
+            else if(value instanceof TaskReminder.Location alert) {entry.addProperty("kind","LOCATION");entry.addProperty("latitude",alert.latitude());entry.addProperty("longitude",alert.longitude());entry.addProperty("radiusMeters",alert.radiusMeters());entry.addProperty("transition",alert.transition().name());}
+            else if(value instanceof TaskReminder.Car alert) {entry.addProperty("kind","CAR");entry.addProperty("event",alert.event().name());}
+            else if(value instanceof TaskReminder.Message alert) {entry.addProperty("kind","MESSAGE");entry.addProperty("contactKey",alert.contactKey());}
+            array.add(entry);
+        });return array;
+    }
+    public static java.util.List<TaskReminder> reminders(JsonElement value) {
+        if(value==null || value.isJsonNull())return java.util.List.of();
+        return StreamSupport.stream(value.getAsJsonArray().spliterator(),false).<TaskReminder>map(item -> {
+            var entry=item.getAsJsonObject();UUID id=id(entry.get("id"));return switch(entry.get("kind").getAsString()) {
+                case "ABSOLUTE" -> new TaskReminder.Absolute(id,moment(entry.get("at")).orElseThrow());
+                case "RELATIVE" -> new TaskReminder.Relative(id,TaskReminder.Anchor.valueOf(entry.get("anchor").getAsString()),entry.get("offsetMinutes").getAsInt());
+                case "LOCATION" -> new TaskReminder.Location(id,entry.get("latitude").getAsDouble(),entry.get("longitude").getAsDouble(),entry.get("radiusMeters").getAsDouble(),TaskReminder.Transition.valueOf(entry.get("transition").getAsString()));
+                case "CAR" -> new TaskReminder.Car(id,TaskReminder.CarEvent.valueOf(entry.get("event").getAsString()));
+                case "MESSAGE" -> new TaskReminder.Message(id,entry.get("contactKey").getAsString());
+                default -> throw new IllegalArgumentException("Unsupported reminder kind");
+            };
+        }).toList();
+    }
+    public static TaskCapabilities capabilities(JsonElement value) {
+        if(value==null || value.isJsonNull())return TaskCapabilities.unknown();
+        var node=value.getAsJsonObject();var fields=new java.util.TreeMap<String,TaskFieldCapability>();
+        node.getAsJsonObject("fields").entrySet().forEach(entry -> {
+            var item=entry.getValue().getAsJsonObject();fields.put(entry.getKey(),new TaskFieldCapability(item.get("readable").getAsBoolean(),item.get("writable").getAsBoolean(),item.get("deletable").getAsBoolean(),text(item.get("note"))));
+        });return new TaskCapabilities(node.get("version").getAsInt(),node.get("providerApiVersion").getAsString(),fields);
+    }
+    public static JsonObject capabilities(TaskCapabilities value) {
+        var node=object();node.addProperty("version",value.version());node.addProperty("providerApiVersion",value.providerApiVersion());var fields=object();
+        new java.util.TreeMap<>(value.fields()).forEach((key,entry) -> {
+            var field=object();field.addProperty("readable",entry.readable());field.addProperty("writable",entry.writable());field.addProperty("deletable",entry.deletable());optional(field,"note",entry.note());fields.add(key,field);
+        });node.add("fields",fields);return node;
+    }
+    public static TaskMetadata metadata(JsonElement value) {
+        if(value==null || value.isJsonNull())return TaskMetadata.empty();
+        var node=value.getAsJsonObject();var tags=StreamSupport.stream(node.getAsJsonArray("tags").spliterator(),false).map(JsonElement::getAsString).collect(Collectors.toUnmodifiableSet());
+        var categories=StreamSupport.stream(node.getAsJsonArray("categories").spliterator(),false).map(JsonElement::getAsString).collect(Collectors.toUnmodifiableSet());
+        var links=StreamSupport.stream(node.getAsJsonArray("links").spliterator(),false).map(item -> {
+            var entry=item.getAsJsonObject();return new TaskLink(id(entry.get("id")),TaskLinkKind.valueOf(entry.get("kind").getAsString()),entry.get("url").getAsString(),
+                    text(entry.get("title")),text(entry.get("providerId")),text(entry.get("remoteId")));
+        }).toList();return new TaskMetadata(tags,categories,links);
+    }
+    public static JsonObject metadata(TaskMetadata value) {
+        var node=object();var tags=new JsonArray();value.tags().stream().sorted().forEach(tags::add);node.add("tags",tags);
+        var categories=new JsonArray();value.categories().stream().sorted().forEach(categories::add);node.add("categories",categories);
+        var links=new JsonArray();value.links().forEach(link -> {
+            var entry=object();entry.addProperty("id",link.id().toString());entry.addProperty("kind",link.kind().name());entry.addProperty("url",link.url());
+            optional(entry,"title",link.title());optional(entry,"providerId",link.providerId());optional(entry,"remoteId",link.remoteId());links.add(entry);
+        });node.add("links",links);return node;
     }
     public static TaskImportance importance(JsonObject value) {
         return new TaskImportance(value.has("priority")?TaskPriority.valueOf(value.get("priority").getAsString()):TaskPriority.UNSPECIFIED,

@@ -11506,6 +11506,291 @@
           }
         ]
       }
+    },
+    "/tasks/{id}/reminders": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskReminders",
+        "summary": "Replace task reminder triggers",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRemindersInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of all typed reminder triggers. Scheduled and due dates are unchanged. Older task writes preserve reminders."
+      }
+    },
+    "/task-connections/{id}/capabilities": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskConnectionCapabilities",
+        "summary": "Replace connector field capabilities",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskConnection"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskCapabilities"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of the complete per-connection capability declaration. Legacy connection updates preserve it."
+      }
+    },
+    "/tasks/{id}/metadata": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskMetadata",
+        "summary": "Replace task tags, categories, and links",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskMetadata"
+              }
+            }
+          }
+        },
+        "description": "Conditional replacement of task metadata. Ordinary task updates preserve it. A provider source link does not become the editable primary URL."
+      }
     }
   },
   "components": {
@@ -12140,6 +12425,17 @@
           },
           "recurrence": {
             "$ref": "#/components/schemas/TaskRecurrence"
+          },
+          "reminders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskReminder"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/TaskMetadata"
           }
         },
         "required": [
@@ -12163,7 +12459,9 @@
           "body",
           "siblingOrder",
           "externalAliases",
-          "recurrence"
+          "recurrence",
+          "reminders",
+          "metadata"
         ],
         "additionalProperties": true
       },
@@ -12744,6 +13042,17 @@
           },
           "recurrence": {
             "$ref": "#/components/schemas/TaskRecurrence"
+          },
+          "reminders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskReminder"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/TaskMetadata"
           }
         },
         "required": [
@@ -13295,6 +13604,17 @@
           },
           "recurrence": {
             "$ref": "#/components/schemas/TaskRecurrence"
+          },
+          "reminders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskReminder"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/TaskMetadata"
           }
         },
         "required": [
@@ -20339,6 +20659,9 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/TaskCapabilities"
           }
         },
         "required": [
@@ -20412,6 +20735,9 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/TaskCapabilities"
           }
         },
         "required": [
@@ -20423,7 +20749,8 @@
           "name",
           "readable",
           "writable",
-          "enabled"
+          "enabled",
+          "capabilities"
         ],
         "additionalProperties": true
       },
@@ -20899,6 +21226,9 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/TaskCapabilities"
           }
         },
         "required": [
@@ -21279,6 +21609,359 @@
             "description": "Exact attachment bytes, at most 5,000,000 after decoding."
           }
         }
+      },
+      "TaskReminderAbsolute": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "const": "ABSOLUTE"
+          },
+          "at": {
+            "$ref": "#/components/schemas/TaskZonedDateTime"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "at"
+        ],
+        "additionalProperties": false
+      },
+      "TaskReminderRelative": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "const": "RELATIVE"
+          },
+          "anchor": {
+            "type": "string",
+            "enum": [
+              "START",
+              "DUE"
+            ]
+          },
+          "offsetMinutes": {
+            "type": "integer",
+            "minimum": -525600,
+            "maximum": 525600
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "anchor",
+          "offsetMinutes"
+        ],
+        "additionalProperties": false
+      },
+      "TaskReminderLocation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "const": "LOCATION"
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "radiusMeters": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 100000
+          },
+          "transition": {
+            "type": "string",
+            "enum": [
+              "ARRIVE",
+              "DEPART"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "latitude",
+          "longitude",
+          "radiusMeters",
+          "transition"
+        ],
+        "additionalProperties": false
+      },
+      "TaskReminderCar": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "const": "CAR"
+          },
+          "event": {
+            "type": "string",
+            "enum": [
+              "CONNECT",
+              "DISCONNECT"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "event"
+        ],
+        "additionalProperties": false
+      },
+      "TaskReminderMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "const": "MESSAGE"
+          },
+          "contactKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "contactKey"
+        ],
+        "additionalProperties": false
+      },
+      "TaskReminder": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TaskReminderAbsolute"
+          },
+          {
+            "$ref": "#/components/schemas/TaskReminderRelative"
+          },
+          {
+            "$ref": "#/components/schemas/TaskReminderLocation"
+          },
+          {
+            "$ref": "#/components/schemas/TaskReminderCar"
+          },
+          {
+            "$ref": "#/components/schemas/TaskReminderMessage"
+          }
+        ],
+        "description": "A typed alert trigger; location, car, and messaging triggers never imply a time."
+      },
+      "TaskRemindersInput": {
+        "type": "object",
+        "properties": {
+          "reminders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskReminder"
+            },
+            "maxItems": 100,
+            "default": []
+          }
+        },
+        "required": [
+          "reminders"
+        ],
+        "additionalProperties": false
+      },
+      "TaskFieldCapability": {
+        "type": "object",
+        "properties": {
+          "readable": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "boolean"
+          },
+          "deletable": {
+            "type": "boolean"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "readable",
+          "writable",
+          "deletable",
+          "note"
+        ],
+        "additionalProperties": false,
+        "description": "Effective capability for one field. Delete implies write and write implies read."
+      },
+      "TaskCapabilities": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "providerApiVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "fields": {
+            "type": "object",
+            "propertyNames": {
+              "pattern": "^[a-z][A-Za-z0-9.]{0,99}$"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TaskFieldCapability"
+            },
+            "maxProperties": 200
+          }
+        },
+        "required": [
+          "version",
+          "providerApiVersion",
+          "fields"
+        ],
+        "additionalProperties": false,
+        "description": "Versioned connector declaration for this account. Omitted field keys are unknown, not unsupported."
+      },
+      "TaskLink": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "LOCAL",
+              "PROVIDER_SOURCE",
+              "PROVIDER_LINKED"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^(https?://|mailto:)",
+            "description": "Only HTTP(S) and mailto URLs are accepted."
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "providerId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "remoteId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "url",
+          "title",
+          "providerId",
+          "remoteId"
+        ],
+        "additionalProperties": false,
+        "description": "Local link or provider-origin source/linked resource. Provider source links are not an editable primary task URL."
+      },
+      "TaskMetadata": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "\\S"
+            },
+            "uniqueItems": true,
+            "maxItems": 100
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "\\S"
+            },
+            "uniqueItems": true,
+            "maxItems": 100
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskLink"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "tags",
+          "categories",
+          "links"
+        ],
+        "additionalProperties": false,
+        "description": "Apple-style tags, Outlook categories, and linked resources remain distinct."
       }
     },
     "parameters": {

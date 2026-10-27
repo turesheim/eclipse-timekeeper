@@ -80,7 +80,7 @@ final class DomainTransfer {
             for(var existing:store.list("TASK_CONNECTION")) if(existing.get("providerId").asText().equals(item.get("providerId").asText())
                     && existing.get("remoteAccountId").asText().equals(item.get("remoteAccountId").asText())) throw ApiFailure.conflict();
             var created=new TaskConnection(UUID.randomUUID(),item.get("providerId").asText(),item.get("remoteAccountId").asText(),
-                    item.get("name").asText(),item.get("readable").asBoolean(),item.get("writable").asBoolean(),item.get("enabled").asBoolean(),0);
+                    item.get("name").asText(),item.get("readable").asBoolean(),item.get("writable").asBoolean(),item.get("enabled").asBoolean(),capabilities(item.get("capabilities")),0);
             store.save("TASK_CONNECTION",created);store.change("TASK_CONNECTION","CREATED",created.id().toString());
             connections.put(uuid(item.get("id")),created.id());mapping(mappings,"TASK_CONNECTION",item,created.id());
         }
@@ -144,7 +144,7 @@ final class DomainTransfer {
                 var created=service.createTask(new CreateTask(project,parentId,item.get("summary").asText(),optionalText(item.get("url")),remapReferences(item.get("externalReferences"),lists),
                         new TaskPlanning(optionalText(item.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),
                                 optionalText(item.get("scheduledDate")).map(java.time.LocalDate::parse),optionalText(item.get("completedAt")).map(java.time.Instant::parse)),
-                        checklist(item.get("checklistItems")),timing(item),importance(item),body(item),item.path("siblingOrder").asInt(0),aliases(item.get("externalAliases")),recurrence(item.get("recurrence"))));
+                        checklist(item.get("checklistItems")),timing(item),importance(item),body(item),item.path("siblingOrder").asInt(0),aliases(item.get("externalAliases")),recurrence(item.get("recurrence")),reminders(item.get("reminders")),metadata(item.get("metadata"))));
                 tasks.put(entry.getKey(),created.id());mapping(mappings,"TASK",item,created.id().value());iterator.remove();progressed=true;
             }
             if(!progressed) throw ApiFailure.validation();

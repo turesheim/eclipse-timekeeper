@@ -430,6 +430,11 @@ connection and optionally one list. Its mode is `INITIAL`, `INCREMENTAL`, or
 is not a task version and is intentionally excluded from account archives and
 portable domain transfers, which require a fresh provider scan after restore.
 
+`TASK_CONNECTION.capabilities` is a versioned, owner-scoped declaration of
+effective field read/write/delete support. Unlisted fields are unknown.
+Older records decode to an empty declaration; legacy connection updates keep
+the existing map. Credentials never belong in it.
+
 Each external reference may contain one namespaced, versioned provider-data
 envelope. Its JSON object preserves exposed provider fields that are not yet
 normalized. The envelope belongs to that reference, so links to other
@@ -445,6 +450,15 @@ Moved, completed, and skipped occurrences remain distinct from the series
 status. Legacy task updates preserve recurrence; older rows decode as a task
 without a series or occurrence exceptions. Account archives and portable
 transfers include it.
+`TASK.reminders` holds owner-scoped typed alert triggers with stable UUIDs.
+Absolute and relative time alerts, geofences, car events, and message contacts
+remain distinct from task scheduling and due dates. Older task writes preserve
+them, and archives and portable transfers include them.
+`TASK.metadata` stores Apple-style tags, Outlook categories, and typed links as
+separate collections. A provider source link is not the task's editable primary
+URL. Each link has a stable Timekeeper UUID; provider-origin links also record
+their provider and, where available, remote link ID. Legacy task writes retain
+the collections and transfers preserve them.
 The account ZIP archive also includes active day labels and Markdown bodies;
 deletion tombstones are not portable account records.
 Imports also accept v1/v2 snapshots, assign their projects and sessions to the

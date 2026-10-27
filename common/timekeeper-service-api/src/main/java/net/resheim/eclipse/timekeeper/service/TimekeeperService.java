@@ -39,6 +39,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateProject;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTask;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskConnection;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskConnectionCapabilities;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskList;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskSyncCursor;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskPlanning;
@@ -48,6 +49,8 @@ import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskImportance;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskBody;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskRecurrence;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskOccurrences;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskReminders;
+import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskMetadata;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateTaskOrder;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery;
 import net.resheim.eclipse.timekeeper.service.Queries.ActivityReport;
@@ -61,6 +64,7 @@ public interface TimekeeperService {
 	List<Project> projects();
 	default TaskConnection createTaskConnection(CreateTaskConnection command) { throw new UnsupportedOperationException("Task connections are not supported"); }
 	default TaskConnection updateTaskConnection(UpdateTaskConnection command) { throw new UnsupportedOperationException("Task connections are not supported"); }
+	default TaskConnection updateTaskConnectionCapabilities(UpdateTaskConnectionCapabilities command) { throw new UnsupportedOperationException("Task connection capabilities are not supported"); }
 	default void deleteTaskConnection(java.util.UUID id,long expectedVersion) { throw new UnsupportedOperationException("Task connections are not supported"); }
 	default Optional<TaskConnection> taskConnection(java.util.UUID id) { throw new UnsupportedOperationException("Task connections are not supported"); }
 	default List<TaskConnection> taskConnections() { throw new UnsupportedOperationException("Task connections are not supported"); }
@@ -84,6 +88,8 @@ public interface TimekeeperService {
 	default Task updateTaskBody(UpdateTaskBody command) { throw new UnsupportedOperationException("Task body is not supported"); }
 	default Task updateTaskRecurrence(UpdateTaskRecurrence command) { throw new UnsupportedOperationException("Task recurrence is not supported"); }
 	default Task updateTaskOccurrences(UpdateTaskOccurrences command) { throw new UnsupportedOperationException("Task occurrences are not supported"); }
+	default Task updateTaskReminders(UpdateTaskReminders command) { throw new UnsupportedOperationException("Task reminders are not supported"); }
+	default Task updateTaskMetadata(UpdateTaskMetadata command) { throw new UnsupportedOperationException("Task metadata is not supported"); }
 	default Task updateTaskOrder(UpdateTaskOrder command) { throw new UnsupportedOperationException("Task order is not supported"); }
 	void deleteTask(DeleteTask command);
 	Optional<Task> task(TaskId id);
