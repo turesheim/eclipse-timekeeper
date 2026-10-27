@@ -520,5 +520,5 @@ Empty deletion tombstones are not portable archive deletion commands.
 See [journal storage protection](../operations/JOURNAL-STORAGE.md) for the
 required deployment encryption, temporary/backup storage, key management and
 readable-server trust boundary. The database and private account archive remain
-authoritative; a future Markdown-folder synchronization feature cannot bypass
-these authorization and conditional-write rules.
+authoritative. The [WebDAV collection](../operations/JOURNAL-WEBDAV.md) uses
+the same owner, authorization and conditional-write rules.

@@ -56,7 +56,7 @@ def package(output, tag, commit):
               'docs/operations/ACCOUNTS.md': 'ACCOUNTS.md',
               'docs/operations/ACCOUNT-DATA.md': 'ACCOUNT-DATA.md',
               'docs/operations/TOGGL-IMPORT.md': 'TOGGL-IMPORT.md',
-              'docs/operations/JOURNAL-SYNC.md': 'JOURNAL-SYNC.md',
+              'docs/operations/JOURNAL-WEBDAV.md': 'JOURNAL-WEBDAV.md',
               'docs/operations/JOURNAL-STORAGE.md': 'JOURNAL-STORAGE.md',
               'docs/development/WEB-CLIENT.md': 'WEB-CLIENT.md'}
     illustrations = {

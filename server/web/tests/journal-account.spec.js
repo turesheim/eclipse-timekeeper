@@ -50,7 +50,7 @@ test('Journal shows WebDAV connection and links to API token management',async({
   }finally{await context.close();}
 });
 
-test('read-only accounts can view the connection without SSH controls',async({browser})=>{
+test('read-only accounts can view the WebDAV connection',async({browser})=>{
   const context=await browser.newContext({baseURL:base(),ignoreHTTPSErrors:true,locale:'en-GB'}),page=await context.newPage();
   try{
     await signIn(page,process.env.TIMEKEEPER_WEB_READ_TOKEN);

@@ -207,14 +207,13 @@ require reviewing current records before another submission. Sign-out or an
 account change clears the page, drafts, displayed token secrets and pending
 results. No shared workspace, membership or invitation model is introduced.
 
-## Journal devices
+## Journal WebDAV access
 
-**My account → Journal** manages one-way daily Markdown import, separate device
-public keys, rotation, revocation, health and incoming conflicts. Credential and
-settings changes require direct account sign-in, your current password and CSRF
-protection. API tokens and token-based browser sessions cannot manage devices.
-Private SSH keys stay on the local device. See the
-[operator and client guide](JOURNAL-SYNC.md) before enabling synchronization.
+**My account → Journal** shows the WebDAV collection URL and connection guidance.
+Create a personal API token with read and write permissions under **My account →
+API tokens** for each client. The token is the HTTP Basic password; revoke it
+there to end that client's access. See the [WebDAV guide](JOURNAL-WEBDAV.md)
+for guarded writes and tested client compatibility.
 
 ## Recovery email addresses
 
