@@ -174,6 +174,25 @@ class ContractTest(unittest.TestCase):
         self.assertFalse(validator('TaskOrderInput').is_valid({'siblingOrder':7,'unknown':True}))
         self.assertEqual('updateTaskOrder',CONTRACT['paths']['/tasks/{id}/order']['put']['operationId'])
 
+    def test_provider_data_is_versioned_and_explicitly_clearable(self):
+        envelope={'namespace':'google.tasks','version':1,'payload':{'future':{'nested':[1,True,None]}}}
+        validator('ExternalTaskProviderData').validate(envelope)
+        self.assertFalse(validator('ExternalTaskProviderData').is_valid({**envelope,'version':0}))
+        self.assertFalse(validator('ExternalTaskProviderData').is_valid({**envelope,'namespace':'Google Tasks'}))
+        command={'providerId':'google','repositoryId':'account/list','externalId':'item','providerData':envelope}
+        validator('ExternalTaskProviderDataInput').validate(command)
+        validator('ExternalTaskProviderDataInput').validate({**command,'providerData':None})
+        self.assertEqual('updateExternalTaskProviderData',CONTRACT['paths']['/tasks/{id}/external-references/provider-data']['put']['operationId'])
+
+    def test_sync_cursors_are_opaque_per_connection_or_list(self):
+        value={'connectionId':ID,'listId':None,'mode':'INITIAL','cursor':None,
+               'lastObservedAt':None,'lastCompleteAt':None}
+        validator('TaskSyncCursorCreateInput').validate(value)
+        validator('TaskSyncCursorCreateInput').validate({**value,'listId':ID,'mode':'INCREMENTAL','cursor':'opaque-state'})
+        self.assertFalse(validator('TaskSyncCursorCreateInput').is_valid({**value,'cursor':'x'*32769}))
+        self.assertFalse(validator('TaskSyncCursorCreateInput').is_valid({**value,'mode':'DELETE_ALL'}))
+        self.assertEqual('listTaskSyncCursors',CONTRACT['paths']['/task-sync-cursors']['get']['operationId'])
+
     def test_timestamp_precision_and_zone_boundary(self):
         for value in ['2026-03-29T00:00:00Z', '2026-03-29T00:00:00.123456789Z']:
             validator('Instant').validate(value)
@@ -300,7 +319,8 @@ class ContractTest(unittest.TestCase):
             'createProject', 'updateProject', 'deleteProject', 'getProject', 'listProjects',
             'createTaskConnection', 'updateTaskConnection', 'deleteTaskConnection', 'getTaskConnection', 'listTaskConnections',
             'createTaskList', 'updateTaskList', 'deleteTaskList', 'getTaskList', 'listTaskLists',
-            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskOrder', 'updateExternalTaskSource', 'deleteTask', 'getTask', 'listTasks',
+            'createTaskSyncCursor', 'updateTaskSyncCursor', 'deleteTaskSyncCursor', 'getTaskSyncCursor', 'listTaskSyncCursors',
+            'createTask', 'updateTask', 'updateTaskPlanning', 'updateTaskChecklist', 'updateTaskTiming', 'updateTaskImportance', 'updateTaskBody', 'updateTaskOrder', 'updateExternalTaskSource', 'updateExternalTaskProviderData', 'deleteTask', 'getTask', 'listTasks',
             'linkExternalReference', 'unlinkExternalReference', 'findTaskByExternalReference',
             'createLabel', 'updateLabel', 'deleteLabel', 'getLabel', 'listLabels',
             'createActivity', 'updateActivity', 'deleteActivity', 'getActivity', 'listActivities',

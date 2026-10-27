@@ -174,6 +174,18 @@ resource; a conflicting representation of the same remote identity returns
 409. Updates require `If-Match`. Mark a missing list `present=false` or a
 disconnected account `enabled=false`; remote disappearance must not trigger
 deletion of local tasks.
+
+`/task-sync-cursors` holds durable, owner-scoped connector progress separately
+from task payloads. A connection-level cursor tracks list discovery; a
+list-level cursor tracks tasks in that owned list. `INITIAL` has no cursor,
+`INCREMENTAL` has an opaque provider cursor or delta URL, and
+`RESCAN_REQUIRED` deliberately clears it. Creates are idempotent for an
+identical connection/list state; updates and deletes require `If-Match`.
+Disabling a connection or marking a list absent retains cursor state and
+tasks. Cursors are excluded from portable transfers and account archives:
+after restoration, a connector must perform a full scan before interpreting
+remote absence as deletion. The opaque cursor is never a Timekeeper version.
+
 An external task reference can carry `taskListId` to point at an owned provider
 list. The list's connection must use the same provider. The existing
 `repositoryId` remains the provider identity namespace and must distinguish
@@ -181,6 +193,18 @@ accounts and lists when remote item IDs are only unique within a list. A legacy
 link update that omits `taskListId` preserves the association. Portable import
 remaps list IDs with the rest of the owned graph; deleting a referenced list is
 rejected. The Timekeeper project remains independent of this association.
+
+An external reference can also hold an optional `providerData` envelope with
+`namespace`, positive schema `version`, and an opaque JSON object `payload`.
+The namespace is the provider ID or a dot-prefixed extension of it. The server
+retains unknown payload fields through reads, unrelated and legacy writes,
+portable transfers, and account archives. `PUT
+/tasks/{id}/external-references/provider-data` conditionally replaces the
+whole envelope for one linked identity; explicit `null` clears it. Connectors
+must store only fields they can actually read, must keep their own OAuth or
+Apple authorization material outside task data, and must not write an
+approximation of an unsupported field to another provider.
+
 Tasks have a nonnegative `siblingOrder` for local ordering among tasks with
 the same parent. `PUT /tasks/{id}/order` changes only this value with `If-Match`;
 legacy task and other section writes preserve it. Provider ordering tokens can

@@ -307,6 +307,10 @@ public class ServerStore {
             });
         }
         if (value instanceof TaskList list) relation(type,id,"connection","TASK_CONNECTION",list.connectionId());
+        if (value instanceof TaskSyncCursor cursor) {
+            relation(type,id,"connection","TASK_CONNECTION",cursor.connectionId());
+            cursor.listId().ifPresent(list -> relation(type,id,"list","TASK_LIST",list));
+        }
         if (value instanceof Activity activity) {
             activity.task().ifPresent(task -> relation(type,id,"task","TASK",task.value()));
             activity.projectId().ifPresent(project -> relation(type,id,"project","PROJECT",project.value()));

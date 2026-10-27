@@ -62,6 +62,11 @@ public final class JsonValues {
             node.put("kind",list.kind().name());node.put("readable",list.readable());node.put("writable",list.writable());
             node.put("shared",list.shared());node.put("owner",list.owner());node.put("present",list.present());node.put("position",list.position());return node;
         }
+        if (value instanceof TaskSyncCursor cursor) {
+            var node=base(owner,cursor.id(),cursor.version());node.put("connectionId",cursor.connectionId().toString());
+            nullable(node,"listId",cursor.listId());node.put("mode",cursor.mode().name());nullable(node,"cursor",cursor.cursor());
+            nullable(node,"lastObservedAt",cursor.lastObservedAt());nullable(node,"lastCompleteAt",cursor.lastCompleteAt());return node;
+        }
         if (value instanceof Project project) { var node = base(owner, project.id().value(), project.version()); node.put("name", project.name()); return node; }
         if (value instanceof Label label) { var node = base(owner, label.id().value(), label.version()); node.put("name", label.name()); nullable(node,"color",label.color()); return node; }
         if (value instanceof Task task) {
@@ -82,6 +87,10 @@ public final class JsonValues {
             task.externalReferences().stream().sorted(Comparator.comparing(ExternalTaskReference::providerId).thenComparing(ExternalTaskReference::repositoryId).thenComparing(ExternalTaskReference::externalId)).forEach(reference -> {
                 var ref = object(); ref.put("providerId",reference.providerId()); ref.put("repositoryId",reference.repositoryId()); ref.put("externalId",reference.externalId()); nullable(ref,"externalUrl",reference.externalUrl());
                 reference.taskListId().ifPresent(list -> ref.put("taskListId",list.toString()));
+                reference.providerData().ifPresent(data -> {
+                    var envelope=ref.putObject("providerData");envelope.put("namespace",data.namespace());envelope.put("version",data.version());
+                    envelope.set("payload",parse(data.json()));
+                });
                 var source=ref.putObject("source");nullable(source,"createdAt",reference.source().createdAt());nullable(source,"modifiedAt",reference.source().modifiedAt());
                 nullable(source,"remoteEtag",reference.source().remoteEtag());nullable(source,"remoteRevision",reference.source().remoteRevision());refs.add(ref);
             }); return node;
@@ -108,6 +117,9 @@ public final class JsonValues {
             case "TASK_LIST" -> new TaskList(id,uuid(node.get("connectionId")),node.get("remoteListId").asText(),node.get("name").asText(),
                     TaskListKind.valueOf(node.get("kind").asText()),node.get("readable").asBoolean(),node.get("writable").asBoolean(),
                     node.get("shared").asBoolean(),node.get("owner").asBoolean(),node.get("present").asBoolean(),node.get("position").asInt(),version);
+            case "TASK_SYNC_CURSOR" -> new TaskSyncCursor(id,uuid(node.get("connectionId")),optionalText(node.get("listId")).map(UUID::fromString),
+                    TaskSyncMode.valueOf(node.get("mode").asText()),optionalText(node.get("cursor")),
+                    optionalText(node.get("lastObservedAt")).map(Instant::parse),optionalText(node.get("lastCompleteAt")).map(Instant::parse),version);
             case "PROJECT" -> new Project(new ProjectId(id), node.get("name").asText(), version);
             case "LABEL" -> new Label(new LabelId(id), node.get("name").asText(), optionalText(node.get("color")), version);
             case "TASK" -> new Task(new TaskId(id), optionalText(node.get("projectId")).map(UUID::fromString).map(ProjectId::new),
@@ -122,7 +134,23 @@ public final class JsonValues {
         };
     }
     public static ExternalTaskReference reference(JsonNode node) {
-        return new ExternalTaskReference(node.get("providerId").asText(),node.get("repositoryId").asText(),node.get("externalId").asText(),optionalText(node.get("externalUrl")),source(node.get("source")),optionalText(node.get("taskListId")).map(UUID::fromString));
+        return new ExternalTaskReference(node.get("providerId").asText(),node.get("repositoryId").asText(),node.get("externalId").asText(),optionalText(node.get("externalUrl")),source(node.get("source")),optionalText(node.get("taskListId")).map(UUID::fromString),
+                Optional.ofNullable(node.get("providerData")).filter(value -> !value.isNull()).map(JsonValues::providerData));
+    }
+    public static ExternalTaskProviderData providerData(JsonNode value) {
+        if(value==null || !value.isObject() || !value.path("payload").isObject()) throw ApiFailure.validation();
+        rejectCredentials(value.get("payload"));
+        String json=value.get("payload").toString();if(json.length()>65536) throw ApiFailure.validation();
+        return new ExternalTaskProviderData(value.get("namespace").asText(),value.get("version").asInt(),json);
+    }
+    private static void rejectCredentials(JsonNode value) {
+        if(value.isObject()) value.fields().forEachRemaining(entry -> {
+            String field=entry.getKey().replaceAll("[^A-Za-z]","").toLowerCase(java.util.Locale.ROOT);
+            if(Set.of("token","accesstoken","refreshtoken","authtoken","oauthtoken","bearertoken",
+                    "clientsecret","privatekey","password","apikey","authorization").contains(field)) throw ApiFailure.validation();
+            rejectCredentials(entry.getValue());
+        });
+        else if(value.isArray()) value.forEach(JsonValues::rejectCredentials);
     }
     public static ExternalTaskSource source(JsonNode value) {
         if(value==null || value.isNull())return ExternalTaskSource.empty();
