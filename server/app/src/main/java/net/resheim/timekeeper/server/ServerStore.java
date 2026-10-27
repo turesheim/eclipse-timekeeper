@@ -9,8 +9,10 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -295,6 +297,8 @@ public class ServerStore {
         if (value instanceof Task task) {
             task.projectId().ifPresent(project -> relation(type,id,"project","PROJECT",project.value()));
             task.parentTaskId().ifPresent(parent -> relation(type,id,"parent","TASK",parent.value()));
+            Set<UUID> lists=new HashSet<>();task.externalReferences().forEach(reference -> reference.taskListId().ifPresent(lists::add));
+            lists.forEach(list -> relation(type,id,"list","TASK_LIST",list));
             update("DELETE FROM tk_external_reference WHERE owner_id=? AND entity_type='TASK' AND task_id=?",owner(),id);
             task.externalReferences().forEach(reference -> {
                 if (postgres()) update("INSERT INTO tk_external_reference(owner_id,provider_id,repository_id,external_id,entity_type,task_id,reference_key) VALUES(?,?,?,?,'TASK',?,?)",

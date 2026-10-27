@@ -174,6 +174,17 @@ resource; a conflicting representation of the same remote identity returns
 409. Updates require `If-Match`. Mark a missing list `present=false` or a
 disconnected account `enabled=false`; remote disappearance must not trigger
 deletion of local tasks.
+An external task reference can carry `taskListId` to point at an owned provider
+list. The list's connection must use the same provider. The existing
+`repositoryId` remains the provider identity namespace and must distinguish
+accounts and lists when remote item IDs are only unique within a list. A legacy
+link update that omits `taskListId` preserves the association. Portable import
+remaps list IDs with the rest of the owned graph; deleting a referenced list is
+rejected. The Timekeeper project remains independent of this association.
+Tasks have a nonnegative `siblingOrder` for local ordering among tasks with
+the same parent. `PUT /tasks/{id}/order` changes only this value with `If-Match`;
+legacy task and other section writes preserve it. Provider ordering tokens can
+remain opaque in provider source state and are not inferred from this number.
 
 An interval end must be at or after its start. A manual interval may be open,
 but each owner has at most one open interval across all tasks and clients.
@@ -215,6 +226,10 @@ either file remain readable; an export with only one provider file is invalid. v
 `workSessions.csv`. Every declared file must be present. Older CSV clients
 reject the new format instead of silently discarding independent sessions or
 client metadata.
+Portable task CSV adds a `taskExtras` JSON object column when tasks contain
+planning, timing, importance, notes, or sibling order. This preserves optional
+fields, including absent fields in mixed older and newer rows. Its descriptor
+marks the column as required, so an incomplete export is rejected.
 Export reads a consistent owned snapshot. Import validates the entire graph,
 then generates fresh UUIDs and rewrites references in one transaction; it never
 updates existing records. Source IDs are correlation keys only. A failure leaves

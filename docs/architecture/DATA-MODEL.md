@@ -414,6 +414,14 @@ retains the records and associated tasks. Explicit deletion is conditional and
 rejects a connection with lists or a list with linked tasks. Account archives
 and portable transfers include these records; older archives import without
 them.
+An external task reference may include the stable Timekeeper `taskListId`.
+Task-to-list relations protect referenced lists from deletion, while portable
+imports remap the list ID. The reference's provider must match the list's
+connection provider. `repositoryId` remains the remote identity namespace;
+connectors must include the account/list scope when remote task IDs can repeat.
+`TASK.siblingOrder` is a nonnegative local position among tasks under the same
+parent. It defaults to zero for older rows, is independent of a provider list's
+position, and survives updates from clients that do not know this field.
 The account ZIP archive also includes active day labels and Markdown bodies;
 journal synchronization state and deletion tombstones are not portable account
 records.

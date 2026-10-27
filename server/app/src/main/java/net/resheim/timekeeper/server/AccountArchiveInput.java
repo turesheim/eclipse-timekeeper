@@ -89,6 +89,8 @@ final class AccountArchiveInput {
             long count=0;for(var record:work.path(link[1])) {var value=record.path(link[2]);count+=value.isArray() ? value.size():value.isTextual() ? 1:0;}
             result.put(link[0],count);
         }
+        long taskLists=0;for(var task:work.path("tasks")) for(var reference:task.path("externalReferences")) if(reference.path("taskListId").isTextual()) taskLists++;
+        result.put("externalReferenceLists",taskLists);
         return result;
     }
     private static Set<String> names(JsonNode value) {var result=new HashSet<String>();value.fieldNames().forEachRemaining(result::add);return result;}

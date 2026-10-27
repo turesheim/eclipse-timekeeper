@@ -10391,6 +10391,101 @@
         "description": "Conditional replacement of task notes only. Legacy task and other section updates preserve the body. HTML is untrusted source markup; clients must sanitize before rendering."
       }
     },
+    "/tasks/{id}/order": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "put": {
+        "operationId": "updateTaskOrder",
+        "summary": "Replace task sibling order",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "Successful operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\"$"
+                },
+                "description": "Strong opaque tag for this canonical resource representation; echo it in If-Match. Do not construct it from the JSON version."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskOrderInput"
+              }
+            }
+          }
+        },
+        "description": "Conditional update of a task position among its siblings. Legacy task and section updates preserve the order."
+      }
+    },
     "/tasks/{id}/external-references/source": {
       "parameters": [
         {
@@ -11362,6 +11457,10 @@
               }
             ]
           },
+          "taskListId": {
+            "$ref": "#/components/schemas/Id",
+            "description": "Optional owner-scoped provider list association. Omission on an existing link preserves its list."
+          },
           "source": {
             "$ref": "#/components/schemas/ExternalTaskSource",
             "description": "Optional when linking. Omission preserves existing source state for the same identity."
@@ -11871,6 +11970,12 @@
           "urgent": {
             "type": "boolean"
           },
+          "siblingOrder": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Position among sibling tasks. This is independent of provider list order."
+          },
           "body": {
             "$ref": "#/components/schemas/TaskBodyInput"
           }
@@ -11893,7 +11998,8 @@
           "priority",
           "flagged",
           "urgent",
-          "body"
+          "body",
+          "siblingOrder"
         ],
         "additionalProperties": true
       },
@@ -12453,6 +12559,12 @@
           "urgent": {
             "type": "boolean"
           },
+          "siblingOrder": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Position among sibling tasks. This is independent of provider list order."
+          },
           "body": {
             "$ref": "#/components/schemas/TaskBodyInput",
             "description": "Optional for older portable archives; absence imports as empty text."
@@ -12861,6 +12973,9 @@
               }
             ]
           },
+          "taskListId": {
+            "$ref": "#/components/schemas/Id"
+          },
           "source": {
             "$ref": "#/components/schemas/ExternalTaskSource"
           }
@@ -12979,6 +13094,12 @@
           },
           "urgent": {
             "type": "boolean"
+          },
+          "siblingOrder": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Position among sibling tasks. This is independent of provider list order."
           },
           "body": {
             "$ref": "#/components/schemas/TaskBodyInput"
@@ -16652,6 +16773,10 @@
             "minimum": 0
           },
           "listConnections": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "externalReferenceLists": {
             "type": "integer",
             "minimum": 0
           }
@@ -21012,6 +21137,21 @@
           "owner",
           "present",
           "position"
+        ],
+        "additionalProperties": false
+      },
+      "TaskOrderInput": {
+        "type": "object",
+        "properties": {
+          "siblingOrder": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Position among sibling tasks. This is independent of provider list order."
+          }
+        },
+        "required": [
+          "siblingOrder"
         ],
         "additionalProperties": false
       }

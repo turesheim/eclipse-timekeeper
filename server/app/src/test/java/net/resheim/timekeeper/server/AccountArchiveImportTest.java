@@ -173,7 +173,8 @@ class AccountArchiveImportTest {
         assertTrue(review.body().path("canImport").asBoolean());inputs.validate("AccountArchiveReview",review.body());
         assertEquals(object().put("projectClients",1L).put("taskProjects",2L).put("parentTasks",1L)
                 .put("activityTasks",1L).put("activityProjects",1L).put("activityLabels",1L)
-                .put("workSessionClients",1L).put("workSessionProjects",1L).put("workSessionLabels",1L).put("listConnections",0L),review.body().path("relationships"));
+                .put("workSessionClients",1L).put("workSessionProjects",1L).put("workSessionLabels",1L).put("listConnections",0L)
+                .put("externalReferenceLists",0L),review.body().path("relationships"));
         assertEquals(before,work());
         store.transaction("b",()->importer().apply(id,false,review.etag()));
         store.transaction("b",()->{
