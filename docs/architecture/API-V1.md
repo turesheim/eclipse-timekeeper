@@ -163,6 +163,15 @@ Explicit null clears a value. Older link calls omit `source` and preserve state
 for an existing identity. The remote ETag is independent of the Timekeeper
 `If-Match` value.
 
+`PUT /tasks/{id}/external-references/replace` atomically changes one current
+provider identity using `previous` (provider, repository, external ID) and a
+complete `current` reference. Both identities must belong to the same provider.
+The old key becomes an `externalAliases` lookup key, so a provider rescan that
+changes a remote ID can still resolve the same Timekeeper task. Alias keys are
+unique per owner and survive ordinary task edits, archive, and portable transfer.
+The new link inherits source, list association, and provider data when omitted.
+Ordinary unlink forgets its current identity and does not create an alias.
+
 Provider accounts and lists have owner-scoped `/task-connections` and
 `/task-lists` collections. A connection holds a provider and remote account
 identity, display name, access flags, and enabled state; no OAuth or Apple

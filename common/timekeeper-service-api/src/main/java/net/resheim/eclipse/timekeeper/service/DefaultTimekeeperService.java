@@ -40,6 +40,7 @@ import net.resheim.eclipse.timekeeper.service.Commands.DeleteLabel;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteProject;
 import net.resheim.eclipse.timekeeper.service.Commands.DeleteTask;
 import net.resheim.eclipse.timekeeper.service.Commands.LinkExternalReference;
+import net.resheim.eclipse.timekeeper.service.Commands.ReplaceExternalReference;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskSource;
 import net.resheim.eclipse.timekeeper.service.Commands.UpdateExternalTaskProviderData;
 import net.resheim.eclipse.timekeeper.service.Commands.StartActivity;
@@ -133,9 +134,13 @@ public class DefaultTimekeeperService implements TimekeeperService {
 					throw conflict("externalReference", "external reference is linked to another task");
 				}
 			}
+			for (ExternalTaskReferenceKey alias : command.externalAliases()) {
+				if (ports.tasks().findByExternalReference(alias).isPresent())
+					throw conflict("externalAlias", "alias is linked to another task");
+			}
 			Task created = ports.tasks().save(new Task(ports.identifiers().newTaskId(), command.projectId(),
 					command.parentTaskId(),
-					command.summary(), command.url(), command.externalReferences(), command.planning(), command.checklist(), command.timing(), command.importance(), command.body(), command.siblingOrder(), 0));
+					command.summary(), command.url(), command.externalReferences(), command.externalAliases(), command.planning(), command.checklist(), command.timing(), command.importance(), command.body(), command.siblingOrder(), 0));
 			publish(TASK, CREATED, created.id().value().toString());
 			return created;
 		});
@@ -289,6 +294,22 @@ public class DefaultTimekeeperService implements TimekeeperService {
 				}
 			});
 			Task updated = ports.tasks().save(current.link(reference));
+			publish(TASK, UPDATED, updated.id().value().toString());
+			return updated;
+		});
+	}
+
+	@Override
+	public Task replaceExternalReference(ReplaceExternalReference command) {
+		return tx(() -> {
+			required(command, "command");
+			Task current = requiredTask(command.taskId());
+			version(current.version(), command.expectedVersion(), "task");
+			ExternalTaskReference reference = required(command.current(), "currentReference");
+			ports.tasks().findByExternalReference(reference.key()).ifPresent(linked -> {
+				if (!linked.id().equals(current.id())) throw conflict("externalReference", "replacement identity is linked to another task");
+			});
+			Task updated = ports.tasks().save(current.replaceExternalReference(required(command.previous(), "previousReference"),reference));
 			publish(TASK, UPDATED, updated.id().value().toString());
 			return updated;
 		});

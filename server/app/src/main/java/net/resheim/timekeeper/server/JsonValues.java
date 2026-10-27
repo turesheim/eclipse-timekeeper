@@ -93,7 +93,11 @@ public final class JsonValues {
                 });
                 var source=ref.putObject("source");nullable(source,"createdAt",reference.source().createdAt());nullable(source,"modifiedAt",reference.source().modifiedAt());
                 nullable(source,"remoteEtag",reference.source().remoteEtag());nullable(source,"remoteRevision",reference.source().remoteRevision());refs.add(ref);
-            }); return node;
+            });
+            ArrayNode aliases=node.putArray("externalAliases");
+            task.externalAliases().stream().sorted(Comparator.comparing(ExternalTaskReferenceKey::providerId).thenComparing(ExternalTaskReferenceKey::repositoryId).thenComparing(ExternalTaskReferenceKey::externalId)).forEach(key -> {
+                var alias=object();alias.put("providerId",key.providerId());alias.put("repositoryId",key.repositoryId());alias.put("externalId",key.externalId());aliases.add(alias);
+            });return node;
         }
         if (value instanceof WorkSession session) {
             if (!owner.equals(session.ownerId().value())) throw new IllegalStateException("Work session owner mismatch");
@@ -123,7 +127,7 @@ public final class JsonValues {
             case "PROJECT" -> new Project(new ProjectId(id), node.get("name").asText(), version);
             case "LABEL" -> new Label(new LabelId(id), node.get("name").asText(), optionalText(node.get("color")), version);
             case "TASK" -> new Task(new TaskId(id), optionalText(node.get("projectId")).map(UUID::fromString).map(ProjectId::new),
-                    optionalText(node.get("parentTaskId")).map(UUID::fromString).map(TaskId::new), node.get("summary").asText(), optionalText(node.get("url")), references(node.get("externalReferences")),
+                    optionalText(node.get("parentTaskId")).map(UUID::fromString).map(TaskId::new), node.get("summary").asText(), optionalText(node.get("url")), references(node.get("externalReferences")),aliases(node.get("externalAliases")),
                     new TaskPlanning(optionalText(node.get("status")).map(TaskStatus::valueOf).orElse(TaskStatus.NOT_STARTED),optionalText(node.get("scheduledDate")).map(java.time.LocalDate::parse),optionalText(node.get("completedAt")).map(Instant::parse)),
                     checklist(node.get("checklistItems")),timing(node),importance(node),body(node),node.path("siblingOrder").asInt(0),version);
             case "ACTIVITY" -> new Activity(new ActivityId(id), optionalText(node.get("taskId")).map(UUID::fromString).map(TaskId::new).orElse(null), new OwnerId(node.get("ownerId").asText()),
@@ -160,6 +164,13 @@ public final class JsonValues {
     public static Set<ExternalTaskReference> references(JsonNode values) {
         if (values == null) return Set.of();
         return java.util.stream.StreamSupport.stream(values.spliterator(),false).map(JsonValues::reference).collect(Collectors.toUnmodifiableSet());
+    }
+    public static ExternalTaskReferenceKey alias(JsonNode value) {
+        return new ExternalTaskReferenceKey(value.get("providerId").asText(),value.get("repositoryId").asText(),value.get("externalId").asText());
+    }
+    public static Set<ExternalTaskReferenceKey> aliases(JsonNode values) {
+        if(values==null || values.isNull())return Set.of();
+        return java.util.stream.StreamSupport.stream(values.spliterator(),false).map(JsonValues::alias).collect(Collectors.toUnmodifiableSet());
     }
     public static Set<LabelId> labels(JsonNode values) {
         return java.util.stream.StreamSupport.stream(values.spliterator(),false).map(JsonValues::uuid).map(LabelId::new).collect(Collectors.toUnmodifiableSet());

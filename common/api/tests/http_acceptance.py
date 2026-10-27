@@ -673,6 +673,45 @@ class HttpAcceptance(unittest.TestCase):
                                     headers={'If-Match':headers['ETag']})
         self.assertEqual(cleared,cleared_result['externalReferences'][0]['source'])
 
+    def test_remote_identity_replacement_preserves_lookup_and_transfer(self):
+        path='/tasks/'+self.task['id']
+        old={'providerId':'microsoft','repositoryId':self.prefix+'/list-a','externalId':'old'}
+        new={'providerId':'microsoft','repositoryId':self.prefix+'/list-b','externalId':'new','externalUrl':None}
+        other={'providerId':'microsoft','repositoryId':self.prefix+'/list-c','externalId':'taken','externalUrl':None}
+        source={'createdAt':'2026-10-01T10:00:00Z','modifiedAt':'2026-10-26T10:00:00Z','remoteEtag':'"old"','remoteRevision':None}
+        original, headers=self.call('GET',path)
+        linked, headers=self.call('PUT',path+'/external-references',body={**old,'externalUrl':None,'source':source},headers={'If-Match':headers['ETag']})
+        other_task=self.create('tasks',{'summary':self.prefix+' other','projectId':None,'parentTaskId':None,'url':None,'externalReferences':[other]})
+        request={'previous':old,'current':new}
+        self.call('PUT',path+'/external-references/replace',body=request,owner='read',headers={'If-Match':headers['ETag']},status=403,code='FORBIDDEN')
+        self.call('PUT',path+'/external-references/replace',body=request,headers={'If-Match':'"wrong"'},status=412,code='STALE_VERSION')
+        self.call('PUT',path+'/external-references/replace',body={'previous':old,'current':other},headers={'If-Match':headers['ETag']},status=409,code='CONFLICT')
+        changed, headers=self.call('PUT',path+'/external-references/replace',body=request,headers={'If-Match':headers['ETag']})
+        self.assertEqual([old],changed['externalAliases'])
+        self.assertEqual(new['externalId'],changed['externalReferences'][0]['externalId'])
+        self.assertEqual(source,changed['externalReferences'][0]['source'])
+        for identity in (old,new):
+            found,_=self.call('GET','/tasks/by-external-reference?'+urlencode({key:identity[key] for key in old}))
+            self.assertEqual(self.task['id'],found['id'])
+        legacy={'projectId':changed['projectId'],'parentTaskId':changed['parentTaskId'],'summary':self.prefix+' renamed','url':None}
+        changed,headers=self.call('PUT',path,body=legacy,headers={'If-Match':headers['ETag']})
+        self.assertEqual([old],changed['externalAliases'])
+        exported,_=self.call('GET','/data/export')
+        imported,_=self.call('POST','/data/import',owner='b',body=exported,headers=self.key(),status=201)
+        resources={'CLIENT':'clients','PROJECT':'projects','TASK':'tasks','LABEL':'labels','ACTIVITY':'activities','WORK_SESSION':'work-sessions'}
+        for item in imported['ids']:
+            self.created.append(('b',resources[item['entityType']],item['id']))
+            if item['entityType']=='TASK' and item['sourceId']==self.task['id']:
+                restored,_=self.call('GET','/tasks/'+item['id'],owner='b')
+                self.assertEqual([old],restored['externalAliases'])
+                for identity in (old,new):
+                    found,_=self.call('GET','/tasks/by-external-reference?'+urlencode({key:identity[key] for key in old}),owner='b')
+                    self.assertEqual(item['id'],found['id'])
+        unlinked,_=self.call('DELETE',path+'/external-references?'+urlencode({key:new[key] for key in old}),headers={'If-Match':headers['ETag']})
+        self.assertEqual([old],unlinked['externalAliases'])
+        self.call('GET','/tasks/by-external-reference?'+urlencode({key:new[key] for key in old}),status=404,code='NOT_FOUND')
+        self.assertEqual(other_task['id'],self.call('GET','/tasks/by-external-reference?'+urlencode({key:other[key] for key in old}))[0]['id'])
+
     def test_provider_accounts_and_lists_are_owned_idempotent_and_portable(self):
         account={'providerId':'microsoft','remoteAccountId':str(uuid4()),'name':'Personal',
                  'readable':True,'writable':True,'enabled':True}

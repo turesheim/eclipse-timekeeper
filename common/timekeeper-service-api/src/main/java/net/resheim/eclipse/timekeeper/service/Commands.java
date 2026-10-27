@@ -45,17 +45,24 @@ public final class Commands {
 			Optional<String> cursor, Optional<Instant> lastObservedAt, Optional<Instant> lastCompleteAt) { }
 
 	public record CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
-			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder) {
+			Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning, TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder, Set<ExternalTaskReferenceKey> externalAliases) {
 		public CreateTask {
 			projectId = optional(projectId);
 			parentTaskId = optional(parentTaskId);
 			url = optional(url);
 			externalReferences = copy(externalReferences);
+			externalAliases = copy(externalAliases);
 			planning = planning == null ? TaskPlanning.unplanned() : planning;
 			checklist = checklist == null ? TaskChecklist.empty() : checklist;
 			timing = timing == null ? TaskTiming.empty() : timing;
 			importance = importance == null ? TaskImportance.ordinary() : importance;
 			body = body == null ? TaskBody.empty() : body;
+		}
+
+		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
+				Optional<String> url, Set<ExternalTaskReference> externalReferences, TaskPlanning planning,
+				TaskChecklist checklist, TaskTiming timing, TaskImportance importance, TaskBody body, int siblingOrder) {
+			this(projectId, parentTaskId, summary, url, externalReferences, planning, checklist, timing, importance, body, siblingOrder, Set.of());
 		}
 
 		public CreateTask(Optional<ProjectId> projectId, Optional<TaskId> parentTaskId, String summary,
@@ -122,6 +129,7 @@ public final class Commands {
 	public record UpdateTaskBody(TaskId id, long expectedVersion, TaskBody body) { }
 	public record UpdateTaskOrder(TaskId id, long expectedVersion, int siblingOrder) { }
 	public record LinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReference reference) { }
+	public record ReplaceExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey previous, ExternalTaskReference current) { }
 	public record UpdateExternalTaskSource(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference, ExternalTaskSource source) { }
 	public record UpdateExternalTaskProviderData(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference, Optional<ExternalTaskProviderData> data) { }
 	public record UnlinkExternalReference(TaskId taskId, long expectedVersion, ExternalTaskReferenceKey reference) { }

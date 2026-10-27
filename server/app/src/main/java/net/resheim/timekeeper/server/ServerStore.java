@@ -307,6 +307,13 @@ public class ServerStore {
                 else update("INSERT INTO tk_external_reference(owner_id,provider_id,repository_id,external_id,entity_type,task_id) VALUES(?,?,?,?,'TASK',?)",
                         owner(),reference.providerId(),reference.repositoryId(),reference.externalId(),id);
             });
+            task.externalAliases().forEach(alias -> {
+                if (postgres()) update("INSERT INTO tk_external_reference(owner_id,provider_id,repository_id,external_id,entity_type,task_id,reference_key) VALUES(?,?,?,?,'TASK',?,?)",
+                        owner(),alias.providerId(),alias.repositoryId(),alias.externalId(),id,
+                        referenceKey(alias.providerId(),alias.repositoryId(),alias.externalId()));
+                else update("INSERT INTO tk_external_reference(owner_id,provider_id,repository_id,external_id,entity_type,task_id) VALUES(?,?,?,?,'TASK',?)",
+                        owner(),alias.providerId(),alias.repositoryId(),alias.externalId(),id);
+            });
         }
         if (value instanceof TaskList list) relation(type,id,"connection","TASK_CONNECTION",list.connectionId());
         if (value instanceof TaskSyncCursor cursor) {
