@@ -32,7 +32,9 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(page.locator('[data-tab=today]')).toHaveAttribute('aria-current','page');await expect(page.locator('#today-panel')).toBeVisible();
     await page.locator('#today-date').fill(date);await expect(page.locator('#today-note-editor')).toBeVisible();
     await expect(page.locator('#today-title')).toContainText('Saturday');await expect(page.locator('#today-title')).toContainText('2025');
-    await expect(page.locator('#today-zone')).toHaveText('Europe/Oslo');
+    await expect(page.locator('#today-zone')).toHaveCount(0);
+    expect((await page.locator('.today-date-field').boundingBox()).width).toBeLessThan(180);
+    expect(await page.locator('.today-toolbar').evaluate(toolbar=>{const heading=toolbar.querySelector('.track-heading').getBoundingClientRect(),controls=toolbar.querySelector('.track-controls').getBoundingClientRect();return Math.abs(heading.y+heading.height/2-controls.y-controls.height/2);})).toBeLessThan(2);
     await expect(page.locator('#today-note-title')).toHaveClass(/visually-hidden/);
     await expect(page.locator('#today-date-choose')).toHaveAccessibleName('Choose date');
     await expect(page.locator('#today-previous')).toHaveAccessibleName('Previous day');
