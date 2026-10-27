@@ -20,7 +20,7 @@ export class TrackDayNotes {
     this.savedStatus=node('p','','hint');this.savedStatus.setAttribute('role','status');
     const markdown=node('div');this.markdown=new MarkdownField(markdown,()=>this.changed(),()=>this.controls(),this.prefix==='track'?'journal':this.prefix+'-journal');
     this.reload=button(t('journal.reload'),'btn btn-outline-secondary');this.reload.addEventListener('click',()=>void this.reloadEditor());
-    const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.savedStatus,this.cancel,this.save);
+    const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.delete=button(t('journal.delete_note'),'btn btn-outline-secondary');this.delete.addEventListener('click',()=>void this.deleteNote());this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.savedStatus,this.cancel,this.delete,this.save);
     this.recovery=node('div',undefined,'journal-recovery');this.recovery.append(this.reload);
     this.content=node('div',undefined,'journal-content');this.content.append(this.title,label,this.text,this.error,markdown,this.recovery);this.form.append(this.content,actions);this.dialog.append(this.form);root.append(this.dialog);
     this.text.addEventListener('input',()=>this.changed());
@@ -117,6 +117,7 @@ export class TrackDayNotes {
     const readOnly=editor.loading||editor.busy||editor.uncertain||!editor.etag||!this.writable;
     if(this.markdown&&this.markdown.readOnly!==readOnly)this.markdown.setReadOnly(readOnly);
     this.save.disabled=editor.loading||editor.failedRead||editor.busy||this.markdown?.loading||editor.uncertain||editor.stale||!editor.etag||!this.writable;
+    this.delete.disabled=editor.loading||editor.failedRead||editor.busy||this.markdown?.loading||editor.uncertain||editor.stale||!editor.etag||!editor.present||!this.writable;
     this.cancel.disabled=editor.busy;
     if(this.reload){this.reload.hidden=!(editor.failedRead||editor.stale||editor.uncertain);this.reload.disabled=editor.loading||editor.busy||this.markdown.loading;this.reload.textContent=t(editor.uncertain?'journal.check_result':'journal.reload');}
     if(this.recovery){
@@ -172,7 +173,7 @@ export class TrackDayNotes {
     try{
       const reply=await editor.session.request('/day-notes/'+editor.date);
       if(this.editor!==editor||editor.session!==this.session)return;
-      this.text.value=reply.data.text;editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;editor.loading=false;editor.failedRead=false;editor.stale=false;editor.uncertain=false;
+      this.text.value=reply.data.text;editor.originalText=reply.data.text;editor.originalBody=reply.data.body;editor.etag=reply.etag;editor.present=reply.data.version>0&&!reply.data.deleted;editor.loading=false;editor.failedRead=false;editor.stale=false;editor.uncertain=false;
       this.markdown.setValue(reply.data.body);this.error.textContent='';this.savedStatus.textContent=t(this.writable?'journal.saved':'journal.read_only');this.controls();this.content.scrollTop=0;if(!this.inline)this.text.focus({preventScroll:true});void this.markdown.showFormatted(false);
     }catch(error){
       if(this.editor!==editor||editor.session!==this.session)return;
@@ -185,7 +186,7 @@ export class TrackDayNotes {
       editor.loading=true;this.controls();
       try{
         const reply=await editor.session.request('/day-notes/'+editor.date);if(this.editor!==editor||editor.session!==this.session)return;
-        if(reply.data.text===editor.sent.text&&reply.data.body===editor.sent.body){this.acceptSaved(reply,editor);return;}
+        if(editor.sent?.delete?reply.data.deleted:reply.data.text===editor.sent.text&&reply.data.body===editor.sent.body){this.acceptSaved(reply,editor);return;}
         editor.uncertain=false;editor.stale=true;this.error.textContent=t('journal.review_saved');
       }catch(error){if(this.editor===editor){this.error.textContent=error.message;if(error.status===401)this.callbacks.onUnauthorized(error);}}
       finally{if(this.editor===editor){editor.loading=false;this.controls();if(this.error.textContent)this.error.scrollIntoView({block:'nearest'});}}
@@ -212,6 +213,20 @@ export class TrackDayNotes {
       const reply=await editor.session.request('/day-notes/'+editor.date,{method:'PUT',etag:editor.etag,body:editor.sent});
       if(this.editor!==editor||editor.session!==this.session)return;
       this.acceptSaved(reply,editor);
+    }catch(error){
+      if(this.editor!==editor||editor.session!==this.session)return;
+      if(error.status===401){this.callbacks.onUnauthorized(error);return;}
+      editor.uncertain=error.uncertain;editor.stale=error.status===412;this.error.textContent=error.uncertain?t('day_notes.uncertain'):error.message;this.savedStatus.textContent=t('journal.unsaved');
+    }finally{if(this.editor===editor){editor.busy=false;this.controls();if(this.error.textContent)this.error.scrollIntoView({block:'nearest'});}}
+  }
+  async deleteNote(){
+    const editor=this.editor;if(!editor||editor.busy||editor.loading||editor.failedRead||editor.uncertain||editor.stale||!editor.present||!editor.etag||!this.writable||editor.session!==this.session)return;
+    if(!confirm(t('journal.delete_confirm',{date:this.dateLabel(editor.date)})))return;
+    editor.sent={delete:true};editor.busy=true;this.error.textContent='';this.savedStatus.textContent=t('journal.deleting');this.controls();
+    try{
+      await editor.session.request('/day-notes/'+editor.date,{method:'DELETE',etag:editor.etag});
+      if(this.editor!==editor||editor.session!==this.session)return;
+      this.acceptSaved({data:{text:'',hasBody:false,deleted:true}},editor);
     }catch(error){
       if(this.editor!==editor||editor.session!==this.session)return;
       if(error.status===401){this.callbacks.onUnauthorized(error);return;}

@@ -103,6 +103,25 @@ test('day notes can be added from the day menu, edited, canceled and removed wit
   }finally{await owner.close();}
 });
 
+test('deleting a day note is explicit, guarded, and distinct from clearing it',async({browser,request})=>{
+  const owner=await context(browser),page=await owner.newPage(),date='2026-05-17';
+  try{
+    await signIn(page,await fresh(request));const api=await apiFor(page);await month(page);
+    await menu(page);await save(page,'First note');
+    await note(page).click();const remove=dialog(page).getByRole('button',{name:'Delete note'});
+    await expect(remove).toBeEnabled();page.once('dialog',prompt=>prompt.dismiss());await remove.click();
+    await expect(dialog(page)).toBeVisible();expect((await(await api('GET','/day-notes/'+date)).json()).deleted).toBe(false);
+    page.once('dialog',prompt=>prompt.accept());await remove.click();await expect(dialog(page)).toBeHidden();
+    const deleted=await api('GET','/day-notes/'+date),deletedValue=await deleted.json();expect(deletedValue.deleted).toBe(true);expect(deletedValue.text).toBe('');
+    await note(page).click();await expect(dialog(page).getByRole('button',{name:'Delete note'})).toBeDisabled();
+    await save(page,'Restored note');const restored=await(await api('GET','/day-notes/'+date)).json();expect(restored.deleted).toBe(false);expect(restored.version).toBeGreaterThan(deletedValue.version);
+    await note(page).click();const current=await api('GET','/day-notes/'+date);await api('PUT','/day-notes/'+date,{text:'Changed elsewhere'},{'If-Match':current.headers().etag});
+    page.once('dialog',prompt=>prompt.accept());await dialog(page).getByRole('button',{name:'Delete note'}).click();
+    await expect(dialog(page).getByRole('alert')).toBeVisible();await expect(dialog(page).getByRole('button',{name:'Delete note'})).toBeDisabled();
+    expect((await(await api('GET','/day-notes/'+date)).json()).text).toBe('Changed elsewhere');
+  }finally{await owner.close();}
+});
+
 test('Escape immediately releases the day-note editor before its queued close event',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage();
   try{
