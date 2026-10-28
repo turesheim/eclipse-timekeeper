@@ -213,12 +213,12 @@ final class InstanceArtifacts {
         catch(IOException failure){if(Set.of("INVALID_INSTANCE_ARTIFACT","INSTANCE_ARTIFACT_QUOTA","INSTANCE_ARTIFACT_BUSY","INSTANCE_ARTIFACT_CONFLICT").contains(failure.getMessage()))throw failure;throw unavailable();}
         catch(RuntimeException failure){throw unavailable();}
     }
-    private static FileChannel createFile(Path file) throws IOException {return FileChannel.open(file,Set.of(StandardOpenOption.CREATE_NEW,StandardOpenOption.READ,StandardOpenOption.WRITE,NOFOLLOW_LINKS),PosixFilePermissions.asFileAttribute(FILE));}
-    private static void directory(Path path) throws IOException {if(!Files.isDirectory(path,NOFOLLOW_LINKS)||!Files.getPosixFilePermissions(path,NOFOLLOW_LINKS).equals(DIRECTORY))throw unavailable();}
-    private static void file(Path path) throws IOException {if(!Files.isRegularFile(path,NOFOLLOW_LINKS)||!Files.getPosixFilePermissions(path,NOFOLLOW_LINKS).equals(FILE)||((Number)Files.getAttribute(path,"unix:nlink",NOFOLLOW_LINKS)).longValue()!=1)throw unavailable();}
-    private static void sync(Path directory) throws IOException {try(var channel=FileChannel.open(directory,StandardOpenOption.READ)){channel.force(true);}}
+    static FileChannel createFile(Path file) throws IOException {return FileChannel.open(file,Set.of(StandardOpenOption.CREATE_NEW,StandardOpenOption.READ,StandardOpenOption.WRITE,NOFOLLOW_LINKS),PosixFilePermissions.asFileAttribute(FILE));}
+    static void directory(Path path) throws IOException {if(!Files.isDirectory(path,NOFOLLOW_LINKS)||!Files.getPosixFilePermissions(path,NOFOLLOW_LINKS).equals(DIRECTORY))throw unavailable();}
+    static void file(Path path) throws IOException {if(!Files.isRegularFile(path,NOFOLLOW_LINKS)||!Files.getPosixFilePermissions(path,NOFOLLOW_LINKS).equals(FILE)||((Number)Files.getAttribute(path,"unix:nlink",NOFOLLOW_LINKS)).longValue()!=1)throw unavailable();}
+    static void sync(Path directory) throws IOException {try(var channel=FileChannel.open(directory,StandardOpenOption.READ)){channel.force(true);}}
     private static void readFully(FileChannel channel,ByteBuffer buffer,long offset) throws IOException {while(buffer.hasRemaining()){int count=channel.read(buffer,offset);if(count<0)throw unavailable();offset+=count;}}
-    private static String sha256(Path path) throws IOException {
+    static String sha256(Path path) throws IOException {
         try {var digest=MessageDigest.getInstance("SHA-256");try(var input=Files.newInputStream(path,StandardOpenOption.READ,NOFOLLOW_LINKS)){byte[] bytes=new byte[64*1024];int count;while((count=input.read(bytes))!=-1)digest.update(bytes,0,count);}return HexFormat.of().formatHex(digest.digest());}
         catch(NoSuchAlgorithmException failure){throw unavailable();}
     }

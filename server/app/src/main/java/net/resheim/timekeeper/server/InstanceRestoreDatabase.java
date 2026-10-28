@@ -66,6 +66,7 @@ final class InstanceRestoreDatabase {
             expireImportedOperations(target,now);
             for(var row:evidence)execute(target,"INSERT INTO tk_instance(id,kind,version,operation_id,actor_owner,occurred_at,payload) VALUES(?,?,?,?,?,?,?)",row.id(),row.kind(),row.version(),row.operation(),row.actor(),row.occurred(),row.payload());
             var restoredControl=control(target).put("artifactRootId",root.toString()).put("restoreGeneration",generation.toString()).put("restorePending",true);
+            if(control.has("restoreIntent"))restoredControl.set("restoreIntent",control.get("restoreIntent").deepCopy());
             restoredControl.putObject("restore").put("operationId",operation.toString()).put("archiveId",archive.manifest().path("archiveId").asText()).put("phase","DATABASE_APPLIED").put("packageId",deployment.packageId());
             execute(target,"UPDATE tk_instance SET version=version+1,payload=? WHERE id=?",restoredControl.toString(),CONTROL);
             remapAuthentication(target,deployment,epoch);
@@ -82,7 +83,7 @@ final class InstanceRestoreDatabase {
         }
     }
     private static MessageDigest digest() {try{return MessageDigest.getInstance("SHA-256");}catch(NoSuchAlgorithmException impossible){throw new IllegalStateException();}}
-    private static void verifyArchive(InstanceBackupArchive.Verified archive) throws IOException {
+    static void verifyArchive(InstanceBackupArchive.Verified archive) throws IOException {
         if(!Files.isRegularFile(archive.database(),LinkOption.NOFOLLOW_LINKS))throw new IOException("INVALID_INSTANCE_BACKUP");
         var digest=digest();long bytes;
         try(var input=new DigestInputStream(Files.newInputStream(archive.database()),digest)){bytes=input.transferTo(OutputStream.nullOutputStream());}

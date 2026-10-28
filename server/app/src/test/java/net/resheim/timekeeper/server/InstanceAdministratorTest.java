@@ -370,6 +370,71 @@ class InstanceAdministratorTest {
         accounts.tx(c->{try(var statement=query(c,"SELECT actor_owner,payload FROM tk_instance WHERE kind='AUDIT' AND operation_id=?",UUID.fromString(id));var rows=statement.executeQuery()){boolean found=false;while(rows.next())if(parse(rows.getString(2)).path("state").asText().equals("EXPIRED")){found=true;assertEquals(owner,rows.getString(1));}assertTrue(found);}catch(Exception failure){throw new AssertionError(failure);}return null;});
         assertEquals("EXPIRED",awaitUpload(uploader,id,"EXPIRED").path("operation").path("state").asText());
     }
+    private InstanceRestoreIntent.Prepared preparedIntent(InstanceAdministrator.Proof proof) throws Exception {
+        char[] phrase="private durable handoff passphrase".toCharArray();Path encrypted=backups.create(proof,phrase.clone(),output);
+        var files=jobs.artifacts();var operation=accounts.tx(c->{
+            lock(c);InstanceOperations.bindStorage(c,files.identity());var lease=InstanceOperations.beginUpload(c,admin,100,"a".repeat(64),clock.now());
+            InstanceOperations.advance(c,lease,InstanceOperations.State.UPLOADING,InstanceOperations.State.VALIDATING,clock.now());InstanceOperations.finishReview(c,lease,object(),clock.now());return InstanceOperations.status(c,lease.id());
+        });
+        var spec=new InstanceRestoreIntent.Spec(UUID.randomUUID(),operation.id(),operation.version(),admin.owner(),files.identity(),null,new InstanceRestoreDatabase.Deployment("dagsverk","https://destination.example:8443","AUTO",true));
+        try(var archive=InstanceBackupArchive.open(encrypted,phrase,output,100_000_000);var target=InstanceConfiguration.captureRuntime()) {
+            return new InstanceRestoreIntent(directory.resolve("restore-intents"),100_000_000).prepare(spec,archive,target,clock.now());
+        }finally{Arrays.fill(phrase,'\0');}
+    }
+    private String originalInstanceControl() throws Exception {try(var c=datasource.getConnection();var s=c.createStatement();var r=s.executeQuery("SELECT payload FROM tk_instance WHERE kind='CONTROL'")){assertTrue(r.next());return r.getString(1);}}
+    private long authorizeIntent(InstanceRestoreIntent.Prepared prepared,InstanceAdministrator.Proof proof,Instant now) {
+        return accounts.tx(c->{try{c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);return prepared.authorize(c,administrators,proof,now);}catch(java.sql.SQLException failure){throw new AssertionError(failure);}});
+    }
+    @Test void committedIntentBlocksRuntimeAndAuthorizesOnlyItsExactOfflineDatabasePhase() throws Exception {
+        var proof=administrators.verify(admin,PASSWORD);
+        try(var prepared=preparedIntent(proof)) {
+            String before=originalInstanceControl();
+            try {
+                assertEquals(prepared.spec().reviewVersion()+1,authorizeIntent(prepared,proof,clock.now()));
+                assertEquals("INSTANCE_RESTORE_PENDING",assertThrows(ApiFailure.class,()->accounts.tx(c->null)).code);
+                Path clone=directory.resolve("authorized-target.json");
+                try(var c=datasource.getConnection()) {
+                    c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);c.setAutoCommit(false);assertEquals("PREPARED",prepared.phase(c));
+                    try(var out=Files.newOutputStream(clone)){InstanceDatabaseImage.write(c,out);}c.rollback();
+                }
+                // Restore a synthetic clone offline; the running Quarkus pool
+                // correctly prevents exclusive activation of its live database.
+                try(var c=java.sql.DriverManager.getConnection("jdbc:h2:"+directory.resolve("offline-target"))) {
+                    ServerSchema.initializeOrValidate(c);c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);c.setAutoCommit(false);InstanceDatabaseImage.replace(c,clone);c.commit();c.setAutoCommit(true);
+                    try(var exclusive=InstanceRestoreFence.exclusive(c)) {
+                        c.setAutoCommit(false);var spec=prepared.spec();InstanceRestoreDatabase.apply(c,exclusive,prepared.archive(),spec.deployment(),spec.actor(),spec.operation(),spec.reviewVersion()+1,spec.artifactRoot(),spec.generation(),clock.now());c.commit();
+                        c.setAutoCommit(true);assertEquals("DATABASE_APPLIED",prepared.phase(c));assertEquals("INSTANCE_RESTORE_PENDING",assertThrows(ApiFailure.class,()->new InstanceRestoreFence().initialize(c)).code);
+                    }
+                }
+            }finally{try(var c=datasource.getConnection()){execute(c,"UPDATE tk_instance SET payload=? WHERE kind='CONTROL'",before);}}
+        }
+    }
+    @Test void rolledBackOrExpiredRestoreConsentCannotAuthorizeTheDurableFiles() throws Exception {
+        var proof=administrators.verify(admin,PASSWORD);
+        try(var prepared=preparedIntent(proof)) {
+            String before=originalInstanceControl();
+            assertEquals("INSTANCE_PROOF_REQUIRED",assertThrows(ApiFailure.class,()->authorizeIntent(prepared,proof,proof.verifiedAt().plusSeconds(301))).code);
+            assertThrows(IllegalStateException.class,()->accounts.tx(c->{
+                try{c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);prepared.authorize(c,administrators,proof,clock.now());throw new IllegalStateException("Synthetic rollback");}
+                catch(java.sql.SQLException failure){throw new AssertionError(failure);}
+            }));
+            assertEquals(before,originalInstanceControl());try(var c=datasource.getConnection()){assertEquals("INSTANCE_RESTORE_NOT_AUTHORIZED",assertThrows(ApiFailure.class,()->prepared.phase(c)).code);}
+            accounts.logout(admin);assertEquals(401,assertThrows(ApiFailure.class,()->authorizeIntent(prepared,proof,clock.now())).status);
+        }
+    }
+    @Test void rewritingTheIntentAndPointerCannotReusePreviouslyCommittedConsent() throws Exception {
+        var proof=administrators.verify(admin,PASSWORD);InstanceRestoreIntent.Spec spec;
+        String before;
+        try(var prepared=preparedIntent(proof)){spec=prepared.spec();before=originalInstanceControl();authorizeIntent(prepared,proof,clock.now());}
+        try {
+            Path root=directory.resolve("restore-intents"),metadata=root.resolve(spec.generation().toString()).resolve("intent.json"),pointer=root.resolve("prepared.json");
+            var changed=(com.fasterxml.jackson.databind.node.ObjectNode)MAPPER.readTree(Files.readString(metadata));changed.put("createdAt",clock.now().plusSeconds(1).toString());Files.writeString(metadata,changed.toString());
+            var receipt=(com.fasterxml.jackson.databind.node.ObjectNode)MAPPER.readTree(Files.readString(pointer));receipt.put("sha256",InstanceArtifacts.sha256(metadata));Files.writeString(pointer,receipt.toString());
+            try(var rewritten=new InstanceRestoreIntent(root,100_000_000).open();var c=datasource.getConnection()) {
+                assertEquals("INSTANCE_RESTORE_NOT_AUTHORIZED",assertThrows(ApiFailure.class,()->rewritten.phase(c)).code);
+            }
+        }finally{try(var c=datasource.getConnection()){execute(c,"UPDATE tk_instance SET payload=? WHERE kind='CONTROL'",before);}}
+    }
     private AgroalDataSource afterCommit(Runnable action) {
         var guarded=(AgroalDataSource)java.lang.reflect.Proxy.newProxyInstance(AgroalDataSource.class.getClassLoader(),new Class<?>[]{AgroalDataSource.class},(proxy,method,args)->{
             try {

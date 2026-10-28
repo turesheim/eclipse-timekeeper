@@ -425,3 +425,41 @@ database commit. H2 recovery preserves the complete old database before commit
 and the complete pending restored database after commit. PostgreSQL retains the
 committed pending database after the client process halts. These are database
 phase guarantees; filesystem recovery and restart completion remain required.
+
+## Durable restore handoff and consent
+
+`InstanceRestoreIntent` now prepares a private, versioned handoff for the offline
+process. It copies the verified logical image, source configuration/material and
+destination configuration/material into an independent generation directory.
+The original decryption job can then close. The encryption passphrase is never
+persisted. Every file has a length and SHA-256 receipt; creation uses private
+permissions, file and directory fsyncs, and an atomic prepared pointer. Quotas
+are checked before writes. Loading rejects malformed metadata, changed bytes,
+symlinks, hard links and insecure permissions. A process lock prevents concurrent
+preparation or activation; a separate-JVM halt test checks that another process
+can recover the same durable handoff after lock-holder termination.
+
+The files are not authorization. Inside a serializable account transaction,
+`Prepared.authorize` requires fresh browser-administrator proof, a still-valid
+session, the original upload session, exact review version and actor, unchanged
+installation generation and artifact root, and an eligible empty target. The
+captured destination database URL, backend and username must match the actual
+connection. Consent commits the handoff generation and metadata digest into both
+the operation and installation control, records `RESTORE_PREPARED`, and sets the
+pending runtime gate. Rolling back that transaction leaves the files unauthorized.
+Rewriting both the metadata and filesystem pointer cannot reuse committed consent
+because the database retains the original digest.
+
+The offline reader checks those database bindings before recognizing `PREPARED`
+or `DATABASE_APPLIED`. The database application phase retains them through
+replacement, allowing recovery to distinguish an authorized prepared handoff from
+one whose database phase has committed. Tests use actual administrator proof and
+PostgreSQL as well as H2; offline application uses an isolated synthetic clone,
+since a live application pool correctly prevents exclusive activation.
+
+These are internal components. There is still no public confirmation endpoint or
+launch-time caller, and no complete file installation/final activation sequence.
+Unreferenced or interrupted private staging must remain private until the recovery
+workflow can safely discard it; files must never be interpreted as consent by a
+launcher. Launcher integration must resolve the current runtime configuration
+before opening the destination and install mapped material before Quarkus starts.

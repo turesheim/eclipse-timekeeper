@@ -136,6 +136,6 @@ final class InstanceBackupArchive {
     }
     private static Path privateDirectory(Path root) throws IOException {return Files.createTempDirectory(root,".instance-",PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));}
     private static Path privateFile(Path folder,String suffix) throws IOException {return Files.createTempFile(folder,".instance-",suffix,PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));}
-    private static void remove(Path folder) throws IOException {try(var files=Files.walk(folder)){for(Path file:files.sorted(Comparator.reverseOrder()).toList())Files.delete(file);}catch(IOException failure){throw new IOException("INSTANCE_BACKUP_CLEANUP_FAILED");}}
+    static void remove(Path folder) throws IOException {try(var files=Files.walk(folder)){for(Path file:files.sorted(Comparator.reverseOrder()).toList())Files.delete(file);}catch(IOException failure){throw new IOException("INSTANCE_BACKUP_CLEANUP_FAILED");}}
     private static IOException invalid(){return new IOException("INVALID_INSTANCE_BACKUP");}
 }
