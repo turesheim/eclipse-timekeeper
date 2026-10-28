@@ -14,7 +14,7 @@ const byId=id=>document.getElementById(id);
 export class TodayView {
   constructor(root,callbacks){
     this.root=root;this.callbacks=callbacks;this.dateInput=byId('today-date');this.grid=byId('today-month-grid');this.monthTitle=byId('today-month-title');this.journalRoot=byId('today-journal');
-    this.journal=new TrackDayNotes(byId('today-journal'),this.grid,this.dateInput,{onUnauthorized:callbacks.onUnauthorized,onChanged:callbacks.onNotesChanged},{inline:true,prefix:'today',statusAnchor:byId('today-note-status-anchor')});
+    this.journal=new TrackDayNotes(byId('today-journal'),this.grid,this.dateInput,{onUnauthorized:callbacks.onUnauthorized,onChanged:callbacks.onNotesChanged},{inline:true,prefix:'today',statusAnchor:byId('today-note-status-anchor'),labelRoot:byId('today-day-label')});
     this.weekEditor=new WeekNoteEditor(root,callbacks);
     this.eventDetails=node('dialog',undefined,'app-dialog shadow-lg calendar-event-details');this.eventDetails.id='today-event-details';this.eventDetails.setAttribute('aria-labelledby','today-event-title');root.append(this.eventDetails);
     this.eventDetails.addEventListener('close',()=>{const origin=this.eventOrigin;this.eventOrigin=null;this.eventDetails.replaceChildren();if(this.visible&&origin?.isConnected)origin.focus();});
@@ -114,15 +114,15 @@ export class TodayView {
     });
     for(const entry of entries){
       const client=this.data.clients.find(value=>value.id===entry.clientId),sessions=this.daySessions.get(entry.clientId),writable=this.connected&&this.callbacks.canWrite();
-      const item=node('li',undefined,'today-session'),action=node(writable?'button':'div',undefined,'btn btn-outline-secondary today-session-action');
+      const item=node('li',undefined,'today-session'),action=node(writable?'button':'div',undefined,'calendar-summary-card today-session-action');
       action.dataset.todayClient=entry.clientId;if(writable)action.type='button';else action.setAttribute('role','group');
-      action.style.setProperty('--today-client-color',client?.color||'var(--accent)');
+      action.style.setProperty('--client-color',client?.color||'var(--accent)');
       action.append(node('strong',client?.name||t('ui.client')));
-      const details=node('span',undefined,'today-session-details'),icons=node('span',undefined,'track-project-icons'),projects=new Map();
+      const details=node('span',undefined,'calendar-summary-total today-session-details'),icons=node('span',undefined,'track-project-icons'),projects=new Map();
       for(const session of sessions){const project=this.data.projects.find(value=>value.id===session.projectId);if(isProjectIcon(project?.icon)){const names=projects.get(project.icon)||new Set();names.add(project.name);projects.set(project.icon,names);}}
       for(const [id,names] of projects)icons.append(projectIcon({icon:id,name:[...names].join(', ')}));icons.setAttribute('aria-hidden','true');
-      details.append(node('span',nanosText(entry.duration),'today-duration'),icons);action.append(details);
-      action.title=t('count.work_sessions',{count:sessions.length})+'\n'+sessions.map(session=>[session.summary||t('ui.work_session_21aa04'),instantText(session.start,zone)+' → '+(session.end?instantText(session.end,zone):t('ui.in_progress'))].join(' · ')).join('\n');
+      details.append(node('span',nanosText(entry.duration),'calendar-summary-time today-duration'),icons);action.append(details);
+      action.title=(client?.name||t('ui.client'))+'\n'+t('count.work_sessions',{count:sessions.length})+'\n'+sessions.map(session=>[session.summary||t('ui.work_session_21aa04'),instantText(session.start,zone)+' → '+(session.end?instantText(session.end,zone):t('ui.in_progress'))].join(' · ')).join('\n');
       if(writable)action.addEventListener('click',()=>this.openSessions(entry.clientId));item.append(action);list.append(item);
     }
     root.append(list);this.paintPicker();
@@ -160,11 +160,12 @@ export class TodayView {
     if(!events.length){root.append(node('p',t('today.no_events'),'hint'));return;}
     const time=value=>dateTimeFormat(getLocale(),{hour:'2-digit',minute:'2-digit',timeZone:zone}).format(new Date(value));
     const list=node('ul',undefined,'today-list');for(const event of events){
-      const item=node('li',undefined,'today-plan'),action=node('button',undefined,'btn btn-outline-secondary today-event-action');action.type='button';action.dataset.todayEvent=event.key;
+      const item=node('li',undefined,'today-plan'),action=node('button',undefined,'calendar-summary-card today-event-action');action.type='button';action.dataset.todayEvent=event.key;
       const client=this.data.clients.find(value=>value.id===event.clientId);action.style.setProperty('--client-color',clientColors(client?.color||event.color).background);
       action.append(node('strong',event.title||t('calendar.untitled')));
-      action.append(node('span',event.allDay?t('calendar.all_day'):`${time(event.start)}–${time(event.end)}`,'hint'));
-      action.append(node('span',client?.name||event.clientName,'hint'));
+      action.append(node('span',event.allDay?t('calendar.all_day'):`${time(event.start)}–${time(event.end)}`,'calendar-summary-time'));
+      action.append(node('span',client?.name||event.clientName));
+      action.title=[event.title||t('calendar.untitled'),event.allDay?t('calendar.all_day'):`${time(event.start)}–${time(event.end)}`,client?.name||event.clientName].join('\n');
       action.addEventListener('click',()=>this.openEvent(event,action));item.append(action);list.append(item);
     }root.append(list);
   }
