@@ -14,6 +14,20 @@ class InstanceConfigurationTest {
         return new HashMap<>(Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:private-source","quarkus.datasource.db-kind","h2","quarkus.datasource.username","sa",
             "timekeeper.auth.tokens-file","NONE","timekeeper.auth.setup-file","NONE"));
     }
+    @Test void environmentAliasesAreCapturedThroughTheirCanonicalPropertiesOnly() throws Exception {
+        Path token=directory.resolve("tokens.json");Files.writeString(token,"private configured hashes");
+        var properties=base();properties.put("timekeeper.auth.tokens-file","${TIMEKEEPER_SERVER_TOKENS_FILE:NONE}");
+        var environment=new io.smallrye.config.EnvConfigSource(Map.of("TIMEKEEPER_SERVER_TOKENS_FILE",token.toString()),300);
+        var config=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(properties,"application",100),environment).build();
+        try(var snapshot=InstanceConfiguration.capture(config)) {
+            assertEquals(1,snapshot.files().size());assertEquals(token.toString(),snapshot.document().path("properties").path("timekeeper.auth.tokens-file").asText());
+            assertFalse(snapshot.document().path("properties").has("timekeeper.server.tokens.file"));
+        }
+        // Explicitly declared application inputs still require classification.
+        properties.put("timekeeper.server.tokens.file",token.toString());
+        var declared=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(properties,"application",100),environment).build();
+        rejects(()->InstanceConfiguration.capture(declared));
+    }
     @Test void credentialsAndConfiguredFilesIncludingNamedTlsKeysAreCapturedExactly() throws Exception {
         Path token=directory.resolve("tokens.json"),key=directory.resolve("server.key"),certificate=directory.resolve("server.crt");
         Files.writeString(token,"private configured token hashes");Files.write(key,new byte[]{0,1,2,-1});Files.writeString(certificate,"private certificate bytes");
@@ -69,6 +83,7 @@ class InstanceConfigurationTest {
     @Test void disabledOptionalInputPathsRemainDisabledWhenConfigConversionRemovesEmptyValues() throws Exception {
         var values=base();values.remove("timekeeper.auth.tokens-file");values.remove("timekeeper.auth.setup-file");
         var config=(org.eclipse.microprofile.config.Config)java.lang.reflect.Proxy.newProxyInstance(org.eclipse.microprofile.config.Config.class.getClassLoader(),new Class<?>[]{org.eclipse.microprofile.config.Config.class},(proxy,method,args)->{
+            if(method.getName().equals("getConfigSources"))return java.util.List.of();
             if(method.getName().equals("getPropertyNames"))return values.keySet();
             if(method.getName().equals("getOptionalValue"))return Optional.ofNullable(values.get(args[0]));
             throw new UnsupportedOperationException();

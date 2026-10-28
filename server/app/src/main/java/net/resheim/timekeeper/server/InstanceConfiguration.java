@@ -31,7 +31,13 @@ final class InstanceConfiguration {
     static Snapshot capture(Config config) throws IOException {
         var properties=new TreeMap<String,String>();var lists=new HashMap<String,List<String>>();
         try {
-            for(String name:config.getPropertyNames())if(owned(name))config.getOptionalValue(name,String.class).ifPresent(value->properties.put(name,value));
+            // Environment variables referenced by application.properties also appear
+            // as synthetic dotted names (TIMEKEEPER_SERVER_TOKENS_FILE becomes
+            // timekeeper.server.tokens.file). Capture their resolved canonical
+            // property once; do not reinterpret an alias as a second file input.
+            var aliases=environmentAliases(config);
+            for(String name:config.getPropertyNames())if(owned(name)&&!(aliases.contains(name)&&config.getConfigValue(name).getSourceName().contains("EnvConfigSource")))
+                config.getOptionalValue(name,String.class).ifPresent(value->properties.put(name,value));
             // Both application inputs intentionally treat an absent/blank path
             // as disabled. MicroProfile removes empty converted values.
             for(String name:List.of("timekeeper.auth.tokens-file","timekeeper.auth.setup-file"))if(!active(properties.get(name)))properties.put(name,"NONE");
@@ -40,6 +46,18 @@ final class InstanceConfiguration {
             }
             return capture(properties,lists);
         }catch(RuntimeException failure){throw invalid();}
+    }
+    private static Set<String> environmentAliases(Config config) {
+        var aliases=new HashSet<String>();var declared=new HashSet<String>();
+        var expression=java.util.regex.Pattern.compile("\\$\\{([A-Z][A-Z0-9_]*)(?=[:}])");
+        for(var source:config.getConfigSources()) {
+            if(source.getName().contains("EnvConfigSource"))continue;
+            for(String name:source.getPropertyNames()) {
+                declared.add(name);String raw=source.getValue(name);if(raw==null)continue;
+                var matcher=expression.matcher(raw);while(matcher.find())aliases.add(matcher.group(1).toLowerCase(Locale.ROOT).replace('_','.'));
+            }
+        }
+        aliases.removeAll(declared);return aliases;
     }
     static Snapshot capture(Map<String,String> properties,Map<String,List<String>> lists) throws IOException {
         var document=object().put("format",FORMAT);var values=document.putObject("properties");var inputs=document.putObject("files");
