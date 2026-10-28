@@ -23,7 +23,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def verify_http_recovery(app, fixture, environment):
+def verify_http_recovery(app, fixture, environment, restored=True):
     """Recover before HTTP, then prove restored credentials/data survive a restart."""
     for _ in range(2):
         with socket.socket() as listener:
@@ -51,7 +51,8 @@ def verify_http_recovery(app, fixture, environment):
                         raise ValueError('Packaged restored server did not become ready')
                     time.sleep(0.25)
                 request = urllib.request.Request(origin + '/api/v1/auth/login',
-                    data=json.dumps({'username': 'user-a', 'password': 'Preserved archive account password', 'remember': False}).encode(),
+                    data=json.dumps({'username': 'user-a' if restored else 'bootstrap',
+                                     'password': 'Preserved archive account password' if restored else 'Disposable bootstrap password', 'remember': False}).encode(),
                     headers={'Content-Type': 'application/json', 'Origin': origin})
                 with urllib.request.urlopen(request, timeout=10) as response:
                     cookies = SimpleCookie()
@@ -67,7 +68,7 @@ def verify_http_recovery(app, fixture, environment):
                 with urllib.request.urlopen(request, timeout=10) as response:
                     data = json.load(response)
                 clients = data['items']
-                if len(clients) != 1 or clients[0]['id'] != '11111111-1111-4111-8111-111111111111' or clients[0]['name'] != 'Restored client æ' or clients[0]['version'] != 17:
+                if (restored and (len(clients) != 1 or clients[0]['id'] != '11111111-1111-4111-8111-111111111111' or clients[0]['name'] != 'Restored client æ' or clients[0]['version'] != 17)) or (not restored and clients):
                     raise ValueError('Restored client data was not preserved by packaged startup')
             finally:
                 process.terminate()
@@ -76,6 +77,8 @@ def verify_http_recovery(app, fixture, environment):
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait(timeout=5)
+    if not restored:
+        return
     # A completed database without its bound material must fail before Quarkus
     # can initialize TLS, listeners, scheduled jobs, or account provisioning.
     missing_settings = fixture / 'missing-material.properties'
@@ -133,12 +136,33 @@ def main():
                 raise ValueError('Packaged offline recovery failed')
         if (fixture / 'intents, café/prepared.json').exists():
             raise ValueError('Completed recovery retained its plaintext handoff')
+        cancelled_fixture = stage / 'cancelled-fixture'
+        cancelled_fixture.mkdir(mode=0o700)
+        prepared = subprocess.run(['java', '-cp', fixture_classpath,
+                                   'net.resheim.timekeeper.server.InstanceRestorePackagedFixture', str(cancelled_fixture)],
+                                  cwd=ROOT, env={key: value for key, value in environment.items() if not key.startswith('TIMEKEEPER_')},
+                                  capture_output=True, timeout=40)
+        if prepared.returncode:
+            raise ValueError('Disposable cancellation fixture failed')
+        environment['TIMEKEEPER_SERVER_DB_PASSWORD_FILE'] = str(cancelled_fixture / 'database-secret')
+        cancel = ['java', '-Dquarkus.config.locations=' + (cancelled_fixture / 'destination.properties').as_uri(),
+                  '-cp', runtime_classpath, 'net.resheim.timekeeper.server.InstanceRestoreMain', '--cancel',
+                  str(cancelled_fixture / 'intents, café'), (cancelled_fixture / 'operation-id').read_text()]
+        for _ in range(2):
+            result = subprocess.run(cancel, cwd=ROOT, env=environment,
+                                    input=json.dumps({'username': 'bootstrap', 'currentPassword': 'Disposable bootstrap password'}).encode(),
+                                    capture_output=True, timeout=40)
+            if result.returncode or result.stdout != b'INSTANCE_RESTORE_CANCELLED\n':
+                raise ValueError('Packaged offline cancellation failed')
+        if (cancelled_fixture / 'intents, café/prepared.json').exists():
+            raise ValueError('Cancelled recovery retained its plaintext handoff')
+        verify_http_recovery(app, cancelled_fixture, environment, restored=False)
         evidence = {'sourceCommit': manifest['commit'], 'distributionSha256': digest,
-                    'packagedRuntimeOnly': True, 'automaticPreboot': True, 'restoredPasswordLogin': True, 'restoredClientRead': True, 'httpRestart': True, 'missingMaterialRejectedBeforeHttp': True, 'fileBackedCredentials': True, 'completedRetry': True, 'plaintextStagingRemoved': True}
+                    'packagedRuntimeOnly': True, 'automaticPreboot': True, 'restoredPasswordLogin': True, 'restoredClientRead': True, 'httpRestart': True, 'missingMaterialRejectedBeforeHttp': True, 'fileBackedCredentials': True, 'completedRetry': True, 'plaintextStagingRemoved': True, 'offlineCancellation': True, 'cancelledStartup': True}
         output = ROOT / 'server/target/acceptance'
         output.mkdir(parents=True, exist_ok=True)
         (output / 'instance-restore.json').write_text(json.dumps(evidence, indent=2) + '\n')
-        print('Packaged automatic restore, authenticated HTTP restart, and offline completed retry passed.')
+        print('Packaged automatic restore, authenticated HTTP restart, offline cancellation, and cancelled startup passed.')
 
 
 if __name__ == '__main__':

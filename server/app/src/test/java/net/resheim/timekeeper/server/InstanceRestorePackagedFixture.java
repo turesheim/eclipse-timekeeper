@@ -9,6 +9,7 @@ public final class InstanceRestorePackagedFixture {
     public static void main(String[] args) throws Exception {
         var fixture=new InstanceRestoreRecoveryTest();fixture.directory=Path.of(args[0]);
         var target=fixture.fixture("jdbc:h2:"+fixture.directory.resolve("target"),"sa","synthetic packaged role password",true);
+        Path operation=fixture.directory.resolve("operation-id");Files.writeString(operation,target.operation().toString());Files.setPosixFilePermissions(operation,PosixFilePermissions.fromString("rw-------"));
         Path secret=fixture.directory.resolve("database-secret");Files.writeString(secret,"synthetic packaged role password\n");Files.setPosixFilePermissions(secret,PosixFilePermissions.fromString("rw-------"));
         var settings=new Properties();try(var input=Files.newInputStream(target.settings())){settings.load(input);}settings.remove("quarkus.datasource.password");try(var output=Files.newOutputStream(target.settings())){settings.store(output,"Disposable file-backed destination");}
     }

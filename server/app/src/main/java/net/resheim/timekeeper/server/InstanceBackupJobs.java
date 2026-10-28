@@ -18,11 +18,15 @@ class InstanceBackupJobs {
     @Inject InstanceAdministrator administrators;
     @Inject InstanceBackupService backups;
     @Inject AccountStore accounts;
+    @Inject io.agroal.api.AgroalDataSource datasource;
     @Inject BackendClock clock;
     @ConfigProperty(name="timekeeper.instance-backup.storage",defaultValue="NONE") String storage;
     @ConfigProperty(name="timekeeper.instance-backup.maximum-archive-bytes",defaultValue="8589934592") long maximumBytes;
     @ConfigProperty(name="timekeeper.instance-backup.maximum-retained-bytes",defaultValue="17179869184") long retainedBytes;
     @ConfigProperty(name="timekeeper.instance-backup.maximum-jobs",defaultValue="3") int maximumJobs;
+
+    @ConfigProperty(name="timekeeper.instance-restore.storage",defaultValue="NONE") String restoreStorage;
+    @ConfigProperty(name="timekeeper.instance-backup.maximum-expanded-bytes",defaultValue="17179869184") long maximumExpandedBytes;
 
     private final ThreadPoolExecutor workers=new ThreadPoolExecutor(1,1,0,TimeUnit.SECONDS,new SynchronousQueue<>(),work->{var thread=new Thread(work,"Timekeeper instance backup");thread.setDaemon(true);return thread;},new ThreadPoolExecutor.AbortPolicy());
     private final class Pending implements Runnable {
@@ -126,10 +130,25 @@ class InstanceBackupJobs {
             return reader.read(input,bytes);
         });
     }
+    private Status discardStaging(InstanceAdministrator.Proof proof,UUID id,InstanceArtifacts files) throws IOException {
+        if(restoreStorage.equals("NONE")||!Files.exists(Path.of(restoreStorage),LinkOption.NOFOLLOW_LINKS))return null;
+        var intent=new InstanceRestoreIntent(Path.of(restoreStorage),Math.addExact(maximumExpandedBytes,128_000_000L));
+        try(var connection=datasource.getConnection();var cancellation=intent.cancellationIfStaged(connection,id)) {
+            if(cancellation==null)return null;
+            accounts.tx(c->{
+                try {
+                    c.setTransactionIsolation(java.sql.Connection.TRANSACTION_SERIALIZABLE);lock(c);administrators.check(c,proof.principal());bindStorage(c,files.identity());
+                    cancellation.cancelUncommitted(c,administrators,proof,clock.now());return null;
+                }catch(java.sql.SQLException failure){throw databaseFailure(failure);}catch(IOException failure){throw new ApiFailure(503,"INSTANCE_BACKUP_CLEANUP_FAILED");}
+            });
+            cancellation.cleanup(connection);return status(connection,id);
+        }catch(java.sql.SQLException failure){throw databaseFailure(failure);}
+    }
     Status discard(InstanceAdministrator.Proof proof,UUID id) {
         administrators.requireFresh(proof);
         try {
-            var files=artifacts();Status expired=accounts.tx(c->{lock(c);administrators.check(c,proof.principal());bindStorage(c,files.identity());var current=status(c,id);
+            var files=artifacts();Status staged=discardStaging(proof,id,files);if(staged!=null){files.remove(id);return staged;}
+            Status expired=accounts.tx(c->{lock(c);administrators.check(c,proof.principal());bindStorage(c,files.identity());var current=status(c,id);
                 if(current.state()==State.EXPIRED)return current;return expire(c,id,proof.principal().owner(),clock.now());});
             files.remove(id);return expired;
         }catch(IOException failure){throw new ApiFailure(503,"INSTANCE_BACKUP_CLEANUP_FAILED");}

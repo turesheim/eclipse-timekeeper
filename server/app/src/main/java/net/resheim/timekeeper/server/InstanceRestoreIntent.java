@@ -148,8 +148,111 @@ final class InstanceRestoreIntent {
         }
     }
     Prepared open() throws IOException {Held held=new Held();boolean complete=false;try{var result=load(held);complete=true;return result;}finally{if(!complete)held.close();}}
-    private Prepared load(Held held) throws IOException {
-        InstanceConfiguration.Snapshot source=null,target=null;Path scratch=null;
+    /** Cancellation reads only the small handoff header, never decrypted business data. */
+    final class Cancellation implements AutoCloseable {
+        private final Held held;private final UUID operation,generation;private final String digest,actor;private final Spec spec;private boolean closed;
+        Cancellation(Held held,Connection c,UUID operation) throws IOException,SQLException {
+            this.held=held;this.operation=operation;var row=cancellationOperation(c,false);var payload=row.path("payload");actor=row.path("actor").asText();
+            if(payload.path("state").asText().equals("EXPIRED")&&payload.path("restorePhase").asText().equals("CANCELLED")||payload.path("state").asText().equals("REVIEW")&&payload.path("restorePhase").asText().equals("PREPARED")) {
+                var binding=payload.path("restoreIntent");fields(binding,Set.of("generation","sha256"));generation=uuid(binding.path("generation").asText());digest=binding.path("sha256").asText();if(!digest.matches("[a-f0-9]{64}"))throw invalid();spec=null;
+            }else {
+                var reference=reference();spec=reference.spec();generation=spec.generation();digest=reference.digest();
+                if(!operation.equals(spec.operation())||!actor.equals(spec.actor()))throw invalid();
+            }
+        }
+        /** Live cancellation is only for staging whose consent has not committed. */
+        void cancelUncommitted(Connection c,InstanceAdministrator administrators,InstanceAdministrator.Proof proof,Instant now) throws SQLException,IOException {
+            transaction(c);if(proof==null||proof.verifiedAt().isBefore(now.minusSeconds(300))||proof.verifiedAt().isAfter(now.plusSeconds(5)))throw new ApiFailure(422,"INSTANCE_PROOF_REQUIRED");
+            lock(c);administrators.check(c,proof.principal());if(!actor.equals(proof.principal().owner()))throw new ApiFailure(403,"FORBIDDEN");
+            var row=cancellationOperation(c,true);
+            if(!row.path("payload").path("upload").path("session").asText().equals(proof.principal().digest()))throw new ApiFailure(403,"FORBIDDEN");
+            recordCancellation(c,row,now,false);
+        }
+        /** Stopped-server recovery uses the original administrator's current password. */
+        void cancelOffline(Connection c,InstanceRestoreFence.Exclusive exclusive,String username,String password,Instant now) throws SQLException,IOException {
+            exclusive.require(c);if(!c.getAutoCommit())throw new SQLException("Offline cancellation requires a fresh transaction");
+            c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);c.setAutoCommit(false);
+            try {
+                lock(c);var row=cancellationOperation(c,true);checkPhase(c,row,true);
+                String key="instance-restore:cancel:"+actor;boolean allowed=attempt(c,key,5,java.time.Duration.ofMinutes(5),now);
+                boolean account=false;try(var statement=query(c,"SELECT username,state,administrator FROM tk_account WHERE owner_id=?",actor);var rows=statement.executeQuery()) {
+                    if(rows.next())account=Objects.equals(rows.getString(1),username)&&rows.getString(2).equals("ENABLED")&&rows.getBoolean(3);
+                }
+                boolean passwordValid=password!=null&&password.length()<=1024&&currentPassword(c,actor,password);
+                if(!allowed||!account||!passwordValid) {
+                    c.commit();c.setAutoCommit(true);throw new ApiFailure(allowed?422:429,allowed?"INSTANCE_PROOF_REQUIRED":"RATE_LIMITED");
+                }
+                execute(c,"DELETE FROM tk_auth_throttle WHERE id=?",hash(key));recordCancellation(c,row,now,true);c.commit();c.setAutoCommit(true);
+            }catch(SQLException|IOException|RuntimeException failure){if(!c.getAutoCommit()){c.rollback();c.setAutoCommit(true);}throw failure;}
+        }
+        private void recordCancellation(Connection c,ObjectNode row,Instant now,boolean pendingAllowed) throws SQLException,IOException {
+            checkPhase(c,row,pendingAllowed);var payload=(ObjectNode)row.path("payload");
+            if(payload.path("restorePhase").asText().equals("CANCELLED"))return;
+            var control=control(c,true);
+            if(control.path("restorePending").asBoolean()) {
+                control.put("restorePending",false);
+                if(!control.hasNonNull("restoreGeneration"))control.remove("restoreIntent");
+                else {
+                    var active=InstanceRestoreMaterial.active(root);var previous=control.path("restore");
+                    if(!active.generation().toString().equals(control.path("restoreGeneration").asText())||!previous.path("phase").asText().equals("COMPLETE")||!previous.path("operationId").asText().equals(active.operation().toString())||!previous.path("materialSha256").asText().equals(active.digest()))throw invalid();
+                    control.set("restoreIntent",object().put("generation",active.generation().toString()).put("sha256",active.intentDigest()));
+                }
+                execute(c,"UPDATE tk_instance SET version=version+1,payload=? WHERE id=?",control.toString(),CONTROL);
+            }
+            payload.put("state","EXPIRED").put("restorePhase","CANCELLED");payload.set("restoreIntent",binding());payload.remove(List.of("download","worker","leaseUntil"));
+            execute(c,"UPDATE tk_instance SET version=version+1,occurred_at=?,payload=? WHERE id=?",now.toString(),payload.toString(),operation);
+            execute(c,"INSERT INTO tk_instance(id,kind,version,operation_id,actor_owner,occurred_at,payload) VALUES(?,'AUDIT',1,?,?,?,?)",UUID.randomUUID(),operation,actor,now.toString(),object().put("type","RESTORE").put("state","EXPIRED").put("action","RESTORE_CANCELLED").toString());
+        }
+        private void checkPhase(Connection c,ObjectNode row,boolean pendingAllowed) throws SQLException {
+            if(closed)throw new SQLException("Restore cancellation is closed");var payload=row.path("payload");var control=control(c,true);
+            if(!row.path("actor").asText().equals(actor)||!payload.path("type").asText().equals("RESTORE")||control.path("restoreGeneration").asText().equals(generation.toString()))throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
+            if(payload.path("state").asText().equals("EXPIRED")&&payload.path("restorePhase").asText().equals("CANCELLED")&&payload.path("restoreIntent").equals(binding())&&!control.path("restorePending").asBoolean())return;
+            // Committed consent is authoritative even if its staged header or
+            // decrypted image was damaged. Cancellation never applies that image.
+            if(pendingAllowed&&payload.path("state").asText().equals("REVIEW")&&control.path("restorePending").asBoolean()&&payload.path("restorePhase").asText().equals("PREPARED")&&payload.path("restoreIntent").equals(binding())&&control.path("restoreIntent").equals(binding()))return;
+            if(spec==null||!control.path("artifactRootId").asText().equals(spec.artifactRoot().toString())||!Objects.equals(control.hasNonNull("restoreGeneration")?control.path("restoreGeneration").asText():null,spec.previousGeneration()==null?null:spec.previousGeneration().toString())||!payload.path("state").asText().equals("REVIEW"))throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
+            if(!control.path("restorePending").asBoolean()&&!payload.has("restorePhase")&&row.path("version").asLong()==spec.reviewVersion())return;
+            throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
+        }
+        /** Call only after committing cancellation. Partial deletion can be retried from the receipt. */
+        void cleanup(Connection c) throws SQLException,IOException {
+            if(closed||!c.getAutoCommit())throw new SQLException("Commit cancellation before cleanup");var row=cancellationOperation(c,false);var control=control(c,false);
+            if(!row.path("payload").path("state").asText().equals("EXPIRED")||!row.path("payload").path("restorePhase").asText().equals("CANCELLED")||!row.path("payload").path("restoreIntent").equals(binding())||control.path("restorePending").asBoolean()||control.path("restoreGeneration").asText().equals(generation.toString()))throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
+            if(Files.exists(root.resolve("active.json"),NOFOLLOW_LINKS)&&InstanceRestoreMaterial.active(root).generation().equals(generation))throw invalid();
+            Path pointer=root.resolve("prepared.json");
+            if(Files.exists(pointer,NOFOLLOW_LINKS)) {
+                var value=read(pointer,1024);fields(value,Set.of("format","generation","sha256"));
+                if(!value.path("format").asText().equals(FORMAT)||!value.path("generation").asText().equals(generation.toString())||!value.path("sha256").asText().equals(digest))throw invalid();
+                Files.delete(pointer);sync(root);
+            }
+            if(Files.exists(root.resolve("material"),NOFOLLOW_LINKS))directory(root.resolve("material"));
+            for(Path path:List.of(root.resolve(generation.toString()),root.resolve("material").resolve(generation.toString())))if(Files.exists(path,NOFOLLOW_LINKS)){directory(path);InstanceBackupArchive.remove(path);sync(path.getParent());}
+        }
+        private ObjectNode binding(){return object().put("generation",generation.toString()).put("sha256",digest);}
+        private ObjectNode cancellationOperation(Connection c,boolean locked) throws SQLException {
+            try(var statement=query(c,"SELECT version,actor_owner,payload FROM tk_instance WHERE id=? AND kind='OPERATION'"+(locked?" FOR UPDATE":""),operation);var rows=statement.executeQuery()) {
+                if(!rows.next())throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");var value=object().put("version",rows.getLong(1)).put("actor",rows.getString(2));value.set("payload",parse(rows.getString(3)));return value;
+            }
+        }
+        private void transaction(Connection c) throws SQLException {if(closed||c.getAutoCommit()||c.getTransactionIsolation()!=Connection.TRANSACTION_SERIALIZABLE)throw new SQLException("Cancel staging in a serializable transaction");}
+        public void close() throws IOException {if(closed)return;closed=true;held.close();}
+    }
+    Cancellation cancellation(Connection c,UUID operation) throws IOException,SQLException {
+        Held held=new Held();boolean complete=false;try{var result=new Cancellation(held,c,operation);complete=true;return result;}finally{if(!complete)held.close();}
+    }
+    /** Hold the root lock across browser discard's database commit and cleanup. */
+    Cancellation cancellationIfStaged(Connection c,UUID operation) throws IOException,SQLException {
+        Held held=new Held();boolean complete=false;
+        try {
+            boolean cancelled=false;try(var statement=query(c,"SELECT payload FROM tk_instance WHERE id=? AND kind='OPERATION'",operation);var rows=statement.executeQuery()) {
+                if(rows.next()){var payload=parse(rows.getString(1));cancelled=payload.path("type").asText().equals("RESTORE")&&payload.path("state").asText().equals("EXPIRED")&&payload.path("restorePhase").asText().equals("CANCELLED");}
+            }
+            if(!cancelled&&(!Files.exists(root.resolve("prepared.json"),NOFOLLOW_LINKS)||!reference().spec().operation().equals(operation)))return null;
+            var result=new Cancellation(held,c,operation);complete=true;return result;
+        }finally{if(!complete)held.close();}
+    }
+    record Reference(Spec spec,String digest,Path stage,ObjectNode metadata) { @Override public String toString(){return "Private restore handoff header";} }
+    private Reference reference() throws IOException {
         try {
             var pointer=read(root.resolve("prepared.json"),1024);fields(pointer,Set.of("format","generation","sha256"));if(!pointer.path("format").asText().equals(FORMAT)||!pointer.path("generation").isTextual()||!pointer.path("sha256").isTextual()||!pointer.path("sha256").asText().matches("[a-f0-9]{64}"))throw invalid();
             UUID generation=uuid(pointer.path("generation").asText());Path stage=root.resolve(generation.toString());directory(stage);
@@ -160,6 +263,13 @@ final class InstanceRestoreIntent {
             if(!metadata.path("previousGeneration").isNull()&&!metadata.path("previousGeneration").isTextual())throw invalid();
             Instant.parse(metadata.path("createdAt").asText());var deployment=metadata.path("deployment");fields(deployment,Set.of("packageId","publicOrigin","passkeyRpId","passkeysEnabled"));if(!deployment.path("passkeysEnabled").isBoolean())throw invalid();for(String name:List.of("packageId","publicOrigin","passkeyRpId"))if(!deployment.path(name).isTextual())throw invalid();
             var spec=new Spec(generation,uuid(metadata.path("operation").asText()),metadata.path("reviewVersion").asLong(),metadata.path("actor").asText(),uuid(metadata.path("artifactRoot").asText()),metadata.path("previousGeneration").isNull()?null:uuid(metadata.path("previousGeneration").asText()),new InstanceRestoreDatabase.Deployment(deployment.path("packageId").asText(),deployment.path("publicOrigin").asText(),deployment.path("passkeyRpId").asText(),deployment.path("passkeysEnabled").asBoolean()));
+            return new Reference(spec,digest,stage,metadata);
+        }catch(IOException failure){throw failure;}catch(RuntimeException failure){throw invalid();}
+    }
+    private Prepared load(Held held) throws IOException {
+        InstanceConfiguration.Snapshot source=null,target=null;Path scratch=null;
+        try {
+            var reference=reference();var spec=reference.spec();String digest=reference.digest();Path stage=reference.stage();var metadata=reference.metadata();
             long total=0;var entries=metadata.path("entries");
             for(var iterator=entries.fields();iterator.hasNext();) {
                 var entry=iterator.next();if(!valid(entry.getKey()))throw invalid();var receipt=entry.getValue();fields(receipt,Set.of("bytes","sha256"));Path path=stage.resolve(entry.getKey());parents(stage,path.getParent(),false);file(path);

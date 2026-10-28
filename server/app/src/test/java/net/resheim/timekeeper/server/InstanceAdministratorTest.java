@@ -38,7 +38,7 @@ class InstanceAdministratorTest {
     @TempDir Path directory;
     TokenRegistry.Principal admin;Path output;
     @BeforeEach void setup() throws Exception {
-        ClientProxy.unwrap(store).stopMaintenance();ClientProxy.unwrap(administrators).clock=clock;
+        ClientProxy.unwrap(store).stopMaintenance();ClientProxy.unwrap(administrators).clock=clock;ClientProxy.unwrap(jobs).restoreStorage="NONE";
         accounts.tx(c->{
             for(String table:List.of("tk_relation","tk_external_reference","tk_active","tk_receipt","tk_change","tk_auth_session","tk_passkey_ceremony","tk_passkey_credential","tk_recovery_link","tk_recovery_address","tk_auth_challenge","tk_api_token","tk_passkey_user","tk_locale","tk_account","tk_resource","tk_owner","tk_auth_throttle"))execute(c,"DELETE FROM "+table);
             execute(c,"DELETE FROM tk_instance WHERE kind<>'CONTROL'");
@@ -426,6 +426,35 @@ class InstanceAdministratorTest {
             assertEquals(before,originalInstanceControl());try(var c=datasource.getConnection()){assertEquals("INSTANCE_RESTORE_NOT_AUTHORIZED",assertThrows(ApiFailure.class,()->prepared.phase(c)).code);}
             accounts.logout(admin);assertEquals(401,assertThrows(ApiFailure.class,()->authorizeIntent(prepared,proof,clock.now())).status);
         }
+    }
+    @Test void stagingCancellationChecksOriginalBrowserProofAndCommitBeforeRemovingPlaintext() throws Exception {
+        var proof=administrators.verify(admin,PASSWORD);InstanceRestoreIntent.Spec spec;Path root;
+        try(var prepared=preparedIntent(proof)){spec=prepared.spec();root=prepared.storage();}
+        var intent=new InstanceRestoreIntent(root,100_000_000);
+        try(var c=datasource.getConnection();var cancellation=intent.cancellation(c,spec.operation())) {
+            assertEquals("INSTANCE_OPERATION_STATE",assertThrows(ApiFailure.class,()->cancellation.cleanup(c)).code);
+            assertThrows(IllegalStateException.class,()->accounts.tx(tx->{
+                try{tx.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);cancellation.cancelUncommitted(tx,administrators,proof,clock.now());throw new IllegalStateException("Rollback staging cancellation");}catch(java.sql.SQLException|java.io.IOException failure){throw new AssertionError(failure);}
+            }));
+            assertEquals(InstanceOperations.State.REVIEW,InstanceOperations.status(c,spec.operation()).state());assertTrue(Files.exists(root.resolve("prepared.json")));
+            assertEquals("INSTANCE_PROOF_REQUIRED",assertThrows(ApiFailure.class,()->accounts.tx(tx->{try{tx.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);cancellation.cancelUncommitted(tx,administrators,proof,proof.verifiedAt().plusSeconds(301));return null;}catch(java.sql.SQLException|java.io.IOException failure){throw new AssertionError(failure);}})).code);
+            accounts.tx(tx->{try{tx.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);cancellation.cancelUncommitted(tx,administrators,proof,clock.now());return null;}catch(java.sql.SQLException|java.io.IOException failure){throw new AssertionError(failure);}});
+            cancellation.cleanup(c);assertFalse(Files.exists(root.resolve("prepared.json")));assertFalse(Files.exists(root.resolve(spec.generation().toString())));
+            assertEquals(InstanceOperations.State.EXPIRED,InstanceOperations.status(c,spec.operation()).state());assertNotNull(accounts.account(admin));
+        }
+    }
+    @Test void publicDiscardCleansItsUncommittedHandoffAndLeavesOtherOperationsUntouched() throws Exception {
+        var browser=httpLogin("instance-admin");var principal=accounts.session(BrowserCookies.read(List.of(browser.cookie())).session());
+        var proof=administrators.verify(principal,PASSWORD);InstanceRestoreIntent.Spec spec;Path root;
+        // The upload belongs to this browser session, just as in the real HTTP flow.
+        var previous=admin;admin=principal;
+        try(var prepared=preparedIntent(proof)){spec=prepared.spec();root=prepared.storage();}finally{admin=previous;}
+        ClientProxy.unwrap(jobs).restoreStorage=root.toString();
+        String path="/admin/instance/operations/"+spec.operation()+"/discard";
+        assertEquals(403,http(browser,false,"POST",path,object().put("currentPassword",PASSWORD)).statusCode());assertTrue(Files.exists(root.resolve("prepared.json")));
+        var other=httpLogin("instance-admin");assertEquals(403,http(other,true,"POST",path,object().put("currentPassword",PASSWORD)).statusCode());assertTrue(Files.exists(root.resolve("prepared.json")));
+        assertEquals(200,http(browser,true,"POST",path,object().put("currentPassword",PASSWORD)).statusCode());assertFalse(Files.exists(root.resolve("prepared.json")));assertFalse(Files.exists(root.resolve(spec.generation().toString())));
+        assertEquals(200,http(browser,true,"POST",path,object().put("currentPassword",PASSWORD)).statusCode());assertNotNull(accounts.account(principal));
     }
     @Test void rewritingTheIntentAndPointerCannotReusePreviouslyCommittedConsent() throws Exception {
         var proof=administrators.verify(admin,PASSWORD);InstanceRestoreIntent.Spec spec;

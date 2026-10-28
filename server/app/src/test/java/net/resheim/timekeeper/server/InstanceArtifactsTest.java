@@ -67,6 +67,12 @@ class InstanceArtifactsTest {
         Path metadata=part(id).resolveSibling("upload.json");Files.writeString(metadata,"{\"format\":1,\"format\":1}");opaque(assertThrows(IOException.class,()->store.status(id)));
         Files.setPosixFilePermissions(directory.resolve("private"),PosixFilePermissions.fromString("rwxr-xr-x"));opaque(assertThrows(IOException.class,this::store));
     }
+    @Test void openingEstablishedStorageDoesNotCompeteWithItsActiveRootOperation() throws Exception {
+        var existing=store();
+        try(var channel=java.nio.channels.FileChannel.open(directory.resolve("private/.lock"),StandardOpenOption.WRITE);var held=channel.lock()) {
+            assertEquals(existing.identity(),store().identity());
+        }
+    }
     @Test void identityPersistsAndMissingIdentityOrChangedCiphertextFailsClosed() throws Exception {
         var store=store();assertEquals(store.identity(),store().identity());var id=UUID.randomUUID();byte[] bytes={1,2};
         store.create(id,2,digest(bytes));store.append(id,0,bytes);store.complete(id);

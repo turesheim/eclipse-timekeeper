@@ -513,7 +513,7 @@ It is not yet exposed as an end-user restore workflow. Separate-JVM tests cover
 H2 and a non-superuser PostgreSQL application role, repeated completion, recovery
 after database commit, partial cleanup, and refusal of populated targets.
 
-Public staging/confirmation and cancellation of uncommitted staging are still required.
+Public staging/confirmation and complete operator recovery guidance are still required.
 Full package-identity migration and restored login/passkey/journal/attachment
 acceptance remain delivery requirements; SQL/password-hash checks alone do not
 prove those application flows.
@@ -557,3 +557,54 @@ restarts and repeats the authenticated read, then checks that missing required
 material prevents framework startup. This loopback protocol check explicitly
 forwards the Secure session cookie; it does not replace HTTPS browser acceptance
 or the remaining passkey, journal, attachment and native migration requirements.
+
+
+## Cancellation before database replacement
+
+The existing fresh-password Discard action also cancels a matching uncommitted
+handoff in the configured restore root. This requires its original account
+session, checks only the small private handoff header, records `EXPIRED` with
+`restorePhase=CANCELLED`, and commits before deleting plaintext. CSRF, administrator
+and fresh-proof checks remain in effect. Other upload artifacts retain their
+existing discard rules. A rolled-back cancellation cannot authorize cleanup.
+
+After restore consent has committed and the maintenance gate is active, stop all
+target server processes before cancellation. The shipped offline entry point
+accepts `--cancel <restore-root> <operation-UUID>` after the main class name.
+It resolves the destination configuration and password files exactly as recovery
+does. Supply one JSON object on standard input with `username` and
+`currentPassword` for the original destination administrator. Use a private input
+pipe or a mode-0600 file; credentials must not be placed in command arguments or
+shell history. A successful cancellation prints only `INSTANCE_RESTORE_CANCELLED`.
+The normal server can then be started again with its original configuration.
+This is an internal recovery interface until the full confirmation workflow and
+final operator guide are delivered.
+
+The offline connection requires exclusive access and the normal application DB
+role. It checks the original account's current password, enabled administrator
+state and durable rate limit. A pending cancellation trusts the exact database
+consent binding, so it does not need a readable decrypted image or staging header.
+The cancellation receipt remains in the destination database and audit; original
+business and account data are unchanged. The source installation is never used.
+
+Cancellation is permitted only before the replacement database transaction
+commits. `DATABASE_APPLIED` and completed generations must resume recovery.
+Cancelling consent clears the pending gate transactionally and preserves any
+previous active generation/material binding. Cleanup verifies the receipt, keeps
+active material, and removes only that cancelled generation's temporary plaintext
+and unpublished material. Deleting the handoff pointer first makes partial
+cleanup repeatable from the database receipt, even after its header is gone.
+No general authenticated API bypass is added for the pending state.
+
+Tests cover rollback before commit, original-session isolation and CSRF, wrong
+and rate-limited credentials, missing/corrupt staged images and headers, repeated
+cancellation, interrupted deletion, symlink refusal, post-application rejection,
+and H2/PostgreSQL application-role execution. Exact-distribution acceptance also
+cancels a pending handoff twice and verifies the original bootstrap account can
+log in after normal startup and restart with no restored source client data.
+
+Storage identities are now published atomically. Opening an established artifact
+store reads its immutable identity without taking its global mutation lock;
+identity validation remains mandatory for each protected operation. A regression
+test holds that lock while opening another store handle, preventing upload-status
+polling from intermittently failing during unrelated storage work.

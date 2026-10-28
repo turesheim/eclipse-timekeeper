@@ -27,7 +27,7 @@ final class InstanceArtifacts {
         this.root=root.toAbsolutePath().normalize();this.maximumBytes=maximumBytes;this.retainedBytes=retainedBytes;this.maximumJobs=maximumJobs;
         try {
             if(!Files.exists(this.root,NOFOLLOW_LINKS))try{Files.createDirectory(this.root,PosixFilePermissions.asFileAttribute(DIRECTORY));}catch(FileAlreadyExistsException race){/* Another replica initialized it. */}
-            directory(this.root);identity=locked(this.root,this::loadIdentity);
+            directory(this.root);identity=Files.exists(this.root.resolve(".identity"),NOFOLLOW_LINKS)?readIdentity():locked(this.root,this::loadIdentity);
         }
         catch(IOException|RuntimeException failure){throw unavailable();}
     }
@@ -165,12 +165,19 @@ final class InstanceArtifacts {
             // The configured parent must already exist. Persist its new root
             // entry before publishing the identity used by database receipts.
             sync(root.getParent());
-            try(var output=createFile(marker)) {
-                var bytes=ByteBuffer.wrap((UUID.randomUUID()+"\n").getBytes(java.nio.charset.StandardCharsets.US_ASCII));while(bytes.hasRemaining())output.write(bytes);output.force(true);
-            }
+            Path temporary=root.resolve(".identity-"+UUID.randomUUID());
+            try {
+                try(var output=createFile(temporary)) {
+                    var bytes=ByteBuffer.wrap((UUID.randomUUID()+"\n").getBytes(java.nio.charset.StandardCharsets.US_ASCII));while(bytes.hasRemaining())output.write(bytes);output.force(true);
+                }
+                Files.move(temporary,marker,StandardCopyOption.ATOMIC_MOVE);
+            }finally{Files.deleteIfExists(temporary);}
             sync(root);
         }
-        file(marker);if(Files.size(marker)!=37)throw unavailable();
+        return readIdentity();
+    }
+    private UUID readIdentity() throws IOException {
+        Path marker=root.resolve(".identity");file(marker);if(Files.size(marker)!=37)throw unavailable();
         String value=Files.readString(marker,java.nio.charset.StandardCharsets.US_ASCII);
         try {UUID id=UUID.fromString(value.strip());if(!value.equals(id+"\n"))throw unavailable();return id;}
         catch(IllegalArgumentException failure){throw unavailable();}
@@ -201,7 +208,7 @@ final class InstanceArtifacts {
     @FunctionalInterface private interface Work<T> {T run() throws IOException;}
     private <T> T locked(Path directory,Work<T> work) throws IOException {
         try {
-            if(identity!=null&&!loadIdentity().equals(identity))throw unavailable();
+            if(identity!=null&&!readIdentity().equals(identity))throw unavailable();
             directory(directory);Path lock=directory.resolve(".lock");
             if(!Files.exists(lock,NOFOLLOW_LINKS))try(var created=createFile(lock)){created.force(true);}catch(FileAlreadyExistsException race){/* Another process created the lock. */}
             file(lock);

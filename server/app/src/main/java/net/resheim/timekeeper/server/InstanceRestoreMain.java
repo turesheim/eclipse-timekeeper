@@ -21,7 +21,8 @@ public final class InstanceRestoreMain {
                 for(String name:incoming.stringPropertyNames())if(!java.util.Set.of("java.class.path","jdk.module.path","sun.java.command","java.home").contains(name))System.setProperty(name,incoming.getProperty(name));incoming.clear();
                 var result=preboot();result.setProperty("status","READY");result.store(output,"Private startup result");result.clear();return;
             }
-            if(args.length!=1)throw new IllegalArgumentException();Path root=Path.of(args[0]).toAbsolutePath().normalize();
+            boolean cancel=args.length==3&&args[0].equals("--cancel");
+            if(!cancel&&args.length!=1)throw new IllegalArgumentException();Path root=Path.of(args[cancel?1:0]).toAbsolutePath().normalize();
             var config=configuration();String configured=config.getOptionalValue("timekeeper.instance-restore.storage",String.class).orElse("NONE");
             if(!configured.equals("NONE")&&!Path.of(configured).toAbsolutePath().normalize().equals(root))throw new IllegalArgumentException();
             String url=config.getValue("quarkus.datasource.jdbc.url",String.class);DatabaseConfiguration.validate(url);
@@ -31,7 +32,18 @@ public final class InstanceRestoreMain {
             long limit=Long.parseLong(config.getOptionalValue("timekeeper.instance-backup.maximum-expanded-bytes",String.class).orElse("17179869184"));
             var intent=new InstanceRestoreIntent(root,Math.addExact(limit,128_000_000L));
             try(var connection=DriverManager.getConnection(url,properties)) {
-                ServerSchema.validate(connection);var material=InstanceRestoreRecovery.resume(connection,intent,Instant.now(),InstanceRestoreMain::preflightConfiguration);
+                ServerSchema.validate(connection);
+                if(cancel) {
+                    byte[] bytes=System.in.readNBytes(8193);if(bytes.length>8192)throw new IllegalArgumentException();
+                    com.fasterxml.jackson.databind.JsonNode credentials;
+                    try{credentials=JsonValues.MAPPER.reader().with(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION).with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(bytes);}finally{java.util.Arrays.fill(bytes,(byte)0);}
+                    if(credentials==null||!credentials.isObject()||credentials.size()!=2||!credentials.path("username").isTextual()||!credentials.path("currentPassword").isTextual()||credentials.path("currentPassword").asText().length()>1024)throw new IllegalArgumentException();
+                    try(var cancellation=intent.cancellation(connection,java.util.UUID.fromString(args[2]));var exclusive=InstanceRestoreFence.exclusive(connection)) {
+                        cancellation.cancelOffline(connection,exclusive,AccountStore.username(credentials.path("username").asText()),credentials.path("currentPassword").asText(),Instant.now());cancellation.cleanup(connection);
+                    }finally{((com.fasterxml.jackson.databind.node.ObjectNode)credentials).removeAll();}
+                    output.println("INSTANCE_RESTORE_CANCELLED");return;
+                }
+                var material=InstanceRestoreRecovery.resume(connection,intent,Instant.now(),InstanceRestoreMain::preflightConfiguration);
                 // The path is private configuration, not a command to evaluate.
                 output.println("INSTANCE_RESTORE_COMPLETE");output.println(material.configuration().toUri().toASCIIString().replace(",","\\,"));
             }finally{properties.clear();}
