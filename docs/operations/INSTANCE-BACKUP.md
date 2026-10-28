@@ -34,6 +34,20 @@ encrypted artifacts and three retained jobs. See the canonical
 `timekeeper.instance-backup.maximum-*` properties for deployment overrides.
 These limits do not replace filesystem capacity planning.
 
+The private configuration inventory includes explicit JVM key/trust stores and
+their passwords, PostgreSQL `sslcert`, `sslkey` and `sslrootcert` additional JDBC
+properties, and conventional runtime trust/certificate/key files that exist for
+the service account. Empty/disabled settings are preserved. Missing configured
+files, unknown file-bearing inputs or files exceeding the inventory limits fail
+backup instead of producing an incomplete archive. JVM store settings follow the
+[JSSE property names](https://docs.oracle.com/en/java/javase/21/security/java-secure-socket-extension-jsse-reference-guide.html);
+PostgreSQL inputs use the [driver's SSL settings](https://jdbc.postgresql.org/documentation/ssl/).
+
+These bytes are retained in the encrypted archive and immutable recovered source
+inventory. They do not replace the destination's database, listener or TLS
+configuration; configure deployment bindings for the destination before preparing
+the restore. Source paths are metadata and are never extraction destinations.
+
 Use a new destination installation and complete its first administrator setup.
 Do not create business records, API tokens or other accounts, or change built-in
 label defaults. Only disposable bootstrap data is eligible for replacement.

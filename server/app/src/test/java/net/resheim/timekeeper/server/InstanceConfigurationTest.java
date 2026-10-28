@@ -112,6 +112,47 @@ class InstanceConfigurationTest {
             assertEquals(directory.resolve("absent-pending.json").toString(),snapshot.document().path("properties").path("timekeeper.maintenance.file").asText());
         }
     }
+    @Test void jvmTlsStoresAndTheirPasswordsAreIncludedAsRecoverableInputs() throws Exception {
+        Path keys=directory.resolve("client.p12"),trust=directory.resolve("trust.jks");Files.write(keys,new byte[]{0,1,2,-1});Files.writeString(trust,"private trust material");
+        var values=base();values.put("javax.net.ssl.keyStore",keys.toString());values.put("javax.net.ssl.keyStorePassword","private JVM key password");
+        values.put("javax.net.ssl.trustStore",trust.toString());values.put("javax.net.ssl.trustStorePassword","private JVM trust password");
+        var config=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(values,"JVM configuration",100)).build();
+        try(var snapshot=InstanceConfiguration.capture(config)) {
+            assertEquals(2,snapshot.files().size());assertEquals("private JVM key password",snapshot.document().path("properties").path("javax.net.ssl.keyStorePassword").asText());
+            assertEquals("private JVM trust password",snapshot.document().path("properties").path("javax.net.ssl.trustStorePassword").asText());
+            var files=snapshot.document().path("files");assertArrayEquals(Files.readAllBytes(keys),snapshot.files().get(files.path("javax.net.ssl.keyStore").get(0).asText()));
+            assertArrayEquals(Files.readAllBytes(trust),snapshot.files().get(files.path("javax.net.ssl.trustStore").get(0).asText()));
+            InstanceConfiguration.validate(snapshot.document(),snapshot.files().keySet());
+        }
+    }
+    @Test void postgresTlsInputsFromAdditionalJdbcPropertiesAreNeverSilentlyOmitted() throws Exception {
+        var values=base();int index=0;
+        for(String name:List.of("quarkus.datasource.jdbc.additional-jdbc-properties.sslrootcert","quarkus.datasource.jdbc.additional-jdbc-properties.\"sslcert\"","quarkus.datasource.\"replica.one\".jdbc.additional-jdbc-properties.sslkey")) {
+            Path file=directory.resolve("postgres-input-"+(index++)+".pem");Files.writeString(file,"private PostgreSQL TLS material "+index);values.put(name,file.toString());
+        }
+        try(var snapshot=InstanceConfiguration.capture(values,Map.of())) {
+            assertEquals(3,snapshot.files().size());
+            for(String name:values.keySet())if(name.contains("additional-jdbc-properties"))assertArrayEquals(Files.readAllBytes(Path.of(values.get(name))),snapshot.files().get(snapshot.document().path("files").path(name).get(0).asText()));
+            InstanceConfiguration.validate(snapshot.document(),snapshot.files().keySet());
+        }
+    }
+    @Test void conventionalRuntimeTrustAndPostgresStoresAreInventoriedWithoutOverridingTls() throws Exception {
+        Path javaHome=Files.createDirectories(directory.resolve("runtime/lib/security")),home=Files.createDirectories(directory.resolve("service/.postgresql"));
+        Files.writeString(javaHome.resolve("cacerts"),"fallback runtime trust");Files.writeString(javaHome.resolve("jssecacerts"),"preferred runtime trust");
+        for(String name:List.of("postgresql.crt","postgresql.pk8","root.crt"))Files.writeString(home.resolve(name),"private default PostgreSQL input "+name);
+        var values=base();values.put("java.home",directory.resolve("runtime").toString());values.put("user.home",directory.resolve("service").toString());values.put("os.name","Linux");values.put("quarkus.datasource.db-kind","postgresql");
+        var config=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(values,"runtime defaults",100)).build();
+        try(var snapshot=InstanceConfiguration.capture(config)) {
+            assertEquals(4,snapshot.files().size());assertFalse(snapshot.document().path("properties").has("javax.net.ssl.trustStore"));
+            assertTrue(snapshot.files().values().stream().anyMatch(bytes->Arrays.equals(bytes,"preferred runtime trust".getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+            assertFalse(snapshot.files().values().stream().anyMatch(bytes->Arrays.equals(bytes,"fallback runtime trust".getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+            InstanceConfiguration.validate(snapshot.document(),snapshot.files().keySet());
+        }
+        Files.delete(javaHome.resolve("jssecacerts"));
+        try(var snapshot=InstanceConfiguration.capture(config)) {
+            assertTrue(snapshot.files().values().stream().anyMatch(bytes->Arrays.equals(bytes,"fallback runtime trust".getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+        }
+    }
     @FunctionalInterface private interface Attempt {Object run() throws Exception;}
     private void rejects(Attempt action){var failure=assertThrows(IOException.class,action::run);assertEquals("INVALID_INSTANCE_CONFIGURATION",failure.getMessage());assertNull(failure.getCause());assertFalse(failure.toString().contains(directory.toString()));}
 }
