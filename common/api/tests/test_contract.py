@@ -68,7 +68,7 @@ class ContractTest(unittest.TestCase):
                             '/auth/passkeys/login/options', '/auth/passkeys/login/finish', '/auth/passkeys/cancel'):
                     self.assertEqual([], operation['security'])
                     continue
-                if path.startswith('/admin/instance/'):
+                if path == '/admin/instance' or path.startswith('/admin/instance/'):
                     self.assertEqual([{'browserSession': [], 'instanceDownloadGrant': []}] if path == '/admin/instance/operations/{id}/content' else [{'browserSession': []}], operation['security'])
                 else:
                     self.assertNotIn('security', operation)
@@ -563,7 +563,7 @@ class ContractTest(unittest.TestCase):
             'passkeyProofOptions', 'verifyPasskeyProof', 'renamePasskey', 'removePasskey',
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
-            'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup', 'createInstanceRestoreUpload', 'getInstanceRestoreUpload', 'appendInstanceRestoreUpload', 'validateInstanceRestoreUpload',
+            'getInstanceBackupSummary', 'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup', 'createInstanceRestoreUpload', 'getInstanceRestoreUpload', 'appendInstanceRestoreUpload', 'validateInstanceRestoreUpload',
             'getAdministrationSettings', 'updateAdministrationSettings', 'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()

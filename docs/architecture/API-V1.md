@@ -875,6 +875,7 @@ being implemented. The current draft adds these routes under the separate
 
 | Method | Path | Behavior |
 | --- | --- | --- |
+| GET | `/` | Read configured archive limits and up to 50 recent operation receipts for page-reload recovery; `canAccessUpload` is true only in the initiating session. No archive storage is opened. |
 | POST | `/backups` | Verify `currentPassword`, consume an encryption `passphrase`, and return `202` with a durable operation receipt and its `Location`. |
 | GET | `/operations/{id}` | Return the operation's ID, type, state, version and UTC update time. |
 | POST | `/operations/{id}/download-grant` | Verify `currentPassword` and issue one private, session-bound download cookie lasting two minutes. |
@@ -884,6 +885,19 @@ being implemented. The current draft adds these routes under the separate
 | GET | `/uploads/{id}` | Read transfer progress, validation result and a safe archive review. |
 | PUT | `/uploads/{id}/content?offset=…` | Append at most 1 MiB of binary ciphertext, or retry an acknowledged range with identical bytes. |
 | POST | `/uploads/{id}/validate` | Re-verify `currentPassword`, consume `passphrase`, and return `202` before full-file verification. |
+
+The Administration **Backup & Restore** page uses these routes. It polls recent
+operation metadata so a reload or lost start response does not require replaying
+a creation request. Upload files are hashed in a worker with locally bundled
+SHA-256, reading at most 1 MiB at a time. The encryption passphrase is requested
+separately for archive verification; it is never sent to the hashing worker.
+Resuming requires selecting the original file again. Its size and checksum must
+match the server receipt before another chunk is sent. A lost acknowledgement
+stops the transfer; a new resume reads the durable offset before continuing.
+Downloads use a native attachment navigation after a password-authorized cookie
+grant, without retaining a complete archive Blob in browser memory. The browser's
+download manager is the authority for transfer completion. Archive review is not
+a restore activation; the page lists the remaining target and offline checks.
 
 Only current administrator browser-account sessions with write permission are
 authorized. Managed or legacy API tokens, token-exchanged browser sessions,

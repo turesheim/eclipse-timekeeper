@@ -15422,6 +15422,84 @@
           }
         }
       }
+    },
+    "/admin/instance": {
+      "get": {
+        "operationId": "getInstanceBackupSummary",
+        "summary": "Read backup limits and recent instance operations",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator browser-account session only. Returns up to 50 recent operations, ordered newest first, with a flag allowing upload access only in its initiating session. Reveals no paths, credentials, worker capabilities or archive contents. Storage configuration does not guarantee filesystem readiness.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceBackupSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -28636,6 +28714,48 @@
           "sha256": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "InstanceBackupSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "storageConfigured",
+          "maximumArchiveBytes",
+          "chunkBytes",
+          "items"
+        ],
+        "properties": {
+          "storageConfigured": {
+            "type": "boolean"
+          },
+          "maximumArchiveBytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "chunkBytes": {
+            "const": 1048576
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operation",
+                "canAccessUpload"
+              ],
+              "properties": {
+                "operation": {
+                  "$ref": "#/components/schemas/InstanceOperation"
+                },
+                "canAccessUpload": {
+                  "type": "boolean"
+                }
+              }
+            }
           }
         }
       }

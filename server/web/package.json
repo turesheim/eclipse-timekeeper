@@ -4,20 +4,22 @@
   "license": "EPL-2.0",
   "type": "module",
   "scripts": {
-    "test": "node scripts/vendor-bootstrap.mjs --check && node scripts/vendor-icons.mjs --check && node scripts/vendor-i18n.mjs --check && node scripts/vendor-holidays.mjs --check && node scripts/vendor-notices.mjs --check && node scripts/vendor-editor.mjs --check && node scripts/vendor-mermaid.mjs --check && node --test tests/model.test.js tests/api.test.js tests/credentials.test.js tests/calendar.test.js tests/month.test.js tests/workweek-session-model.test.js tests/toggl-csv.test.js tests/import-model.test.js tests/webauthn.test.js tests/icons.test.js tests/i18n.test.js tests/holidays.test.js tests/markdown-document.test.js",
+    "test": "node scripts/vendor-hashes.mjs --check && node scripts/vendor-bootstrap.mjs --check && node scripts/vendor-icons.mjs --check && node scripts/vendor-i18n.mjs --check && node scripts/vendor-holidays.mjs --check && node scripts/vendor-notices.mjs --check && node scripts/vendor-editor.mjs --check && node scripts/vendor-mermaid.mjs --check && node --test tests/model.test.js tests/api.test.js tests/credentials.test.js tests/calendar.test.js tests/month.test.js tests/workweek-session-model.test.js tests/toggl-csv.test.js tests/import-model.test.js tests/webauthn.test.js tests/icons.test.js tests/i18n.test.js tests/holidays.test.js tests/markdown-document.test.js tests/file-sha256.test.js tests/instance-upload.test.js",
     "test:browser": "playwright test",
     "vendor:bootstrap": "node scripts/vendor-bootstrap.mjs",
-    "check:assets": "node scripts/vendor-bootstrap.mjs --check && node scripts/vendor-icons.mjs --check && node scripts/vendor-i18n.mjs --check && node scripts/vendor-holidays.mjs --check && node scripts/vendor-notices.mjs --check && node scripts/vendor-editor.mjs --check && node scripts/vendor-mermaid.mjs --check",
+    "check:assets": "node scripts/vendor-hashes.mjs --check && node scripts/vendor-bootstrap.mjs --check && node scripts/vendor-icons.mjs --check && node scripts/vendor-i18n.mjs --check && node scripts/vendor-holidays.mjs --check && node scripts/vendor-notices.mjs --check && node scripts/vendor-editor.mjs --check && node scripts/vendor-mermaid.mjs --check",
     "vendor:mermaid": "node scripts/vendor-mermaid.mjs",
     "vendor:icons": "node scripts/vendor-icons.mjs",
     "vendor:i18n": "node scripts/vendor-i18n.mjs",
     "vendor:holidays": "node scripts/vendor-holidays.mjs",
     "vendor:notices": "node scripts/vendor-notices.mjs",
-    "vendor:editor": "node scripts/vendor-editor.mjs"
+    "vendor:editor": "node scripts/vendor-editor.mjs",
+    "vendor:hashes": "node scripts/vendor-hashes.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
     "@milkdown/kit": "7.22.3",
+    "@noble/hashes": "2.4.0",
     "@playwright/test": "1.64.0",
     "bootstrap": "5.3.8",
     "bootstrap-icons": "1.13.2",

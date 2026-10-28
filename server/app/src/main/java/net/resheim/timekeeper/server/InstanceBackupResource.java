@@ -24,6 +24,7 @@ public class InstanceBackupResource {
         var body=object().put("id",value.id().toString()).put("type",value.type().name()).put("state",value.state().name()).put("version",value.version()).put("updatedAt",value.updatedAt().toString());
         return new ApiReplies(status,body,null,location?"/api/v1/admin/instance/operations/"+value.id():null).response();
     }
+    @GET public Response summary() {noQueries();return new ApiReplies(200,jobs.summary(identity.principal()),null,null).response();}
     @POST @Path("/backups") public Response create(JsonNode body) {
         noQueries();administrators.require(identity.principal());var input=inputs.validate("InstanceBackupCreateInput",body);char[] phrase=null;
         try {

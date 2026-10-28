@@ -128,8 +128,8 @@ jobs:
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip
     - name: Verify email recovery through HTTPS and actual SMTP delivery
       run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --mail --grep 'first administrator|email recovery'
-    - name: Verify Journal WebDAV account help through HTTPS
-      run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --grep 'Journal shows WebDAV|read-only accounts can view the WebDAV connection'
+    - name: Verify Journal WebDAV help and instance backups through HTTPS
+      run: python3 server/web/tests/acceptance.py --distribution server/target/distribution/timekeeper-server.zip --https --grep 'Journal shows WebDAV|read-only accounts can view the WebDAV connection|instance backup Administration'
     - name: Upload browser acceptance evidence
       if: always()
       uses: actions/upload-artifact@v7.0.1

@@ -182,15 +182,28 @@ class InstanceAdministratorTest {
         assertEquals(403,http(browser,false,"POST",status+"/discard",object().put("currentPassword",PASSWORD)).statusCode());
         var discarded=http(browser,true,"POST",status+"/discard",object().put("currentPassword",PASSWORD));assertEquals(200,discarded.statusCode(),discarded.asString());assertEquals("EXPIRED",parse(discarded.asString()).path("state").asText());
     }
+    @Test void httpSummaryRecoversRecentOperationsWithoutOpeningStorageOrExposingCapabilities() throws Exception {
+        var browser=httpLogin("instance-admin");var principal=accounts.session(browser.cookie().split("=",2)[1].split(";",2)[0]);
+        var initial=http(browser,false,"GET","/admin/instance",null);assertEquals(200,initial.statusCode(),initial.asString());
+        contracts.validate("InstanceBackupSummary",parse(initial.asString()));assertTrue(parse(initial.asString()).path("items").isEmpty());assertFalse(Files.exists(output.resolve("private")));
+        UUID id=accounts.tx(c->{lock(c);return InstanceOperations.beginUpload(c,principal,100,"a".repeat(64),clock.now()).id();});
+        var read=http(browser,false,"GET","/admin/instance",null);assertEquals(200,read.statusCode(),read.asString());var value=parse(read.asString());contracts.validate("InstanceBackupSummary",value);
+        assertEquals(id.toString(),value.path("items").get(0).path("operation").path("id").asText());assertTrue(value.path("items").get(0).path("canAccessUpload").asBoolean());
+        assertEquals(5_000_000,value.path("maximumArchiveBytes").asLong());assertTrue(value.path("storageConfigured").asBoolean());
+        assertFalse(read.asString().contains(principal.digest()));assertFalse(read.asString().contains("worker"));assertFalse(Files.exists(output.resolve("private")));
+        var other=httpLogin("instance-admin");assertFalse(parse(http(other,false,"GET","/admin/instance",null).asString()).path("items").get(0).path("canAccessUpload").asBoolean());
+        assertEquals(400,http(browser,false,"GET","/admin/instance?path=private",null).statusCode());
+        ClientProxy.unwrap(jobs).storage="NONE";assertFalse(parse(http(browser,false,"GET","/admin/instance",null).asString()).path("storageConfigured").asBoolean());
+    }
     @Test void httpRegularAndTokenExchangedAccountsCannotReachInstanceJobs() {
         var token=accounts.createToken(admin,"Forbidden instance token",Set.of("read","write"),null).path("token").asText();
         var input=object().put("currentPassword",PASSWORD).put("passphrase","private forbidden API passphrase");
         assertEquals(403,io.restassured.RestAssured.given().header("Authorization","Bearer "+token).contentType("application/json").body(input.toString()).post("/api/v1/admin/instance/backups").statusCode());
         assertEquals(403,io.restassured.RestAssured.given().header("Authorization","Bearer "+token).get("/api/v1/admin/instance/operations/"+UUID.randomUUID()).statusCode());
         var request=io.restassured.RestAssured.given().header("Authorization","Bearer "+token);if(!origin.configured().equals("NONE"))request.header("Origin",origin.configured());
-        var exchanged=httpBrowser(request.post("/api/v1/auth/token-login"));assertEquals(403,http(exchanged,true,"POST","/admin/instance/backups",input).statusCode());
+        var exchanged=httpBrowser(request.post("/api/v1/auth/token-login"));assertEquals(403,http(exchanged,true,"POST","/admin/instance/backups",input).statusCode());assertEquals(403,http(exchanged,false,"GET","/admin/instance",null).statusCode());
         accounts.createUser(admin,"http-ordinary-user",PASSWORD,"Ordinary user",false);var normal=httpLogin("http-ordinary-user");
-        assertEquals(403,http(normal,true,"POST","/admin/instance/backups",input).statusCode());
+        assertEquals(403,http(normal,true,"POST","/admin/instance/backups",input).statusCode());assertEquals(403,http(normal,false,"GET","/admin/instance",null).statusCode());
         assertEquals(403,http(normal,false,"GET","/admin/instance/operations/"+UUID.randomUUID(),null).statusCode());
         assertFalse(Files.exists(output.resolve("private")));
     }

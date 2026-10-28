@@ -92,6 +92,19 @@ final class InstanceOperations {
     private static void downloadAudit(Connection connection,UUID operation,String actor,Instant now,String action) {
         insert(connection,UUID.randomUUID(),"AUDIT",operation,actor,now,object().put("type",Type.BACKUP.name()).put("state",State.READY.name()).put("action",action));
     }
+    /** Bounded metadata for recovery after navigation or a lost start reply. */
+    static com.fasterxml.jackson.databind.node.ArrayNode recent(Connection connection,TokenRegistry.Principal principal) {
+        var items=JsonValues.MAPPER.createArrayNode();
+        try(var statement=query(connection,"SELECT id,version,actor_owner,occurred_at,payload FROM tk_instance WHERE kind='OPERATION' ORDER BY CAST(occurred_at AS TIMESTAMP WITH TIME ZONE) DESC,id DESC FETCH FIRST 50 ROWS ONLY");var rows=statement.executeQuery()) {
+            while(rows.next()) {
+                var payload=(ObjectNode)parse(rows.getString(5));
+                var operation=new Status(UUID.fromString(rows.getString(1)),Type.valueOf(payload.path("type").asText()),state(payload),rows.getLong(2),Instant.parse(rows.getString(4)));
+                boolean own=operation.type()==Type.RESTORE&&principal.owner().equals(rows.getString(3))&&principal.digest()!=null&&principal.digest().equals(payload.path("upload").path("session").asText());
+                var item=object().put("canAccessUpload",own);item.set("operation",InstanceRestoreUploads.representation(operation));items.add(item);
+            }
+            return items;
+        }catch(SQLException failure){throw unavailable();}
+    }
     static Status status(Connection connection,UUID id) {return read(connection,id,false).status();}
     static Status advance(Connection connection,Lease lease,State expected,State next,Instant now) {
         lockControl(connection);var row=read(connection,lease.id(),true);var value=row.payload();
