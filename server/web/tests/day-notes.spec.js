@@ -469,7 +469,7 @@ test('Week day headings open shared daily notes with one toolbar and right-align
       return bounds&&heading?Math.abs(bounds.x+bounds.width-heading.x-heading.width):Infinity;
     }).toBeLessThanOrEqual(4);
     await entry.click();await expect(editor).toBeVisible();await expect(editor.locator('#week-journal-formatted .ProseMirror')).toHaveText('A shared note');await expect(page.locator('dialog[open]')).toHaveCount(1);
-    const toolbar=editor.locator('.markdown-toolbar');await expect(toolbar.locator('.markdown-modes button')).toHaveCount(2);await expect(toolbar.getByRole('separator')).toHaveAttribute('aria-orientation','vertical');
+    const toolbar=editor.getByRole('toolbar',{name:'Formatting',exact:true});await expect(toolbar).toHaveClass(/btn-toolbar/);await expect(toolbar.locator('.btn-group')).toHaveCount(2);await expect(toolbar.locator('.markdown-modes button')).toHaveCount(2);await expect(toolbar.getByRole('separator')).toHaveAttribute('aria-orientation','vertical');
     expect(await toolbar.evaluate(node=>node.querySelector('.markdown-modes').nextElementSibling.getAttribute('role')==='separator'&&node.querySelector('.markdown-tools').previousElementSibling.getAttribute('role')==='separator')).toBe(true);
     for(const name of ['Clear note body','Download Markdown'])await expect(editor.getByRole('button',{name,exact:true})).toHaveCount(0);await expect(editor.getByText('Editing help',{exact:true})).toHaveCount(0);
     const rich=editor.locator('.ProseMirror');await rich.fill('Edited from Week');await editor.locator('#week-note-text').fill('Week label');await editor.getByRole('button',{name:'Save',exact:true}).click();await expect(editor).not.toBeVisible();await expect(entry).toBeFocused();
@@ -510,7 +510,15 @@ test('journal links already saved as angle-bracket autolinks open in formatted m
   try {
     await signInWithFixtureToken(page);const api=await apiFor(page),body='Links: <https://example.com/path?q=1&v=2>, <mailto:notes@example.com> and <person@example.com>.\n';
     const initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{text:'',body},{'If-Match':initial.headers().etag});await month(page);await menu(page);
-    const rich=dialog(page).locator('.ProseMirror');await expect(rich).toBeVisible();await expect(rich.locator('a')).toHaveCount(3);await rich.locator('a').first().click();await expect(page).toHaveURL(/\/web\/$/);await save(page,'Autolinks');expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe(body);
+    const rich=dialog(page).locator('.ProseMirror');await expect(rich).toBeVisible();await expect(rich.locator('a')).toHaveCount(3);
+    await rich.locator('a').first().click();await expect(page).toHaveURL(/\/web\/$/);
+    await owner.route('https://example.com/path?*',route=>route.fulfill({status:200,contentType:'text/html',body:'<title>Linked page</title>'}));
+    for(const modifier of ['Meta','Control']){
+      const popup=owner.waitForEvent('page');await rich.locator('a').first().click({modifiers:[modifier]});const linked=await popup;
+      await linked.waitForLoadState();await expect(linked).toHaveURL('https://example.com/path?q=1&v=2');expect(await linked.evaluate(()=>window.opener)).toBe(null);
+      await linked.close();await expect(dialog(page)).toBeVisible();await expect(rich.locator('a')).toHaveCount(3);
+    }
+    await save(page,'Autolinks');expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe(body);
   } finally {await owner.close();}
 });
 

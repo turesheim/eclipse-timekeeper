@@ -14,7 +14,7 @@ const byId=id=>document.getElementById(id);
 export class TodayView {
   constructor(root,callbacks){
     this.root=root;this.callbacks=callbacks;this.dateInput=byId('today-date');this.grid=byId('today-month-grid');this.monthTitle=byId('today-month-title');this.journalRoot=byId('today-journal');
-    this.journal=new TrackDayNotes(byId('today-journal'),this.grid,this.dateInput,{onUnauthorized:callbacks.onUnauthorized,onChanged:callbacks.onNotesChanged},{inline:true,prefix:'today',statusAnchor:byId('today-note-status-anchor')});
+    this.journal=new TrackDayNotes(byId('today-journal'),this.grid,this.dateInput,{onUnauthorized:callbacks.onUnauthorized,onChanged:callbacks.onNotesChanged},{inline:true,prefix:'today',statusAnchor:byId('today-note-status-anchor'),labelRoot:byId('today-day-label')});
     this.weekEditor=new WeekNoteEditor(root,callbacks);
     this.eventDetails=node('dialog',undefined,'app-dialog shadow-lg calendar-event-details');this.eventDetails.id='today-event-details';this.eventDetails.setAttribute('aria-labelledby','today-event-title');root.append(this.eventDetails);
     this.eventDetails.addEventListener('close',()=>{const origin=this.eventOrigin;this.eventOrigin=null;this.eventDetails.replaceChildren();if(this.visible&&origin?.isConnected)origin.focus();});
