@@ -78,7 +78,12 @@ def verify_http_recovery(app, fixture, environment):
                     process.wait(timeout=5)
     # A completed database without its bound material must fail before Quarkus
     # can initialize TLS, listeners, scheduled jobs, or account provisioning.
-    missing = command[:1] + ['-Dtimekeeper.instance-restore.storage=NONE'] + command[1:]
+    missing_settings = fixture / 'missing-material.properties'
+    missing_settings.write_text('\n'.join(line for line in (fixture / 'destination.properties').read_text().splitlines()
+                                            if not line.startswith('timekeeper.instance-restore.storage=')) + '\n')
+    missing_settings.chmod(0o600)
+    missing = [('-Dquarkus.config.locations=' + missing_settings.as_uri())
+               if argument.startswith('-Dquarkus.config.locations=') else argument for argument in command]
     rejected = subprocess.run(missing, cwd=ROOT, env=environment, capture_output=True, timeout=30)
     if rejected.returncode != 1 or b'Timekeeper startup recovery could not be verified.' not in rejected.stderr or rejected.stdout:
         raise ValueError('Completed restore without its material did not fail before HTTP startup')
