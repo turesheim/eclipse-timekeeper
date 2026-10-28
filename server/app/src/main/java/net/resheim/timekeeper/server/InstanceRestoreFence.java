@@ -74,12 +74,16 @@ class InstanceRestoreFence {
             try(var statement=connection.createStatement();var rows=statement.executeQuery(sql)) {
                 if(!rows.next()||rows.getLong(1)!=0)throw unavailable("INSTANCE_OTHER_DATABASE_CLIENTS");
             }
+            // The offline helper must acknowledge durable commits even when the
+            // deployment normally uses asynchronous/default H2 writes.
+            try(var statement=connection.createStatement()){statement.execute(postgres?"SET synchronous_commit=on":"SET WRITE_DELAY 0");}
             return new Exclusive(connection,postgres);
         }catch(SQLException|RuntimeException failure){if(held)new Exclusive(connection,postgres).close();throw failure;}
     }
     static final class Exclusive implements AutoCloseable {
         private final Connection connection;private final boolean postgres;private boolean closed;
         private Exclusive(Connection connection,boolean postgres){this.connection=connection;this.postgres=postgres;}
+        void require(Connection selected) throws SQLException {if(closed||connection!=selected||connection.isClosed())throw new SQLException("Offline restore requires its active exclusive connection");}
         @Override public void close() throws SQLException {
             if(closed)return;closed=true;
             try {

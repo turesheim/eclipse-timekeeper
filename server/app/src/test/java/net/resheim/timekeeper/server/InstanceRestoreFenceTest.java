@@ -85,7 +85,7 @@ class InstanceRestoreFenceTest {
         }
     }
     @FunctionalInterface interface PgWork {void run(String url,String password,String owner) throws Exception;}
-    private void postgres(PgWork work) throws Exception {
+    static void postgres(PgWork work) throws Exception {
         String url=System.getenv("TIMEKEEPER_INSTANCE_TEST_PG_URL"),password=System.getenv("TIMEKEEPER_INSTANCE_TEST_PG_PASSWORD");
         org.junit.jupiter.api.Assumptions.assumeTrue(url!=null,"Requires dedicated PostgreSQL fixture");
         if(!url.matches("jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/postgres"))throw new IllegalArgumentException("Only loopback disposable PostgreSQL is supported");

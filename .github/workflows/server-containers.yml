@@ -125,7 +125,7 @@ jobs:
             sleep 1
           done
           docker exec timekeeper-pg-test psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE timekeeper_instance' -c 'CREATE DATABASE timekeeper_recovery' -c 'CREATE DATABASE timekeeper_passkeys' -c 'CREATE DATABASE timekeeper_settings' -c 'CREATE DATABASE timekeeper_archive_export' -c 'CREATE DATABASE timekeeper_archive_import' -c 'CREATE DATABASE timekeeper_archive_http' -c 'CREATE DATABASE timekeeper_archive_upload' -c 'CREATE DATABASE timekeeper_calendars'
-          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,InstanceRestoreFenceTest,InstanceOperationsTest,InstanceAdministratorTest,InstanceBackupArchiveTest,InstanceConfigurationTest,InstanceDatabaseImageTest,InstanceBackupEncryptionTest,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest,AccountArchiveTest,AccountArchiveImportTest,AccountArchiveHttpTest,AccountUploadsTest,CalendarHttpTest -Dsurefire.failIfNoSpecifiedTests=false
+          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,InstanceRestoreFenceTest,InstanceRestoreDatabaseTest,InstanceOperationsTest,InstanceAdministratorTest,InstanceBackupArchiveTest,InstanceConfigurationTest,InstanceDatabaseImageTest,InstanceBackupEncryptionTest,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest,AccountArchiveTest,AccountArchiveImportTest,AccountArchiveHttpTest,AccountUploadsTest,CalendarHttpTest -Dsurefire.failIfNoSpecifiedTests=false
           docker rm -f timekeeper-pg-test
       - name: Verify HTTP contracts, rolling updates, backups and durable restart
         run: |
@@ -223,7 +223,7 @@ jobs:
             sleep 1
           done
           docker exec timekeeper-pg17-test psql -U postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE timekeeper_instance' -c 'CREATE DATABASE timekeeper_recovery' -c 'CREATE DATABASE timekeeper_passkeys' -c 'CREATE DATABASE timekeeper_settings' -c 'CREATE DATABASE timekeeper_archive_export' -c 'CREATE DATABASE timekeeper_archive_import' -c 'CREATE DATABASE timekeeper_archive_http' -c 'CREATE DATABASE timekeeper_archive_upload' -c 'CREATE DATABASE timekeeper_calendars'
-          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,InstanceRestoreFenceTest,InstanceOperationsTest,InstanceAdministratorTest,InstanceBackupArchiveTest,InstanceConfigurationTest,InstanceDatabaseImageTest,InstanceBackupEncryptionTest,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest,AccountArchiveTest,AccountArchiveImportTest,AccountArchiveHttpTest,AccountUploadsTest,CalendarHttpTest -Dsurefire.failIfNoSpecifiedTests=false
+          ./mvnw -B -ntp -f server/pom.xml test -Dtest=PostgresSchemaIT,InstanceRestoreFenceTest,InstanceRestoreDatabaseTest,InstanceOperationsTest,InstanceAdministratorTest,InstanceBackupArchiveTest,InstanceConfigurationTest,InstanceDatabaseImageTest,InstanceBackupEncryptionTest,EmailRecoveryStoreTest,PasskeyStoreTest,PasskeyCredentialsTest,PasskeyCeremoniesTest,ServiceSettingsTest,AccountArchiveTest,AccountArchiveImportTest,AccountArchiveHttpTest,AccountUploadsTest,CalendarHttpTest -Dsurefire.failIfNoSpecifiedTests=false
           docker rm -f -v timekeeper-pg17-test
       - name: Verify real API, backup, recovery and rolling updates with PostgreSQL 17
         run: |

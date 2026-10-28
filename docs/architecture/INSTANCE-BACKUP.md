@@ -373,9 +373,55 @@ H2 uses non-forcing `SET EXCLUSIVE 1`. It never terminates another client or
 rolls back its work. All target replicas must be stopped before activation.
 Closing the helper rolls back unfinished work before releasing exclusivity,
 including on H2 where changing exclusive mode otherwise commits a transaction.
+The helper enables H2 synchronous writes or PostgreSQL synchronous commits before
+returning its exclusive guard.
 See [H2 exclusive mode](https://h2database.com/html/commands.html#set_exclusive)
 and [PostgreSQL advisory locks](https://www.postgresql.org/docs/17/functions-admin.html#FUNCTIONS-ADVISORY-LOCKS).
 
 This fence is an activation prerequisite. Durable restore intent, deployment
 mapping, launch-time application and interruption recovery remain unfinished;
 the Administration page continues to report `restoreReady: false`.
+
+## Offline database application phase
+
+`InstanceRestoreDatabase` now applies a fully verified portable image inside the
+caller's serializable transaction and active exclusive restore guard. It repeats
+the empty-target check, requires the exact reviewed operation version and actor,
+and verifies the destination artifact-root identity. Database and configuration
+checksums are rechecked before application and before this phase returns. Source
+authentication, operation compatibility and destination/source audit identifier
+collisions are checked before replacing any rows. An error rolls back the entire
+phase to its savepoint; neither this component nor guard release commits it.
+
+Business records, account password hashes, API token records, passkey credentials
+and handles retain their IDs, versions and timestamps. Source audit rows remain
+unchanged. Destination operation/audit evidence survives replacement of the
+bootstrap account. Imported artifact operations are expired and their worker,
+upload and download capabilities removed because the corresponding local
+artifact files were not recursively included in the archive.
+
+The confirmed destination package identity and authentication origin/RP policy
+are recorded. Saved and effective service settings retain SMTP passwords and
+settings while receiving the destination origin/RP policy and a new origin epoch
+above both installations' epochs. Both settings versions advance once so a
+pre-restore settings ETag cannot authorize changing the remapped configuration;
+a pending saved/effective distinction is retained. Existing session rows receive epoch zero;
+setup/recovery challenges, recovery links and passkey ceremonies are consumed.
+Thus imported browser sessions cannot become valid at the new destination, even
+if an archived row contains a future epoch. Stored passkey RP associations are
+preserved: changing the hostname requires enrollment for the new RP. API tokens
+and passwords remain preserved. With no HTTPS origin, email recovery is disabled.
+
+The database control record remains `restorePending: true` with a
+`DATABASE_APPLIED` phase and fresh generation. This phase does **not** clear the
+gate or claim restore completion. Durable intent, file/configuration installation,
+launch coordination, interrupted-operation recovery and the final activation UI
+are still required before exposing activation. H2 and PostgreSQL tests exercise
+actual image application, credential/data/audit preservation, checksum rejection,
+refusal of populated or stale targets, and full rollback without a commit.
+
+Separate child-JVM crash probes halt without cleanup before and after the
+database commit. H2 recovery preserves the complete old database before commit
+and the complete pending restored database after commit. PostgreSQL retains the
+committed pending database after the client process halts. These are database
+phase guarantees; filesystem recovery and restart completion remain required.
