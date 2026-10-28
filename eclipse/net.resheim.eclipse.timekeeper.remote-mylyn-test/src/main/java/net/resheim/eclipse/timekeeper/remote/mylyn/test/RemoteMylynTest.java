@@ -22,6 +22,7 @@ public class RemoteMylynTest {
         RemoteTestSupport.readyWithMylyn();RemoteTestSupport.showWorkweek();
         RemoteTestSupport.waitFor(()->MylynIntegration.getDefault()!=null && TimekeeperUiPlugin.getDefault().getTaskIntegration().isPresent(),"Mylyn adapter did not register");
         try(var api=RemoteTestSupport.client()) {
+            RemoteProjectionRaceScenario.run(api);
             RemoteQueryProjectScenario.run(api);
             var project=api.createProject(new CreateProject("Installed Mylyn remote project"));
             var first=api.createTask(new CreateTask(Optional.of(project.id()),"Remote Mylyn first",Optional.empty()));

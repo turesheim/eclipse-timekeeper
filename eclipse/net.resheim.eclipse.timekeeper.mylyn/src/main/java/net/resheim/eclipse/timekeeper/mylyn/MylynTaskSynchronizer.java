@@ -66,6 +66,7 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 	private final java.util.function.Supplier<MylynBackendScope> scopeSupplier;
 	private volatile boolean running;
     private volatile Thread worker;
+    private volatile Thread projectionThread;
     private volatile boolean busy;
 	private boolean restoreAfterDeletionFailure;
 	private volatile boolean applying;
@@ -128,7 +129,7 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 
 	@Override
 	public void containersChanged(Set<TaskContainerDelta> deltas) {
-		if (!running || (applying && (worker==null || Thread.currentThread()==worker)))
+		if (!running || (applying && (worker==null || Thread.currentThread()==worker || Thread.currentThread()==projectionThread)))
 			return;
 		for (TaskContainerDelta delta : deltas) {
 			if (delta.getKind() != TaskContainerDelta.Kind.DELETED)
@@ -143,9 +144,11 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 	}
 
 	private void schedule(boolean fromMylyn, boolean fromBackend) {
+        // Record external edits immediately, even when their scheduling callback
+        // has not yet reached the UI event queue.
+        if(fromMylyn) mylynDirty.set(true);
+        if(fromBackend) backendDirty.set(true);
         if(Display.getCurrent()!=display) {if(!display.isDisposed()) display.asyncExec(()->schedule(fromMylyn,fromBackend));return;}
-		if(fromMylyn) mylynDirty.set(true);
-		if(fromBackend) backendDirty.set(true);
 		if (scheduled || display.isDisposed())
 			return;
 		scheduled = true;
@@ -342,16 +345,37 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 		return current;
 	}
 
-	private void synchronizeBackendToMylyn() {
+    private void synchronizeBackendToMylyn() {
+        String backendScope=scope().scope();
+        // Remote reads stay on the operation worker. Task List objects and their
+        // acknowledged baselines are changed atomically with respect to UI edits.
+        var tasks=List.copyOf(service.tasks());
+        var projects=List.copyOf(service.projects());
+        Runnable projection=()->{
+            if(!running || display.isDisposed()) return;
+            var current=scopeSupplier.get();
+            if(current==null || !backendScope.equals(current.scope())) {backendDirty.set(true);return;}
+            // A user/provider edit arrived after this pass consumed its input.
+            // Import that edit next, rather than replaying an older snapshot over it.
+            if(mylynDirty.get()) return;
+            projectionThread=Thread.currentThread();
+            try {applyBackendToMylyn(tasks,projects);}
+            finally {projectionThread=null;}
+        };
+        if(Display.getCurrent()==display) projection.run();
+        else if(!display.isDisposed()) display.syncExec(projection);
+    }
+
+	private void applyBackendToMylyn(List<Task> backendTasks,List<Project> backendProjects) {
 		Map<TaskId, Task> domainTasks = new HashMap<>();
-		service.tasks().forEach(task -> domainTasks.put(task.id(), task));
+		backendTasks.forEach(task -> domainTasks.put(task.id(), task));
 		for (AbstractTask projected : List.copyOf(taskList.getAllTasks())) {
 			if (!(projected instanceof LocalTask))
 				continue;
 			mappedTask(projected).filter(id -> (scope().ownsProjection(projected) || knownBackendTasks.contains(id)) && !domainTasks.containsKey(id))
 					.ifPresent(id -> taskList.deleteTask(projected));
 		}
-		Set<ProjectId> projectIds = service.projects().stream().map(Project::id)
+		Set<ProjectId> projectIds = backendProjects.stream().map(Project::id)
 				.collect(java.util.stream.Collectors.toSet());
 		for (AbstractTaskCategory category : Set.copyOf(taskList.getTaskCategories())) {
 			mappedProject(category).filter(id -> (scope().ownsCategory(category) || knownBackendProjects.contains(id)) && !projectIds.contains(id))
@@ -382,13 +406,13 @@ public final class MylynTaskSynchronizer implements ITaskListChangeListener, IPr
 		}
 		Set<ProjectId> nativeProjects = new HashSet<>();
 		if (includeNew)
-			service.projects().stream().map(Project::id).forEach(nativeProjects::add);
-		service.projects().stream().filter(project -> scope().category(project.id()) != null)
+			backendProjects.stream().map(Project::id).forEach(nativeProjects::add);
+		backendProjects.stream().filter(project -> scope().category(project.id()) != null)
 				.map(Project::id).forEach(nativeProjects::add);
 		domainTasks.values().stream().filter(task -> projected.contains(task.id())).map(Task::projectId)
 				.flatMap(Optional::stream).forEach(nativeProjects::add);
 		Map<ProjectId, AbstractTaskCategory> categories = new HashMap<>();
-		for (Project project : service.projects()) {
+		for (Project project : backendProjects) {
 			if (nativeProjects.contains(project.id()))
 				categories.put(project.id(), ensureCategory(project));
 		}
