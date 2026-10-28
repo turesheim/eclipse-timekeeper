@@ -518,3 +518,15 @@ pre-start invocation and returning to the web application are still required.
 Full package-identity migration and restored login/passkey/journal/attachment
 acceptance remain delivery requirements; SQL/password-hash checks alone do not
 prove those application flows.
+
+The entry point also resolves the deployment's database/SMTP password-file
+variables using the same trailing-newline handling as the shell entrypoint.
+Their file bytes and canonical resolved values are included in the inventory.
+Credentials stay in the child environment/configuration and are not command
+arguments. The shipped-helper classpath includes `app/*`, `lib/main/*` **and**
+`lib/boot/*`; the boot libraries supply logging and SmallRye classes.
+`server/scripts/instance_restore_acceptance.py` runs the helper and its completed
+retry against a password-protected target using its credential file, from the
+actual distribution without test libraries in its runtime
+classpath. The normal Server CI job runs this check after packaging and retains
+checksum/commit-bound evidence alongside the other acceptance reports.

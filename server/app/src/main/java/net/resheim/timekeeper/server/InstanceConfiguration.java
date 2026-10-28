@@ -16,7 +16,7 @@ final class InstanceConfiguration {
     static final String FORMAT="timekeeper-instance-configuration-v1";
     static final int MAX_FILE_BYTES=20_000_000,MAX_TOTAL_BYTES=64_000_000,MAX_FILES=64;
     private static final Set<String> REQUIRED=Set.of("quarkus.datasource.jdbc.url","quarkus.datasource.db-kind","quarkus.datasource.username","timekeeper.auth.tokens-file","timekeeper.auth.setup-file");
-    private static final Set<String> SINGLE=Set.of("timekeeper.auth.tokens-file","timekeeper.auth.setup-file",
+    private static final Set<String> SINGLE=Set.of("timekeeper.auth.tokens-file","timekeeper.auth.setup-file","timekeeper.server.db.password.file","timekeeper.smtp.password.file",
         "quarkus.http.ssl.certificate.key-store-file","quarkus.http.ssl.certificate.trust-store-file");
     private static final Set<String> MULTIPLE=Set.of("timekeeper.instance-restored.files","quarkus.http.ssl.certificate.files","quarkus.http.ssl.certificate.key-files","quarkus.config.locations");
     /** Internal secret-bearing object; never return this as a JSON API reply. */

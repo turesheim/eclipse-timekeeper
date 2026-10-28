@@ -14,8 +14,8 @@ class InstanceRestoreRecoveryTest {
     @TempDir Path directory;
     private final UUID generation=UUID.randomUUID(),artifactRoot=UUID.randomUUID();
     private final Instant now=Instant.parse("2026-10-28T12:00:00Z");
-    private record Fixture(InstanceRestoreIntent intent,UUID operation,Path settings,String url,String user,String password) { }
-    private Fixture fixture(String url,String user,String password) throws Exception {
+    record Fixture(InstanceRestoreIntent intent,UUID operation,Path settings,String url,String user,String password) { }
+    Fixture fixture(String url,String user,String password) throws Exception {
         UUID operation;long version;
         try(var c=DriverManager.getConnection(url,user,password)) {
             ServerSchema.initializeOrValidate(c);c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);c.setAutoCommit(false);
@@ -44,7 +44,7 @@ class InstanceRestoreRecoveryTest {
     private String cli(Fixture fixture,boolean success) throws Exception {
         Path log=directory.resolve("cli.log");String executable=Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name").startsWith("Windows")?"java.exe":"java").toString();
         var command=new ProcessBuilder(executable,"-Dquarkus.config.locations="+fixture.settings().toUri().toASCIIString(),"-cp",System.getProperty("surefire.test.class.path",System.getProperty("java.class.path")),InstanceRestoreMain.class.getName(),fixture.intent().storage().toString());
-        command.environment().remove("QUARKUS_PROFILE");var process=command.redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        command.environment().remove("QUARKUS_PROFILE");Path secret=directory.resolve("database-secret");if(Files.exists(secret))command.environment().put("TIMEKEEPER_SERVER_DB_PASSWORD_FILE",secret.toString());var process=command.redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try{assertTrue(process.waitFor(30,java.util.concurrent.TimeUnit.SECONDS));assertEquals(success?0:1,process.exitValue(),Files.readString(log));return Files.readString(log);}
         finally{if(process.isAlive()){process.destroyForcibly();process.waitFor(5,java.util.concurrent.TimeUnit.SECONDS);}}
     }
@@ -77,6 +77,12 @@ class InstanceRestoreRecoveryTest {
         var settings=new Properties();try(var input=Files.newInputStream(fixture.settings())){settings.load(input);}settings.setProperty("quarkus.datasource.password","private invalid credential");try(var output=Files.newOutputStream(fixture.settings())){settings.store(output,"Synthetic wrong credential");}
         String result=cli(fixture,false);assertFalse(result.contains("private invalid credential"));assertFalse(result.contains("password"));assertFalse(result.contains(directory.toString()));
         try(var c=DriverManager.getConnection(fixture.url(),fixture.user(),fixture.password())){assertEquals("bootstrap",scalar(c,"SELECT owner_id FROM tk_account"));assertEquals("1",scalar(c,"SELECT COUNT(*) FROM tk_resource WHERE entity_type='CLIENT'"));}
+    }
+    @Test void offlineEntryPointResolvesTheSamePasswordFileAsTheDeploymentEntrypoint() throws Exception {
+        var fixture=fixture("jdbc:h2:"+directory.resolve("file-secret-target"),"sa","synthetic file-backed role password");
+        Path secret=directory.resolve("database-secret");Files.writeString(secret,"synthetic file-backed role password\n");Files.setPosixFilePermissions(secret,java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+        var settings=new Properties();try(var input=Files.newInputStream(fixture.settings())){settings.load(input);}settings.remove("quarkus.datasource.password");try(var output=Files.newOutputStream(fixture.settings())){settings.store(output,"Synthetic file-backed destination");}
+        assertTrue(cli(fixture,true).startsWith("INSTANCE_RESTORE_COMPLETE\n"));assertComplete(fixture);
     }
     @Test void postgresEntryPointRestoresUsingAnOrdinaryApplicationRole() throws Exception {
         String login="timekeeper_restore_"+UUID.randomUUID().toString().replace("-","");var created=new java.util.concurrent.atomic.AtomicBoolean();

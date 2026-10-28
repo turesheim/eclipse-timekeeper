@@ -16,7 +16,7 @@ public final class InstanceRestoreMain {
         System.setOut(new java.io.PrintStream(java.io.OutputStream.nullOutputStream()));System.setErr(new java.io.PrintStream(java.io.OutputStream.nullOutputStream()));
         try {
             if(args.length!=1)throw new IllegalArgumentException();Path root=Path.of(args[0]).toAbsolutePath().normalize();
-            var config=ConfigUtils.configBuilder(LaunchMode.NORMAL).build();String configured=config.getOptionalValue("timekeeper.instance-restore.storage",String.class).orElse("NONE");
+            var config=configuration();String configured=config.getOptionalValue("timekeeper.instance-restore.storage",String.class).orElse("NONE");
             if(!configured.equals("NONE")&&!Path.of(configured).toAbsolutePath().normalize().equals(root))throw new IllegalArgumentException();
             String url=config.getValue("quarkus.datasource.jdbc.url",String.class);DatabaseConfiguration.validate(url);
             if(url.startsWith("jdbc:h2:mem:"))throw new IllegalArgumentException();
@@ -31,12 +31,23 @@ public final class InstanceRestoreMain {
             }finally{properties.clear();}
         }catch(Throwable failure){errors.println("Instance restore could not be completed. Keep the server stopped and follow the instance recovery instructions.");System.exit(1);}
     }
+    private static io.smallrye.config.SmallRyeConfig configuration() throws java.io.IOException {
+        var resolved=new java.util.HashMap<String,String>();
+        for(String name:java.util.List.of("TIMEKEEPER_SERVER_DB_PASSWORD","TIMEKEEPER_SMTP_PASSWORD")) {
+            String path=System.getenv(name+"_FILE");if(path==null||path.isBlank())continue;
+            if(java.nio.file.Files.size(Path.of(path))>1_048_576)throw new java.io.IOException("INVALID_SECRET_FILE");
+            String value=java.nio.file.Files.readString(Path.of(path));while(value.endsWith("\n"))value=value.substring(0,value.length()-1);resolved.put(name,value);
+        }
+        // Match the entrypoint's file-backed environment variables, while
+        // retaining direct canonical properties and higher-priority files.
+        var builder=ConfigUtils.configBuilder(LaunchMode.NORMAL);if(!resolved.isEmpty())builder.withSources(new io.smallrye.config.EnvConfigSource(resolved,310));return builder.build();
+    }
     private static void preflightConfiguration(InstanceRestoreMaterial.Installed material) throws java.io.IOException {
         String previous=System.getProperty("quarkus.config.locations");
         try {
-            var initial=ConfigUtils.configBuilder(LaunchMode.NORMAL).build();String locations=initial.getOptionalValue("quarkus.config.locations",String.class).orElse("");
+            var initial=configuration();String locations=initial.getOptionalValue("quarkus.config.locations",String.class).orElse("");
             String added=material.configuration().toUri().toASCIIString().replace(",","\\,");System.setProperty("quarkus.config.locations",locations.isBlank()?added:locations+","+added);
-            var effective=ConfigUtils.configBuilder(LaunchMode.NORMAL).build();var properties=new Properties();try(var input=java.nio.file.Files.newInputStream(material.configuration())){properties.load(input);}
+            var effective=configuration();var properties=new Properties();try(var input=java.nio.file.Files.newInputStream(material.configuration())){properties.load(input);}
             var expected=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(properties,"recovered configuration",450)).build();
             for(String key:java.util.List.of("timekeeper.auth.tokens-file","timekeeper.auth.setup-file","timekeeper.service-settings.recover","timekeeper.package-id","timekeeper.instance-restore.storage","timekeeper.instance-restore.generation","timekeeper.calendars.automatic")) {
                 if(!effective.getValue(key,String.class).equals(expected.getValue(key,String.class)))throw new java.io.IOException("RECOVERED_CONFIGURATION_OVERRIDDEN");

@@ -93,6 +93,17 @@ class InstanceConfigurationTest {
             assertEquals("NONE",snapshot.document().path("properties").path("timekeeper.auth.setup-file").asText());assertTrue(snapshot.files().isEmpty());
         }
     }
+    @Test void entrypointSecretFilesAndTheirResolvedValuesAreBothInventoried() throws Exception {
+        Path database=directory.resolve("database-password"),smtp=directory.resolve("smtp-password");Files.writeString(database,"private DB secret\n");Files.writeString(smtp,"private SMTP secret\n");
+        var values=base();values.put("quarkus.datasource.password","private DB secret");values.put("quarkus.mailer.password","private SMTP secret");
+        var env=new io.smallrye.config.EnvConfigSource(Map.of("TIMEKEEPER_SERVER_DB_PASSWORD_FILE",database.toString(),"TIMEKEEPER_SMTP_PASSWORD_FILE",smtp.toString()),300);
+        var config=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(values,"application",100),env).build();
+        try(var snapshot=InstanceConfiguration.capture(config)) {
+            assertEquals(2,snapshot.files().size());assertEquals("private DB secret",snapshot.document().path("properties").path("quarkus.datasource.password").asText());
+            assertTrue(snapshot.files().values().stream().anyMatch(bytes->Arrays.equals(bytes,"private DB secret\n".getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+            assertTrue(snapshot.files().values().stream().anyMatch(bytes->Arrays.equals(bytes,"private SMTP secret\n".getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+        }
+    }
     @FunctionalInterface private interface Attempt {Object run() throws Exception;}
     private void rejects(Attempt action){var failure=assertThrows(IOException.class,action::run);assertEquals("INVALID_INSTANCE_CONFIGURATION",failure.getMessage());assertNull(failure.getCause());assertFalse(failure.toString().contains(directory.toString()));}
 }
