@@ -16,6 +16,7 @@ class InstanceAdministrator {
         private final TokenRegistry.Principal principal;private final Instant verifiedAt;
         private Proof(TokenRegistry.Principal principal,Instant verifiedAt){this.principal=principal;this.verifiedAt=verifiedAt;}
         TokenRegistry.Principal principal(){return principal;}
+        Instant verifiedAt(){return verifiedAt;}
         @Override public String toString(){return "Private instance-operation authority";}
     }
     void require(TokenRegistry.Principal principal) {accounts.tx(c->{lock(c);check(c,principal);return null;});}
@@ -34,6 +35,10 @@ class InstanceAdministrator {
             execute(c,"DELETE FROM tk_auth_throttle WHERE id=?",hash(key));return true;
         });
         if(!verified)throw new ApiFailure(422,"INSTANCE_PROOF_REQUIRED");return new Proof(principal,clock.now());
+    }
+    Proof downloadProof(InstanceDownloads.Grant grant) {
+        if(grant==null)throw new ApiFailure(403,"INSTANCE_DOWNLOAD_REQUIRED");
+        var proof=new Proof(grant.principal(),grant.verifiedAt());requireFresh(proof);return proof;
     }
     void requireFresh(Proof proof) {
         if(proof==null||proof.verifiedAt.isBefore(clock.now().minusSeconds(300))||proof.verifiedAt.isAfter(clock.now().plusSeconds(5)))throw new ApiFailure(422,"INSTANCE_PROOF_REQUIRED");

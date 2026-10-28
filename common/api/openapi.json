@@ -14837,6 +14837,207 @@
           }
         }
       }
+    },
+    "/admin/instance/operations/{id}/download-grant": {
+      "post": {
+        "operationId": "authorizeInstanceDownload",
+        "summary": "Authorize one native browser download",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Current administrator password proof mints one two-minute HttpOnly Secure SameSite=Strict cookie grant bound to this job and the current account session. The raw grant is never returned in JSON or included in a URL.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "One-use __Host-timekeeper-instance-download cookie; Secure, HttpOnly, SameSite=Strict, Path=/, Max-Age=120."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceDownload"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceOperationProofInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/instance/operations/{id}/content": {
+      "get": {
+        "operationId": "downloadInstanceBackup",
+        "summary": "Stream an encrypted full-instance archive",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": [],
+            "instanceDownloadGrant": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Consumes a previously issued one-use cookie grant for this exact job and browser session before streaming. Expired, reused, wrong-session or wrong-job grants are rejected. A failed or interrupted transfer requires fresh authorization. DOWNLOAD_STARTED audit means a stream was authorized to start, not that the browser saved it.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "Content-Length": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Attachment with server-generated UUID filename and .tkbackup extension."
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Clears the consumed download grant cookie."
+              }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -14851,6 +15052,12 @@
         "in": "cookie",
         "name": "__Host-timekeeper-session",
         "description": "Opaque HttpOnly; Secure; SameSite=Lax cookie. Configured HTTPS browser requests require the exact canonical Origin, or a matching Referer origin on reads. Unsafe cookie requests also require X-CSRF-Token. A separate host-only HttpOnly browser-binding cookie is issued by same-origin GET /auth/status and refreshed on sign-in. Bearer API/Eclipse requests remain origin-independent; /auth/token-login explicitly exchanges a bearer token for a bound browser session."
+      },
+      "instanceDownloadGrant": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-timekeeper-instance-download",
+        "description": "Short-lived one-use grant from the password-verified download-grant POST, bound to the same browser account session and operation. Never send this in a URL."
       }
     },
     "schemas": {
@@ -27860,6 +28067,29 @@
             "maximum": 9007199254740991
           },
           "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "InstanceDownload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "downloadUrl",
+          "expiresAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "downloadUrl": {
+            "type": "string",
+            "pattern": "^/api/v1/admin/instance/operations/[a-f0-9-]{36}/content$"
+          },
+          "expiresAt": {
             "type": "string",
             "format": "date-time"
           }

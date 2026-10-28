@@ -47,6 +47,24 @@ final class InstanceOperations {
         insert(connection,lease.id(),"OPERATION",lease.id(),actor,now,value);
         audit(connection,lease.id(),actor,now,type,state(value));return lease;
     }
+    static void issueDownload(Connection connection,UUID id,TokenRegistry.Principal principal,String digest,Instant verifiedAt,Instant expires,long bytes,Instant now) {
+        lockControl(connection);var row=read(connection,id,true);readyBackup(row);
+        if(verifiedAt.isBefore(now.minusSeconds(300))||verifiedAt.isAfter(now.plusSeconds(5))||!expires.isAfter(now)||expires.isAfter(now.plusSeconds(120))||bytes<1)throw new ApiFailure(403,"INSTANCE_DOWNLOAD_REQUIRED");
+        row.payload().putObject("download").put("digest",digest).put("owner",principal.owner()).put("session",principal.digest()).put("verifiedAt",verifiedAt.toString()).put("expiresAt",expires.toString()).put("bytes",bytes);
+        update(connection,row,now,row.payload());downloadAudit(connection,id,principal.owner(),now,"DOWNLOAD_AUTHORIZED");
+    }
+    static ObjectNode consumeDownload(Connection connection,UUID id,TokenRegistry.Principal principal,String digest,Instant now) {
+        lockControl(connection);var row=read(connection,id,true);readyBackup(row);var grant=row.payload().path("download");
+        if(!grant.isObject()||!grant.path("owner").asText().equals(principal.owner())||!grant.path("session").asText().equals(principal.digest())
+            ||!java.security.MessageDigest.isEqual(grant.path("digest").asText().getBytes(java.nio.charset.StandardCharsets.US_ASCII),digest.getBytes(java.nio.charset.StandardCharsets.US_ASCII))
+            ||!Instant.parse(grant.path("expiresAt").asText()).isAfter(now)||Instant.parse(grant.path("verifiedAt").asText()).isBefore(now.minusSeconds(300)))throw new ApiFailure(403,"INSTANCE_DOWNLOAD_REQUIRED");
+        var result=((ObjectNode)grant).deepCopy();row.payload().remove("download");update(connection,row,now,row.payload());downloadAudit(connection,id,principal.owner(),now,"DOWNLOAD_STARTED");
+        result.remove(java.util.List.of("digest","owner","session","expiresAt"));return result;
+    }
+    private static void readyBackup(Row row) {if(row.status().type()!=Type.BACKUP||row.status().state()!=State.READY)throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");}
+    private static void downloadAudit(Connection connection,UUID operation,String actor,Instant now,String action) {
+        insert(connection,UUID.randomUUID(),"AUDIT",operation,actor,now,object().put("type",Type.BACKUP.name()).put("state",State.READY.name()).put("action",action));
+    }
     static Status status(Connection connection,UUID id) {return read(connection,id,false).status();}
     static Status advance(Connection connection,Lease lease,State expected,State next,Instant now) {
         lockControl(connection);var row=read(connection,lease.id(),true);var value=row.payload();
@@ -72,7 +90,7 @@ final class InstanceOperations {
     static Status expire(Connection connection,UUID id,Instant now) {
         lockControl(connection);var row=read(connection,id,true);var previous=row.status().state();
         if(previous!=State.READY&&previous!=State.REVIEW)throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
-        row.payload().put("state",State.EXPIRED.name());update(connection,row,now,row.payload());
+        row.payload().remove("download");row.payload().put("state",State.EXPIRED.name());update(connection,row,now,row.payload());
         audit(connection,id,row.actor(),now,row.status().type(),State.EXPIRED);return status(connection,id);
     }
     static int interruptAbandoned(Connection connection,Instant now) {

@@ -3,7 +3,7 @@
 This feature is being implemented for [#473](https://github.com/turesheim/eclipse-timekeeper/issues/473).
 The internal encrypted archive, configuration inventory, database-image and
 administrator-authority components exist. Administrator start/status/discard routes are integrated with durable backup
-jobs. Download, upload/review, restore activation and Administration UI remain
+jobs, including one-use native browser downloads. Upload/review, restore activation and Administration UI remain
 unfinished. The acceptance criteria in the
 issue remain the delivery requirements; these foundations alone do not satisfy them.
 
@@ -78,12 +78,12 @@ resets its own failure counter. Proof objects are internal and cannot be
 constructed from request data.
 
 `InstanceBackupService` checks fresh proof before accessing the complete
-installation, creates one encrypted archive from a repeatable-read transaction,
+installation, creates one encrypted archive from a backend-appropriate snapshot transaction,
 then rechecks the original session and administrator role before publishing the
 result. Logout, password revocation or demotion prevents publication. Its
 passphrase array is cleared on success and failure. Administrator start/status/discard HTTP routes enforce browser-only authority,
 CSRF and current password proof, with typed contract inputs and metadata-only
-replies. Download grants and restore routes still need integration.
+replies. Native download grants are integrated; restore routes remain unfinished.
 
 ## Connected backup jobs and HTTP entry points
 
@@ -112,8 +112,14 @@ artifact. HTTP tests exercise real browser cookies and CSRF, reject wrong proof,
 unknown input fields, foreign origins, ordinary users, bearer tokens and
 token-exchanged sessions, and validate the status reply against OpenAPI. Internal
 archive reads also require fresh proof and recheck authorization and `READY`
-after their integrity check. Native browser download grants, upload/review and
-restore activation have not yet been exposed. See [API policy](API-V1.md).
+after their integrity check. Download authorization re-verifies the current
+password and issues a two-minute, one-use, session-bound HttpOnly cookie. The
+separate native GET consumes it atomically, records a safe started audit event,
+and streams encrypted bytes directly to the browser. No secret enters the URL or
+JSON response, and the client need not accumulate a Blob. Simultaneous requests
+can consume the grant only once. Replacement, expiry, wrong job/session and
+logout invalidate access. Upload/review and restore activation remain unfinished.
+See [API policy](API-V1.md).
 
 ## Durable operation records and schema 9
 
@@ -168,7 +174,7 @@ root, interrupt source jobs, and retain audit records. Input files and existing
 backup downloads are transient operation artifacts, not recursively included
 in subsequent backups. The storage component itself does not authorize requests, make
 uploaded bytes trusted, validate archive semantics, or activate a restore. Its backup job service now supplies those authorization and recovery-cleanup
-boundaries; upload/download HTTP integration remains in progress.
+boundaries; native download HTTP is integrated and upload HTTP remains in progress.
 
 ## Complete database image
 
@@ -180,8 +186,14 @@ included, without owner or resource-type filtering. This includes password
 hashes, tokens, passkeys, sessions, recovery state, both stored SMTP passwords,
 private resource payloads, relationships, receipts and change history.
 
-Backup requires one repeatable-read or serializable transaction across all
-tables. Metadata checks compare every physical table and column against the
+Backup requires one PostgreSQL repeatable-read (or serializable) transaction,
+or an H2 serializable transaction, across all tables. H2 repeatable-read can see
+later committed data when an independent table is read for the first time; it is
+therefore rejected by the image writer. This distinction follows H2's
+[isolation semantics](https://h2database.com/html/advanced.html#isolation) and is
+verified against pinned H2 2.4.240: a concurrent atomic owner/settings update
+between their first reads must not enter the in-progress image. A new transaction
+must see the complete committed update. Metadata checks compare every physical table and column against the
 portable definition. A newly persisted table or field fails coverage until its
 backup semantics are implemented. PostgreSQL's `reference_key` is the sole
 derived column: export verifies it against the complete external identity and
@@ -207,7 +219,7 @@ staging is damaged after preflight or an insertion fails.
 
 ## Verification and remaining integration
 
-The current local server reactor passes 351 application tests and the shared
+The current local server reactor passes 356 application tests and the shared
 module suites. The new checks include real-runtime configuration capture, complete archive integrity,
 unsafe/duplicate ZIP and JSON rejection, decompression budgets, scoped credential
 proof, HTTP browser-only/CSRF boundaries, asynchronous backup lifecycle,
@@ -219,7 +231,7 @@ rollback. A real PostgreSQL 17 fixture verifies H2 → PostgreSQL → H2 using
 byte-identical images, including Unicode and nanosecond timestamps. Both
 PostgreSQL CI jobs include these tests.
 
-Delivery still requires native download grants and uploaded-archive validation APIs,
+Delivery still requires uploaded-archive validation/review APIs,
 Administration UI,
 exclusive restart-safe activation, semantic authentication/configuration validation,
 deployment and hostname remapping,

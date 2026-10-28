@@ -38,6 +38,13 @@ class ContractTest(unittest.TestCase):
         self.assertIn('202',operation['responses'])
         self.assertIn({'$ref':'#/components/parameters/Csrf'},operation['parameters'])
 
+    def test_instance_download_grant_is_a_cookie_not_a_url_credential(self):
+        operation = CONTRACT['paths']['/admin/instance/operations/{id}/content']['get']
+        self.assertEqual([{'browserSession': [],'instanceDownloadGrant': []}],operation['security'])
+        self.assertIn('application/octet-stream',operation['responses']['200']['content'])
+        self.assertEqual('cookie',CONTRACT['components']['securitySchemes']['instanceDownloadGrant']['in'])
+        self.assertEqual({'id','downloadUrl','expiresAt'},set(CONTRACT['components']['schemas']['InstanceDownload']['properties']))
+
     def test_all_private_operations_require_authentication_and_permission(self):
         self.assertEqual([{'bearerAuth': []}, {'browserSession': []}], CONTRACT['security'])
         ids = []
@@ -53,7 +60,7 @@ class ContractTest(unittest.TestCase):
                     self.assertEqual([], operation['security'])
                     continue
                 if path.startswith('/admin/instance/'):
-                    self.assertEqual([{'browserSession': []}], operation['security'])
+                    self.assertEqual([{'browserSession': [], 'instanceDownloadGrant': []}] if path.endswith('/content') else [{'browserSession': []}], operation['security'])
                 else:
                     self.assertNotIn('security', operation)
                 self.assertEqual(('write' if path.startswith('/admin/') else 'read') if method == 'get' else ('read' if path in ('/auth/logout', '/auth/token-login') else 'write'),
@@ -547,7 +554,7 @@ class ContractTest(unittest.TestCase):
             'passkeyProofOptions', 'verifyPasskeyProof', 'renamePasskey', 'removePasskey',
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
-            'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact',
+            'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup',
             'getAdministrationSettings', 'updateAdministrationSettings', 'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()

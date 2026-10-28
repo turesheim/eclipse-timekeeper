@@ -877,6 +877,8 @@ being implemented. The current draft adds these routes under the separate
 | --- | --- | --- |
 | POST | `/backups` | Verify `currentPassword`, consume an encryption `passphrase`, and return `202` with a durable operation receipt and its `Location`. |
 | GET | `/operations/{id}` | Return the operation's ID, type, state, version and UTC update time. |
+| POST | `/operations/{id}/download-grant` | Verify `currentPassword` and issue one private, session-bound download cookie lasting two minutes. |
+| GET | `/operations/{id}/content` | Consume that cookie and stream the encrypted archive as a native attachment. |
 | POST | `/operations/{id}/discard` | Verify `currentPassword`, expire a completed artifact or restore review, and remove its private files. |
 
 Only current administrator browser-account sessions with write permission are
@@ -897,5 +899,18 @@ Encryption passphrases are not stored in operation or command receipts. These
 POST actions do not support automatic replay using `Idempotency-Key`; use the
 returned status URL instead of automatically resubmitting creation. A repeated
 discard can finish filesystem cleanup after its database receipt was committed.
-The current draft has no file-download, upload/review or restore-activation route
-yet. Those integrations and their operator workflows remain part of #473.
+Native downloads require both the account session and the separate
+`__Host-timekeeper-instance-download` cookie. The grant is bound to the exact
+operation and session, stored only as a digest, expires after two minutes and is
+consumed atomically before streaming. It is sent with `Secure`, `HttpOnly`,
+`SameSite=Strict` and `Path=/`. The grant POST returns only `id`, `downloadUrl` and
+`expiresAt`; its secret never appears in JSON, a query or a URL. Navigate the
+browser to that returned URL to download the attachment without buffering the
+archive in a JavaScript Blob. A replay, wrong job/session, expired grant or logged
+out session is rejected. A replacement grant invalidates the earlier one.
+Interrupted transfers require a new password-verified grant.
+
+The audit records `DOWNLOAD_AUTHORIZED` and `DOWNLOAD_STARTED` without cookies,
+digests, passwords or paths. The started event records consumption of authority,
+not a claim that a browser saved the file. Upload/review, restore activation and
+the Administration UI remain unfinished parts of #473.

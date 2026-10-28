@@ -29,6 +29,7 @@ class InstanceAdministratorTest {
     @Inject InstanceAdministrator administrators;
     @Inject InstanceBackupService backups;
     @Inject InstanceBackupJobs jobs;
+    @Inject InstanceDownloads downloads;
     @Inject ContractInputs contracts;
     @Inject RecoveryOrigin origin;
     @Inject BackendClock clock;
@@ -48,7 +49,7 @@ class InstanceAdministratorTest {
         admin=accounts.session(issued.secret());output=Files.createDirectory(directory.resolve("operations"));
         var worker=ClientProxy.unwrap(jobs);worker.storage=output.resolve("private").toString();worker.maximumBytes=5_000_000;worker.retainedBytes=10_000_000;worker.maximumJobs=2;
     }
-    @AfterEach void reset(){ClientProxy.unwrap(accounts).setupFile="NONE";ClientProxy.unwrap(administrators).clock=clock;ClientProxy.unwrap(backups).datasource=datasource;ClientProxy.unwrap(jobs).storage="NONE";}
+    @AfterEach void reset(){ClientProxy.unwrap(accounts).setupFile="NONE";ClientProxy.unwrap(administrators).clock=clock;ClientProxy.unwrap(backups).datasource=datasource;ClientProxy.unwrap(jobs).storage="NONE";ClientProxy.unwrap(downloads).clock=clock;}
 
     @Test void administratorMustProveCurrentCredentialAndReceivesOnlyEncryptedArchive() throws Exception {
         var proof=administrators.verify(admin,PASSWORD);administrators.requireFresh(proof);assertFalse(proof.toString().contains(admin.digest()));
@@ -191,6 +192,57 @@ class InstanceAdministratorTest {
         assertEquals(403,http(normal,true,"POST","/admin/instance/backups",input).statusCode());
         assertEquals(403,http(normal,false,"GET","/admin/instance/operations/"+UUID.randomUUID(),null).statusCode());
         assertFalse(Files.exists(output.resolve("private")));
+    }
+    private Browser withDownload(Browser browser,io.restassured.response.Response response) {
+        assertEquals(200,response.statusCode(),response.asString());String grant=response.cookie(InstanceDownloads.COOKIE);assertNotNull(grant);
+        return new Browser(browser.cookie()+"; "+InstanceDownloads.COOKIE+"="+grant,browser.csrf());
+    }
+    private InstanceOperations.Status readyBackup() {return jobs.create(administrators.verify(admin,PASSWORD),"native browser backup passphrase".toCharArray());}
+    @Test void nativeHttpDownloadIsEncryptedCookieBoundOneUseAndNeverPutsAGrantInTheUrl() throws Exception {
+        var job=readyBackup();var browser=httpLogin("instance-admin");String path="/admin/instance/operations/"+job.id();var proof=object().put("currentPassword",PASSWORD);
+        assertEquals(403,http(browser,false,"GET",path+"/content",null).statusCode());
+        assertEquals(403,http(browser,false,"POST",path+"/download-grant",proof).statusCode());
+        assertEquals(422,http(browser,true,"POST",path+"/download-grant",proof.deepCopy().put("currentPassword","wrong password")).statusCode());
+        var issued=http(browser,true,"POST",path+"/download-grant",proof);var authorized=withDownload(browser,issued);var reply=parse(issued.asString());contracts.validate("InstanceDownload",reply);
+        String raw=issued.cookie(InstanceDownloads.COOKIE);assertFalse(issued.asString().contains(raw));assertEquals("/api/v1"+path+"/content",reply.path("downloadUrl").asText());
+        String cookie=issued.getHeaders().getValues("Set-Cookie").stream().filter(value->value.startsWith(InstanceDownloads.COOKIE+"=")).findFirst().orElseThrow();
+        for(String flag:List.of("HttpOnly","Secure","SameSite=Strict","Path=/","Max-Age=120"))assertTrue(cookie.contains(flag));
+        assertEquals(400,http(new Browser(authorized.cookie()+"; "+InstanceDownloads.COOKIE+"="+raw,authorized.csrf()),false,"GET",path+"/content",null).statusCode());
+        assertEquals(403,io.restassured.RestAssured.given().header("Cookie",authorized.cookie()).header("Origin","https://untrusted.example").get("/api/v1"+path+"/content").statusCode());
+        var response=http(authorized,false,"GET",path+"/content",null);assertEquals(200,response.statusCode(),response.asString());assertEquals("application/octet-stream",response.contentType());assertEquals("no-store",response.header("Cache-Control"));
+        assertEquals("attachment; filename=\"timekeeper-instance-"+job.id()+".tkbackup\"",response.header("Content-Disposition"));
+        byte[] encrypted=response.asByteArray();assertEquals(encrypted.length,Long.parseLong(response.header("Content-Length")));assertTrue(new String(encrypted,0,8,java.nio.charset.StandardCharsets.US_ASCII).equals("TKIBK001"));
+        Path file=output.resolve("http-downloaded.tki");Files.write(file,encrypted);char[] phrase="native browser backup passphrase".toCharArray();
+        try(var archive=InstanceBackupArchive.open(file,phrase,output,100_000_000)){assertEquals(23,archive.counts().size());}finally{Arrays.fill(phrase,'\0');}
+        assertEquals(403,http(authorized,false,"GET",path+"/content",null).statusCode());
+        accounts.tx(c->{try(var statement=query(c,"SELECT payload FROM tk_instance WHERE kind='AUDIT'");var rows=statement.executeQuery()){var actions=new HashSet<String>();while(rows.next()){var item=parse(rows.getString(1));assertFalse(item.toString().contains(raw));if(item.has("action"))actions.add(item.path("action").asText());}assertEquals(Set.of("DOWNLOAD_AUTHORIZED","DOWNLOAD_STARTED"),actions);}catch(Exception failure){throw new AssertionError(failure);}return null;});
+    }
+    @Test void downloadGrantCannotCrossJobsSessionsExpiryOrLogout() {
+        var first=readyBackup();var second=readyBackup();var browser=httpLogin("instance-admin");var other=httpLogin("instance-admin");var proof=object().put("currentPassword",PASSWORD);
+        String path="/admin/instance/operations/"+first.id();var issued=http(browser,true,"POST",path+"/download-grant",proof);var authorized=withDownload(browser,issued);
+        var wrongSession=new Browser(other.cookie()+"; "+InstanceDownloads.COOKIE+"="+issued.cookie(InstanceDownloads.COOKIE),other.csrf());
+        assertEquals(403,http(wrongSession,false,"GET",path+"/content",null).statusCode());
+        assertEquals(403,http(authorized,false,"GET","/admin/instance/operations/"+second.id()+"/content",null).statusCode());
+        ClientProxy.unwrap(downloads).clock=new BackendClock(){public Instant now(){return clock.now().plusSeconds(121);}};
+        assertEquals(403,http(authorized,false,"GET",path+"/content",null).statusCode());ClientProxy.unwrap(downloads).clock=clock;
+        var replacement=withDownload(browser,http(browser,true,"POST",path+"/download-grant",proof));
+        assertEquals(403,http(authorized,false,"GET",path+"/content",null).statusCode());
+        assertEquals(204,http(browser,true,"POST","/auth/logout",null).statusCode());assertEquals(401,http(replacement,false,"GET",path+"/content",null).statusCode());
+    }
+    @Test void concurrentNativeDownloadsCanConsumeACookieGrantOnlyOnce() throws Exception {
+        var job=readyBackup();var browser=httpLogin("instance-admin");String path="/admin/instance/operations/"+job.id();var authorized=withDownload(browser,http(browser,true,"POST",path+"/download-grant",object().put("currentPassword",PASSWORD)));
+        var ready=new java.util.concurrent.CountDownLatch(2);var go=new java.util.concurrent.CountDownLatch(1);
+        try(var workers=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var replies=new ArrayList<java.util.concurrent.Future<Integer>>();
+            for(int index=0;index<2;index++)replies.add(workers.submit(()->{ready.countDown();assertTrue(go.await(30,java.util.concurrent.TimeUnit.SECONDS));return http(authorized,false,"GET",path+"/content",null).statusCode();}));
+            assertTrue(ready.await(30,java.util.concurrent.TimeUnit.SECONDS));go.countDown();
+            var statuses=new ArrayList<Integer>();for(var reply:replies)statuses.add(reply.get(30,java.util.concurrent.TimeUnit.SECONDS));Collections.sort(statuses);assertEquals(List.of(200,403),statuses);
+        }finally{go.countDown();}
+    }
+    @Test void damagedCiphertextCannotMintADownloadGrantOrLeakItsStoragePath() throws Exception {
+        var job=readyBackup();Path file=output.resolve("private").resolve(job.id().toString()).resolve("archive.tki");byte[] encrypted=Files.readAllBytes(file);encrypted[0]^=1;Files.write(file,encrypted,StandardOpenOption.TRUNCATE_EXISTING);
+        var browser=httpLogin("instance-admin");var response=http(browser,true,"POST","/admin/instance/operations/"+job.id()+"/download-grant",object().put("currentPassword",PASSWORD));
+        assertEquals(503,response.statusCode());assertFalse(response.asString().contains(output.toString()));assertFalse(response.asString().contains(PASSWORD));assertNull(response.cookie(InstanceDownloads.COOKIE));
     }
     private AgroalDataSource afterCommit(Runnable action) {
         var guarded=(AgroalDataSource)java.lang.reflect.Proxy.newProxyInstance(AgroalDataSource.class.getClassLoader(),new Class<?>[]{AgroalDataSource.class},(proxy,method,args)->{
