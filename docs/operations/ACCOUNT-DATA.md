@@ -5,7 +5,14 @@ signed-in account. Administrator access does not include anyone else's records.
 
 ## Download
 
-**Download my data** creates a private ZIP containing:
+In **Download my data**, select **Prepare archive**. This creates and fetches a
+consistent snapshot without opening a browser download. When it is ready, select
+**Download archive** to save `timekeeper-account-YYYY-MM-DD.zip`; the date is the
+server's UTC preparation date. Preparing again replaces the previous browser
+copy. Leaving the page releases that copy; prepare again if you return later.
+Read-only sessions can also prepare and download archives.
+
+The private ZIP contains:
 
 - `archive.json`: a versioned snapshot for restoring work and preferences, with a checksummed file index.
 - `manifest.json`: archive identity, generation time, record counts and file descriptions.

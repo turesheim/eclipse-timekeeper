@@ -20,6 +20,17 @@ test('private binary downloads retain cookie/owner checks and reject late or for
   let finish;const late=new Api(null,()=>new Promise(resolve=>{finish=resolve;}));const pending=late.request('/data/account/export',{binary:true});late.close();finish(zip());await assert.rejects(pending,error=>error.code==='UNAUTHENTICATED');
   const denied=new Api(null,async()=>reply({code:'FORBIDDEN'},'b3duZXItYQ',403));await assert.rejects(denied.request('/data/account/export',{binary:true}),error=>error.code==='FORBIDDEN');
 });
+test('account ZIP downloads expose only the safe dated server filename',async()=>{
+  for(const [disposition,expected] of [
+    ['attachment; filename="timekeeper-account-2026-10-28.zip"','timekeeper-account-2026-10-28.zip'],
+    ['attachment; filename="../private.zip"',undefined],
+    ['attachment; filename="timekeeper-account.zip"',undefined],
+    ['attachment; filename="timekeeper-account-2026-10-28.zip"; extra="untrusted"',undefined]
+  ]) {
+    const api=new Api(null,async()=>new Response('synthetic ZIP',{headers:{'Content-Type':'application/zip','Content-Disposition':disposition,'X-Timekeeper-Owner':'b3duZXItYQ'}}),{ownerId:'owner-a'});
+    assert.equal((await api.request('/data/account/export',{binary:true})).fileName,expected);
+  }
+});
 test('first empty page binds the session and rejects later owner changes', async () => {
   let index = 0;
   const api = new Api('never-display-token', async (url, options) => {

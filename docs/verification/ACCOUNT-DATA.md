@@ -49,3 +49,19 @@ checks. Packaged browser receipts identify the distribution digest and source.
 Traces and videos containing credentials are disabled. See the
 [user guide](../operations/ACCOUNT-DATA.md) and
 [desktop/mobile review screenshots](../development/WEB-CLIENT.md#account-data-portability).
+
+## Separate preparation and download (#469)
+
+On 2026-10-28, candidate `8854638f1c44e8c20b4803cfc648e9351c547e5b`
+passed all 97 web unit tests and all five packaged account-portability scenarios
+in Chromium and HTTPS WebKit. The tested distribution SHA-256 was
+`5a9062f9d94d1c70bfbf7a94a403b379a272e23c97fe8532adfc10298ff5411f`.
+
+The browser regressions observe zero download events after **Prepare archive**,
+then exactly one after **Download archive**, with a dated server filename.
+Read-only sessions repeat both operations; preparing again replaces and revokes
+the previous private object URL. Existing upload/review, lost-reply recovery,
+concurrent session refresh and duplicate-safe restore checks pass through this
+new download flow. Desktop, 390px and 320px layouts pass automated accessibility
+and overflow checks. The desktop/mobile review screenshots were refreshed from
+the WebKit run and visually inspected. These use disposable local accounts.

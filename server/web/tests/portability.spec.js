@@ -28,8 +28,15 @@ async function account(page,request) {
   await expect(page.getByRole('heading',{name:'Download my data',exact:true})).toBeVisible();return {username,session:await session.json()};
 }
 async function download(page) {
-  const waiting=page.waitForEvent('download');await page.getByRole('button',{name:'Download my data',exact:true}).click();const result=await waiting;
-  expect(result.suggestedFilename()).toBe('timekeeper-account.zip');const path=test.info().outputPath('private-account.zip');await result.saveAs(path);return path;
+  const downloads=[];const observe=value=>downloads.push(value);page.on('download',observe);
+  try {
+    await page.getByRole('button',{name:'Prepare archive',exact:true}).click();
+    const link=page.getByRole('link',{name:'Download archive',exact:true});await expect(link).toBeVisible();
+    await expect(page.getByRole('button',{name:'Prepare archive',exact:true})).toBeEnabled();expect(downloads).toHaveLength(0);
+    const waiting=page.waitForEvent('download');await link.click();const result=await waiting;
+    expect(result.suggestedFilename()).toMatch(/^timekeeper-account-\d{4}-\d{2}-\d{2}\.zip$/);
+    const path=test.info().outputPath('private-account.zip');await result.saveAs(path);expect(downloads).toHaveLength(1);return path;
+  } finally {page.off('download',observe);}
 }
 async function snapshot(page) {return (await own(page,'GET','/data/export')).json();}
 test('portability: private download, accessible review, stale review and duplicate-safe restore preserve account identity',async({page,request})=>{
@@ -75,7 +82,10 @@ test('portability: upload resumes the next chunk after a lost reply, reload and 
 test('portability: read-only sessions can download repeatedly while restore stays disabled',async({page})=>{
   await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(process.env.TIMEKEEPER_WEB_READ_TOKEN);await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
   await openAccountMenu(page);await page.getByRole('link',{name:'My Account',exact:true}).click();await page.getByRole('link',{name:'Your data',exact:true}).click();await expect(page.getByRole('button',{name:'Review archive',exact:true})).toBeDisabled();
-  await download(page);await expect(page.getByRole('button',{name:'Download my data',exact:true})).toBeEnabled();await download(page);
+  await download(page);await expect(page.getByRole('button',{name:'Prepare archive',exact:true})).toBeEnabled();
+  const previous=await page.getByRole('link',{name:'Download archive',exact:true}).getAttribute('href');await download(page);
+  expect(await page.getByRole('link',{name:'Download archive',exact:true}).getAttribute('href')).not.toBe(previous);
+  expect(await page.evaluate(async url=>{try{await fetch(url);return true;}catch{return false;}},previous)).toBe(false);
 });
 test('portability: concurrent session refreshes do not interrupt private archive downloads',async({page,request})=>{
   await account(page,request);
