@@ -251,7 +251,20 @@ test('a long press opens the day note menu while movement, release and multiple 
     await start();await expect(page.getByRole('menuitem')).toBeVisible();await cell.dispatchEvent('pointerup',{pointerType:'touch',pointerId:7,bubbles:true});await expect(page.locator('#track-month')).toHaveValue('2026-05');await expect(dialog(page)).not.toBeVisible();await page.getByRole('menuitem').tap();await expect(dialog(page)).toBeVisible();await expect(page.locator('#track-note-text')).toBeEnabled();await save(page,'Ferie');await expect(note(page,'2026-05-10')).toHaveText('Ferie');
     await expect(note(page,'2026-05-10')).toHaveCSS('opacity','1');
     if(browserName==='chromium'){
-      await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await expect(note(page,'2026-05-11')).toBeEnabled();const target=day(page,'2026-05-11');await target.evaluate(node=>node.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const point=await target.locator('.track-date').evaluate(node=>{const r=node.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2};});const cdp=await owner.newCDPSession(page);
+      await expect(page.locator('#workspace')).toHaveAttribute('aria-busy','false');await expect(note(page,'2026-05-11')).toBeEnabled();const target=day(page,'2026-05-11');await target.evaluate(node=>node.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));// A refresh can detach the resolved date between locator resolution and
+      // evaluation. Never send a native touch using its resulting zero rectangle.
+      let point;
+      await expect.poll(async()=>{
+        point=await target.locator('.track-date').evaluate(node=>{
+          const r=node.getBoundingClientRect();
+          if(!node.isConnected||!r.width||!r.height)return null;
+          const point={x:r.left+r.width/2,y:r.top+r.height/2};
+          const hit=document.elementFromPoint(point.x,point.y);
+          return hit&&node.closest('[data-track-date]').contains(hit)?point:null;
+        });
+        return point;
+      }).not.toBeNull();
+      const cdp=await owner.newCDPSession(page);
       await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point]});await expectMenuAt(page,point);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await expectMenuAt(page,point);expect(await page.evaluate(()=>getSelection().toString())).toBe('');await expect(dialog(page)).not.toBeVisible();await captureScreenshot(page,{path:'test-results/day-notes-touch-menu.png'});await page.getByRole('menuitem').tap();await expect(page.locator('#track-note-text')).toBeEnabled();await save(page,'Avspasering');await expect(note(page,'2026-05-11')).toHaveText('Avspasering');await cdp.detach();
     }
   }finally{await owner.close();}

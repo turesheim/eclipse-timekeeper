@@ -199,9 +199,11 @@ def main():
         stopped, stopped_headers = client.call('POST', '/activities/' + active['id'] + '/stop', headers=stop_key)
         expected, _ = client.call('GET', '/data/export')
         # One database means planned/failed database restarts interrupt the API.
+        # After restarting existing containers, probe live replica/proxy readiness.
+        # Compose --wait can fail immediately on a cached unhealthy gateway status
+        # from the deliberate outage, before Docker runs its next health check.
         compose('stop', 'postgres')
         compose('start', 'postgres')
-        compose('up', '-d', '--wait', '--wait-timeout', '120')
         wait_ready()
         actual, _ = client.call('GET', '/data/export')
         client.assertEqual(expected, actual)
@@ -213,7 +215,6 @@ def main():
         subprocess.run(['docker', 'update', '--restart=no', container], check=True, capture_output=True)
         compose('kill', '-s', 'SIGKILL', 'postgres')
         compose('start', 'postgres')
-        compose('up', '-d', '--wait', '--wait-timeout', '120')
         wait_ready()
         actual, _ = client.call('GET', '/data/export')
         client.assertEqual(expected, actual)
@@ -230,7 +231,6 @@ def main():
         receipt['serverFailover'] = True
         print('API replica failure preserved exact command replay: PASS', flush=True)
         compose('start', 'api-1')
-        compose('up', '-d', '--wait', '--wait-timeout', '120')
         wait_ready()
         expected, _ = client.call('GET', '/data/export')
         # Back up and restore through a separate client using the actual application role.
