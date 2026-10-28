@@ -104,6 +104,14 @@ class InstanceConfigurationTest {
             assertTrue(snapshot.files().values().stream().anyMatch(bytes->Arrays.equals(bytes,"private SMTP secret\n".getBytes(java.nio.charset.StandardCharsets.UTF_8))));
         }
     }
+    @Test void nativeMaintenanceMarkerIsRuntimeGuardRatherThanRequiredArchiveInput() throws Exception {
+        var env=new io.smallrye.config.EnvConfigSource(Map.of("TIMEKEEPER_MAINTENANCE_FILE",directory.resolve("absent-pending.json").toString()),300);
+        var config=new io.smallrye.config.SmallRyeConfigBuilder().addDefaultInterceptors().withSources(new io.smallrye.config.PropertiesConfigSource(base(),"application",100),env).build();
+        try(var snapshot=InstanceConfiguration.capture(config)) {
+            assertTrue(snapshot.files().isEmpty());
+            assertEquals(directory.resolve("absent-pending.json").toString(),snapshot.document().path("properties").path("timekeeper.maintenance.file").asText());
+        }
+    }
     @FunctionalInterface private interface Attempt {Object run() throws Exception;}
     private void rejects(Attempt action){var failure=assertThrows(IOException.class,action::run);assertEquals("INVALID_INSTANCE_CONFIGURATION",failure.getMessage());assertNull(failure.getCause());assertFalse(failure.toString().contains(directory.toString()));}
 }

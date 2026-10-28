@@ -130,7 +130,7 @@ final class InstanceConfiguration {
     static boolean validFileName(String name){return name.matches("configuration/[0-9]{4}\\.(?:bin|p12|pfx|jks|pem|crt|key|json|properties|der)");}
     static boolean coversDeclaredProperty(String name){return owned(name)&&(!looksLikeInput(name)||kind(name)!=0||output(name));}
     private static boolean looksLikeInput(String name){return (name.startsWith("timekeeper.")||name.startsWith("smallrye.config.")||name.startsWith("quarkus.tls.")||name.startsWith("quarkus.http.ssl.")||name.startsWith("quarkus.management.ssl."))&&name.matches(".*(?:[.-](?:file|files|path|paths|dir|dirs|directory|directories|location|locations))$");}
-    private static boolean output(String name){return name.startsWith("quarkus.log.")||name.startsWith("quarkus.http.access-log.")||name.equals("timekeeper.instance-backup.storage");}
+    private static boolean output(String name){return name.startsWith("quarkus.log.")||name.startsWith("quarkus.http.access-log.")||name.equals("timekeeper.instance-backup.storage")||name.equals("timekeeper.maintenance.file");}
     private static Set<String> fields(JsonNode object){var result=new HashSet<String>();object.fieldNames().forEachRemaining(result::add);return result;}
     private static byte[] read(String value,boolean tls) throws IOException {
         if(tls&&!value.startsWith("classpath:")&&!Path.of(value).isAbsolute()&&InstanceConfiguration.class.getClassLoader().getResource(value)!=null)value="classpath:"+value;

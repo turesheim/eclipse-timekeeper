@@ -185,7 +185,7 @@ def main():
             command('docker','cp',str(release),target+':/tmp/timekeeper-migration-incoming/scripts/release.json')
             command('docker','exec',target,'chown','-R','37017:37017','/tmp/timekeeper-migration-incoming')
             helper('validate')
-            command('docker','exec','--user','37017:37017',target,'cp','/tmp/timekeeper-migration-incoming/project/compose.yaml','/var/packages/timekeeper/target/project/compose.yaml')
+            command('docker','exec',target,'cp','/tmp/timekeeper-migration-incoming/project/compose.yaml','/var/packages/timekeeper/target/project/compose.yaml')
             helper('install')
             ddl=''.join((DB/name).read_text() for name in ('schema-v1-postgresql.sql','auth-v2.sql','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql','instance-v9.sql'))+"UPDATE tk_schema SET schema_version=9,state='READY';"
             canonical="SET ROLE timekeeper_fixture_app; "+ddl
