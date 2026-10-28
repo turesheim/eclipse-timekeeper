@@ -4,6 +4,8 @@ import AxeBuilder from '@axe-core/playwright';
 import {captureScreenshot} from './screenshots.js';
 
 const token=process.env.TIMEKEEPER_WEB_TOKEN;
+const CARD_STYLE_PROPERTIES=['fontFamily','fontSize','fontWeight','lineHeight','paddingTop','paddingRight','paddingBottom','paddingLeft','borderRadius','borderInlineStartWidth'];
+const CARD_TITLE_STYLE_PROPERTIES=['fontSize','fontWeight','lineHeight','whiteSpace','textOverflow','overflow'];
 async function api(request,method,path,data,headers={}){
   const response=await request.fetch('/api/v1'+path,{method,data,headers:{Authorization:`Bearer ${token}`,...headers}});
   expect(response.ok(),`${method} ${path}: ${response.status()}`).toBe(true);return response;
@@ -65,10 +67,10 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(page.locator('#today-event-details')).toContainText('From an imported calendar');
     await expect(page.locator('#today-event-details')).toContainText('All day');
     await page.locator('#today-event-details').getByRole('button',{name:'Close',exact:true}).click();
-    const cardStyle=locator=>locator.evaluate(card=>{
+    const cardStyle=locator=>locator.evaluate((card,{cardProperties,titleProperties})=>{
       const styles=getComputedStyle(card),title=getComputedStyle(card.querySelector('strong'));
-      return Object.fromEntries(['fontFamily','fontSize','fontWeight','lineHeight','paddingTop','paddingRight','paddingBottom','paddingLeft','borderRadius','borderInlineStartWidth'].map(key=>[key,styles[key]]).concat(['fontSize','fontWeight','lineHeight','whiteSpace','textOverflow','overflow'].map(key=>['title.'+key,title[key]])));
-    });
+      return Object.fromEntries(cardProperties.map(key=>[key,styles[key]]).concat(titleProperties.map(key=>['title.'+key,title[key]])));
+    },{cardProperties:CARD_STYLE_PROPERTIES,titleProperties:CARD_TITLE_STYLE_PROPERTIES});
     for(const width of [1440,390]){
       await page.setViewportSize({width,height:1000});
       const sessionCard=page.locator('#today-sessions [data-today-client]'),eventCard=page.locator('[data-today-event="today-meeting"]');
