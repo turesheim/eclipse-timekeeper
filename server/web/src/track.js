@@ -154,14 +154,14 @@ export class MonthTrack {
         });
         for (const entry of entries) {
           const client = clientsById.get(entry.clientId);
-          const summary = node(this.writable ? 'button' : 'div', undefined, 'track-client-day');summary.dataset.trackDailyClient = entry.clientId;
+          const summary = node(this.writable ? 'button' : 'div', undefined, 'calendar-summary-card track-client-day');summary.dataset.trackDailyClient = entry.clientId;
           if (this.writable) {summary.type = 'button';summary.setAttribute('aria-haspopup', 'dialog');summary.addEventListener('click', () => this.open(day.date, entry.clientId));} else
           summary.setAttribute('role', 'group');
           summary.setAttribute('aria-label', `${client?.name || i18nText("ui.client")} · ${day.date}`);
           if (/^#[0-9a-f]{6}$/i.test(client?.color)) summary.style.setProperty('--client-color', client.color);
-          const duration = node('span', undefined, 'track-client-day-time'),short = node('span', undefined, 'track-client-day-time-short');short.setAttribute('aria-hidden', 'true');
+          const duration = node('span', undefined, 'calendar-summary-time track-client-day-time'),short = node('span', undefined, 'track-client-day-time-short');short.setAttribute('aria-hidden', 'true');
           this.dailyTimes.set(day.date + '/' + entry.clientId, { duration, short, summary, name: client?.name || i18nText("ui.client"), details: this.details(day.date, entry.clientId) });
-          const line = node('span', undefined, 'track-client-day-total'),icons = node('span', undefined, 'track-project-icons'),projects = new Map();
+          const line = node('span', undefined, 'calendar-summary-total track-client-day-total'),icons = node('span', undefined, 'track-project-icons'),projects = new Map();
           for (const session of this.sessions(day.date, entry.clientId)) {
             const project = projectsById.get(session.projectId);
             if (isProjectIcon(project?.icon)) {const names = projects.get(project.icon) || new Set();names.add(project.name);projects.set(project.icon, names);}
