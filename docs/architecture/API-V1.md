@@ -840,7 +840,11 @@ See [journal storage protection](../operations/JOURNAL-STORAGE.md) for the
 required deployment encryption, temporary/backup storage, key management and
 readable-server trust boundary. The database and private account archive remain
 authoritative. The [WebDAV collection](../operations/JOURNAL-WEBDAV.md) uses
-the same owner, authorization and conditional-write rules.
+the same owner, authorization and conditional-write rules. Its finite
+`/remote.php/webdav/` alias exposes the same journal and asset resources for
+MySync; both prefixes require HTTP Basic with the existing API token as password
+and HTTPS outside loopback development. The alias adds no REST API variants or
+independent document state.
 
 ### Private day-label and note diagnostics
 

@@ -97,16 +97,19 @@ The tested releases use conditional writes and deletes. MySync normalizes text
 line endings to LF, including its local copy of a downloaded CRLF document.
 An unchanged synchronization retains the original server bytes and ETag; an
 actual client edit uploads LF. Unknown frontmatter and trailing spaces survive
-unchanged scans. MySync filters attachment types: PDFs were verified byte-for-byte; arbitrary
+unchanged scans. MySync filters attachment types: PDFs were verified
+byte-for-byte; arbitrary
 `.bin` files are skipped by this release. Timekeeper itself retains arbitrary
-attachment bytes through its asset API and WebDAV. Choose an editor/client that preserves line endings if exact
+attachment bytes through its asset API and WebDAV. Choose an editor/client
+that preserves line endings if exact
 CRLF copies are required on every device. Calendar labels are independent of
 note files, including legacy `timekeeper-label` frontmatter.
 
 The acceptance run uses real released desktop binaries and the unmodified
 plugin, with a fresh private vault and trusted HTTPS certificate. It is Linux
 interoperability evidence, not a claim that every macOS, Windows or mobile
-release was exercised. Validate the relevant release before relying on automatic sync there.
+release was exercised. Validate the relevant release before relying on automatic
+sync there.
 The server uses standard WebDAV and has no platform-specific client runtime.
 
 ### Reproducing client acceptance

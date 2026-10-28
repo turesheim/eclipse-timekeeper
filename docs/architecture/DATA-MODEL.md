@@ -556,8 +556,12 @@ The time-overlap calculation does not create a persistent association.
 
 ## Server day notes and WebDAV
 
+The canonical HTTP collection `/dav/journal/` and its MySync-compatible
+`/remote.php/webdav/` alias address these same owner-scoped resources, including
+`assets/`. They share token authorization, data, ETags and guarded mutations.
+
 The server has a separate physical schema from embedded Eclipse storage
-(`ServerSchema.CURRENT` is 7). Day notes and their deletion markers reuse
+(`ServerSchema.CURRENT` is 9). Day notes and their deletion markers reuse
 `tk_resource(owner_id, entity_type, id, version, payload)` in both H2 and
 PostgreSQL. Its primary key is `(owner_id, entity_type, id)`; `payload` is JSON.
 These are logical row types, not extra SQL tables or Eclipse JPA entities.
