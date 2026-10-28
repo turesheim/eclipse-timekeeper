@@ -24,7 +24,7 @@ final class InstanceRestoreIntent {
     private final Path root;private final long maximumBytes;
     record Spec(UUID generation,UUID operation,long reviewVersion,String actor,UUID artifactRoot,UUID previousGeneration,InstanceRestoreDatabase.Deployment deployment) {
         Spec {
-            if(generation==null||generation.equals(CONTROL)||operation==null||reviewVersion<1||reviewVersion>=9007199254740989L||actor==null||actor.isBlank()||actor.length()>400||artifactRoot==null||deployment==null)throw ApiFailure.validation();
+            if(generation==null||generation.equals(CONTROL)||generation.equals(previousGeneration)||operation==null||reviewVersion<1||reviewVersion>=9007199254740989L||actor==null||actor.isBlank()||actor.length()>400||artifactRoot==null||deployment==null)throw ApiFailure.validation();
         }
         @Override public String toString(){return "Private instance restore intent";}
     }
@@ -49,6 +49,8 @@ final class InstanceRestoreIntent {
         private final InstanceBackupArchive.Verified archive;private final InstanceConfiguration.Snapshot target;private boolean closed;
         Prepared(Held held,Spec spec,String digest,InstanceBackupArchive.Verified archive,InstanceConfiguration.Snapshot target){this.held=held;this.spec=spec;this.digest=digest;this.archive=archive;this.target=target;}
         Spec spec(){return spec;}
+        Path storage(){if(closed)throw new IllegalStateException("Restore intent is closed");return root;}
+        String digest(){return digest;}
         InstanceBackupArchive.Verified archive(){return archive;}
         InstanceConfiguration.Snapshot target(){return target;}
         @Override public String toString(){return "Private prepared instance restore";}
@@ -73,13 +75,27 @@ final class InstanceRestoreIntent {
         /** Offline recovery must prove the database committed this exact private intent. */
         String phase(Connection c) throws SQLException {
             if(closed)throw new SQLException("Restore intent is closed");var control=control(c,false);var operation=operation(c,false);var payload=operation.path("payload");
-            if(!control.path("restoreIntent").equals(binding())||!payload.path("restoreIntent").equals(binding())||!operation.path("actor").asText().equals(spec.actor())||!payload.path("type").asText().equals("RESTORE")||!payload.path("state").asText().equals("REVIEW"))throw new ApiFailure(409,"INSTANCE_RESTORE_NOT_AUTHORIZED");
+            if(!control.path("restoreIntent").equals(binding())||!payload.path("restoreIntent").equals(binding())||!operation.path("actor").asText().equals(spec.actor())||!payload.path("type").asText().equals("RESTORE")||!Set.of("REVIEW","RESTORED").contains(payload.path("state").asText()))throw new ApiFailure(409,"INSTANCE_RESTORE_NOT_AUTHORIZED");
             String phase=payload.path("restorePhase").asText();long version=operation.path("version").asLong();
-            if(phase.equals("PREPARED")&&version==spec.reviewVersion()+1&&control.path("restorePending").asBoolean()&&Objects.equals(control.hasNonNull("restoreGeneration")?control.path("restoreGeneration").asText():null,spec.previousGeneration()==null?null:spec.previousGeneration().toString()))return phase;
-            if(phase.equals("DATABASE_APPLIED")&&version==spec.reviewVersion()+2&&control.path("restorePending").asBoolean()&&control.path("restoreGeneration").asText().equals(spec.generation().toString())&&control.path("restore").path("operationId").asText().equals(spec.operation().toString()))return phase;
+            if(payload.path("state").asText().equals("REVIEW")&&phase.equals("PREPARED")&&version==spec.reviewVersion()+1&&control.path("restorePending").asBoolean()&&Objects.equals(control.hasNonNull("restoreGeneration")?control.path("restoreGeneration").asText():null,spec.previousGeneration()==null?null:spec.previousGeneration().toString()))return phase;
+            if(payload.path("state").asText().equals("REVIEW")&&phase.equals("DATABASE_APPLIED")&&version==spec.reviewVersion()+2&&control.path("restorePending").asBoolean()&&control.path("restoreGeneration").asText().equals(spec.generation().toString())&&control.path("restore").path("operationId").asText().equals(spec.operation().toString()))return phase;
+            if(phase.equals("COMPLETE")&&payload.path("state").asText().equals("RESTORED")&&version==spec.reviewVersion()+3&&!control.path("restorePending").asBoolean()&&control.path("restoreGeneration").asText().equals(spec.generation().toString())&&control.path("restore").path("phase").asText().equals("COMPLETE")&&control.path("restore").path("operationId").asText().equals(spec.operation().toString()))return phase;
             throw new ApiFailure(409,"INSTANCE_RESTORE_NOT_AUTHORIZED");
         }
-        private void targetBinding(Connection c) throws SQLException {
+        /** Files must already be durably published; the caller commits final activation. */
+        void complete(Connection c,InstanceRestoreFence.Exclusive exclusive,Instant now) throws SQLException,IOException {
+            exclusive.require(c);if(c.getAutoCommit()||c.getTransactionIsolation()!=Connection.TRANSACTION_SERIALIZABLE)throw new SQLException("Complete restore in a serializable transaction");
+            var material=InstanceRestoreMaterial.active(root);if(!material.generation().equals(spec.generation())||!material.operation().equals(spec.operation())||!material.intentDigest().equals(digest))throw new IOException("INVALID_INSTANCE_RESTORE_MATERIAL");
+            String current=phase(c);var control=control(c,true);
+            if(current.equals("COMPLETE")){if(!control.path("restore").path("materialSha256").asText().equals(material.digest()))throw new IOException("INVALID_INSTANCE_RESTORE_MATERIAL");return;}
+            if(!current.equals("DATABASE_APPLIED"))throw new ApiFailure(409,"INSTANCE_RESTORE_NOT_APPLIED");
+            var operation=operation(c,true);var payload=(ObjectNode)operation.get("payload");payload.put("state","RESTORED").put("restorePhase","COMPLETE");
+            control.put("restorePending",false);control.withObject("restore").put("phase","COMPLETE").put("materialSha256",material.digest());
+            execute(c,"UPDATE tk_instance SET version=version+1,payload=? WHERE id=?",control.toString(),CONTROL);
+            execute(c,"UPDATE tk_instance SET version=version+1,occurred_at=?,payload=? WHERE id=?",now.toString(),payload.toString(),spec.operation());
+            execute(c,"INSERT INTO tk_instance(id,kind,version,operation_id,actor_owner,occurred_at,payload) VALUES(?,'AUDIT',1,?,?,?,?)",UUID.randomUUID(),spec.operation(),spec.actor(),now.toString(),object().put("type","RESTORE").put("state","RESTORED").put("action","RESTORE_COMPLETED").toString());
+        }
+        void targetBinding(Connection c) throws SQLException {
             var properties=target.document().path("properties");String configured=properties.path("quarkus.datasource.jdbc.url").asText(),actual=c.getMetaData().getURL();
             try{DatabaseConfiguration.validate(configured);}catch(IllegalArgumentException invalid){throw new ApiFailure(409,"INSTANCE_TARGET_CONFIGURATION_CHANGED");}
             boolean postgres=c.getMetaData().getDatabaseProductName().equals("PostgreSQL");
@@ -113,6 +129,23 @@ final class InstanceRestoreIntent {
             var result=load(held);complete=true;return result;
         }catch(IOException|RuntimeException failure){throw failure;}
         finally{if(!complete){try{if(stage!=null&&!Files.exists(root.resolve("prepared.json"),NOFOLLOW_LINKS))InstanceBackupArchive.remove(stage);}finally{held.close();}}}
+    }
+    Path storage(){return root;}
+    /** Complete-state cleanup needs no image, so a crash during deletion is resumable. */
+    void cleanupCompleted(Connection c,InstanceRestoreMaterial.Installed expected) throws IOException,SQLException {
+        try(var held=new Held()) {
+            var control=control(c,false);var restore=control.path("restore");var active=InstanceRestoreMaterial.active(root);
+            if(control.path("restorePending").asBoolean()||!restore.path("phase").asText().equals("COMPLETE")||!active.equals(expected)||!control.path("restoreGeneration").asText().equals(active.generation().toString())||!restore.path("materialSha256").asText().equals(active.digest())||!restore.path("operationId").asText().equals(active.operation().toString())||!control.path("restoreIntent").path("generation").asText().equals(active.generation().toString())||!control.path("restoreIntent").path("sha256").asText().equals(active.intentDigest()))throw invalid();
+            Path pointer=root.resolve("prepared.json");
+            if(Files.exists(pointer,NOFOLLOW_LINKS)) {
+                var value=read(pointer,1024);fields(value,Set.of("format","generation","sha256"));
+                if(value.path("generation").asText().equals(active.generation().toString())) {
+                    if(!value.path("format").asText().equals(FORMAT)||!value.path("sha256").asText().equals(active.intentDigest())||!control.path("restoreIntent").path("sha256").asText().equals(active.intentDigest()))throw invalid();
+                    Files.delete(pointer);sync(root);
+                }
+            }
+            Path stage=root.resolve(active.generation().toString());if(Files.exists(stage,NOFOLLOW_LINKS)){directory(stage);InstanceBackupArchive.remove(stage);sync(root);}
+        }
     }
     Prepared open() throws IOException {Held held=new Held();boolean complete=false;try{var result=load(held);complete=true;return result;}finally{if(!complete)held.close();}}
     private Prepared load(Held held) throws IOException {

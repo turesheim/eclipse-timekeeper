@@ -869,6 +869,13 @@ privacy boundaries, portability and the coordinated schema-8 upgrade.
 
 ### Administrator instance backup operations (in progress)
 
+An instance operation can report terminal `RESTORED` after the offline coordinator
+has committed its database and material phases. It retains its audit receipt and
+is not an upload that can be resumed or downloaded. The public confirmation and
+automatic restart workflow are still under implementation; current archive review
+continues to return `restoreReady: false`. Completed-generation startup requires
+the verified recovered material, or fails with `INSTANCE_RESTORE_MATERIAL_REQUIRED`.
+
 Issue [#473](https://github.com/turesheim/eclipse-timekeeper/issues/473) is still
 being implemented. The current draft adds these routes under the separate
 `/api/v1/admin/instance` namespace:

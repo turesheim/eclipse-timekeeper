@@ -100,7 +100,7 @@ class InstanceBackupJobs {
             lock(c);administrators.check(c,proof.principal());bindStorage(c,files.identity());interruptAbandoned(c,clock.now());
             var ids=new ArrayList<UUID>();
             try(var statement=query(c,"SELECT id,payload FROM tk_instance WHERE kind='OPERATION'");var rows=statement.executeQuery()) {
-                while(rows.next())if(Set.of("FAILED","INTERRUPTED","EXPIRED").contains(parse(rows.getString(2)).path("state").asText()))ids.add(UUID.fromString(rows.getString(1)));
+                while(rows.next())if(Set.of("FAILED","INTERRUPTED","EXPIRED","RESTORED").contains(parse(rows.getString(2)).path("state").asText()))ids.add(UUID.fromString(rows.getString(1)));
             }catch(java.sql.SQLException failure){throw new ApiFailure(503,"INSTANCE_OPERATIONS_UNAVAILABLE");}
             return ids;
         });

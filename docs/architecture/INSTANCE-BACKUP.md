@@ -4,8 +4,8 @@ This feature is being implemented for [#473](https://github.com/turesheim/eclips
 The internal encrypted archive, configuration inventory, database-image and
 administrator-authority components exist. Administrator start/status/discard routes are integrated with durable backup
 jobs, one-use native downloads and uploaded-archive review. The Administration
-interface supports these operations. Target checks and restore activation remain
-unfinished. The acceptance criteria in the
+interface supports these operations. Public restore confirmation and automatic
+launcher integration remain unfinished; the offline recovery coordinator exists. The acceptance criteria in the
 issue remain the delivery requirements; these foundations alone do not satisfy them.
 
 ## Administration workflow
@@ -332,8 +332,8 @@ staging is damaged after preflight or an insertion fails.
 
 ## Verification and remaining integration
 
-The current local server reactor passes 360 application tests and the shared
-module suites. The new checks include real-runtime configuration capture, complete archive integrity,
+The server reactor and shared module suites, API contracts, pinned web assets and
+packaging checks cover the current implementation. The checks include real-runtime configuration capture, complete archive integrity,
 unsafe/duplicate ZIP and JSON rejection, decompression budgets, scoped credential
 proof, HTTP browser-only/CSRF boundaries, asynchronous backup lifecycle,
 revocation/configuration-change publication guards, randomized multi-segment encryption,
@@ -344,11 +344,11 @@ rollback. A real PostgreSQL 17 fixture verifies H2 → PostgreSQL → H2 using
 byte-identical images, including Unicode and nanosecond timestamps. Both
 PostgreSQL CI jobs include these tests.
 
-Delivery still requires the Administration UI,
-exclusive restart-safe activation, semantic authentication/configuration validation,
-deployment and hostname remapping,
-Synology/Docker/standalone integration, full restored-access tests and operator
-documentation. Deployment integration must still audit all recoverable inputs and applicable
+Delivery still requires public Administration confirmation/status/recovery controls,
+automatic launcher integration, complete deployment mapping review,
+Synology/Docker/standalone acceptance, full restored-access tests and operator
+documentation. The offline coordinator applies the database, installs mapped
+material, completes activation and resumes committed recovery phases. Deployment integration must still audit all recoverable inputs and applicable
 security material, including native maintenance backup coverage after a restore. No privileged host credentials may be granted to the web process to
 make that integration work.
 
@@ -378,9 +378,11 @@ returning its exclusive guard.
 See [H2 exclusive mode](https://h2database.com/html/commands.html#set_exclusive)
 and [PostgreSQL advisory locks](https://www.postgresql.org/docs/17/functions-admin.html#FUNCTIONS-ADVISORY-LOCKS).
 
-This fence is an activation prerequisite. Durable restore intent, deployment
-mapping, launch-time application and interruption recovery remain unfinished;
-the Administration page continues to report `restoreReady: false`.
+The completed-generation startup check also requires the matching recovered
+configuration and verified material digest. Missing material returns
+`INSTANCE_RESTORE_MATERIAL_REQUIRED` before account initialization. The
+Administration page continues to report `restoreReady: false` until confirmation
+and launch integration are connected.
 
 ## Offline database application phase
 
@@ -414,9 +416,10 @@ and passwords remain preserved. With no HTTPS origin, email recovery is disabled
 
 The database control record remains `restorePending: true` with a
 `DATABASE_APPLIED` phase and fresh generation. This phase does **not** clear the
-gate or claim restore completion. Durable intent, file/configuration installation,
-launch coordination, interrupted-operation recovery and the final activation UI
-are still required before exposing activation. H2 and PostgreSQL tests exercise
+gate or claim restore completion by itself. The recovery coordinator installs
+material, commits this database phase, publishes the active pointer and completes
+activation. Launch coordination and the final activation UI are still required
+before exposing restoration. H2 and PostgreSQL tests exercise
 actual image application, credential/data/audit preservation, checksum rejection,
 refusal of populated or stale targets, and full rollback without a commit.
 
@@ -424,7 +427,8 @@ Separate child-JVM crash probes halt without cleanup before and after the
 database commit. H2 recovery preserves the complete old database before commit
 and the complete pending restored database after commit. PostgreSQL retains the
 committed pending database after the client process halts. These are database
-phase guarantees; filesystem recovery and restart completion remain required.
+phase guarantees. The coordinator additionally tests resumption after this
+commit and after interrupted completed-stage cleanup.
 
 ## Durable restore handoff and consent
 
@@ -458,8 +462,59 @@ PostgreSQL as well as H2; offline application uses an isolated synthetic clone,
 since a live application pool correctly prevents exclusive activation.
 
 These are internal components. There is still no public confirmation endpoint or
-launch-time caller, and no complete file installation/final activation sequence.
+automatic launch-time caller. `InstanceRestoreMain` is a manual offline entry
+point for an already-authorized handoff; it does not start the HTTP server.
 Unreferenced or interrupted private staging must remain private until the recovery
 workflow can safely discard it; files must never be interpreted as consent by a
 launcher. Launcher integration must resolve the current runtime configuration
 before opening the destination and install mapped material before Quarkus starts.
+
+
+## Material installation and offline completion
+
+`InstanceRestoreMaterial` copies source configuration and every archived input
+into an immutable private generation, with a checksummed index. Original source
+paths remain metadata. The source token registry is validated using the runtime
+parser and mapped to its copied file. Setup material is retained without being
+reactivated. The source calendar trust/refresh policy is validated and retained.
+Database credentials, listener settings and active TLS bindings remain with the
+destination. Recovered source configuration, keys and other inactive material
+are explicitly included by `timekeeper.instance-restored.files`, so another full
+backup retains their bytes. Tests cover commas, Unicode and literal expression
+markers in paths, changed installed files and malformed token registries.
+
+The generated overlay has configuration ordinal 450. Before changing rows, the
+offline entry point uses the real Quarkus configuration loader with the overlay
+and checks required bindings and normal backup inventory limits. Conflicting
+higher-priority settings fail this preflight. Later deliberate operator recovery
+may use a private override properties file with an explicitly higher ordinal;
+final operator procedures remain part of launcher/deployment integration.
+
+`InstanceRestoreRecovery` installs material, applies the verified image inside
+the exclusive serializable transaction, commits with the pending gate, then
+publishes the material pointer. Final completion verifies that pointer, records
+`RESTORE_COMPLETED`/`RESTORED`, and clears the pending gate transactionally. A
+repeat completion does not emit a second audit event. Startup checks the
+completed generation and material digest before initializing accounts.
+
+Completed cleanup deletes the prepared pointer before removing its temporary
+plaintext image. If deletion is interrupted, recovery verifies the completed
+database and active material instead of trying to reopen a partly deleted image.
+Active material survives separately. Completed upload artifacts are eligible for
+normal job cleanup; the completed operation receipt remains available.
+
+The manual offline entry point is `net.resheim.timekeeper.server.InstanceRestoreMain`.
+It resolves normal profiles, environment variables and external configuration,
+uses only destination application JDBC credentials, refuses in-memory targets,
+and opens H2 with `IFEXISTS`. It suppresses private configuration/JDBC diagnostics
+and returns a fixed completion marker plus the recovered configuration location.
+It requires an authorized handoff and all other target database clients stopped.
+It is not yet exposed as an end-user restore workflow. Separate-JVM tests cover
+H2 and a non-superuser PostgreSQL application role, repeated completion, recovery
+after database commit, partial cleanup, and refusal of populated targets.
+
+Public staging/confirmation, cancellation of uncommitted staging, automatic
+pre-start invocation and returning to the web application are still required.
+Full package-identity migration and restored login/passkey/journal/attachment
+acceptance remain delivery requirements; SQL/password-hash checks alone do not
+prove those application flows.

@@ -1131,5 +1131,7 @@
   "backups.error_restore_pending": "Instance restore is pending. The server operator must complete recovery before requests can resume.",
   "backups.error_restart_required": "This server process must restart after an instance restore. Contact the server operator.",
   "backups.error_maintenance": "Instance maintenance is in progress. Try again shortly.",
-  "backups.error_fence": "The instance maintenance state could not be verified. Contact the server operator."
+  "backups.error_fence": "The instance maintenance state could not be verified. Contact the server operator.",
+  "backups.restored": "Restored",
+  "backups.error_material_required": "The recovered configuration for this installation is required before the server can start. Contact the server operator."
 }

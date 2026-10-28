@@ -23,8 +23,18 @@ class InstanceRestoreFence {
         try(var held=shared(connection)) {
             var state=read(connection);if(state.pending())throw unavailable("INSTANCE_RESTORE_PENDING");
             if(initialized&&!Objects.equals(generation,state.generation()))throw unavailable("INSTANCE_RESTART_REQUIRED");
-            generation=state.generation();initialized=true;
+            attest(connection,state.generation());generation=state.generation();initialized=true;
         }
+    }
+    private static void attest(Connection connection,String generation) throws SQLException {
+        try(var statement=query(connection,"SELECT payload FROM tk_instance WHERE id=?",CONTROL);var rows=statement.executeQuery()) {
+            if(!rows.next())throw unavailable("INSTANCE_FENCE_UNAVAILABLE");var control=READER.readTree(rows.getString(1));
+            if(!control.path("restore").path("phase").asText().equals("COMPLETE"))return;
+            var config=org.eclipse.microprofile.config.ConfigProvider.getConfig();String root=config.getOptionalValue("timekeeper.instance-restore.storage",String.class).orElse("NONE");
+            if(root.equals("NONE")||!config.getOptionalValue("timekeeper.instance-restore.generation",String.class).orElse("").equals(generation))throw unavailable("INSTANCE_RESTORE_MATERIAL_REQUIRED");
+            var material=InstanceRestoreMaterial.active(java.nio.file.Path.of(root));
+            if(!material.generation().toString().equals(generation)||!material.operation().toString().equals(control.path("restore").path("operationId").asText())||!material.digest().equals(control.path("restore").path("materialSha256").asText()))throw unavailable("INSTANCE_RESTORE_MATERIAL_REQUIRED");
+        }catch(ApiFailure failure){throw failure;}catch(Exception failure){throw unavailable("INSTANCE_RESTORE_MATERIAL_REQUIRED");}
     }
     /** Acquire before beginning the body transaction, including repeatable-read snapshots. */
     Guard enter(Connection connection) throws SQLException {

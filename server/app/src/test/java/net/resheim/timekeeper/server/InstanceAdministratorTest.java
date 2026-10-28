@@ -392,6 +392,7 @@ class InstanceAdministratorTest {
             try {
                 assertEquals(prepared.spec().reviewVersion()+1,authorizeIntent(prepared,proof,clock.now()));
                 assertEquals("INSTANCE_RESTORE_PENDING",assertThrows(ApiFailure.class,()->accounts.tx(c->null)).code);
+                var material=InstanceRestoreMaterial.install(prepared);
                 Path clone=directory.resolve("authorized-target.json");
                 try(var c=datasource.getConnection()) {
                     c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);c.setAutoCommit(false);assertEquals("PREPARED",prepared.phase(c));
@@ -402,8 +403,12 @@ class InstanceAdministratorTest {
                 try(var c=java.sql.DriverManager.getConnection("jdbc:h2:"+directory.resolve("offline-target"))) {
                     ServerSchema.initializeOrValidate(c);c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);c.setAutoCommit(false);InstanceDatabaseImage.replace(c,clone);c.commit();c.setAutoCommit(true);
                     try(var exclusive=InstanceRestoreFence.exclusive(c)) {
+                        assertEquals("INSTANCE_RESTORE_NOT_APPLIED",assertThrows(java.io.IOException.class,()->InstanceRestoreMaterial.publish(prepared,c,exclusive,material)).getMessage());
                         c.setAutoCommit(false);var spec=prepared.spec();InstanceRestoreDatabase.apply(c,exclusive,prepared.archive(),spec.deployment(),spec.actor(),spec.operation(),spec.reviewVersion()+1,spec.artifactRoot(),spec.generation(),clock.now());c.commit();
-                        c.setAutoCommit(true);assertEquals("DATABASE_APPLIED",prepared.phase(c));assertEquals("INSTANCE_RESTORE_PENDING",assertThrows(ApiFailure.class,()->new InstanceRestoreFence().initialize(c)).code);
+                        c.setAutoCommit(true);assertEquals("DATABASE_APPLIED",prepared.phase(c));InstanceRestoreMaterial.publish(prepared,c,exclusive,material);assertEquals(material.digest(),InstanceRestoreMaterial.active(prepared.storage()).digest());assertEquals("INSTANCE_RESTORE_PENDING",assertThrows(ApiFailure.class,()->new InstanceRestoreFence().initialize(c)).code);
+                        c.setAutoCommit(false);prepared.complete(c,exclusive,clock.now());c.commit();c.setAutoCommit(true);assertEquals("COMPLETE",prepared.phase(c));
+                        c.setAutoCommit(false);prepared.complete(c,exclusive,clock.now());c.commit();c.setAutoCommit(true);assertEquals("COMPLETE",prepared.phase(c));
+                        assertEquals("INSTANCE_RESTORE_MATERIAL_REQUIRED",assertThrows(ApiFailure.class,()->new InstanceRestoreFence().initialize(c)).code);
                     }
                 }
             }finally{try(var c=datasource.getConnection()){execute(c,"UPDATE tk_instance SET payload=? WHERE kind='CONTROL'",before);}}

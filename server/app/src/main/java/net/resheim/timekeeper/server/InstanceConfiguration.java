@@ -18,7 +18,7 @@ final class InstanceConfiguration {
     private static final Set<String> REQUIRED=Set.of("quarkus.datasource.jdbc.url","quarkus.datasource.db-kind","quarkus.datasource.username","timekeeper.auth.tokens-file","timekeeper.auth.setup-file");
     private static final Set<String> SINGLE=Set.of("timekeeper.auth.tokens-file","timekeeper.auth.setup-file",
         "quarkus.http.ssl.certificate.key-store-file","quarkus.http.ssl.certificate.trust-store-file");
-    private static final Set<String> MULTIPLE=Set.of("quarkus.http.ssl.certificate.files","quarkus.http.ssl.certificate.key-files","quarkus.config.locations");
+    private static final Set<String> MULTIPLE=Set.of("timekeeper.instance-restored.files","quarkus.http.ssl.certificate.files","quarkus.http.ssl.certificate.key-files","quarkus.config.locations");
     /** Internal secret-bearing object; never return this as a JSON API reply. */
     record Snapshot(ObjectNode document,Map<String,byte[]> files) implements AutoCloseable {
         Snapshot {files=Map.copyOf(files);}

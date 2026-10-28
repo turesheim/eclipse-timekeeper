@@ -28614,7 +28614,8 @@
               "READY",
               "FAILED",
               "INTERRUPTED",
-              "EXPIRED"
+              "EXPIRED",
+              "RESTORED"
             ]
           },
           "version": {

@@ -3,7 +3,7 @@ import {node,form,field,passwordField,section,table,button} from '/web/account-u
 import {uploadCiphertext} from '/web/instance-upload.js';
 
 const base='/admin/instance';
-const statuses={PREPARING:'backups.preparing',UPLOADING:'backups.uploading',VALIDATING:'backups.validating',REVIEW:'backups.review',READY:'backups.ready',FAILED:'backups.failed',INTERRUPTED:'backups.interrupted',EXPIRED:'backups.expired'};
+const statuses={PREPARING:'backups.preparing',UPLOADING:'backups.uploading',VALIDATING:'backups.validating',REVIEW:'backups.review',READY:'backups.ready',FAILED:'backups.failed',INTERRUPTED:'backups.interrupted',EXPIRED:'backups.expired',RESTORED:'backups.restored'};
 export async function renderInstanceBackups(view) {
   const {data:access}=await view.session.request('/admin/settings');if(!view.valid())return;
   if(!access.canEdit){section(view,t('backups.title')).append(node('p',t('backups.account_required'),'alert alert-info'));return;}

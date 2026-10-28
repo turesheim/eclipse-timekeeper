@@ -13,7 +13,7 @@ final class InstanceOperations {
     private static final UUID CONTROL=new UUID(0,0);
     private static final Duration LEASE=Duration.ofMinutes(10);
     enum Type { BACKUP, RESTORE }
-    enum State { PREPARING, UPLOADING, VALIDATING, REVIEW, READY, FAILED, INTERRUPTED, EXPIRED }
+    enum State { PREPARING, UPLOADING, VALIDATING, REVIEW, READY, FAILED, INTERRUPTED, EXPIRED, RESTORED }
     /** Internal fencing capability, never serialize as a response or log it. */
     record Lease(UUID id,UUID worker) {
         @Override public String toString(){return "Private instance-operation lease";}
@@ -148,7 +148,7 @@ final class InstanceOperations {
         }
         return abandoned.size();
     }
-    private static boolean terminal(State state){return Set.of(State.READY,State.FAILED,State.INTERRUPTED,State.EXPIRED).contains(state);}
+    private static boolean terminal(State state){return Set.of(State.READY,State.FAILED,State.INTERRUPTED,State.EXPIRED,State.RESTORED).contains(state);}
     private static State state(ObjectNode value){return State.valueOf(value.path("state").asText());}
     private static void requireLease(ObjectNode value,Lease lease,State expected,Instant now) {
         if(state(value)!=expected||!value.path("worker").asText().equals(lease.worker().toString())||!Instant.parse(value.path("leaseUntil").asText()).isAfter(now))throw new ApiFailure(409,"INSTANCE_OPERATION_LEASE_LOST");

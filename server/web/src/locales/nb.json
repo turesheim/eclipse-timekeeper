@@ -1131,5 +1131,7 @@
   "backups.error_restore_pending": "Gjenoppretting av instansen venter. Serveroperatøren må fullføre gjenopprettingen før forespørsler kan fortsette.",
   "backups.error_restart_required": "Denne serverprosessen må startes på nytt etter gjenoppretting av instansen. Kontakt serveroperatøren.",
   "backups.error_maintenance": "Vedlikehold av instansen pågår. Prøv igjen om litt.",
-  "backups.error_fence": "Vedlikeholdstilstanden til instansen kunne ikke bekreftes. Kontakt serveroperatøren."
+  "backups.error_fence": "Vedlikeholdstilstanden til instansen kunne ikke bekreftes. Kontakt serveroperatøren.",
+  "backups.restored": "Gjenopprettet",
+  "backups.error_material_required": "Den gjenopprettede konfigurasjonen for denne installasjonen kreves før serveren kan starte. Kontakt serveroperatøren."
 }
