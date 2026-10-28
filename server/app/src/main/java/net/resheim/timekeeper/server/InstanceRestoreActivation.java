@@ -64,13 +64,18 @@ class InstanceRestoreActivation {
         try(var target=InstanceConfiguration.captureRuntime()) {
             var intent=intent();files=jobs.artifacts();var selected=files;UUID generation=UUID.randomUUID();var previous=new UUID[1];
             var targetSummary=summary(task.deployment,target);
-            lease=accounts.tx(c->{try {
-                c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);lock(c);administrators.check(c,task.proof.principal());bindStorage(c,selected.identity());
+            accounts.tx(c->{try {
+                c.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);lock(c);administrators.check(c,task.proof.principal());bindStorage(c,selected.identity());uploadInfo(c,task.id,task.proof.principal());
+                var current=status(c,task.id);if(current.version()!=task.version)throw new ApiFailure(412,"STALE_VERSION");
+                if(current.state()!=State.REVIEW||!Set.of("NONE","FAILED").contains(stagingInfo(c,task.id,task.proof.principal()).path("phase").asText()))throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
+                intent.cleanupOrphans(c,administrators,task.proof,task.id,clock.now());return null;
+            }catch(SQLException failure){throw databaseFailure(failure);}catch(IOException failure){throw failure(failure);}});
+            lease=serializable(c->{try {
+                lock(c);administrators.check(c,task.proof.principal());bindStorage(c,selected.identity());
                 if(!InstanceRestoreTarget.inspect(c,task.proof.principal().owner()).databaseEligible())throw new ApiFailure(409,"INSTANCE_TARGET_NOT_EMPTY");
-                uploadInfo(c,task.id,task.proof.principal());intent.cleanupOrphans(c,administrators,task.proof,task.id,clock.now());
                 try(var statement=c.createStatement();var rows=statement.executeQuery("SELECT payload FROM tk_instance WHERE kind='CONTROL'")){if(!rows.next())throw new SQLException();var value=parse(rows.getString(1));if(value.hasNonNull("restoreGeneration"))previous[0]=UUID.fromString(value.path("restoreGeneration").asText());}
                 return beginStaging(c,task.id,task.proof.principal(),task.version,generation,targetSummary,clock.now());
-            }catch(SQLException failure){throw databaseFailure(failure);}catch(IOException failure){throw failure(failure);}});
+            }catch(SQLException failure){throw databaseFailure(failure);}});
             var owned=lease;task.started.complete(get(task.proof.principal(),task.id));
             var lost=new AtomicBoolean();renewal=Executors.newSingleThreadScheduledExecutor(work->{var thread=new Thread(work,"Timekeeper restore staging lease");thread.setDaemon(true);return thread;});
             renewal.scheduleWithFixedDelay(()->{try{accounts.tx(c->{lock(c);administrators.check(c,task.proof.principal());renewStaging(c,owned,clock.now());return null;});}catch(RuntimeException failure){lost.set(true);}},60,60,TimeUnit.SECONDS);
@@ -81,8 +86,8 @@ class InstanceRestoreActivation {
                     try(var staged=intent.stage(spec,archive,target,clock.now())) {
                         InstanceRestoreMaterial.install(staged,archive);
                         if(lost.get())throw new ApiFailure(409,"INSTANCE_OPERATION_LEASE_LOST");
-                        accounts.tx(c->{try {
-                            c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);lock(c);administrators.check(c,task.proof.principal());
+                        serializable(c->{try {
+                            lock(c);administrators.check(c,task.proof.principal());
                             if(!InstanceRestoreTarget.inspect(c,task.proof.principal().owner()).databaseEligible())throw new ApiFailure(409,"INSTANCE_TARGET_NOT_EMPTY");
                             finishStaging(c,owned,spec.reviewVersion(),generation,staged.digest(),clock.now());return null;
                         }catch(SQLException failure){throw databaseFailure(failure);}});
@@ -93,8 +98,12 @@ class InstanceRestoreActivation {
             complete=true;
         }finally {
             if(renewal!=null)renewal.shutdownNow();
+            IOException cleanup=null;
+            // Only an acquired lease owns this workspace. Finish cleanup before
+            // exposing FAILED so a retry cannot race an older worker's deletion.
+            if(files!=null&&lease!=null)try{files.clearWork(task.id);}catch(IOException failure){cleanup=failure;}
             if(!complete&&lease!=null){var owned=lease;try{accounts.tx(c->{failStaging(c,owned,clock.now());return null;});}catch(RuntimeException ignored){/* Durable worker fencing owns any newer outcome. */}}
-            if(files!=null)files.clearWork(task.id);
+            if(cleanup!=null)throw cleanup;
         }
     }
     ObjectNode confirm(InstanceAdministrator.Proof proof,UUID id,long version,UUID generation,String confirmation) {
@@ -102,13 +111,23 @@ class InstanceRestoreActivation {
         try(var current=InstanceConfiguration.captureRuntime();var staged=intent().staged()) {
             if(!staged.spec().operation().equals(id)||!staged.spec().generation().equals(generation)||staged.spec().reviewVersion()!=version)throw new ApiFailure(412,"STALE_VERSION");
             if(!staged.spec().deployment().packageId().equals(packageId())||!confirmation.equals("RESTORE "+packageId()))throw ApiFailure.validation();
-            long committed=accounts.tx(c->{try {
-                c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);lock(c);administrators.check(c,proof.principal());
+            long committed=serializable(c->{try {
+                lock(c);administrators.check(c,proof.principal());
                 var stage=stagingInfo(c,id,proof.principal());if(!stage.path("phase").asText().equals("READY"))throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
                 return staged.authorize(c,administrators,proof,current,clock.now());
             }catch(SQLException failure){throw databaseFailure(failure);}catch(IOException failure){throw failure(failure);}});
             return object().put("id",id.toString()).put("generation",generation.toString()).put("operationVersion",committed).put("phase","PENDING_RESTART").put("publicOrigin",staged.spec().deployment().publicOrigin());
         }catch(IOException failure){throw failure(failure);}
+    }
+    /** Retry only rolled-back SQL snapshot conflicts, never file I/O or uncertain commits. */
+    private <T> T serializable(java.util.function.Function<Connection,T> operation) {
+        for(int attempt=0;;attempt++) {
+            try{return accounts.tx(c->{try{c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);}catch(SQLException failure){throw databaseFailure(failure);}return operation.apply(c);});}
+            catch(ApiFailure failure){if(attempt>=4||!snapshotConflict(failure))throw failure;}
+        }
+    }
+    private static boolean snapshotConflict(Throwable failure) {
+        for(Throwable cause=failure;cause!=null;cause=cause.getCause())if(cause instanceof SQLException sql&&Set.of("40001","40P01").contains(sql.getSQLState()))return true;return false;
     }
     private static ApiFailure failure(IOException failure){return new ApiFailure(failure.getMessage()!=null&&failure.getMessage().equals("INSTANCE_RESTORE_BUSY")?409:503,failure.getMessage()!=null&&failure.getMessage().equals("INSTANCE_RESTORE_BUSY")?"INSTANCE_OPERATION_BUSY":"INSTANCE_VALIDATION_FAILED");}
     @jakarta.annotation.PreDestroy void stop(){for(Runnable task:workers.shutdownNow())((Staging)task).cancel();try{workers.awaitTermination(5,TimeUnit.SECONDS);}catch(InterruptedException stopped){Thread.currentThread().interrupt();}}

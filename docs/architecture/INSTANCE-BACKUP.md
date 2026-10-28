@@ -650,3 +650,5 @@ weekly journal bodies, independent labels and exact attachment bytes. Its source
 archive checksum must remain unchanged. This complements the database fidelity
 suite; native Synology migration and remaining security-material coverage still
 need their own acceptance evidence.
+
+Restore preparation and confirmation retry only bounded SQL serialization/deadlock aborts (40001/40P01). Garbage collection and file work stay outside the retried transaction. Each attempt reacquires the runtime fence and current account authority; uncertain connection/commit failures are not replayed. A worker may clean its private workspace only after acquiring its lease, and cleanup finishes before a failed stage becomes retryable. Real PostgreSQL conflict and rejected-worker workspace tests cover these boundaries.

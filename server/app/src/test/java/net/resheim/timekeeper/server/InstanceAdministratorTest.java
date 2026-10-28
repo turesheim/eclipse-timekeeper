@@ -51,7 +51,7 @@ class InstanceAdministratorTest {
         admin=accounts.session(issued.secret());output=Files.createDirectory(directory.resolve("operations"));
         var worker=ClientProxy.unwrap(jobs);worker.storage=output.resolve("private").toString();worker.maximumBytes=5_000_000;worker.retainedBytes=10_000_000;worker.maximumJobs=2;
     }
-    @AfterEach void reset(){ClientProxy.unwrap(accounts).setupFile="NONE";ClientProxy.unwrap(administrators).clock=clock;ClientProxy.unwrap(backups).datasource=datasource;ClientProxy.unwrap(jobs).storage="NONE";ClientProxy.unwrap(downloads).clock=clock;ClientProxy.unwrap(uploads).maximumExpandedBytes=17_179_869_184L;}
+    @AfterEach void reset(){ClientProxy.unwrap(accounts).datasource=datasource;ClientProxy.unwrap(accounts).setupFile="NONE";ClientProxy.unwrap(administrators).clock=clock;ClientProxy.unwrap(backups).datasource=datasource;ClientProxy.unwrap(jobs).storage="NONE";ClientProxy.unwrap(downloads).clock=clock;ClientProxy.unwrap(uploads).maximumExpandedBytes=17_179_869_184L;}
 
     @Test void administratorMustProveCurrentCredentialAndReceivesOnlyEncryptedArchive() throws Exception {
         var proof=administrators.verify(admin,PASSWORD);administrators.requireFresh(proof);assertFalse(proof.toString().contains(admin.digest()));
@@ -501,6 +501,39 @@ class InstanceAdministratorTest {
             assertEquals("INSTANCE_RESTORE_PENDING",assertThrows(ApiFailure.class,()->accounts.account(admin)).code);
             try(var c=datasource.getConnection();var prepared=new InstanceRestoreIntent(directory.resolve("activation-intents"),100_000_000).open()){assertEquals("PREPARED",prepared.phase(c));}
         }finally{try(var c=datasource.getConnection()){execute(c,"UPDATE tk_instance SET payload=? WHERE kind='CONTROL'",before);}}
+    }
+    @Test void rejectedStagingCannotRemoveAnUploadsPrivateWorkingFiles() throws Exception {
+        var browser=httpLogin("instance-admin");String id=reviewedForActivation(browser),path="/admin/instance/uploads/"+id;var input=stageInput(browser,id);
+        Path work=jobs.artifacts().validationWork(UUID.fromString(id)),marker=work.resolve("private-owned-marker");Files.writeString(marker,"Private owner work");Files.setPosixFilePermissions(marker,java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+        var other=httpLogin("instance-admin");assertEquals(403,http(other,true,"POST",path+"/staging",input).statusCode());assertTrue(Files.exists(marker),"A rejected worker must not clean another lease's workspace");
+        assertEquals(200,http(browser,true,"POST","/admin/instance/operations/"+id+"/discard",object().put("currentPassword",PASSWORD)).statusCode());
+    }
+    @Test void postgresStagingRetriesARealSerializableConflictWithoutRepeatingExternalWork() throws Exception {
+        try(var c=datasource.getConnection()){Assumptions.assumeTrue(c.getMetaData().getDatabaseProductName().equals("PostgreSQL"));}
+        var browser=httpLogin("instance-admin");String id=reviewedForActivation(browser),path="/admin/instance/uploads/"+id;var input=stageInput(browser,id);var force=new java.util.concurrent.atomic.AtomicBoolean(true);var snapshots=new java.util.concurrent.atomic.AtomicInteger();
+        var wrapped=(AgroalDataSource)java.lang.reflect.Proxy.newProxyInstance(AgroalDataSource.class.getClassLoader(),new Class<?>[]{AgroalDataSource.class},(proxy,method,args)->{
+            try {
+                var result=method.invoke(datasource,args);if(!method.getName().equals("getConnection"))return result;var connection=(Connection)result;var serializable=new java.util.concurrent.atomic.AtomicBoolean();
+                return java.lang.reflect.Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},(ignored,call,arguments)->{
+                    try {
+                        if(call.getName().equals("setTransactionIsolation")&&arguments[0].equals(Connection.TRANSACTION_SERIALIZABLE))serializable.set(snapshots.incrementAndGet()==2);
+                        if(call.getName().equals("prepareStatement")&&serializable.get()&&arguments[0] instanceof String sql&&sql.contains("FROM tk_account WHERE owner_id=")&&sql.endsWith(" FOR UPDATE")&&force.compareAndSet(true,false)) {
+                            // The auth-control read established this SERIALIZABLE snapshot.
+                            // A concurrent login/account guard can update the locked account
+                            // before our FOR UPDATE; PostgreSQL must return SQLSTATE 40001.
+                            try(var writer=datasource.getConnection()){execute(writer,"UPDATE tk_account SET version=version WHERE owner_id=?",admin.owner());}
+                        }
+                        return call.invoke(connection,arguments);
+                    }catch(java.lang.reflect.InvocationTargetException failure){throw failure.getCause();}
+                });
+            }catch(java.lang.reflect.InvocationTargetException failure){throw failure.getCause();}
+        });
+        ClientProxy.unwrap(accounts).datasource=wrapped;
+        try {
+            assertEquals(202,http(browser,true,"POST",path+"/staging",input).statusCode());var ready=awaitStage(browser,id,"READY");assertFalse(force.get());assertEquals(input.path("operationVersion").asLong()+2,ready.path("operationVersion").asLong());
+            assertFalse(parse(originalInstanceControl()).path("restorePending").asBoolean());
+            assertEquals(200,http(browser,true,"POST","/admin/instance/operations/"+id+"/discard",object().put("currentPassword",PASSWORD)).statusCode());
+        }finally{ClientProxy.unwrap(accounts).datasource=datasource;}
     }
     @Test void orphanCleanupRemovesOnlyUnreferencedPrivateStagesAndKeepsThePublishedHandoff() throws Exception {
         var proof=administrators.verify(admin,PASSWORD);Path root;UUID protectedGeneration,operation;
