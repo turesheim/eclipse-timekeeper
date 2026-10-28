@@ -85,9 +85,10 @@ final class InstanceBackupArchive {
             }
             InstanceConfiguration.validate(configuration,contents.keySet());
             if(!manifest.path("source").path("databaseType").asText().equals(configuration.path("properties").path("quarkus.datasource.db-kind").asText()))throw invalid();
-            var counts=InstanceDatabaseImage.preflight(database,stage);Files.delete(plain);
+            var counts=InstanceDatabaseImage.preflight(database,stage,InstanceAuthenticationPreflight::inspect);Files.delete(plain);
             var verified=new Verified(stage,database,manifest,new InstanceConfiguration.Snapshot(configuration,contents),counts);complete=true;return verified;
-        }catch(Exception failure){throw invalid();}
+        }catch(InstanceArchiveRejection failure){throw failure;}
+        catch(Exception failure){throw invalid();}
         finally {if(!complete){contents.values().forEach(bytes->Arrays.fill(bytes,(byte)0));remove(stage);}}
     }
 

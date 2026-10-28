@@ -66,9 +66,10 @@ final class InstanceOperations {
         if(row.payload().has("validationCode"))result.set("validationCode",row.payload().get("validationCode"));
         if(row.payload().has("review"))result.set("review",row.payload().get("review").deepCopy());return result;
     }
-    static void rejectValidation(Connection connection,Lease lease,Instant now) {
+    static void rejectValidation(Connection connection,Lease lease,Instant now) {rejectValidation(connection,lease,now,false);}
+    static void rejectValidation(Connection connection,Lease lease,Instant now,boolean authentication) {
         advance(connection,lease,State.VALIDATING,State.UPLOADING,now);var row=read(connection,lease.id(),true);
-        row.payload().put("validationCode","INVALID_INSTANCE_BACKUP");update(connection,row,now,row.payload());
+        row.payload().put("validationCode",authentication?"INVALID_INSTANCE_AUTHENTICATION":"INVALID_INSTANCE_BACKUP");update(connection,row,now,row.payload());
     }
     static void finishReview(Connection connection,Lease lease,ObjectNode review,Instant now) {
         advance(connection,lease,State.VALIDATING,State.REVIEW,now);var row=read(connection,lease.id(),true);

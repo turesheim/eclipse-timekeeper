@@ -316,6 +316,16 @@ class InstanceAdministratorTest {
         var retained=http(browser,false,"GET","/clients/"+parse(created.asString()).path("id").asText(),null);assertEquals(200,retained.statusCode());assertEquals(parse(created.asString()),parse(retained.asString()));
         assertEquals(version,awaitUpload(browser,id,"REVIEW").path("operation").path("version").asLong());
     }
+    @Test void invalidSourceAuthenticationHasASafeDistinctValidationCodeAndCannotReachReview() throws Exception {
+        String owner=accounts.createUser(admin,"invalid-source-user",PASSWORD,"Source user",false).path("ownerId").asText();
+        accounts.tx(c->{execute(c,"UPDATE tk_account SET password_hash=? WHERE owner_id=?","private unsupported source credential",owner);return null;});
+        byte[] bytes=uploadFixture();var browser=httpLogin("instance-admin");String id=createUpload(browser,bytes,cipherDigest(bytes)),path="/admin/instance/uploads/"+id;
+        assertEquals(200,chunk(browser,true,id,0,bytes).statusCode());
+        var accepted=http(browser,true,"POST",path+"/validate",object().put("currentPassword",PASSWORD).put("passphrase","upload review source passphrase"));assertEquals(202,accepted.statusCode(),accepted.asString());
+        var rejected=awaitUpload(browser,id,"UPLOADING");assertEquals("INVALID_INSTANCE_AUTHENTICATION",rejected.path("validationCode").asText());assertFalse(rejected.has("review"));assertTrue(rejected.path("complete").asBoolean());
+        assertFalse(rejected.toString().contains("private unsupported"));assertFalse(rejected.toString().contains("invalid-source-user"));assertFalse(Files.exists(output.resolve("private").resolve(id).resolve("work")));
+        assertEquals(409,http(browser,true,"POST",path+"/target",object().put("currentPassword",PASSWORD)).statusCode());
+    }
     @Test void uploadRejectsOtherSessionsTokensOversizedChunksAndWrongChecksums() throws Exception {
         byte[] bytes=uploadFixture();var browser=httpLogin("instance-admin");String id=createUpload(browser,bytes,"0".repeat(64));String path="/admin/instance/uploads/"+id;var other=httpLogin("instance-admin");
         assertEquals(403,http(other,false,"GET",path,null).statusCode());assertEquals(403,chunk(other,true,id,0,bytes).statusCode());

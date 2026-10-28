@@ -111,7 +111,7 @@ class InstanceRestoreUploads {
                         result.putArray("requiredSteps").add("TARGET_READINESS").add("AUTHENTICATION_CONFIGURATION").add("DEPLOYMENT_MAPPING").add("OFFLINE_ACTIVATION");return result;
                     }
                 });
-            }catch(IOException invalid){files.clearWork(id);accounts.tx(c->{lock(c);administrators.check(c,proof.principal());rejectValidation(c,owned,clock.now());return null;});completed=true;return get(proof.principal(),id);}
+            }catch(IOException invalid){files.clearWork(id);accounts.tx(c->{lock(c);administrators.check(c,proof.principal());rejectValidation(c,owned,clock.now(),invalid instanceof InstanceArchiveRejection rejection&&rejection.code()==InstanceArchiveRejection.Code.INVALID_INSTANCE_AUTHENTICATION);return null;});completed=true;return get(proof.principal(),id);}
             files.clearWork(id);if(lost.get())throw new ApiFailure(409,"INSTANCE_OPERATION_LEASE_LOST");
             accounts.tx(c->{lock(c);administrators.check(c,proof.principal());finishReview(c,owned,review,clock.now());return null;});completed=true;return get(proof.principal(),id);
         }catch(IOException failure){throw io(failure);}

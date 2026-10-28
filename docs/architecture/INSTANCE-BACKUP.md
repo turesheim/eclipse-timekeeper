@@ -104,8 +104,26 @@ length/hash mismatches and configuration references that do not match the file
 index. A caller-supplied budget limits both the decrypted ZIP and the total
 uncompressed contents, including the manifest. Every indexed byte is verified
 before disposable-database preflight. Checksummed but incomplete databases are
-still rejected. Source paths are metadata; opening an archive never reads or
-writes those paths on the destination.
+still rejected. The disposable database also runs source authentication preflight:
+claimed accounts must have password hashes supported by the same parser as normal
+sign-in, an enabled administrator and completed bootstrap must exist, token
+records must have supported digests and timestamps, and passkeys must contain
+parseable public COSE keys with matching credential indexes, nonempty handles,
+valid transport lists and canonical RP IDs. Saved/effective service settings are
+checked by the startup validator, and the effective authentication origin/epoch
+must match the recovery control. A malformed credential inside an otherwise
+correctly encrypted and checksummed archive is rejected; no partial review is
+published. A fixed `INVALID_INSTANCE_AUTHENTICATION` code identifies this case
+without exposing an account, credential or underlying exception. The interface
+asks the operator to repair the source and upload a replacement backup, rather
+than repeatedly changing the encryption passphrase. These checks never require a plaintext account password or an
+authenticator's private key.
+
+Old-hostname passkeys remain stored unchanged. Source validation does not make
+those passkeys usable at a different target hostname, authorize an origin cutover,
+or validate destination TLS/key material. Deployment review and exclusive
+activation checks remain required. Source paths are metadata; opening an archive
+never reads or writes those paths on the destination.
 
 `InstanceConfiguration` captures resolved `timekeeper.*`, `quarkus.*` and
 `smallrye.config.*` values, including applicable DB/SMTP credentials and

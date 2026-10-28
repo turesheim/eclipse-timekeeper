@@ -1126,5 +1126,6 @@
   "backups.target_data": "Business records or modified bootstrap labels exist.",
   "backups.target_tokens": "API token records exist, including any revoked tokens.",
   "backups.target_history": "Business changes or command receipts exist.",
-  "backups.target_advisory": "This check does not reserve the database or authorize a restore. Activation must repeat it while writes are stopped, and complete authentication and deployment checks."
+  "backups.target_advisory": "This check does not reserve the database or authorize a restore. Activation must repeat it while writes are stopped, and complete authentication and deployment checks.",
+  "backups.invalid_authentication": "The archive contains unsupported credentials or service settings. Repair the source and create a new backup. Discard this upload before uploading its replacement."
 }

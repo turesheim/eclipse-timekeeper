@@ -907,6 +907,18 @@ require the normal same-origin and CSRF checks. Credential input schemas reject
 unknown fields; operation replies contain no contents, credentials, worker
 capabilities or filesystem paths. Replies use `Cache-Control: no-store`.
 
+Uploaded-archive validation also checks source authentication in a disposable
+database. Unsupported password hashes, malformed passkey public keys or credential
+indexes, invalid token records, invalid saved/effective service settings and an
+inconsistent effective recovery origin/epoch cannot reach `REVIEW`, even when
+archive encryption and file checksums are correct. Older-hostname passkeys remain
+preserved for explicit deployment review. These source checks do not complete the
+destination authentication, mapping or offline activation steps.
+`INVALID_INSTANCE_AUTHENTICATION` distinguishes unsupported stored credentials or
+service settings from a wrong passphrase or damaged archive
+(`INVALID_INSTANCE_BACKUP`). Both retain encrypted upload bytes and remove private
+plaintext working files; neither publishes a review.
+
 The start call returns before snapshot completion. Its bounded background
 worker renews a ten-minute lease; concurrent starts are rejected. `READY` means
 the complete encrypted file is durably staged and the original administrator

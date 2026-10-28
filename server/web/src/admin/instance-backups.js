@@ -79,7 +79,7 @@ export async function renderInstanceBackups(view) {
       const details=node('div');root.append(details);
       {
         const progress=node('p',t('backups.progress',{received:data.received,total:data.bytes}));cards.get(key).progress=progress;details.append(progress);
-        if(data.validationCode)details.append(node('p',t('backups.invalid_archive'),'alert alert-warning'));
+        if(data.validationCode)details.append(node('p',t(data.validationCode==='INVALID_INSTANCE_AUTHENTICATION'?'backups.invalid_authentication':'backups.invalid_archive'),'alert alert-warning'));
         if(data.review){
           const review=data.review;details.append(node('p',t('backups.review_warning'),'alert alert-warning'),table([t('backups.table'),t('backups.rows')],Object.entries(review.counts).map(([name,count])=>[name,String(count)])));
           details.append(node('p',t('backups.archive_source',{build:review.source.serverVersion,backend:review.source.databaseType,schema:review.schema})));

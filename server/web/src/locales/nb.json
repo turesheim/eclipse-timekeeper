@@ -1126,5 +1126,6 @@
   "backups.target_data": "Forretningsdata eller endrede oppstartsetiketter finnes.",
   "backups.target_tokens": "API-token finnes, også eventuelle tilbakekalte token.",
   "backups.target_history": "Endringshistorikk eller kommandokvitteringer finnes.",
-  "backups.target_advisory": "Denne kontrollen reserverer ikke databasen og godkjenner ikke gjenoppretting. Aktivering må gjenta kontrollen mens skriving er stanset, og fullføre autentiserings- og installasjonskontrollene."
+  "backups.target_advisory": "Denne kontrollen reserverer ikke databasen og godkjenner ikke gjenoppretting. Aktivering må gjenta kontrollen mens skriving er stanset, og fullføre autentiserings- og installasjonskontrollene.",
+  "backups.invalid_authentication": "Arkivet inneholder legitimasjon eller tjenesteinnstillinger som ikke støttes. Rett kilden og opprett en ny sikkerhetskopi. Forkast denne opplastingen før du laster opp erstatningen."
 }

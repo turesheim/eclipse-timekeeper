@@ -2,6 +2,7 @@ package net.resheim.timekeeper.server;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static net.resheim.timekeeper.server.JsonValues.*;
+import static net.resheim.timekeeper.server.AccountStore.*;
 import java.nio.file.*;
 import java.sql.Connection;
 import io.agroal.api.AgroalDataSource;
@@ -16,8 +17,12 @@ class InstanceBackupRuntimeTest {
         public java.util.Map<String,String> getConfigOverrides(){return java.util.Map.of("quarkus.datasource.jdbc.url","jdbc:h2:mem:instance_runtime_tests");}
     }
     @Inject AgroalDataSource datasource;
+    @Inject AccountStore accounts;
     @TempDir Path directory;
     @Test void realRuntimeConfigurationAndDatabaseProduceACompleteAuthenticatedArchive() throws Exception {
+        String code=AccountPasswords.secret();
+        accounts.tx(c->{execute(c,"INSERT INTO tk_auth_challenge VALUES(?,'SETUP','a',?,FALSE)",hash(code),java.time.Instant.now().plusSeconds(600).toString());return null;});
+        accounts.complete(code,"runtime-administrator","Synthetic runtime account password","Administrator",false);
         char[] passphrase="synthetic runtime backup passphrase".toCharArray();
         try(var configuration=InstanceConfiguration.captureRuntime();var database=datasource.getConnection()) {
             assertEquals("h2",configuration.document().path("properties").path("quarkus.datasource.db-kind").asText());

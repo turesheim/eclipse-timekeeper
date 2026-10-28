@@ -51,6 +51,7 @@ class ContractTest(unittest.TestCase):
         self.assertEqual(1048576,op['requestBody']['content']['application/octet-stream']['schema']['maxLength'])
         self.assertIn('409',op['responses'])
         self.assertFalse(CONTRACT['components']['schemas']['InstanceArchiveReview']['properties']['restoreReady']['const'])
+        self.assertEqual({'INVALID_INSTANCE_BACKUP','INVALID_INSTANCE_AUTHENTICATION'},set(CONTRACT['components']['schemas']['InstanceRestoreUpload']['properties']['validationCode']['enum']))
         self.assertTrue(validator('InstanceRestoreUploadInput').is_valid({'currentPassword':'private proof','bytes':1024,'sha256':'a'*64}))
         self.assertFalse(validator('InstanceRestoreUploadInput').is_valid({'currentPassword':'private proof','bytes':1024,'sha256':'a'*64,'path':'/outside'}))
 

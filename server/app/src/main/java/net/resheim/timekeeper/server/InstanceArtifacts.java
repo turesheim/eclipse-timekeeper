@@ -209,6 +209,7 @@ final class InstanceArtifacts {
                 if(held==null)throw new IOException("INSTANCE_ARTIFACT_BUSY");return work.run();
             }
         }catch(OverlappingFileLockException failure){throw new IOException("INSTANCE_ARTIFACT_BUSY");}
+        catch(InstanceArchiveRejection failure){throw failure;}
         catch(IOException failure){if(Set.of("INVALID_INSTANCE_ARTIFACT","INSTANCE_ARTIFACT_QUOTA","INSTANCE_ARTIFACT_BUSY","INSTANCE_ARTIFACT_CONFLICT").contains(failure.getMessage()))throw failure;throw unavailable();}
         catch(RuntimeException failure){throw unavailable();}
     }

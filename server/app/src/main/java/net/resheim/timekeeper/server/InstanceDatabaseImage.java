@@ -111,15 +111,20 @@ final class InstanceDatabaseImage {
 
     /** Validate types, uniqueness, foreign keys and checks in disposable storage. */
     static Map<String,Long> preflight(Path image,Path privateDirectory) throws IOException {
+        return preflight(image,privateDirectory,connection->{});
+    }
+    @FunctionalInterface interface Inspection {void check(Connection connection) throws Exception;}
+    static Map<String,Long> preflight(Path image,Path privateDirectory,Inspection inspection) throws IOException {
         validate(image);Path scratch=Files.createTempDirectory(privateDirectory,".database-check-",PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
         try {
             String path=scratch.resolve("validation").toAbsolutePath().toString();if(path.indexOf(';')>=0)throw new IOException();
             try(var connection=DriverManager.getConnection("jdbc:h2:"+path)) {
                 ServerSchema.initializeOrValidate(connection);connection.setAutoCommit(false);
                 clear(connection);var counts=read(image,(table,row)->insert(connection,table,row));
-                ServerSchema.validate(connection);connection.rollback();return counts;
+                ServerSchema.validate(connection);inspection.check(connection);connection.rollback();return counts;
             }
-        }catch(Exception failure){throw new IOException("INVALID_INSTANCE_DATABASE");}
+        }catch(InstanceArchiveRejection failure){throw failure;}
+        catch(Exception failure){throw new IOException("INVALID_INSTANCE_DATABASE");}
         finally {
             try(var files=Files.walk(scratch)) {for(Path file:files.sorted(Comparator.reverseOrder()).toList())Files.delete(file);}
             catch(IOException failure){throw new IOException("INSTANCE_BACKUP_CLEANUP_FAILED");}

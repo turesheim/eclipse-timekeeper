@@ -21,7 +21,7 @@ class InstanceBackupArchiveTest {
         var properties=InstanceConfigurationTest.base();Path tokens=directory.resolve("source-tokens.json");Files.writeString(tokens,"private token registry bytes");
         properties.put("timekeeper.auth.tokens-file",tokens.toString());properties.put("quarkus.datasource.password","private DB password");properties.put("quarkus.mailer.password","private SMTP password");
         try(var database=InstanceDatabaseImageTest.database();var configuration=InstanceConfiguration.capture(properties,Map.of())) {
-            InstanceDatabaseImageTest.seed(database);return InstanceBackupArchive.create(database,configuration,source(),passphrase,directory);
+            InstanceAuthenticationPreflightTest.seed(database);return InstanceBackupArchive.create(database,configuration,source(),passphrase,directory);
         }
     }
     @Test void oneEncryptedArchiveContainsCompleteDatabaseConfigurationAndPrivateFiles() throws Exception {
@@ -72,6 +72,23 @@ class InstanceBackupArchiveTest {
             catch(IOException failure){throw new AssertionError(failure);}
         },true);rejects(changed,passphrase,10_000_000);
     }
+    @Test void checksummedAuthenticationCorruptionCannotReachReviewOrLeakPrivateStaging() throws Exception {
+        Path encrypted=archive();
+        for(String name:List.of("tk_account","tk_service_settings","tk_passkey_credential","tk_recovery_control")) {
+            Path changed=mutate(encrypted,entries->{
+                try {
+                    var image=MAPPER.readTree(entries.get("database.json"));
+                    for(var table:image.path("tables"))if(table.path("name").asText().equals(name)) {
+                        var row=(com.fasterxml.jackson.databind.node.ArrayNode)table.path("rows").get(0);
+                        int index=switch(name){case "tk_account"->2;case "tk_service_settings"->4;case "tk_passkey_credential"->5;default->2;};
+                        row.set(index,MAPPER.getNodeFactory().textNode(name.equals("tk_recovery_control")?"4":"private unsupported value"));
+                    }
+                    entries.put("database.json",MAPPER.writeValueAsBytes(image));
+                }catch(IOException failure){throw new AssertionError(failure);}
+            },true);
+            rejects(changed,passphrase,10_000_000,"INVALID_INSTANCE_AUTHENTICATION");
+        }
+    }
     @Test void compressedSizeCannotBypassTheUncompressedArchiveBudget() throws Exception {
         Path encrypted=archive(),plain=InstanceBackupEncryption.decrypt(encrypted,directory,passphrase,10_000_000);long size=Files.size(plain),expanded=0;
         try(var zip=new ZipFile(plain.toFile())) {var entries=zip.entries();while(entries.hasMoreElements())expanded+=entries.nextElement().getSize();}
@@ -103,9 +120,10 @@ class InstanceBackupArchiveTest {
         try {var manifest=(ObjectNode)MAPPER.readTree(entries.get("manifest.json"));change.accept(manifest);entries.put("manifest.json",MAPPER.writeValueAsBytes(manifest));}
         catch(IOException failure){throw new AssertionError(failure);}
     }
-    private void rejects(Path encrypted,char[] phrase,long limit) throws Exception {
+    private void rejects(Path encrypted,char[] phrase,long limit) throws Exception {rejects(encrypted,phrase,limit,"INVALID_INSTANCE_BACKUP");}
+    private void rejects(Path encrypted,char[] phrase,long limit,String code) throws Exception {
         List<Path> before;try(var files=Files.list(directory)){before=files.sorted().toList();}
-        var failure=assertThrows(IOException.class,()->InstanceBackupArchive.open(encrypted,phrase,directory,limit));assertEquals("INVALID_INSTANCE_BACKUP",failure.getMessage());assertNull(failure.getCause());
+        var failure=assertThrows(IOException.class,()->InstanceBackupArchive.open(encrypted,phrase,directory,limit));assertEquals(code,failure.getMessage());assertNull(failure.getCause());
         try(var files=Files.list(directory)){assertEquals(before,files.sorted().toList());}
     }
 }

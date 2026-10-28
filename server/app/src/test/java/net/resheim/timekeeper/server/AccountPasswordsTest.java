@@ -4,6 +4,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
 
 class AccountPasswordsTest {
+    @Test void supportedHashesUseTheSameParametersAsRuntimeVerification() {
+        String password="Supported existing account password",encoded=AccountPasswords.hash(password);assertTrue(AccountPasswords.supported(encoded));assertTrue(AccountPasswords.matches(password,encoded));
+        for(String invalid:new String[]{null,"","unsupported",encoded.replace("600000","1"),encoded.replace("600000","2000001"),"pbkdf2-sha256$600000$AA$AA","pbkdf2-sha256$invalid$AA$AA"}) {assertFalse(AccountPasswords.supported(invalid));assertFalse(AccountPasswords.matches(password,invalid));}
+    }
     @Test void saltedHashesRetainLongUnicodePasswordsWithoutTrimmingOrTruncation() {
         String password="  ø 🧩 passphrase "+"long".repeat(30)+"  ";
         var first=AccountPasswords.hash(password);var second=AccountPasswords.hash(password);

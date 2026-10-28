@@ -28800,7 +28800,11 @@
             "const": 1048576
           },
           "validationCode": {
-            "const": "INVALID_INSTANCE_BACKUP"
+            "type": "string",
+            "enum": [
+              "INVALID_INSTANCE_BACKUP",
+              "INVALID_INSTANCE_AUTHENTICATION"
+            ]
           },
           "review": {
             "$ref": "#/components/schemas/InstanceArchiveReview"
