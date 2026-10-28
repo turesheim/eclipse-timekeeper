@@ -18,6 +18,19 @@ spec=importlib.util.spec_from_file_location('restore_database',ROOT/'server/depl
 restorer=importlib.util.module_from_spec(spec);spec.loader.exec_module(restorer)
 
 
+def failure_reason(stderr):
+    # Database diagnostics can contain restored rows and credentials. Return
+    # only fixed categories for known guards; never forward stderr or SQL.
+    text=stderr.decode('utf-8',errors='replace') if isinstance(stderr,bytes) else ''
+    for message,reason in (
+        ('Stop all other database clients before maintenance','other-database-clients'),
+        ('Noncanonical Timekeeper schema','noncanonical-schema'),
+        ('Incomplete Timekeeper schema','incomplete-schema'),
+        ('Missing instance-operation control','missing-instance-control')):
+        if message in text:return reason
+    return 'command-rejected'
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--postgres-image',default='postgres:18.6-bookworm')
@@ -26,7 +39,7 @@ def main():
     def command(*arguments,input=None,output=None):
         options={'stdin':input} if hasattr(input,'read') else {'input':input.encode() if input else None}
         result=subprocess.run(arguments,stdout=output if output is not None else subprocess.PIPE,stderr=subprocess.PIPE,**options)
-        if result.returncode:raise RuntimeError('Isolated restore operation failed: '+arguments[0])
+        if result.returncode:raise RuntimeError('Isolated restore operation failed: '+arguments[0]+' ['+failure_reason(result.stderr)+']')
         return result.stdout.decode().strip() if output is None else None
     def client(program,arguments,*,input=None,output=None):
         adjusted=list(arguments)
