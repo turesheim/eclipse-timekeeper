@@ -3,9 +3,53 @@
 This feature is being implemented for [#473](https://github.com/turesheim/eclipse-timekeeper/issues/473).
 The internal encrypted archive, configuration inventory, database-image and
 administrator-authority components exist. Administrator start/status/discard routes are integrated with durable backup
-jobs, one-use native downloads and uploaded-archive review. Restore activation and Administration UI remain
+jobs, one-use native downloads and uploaded-archive review. The Administration
+interface supports these operations. Target checks and restore activation remain
 unfinished. The acceptance criteria in the
 issue remain the delivery requirements; these foundations alone do not satisfy them.
+
+## Administration workflow
+
+An operator configures `timekeeper.instance-backup.storage` to a private storage
+root whose parent already exists. The same root must be mounted on every replica;
+its durable identity is bound to the installation database. The defaults reserve
+at most 8 GiB per archive, 16 GiB in aggregate, and three staged jobs. Filesystems
+must support the required private POSIX modes and durable writes.
+
+Sign in with an administrator account password or passkey, then open
+**Administration → Backup & Restore**. Token-derived sessions cannot authorize
+instance operations. Creation asks for the current administrator password and a
+separate encryption passphrase, entered twice. Store that passphrase separately;
+it cannot be recovered. Passwords and phrases are cleared from the form before
+waiting for a request, and are never stored in browser storage or worker messages.
+
+The page polls at most 50 recent operation receipts, which also lets a reloaded
+page discover ongoing work after a lost creation response. A ready backup has a
+password-authorized native download. Check the browser download manager for
+completion; handing off the request does not prove that the file was saved.
+The link sends only the page origin as its referrer, as required by authenticated
+API reads, while the grant remains in its private session-bound cookie.
+
+Choose an encrypted file to upload. A local SHA-256 worker reads it in 1 MiB
+chunks so the browser never needs a full archive buffer. Uploads use bounded raw
+binary requests with the normal account binding and CSRF checks. To resume after
+a lost reply or reload, select the same file and use the operation's resume
+button. The size and digest must match its receipt before sending further bytes;
+the server's durable offset decides where transfer continues. Upload access is
+restricted to its initiating session. A different administrator session can
+freshly authorize discarding its artifact, but cannot take over the upload.
+
+After transfer, verify the archive using the current password and encryption
+passphrase. An incorrect phrase retains encrypted bytes for retry. A successful
+review shows source metadata and table counts, with an explicit warning that
+target readiness, authentication checks, deployment mapping and offline
+activation are still required. The current interface cannot activate a restore.
+Discard removes the staged archive and work files while retaining its audit.
+
+The checksum library is pinned, bundled locally and included in the About license
+inventory. Chromium and WebKit acceptance exercises the packaged server over
+HTTPS, including native download, incorrect-passphrase retry, reload recovery,
+mobile layouts and accessibility.
 
 ## Encryption envelope
 
@@ -50,7 +94,10 @@ writes those paths on the destination.
 
 `InstanceConfiguration` captures resolved `timekeeper.*`, `quarkus.*` and
 `smallrye.config.*` values, including applicable DB/SMTP credentials and
-configuration encryption keys. It does not collect unrelated host environment
+configuration encryption keys. Environment aliases referenced by canonical
+configuration expressions are captured through those resolved properties, rather
+than reinterpreted as additional file inputs. Explicitly declared unknown file
+inputs still fail coverage. It does not collect unrelated host environment
 variables. Its file inventory covers token/setup files, external configuration
 files and [Quarkus 3.40 TLS inputs](https://quarkus.io/version/3.40/guides/tls-registry-reference/),
 including named PEM pairs, keystores, certificate lists and flat trust directories.
