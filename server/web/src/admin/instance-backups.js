@@ -38,15 +38,15 @@ export async function renderInstanceBackups(view) {
     worker?.terminate();const generation=++hashGeneration;selected=null;digest=null;upload.submit.disabled=true;
     const file=fileInput.files?.[0];if(!file)return;
     if(file.size<40||file.size>summary.maximumArchiveBytes){hashing.textContent=t('backups.file_size',{maximum:summary.maximumArchiveBytes});return;}
-    selected=file;hashing.textContent=t('backups.hashing');worker=new Worker('/web/instance-upload-worker.js',{type:'module'});
-    const failed=()=>{if(view.valid()&&generation===hashGeneration){digest=null;hashing.textContent=t('backups.hash_failed');upload.submit.disabled=true;}worker?.terminate();};
-    worker.onerror=failed;
-    worker.onmessage=({data})=>{
+    selected=file;hashing.textContent=t('backups.hashing');const activeWorker=new Worker('/web/instance-upload-worker.js',{type:'module'});worker=activeWorker;
+    const failed=()=>{if(view.valid()&&generation===hashGeneration){digest=null;hashing.textContent=t('backups.hash_failed');upload.submit.disabled=true;}activeWorker.terminate();if(worker===activeWorker)worker=null;};
+    activeWorker.onerror=failed;
+    activeWorker.onmessage=({data})=>{
       if(!view.valid()||generation!==hashGeneration)return;
       if(data.failed){failed();return;}
-      if(data.sha256){digest=data.sha256;hashing.textContent=t('backups.file_ready');upload.submit.disabled=view.busy||view.uncertain;worker.terminate();worker=null;}
+      if(data.sha256){digest=data.sha256;hashing.textContent=t('backups.file_ready');upload.submit.disabled=view.busy||view.uncertain;activeWorker.terminate();if(worker===activeWorker)worker=null;}
       else hashing.textContent=t('backups.hash_progress',{received:data.received,total:file.size});
-    };worker.postMessage({file});
+    };activeWorker.postMessage({file});
   });
   const operations=section(view,t('backups.operations')),list=node('div');operations.append(button(t('backups.refresh'),()=>void view.run(refresh)),list);
   async function addOperation(item) {
