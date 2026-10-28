@@ -56,7 +56,10 @@ def fixture_sql(schema=6, *, runtime=False):
             sql+=f"INSERT INTO tk_resource VALUES({quote(owner)},'{kind}','{identifier}',9,{quote(json.dumps(payload,ensure_ascii=False))});\n"
         for from_type,kind,to_type in (('TASK','project','PROJECT'),('PROJECT','client','CLIENT'),('WORK_SESSION','client','CLIENT'),('ACTIVITY','task','TASK'),('ACTIVITY','workSession','WORK_SESSION'),('ACTIVITY','label','LABEL')):
             sql+=f"INSERT INTO tk_relation VALUES({quote(owner)},'{from_type}','{ids[from_type]}','{kind}','{to_type}','{ids[to_type]}');\n"
-        sql+=f"INSERT INTO tk_external_reference VALUES({quote(owner)},'mylyn','https://example.invalid/repository','issue-123','TASK','{ids['TASK']}',{quote(hashlib.sha256(owner.encode()).hexdigest())});\n"
+        # A running application validates its derived index. Data-only transfer
+        # cases deliberately preserve an arbitrary source index byte for byte.
+        reference=json.dumps(['mylyn','https://example.invalid/repository','issue-123'],separators=(',',':')) if runtime else owner
+        sql+=f"INSERT INTO tk_external_reference VALUES({quote(owner)},'mylyn','https://example.invalid/repository','issue-123','TASK','{ids['TASK']}',{quote(hashlib.sha256(reference.encode()).hexdigest())});\n"
         if index==0:sql+=f"INSERT INTO tk_active VALUES({quote(owner)},'ACTIVITY','{ids['ACTIVITY']}');\n"
         sql+=f"INSERT INTO tk_receipt VALUES({quote(owner)},'{uuid.uuid4()}',{'%s'},201,{quote(json.dumps({'id':ids['ACTIVITY'],'start':now}))},'\"9\"','/api/v1/activities/{ids['ACTIVITY']}',{quote(now)});\n" % quote('f'*64)
         sql+=f"INSERT INTO tk_change VALUES({quote(owner)},{sequence},'ACTIVITY','{ids['ACTIVITY']}','CREATED',{quote(now)});\n"
