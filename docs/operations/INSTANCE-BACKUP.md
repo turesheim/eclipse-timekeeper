@@ -23,6 +23,14 @@ Their canonical properties are `timekeeper.instance-backup.storage` and
 requires the second directory. On replicated deployments, every process must use
 the same persistent roots and database; mismatched storage identities fail closed.
 
+The shipped Docker Compose deployment configures both roots in its project-scoped
+`instance-state` named volume, mounted at `/instance` on both API replicas. The
+server image initializes that directory with mode 0700 for UID/GID 10001. Normal
+container replacement and `docker compose down` retain the volume. Do not use
+`docker compose down --volumes` on a live installation: it deletes this state.
+Keep the same Compose project identity when replacing containers so that the
+replicas retain their existing volume.
+
 Use a private POSIX filesystem: directories have mode 0700 and files mode 0600.
 Symlinks and hard links are rejected for protected inputs. ACL-backed storage is
 not yet verified. Reserve space for the encrypted upload, decrypted working
