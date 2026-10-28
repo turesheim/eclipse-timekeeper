@@ -42,8 +42,8 @@ class API:
                    '--request',method,'--header','Origin: '+self.origin]
         if token:arguments+=['--header','Authorization: Bearer '+token]
         elif self.cookies:
-            arguments+=['--header','Cookie: '+'; '.join(key+'='+value.value for key,value in self.cookies.items()),
-                        '--header','X-CSRF-Token: '+self.csrf]
+            arguments+=['--header','Cookie: '+'; '.join(key+'='+value.value for key,value in self.cookies.items())]
+            if self.csrf:arguments+=['--header','X-CSRF-Token: '+self.csrf]
             if self.owner:arguments+=['--header','X-Timekeeper-Owner: '+self.owner]
         for key,value in (headers or {}).items():arguments+=['--header',key+': '+value]
         body=None
@@ -61,9 +61,10 @@ class API:
         for cookie in response.get_all('Set-Cookie',[]):self.cookies.load(cookie)
         if response.get('X-Timekeeper-Owner'):self.owner=response['X-Timekeeper-Owner']
         value=json.loads(payload) if payload and response.get_content_type()=='application/json' else payload
-        if isinstance(value,dict) and 'csrf' in value:self.csrf=value['csrf']
+        if isinstance(value,dict) and value.get('csrf'):self.csrf=value['csrf']
         if status not in (expected if expected is not None else range(200,300)):
-            raise RuntimeError('Native API '+method+' '+path+' returned '+str(status))
+            code=value.get('code','') if isinstance(value,dict) else ''
+            raise RuntimeError('Native API '+method+' '+path+' returned '+str(status)+' '+str(code))
         return value,response
 
     def call(self,method,path,data=None,**kwargs):return self.request(method,path,data,**kwargs)[0]
@@ -156,7 +157,14 @@ class Installation:
                 for path in destination.iterdir():
                     if path.name not in names:path.unlink()
                 for name in names:
-                    shutil.copyfile(prepared/kind/name,destination/name);(destination/name).chmod(0o444 if kind=='secrets' else 0o644)
+                    with tempfile.NamedTemporaryFile(dir=destination,delete=False) as output:
+                        replacement=Path(output.name)
+                    try:
+                        shutil.copyfile(prepared/kind/name,replacement)
+                        replacement.chmod(0o444 if kind=='secrets' else 0o644)
+                        replacement.replace(destination/name)
+                    finally:
+                        replacement.unlink(missing_ok=True)
 
     def start(self):
         command(*self.compose,'start')
@@ -184,6 +192,7 @@ class Installation:
 
 def seed(source):
     api=source.api()
+    api.call('GET','/auth/status')
     owner=api.call('POST','/auth/setup',{'code':source.code,'username':'original-admin','password':ADMIN_PASSWORD,'displayName':'Original administrator','email':'original-admin@example.org'})['ownerId']
     api.call('POST','/admin/users',{'username':'original-colleague','password':COLLEAGUE_PASSWORD,'displayName':'Original colleague','email':'colleague@example.org','administrator':False})
     client=api.call('POST','/clients',{'name':'Original client æøå','color':'#176653'})
@@ -195,7 +204,7 @@ def seed(source):
     activity=api.call('POST','/activities',{'summary':'Original activity','taskId':task['id'],'projectId':project['id'],'labelIds':[label['id']],
                      'start':'2026-10-27T08:00:00.123456789Z','end':'2026-10-27T09:00:00.123456789Z'})
     attachment='Exact attachment bytes æ\n'.encode()
-    api.call('PUT','/journal-assets/migration.txt',{'data':base64.b64encode(attachment).decode()})
+    api.call('PUT','/journal-assets/migration.txt',{'data':base64.b64encode(attachment).decode()},headers={'If-None-Match':'*'})
     api.put('/day-labels/2026-10-27',{'text':'Independent original label'})
     api.put('/day-notes/2026-10-27/content',{'body':'# Original journal\n\n[Attachment](assets/migration.txt)\n'})
     api.put('/week-notes/2026-W44',{'body':'# Original weekly journal\n'})
@@ -221,6 +230,7 @@ def export(api):
 
 def restore(destination,archive):
     api=destination.api()
+    api.call('GET','/auth/status')
     api.call('POST','/auth/setup',{'code':destination.code,'username':'destination-admin','password':DESTINATION_PASSWORD,'displayName':'Disposable destination administrator','email':'destination@example.org'})
     operation=api.call('POST','/admin/instance/uploads',{'currentPassword':DESTINATION_PASSWORD,'bytes':len(archive),'sha256':hashlib.sha256(archive).hexdigest()})['operation']['id']
     path='/admin/instance/uploads/'+operation
@@ -236,6 +246,7 @@ def restore(destination,archive):
              'generation':stage['generation'],'confirmation':'RESTORE dagsverk'})
     api.call('GET','/clients',expected=(503,))
     destination.stop();destination.start()
+    api.call('GET','/clients',expected=(401,))
 
 
 def verify_data(destination,expected):
@@ -259,6 +270,7 @@ def main():
     parser.add_argument('--timekeeper-package',required=True,type=Path)
     parser.add_argument('--dagsverk-package',required=True,type=Path)
     parser.add_argument('--postgres-image',default='postgres:17.11-bookworm')
+    parser.add_argument('--expected-commit',help='Require packages from this exact source build')
     parser.add_argument('--output',type=Path,default=ROOT/'server/target/acceptance/instance-packages.json')
     args=parser.parse_args()
     args.output.unlink(missing_ok=True)
@@ -272,6 +284,7 @@ def main():
             if checked['package']!=identity:raise ValueError('Provide the two independent package identities')
             packages.append((directory,checked,release))
         if packages[0][1]['sourceCommit']!=packages[1][1]['sourceCommit'] or packages[0][2]!=packages[1][2] or packages[0][1]['imageId']!=packages[1][1]['imageId']:raise ValueError('Use compatible packages from the same tested build')
+        if args.expected_commit and packages[0][1]['sourceCommit']!=args.expected_commit:raise ValueError('Packages do not match the expected source build')
         command('docker','image','load','-i',str(packages[0][0]/'payload/image.tar.gz'))
         image=packages[0][2]['image']
         if command('docker','image','inspect','--format','{{.Architecture}}',image).stdout.strip()!='amd64':raise ValueError('Use actual r1000 packages')
@@ -295,6 +308,10 @@ def main():
             before_database,before_files=source.fingerprint(),source.files()
             destination=Installation(database,'dagsverk',38017,folder/'dagsverk',packages[1][0],volumes[1]);installations.append(destination)
             destination.install(password);restore(destination,archive)
+            replay=destination.api()
+            for key,value in original.cookies.items():replay.cookies[key]=value.value
+            replay.csrf,replay.owner=original.csrf,original.owner
+            replay.call('GET','/clients',expected=(401,))
             restored=verify_data(destination,data)
             activity=restored.call('POST','/activities',{'summary':'New work after migration','taskId':data['task']['id'],'projectId':data['project']['id'],
                                   'labelIds':[data['label']['id']],'start':'2026-10-27T11:00:00Z','end':'2026-10-27T11:15:00Z'})
@@ -308,6 +325,7 @@ def main():
             if original.call('GET','/clients/'+data['client']['id'])!=data['client']:raise RuntimeError('Original installation is no longer usable')
             evidence={'commit':packages[0][1]['sourceCommit'],'sourcePackageSha256':packages[0][1]['sha256'],'destinationPackageSha256':packages[1][1]['sha256'],'imageId':packages[0][1]['imageId'],'sourcePackage':'timekeeper','destinationPackage':'dagsverk',
                               'independentPackageAccounts':True,'sourceDatabaseAndInstalledFilesUnchanged':True,'encryptedNativeExportPublicRestore':True,
+                              'bootstrapAndCopiedSourceSessionsInvalidated':True,
                               'bothPasswordsAndOwnerBindingsPreserved':True,'integrationTokenPreserved':True,'userDataIsolationPreserved':True,
                               'businessIdsVersionsRelationshipsAndTimestampsPreserved':True,'independentDayLabelAndJournalsPreserved':True,
                               'exactAttachmentBytesPreserved':True,'restoredApplicationWritesWork':True,'subsequentNativeMaterialRecovery':True}

@@ -240,7 +240,7 @@ jobs:
       - name: Build the independent Dagsverk migration destination
         run: python server/scripts/package_synology.py --commit "$GITHUB_SHA" --image "ghcr.io/turesheim/eclipse-timekeeper-server:sha-$GITHUB_SHA" --revision "$GITHUB_RUN_NUMBER" --package-id dagsverk --output server/target/synology-migration
       - name: Verify full-instance migration between independent native packages
-        run: python server/synology/tests/instance_migration_acceptance.py --timekeeper-package "server/target/synology/timekeeper-1.99.0-$GITHUB_RUN_NUMBER-r1000.spk" --dagsverk-package "server/target/synology-migration/dagsverk-1.99.0-$GITHUB_RUN_NUMBER-r1000.spk" --output server/target/synology-acceptance/instance-packages.json
+        run: python server/synology/tests/instance_migration_acceptance.py --timekeeper-package "server/target/synology/timekeeper-1.99.0-$GITHUB_RUN_NUMBER-r1000.spk" --dagsverk-package "server/target/synology-migration/dagsverk-1.99.0-$GITHUB_RUN_NUMBER-r1000.spk" --expected-commit "$GITHUB_SHA" --output server/target/synology-acceptance/instance-packages.json
       - name: Generate preview discovery metadata for NAS acceptance
         run: |
           python server/scripts/synology_catalog.py --package "server/target/synology/timekeeper-1.99.0-$GITHUB_RUN_NUMBER-r1000.spk" --base-url "https://turesheim.github.io/eclipse-timekeeper/synology/preview/r1000/"
