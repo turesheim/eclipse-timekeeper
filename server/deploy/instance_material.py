@@ -229,6 +229,7 @@ def volume(script, arguments=(), *, input=None, output=None, missing=False):
 def backup(directory, client):
     control = dump_control(directory / 'database.dump', client)
     raw = volume(PRIVATE + '''
+test ! -e /instance/maintenance.pending && test ! -L /instance/maintenance.pending
 if test ! -e /instance/restore/active.json && test ! -L /instance/restore/active.json; then exit 3; fi
 check active.json
 test "$(stat -c '%s' /instance/restore/active.json)" -le 1024

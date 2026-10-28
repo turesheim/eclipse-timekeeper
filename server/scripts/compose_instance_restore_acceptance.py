@@ -157,6 +157,12 @@ def main():
                 finally:
                     held.stdin.close(); held.wait(timeout=30); held.stdout.close()
             destination.stop()
+            # Valid active files cannot make a backup complete while interrupted
+            # configuration/SQL maintenance is still gated.
+            destination.run('python3', './instance_material.py', 'prepare', str(backup))
+            destination.backup(expected=1)
+            destination.restore(backup)
+            destination.stop()
             # Remove the active root while retaining the logical database. A new
             # container cannot start it, and another backup must refuse omission.
             destination.compose('run', '--rm', '--no-deps', '-T', '--user', '10001:10001', '--entrypoint', 'sh', 'maintenance', '-ec',
@@ -188,7 +194,7 @@ def main():
             args.output.parent.mkdir(parents=True, exist_ok=True)
             receipt = {'sourceCommit': information['commit'], 'publicAdministratorRestore': True, 'twoAccountsAndOwnerIsolation': True,
                 'dataIdsVersionsAndRelationships': True, 'journalsAndAttachmentBytes': True, 'pendingRestoreBackupRefused': True,
-                'materialLossBackupRefused': True, 'maintenanceMaterialRecovery': True, 'concurrentMaintenanceRefused': True, 'interruptedMaintenanceRestartRefused': True, 'strippedMaterialSqlRolledBack': True,
+                'materialLossBackupRefused': True, 'maintenanceMaterialRecovery': True, 'concurrentMaintenanceRefused': True, 'pendingMaintenanceBackupRefused': True, 'interruptedMaintenanceRestartRefused': True, 'strippedMaterialSqlRolledBack': True,
                 'completeBackupRetry': True, 'sourceApplicationUnchanged': True}
             args.output.write_text(json.dumps(receipt, indent=2) + '\n')
             print(json.dumps(receipt, indent=2))
