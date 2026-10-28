@@ -15,7 +15,8 @@ class InstanceRestoreRecoveryTest {
     private final UUID generation=UUID.randomUUID(),artifactRoot=UUID.randomUUID();
     private final Instant now=Instant.parse("2026-10-28T12:00:00Z");
     record Fixture(InstanceRestoreIntent intent,UUID operation,Path settings,String url,String user,String password) { }
-    Fixture fixture(String url,String user,String password) throws Exception {
+    Fixture fixture(String url,String user,String password) throws Exception {return fixture(url,user,password,false);}
+    Fixture fixture(String url,String user,String password,boolean httpFixture) throws Exception {
         UUID operation;long version;
         try(var c=DriverManager.getConnection(url,user,password)) {
             ServerSchema.initializeOrValidate(c);c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);c.setAutoCommit(false);
@@ -25,10 +26,19 @@ class InstanceRestoreRecoveryTest {
         }
         char[] phrase="Synthetic recovery source passphrase".toCharArray();Path encrypted;
         try(var source=InstanceDatabaseImageTest.database();var config=InstanceConfiguration.capture(InstanceConfigurationTest.base(),Map.of())) {
-            InstanceAuthenticationPreflightTest.seed(source);encrypted=InstanceBackupArchive.create(source,config,object().put("serverVersion","2.0.0").put("commit","0".repeat(40)).put("databaseType","h2").put("packageId","timekeeper").put("publicOrigin","https://source.example"),phrase,directory);
+            InstanceAuthenticationPreflightTest.seed(source);
+            if(httpFixture){
+                // Portability fixtures deliberately contain opaque domain payloads.
+                // HTTP acceptance uses well-formed business data instead.
+                for(String table:List.of("tk_relation","tk_external_reference","tk_active","tk_resource","tk_receipt","tk_change"))execute(source,"DELETE FROM "+table);
+                UUID client=UUID.fromString("11111111-1111-4111-8111-111111111111");
+                var payload=object().put("id",client.toString()).put("ownerId","a").put("version",17).put("name","Restored client æ").put("color","#123456");
+                execute(source,"INSERT INTO tk_resource VALUES('a','CLIENT',?,17,?)",client,payload.toString());source.commit();
+            }
+            encrypted=InstanceBackupArchive.create(source,config,object().put("serverVersion","2.0.0").put("commit","0".repeat(40)).put("databaseType","h2").put("packageId","timekeeper").put("publicOrigin","https://source.example"),phrase,directory);
         }
         var values=InstanceConfigurationTest.base();values.put("quarkus.datasource.jdbc.url",url);values.put("quarkus.datasource.db-kind",DatabaseConfiguration.postgres(url)?"postgresql":"h2");values.put("quarkus.datasource.username",user);values.put("quarkus.datasource.password",password);
-        var intent=new InstanceRestoreIntent(directory.resolve("intents, café"),10_000_000);var spec=new InstanceRestoreIntent.Spec(generation,operation,version,"bootstrap",artifactRoot,null,new InstanceRestoreDatabase.Deployment("dagsverk","https://destination.example:8443","AUTO",true));
+        var intent=new InstanceRestoreIntent(directory.resolve("intents, café"),10_000_000);var spec=new InstanceRestoreIntent.Spec(generation,operation,version,"bootstrap",artifactRoot,null,new InstanceRestoreDatabase.Deployment("dagsverk",httpFixture?"NONE":"https://destination.example:8443","AUTO",!httpFixture));
         try(var archive=InstanceBackupArchive.open(encrypted,phrase,directory,10_000_000);var target=InstanceConfiguration.capture(values,Map.of());var prepared=intent.prepare(spec,archive,target,now);var c=DriverManager.getConnection(url,user,password)) {
             // Protocol fixture only. Real proof/session/consent commits and
             // rollback are covered through InstanceAdministratorTest.

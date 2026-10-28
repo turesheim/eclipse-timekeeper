@@ -15,9 +15,17 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def verify_build_identity(app, commit):
     """The embedded runtime identity must agree with the distribution manifest."""
+    entry = 'net/resheim/timekeeper/server/InstancePreboot.class'
+    with zipfile.ZipFile(app / 'quarkus-run.jar') as runner:
+        manifest = runner.read('META-INF/MANIFEST.MF').decode().replace('\r\n ', '')
+        if 'Main-Class: net.resheim.timekeeper.server.InstancePreboot' not in manifest:
+            raise ValueError('Packaged server must run restore recovery before framework startup')
+        bootstrap = runner.read(entry)
     identities = []
     for jar in (app / 'app').glob('*.jar'):
         with zipfile.ZipFile(jar) as archive:
+            if entry in archive.namelist() and archive.read(entry) != bootstrap:
+                raise ValueError('Packaged startup recovery class differs from application build')
             if 'timekeeper-build.properties' in archive.namelist():
                 properties = dict(line.split('=', 1) for line in archive.read('timekeeper-build.properties').decode().splitlines()
                                   if '=' in line and not line.startswith('#'))

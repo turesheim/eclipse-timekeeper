@@ -57,6 +57,18 @@
       </resource>
     </resources>
     <plugins>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <systemPropertyVariables><java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager></systemPropertyVariables>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>io.quarkus.platform</groupId><artifactId>quarkus-maven-plugin</artifactId><version>${quarkus.platform.version}</version>
+        <extensions>true</extensions>
+        <executions><execution><goals><goal>build</goal><goal>generate-code</goal><goal>generate-code-tests</goal></goals></execution></executions>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId><artifactId>maven-antrun-plugin</artifactId><version>3.2.0</version>
         <executions><execution><id>build-identity</id><phase>initialize</phase><goals><goal>run</goal></goals>
@@ -88,18 +100,15 @@
             </condition>
             <property name="timekeeper.build.dirty" value="unknown"/>
           </target></configuration>
+        </execution>
+        <execution><id>preboot-entrypoint</id><phase>package</phase><goals><goal>run</goal></goals>
+          <configuration><target>
+            <jar destfile="${project.build.directory}/quarkus-app/quarkus-run.jar" update="true">
+              <fileset dir="${project.build.outputDirectory}" includes="net/resheim/timekeeper/server/InstancePreboot.class"/>
+              <manifest><attribute name="Main-Class" value="net.resheim.timekeeper.server.InstancePreboot"/></manifest>
+            </jar>
+          </target></configuration>
         </execution></executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-          <systemPropertyVariables><java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager></systemPropertyVariables>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>io.quarkus.platform</groupId><artifactId>quarkus-maven-plugin</artifactId><version>${quarkus.platform.version}</version>
-        <extensions>true</extensions>
-        <executions><execution><goals><goal>build</goal><goal>generate-code</goal><goal>generate-code-tests</goal></goals></execution></executions>
       </plugin>
     </plugins>
   </build>

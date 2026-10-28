@@ -10,12 +10,78 @@ import json
 import os
 from pathlib import Path
 import stat
+import socket
+import time
+import urllib.request
+import urllib.error
+from http.cookies import SimpleCookie
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def verify_http_recovery(app, fixture, environment):
+    """Recover before HTTP, then prove restored credentials/data survive a restart."""
+    for _ in range(2):
+        with socket.socket() as listener:
+            listener.bind(('127.0.0.1', 0))
+            port = listener.getsockname()[1]
+        origin = 'http://127.0.0.1:' + str(port)
+        command = ['java', '-Xmx384m', '-Dquarkus.http.host=127.0.0.1',
+                   '-Dquarkus.http.port=' + str(port),
+                   '-Dquarkus.config.locations=' + (fixture / 'destination.properties').as_uri(),
+                   '-jar', str(app / 'quarkus-run.jar')]
+        with tempfile.TemporaryFile() as log:
+            process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=log)
+            try:
+                deadline = time.monotonic() + 60
+                while True:
+                    if process.poll() is not None:
+                        raise ValueError('Packaged server exited before restored HTTP readiness')
+                    try:
+                        with urllib.request.urlopen(origin + '/q/health/ready', timeout=2) as response:
+                            if response.status == 200:
+                                break
+                    except (urllib.error.URLError, TimeoutError):
+                        pass
+                    if time.monotonic() >= deadline:
+                        raise ValueError('Packaged restored server did not become ready')
+                    time.sleep(0.25)
+                request = urllib.request.Request(origin + '/api/v1/auth/login',
+                    data=json.dumps({'username': 'user-a', 'password': 'Preserved archive account password', 'remember': False}).encode(),
+                    headers={'Content-Type': 'application/json', 'Origin': origin})
+                with urllib.request.urlopen(request, timeout=10) as response:
+                    cookies = SimpleCookie()
+                    for header in response.headers.get_all('Set-Cookie', []):
+                        cookies.load(header)
+                    json.load(response)
+                # Explicitly forward the Secure cookie for this disposable loopback
+                # protocol test; deployed browser acceptance uses real HTTPS.
+                cookie = '; '.join(key + '=' + value.value for key, value in cookies.items())
+                if not cookie:
+                    raise ValueError('Restored password login did not issue a session')
+                request = urllib.request.Request(origin + '/api/v1/clients', headers={'Cookie': cookie})
+                with urllib.request.urlopen(request, timeout=10) as response:
+                    data = json.load(response)
+                clients = data['items']
+                if len(clients) != 1 or clients[0]['name'] != 'Restored client æ' or clients[0]['version'] != 17:
+                    raise ValueError('Restored client data was not preserved by packaged startup')
+            finally:
+                process.terminate()
+                try:
+                    process.wait(timeout=15)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+    # A completed database without its bound material must fail before Quarkus
+    # can initialize TLS, listeners, scheduled jobs, or account provisioning.
+    missing = command[:1] + ['-Dtimekeeper.instance-restore.storage=NONE'] + command[1:]
+    rejected = subprocess.run(missing, cwd=ROOT, env=environment, capture_output=True, timeout=30)
+    if rejected.returncode != 1 or b'Timekeeper startup recovery could not be verified.' not in rejected.stderr or rejected.stdout:
+        raise ValueError('Completed restore without its material did not fail before HTTP startup')
 
 
 def main():
@@ -55,6 +121,7 @@ def main():
         environment['TIMEKEEPER_SERVER_DB_PASSWORD_FILE'] = str(fixture / 'database-secret')
         command = ['java', '-Dquarkus.config.locations=' + (fixture / 'destination.properties').as_uri(),
                    '-cp', runtime_classpath, 'net.resheim.timekeeper.server.InstanceRestoreMain', str(fixture / 'intents, café')]
+        verify_http_recovery(app, fixture, environment)
         for _ in range(2):
             restored = subprocess.run(command, cwd=ROOT, env=environment, capture_output=True, timeout=40)
             if restored.returncode or not restored.stdout.startswith(b'INSTANCE_RESTORE_COMPLETE\n'):
@@ -62,11 +129,11 @@ def main():
         if (fixture / 'intents, café/prepared.json').exists():
             raise ValueError('Completed recovery retained its plaintext handoff')
         evidence = {'sourceCommit': manifest['commit'], 'distributionSha256': digest,
-                    'packagedRuntimeOnly': True, 'fileBackedCredentials': True, 'completedRetry': True, 'plaintextStagingRemoved': True}
+                    'packagedRuntimeOnly': True, 'automaticPreboot': True, 'restoredPasswordLogin': True, 'restoredClientRead': True, 'httpRestart': True, 'missingMaterialRejectedBeforeHttp': True, 'fileBackedCredentials': True, 'completedRetry': True, 'plaintextStagingRemoved': True}
         output = ROOT / 'server/target/acceptance'
         output.mkdir(parents=True, exist_ok=True)
         (output / 'instance-restore.json').write_text(json.dumps(evidence, indent=2) + '\n')
-        print('Packaged offline instance recovery and completed retry passed.')
+        print('Packaged automatic restore, authenticated HTTP restart, and offline completed retry passed.')
 
 
 if __name__ == '__main__':

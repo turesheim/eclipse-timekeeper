@@ -15,6 +15,12 @@ public final class InstanceRestoreMain {
         // private archive diagnostics; only our fixed result reaches the caller.
         System.setOut(new java.io.PrintStream(java.io.OutputStream.nullOutputStream()));System.setErr(new java.io.PrintStream(java.io.OutputStream.nullOutputStream()));
         try {
+            if(args.length==1&&args[0].equals("--preboot")) {
+                var incoming=new Properties();byte[] bytes=System.in.readNBytes(8_388_609);if(bytes.length>8_388_608)throw new IllegalArgumentException();
+                try(var input=new java.io.ByteArrayInputStream(bytes)){incoming.load(input);}finally{java.util.Arrays.fill(bytes,(byte)0);}
+                for(String name:incoming.stringPropertyNames())if(!java.util.Set.of("java.class.path","jdk.module.path","sun.java.command","java.home").contains(name))System.setProperty(name,incoming.getProperty(name));incoming.clear();
+                var result=preboot();result.setProperty("status","READY");result.store(output,"Private startup result");result.clear();return;
+            }
             if(args.length!=1)throw new IllegalArgumentException();Path root=Path.of(args[0]).toAbsolutePath().normalize();
             var config=configuration();String configured=config.getOptionalValue("timekeeper.instance-restore.storage",String.class).orElse("NONE");
             if(!configured.equals("NONE")&&!Path.of(configured).toAbsolutePath().normalize().equals(root))throw new IllegalArgumentException();
@@ -31,13 +37,57 @@ public final class InstanceRestoreMain {
             }finally{properties.clear();}
         }catch(Throwable failure){errors.println("Instance restore could not be completed. Keep the server stopped and follow the instance recovery instructions.");System.exit(1);}
     }
-    private static io.smallrye.config.SmallRyeConfig configuration() throws java.io.IOException {
+    /** Read-only for routine startup; exclusive replacement only for committed pending consent. */
+    private static Properties preboot() throws Exception {
+        var config=configuration();var updates=new Properties();
+        for(var entry:resolvedSecrets().entrySet())if(System.getProperty(entry.getKey())==null)updates.setProperty(entry.getKey(),entry.getValue());
+        String url=config.getValue("quarkus.datasource.jdbc.url",String.class);DatabaseConfiguration.validate(url);
+        String storage=config.getOptionalValue("timekeeper.instance-restore.storage",String.class).orElse("NONE");Path root=storage.equals("NONE")?null:Path.of(storage).toAbsolutePath().normalize();
+        boolean recovery=root!=null&&(java.nio.file.Files.exists(root.resolve("prepared.json"),java.nio.file.LinkOption.NOFOLLOW_LINKS)||java.nio.file.Files.exists(root.resolve("active.json"),java.nio.file.LinkOption.NOFOLLOW_LINKS));
+        if(url.startsWith("jdbc:h2:mem:")){if(recovery)throw new java.io.IOException("RESTORE_REQUIRES_PERSISTENT_TARGET");return updates;}
+        var properties=new Properties();properties.setProperty("user",config.getOptionalValue("quarkus.datasource.username",String.class).orElse("sa"));properties.setProperty("password",config.getOptionalValue("quarkus.datasource.password",String.class).orElse(""));
+        boolean postgres=DatabaseConfiguration.postgres(url);if(postgres)properties.setProperty("connectTimeout","5");else url=url.replaceAll("(?i);IFEXISTS=(?:true|false)(?=;|$)","")+";IFEXISTS=TRUE";
+        try(var connection=DriverManager.getConnection(url,properties)) {
+            com.fasterxml.jackson.databind.JsonNode control;
+            try(var statement=connection.createStatement()) {
+                statement.setQueryTimeout(5);
+                try(var rows=statement.executeQuery("SELECT payload FROM tk_instance WHERE kind='CONTROL'")) {
+                    if(!rows.next()){if(recovery)throw new java.io.IOException("INVALID_INSTANCE_CONTROL");return updates;}
+                    control=JsonValues.MAPPER.reader().with(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION).with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(rows.getString(1));
+                    if(!control.isObject()||rows.next())throw new java.io.IOException("INVALID_INSTANCE_CONTROL");
+                }
+            }catch(java.sql.SQLException missing) {if(!recovery&&java.util.Set.of("42P01","42S02").contains(missing.getSQLState()))return updates;throw missing;}
+            InstanceRestoreMaterial.Installed material=null;
+            if(control.path("restorePending").asBoolean()) {
+                if(root==null||!java.nio.file.Files.isDirectory(root,java.nio.file.LinkOption.NOFOLLOW_LINKS))throw new java.io.IOException("RESTORE_STORAGE_REQUIRED");
+                long limit=Long.parseLong(config.getOptionalValue("timekeeper.instance-backup.maximum-expanded-bytes",String.class).orElse("17179869184"));
+                material=InstanceRestoreRecovery.resume(connection,new InstanceRestoreIntent(root,Math.addExact(limit,128_000_000L)),Instant.now(),InstanceRestoreMain::preflightConfiguration);
+            }else if(control.path("restore").path("phase").asText().equals("COMPLETE")) {
+                if(root==null)throw new java.io.IOException("RESTORE_STORAGE_REQUIRED");material=InstanceRestoreMaterial.active(root);
+                if(!material.generation().toString().equals(control.path("restoreGeneration").asText())||!material.operation().toString().equals(control.path("restore").path("operationId").asText())||!material.digest().equals(control.path("restore").path("materialSha256").asText())||!material.intentDigest().equals(control.path("restoreIntent").path("sha256").asText()))throw new java.io.IOException("INVALID_INSTANCE_RESTORE_MATERIAL");
+                if(java.nio.file.Files.exists(root.resolve(material.generation().toString()),java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                    try{new InstanceRestoreIntent(root,128_000_000L).cleanupCompleted(connection,material);}catch(java.io.IOException busy){if(!"INSTANCE_RESTORE_BUSY".equals(busy.getMessage()))throw busy;}
+                }
+            }
+            if(material!=null) {
+                String location=material.configuration().toUri().toASCIIString().replace(",","\\,");String original=config.getOptionalValue("quarkus.config.locations",String.class).orElse("");
+                updates.setProperty("quarkus.config.locations",original.isBlank()?location:original+","+location);
+            }
+            return updates;
+        }catch(java.sql.SQLException missing){if(!postgres&&!recovery&&java.util.Set.of(90013,90146).contains(missing.getErrorCode()))return updates;throw missing;}
+        finally{properties.clear();}
+    }
+    private static java.util.Map<String,String> resolvedSecrets() throws java.io.IOException {
         var resolved=new java.util.HashMap<String,String>();
         for(String name:java.util.List.of("TIMEKEEPER_SERVER_DB_PASSWORD","TIMEKEEPER_SMTP_PASSWORD")) {
             String path=System.getenv(name+"_FILE");if(path==null||path.isBlank())continue;
             if(java.nio.file.Files.size(Path.of(path))>1_048_576)throw new java.io.IOException("INVALID_SECRET_FILE");
             String value=java.nio.file.Files.readString(Path.of(path));while(value.endsWith("\n"))value=value.substring(0,value.length()-1);resolved.put(name,value);
         }
+        return resolved;
+    }
+    private static io.smallrye.config.SmallRyeConfig configuration() throws java.io.IOException {
+        var resolved=resolvedSecrets();
         // Match the entrypoint's file-backed environment variables, while
         // retaining direct canonical properties and higher-priority files.
         var builder=ConfigUtils.configBuilder(LaunchMode.NORMAL);if(!resolved.isEmpty())builder.withSources(new io.smallrye.config.EnvConfigSource(resolved,310));return builder.build();
