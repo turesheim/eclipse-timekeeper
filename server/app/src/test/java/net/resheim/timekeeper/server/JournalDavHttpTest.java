@@ -24,7 +24,13 @@ class JournalDavHttpTest {
     }
     @Test void legacyCollectionAliasSharesAuthenticationDocumentsAndConditionalVersions(){
         String alias="/remote.php/webdav/",filename="2026-08-14.md",source="---\r\ncustom: retained\r\n---\r\n# Journal æ\r\n";
-        assertEquals(401,given().request("PROPFIND",alias).statusCode());
+        var unauthenticated=given().request("PROPFIND",alias);
+        assertEquals(401,unauthenticated.statusCode());
+        assertEquals("Basic realm=\"Timekeeper journal\"",unauthenticated.header("WWW-Authenticate"));
+        assertEquals("Basic realm=\"Timekeeper journal\"",given().request("PROPFIND",alias+"assets/").header("WWW-Authenticate"));
+        var invalid=client("not-a-valid-token").get(alias+filename);
+        assertEquals(401,invalid.statusCode());
+        assertEquals("Basic realm=\"Timekeeper journal\"",invalid.header("WWW-Authenticate"));
         assertEquals(401,given().header("Authorization","Bearer test-a").get(alias+filename).statusCode());
         var created=client("test-a").header("If-None-Match","*").body(source.getBytes(StandardCharsets.UTF_8)).put(alias+filename);
         assertEquals(201,created.statusCode());String first=created.header("ETag");
