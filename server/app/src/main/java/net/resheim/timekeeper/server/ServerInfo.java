@@ -43,5 +43,10 @@ public class ServerInfo {
     }
 
     @GET public Response get() {return new ApiReplies(200,information.deepCopy(),null,null).response();}
+    ObjectNode journalIdentity() {
+        var result=JsonValues.object();
+        for(String name:java.util.List.of("version","commit","dirty"))result.set(name,information.get(name));
+        return result;
+    }
     String spkVersion() {return spkVersion.orElse(null);}
 }

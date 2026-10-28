@@ -64,11 +64,11 @@ unchanged; dates and display numbers follow the selected region.
 
 ## Existing data and accounts
 
-Back up before upgrading. Schema 7 upgrades only the exact canonical server
-schema 1, 2, 3, 4, 5 or 6, preserving owner IDs, UUIDs, timestamps, relations, versions and
+Back up before upgrading. Schema 8 upgrades only the exact canonical server
+schema 1, 2, 3, 4, 5, 6 or 7, preserving owner IDs, UUIDs, timestamps, relations, versions and
 revisions. PostgreSQL upgrades transactionally under a database advisory lock.
 Stop both replicas for the first schema upgrade: an older replica cannot serve
-schema 7. Pre-schema-4 browser sessions are ended because earlier versions did
+schema 8. Pre-schema-4 browser sessions are ended because earlier versions did
 not record their origin and browser binding. Schema-4 sessions and passkeys are
 preserved; changing service settings later retires sessions at activation.
 Passwords and Eclipse API tokens remain valid. Upgrading is refused by default. After backing up and stopping both
@@ -315,7 +315,7 @@ This operation replaces service settings, not account passwords or work data.
 
 Protect dumps and mail configuration as credentials. Current native and Compose
 backups include mail settings and the SMTP password. Restoring a schema-2 native
-backup upgrades its database to schema 7 and keeps the target's current SMTP
+backup upgrades its database to schema 8 and keeps the target's current SMTP
 configuration, because older backups did not contain those settings.
 
 ## Passkeys
@@ -388,7 +388,7 @@ There is no cross-host redirect carrying authentication secrets.
 To roll back an origin configuration, keep the current database and use an epoch
 higher than every previously deployed value, including on the old hostname. Never
 lower the epoch or restore an older authentication backup merely to undo a routing
-change. A schema-6 or earlier binary cannot serve schema 7: rolling back that binary requires
+change. A schema-7 or earlier binary cannot serve schema 8: rolling back that binary requires
 a matching pre-upgrade backup and loses later changes. Perform backup recovery
 offline and account for revoked credentials as described below.
 

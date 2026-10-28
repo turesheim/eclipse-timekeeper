@@ -30,9 +30,12 @@ final class DayLabels {
         text=text.strip();if(!java.nio.charset.StandardCharsets.UTF_8.newEncoder().canEncode(text)||text.codePointCount(0,text.length())>80||text.codePoints().anyMatch(Character::isISOControl))throw ApiFailure.validation();
         if(previous.path("version").asLong()>0&&previous.path("text").asText().equals(text))return previous;
         long version=previous.path("version").asLong();if(version>=9007199254740991L)throw ApiFailure.conflict();
+        var historyBefore=previous.deepCopy();
+        historyBefore.set("modifiedAt",store.find(TYPE,DayNotes.id(date)).map(old->old.get("modifiedAt")).orElse(null));
         var value=previous.deepCopy().put("version",version+1).put("text",text).put("modifiedAt",store.now().toString());
         if(version==0)store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,1,?)",store.owner(),TYPE,DayNotes.id(date),value.toString());
         else if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,value.toString(),store.owner(),TYPE,DayNotes.id(date),version)!=1)throw new ApiFailure(412,"STALE_VERSION");
+        new DayNoteHistory(store).label(date,historyBefore,value);
         store.change("PROFILE","UPDATED",store.owner());value.remove("modifiedAt");return value;
     }
     /** Called during the authorized model upgrade, in an owner transaction. */

@@ -29,10 +29,12 @@ final class AccountArchiveImport {
         }catch(RuntimeException|Error failure){file.close();throw failure;}
     }
     private void restoreJournals(Document document){
+        store.withJournalSource(DayNoteHistory.Source.ARCHIVE_RESTORE,()->{
         var archive=document.data();
         new DayLabels(store).restore(archive.path("dayLabels"));
         new DayNotes(store).restore(archive.path("dayNotes"));new WeekNotes(store).restore(archive.path("weekNotes"));new JournalAssets(store).restore(archive.path("journalAssets"));
         if(archive.path("journalFiles").size()>0)ArchiveJournalFiles.restore(document.file().file(),archive.path("journalFiles"),store,archive.has("dayLabels"));
+        return null;});
     }
     private void importWork(Document document){
         var archive=document.data();

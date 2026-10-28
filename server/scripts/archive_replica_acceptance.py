@@ -181,9 +181,17 @@ def exercise(system):
     route='/data/account/uploads/'+upload['id']
     for offset in range(0,len(packed),upload['chunkBytes']):
         expect(system.request(2,carol,route+'/chunks/'+str(offset//upload['chunkBytes']),{'data':base64.b64encode(packed[offset:offset+upload['chunkBytes']]).decode()},method='PUT'),200,'Upload separate-file ZIP on other JVM')
+    history_route='/day-notes/'+day+'/history'
+    if expect(system.request(2,carol,history_route),200,'Initial target diagnostics')['items']:raise AssertionError('Fresh target already contains note history')
     review=system.request(1,carol,route+'/preview',{'restoreTimeZone':False})
     if not expect(review,200,'Review separate-file ZIP')['canImport']:raise AssertionError('Separate files failed valid ZIP review')
+    if expect(system.request(2,carol,history_route),200,'Preview did not publish diagnostics')['items']:raise AssertionError('Archive preview committed diagnostic events')
     expect(system.request(2,carol,route+'/import',{'restoreTimeZone':False},headers={'If-Match':review[2]['ETag']}),201,'Restore separate-file ZIP on other JVM')
+    diagnostic=expect(system.request(1,carol,history_route),200,'Authenticated restore diagnostics on peer')
+    if len(diagnostic['items'])!=2 or any(event['source']!='ARCHIVE_RESTORE' or event['operation']!='RESTORE' or event['client']['authentication']!='BROWSER_SESSION' or event['build']['commit']!=system.server_commit for event in diagnostic['items']):raise AssertionError('Restore diagnostics lost source, actual actor or writing build')
+    if not diagnostic['legacyGap']:raise AssertionError('Imported source history was incorrectly claimed as locally complete')
+    if not any(item['entityType']=='ARCHIVE_AUDIT' and item['data'].get('kind')=='DAY_NOTE_HISTORY' for item in snapshot['importHistory']):raise AssertionError('Account ZIP omitted source diagnostic evidence')
+
     if expect(system.request(1,carol,'/day-notes/'+day),200,'Restored daily note')['body']!=day_body or expect(system.request(2,carol,'/week-notes/'+week),200,'Restored weekly note')['body']!=week_body:raise AssertionError('ZIP restore changed exact note bodies')
     for date,label in independent_labels.items():
         value=expect(system.request(2,carol,'/day-labels/'+date),200,'Restored independent day label')
@@ -194,11 +202,15 @@ def exercise(system):
     with zipfile.ZipFile(io.BytesIO(restored_zip)) as archive:
         if archive.read(day+'.md')!=day_body.encode() or archive.read(week+'.md')!=week_body.encode() or archive.read('assets/replica.bin')!=attachment or archive.read(task_file)!=attachment:raise AssertionError('Cross-JVM ZIP restore changed separate Markdown or binary files')
     system.restart(2)
+    if expect(system.request(2,carol,history_route),200,'Diagnostics after actual JVM restart')['items']!=diagnostic['items']:raise AssertionError('Restart changed diagnostic event identities or metadata')
     for date,label in independent_labels.items():
         if expect(system.request(1,carol,'/day-labels/'+date),200,'Label after peer restart')['text']!=label:raise AssertionError('Independent label changed across restart')
     route='/day-notes/'+day+'/content';current=system.request(1,carol,route)
     expect(system.request(2,carol,route,{'body':''},method='PUT',headers={'If-Match':current[2]['ETag']}),200,'Clear only restored body')
     if expect(system.request(1,carol,'/day-labels/'+day),200,'Label after body clearing')['text']!=independent_labels[day]:raise AssertionError('Clearing body removed label')
+    after_clear=expect(system.request(1,carol,history_route),200,'Independent body-clear diagnostics')
+    if after_clear['items'][-1]['resource']!='NOTE' or after_clear['items'][-1]['newLabel']!=independent_labels[day] or day_body.encode() in json.dumps(after_clear).encode():raise AssertionError('Diagnostic body clear changed label semantics or exposed body bytes')
+    passed('prospective diagnostics survive replica restore and restart, exclude bodies, and retain authenticated actor/build without trusting imported history')
     passed('independent labels and clears survive note deletion, ZIP restore, body clearing and actual JVM restart')
     passed('separate daily/weekly Markdown and binary journal/task attachments restore exactly across PostgreSQL JVMs')
     return checks

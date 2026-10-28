@@ -13,7 +13,7 @@ public class DayLabelResource {
     @Inject RequestIdentity identity;
     @Inject ContractInputs inputs;
     @Context UriInfo uri;
-    private Response tx(Supplier<ApiReplies> action){return store.authenticated(identity,()->Response.fromResponse(action.get().response()).header("Cache-Control",null).header("Cache-Control","private, no-store").build());}
+    private Response tx(Supplier<ApiReplies> action){return store.authenticated(identity,()->store.withJournalSource(DayNoteHistory.Source.REST_LABEL,()->Response.fromResponse(action.get().response()).header("Cache-Control",null).header("Cache-Control","private, no-store").build()));}
     @GET public Response list(@QueryParam("fromDate")String from,@QueryParam("toDate")String to){
         ContractInputs.queries(uri.getQueryParameters(),"fromDate","toDate");var first=DayNotes.date(from);var last=DayNotes.date(to);
         return tx(()->new ApiReplies(200,new DayLabels(store).list(first,last),null,null));

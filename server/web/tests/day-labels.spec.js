@@ -27,5 +27,9 @@ for(const view of ['today','track','week'])for(const mode of ['Formatted','Markd
  await editor.getByRole('button',{name:'Save',exact:true}).click();
  await expect.poll(async()=>{const response=await read();return(await response.json()).text;}).toBe('Unsaved label draft');
  const after=await(await read()).json();expect(after.deleted).toBe(true);expect(after.version).toBe(deleted.version);
+ const diagnostics=await request.get('/api/v1/day-notes/'+date+'/history',{headers});expect(diagnostics.ok()).toBe(true);
+ const events=(await diagnostics.json()).items,last=events.at(-1);expect(last.source).toBe('REST_ENTRY');expect(last.client.authentication).toBe('BROWSER_SESSION');expect(last.client.tokenId).toBeTruthy();
+ expect(last).not.toHaveProperty('body');expect(last).not.toHaveProperty('markdown');expect(last.client).not.toHaveProperty('digest');
+
 
 });

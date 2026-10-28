@@ -20,7 +20,7 @@ import (
 const packageID = "timekeeper"
 const packageTarget = "/var/packages/timekeeper/target"
 const nativePSQL = "/var/packages/postgresql/target/bin/psql"
-const currentSchema = 7
+const currentSchema = 8
 
 func supportedSchema(version int) bool { return version >= 2 && version <= currentSchema }
 func supportedUpgrade(from, to int) bool {

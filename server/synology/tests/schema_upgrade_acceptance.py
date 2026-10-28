@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the real, unprivileged schema-2/3/4/5/6-to-7 package upgrade and interrupted retries."""
+"""Verify the real, unprivileged schema-2/3/4/5/6/7-to-8 package upgrade and interrupted retries."""
 import argparse
 import hashlib
 import io
@@ -32,7 +32,7 @@ def main():
         command('go','-C',str(ROOT/'server/synology/installer'),'build','-o',str(binary),'.',
                 environment={**os.environ,'GOOS':'linux','GOARCH':architecture,'CGO_ENABLED':'0',
                              'GOCACHE':str(ROOT/'server/target/schema-upgrade-go-cache')})
-        for source_schema,interruption in itertools.product((2,3,4,5,6),('before-commit','after-commit')):
+        for source_schema,interruption in itertools.product((2,3,4,5,6,7),('before-commit','after-commit')):
             container = 'timekeeper-schema-upgrade-'+secrets.token_hex(4)
             password = secrets.token_urlsafe(32)
             command('docker','run','-d','--name',container,'--network','none',
@@ -69,14 +69,14 @@ def main():
                 for name,value in inputs.items():
                     file=folder/('fixture-'+secrets.token_hex(4));file.write_text(value);file.chmod(0o600)
                     command('docker','cp',str(file),container+':/var/packages/timekeeper/var/server/'+name)
-                release=folder/'release.json';release.write_text(json.dumps({'commit':commit,'image':image,'serverSchema':7}))
+                release=folder/'release.json';release.write_text(json.dumps({'commit':commit,'image':image,'serverSchema':8}))
                 blueprint=folder/'compose.yaml';blueprint.write_text((ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',image))
                 command('docker','cp',str(binary),container+':/var/packages/timekeeper/scripts/timekeeper-dsm')
                 command('docker','cp',str(release),container+':/var/packages/timekeeper/scripts/release.json')
                 command('docker','exec',container,'mkdir','-p','/tmp/timekeeper-incoming/package/scripts')
                 command('docker','cp',str(release),container+':/tmp/timekeeper-incoming/package/scripts/release.json')
                 command('docker','cp',str(blueprint),container+':/var/packages/timekeeper/target/project/compose.yaml')
-                for name in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','schema-v5-postgresql.shape','schema-v6-postgresql.shape','schema-v7-postgresql.shape','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql','day-labels-v7.sql'):
+                for name in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','schema-v5-postgresql.shape','schema-v6-postgresql.shape','schema-v7-postgresql.shape','schema-v8-postgresql.shape','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql','day-labels-v7.sql','day-note-history-v8.sql'):
                     command('docker','cp',str(DB/name),container+':/var/packages/timekeeper/scripts/migration/'+name)
                 command('docker','exec',container,'chown','-R','10001:10001','/var/packages/timekeeper')
                 def helper(action,expected=0,argument=None):
@@ -99,7 +99,7 @@ def main():
                 assert sql('SELECT schema_version FROM tk_schema')==str(source_schema)
                 assert command('docker','exec',container,'find','/var/packages/timekeeper/var/server/backups','-type','f').stdout.strip()==''
                 # A canonical-shape failure must roll all DDL/data back and retain the backup/journal.
-                migration_name='day-labels-v7.sql' if source_schema>=6 else 'locale-v6.sql'
+                migration_name='day-note-history-v8.sql' if source_schema>=7 else 'day-labels-v7.sql' if source_schema>=6 else 'locale-v6.sql'
                 damaged=folder/'damaged.sql';damaged.write_text((DB/migration_name).read_text()+'\nCREATE TABLE unexpected_upgrade_table(id INT);\n')
                 command('docker','cp',str(damaged),container+':/var/packages/timekeeper/scripts/migration/'+migration_name)
                 helper('upgrade',expected=1)
@@ -117,14 +117,14 @@ def main():
                 command('docker','cp',str(DB/migration_name),container+':/var/packages/timekeeper/scripts/migration/'+migration_name)
                 if interruption=='after-commit':
                     # Reproduce a process ending after the DB transaction but before settings publication.
-                    sql('SET ROLE timekeeper_fixture_app; BEGIN; '+((DB/'recovery-v3.sql').read_text() if source_schema<3 else '')+((DB/'passkeys-v4.sql').read_text() if source_schema<4 else '')+((DB/'settings-v5.sql').read_text() if source_schema<5 else '')+((DB/'locale-v6.sql').read_text() if source_schema<6 else '')+(DB/'day-labels-v7.sql').read_text()+"UPDATE tk_schema SET schema_version=7; COMMIT;")
+                    sql('SET ROLE timekeeper_fixture_app; BEGIN; '+((DB/'recovery-v3.sql').read_text() if source_schema<3 else '')+((DB/'passkeys-v4.sql').read_text() if source_schema<4 else '')+((DB/'settings-v5.sql').read_text() if source_schema<5 else '')+((DB/'locale-v6.sql').read_text() if source_schema<6 else '')+(DB/'day-labels-v7.sql').read_text()+(DB/'day-note-history-v8.sql').read_text()+"UPDATE tk_schema SET schema_version=8; COMMIT;")
                     helper('prestart',expected=1)
                 helper('validate');helper('upgrade');helper('prestart')
-                assert sql('SELECT schema_version FROM tk_schema')=='7'
-                assert sql((DB/'postgresql-shape.sql').read_text())==(DB/'schema-v7-postgresql.shape').read_text().strip()
+                assert sql('SELECT schema_version FROM tk_schema')=='8'
+                assert sql((DB/'postgresql-shape.sql').read_text())==(DB/'schema-v8-postgresql.shape').read_text().strip()
                 assert sql(fingerprints)==before
                 retained=json.loads(command('docker','exec',container,'cat','/var/packages/timekeeper/var/server/settings.json').stdout)
-                assert retained['release']['serverSchema']==7
+                assert retained['release']['serverSchema']==8
                 assert sql('SELECT count(*) FROM tk_auth_session')==('1' if source_schema>=4 else '0')
                 if recovery_source is not None:assert sql('SELECT row_to_json(t)::text FROM tk_recovery_address t ORDER BY owner_id,slot; SELECT row_to_json(t)::text FROM tk_recovery_control t;')==recovery_source
                 command('docker','exec',container,'test','!','-e','/var/packages/timekeeper/var/server/config/maintenance-pending.json')
@@ -155,13 +155,13 @@ def main():
                     # or partial commits; the original accounts become canonical schema 7.
                     helper('restore',argument=journal['archivePath'])
                     assert sql(fingerprints)==before
-                    assert sql('SELECT schema_version FROM tk_schema')=='7'
+                    assert sql('SELECT schema_version FROM tk_schema')=='8'
                     assert sql('SELECT count(*) FROM tk_recovery_address')==('0' if source_schema<3 else '4')
-                    assert sql((DB/'postgresql-shape.sql').read_text())==(DB/'schema-v7-postgresql.shape').read_text().strip()
+                    assert sql((DB/'postgresql-shape.sql').read_text())==(DB/'schema-v8-postgresql.shape').read_text().strip()
                     for source,destination in ((mail,'config/mail.properties'),(smtp,'secrets/smtp_password')):
                         expected=source.read_text() if source_schema<3 else inputs[destination]
                         assert command('docker','exec',container,'cat','/var/packages/timekeeper/var/server/'+destination).stdout==expected, 'Restore must use the matching backup mail settings or retain them for schema 2'
-                print(json.dumps({'sourceSchema':source_schema,'targetSchema':7,'retiredBrowserSessionsRevoked':source_schema<4,'passkeySessionProvenancePreserved':source_schema>=4,'scenario':interruption,'privateDataAndCredentialsPreserved':True,'transactionRollback':True,'retryCompleted':True,'preUpgradeBackupRetained':True,'nativeBackupAndOldBackupRestore':interruption=='before-commit'}),flush=True)
+                print(json.dumps({'sourceSchema':source_schema,'targetSchema':8,'retiredBrowserSessionsRevoked':source_schema<4,'passkeySessionProvenancePreserved':source_schema>=4,'scenario':interruption,'privateDataAndCredentialsPreserved':True,'transactionRollback':True,'retryCompleted':True,'preUpgradeBackupRetained':True,'nativeBackupAndOldBackupRestore':interruption=='before-commit'}),flush=True)
             finally:command('docker','rm','-f',container)
 
 

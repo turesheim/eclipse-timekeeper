@@ -29,7 +29,7 @@ public class DayEntryResource {
     @POST public Response edit(@PathParam("date")String date,@HeaderParam("If-Match")String match,JsonNode body){
         if(match!=null)throw ApiFailure.badRequest();
         ContractInputs.queries(uri.getQueryParameters());var day=DayNotes.date(date);var input=inputs.validate("DayEntryInput",body);
-        return store.authenticated(identity,()->{
+        return store.authenticated(identity,()->store.withJournalSource(DayNoteHistory.Source.REST_ENTRY,()->{
             var labels=new DayLabels(store);var notes=new DayNotes(store);
             var label=labels.get(day);var note=notes.getContent(day);
             if(input.has("text")&&input.path("labelVersion").asLong()!=label.path("version").asLong()
@@ -37,6 +37,6 @@ public class DayEntryResource {
             if(input.has("text"))labels.save(day,etag(label),input.path("text").asText());
             if(input.has("body"))notes.saveContent(day,etag(note),input);
             return reply(day);
-        });
+        }));
     }
 }

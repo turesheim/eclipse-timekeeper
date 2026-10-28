@@ -25,7 +25,7 @@ versions. A combined save commits both changes or neither. A label-only day can
 remain visible in Calendar after its note has been deleted. Today calendar dots
 indicate note body content, independently of labels.
 
-Before the schema-7 upgrade, stop all older API replicas and make a protected
+Before the schema-8 upgrade, stop all older API replicas and make a protected
 backup. Explicitly authorize the upgrade using the deployment's existing schema
 upgrade procedure. The SQL table shape is unchanged, but the model version gates
 older binaries. Startup copies legacy labels in owner transactions and preserves
@@ -101,3 +101,9 @@ account boundary and explicitly include note bodies, so protect downloaded
 copies and their destination backups as carefully as the database itself.
 
 The rich editor and WebDAV endpoint retain the at-rest trust boundary above.
+
+Prospective label/note change history is private operational metadata with the
+same at-rest trust boundary. It retains labels, changed-field names and safe
+client/build identity without body bytes or authentication secrets. See
+[API diagnostics](API-DIAGNOSTICS.md) for retention, legacy gaps, portability and
+read-only access. Schema 8 fences older servers from unrecorded writes.

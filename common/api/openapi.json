@@ -9700,6 +9700,81 @@
         "description": "Independent Markdown resource and ETag. Empty body preserves the day label; DELETE removes the document, including its WebDAV presence, and preserves the label. Legacy timekeeper-label frontmatter is opaque metadata and never updates the independent label."
       }
     },
+    "/day-notes/{date}/history": {
+      "parameters": [
+        {
+          "name": "date",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getDayNoteHistory",
+        "summary": "Read private prospective label/note change diagnostics without note bodies",
+        "x-required-permission": "read",
+        "description": "Retains the latest 1,000 actual changes per date. History and current state contain no Markdown bodies, attachments, authentication digests or session secrets. A legacyGap or retentionTruncated flag identifies missing history; no older revisions are fabricated. Owner/date/filter/revision-bound cursors expire with CURSOR_EXPIRED (409) after any owner change; restart pagination. History survives note deletion/recreation and database backups. Personal account archives include diagnostic history as inert source evidence in importHistory. Restoring an archive preserves that evidence without accepting its identities, sequences or claims as locally authenticated changes; new local RESTORE events describe the actual restore. Database backups retain local history unchanged.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private current-state summary and bounded history page. recordingStartedAt is null when recording has not begun.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayNoteHistoryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
     "/day-entries/{date}": {
       "get": {
         "operationId": "getDayEntry",
@@ -27126,6 +27201,308 @@
           "bytes",
           "sha256",
           "archiveFile"
+        ],
+        "additionalProperties": false
+      },
+      "DayNoteHistoryClient": {
+        "type": "object",
+        "properties": {
+          "authentication": {
+            "type": "string",
+            "enum": [
+              "API_TOKEN",
+              "BROWSER_SESSION",
+              "INTERNAL"
+            ]
+          },
+          "tokenId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "authentication",
+          "tokenId"
+        ],
+        "additionalProperties": false
+      },
+      "DayNoteHistoryBuild": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "commit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "dirty": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "version",
+          "commit",
+          "dirty"
+        ],
+        "additionalProperties": false
+      },
+      "DayNoteHistoryCurrent": {
+        "type": "object",
+        "properties": {
+          "noteVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "labelVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "noteDeleted": {
+            "type": "boolean"
+          },
+          "hasBody": {
+            "type": "boolean"
+          },
+          "noteModifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "labelModifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "noteVersion",
+          "labelVersion",
+          "label",
+          "noteDeleted",
+          "hasBody",
+          "noteModifiedAt",
+          "labelModifiedAt"
+        ],
+        "additionalProperties": false
+      },
+      "DayNoteHistoryEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resource": {
+            "type": "string",
+            "enum": [
+              "LABEL",
+              "NOTE"
+            ]
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "CREATE",
+              "UPDATE",
+              "CLEAR",
+              "DELETE",
+              "RECREATE",
+              "REPLACE",
+              "RESTORE"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "REST_LEGACY",
+              "REST_NOTE",
+              "REST_LABEL",
+              "REST_ENTRY",
+              "WEBDAV",
+              "ARCHIVE_RESTORE",
+              "INTERNAL"
+            ]
+          },
+          "previousNoteVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "noteVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "previousLabelVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "labelVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "previousLabel": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "newLabel": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "hadBody": {
+            "type": "boolean"
+          },
+          "hasBody": {
+            "type": "boolean"
+          },
+          "noteDeleted": {
+            "type": "boolean"
+          },
+          "previousModifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "changedFields": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "text",
+                "body",
+                "markdown",
+                "presence",
+                "deleted"
+              ]
+            }
+          },
+          "client": {
+            "$ref": "#/components/schemas/DayNoteHistoryClient"
+          },
+          "build": {
+            "$ref": "#/components/schemas/DayNoteHistoryBuild"
+          }
+        },
+        "required": [
+          "id",
+          "sequence",
+          "occurredAt",
+          "resource",
+          "operation",
+          "source",
+          "previousNoteVersion",
+          "noteVersion",
+          "previousLabelVersion",
+          "labelVersion",
+          "previousLabel",
+          "newLabel",
+          "hadBody",
+          "hasBody",
+          "noteDeleted",
+          "previousModifiedAt",
+          "changedFields",
+          "client",
+          "build"
+        ],
+        "additionalProperties": false
+      },
+      "DayNoteHistoryPage": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/DayNoteHistoryEvent"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "current": {
+            "$ref": "#/components/schemas/DayNoteHistoryCurrent"
+          },
+          "historyVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "retentionLimit": {
+            "type": "integer",
+            "const": 1000
+          },
+          "legacyGap": {
+            "type": "boolean"
+          },
+          "retentionTruncated": {
+            "type": "boolean"
+          },
+          "recordingStartedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "revision",
+          "items",
+          "nextCursor",
+          "date",
+          "current",
+          "historyVersion",
+          "retentionLimit",
+          "legacyGap",
+          "retentionTruncated",
+          "recordingStartedAt"
         ],
         "additionalProperties": false
       }

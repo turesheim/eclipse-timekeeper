@@ -164,6 +164,25 @@ class HttpAcceptance(unittest.TestCase):
         self.assertEqual(markdown, recreated['body'])
         self.assertGreater(recreated['version'], labeled['version'])
 
+    def test_private_note_history_preserves_labels_and_excludes_bodies(self):
+        date='2026-11-08';label='/day-labels/'+date;note='/day-notes/'+date+'/content';path='/day-notes/'+date+'/history'
+        initial,_=self.call('GET',path);current,headers=self.call('GET',label)
+        label_text=self.prefix+' label'
+        self.call('PUT',label,{'text':label_text},headers={'If-Match':headers['ETag']})
+        current,headers=self.call('GET',note);body='PRIVATE_NOTE_BODY_'+str(uuid4())
+        _,saved=self.call('PUT',note,{'body':body},headers={'If-Match':headers['ETag']})
+        self.call('DELETE',note,headers={'If-Match':saved['ETag']},status=204)
+        page,headers=self.call('GET',path,owner='read')
+        self.assertEqual('private, no-store',headers['Cache-Control'])
+        self.assertEqual(initial['historyVersion']+3,page['historyVersion'])
+        self.assertTrue(page['current']['noteDeleted']);self.assertEqual(label_text,page['current']['label'])
+        self.assertNotIn('body',page['current']);self.assertNotIn(body,json.dumps(page))
+        self.assertEqual('DELETE',page['items'][-1]['operation']);self.assertEqual(label_text,page['items'][-1]['newLabel'])
+        first,_=self.call('GET',path+'?limit=1');self.assertIsNotNone(first['nextCursor'])
+        second,_=self.call('GET',path+'?'+urlencode({'limit':1,'cursor':first['nextCursor']}))
+        self.assertEqual(first['items'][0]['sequence']+1,second['items'][0]['sequence'])
+        other,_=self.call('GET',path,owner='b');self.assertEqual([],other['items']);self.assertEqual('',other['current']['label'])
+
     def test_day_labels_have_independent_versions_and_survive_note_deletion(self):
         date='2070-02-04';label_path='/day-labels/'+date;note_path='/day-notes/'+date+'/content'
         _, label_headers=self.call('GET',label_path);empty_note,note_headers=self.call('GET',note_path)
