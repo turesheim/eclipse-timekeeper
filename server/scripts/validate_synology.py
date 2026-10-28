@@ -10,6 +10,7 @@ import re
 import struct
 import tarfile
 
+from synology_identity import require_identity, application_id
 from synology_acceptance import RECORD, content_digest, validate_record
 
 REQUIRED = {'INFO','LICENSE','PACKAGE_ICON.PNG','PACKAGE_ICON_256.PNG','package.tgz',
@@ -57,7 +58,8 @@ def validate(path):
             key,raw=line.split('=',1)
             if key in info:raise ValueError('Duplicate INFO key')
             info[key]=json.loads(raw)
-        if info.get('package')!='timekeeper' or info.get('arch')!='r1000' or info.get('os_min_ver')!='7.2.2-72806':
+        package_id=require_identity(info.get('package'))
+        if info.get('arch')!='r1000' or info.get('os_min_ver')!='7.2.2-72806':
             raise ValueError('Incorrect target DSM identity')
         if info.get('install_type','')!='':
             raise ValueError('Use DSM default volume installation and permanent appdata')
@@ -65,7 +67,7 @@ def validate(path):
             raise ValueError('Invalid monotonic package version')
         if info.get('precheckstartstop')!='yes':
             raise ValueError('Package start must synchronize retained configuration before the worker starts')
-        if info.get('dsmuidir')!='ui' or info.get('dsmappname')!='net.resheim.timekeeper':
+        if info.get('dsmuidir')!='ui' or info.get('dsmappname')!=application_id(package_id):
             raise ValueError('Missing Package Center Open integration')
         if info.get('install_dep_packages')!='ContainerManager:postgresql>=17.11-6':
             raise ValueError('Incorrect native package dependencies')
@@ -78,13 +80,13 @@ def validate(path):
             if name.startswith('scripts/') and '/' not in name[len('scripts/'):] and name!='scripts/release.json' and not members[name].mode & 0o111:
                 raise ValueError('Package controller is not executable')
         privilege=json.loads(read('conf/privilege'))
-        if privilege!={'defaults':{'run-as':'package'},'username':'timekeeper','groupname':'timekeeper'}:
+        if privilege!={'defaults':{'run-as':'package'},'username':package_id,'groupname':package_id}:
             raise ValueError('Installer must use the unprivileged package account')
         resource=json.loads(read('conf/resource'))
         if set(resource)!={'docker-project'}:
             raise ValueError('Retained state must use install-time FHS appdata, not a startup-time data-share')
         projects=resource['docker-project']
-        if projects['preload-image']!='image.tar.gz' or projects['projects'][0]['path']!='project':
+        if projects['preload-image']!='image.tar.gz' or len(projects['projects'])!=1 or projects['projects'][0]['path']!='project' or projects['projects'][0]['name']!=package_id+'-server':
             raise ValueError('Incorrect Container Manager resource')
         release=json.loads(read('scripts/release.json'))
         if release['serverSchema']!=9 or not re.fullmatch('[a-f0-9]{40}',release['commit']) or release['image']!='ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+release['commit']:
@@ -111,13 +113,22 @@ def validate(path):
                 raise ValueError('Container Manager needs the complete pinned project before postinst')
             service=project['services']['server']
             state=[mount for mount in service.get('volumes',[]) if mount.get('target')=='/state']
-            if len(state)!=1 or state[0]!={'type':'bind','source':'/var/packages/timekeeper/var','target':'/state','read_only':False}:
+            if len(state)!=1 or state[0]!={'type':'bind','source':'/var/packages/'+package_id+'/var','target':'/state','read_only':False}:
                 raise ValueError('Native instance state must use retained package appdata')
             environment=service.get('environment',{})
             if environment.get('TIMEKEEPER_INSTANCE_BACKUP_STORAGE')!='/state/server/instance-backup' or environment.get('TIMEKEEPER_INSTANCE_RESTORE_STORAGE')!='/state/server/instance-restore':
                 raise ValueError('Native full instance backup and restore need private persistent storage')
+            if service.get('container_name')!=package_id+'-server':
+                raise ValueError('Native container identity must match its package')
+            expected={
+                '/config':{'type':'bind','source':'/var/packages/'+package_id+'/target/private/config','target':'/config','read_only':True},
+                '/run/secrets':{'type':'bind','source':'/var/packages/'+package_id+'/target/private/secrets','target':'/run/secrets','read_only':True},
+                '/state':state[0]}
+            mounts=service.get('volumes',[])
+            if len(mounts)!=3 or {mount.get('target') for mount in mounts}!=set(expected) or any(mount!=expected[mount['target']] for mount in mounts):
+                raise ValueError('Native mounts must remain inside their own package')
             launch=json.load(inner.extractfile('ui/config'))
-            if launch['.url']['net.resheim.timekeeper']['type']!='url':
+            if set(launch.get('.url',{}))!={application_id(package_id)} or launch['.url'][application_id(package_id)]['type']!='url':
                 raise ValueError('Invalid DSM launcher')
             with tarfile.open(fileobj=io.BytesIO(inner.extractfile('image.tar.gz').read()),mode='r:gz') as image:
                 image_members=safe_members(image)

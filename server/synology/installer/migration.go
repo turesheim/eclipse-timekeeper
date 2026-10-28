@@ -247,5 +247,5 @@ func cancelEmptyImport(root string) error {
 	if err = os.Remove(path); err != nil {
 		return err
 	}
-	return syncMaintenanceMarker(root, packageTarget)
+	return syncMaintenanceMarker(root, packageTarget())
 }

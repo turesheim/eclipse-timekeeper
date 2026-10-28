@@ -51,6 +51,29 @@ numeric UID/GID. It configures private `instance-backup` and `instance-restore`
 roots there without granting the application Docker or privileged host access.
 End-to-end migration acceptance remains a release requirement.
 
+## Timekeeper to Dagsverk on the same NAS
+
+Install the separately built `dagsverk` SPK alongside `timekeeper`. Select a new
+application database/role and public HTTPS route; keep the original package's
+settings and route. Finish only the destination's initial administrator setup.
+Export/download from the original Timekeeper administrator, then upload and
+prepare that archive in Dagsverk. Confirm only when the review names `dagsverk`
+and the intended destination origin, RP policy, database and listener.
+
+Stop and start the **destination** package after confirmation; the source package
+and database are independent. Sign in using the preserved source accounts and
+verify clients, projects, tasks, activities, sessions, labels, journals and
+attachments before retiring anything. A changed RP requires the documented
+passkey reenrollment; password access remains available. Preserve the encrypted
+source archive and passphrase until verification and a subsequent destination
+backup/recovery check have passed.
+
+A native maintenance backup made after restoration includes Dagsverk's active
+restore material. Keep that material with its database and use the destination's
+own controller/account for maintenance. The full-instance archive provides
+portable migration; a native maintenance archive recovers the installation and
+material already bound to that package.
+
 ## Create and download an archive
 
 Sign in with an administrator account password or passkey, then open

@@ -19,7 +19,7 @@ func render(root, target string, s Settings) error {
 	if err := os.MkdirAll(filepath.Join(target, "ui"), 0755); err != nil {
 		return err
 	}
-	launch := map[string]any{".url": map[string]any{"net.resheim.timekeeper": map[string]any{"type": "url", "title": "Timekeeper", "desc": "Timekeeper web client", "allUsers": true, "icon": "images/timekeeper_{0}.png", "url": s.PublicOrigin + "/web/"}}}
+	launch := map[string]any{".url": map[string]any{applicationID(): map[string]any{"type": "url", "title": packageDisplayName(), "desc": packageDisplayName() + " web client", "allUsers": true, "icon": "images/timekeeper_{0}.png", "url": s.PublicOrigin + "/web/"}}}
 	return writeJSON(filepath.Join(target, "ui", "config"), launch, 0644)
 }
 func writeChallenge(root string, w Wizard) error {
@@ -264,11 +264,11 @@ func syncMaintenanceMarker(root, target string) error {
 	return atomic(filepath.Join(target, "private", marker), content, 0644)
 }
 func finishMaintenance(root string, s Settings) error {
-	if err := publishConfiguration(root, packageTarget, s); err != nil {
+	if err := publishConfiguration(root, packageTarget(), s); err != nil {
 		return err
 	}
 	if err := os.Remove(filepath.Join(root, "config/maintenance-pending.json")); err != nil {
 		return err
 	}
-	return syncMaintenanceMarker(root, packageTarget)
+	return syncMaintenanceMarker(root, packageTarget())
 }

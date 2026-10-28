@@ -505,3 +505,33 @@ func TestStartWaitsForContainerWorkerReadiness(t *testing.T) {
 		}
 	}
 }
+
+func TestDagsverkPackageIdentityDoesNotReuseTimekeeperPaths(t *testing.T) {
+	previous := packageID
+	packageID = "dagsverk"
+	defer func() { packageID = previous }()
+	root, err := stateRoot(func(key string) string {
+		if key == "SYNOPKG_PKGDEST_VOL" {
+			return "/volume1"
+		}
+		return ""
+	})
+	if err != nil || root != "/volume1/@appdata/dagsverk/server" {
+		t.Fatalf("wrong destination state: %s %v", root, err)
+	}
+	if packageTarget() != "/var/packages/dagsverk/target" || applicationID() != "net.resheim.dagsverk" {
+		t.Fatal("destination reused a source package identity")
+	}
+	if strings.Contains(tailscaleSetupCommand(), "/timekeeper/") {
+		t.Fatal("destination instructions address the original package")
+	}
+	if !strings.Contains(tailscaleSetupCommand(), "/dagsverk/") {
+		t.Fatal("missing destination forwarding path")
+	}
+	env := func(string) string { return "timekeeper" }
+	for _, action := range []string{"wizard", "uninstall-wizard", "install", "backup", "restore"} {
+		if run(action, root, packageTarget(), t.TempDir(), env, "") == nil {
+			t.Fatalf("destination helper accepted a source package action: %s", action)
+		}
+	}
+}

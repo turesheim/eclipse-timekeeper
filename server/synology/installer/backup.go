@@ -400,12 +400,12 @@ func beginMaintenance(root, path, operation string) error {
 			if err = writeJSON(journal, maintenancePending{operation, digest, path}, 0644); err != nil {
 				return err
 			}
-			return syncMaintenanceMarker(root, packageTarget)
+			return syncMaintenanceMarker(root, packageTarget())
 		}
 		if retained.Operation != operation || retained.ArchiveSHA256 != digest {
 			return errors.New("Retry the same archive and operation to complete interrupted maintenance")
 		}
-		return syncMaintenanceMarker(root, packageTarget)
+		return syncMaintenanceMarker(root, packageTarget())
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return errors.New("Restore the original maintenance journal before proceeding")
@@ -413,5 +413,5 @@ func beginMaintenance(root, path, operation string) error {
 	if err = writeJSON(journal, maintenancePending{operation, digest, path}, 0644); err != nil {
 		return err
 	}
-	return syncMaintenanceMarker(root, packageTarget)
+	return syncMaintenanceMarker(root, packageTarget())
 }

@@ -21,10 +21,10 @@ def preview(package):
         raise ValueError('Only a verified preview can be promoted')
     for key, actual in (('commit', checked['sourceCommit']), ('sha256', checked['sha256']),
                         ('imageId', checked['imageId']), ('version', checked['version']),
-                        ('architecture', 'r1000'), ('package', 'timekeeper')):
+                        ('architecture', 'r1000'), ('package', checked['package'])):
         if provenance.get(key) != actual:
             raise ValueError('Preview provenance mismatch: ' + key)
-    if package.name != 'timekeeper-' + checked['version'] + '-r1000.spk':
+    if package.name != checked['package'] + '-' + checked['version'] + '-r1000.spk':
         raise ValueError('Use the original versioned preview filename')
     return checked, provenance
 
@@ -35,7 +35,7 @@ def promote(package, acceptance, output):
     record = json.loads(acceptance.read_text())
     validate_record(record, checked, checked['sha256'])
     version = checked['version'].replace('1.99.0-', '2.0.0-', 1)
-    name = 'timekeeper-' + version + '-r1000.spk'
+    name = checked['package'] + '-' + version + '-r1000.spk'
     output.mkdir(parents=True, exist_ok=True)
     paths = [output / name, output / (name + '.sha256'), output / (name[:-4] + '.json')]
     if any(path.exists() for path in paths):

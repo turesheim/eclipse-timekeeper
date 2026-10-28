@@ -32,7 +32,7 @@ def archive(files, compressed=False, extra=None):
 
 
 class SynologyPackageTest(unittest.TestCase):
-    def candidate(self, *, invalid_instance_storage=False, image_tag=IMAGE, architecture='amd64', missing_launcher=False, missing_staged_release=False, staged_commit=COMMIT, missing_staged_migration=None, changed_staged_migration=None, empty_project=False, elevated=False, late_share=False, install_type=None, outer_extra=None, checksum=None):
+    def candidate(self, *, foreign_mount=False, invalid_instance_storage=False, image_tag=IMAGE, architecture='amd64', missing_launcher=False, missing_staged_release=False, staged_commit=COMMIT, missing_staged_migration=None, changed_staged_migration=None, empty_project=False, elevated=False, late_share=False, install_type=None, outer_extra=None, checksum=None):
         image=archive({'manifest.json':json.dumps([{'RepoTags':[image_tag],'Config':'config.json','Layers':[]}]).encode(),
                        'config.json':json.dumps({'architecture':architecture,'os':'linux'}).encode()},True)
         payload={'image.tar.gz':image,'project/compose.yaml':(ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',IMAGE).encode(),
@@ -44,6 +44,8 @@ class SynologyPackageTest(unittest.TestCase):
         payload.update({name:value for name,value in migrations.items() if name!=missing_staged_migration})
         if changed_staged_migration:payload[changed_staged_migration]+=b'\nchanged\n'
         if not missing_launcher:payload['ui/config']=(ROOT/'server/synology/ui/config').read_bytes()
+        if foreign_mount:
+            project=json.loads(payload['project/compose.yaml']);project['services']['server']['volumes'][0]['source']='/var/packages/other/target/private/config';payload['project/compose.yaml']=json.dumps(project).encode()
         if invalid_instance_storage:
             project=json.loads(payload['project/compose.yaml']);project['services']['server']['environment']['TIMEKEEPER_INSTANCE_RESTORE_STORAGE']='NONE';payload['project/compose.yaml']=json.dumps(project).encode()
         if empty_project:payload['project/compose.yaml']=b'{"services":{}}'
@@ -84,29 +86,40 @@ class SynologyPackageTest(unittest.TestCase):
         config=json.dumps({'architecture':'amd64','os':'linux'}).encode()
         saved=archive({'manifest.json':json.dumps([{'RepoTags':[IMAGE],'Config':'config.json','Layers':[]}]).encode(),
                        'config.json':config})
-        process=MagicMock(stdout=io.BytesIO(saved))
-        process.wait.return_value=0
-        def compile_helper(command, **options):
-            helper=bytearray(64);helper[:5]=b'\x7fELF\x02';struct.pack_into('<H',helper,18,62)
-            Path(command[command.index('-o')+1]).write_bytes(helper)
-        with tempfile.TemporaryDirectory() as temporary, \
-                patch('package_synology.check_source'), \
-                patch('package_synology.verify_image',return_value='sha256:'+'b'*64), \
-                patch('package_synology.subprocess.check_output',return_value='1'), \
-                patch('package_synology.subprocess.run',side_effect=compile_helper), \
-                patch('package_synology.subprocess.Popen',return_value=process):
-            package=build(Path(temporary),COMMIT,IMAGE,1,'preview')
-            provenance=json.loads(package.with_suffix('.json').read_text())
-            self.assertEqual('sha256:'+hashlib.sha256(config).hexdigest(),provenance['imageId'])
-            self.assertEqual(validate(package)['imageId'],provenance['imageId'])
-            self.assertTrue(catalog(package,'https://example.invalid/synology/preview/r1000/').is_file())
+        for package_id in ('timekeeper','dagsverk'):
+            process=MagicMock(stdout=io.BytesIO(saved))
+            process.wait.return_value=0
+            def compile_helper(command, **options):
+                self.assertIn('-ldflags=-s -w -X main.packageID='+package_id,command)
+                helper=bytearray(64);helper[:5]=b'\x7fELF\x02';struct.pack_into('<H',helper,18,62)
+                Path(command[command.index('-o')+1]).write_bytes(helper)
+            with tempfile.TemporaryDirectory() as temporary, \
+                    patch('package_synology.check_source'), \
+                    patch('package_synology.verify_image',return_value='sha256:'+'b'*64), \
+                    patch('package_synology.subprocess.check_output',return_value='1'), \
+                    patch('package_synology.subprocess.run',side_effect=compile_helper), \
+                    patch('package_synology.subprocess.Popen',return_value=process):
+                package=build(Path(temporary),COMMIT,IMAGE,1,'preview',package_id)
+                provenance=json.loads(package.with_suffix('.json').read_text())
+                self.assertEqual('sha256:'+hashlib.sha256(config).hexdigest(),provenance['imageId'])
+                self.assertEqual(validate(package)['imageId'],provenance['imageId'])
+                self.assertEqual(package_id,validate(package)['package'])
+                with tarfile.open(package) as outer,tarfile.open(fileobj=io.BytesIO(outer.extractfile('package.tgz').read()),mode='r:gz') as inner:
+                    guide=inner.extractfile('README.md').read().decode()
+                    self.assertIn('**Package identity: `'+package_id+'`',guide)
+                    self.assertIn('/var/packages/'+package_id+'/',guide)
+                    if package_id=='dagsverk':self.assertNotIn('/var/packages/timekeeper/',guide)
+                catalog_file=catalog(package,'https://example.invalid/synology/preview/r1000/')
+                metadata=json.loads(catalog_file.read_text())['packages'][0]
+                self.assertEqual(package_id,metadata['package'])
+                self.assertTrue(metadata['link'].endswith('/'+package_id+'-1.99.0-1-r1000.spk'))
 
     def test_wrong_image_tag_or_cpu_is_rejected(self):
         for overrides in ({'image_tag':'timekeeper:latest'},{'architecture':'arm64'}):
             with self.subTest(overrides=overrides),self.assertRaises(ValueError):self.check(self.candidate(**overrides))
 
     def test_missing_launcher_privileged_controller_or_corrupted_payload_is_rejected(self):
-        for overrides in ({'invalid_instance_storage':True},{'missing_launcher':True},{'empty_project':True},{'elevated':True},{'late_share':True},{'install_type':'system'},{'checksum':'0'*32}):
+        for overrides in ({'foreign_mount':True},{'invalid_instance_storage':True},{'missing_launcher':True},{'empty_project':True},{'elevated':True},{'late_share':True},{'install_type':'system'},{'checksum':'0'*32}):
             with self.subTest(overrides=overrides),self.assertRaises(ValueError):self.check(self.candidate(**overrides))
 
     def test_parent_path_and_symlink_escape_is_rejected(self):

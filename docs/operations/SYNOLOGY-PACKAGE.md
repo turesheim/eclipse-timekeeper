@@ -14,6 +14,29 @@ they are not acceptance gates for this implementation. Publication tooling
 described below is prepared for future use. Preview publication remains off by
 default.
 
+## Independent migration package
+
+The SPK builder accepts `--package-id timekeeper` (the default) or
+`--package-id dagsverk`. The latter produces a separately installable Dagsverk
+package, with its own package account, appdata, container, launcher, database/role
+defaults and runtime identity. Both use the same verified application image.
+Use separate output directories and keep the original installation intact.
+A Dagsverk package is a migration destination; installing it never renames or
+reuses the original Timekeeper package's state.
+
+Choose a different dedicated database/role and a distinct local port and public
+HTTPS origin/proxy route for the destination. Do not overwrite the source's
+reverse-proxy or Tailscale forwarding route. Complete the destination's disposable
+administrator setup, then use the encrypted
+[full-instance workflow](INSTANCE-BACKUP.md) to migrate. The confirmation must show
+`dagsverk` as the actual destination identity. The original package can remain
+installed and running; only stop/restart the destination during activation.
+
+These builds are preview packages until the required real-NAS acceptance is
+recorded. Changing identity does not bypass image provenance, native dependency,
+archive compatibility or stable-promotion checks. The bundled guides identify the
+package they address and use that package's operational paths.
+
 ## Installation flow
 
 Install SynoCommunity PostgreSQL and Synology Container Manager first. Native
