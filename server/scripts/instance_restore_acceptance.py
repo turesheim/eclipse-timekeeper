@@ -161,12 +161,16 @@ def main():
         verify_http_recovery(app, cancelled_fixture, environment, restored=False)
         verify_public_restore(ROOT, app, stage / 'public-fixture', fixture_classpath,
                               {key: value for key, value in environment.items() if not key.startswith('TIMEKEEPER_')})
+        for name, origin in [('same-rp', 'https://source.example'), ('changed-rp', 'https://destination.example')]:
+            verify_public_restore(ROOT, app, stage / name, fixture_classpath,
+                                  {key: value for key, value in environment.items() if not key.startswith('TIMEKEEPER_')},
+                                  deployment_origin=origin)
         evidence = {'sourceCommit': manifest['commit'], 'distributionSha256': digest,
-                    'packagedRuntimeOnly': True, 'automaticPreboot': True, 'restoredPasswordLogin': True, 'restoredClientRead': True, 'httpRestart': True, 'missingMaterialRejectedBeforeHttp': True, 'fileBackedCredentials': True, 'completedRetry': True, 'plaintextStagingRemoved': True, 'offlineCancellation': True, 'cancelledStartup': True, 'publicStageConfirm': True, 'restoredJournalLabelAsset': True, 'sourceArchiveUnchanged': True}
+                    'packagedRuntimeOnly': True, 'automaticPreboot': True, 'restoredPasswordLogin': True, 'restoredClientRead': True, 'httpRestart': True, 'missingMaterialRejectedBeforeHttp': True, 'fileBackedCredentials': True, 'completedRetry': True, 'plaintextStagingRemoved': True, 'offlineCancellation': True, 'cancelledStartup': True, 'publicStageConfirm': True, 'restoredJournalLabelAsset': True, 'sourceArchiveUnchanged': True, 'sameRpSignedPasskeyLogin': True, 'changedRpRejectsOriginalCredential': True, 'changedRpPasswordReenrollment': True}
         output = ROOT / 'server/target/acceptance'
         output.mkdir(parents=True, exist_ok=True)
         (output / 'instance-restore.json').write_text(json.dumps(evidence, indent=2) + '\n')
-        print('Packaged automatic restore, authenticated HTTP restart, offline cancellation, and cancelled startup passed.')
+        print('Packaged automatic restore, authenticated restart, signed passkey preservation and reenrollment, and offline cancellation passed.')
 
 
 if __name__ == '__main__':

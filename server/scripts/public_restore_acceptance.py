@@ -1,4 +1,10 @@
-"""Public restore protocol on the actual packaged JVM; disposable test data only."""
+"""Public restore protocol on the actual packaged JVM; disposable test data only.
+
+Signed passkey tests model a TLS proxy forwarding canonical Origin and Secure
+cookies to the loopback backend. HTTPS/browser interoperability has separate tests.
+The authenticator private key is fixture-side only and never enters the archive.
+"""
+import base64
 import hashlib
 import json
 import socket
@@ -9,8 +15,10 @@ import urllib.request
 import urllib.error
 from http.cookies import SimpleCookie
 
+from passkey_replica_acceptance import Authenticator
 
-def verify_public_restore(root, app, fixture, fixture_classpath, environment):
+
+def verify_public_restore(root, app, fixture, fixture_classpath, environment, *, deployment_origin="NONE"):
     fixture.mkdir(mode=0o700)
     prepared = subprocess.run(['java', '-cp', fixture_classpath,
                               'net.resheim.timekeeper.server.InstanceRestorePublicFixture', str(fixture)],
@@ -20,12 +28,19 @@ def verify_public_restore(root, app, fixture, fixture_classpath, environment):
     environment = dict(environment, TIMEKEEPER_SERVER_DB_PASSWORD_FILE=str(fixture / 'database-secret'))
     archive = (fixture / 'source.tkbackup').read_bytes()
     source_digest = hashlib.sha256(archive).hexdigest()
+    credential = json.loads((fixture / 'authenticator.json').read_text())
+    authenticator = Authenticator.__new__(Authenticator)
+    authenticator.credential = base64.urlsafe_b64decode(credential['credential'] + '=' * (-len(credential['credential']) % 4))
+    authenticator.handle = credential['handle']
+    authenticator.rp = credential['rp']
+    authenticator.private = fixture / 'authenticator.pem'
     operation = None
     for restoring in (True, False):
         with socket.socket() as listener:
             listener.bind(('127.0.0.1', 0))
             port = listener.getsockname()[1]
-        origin = 'http://127.0.0.1:' + str(port)
+        base = 'http://127.0.0.1:' + str(port)
+        origin = base if restoring or deployment_origin == 'NONE' else deployment_origin
         cookie = ''
         csrf = ''
         owner = ''
@@ -40,7 +55,7 @@ def verify_public_restore(root, app, fixture, fixture_classpath, environment):
                 headers['Content-Type'] = 'application/octet-stream' if binary else 'application/json'
                 if not binary:
                     data = json.dumps(data).encode()
-            request = urllib.request.Request(origin + '/api/v1' + path, data=data, headers=headers, method=method)
+            request = urllib.request.Request(base + '/api/v1' + path, data=data, headers=headers, method=method)
             with urllib.request.urlopen(request, timeout=45) as response:
                 cookies = SimpleCookie()
                 for header in response.headers.get_all('Set-Cookie', []):
@@ -66,7 +81,7 @@ def verify_public_restore(root, app, fixture, fixture_classpath, environment):
                     if process.poll() is not None:
                         raise ValueError('Public restore server exited before readiness')
                     try:
-                        with urllib.request.urlopen(origin + '/q/health/ready', timeout=2) as response:
+                        with urllib.request.urlopen(base + '/q/health/ready', timeout=2) as response:
                             if response.status == 200:
                                 break
                     except (urllib.error.URLError, TimeoutError):
@@ -74,6 +89,7 @@ def verify_public_restore(root, app, fixture, fixture_classpath, environment):
                     if time.monotonic() > deadline:
                         raise ValueError('Public restore server did not become ready')
                     time.sleep(0.25)
+                api('GET', '/auth/status')
                 if restoring:
                     api('POST', '/auth/setup', {'code': (fixture / 'setup-code').read_text(), 'username': 'destination-admin',
                                               'password': 'Disposable public destination password', 'displayName': 'Destination administrator', 'email': 'destination@example.org'})
@@ -91,7 +107,7 @@ def verify_public_restore(root, app, fixture, fixture_classpath, environment):
                     stage = api('GET', path + '/staging')
                     api('POST', path + '/staging', {'currentPassword': 'Disposable public destination password',
                         'passphrase': 'Public fixture archive passphrase', 'operationVersion': stage['operationVersion'],
-                        'publicOrigin': 'NONE', 'passkeyRpId': 'AUTO', 'passkeysEnabled': False})
+                        'publicOrigin': deployment_origin, 'passkeyRpId': 'AUTO', 'passkeysEnabled': deployment_origin != 'NONE'})
                     deadline = time.monotonic() + 60
                     while True:
                         stage = api('GET', path + '/staging')
@@ -128,6 +144,43 @@ def verify_public_restore(root, app, fixture, fixture_classpath, environment):
                         raise ValueError('Restored API token did not retain its access and owner binding')
                     if api('GET', '/journal-assets/restored.txt') != 'Restored attachment bytes æ\n'.encode():
                         raise ValueError('Public restore did not preserve exact journal attachment bytes')
+                    if deployment_origin != 'NONE':
+                        keys = api('GET', '/auth/passkeys')['items']
+                        if (len(keys) != 1 or keys[0]['rpId'] != authenticator.rp
+                                or keys[0]['id'] != '44444444-4444-4444-4444-444444444444'
+                                or keys[0]['version'] != 6
+                                or keys[0]['usableHere'] != (deployment_origin == 'https://source.example')):
+                            raise ValueError('Restore changed the original passkey RP binding')
+                        original_owner = owner
+                        # A fresh browser binding is required for each sign-in;
+                        # replaying an imported or bootstrap session is forbidden.
+                        cookie = csrf = owner = ''
+                        api('GET', '/auth/status')
+                        options = api('POST', '/auth/passkeys/login/options', {'remember': False})
+                        assertion = authenticator.assertion(options, origin)
+                        if deployment_origin == 'https://source.example':
+                            api('POST', '/auth/passkeys/login/finish', assertion)
+                            if owner != original_owner:
+                                raise ValueError('Same-RP restored passkey changed account ownership')
+                            api('GET', '/clients')
+                        else:
+                            try:
+                                api('POST', '/auth/passkeys/login/finish', assertion)
+                                raise ValueError('Changed-RP restore accepted the original RP credential')
+                            except urllib.error.HTTPError as rejected:
+                                if rejected.code != 401:
+                                    raise
+                            api('POST', '/auth/login', {'username': 'user-a', 'password': 'Preserved archive account password', 'remember': False})
+                            replacement = Authenticator(fixture)
+                            options = api('POST', '/auth/passkeys/register/options', {'name': 'Re-enrolled destination credential', 'currentPassword': 'Preserved archive account password'})
+                            api('POST', '/auth/passkeys/register/finish', replacement.registration(options, origin))
+                            cookie = csrf = owner = ''
+                            api('GET', '/auth/status')
+                            options = api('POST', '/auth/passkeys/login/options', {'remember': False})
+                            api('POST', '/auth/passkeys/login/finish', replacement.assertion(options, origin))
+                            if owner != original_owner:
+                                raise ValueError('Re-enrolled destination passkey changed account ownership')
+                            api('GET', '/clients')
             finally:
                 process.terminate()
                 try:

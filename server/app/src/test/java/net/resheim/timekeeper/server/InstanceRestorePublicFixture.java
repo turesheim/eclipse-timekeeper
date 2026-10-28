@@ -15,6 +15,14 @@ public final class InstanceRestorePublicFixture {
         Path root=Path.of(args[0]);
         try(var source=InstanceDatabaseImageTest.database();var configuration=InstanceConfiguration.capture(InstanceConfigurationTest.base(),Map.of())) {
             InstanceAuthenticationPreflightTest.seed(source);
+            // Keep the disposable authenticator outside the archive, as a real
+            // user's authenticator would be. Acceptance signs fresh challenges.
+            var authenticator=new WebAuthnProtocolTest.Authenticator("Public restored credential");
+            String handle=AccountPasswords.secret();
+            execute(source,"UPDATE tk_passkey_user SET user_handle=?",handle);
+            execute(source,"UPDATE tk_passkey_credential SET credential_digest=?,credential_id=?,public_key=?,signature_count=0,backed_up=TRUE",hash(authenticator.id.getBase64Url()),authenticator.id.getBase64Url(),authenticator.cose.getBase64Url());
+            privateText(root.resolve("authenticator.pem"),"-----BEGIN PRIVATE KEY-----\n"+Base64.getMimeEncoder(64,new byte[]{10}).encodeToString(authenticator.key.getPrivate().getEncoded())+"\n-----END PRIVATE KEY-----\n");
+            privateText(root.resolve("authenticator.json"),object().put("credential",authenticator.id.getBase64Url()).put("handle",handle).put("rp","source.example").toString());
             for(String table:List.of("tk_relation","tk_external_reference","tk_active","tk_resource","tk_receipt","tk_change"))execute(source,"DELETE FROM "+table);
             UUID client=UUID.fromString("11111111-1111-4111-8111-111111111111");
             execute(source,"INSERT INTO tk_resource VALUES('a','CLIENT',?,17,?)",client,object().put("id",client.toString()).put("ownerId","a").put("version",17).put("name","Restored client æ").put("color","#123456").toString());
