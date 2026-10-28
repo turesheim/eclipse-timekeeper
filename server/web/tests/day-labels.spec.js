@@ -13,8 +13,8 @@ for(const view of ['today','track','week'])for(const mode of ['Formatted','Markd
  await editor.getByRole('button',{name:mode,exact:true}).click();
  const body=mode==='Formatted'?editor.locator('.ProseMirror'):editor.locator('textarea');await expect(body).toBeVisible();await body.click();await page.keyboard.press('ControlOrMeta+A');await page.keyboard.press('Backspace');
  await expect(field).toHaveValue(label);
- const sent=page.waitForRequest(r=>r.method()==='POST'&&r.url().endsWith('/day-entries/'+date));await editor.getByRole('button',{name:'Save',exact:true}).click();const input=(await sent).postDataJSON();expect(input).not.toHaveProperty('text');expect(input).not.toHaveProperty('labelVersion');expect(input).toHaveProperty('noteVersion');
- await expect.poll(async()=>{const response=await read();return(await response.json()).text;}).toBe(label);
+ const sent=page.waitForRequest(r=>r.method()==='POST'&&r.url().endsWith('/day-entries/'+date));await editor.getByRole('button',{name:'Save',exact:true}).click();const input=(await sent).postDataJSON();expect(input).not.toHaveProperty('text');expect(input).not.toHaveProperty('labelVersion');expect(input).toHaveProperty('noteVersion');expect(input.body).toBe('');
+ await expect.poll(async()=>{const response=await read();return(await response.json()).body;}).toBe('');
  current=await read();const note=await current.json();expect(note.deleted).toBe(false);expect(note.body).toBe('');
  const list=await request.get('/api/v1/day-notes?fromDate='+date+'&toDate='+date,{headers});expect((await list.json()).items[0].text).toBe(label);
  if(view==='track')await page.locator('[data-track-note-date="'+date+'"]').click();
