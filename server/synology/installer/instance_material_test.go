@@ -87,7 +87,7 @@ func TestNativeMaterialInventoryAndRecoveryPreserveOnlyActiveImmutableFiles(t *t
 }
 
 func TestNativeMaterialRejectsTamperingPermissionsLinksAndUnexpectedInputs(t *testing.T) {
-	for _, kind := range []string{"bytes", "permissions", "symlink", "hardlink", "unknown", "traversal", "digest"} {
+	for _, kind := range []string{"bytes", "permissions", "symlink", "hardlink", "unknown", "traversal", "digest", "duplicate"} {
 		t.Run(kind, func(t *testing.T) {
 			root := t.TempDir()
 			material := fixtureNativeMaterial(t, root)
@@ -105,6 +105,23 @@ func TestNativeMaterialRejectsTamperingPermissionsLinksAndUnexpectedInputs(t *te
 				}
 			case "hardlink":
 				if err := os.Link(path, filepath.Join(root, "link")); err != nil {
+					t.Fatal(err)
+				}
+			case "duplicate":
+				path := filepath.Join(directory, "material.json")
+				content, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				content = append([]byte(`{"format":"untrusted",`), content[1:]...)
+				if err = os.WriteFile(path, content, 0600); err != nil {
+					t.Fatal(err)
+				}
+				digest, err := fileDigest(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err = writeJSON(filepath.Join(root, "instance-restore/active.json"), materialPointer{materialFormat, material.Generation, digest}, 0600); err != nil {
 					t.Fatal(err)
 				}
 			case "digest":
