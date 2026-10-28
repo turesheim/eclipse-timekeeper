@@ -46,7 +46,7 @@ async function manage(page){
 async function tracking(page){await page.locator('a[href="#tracking"]').click();await expect(page.locator('#workspace')).toBeVisible();}
 async function expectClientIndicator(page,item){
   const expected=await page.evaluate(()=>{
-    const reference=document.createElement('div');reference.className='track-client-day';reference.style.setProperty('--client-color','#176653');document.body.append(reference);
+    const reference=document.createElement('div');reference.className='calendar-summary-card track-client-day';reference.style.setProperty('--client-color','#176653');document.body.append(reference);
     const style=getComputedStyle(reference),values=Object.fromEntries(['background-color','color','border-inline-start-color','border-inline-start-width','border-inline-start-style'].map(property=>[property,style.getPropertyValue(property)]));reference.remove();return values;
   });
   for(const [property,value]of Object.entries(expected))await expect(item).toHaveCSS(property,value);

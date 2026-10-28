@@ -4,17 +4,19 @@ import AxeBuilder from '@axe-core/playwright';
 import {captureScreenshot} from './screenshots.js';
 
 const token=process.env.TIMEKEEPER_WEB_TOKEN;
+const CARD_STYLE_PROPERTIES=['fontFamily','fontSize','fontWeight','lineHeight','paddingTop','paddingRight','paddingBottom','paddingLeft','borderRadius','borderInlineStartWidth'];
+const CARD_TITLE_STYLE_PROPERTIES=['fontSize','fontWeight','lineHeight','whiteSpace','textOverflow','overflow'];
 async function api(request,method,path,data,headers={}){
   const response=await request.fetch('/api/v1'+path,{method,data,headers:{Authorization:`Bearer ${token}`,...headers}});
   expect(response.ok(),`${method} ${path}: ${response.status()}`).toBe(true);return response;
 }
 
 test('Today shows the selected journal, mini calendar, work sessions and imported all-day plans',async({page,request})=>{
-  const original=await(await api(request,'GET','/me')).json(),date='2025-05-17',next='2025-05-18';
+  const original=await(await api(request,'GET','/me')).json(),date='2025-05-17',next='2025-05-18',meetingTitle='Team meeting with a deliberately long calendar event title for truncation';
   let client,project,session,secondSession,task;
   try{
     const profile=await api(request,'GET','/me');await api(request,'PUT','/me',{zoneId:'Europe/Oslo'},{'If-Match':profile.headers().etag});
-    client=await(await api(request,'POST','/clients',{name:'Today client '+randomUUID().slice(0,8),color:'#176653'})).json();
+    client=await(await api(request,'POST','/clients',{name:'Domstoladministrasjonen with a deliberately long client name '+randomUUID().slice(0,8),color:'#176653'})).json();
     project=await(await api(request,'POST','/projects',{name:'Today project',clientId:client.id,icon:'code'})).json();
     task=await(await api(request,'POST','/tasks',{summary:'Scheduled review',projectId:null,parentTaskId:null,url:null})).json();
     session=await(await api(request,'POST','/work-sessions',{clientId:client.id,projectId:null,summary:'Today review',start:'2025-05-17T08:00:00Z',end:'2025-05-17T09:30:00Z'})).json();
@@ -25,7 +27,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     });
     await page.route('**/api/v1/calendar-events?**',async route=>{
       const response=await route.fetch(),body=await response.json(),from=new URL(route.request().url()).searchParams.get('fromDate');
-      await route.fulfill({response,json:{...body,items:from===date?[{key:'today-plan',subscriptionId:randomUUID(),eventVersion:1,title:'All-day planning',description:'From an imported calendar',allDay:true,firstDate:date,endDate:next,clientName:client.name,calendarName:'Team plan',clientId:client.id,activityIds:[]},{key:'today-meeting',subscriptionId:randomUUID(),eventVersion:1,title:'Team meeting',description:'Timed calendar event',location:'Meeting room A',allDay:false,start:'2025-05-17T12:00:00Z',end:'2025-05-17T13:00:00Z',firstDate:date,endDate:next,clientName:client.name,calendarName:'Team plan',clientId:client.id,activityIds:[]}]:[]}});
+      await route.fulfill({response,json:{...body,items:from===date?[{key:'today-plan',subscriptionId:randomUUID(),eventVersion:1,title:'All-day planning',description:'From an imported calendar',allDay:true,firstDate:date,endDate:next,clientName:client.name,calendarName:'Team plan',clientId:client.id,activityIds:[]},{key:'today-meeting',subscriptionId:randomUUID(),eventVersion:1,title:meetingTitle,description:'Timed calendar event',location:'Meeting room A',allDay:false,start:'2025-05-17T12:00:00Z',end:'2025-05-17T13:00:00Z',firstDate:date,endDate:next,clientName:client.name,calendarName:'Team plan',clientId:client.id,activityIds:[]}]:[]}});
     });
     await page.goto('/web/');await page.locator('#auth-mode').selectOption('token');await page.locator('#token').fill(token);
     await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.locator('#status')).toHaveText('Up to date');
@@ -57,7 +59,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(meeting).toContainText(client.name);
     await expect(meeting).toHaveCSS('border-left-color','rgb(23, 102, 83)');
     await meeting.focus();await page.keyboard.press('Enter');
-    const eventDetails=page.getByRole('dialog',{name:'Team meeting',exact:true});
+    const eventDetails=page.getByRole('dialog',{name:meetingTitle,exact:true});
     await expect(eventDetails).toBeVisible();await expect(eventDetails).toContainText('Team plan');
     await expect(eventDetails).toContainText('Meeting room A');await expect(eventDetails).toContainText('Timed calendar event');
     await page.keyboard.press('Escape');await expect(eventDetails).not.toBeVisible();await expect(meeting).toBeFocused();
@@ -65,6 +67,27 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(page.locator('#today-event-details')).toContainText('From an imported calendar');
     await expect(page.locator('#today-event-details')).toContainText('All day');
     await page.locator('#today-event-details').getByRole('button',{name:'Close',exact:true}).click();
+    const cardStyle=locator=>locator.evaluate((card,{cardProperties,titleProperties})=>{
+      const styles=getComputedStyle(card),title=getComputedStyle(card.querySelector('strong'));
+      return Object.fromEntries(cardProperties.map(key=>[key,styles[key]]).concat(titleProperties.map(key=>['title.'+key,title[key]])));
+    },{cardProperties:CARD_STYLE_PROPERTIES,titleProperties:CARD_TITLE_STYLE_PROPERTIES});
+    for(const width of [1440,390]){
+      await page.setViewportSize({width,height:1000});
+      const sessionCard=page.locator('#today-sessions [data-today-client]'),eventCard=page.locator('[data-today-event="today-meeting"]');
+      const sessionStyle=await cardStyle(sessionCard),eventStyle=await cardStyle(eventCard);
+      for(const card of [sessionCard,eventCard]){
+        await expect(card.locator('strong')).toHaveCSS('white-space','nowrap');await expect(card.locator('strong')).toHaveCSS('text-overflow','ellipsis');
+        expect(await card.locator('strong').evaluate(title=>title.scrollWidth>title.clientWidth)).toBe(true);
+        expect(await card.locator('strong').evaluate(title=>title.getBoundingClientRect().height<=parseFloat(getComputedStyle(title).lineHeight)+1)).toBe(true);
+      }
+      await expect(sessionCard).toHaveAttribute('title',new RegExp(client.name));await expect(eventCard).toHaveAttribute('title',new RegExp(meetingTitle));
+      await expect(eventCard.locator('.calendar-summary-time')).toBeVisible();
+      await page.locator('[data-tab=track]').click();await page.getByLabel('Month',{exact:true}).fill('2025-05');
+      const calendarCard=page.locator(`[data-track-date="${date}"] [data-track-daily-client="${client.id}"]`);await expect(calendarCard).toBeAttached();
+      const calendarStyle=await cardStyle(calendarCard);expect(sessionStyle).toEqual(calendarStyle);expect(eventStyle).toEqual(calendarStyle);
+      await page.locator('[data-tab=today]').click();await expect(page.locator('#today-date')).toHaveValue(date);
+    }
+    await page.setViewportSize({width:1440,height:1200});
     await expect(page.locator('#today-sessions [data-today-client]')).toHaveCSS('font-size','12.8px');
     await expect(page.locator('#today-planned-tasks')).toContainText('Scheduled review');
     await expect(page.locator('#today-active-tasks')).toHaveCount(0);
