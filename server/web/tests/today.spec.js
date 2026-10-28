@@ -38,6 +38,13 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     expect((await page.locator('.today-date-field').boundingBox()).width).toBeLessThan(180);
     expect(await page.locator('.today-toolbar').evaluate(toolbar=>{const heading=toolbar.querySelector('.track-heading').getBoundingClientRect(),controls=toolbar.querySelector('.track-controls').getBoundingClientRect();return Math.abs(heading.y+heading.height/2-controls.y-controls.height/2);})).toBeLessThan(2);
     await expect(page.locator('#today-note-title')).toHaveClass(/visually-hidden/);
+    const dayLabel=page.locator('#today-day-label');
+    await expect(dayLabel.getByLabel('Day label',{exact:true})).toBeEnabled();
+    await expect(page.locator('#today-note-editor #today-note-text')).toHaveCount(0);
+    expect(await dayLabel.locator('input').evaluate(input=>input.form?.id)).toBe('today-note-form');
+    const toolbar=page.locator('#today-note-editor').getByRole('toolbar',{name:'Formatting',exact:true});
+    await expect(toolbar).toHaveClass(/btn-toolbar/);await expect(toolbar.locator('.btn-group')).toHaveCount(2);
+    await expect(page.locator('#today-journal-formatted')).toHaveCSS('border-top-width','0px');
     await expect(page.locator('#today-date-choose')).toHaveAccessibleName('Choose date');
     await expect(page.locator('#today-previous')).toHaveAccessibleName('Previous day');
     await expect(page.locator('#today-current')).toHaveAccessibleName('Today');
@@ -87,6 +94,12 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
       const calendarStyle=await cardStyle(calendarCard);expect(sessionStyle).toEqual(calendarStyle);expect(eventStyle).toEqual(calendarStyle);
       await page.locator('[data-tab=today]').click();await expect(page.locator('#today-date')).toHaveValue(date);
     }
+    for(const width of [1440,768,390]){
+      await page.setViewportSize({width,height:1200});
+      const position=await page.locator('.today-calendar').evaluate(root=>{const calendar=root.querySelector('.today-month').getBoundingClientRect(),label=root.querySelector('#today-day-label').getBoundingClientRect();return {gap:label.top-calendar.bottom,offset:label.left-calendar.left};});
+      expect(position.gap).toBeGreaterThan(0);expect(Math.abs(position.offset)).toBeLessThan(1);
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    }
     await page.setViewportSize({width:1440,height:1200});
     await expect(page.locator('#today-sessions [data-today-client]')).toHaveCSS('font-size','12.8px');
     await expect(page.locator('#today-planned-tasks')).toContainText('Scheduled review');
@@ -113,6 +126,10 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(page.locator('#today-note-editor')).toContainText('Saved');
     const saved=await(await api(request,'GET','/day-notes/'+date)).json();expect(saved.text).toBe('Review day');expect(saved.body).toContain('Plan the release.');
     await expect(page.locator('#today-month-grid [data-date="2025-05-17"] .today-month-dot')).toHaveCount(1);
+    await dayLabel.getByLabel('Day label',{exact:true}).fill('Sidebar label');await page.locator('#today-note-text').press('Enter');
+    await expect(page.locator('#today-note-editor')).toContainText('Saved');
+    expect((await(await api(request,'GET','/day-labels/'+date)).json()).text).toBe('Sidebar label');
+    expect((await(await api(request,'GET','/day-notes/'+date+'/content')).json()).body).toContain('Plan the release.');
     await page.locator('#today-note-text').fill('Unsaved change');
     page.once('dialog',dialog=>dialog.dismiss());
     await page.locator('#today-next').click();await expect(page.locator('#today-date')).toHaveValue(date);
@@ -126,7 +143,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(page.locator('#today-planned-tasks')).toContainText('No tasks planned for this day');
     await expect(page.locator('#today-events')).toContainText('No calendar events');
     await page.locator('#today-month-grid [data-date="2025-05-17"]').click();await expect(page.locator('#today-date')).toHaveValue(date);
-    await expect(page.locator('#today-note-text')).toHaveValue('Review day');
+    await expect(page.locator('#today-note-text')).toHaveValue('Sidebar label');
     await page.evaluate(()=>window.scrollTo(0,50));
     await page.setViewportSize({width:1440,height:1200});await page.evaluate(()=>window.scrollTo(0,0));
     await expect.poll(()=>page.evaluate(()=>document.querySelector('#workspace-navigation').getBoundingClientRect().top-document.querySelector('#today-note-editor').getBoundingClientRect().bottom)).toBeLessThan(24);

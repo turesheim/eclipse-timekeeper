@@ -18,12 +18,12 @@ async function loadEngine(){if(!engine)engine=await import('./assets/milkdown/mi
 export class MarkdownField {
   constructor(root,onChange,onState,prefix='journal',onUpload){
     Object.assign(this,{root,onChange,onState,onUpload,generation:0,readOnly:true});root.classList.add('markdown-editor');
-    this.modes=node('div',undefined,'markdown-modes');this.modes.setAttribute('role','group');this.modes.setAttribute('aria-label',t('markdown.mode'));
+    this.modes=node('div',undefined,'btn-group markdown-modes');this.modes.setAttribute('role','group');this.modes.setAttribute('aria-label',t('markdown.mode'));
     this.formatted=iconButton(button(),'file-richtext',t('markdown.formatted'));this.source=iconButton(button(),'markdown',t('markdown.source'));this.modes.append(this.formatted,this.source);
     this.status=node('p','','hint');this.status.setAttribute('role','status');
     this.normalization=node('p',t('journal.normalization'),'hint');this.normalization.id=prefix+'-markdown-normalization';
     this.metadata=node('details');this.metadata.hidden=true;this.frontmatterView=node('pre');this.metadata.append(node('summary',t('markdown.metadata')),this.frontmatterView);
-    this.tools=node('div',undefined,'markdown-tools');this.tools.setAttribute('role','group');this.tools.setAttribute('aria-label',t('markdown.formatting'));
+    this.tools=node('div',undefined,'btn-group markdown-tools');this.tools.setAttribute('role','group');this.tools.setAttribute('aria-label',t('markdown.formatting'));
     this.blockTrigger=iconButton(button(),'paragraph',t('markdown.block_style'));this.blockTrigger.classList.add('markdown-block-trigger');
     this.blockTrigger.setAttribute('aria-haspopup','menu');this.blockTrigger.setAttribute('aria-expanded','false');this.blockTrigger.setAttribute('aria-controls',prefix+'-block-menu');
     this.blockMenu=node('div',undefined,'dropdown-menu markdown-block-menu shadow');this.blockMenu.id=prefix+'-block-menu';this.blockMenu.popover='auto';this.blockMenu.setAttribute('role','menu');this.blockMenu.setAttribute('aria-label',t('markdown.block_style'));
@@ -76,7 +76,7 @@ export class MarkdownField {
     this.plain=node('div',undefined,'journal-source');const label=node('label',t('markdown.body'),'form-label');label.htmlFor=prefix+'-body';
     this.text=node('textarea',undefined,'form-control');this.text.id=prefix+'-body';this.text.rows=14;this.text.spellcheck=false;this.plain.append(label,this.text);
     this.formatted.setAttribute('aria-controls',this.rich.id);this.source.setAttribute('aria-controls',this.text.id);
-    this.toolbar=node('div',undefined,'markdown-toolbar');this.separator=node('span',undefined,'markdown-toolbar-separator');this.separator.setAttribute('role','separator');this.separator.setAttribute('aria-orientation','vertical');this.toolbar.append(this.modes,this.separator,this.tools);
+    this.toolbar=node('div',undefined,'btn-toolbar flex-nowrap align-items-center gap-2 markdown-toolbar');this.toolbar.setAttribute('role','toolbar');this.toolbar.setAttribute('aria-label',t('markdown.formatting'));this.separator=node('span',undefined,'markdown-toolbar-separator');this.separator.setAttribute('role','separator');this.separator.setAttribute('aria-orientation','vertical');this.toolbar.append(this.modes,this.separator,this.tools);
     root.append(this.metadata,this.toolbar,this.normalization,this.status,this.rich,this.plain,this.imagePicker,this.attachmentPicker,this.blockMenu);
     this.source.addEventListener('click',()=>void this.showSource());this.formatted.addEventListener('click',()=>void this.showFormatted());
     this.text.addEventListener('input',()=>{this.unterminated=false;this.status.textContent='';this.onChange();});this.clear();
@@ -137,6 +137,7 @@ export class MarkdownField {
     if(!formatted)this.closeBlockMenu();
     this.rich.hidden=!formatted;this.tools.hidden=!formatted;this.separator.hidden=!formatted;this.plain.hidden=formatted;
     this.normalization.hidden=!formatted||this.readOnly;
+    this.formatted.classList.toggle('active',formatted);this.source.classList.toggle('active',!formatted);
     this.formatted.setAttribute('aria-pressed',String(formatted));this.source.setAttribute('aria-pressed',String(!formatted));
   }
   clear(){

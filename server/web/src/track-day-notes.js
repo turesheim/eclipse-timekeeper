@@ -14,8 +14,8 @@ export class TrackDayNotes {
     this.status=node('p',undefined,'hint '+this.prefix+'-note-status');this.status.setAttribute('role','status');this.message=node('span');
     this.retry=button(t('ui.retry'),'btn btn-link btn-sm');this.retry.hidden=true;this.retry.addEventListener('click',()=>{this.key=null;this.load();});this.status.append(this.message,' ',this.retry);if(this.statusAnchor)this.statusAnchor.before(this.status);else grid.after(this.status);this.status.hidden=true;
     this.dialog=node(this.inline?'section':'dialog',undefined,this.inline?'card journal-inline':'app-dialog journal-dialog shadow-lg');this.dialog.id=this.prefix+'-note-editor';this.dialog.setAttribute('aria-labelledby',this.prefix+'-note-title');
-    this.form=node('form');this.title=node('h2');this.title.id=this.prefix+'-note-title';if(this.inline)this.title.classList.add('visually-hidden');
-    const label=node('label',t('day_notes.text'),'form-label');label.htmlFor=this.prefix+'-note-text';this.text=node('input',undefined,'form-control journal-note-label');this.text.id=this.prefix+'-note-text';this.text.maxLength=80;this.text.autocomplete='off';
+    this.form=node('form');this.form.id=this.prefix+'-note-form';this.title=node('h2');this.title.id=this.prefix+'-note-title';if(this.inline)this.title.classList.add('visually-hidden');
+    const label=node('label',t('day_notes.text'),'form-label');label.id=this.prefix+'-note-text-label';label.htmlFor=this.prefix+'-note-text';this.text=node('input',undefined,'form-control journal-note-label');this.text.id=this.prefix+'-note-text';this.text.maxLength=80;this.text.autocomplete='off';
     this.error=node('p','','alert alert-danger');this.error.setAttribute('role','alert');
     this.savedStatus=node('p','','hint');this.savedStatus.setAttribute('role','status');
     const markdown=node('div');this.markdown=new MarkdownField(markdown,()=>this.changed(),()=>this.controls(),
@@ -23,7 +23,9 @@ export class TrackDayNotes {
     this.reload=button(t('journal.reload'),'btn btn-outline-secondary');this.reload.addEventListener('click',()=>void this.reloadEditor());
     const actions=node('div',undefined,'dialog-actions');this.cancel=button(t('ui.cancel'),'btn btn-outline-secondary');this.delete=button(t('journal.delete_note'),'btn btn-outline-secondary');this.delete.addEventListener('click',()=>void this.deleteNote());this.save=button(t('ui.save'),'btn btn-primary');this.save.type='submit';actions.append(this.savedStatus,this.cancel,this.delete,this.save);
     this.recovery=node('div',undefined,'journal-recovery');this.recovery.append(this.reload);
-    this.content=node('div',undefined,'journal-content');this.content.append(this.title,label,this.text,this.error,markdown,this.recovery);this.form.append(this.content,actions);this.dialog.append(this.form);root.append(this.dialog);
+    this.content=node('div',undefined,'journal-content');this.content.append(this.title);
+    if(this.labelRoot){this.text.setAttribute('form',this.form.id);this.text.disabled=true;this.labelRoot.append(label,this.text);}else this.content.append(label,this.text);
+    this.content.append(this.error,markdown,this.recovery);this.form.append(this.content,actions);this.dialog.append(this.form);root.append(this.dialog);
     this.text.addEventListener('input',()=>this.changed());
     this.cancel.addEventListener('click',()=>this.requestClose());
     // Focus returns before the native close event is delivered. Release editor
@@ -52,7 +54,7 @@ export class TrackDayNotes {
   closeEditor(){if(!this.inline)this.dialog.close();this.finishEditor();}
   finishEditor(){
     if(!this.inline&&this.dialog.open)return;
-    const date=this.editor?.date,uncertain=this.editor?.uncertain;this.editor=null;this.text.value='';this.error.textContent='';this.savedStatus.textContent='';this.markdown.clear();
+    const date=this.editor?.date,uncertain=this.editor?.uncertain;this.editor=null;this.text.value='';if(this.labelRoot)this.text.disabled=true;this.error.textContent='';this.savedStatus.textContent='';this.markdown.clear();
     if(date)this.focusDate(date);
     if(uncertain&&this.session){this.key=null;this.load();}
   }
