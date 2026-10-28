@@ -168,9 +168,9 @@ class HttpAcceptance(unittest.TestCase):
         date='2026-11-08';label='/day-labels/'+date;note='/day-notes/'+date+'/content';path='/day-notes/'+date+'/history'
         initial,_=self.call('GET',path);current,headers=self.call('GET',label)
         label_text=self.prefix+' label'
-        self.call('PUT',label,{'text':label_text},headers={'If-Match':headers['ETag']})
+        self.call('PUT',label,body={'text':label_text},headers={'If-Match':headers['ETag']})
         current,headers=self.call('GET',note);body='PRIVATE_NOTE_BODY_'+str(uuid4())
-        _,saved=self.call('PUT',note,{'body':body},headers={'If-Match':headers['ETag']})
+        _,saved=self.call('PUT',note,body={'body':body},headers={'If-Match':headers['ETag']})
         self.call('DELETE',note,headers={'If-Match':saved['ETag']},status=204)
         page,headers=self.call('GET',path,owner='read')
         self.assertEqual('private, no-store',headers['Cache-Control'])
