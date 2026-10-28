@@ -202,7 +202,7 @@ def main():
             command('docker','exec',target,'test','-f','/var/packages/timekeeper/var/server/config/maintenance-pending.json')
             helper('cancel-empty-import')
             helper('import-postgresql18',native_archive)
-            compared=[table for table in exporter.tables(args.source_schema) if (table!='tk_schema' or args.source_schema==6) and (table!='tk_auth_session' or args.source_schema>=4)]
+            compared=[table for table in exporter.tables(args.source_schema) if (table!='tk_schema' or args.source_schema==9) and (table!='tk_auth_session' or args.source_schema>=4)]
             fingerprints=client('psql',['-X','-q','-A','-t'],sql='\n'.join(exporter.fingerprint_sql(table) for table in compared))
             actual=command('docker','exec','-i',target,'psql','-X','-q','-A','-t','-U','postgres','-p','5433','-d','timekeeper_fixture',input='\n'.join(exporter.fingerprint_sql(table) for table in compared)).stdout.strip()
             if actual!=fingerprints:raise AssertionError('Migration changed source data')
