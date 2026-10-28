@@ -15,6 +15,10 @@ class InstanceArtifactsTest {
     private static String digest(byte[] bytes) throws Exception {return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}
     private Path part(UUID id){return directory.resolve("private").resolve(id.toString()).resolve("input.part");}
     private static void opaque(IOException failure){assertNull(failure.getCause());assertFalse(failure.getMessage().contains("/"));}
+    @Test void storageRequiresAnExistingProvisionedParent() {
+        opaque(assertThrows(IOException.class,()->new InstanceArtifacts(directory.resolve("missing/parent/root"),8,16,2)));
+        assertFalse(Files.exists(directory.resolve("missing")));
+    }
     @Test void resumesAcrossInstancesAndRetriesAcknowledgedChunksWithoutDuplicatingData() throws Exception {
         var store=store();var id=UUID.randomUUID();byte[] bytes=new byte[2*InstanceArtifacts.CHUNK_BYTES+7];new Random(473).nextBytes(bytes);
         store.create(id,bytes.length,digest(bytes));

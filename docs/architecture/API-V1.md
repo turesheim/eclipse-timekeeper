@@ -866,3 +866,36 @@ recorded mutations. Source diagnostics in account archives remain inert audit
 copies on import; actual local restoration emits new `ARCHIVE_RESTORE` events.
 See [API diagnostics](../operations/API-DIAGNOSTICS.md) for a read-only workflow,
 privacy boundaries, portability and the coordinated schema-8 upgrade.
+
+### Administrator instance backup operations (in progress)
+
+Issue [#473](https://github.com/turesheim/eclipse-timekeeper/issues/473) is still
+being implemented. The current draft adds these routes under the separate
+`/api/v1/admin/instance` namespace:
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| POST | `/backups` | Verify `currentPassword`, consume an encryption `passphrase`, and return `202` with a durable operation receipt and its `Location`. |
+| GET | `/operations/{id}` | Return the operation's ID, type, state, version and UTC update time. |
+| POST | `/operations/{id}/discard` | Verify `currentPassword`, expire a completed artifact or restore review, and remove its private files. |
+
+Only current administrator browser-account sessions with write permission are
+authorized. Managed or legacy API tokens, token-exchanged browser sessions,
+regular users and read-only sessions cannot use these routes. Browser mutations
+require the normal same-origin and CSRF checks. Credential input schemas reject
+unknown fields; operation replies contain no contents, credentials, worker
+capabilities or filesystem paths. Replies use `Cache-Control: no-store`.
+
+The start call returns before snapshot completion. Its bounded background
+worker renews a ten-minute lease; concurrent starts are rejected. `READY` means
+the complete encrypted file is durably staged and the original administrator
+session has been checked again. Wrong or missing current credentials cannot
+create files. Revocation prevents publication. Failures retain a safe operation
+receipt and audit; a later authorized start removes abandoned working files.
+
+Encryption passphrases are not stored in operation or command receipts. These
+POST actions do not support automatic replay using `Idempotency-Key`; use the
+returned status URL instead of automatically resubmitting creation. A repeated
+discard can finish filesystem cleanup after its database receipt was committed.
+The current draft has no file-download, upload/review or restore-activation route
+yet. Those integrations and their operator workflows remain part of #473.

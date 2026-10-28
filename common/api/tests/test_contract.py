@@ -27,7 +27,18 @@ class ContractTest(unittest.TestCase):
         for schema in CONTRACT['components']['schemas'].values():
             Draft202012Validator.check_schema(schema)
 
-    def test_all_private_operations_require_token_and_permission(self):
+    def test_instance_operations_require_browser_proof_and_expose_only_status(self):
+        value = {'currentPassword':'current private credential','passphrase':'private encrypted backup phrase'}
+        self.assertTrue(validator('InstanceBackupCreateInput').is_valid(value))
+        self.assertFalse(validator('InstanceBackupCreateInput').is_valid({**value,'path':'/private/source'}))
+        self.assertFalse(validator('InstanceBackupCreateInput').is_valid({'passphrase':value['passphrase']}))
+        self.assertTrue(CONTRACT['components']['schemas']['InstanceBackupCreateInput']['properties']['passphrase']['writeOnly'])
+        self.assertEqual({'id','type','state','version','updatedAt'},set(CONTRACT['components']['schemas']['InstanceOperation']['properties']))
+        operation = CONTRACT['paths']['/admin/instance/backups']['post']
+        self.assertIn('202',operation['responses'])
+        self.assertIn({'$ref':'#/components/parameters/Csrf'},operation['parameters'])
+
+    def test_all_private_operations_require_authentication_and_permission(self):
         self.assertEqual([{'bearerAuth': []}, {'browserSession': []}], CONTRACT['security'])
         ids = []
         for path, item in CONTRACT['paths'].items():
@@ -41,7 +52,10 @@ class ContractTest(unittest.TestCase):
                             '/auth/passkeys/login/options', '/auth/passkeys/login/finish', '/auth/passkeys/cancel'):
                     self.assertEqual([], operation['security'])
                     continue
-                self.assertNotIn('security', operation)
+                if path.startswith('/admin/instance/'):
+                    self.assertEqual([{'browserSession': []}], operation['security'])
+                else:
+                    self.assertNotIn('security', operation)
                 self.assertEqual(('write' if path.startswith('/admin/') else 'read') if method == 'get' else ('read' if path in ('/auth/logout', '/auth/token-login') else 'write'),
                                  operation['x-required-permission'])
                 self.assertIn('401', operation['responses'])
@@ -533,6 +547,7 @@ class ContractTest(unittest.TestCase):
             'passkeyProofOptions', 'verifyPasskeyProof', 'renamePasskey', 'removePasskey',
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
+            'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact',
             'getAdministrationSettings', 'updateAdministrationSettings', 'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()

@@ -19,7 +19,7 @@ class InstanceAdministrator {
         @Override public String toString(){return "Private instance-operation authority";}
     }
     void require(TokenRegistry.Principal principal) {accounts.tx(c->{lock(c);check(c,principal);return null;});}
-    private void check(Connection connection,TokenRegistry.Principal principal) {
+    void check(Connection connection,TokenRegistry.Principal principal) {
         if(principal==null||!principal.kind().equals("SESSION")||!principal.permissions().contains("write"))throw new ApiFailure(403,"FORBIDDEN");
         accounts.guard(connection,principal);requireAdmin(connection,principal);
         if(!accountSession(connection,principal))throw new ApiFailure(403,"FORBIDDEN");

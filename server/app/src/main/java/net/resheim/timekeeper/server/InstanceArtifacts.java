@@ -24,7 +24,10 @@ final class InstanceArtifacts {
     InstanceArtifacts(Path root,long maximumBytes,long retainedBytes,int maximumJobs) throws IOException {
         if(maximumBytes<1||retainedBytes<maximumBytes||maximumJobs<1)throw invalid();
         this.root=root.toAbsolutePath().normalize();this.maximumBytes=maximumBytes;this.retainedBytes=retainedBytes;this.maximumJobs=maximumJobs;
-        try {Files.createDirectories(this.root,PosixFilePermissions.asFileAttribute(DIRECTORY));directory(this.root);identity=locked(this.root,this::loadIdentity);}
+        try {
+            if(!Files.exists(this.root,NOFOLLOW_LINKS))try{Files.createDirectory(this.root,PosixFilePermissions.asFileAttribute(DIRECTORY));}catch(FileAlreadyExistsException race){/* Another replica initialized it. */}
+            directory(this.root);identity=locked(this.root,this::loadIdentity);
+        }
         catch(IOException|RuntimeException failure){throw unavailable();}
     }
     UUID identity(){return identity;}
@@ -48,6 +51,29 @@ final class InstanceArtifacts {
             }catch(IOException failure){throw unavailable();}
             return null;
         });
+    }
+    /** Reserve capacity before any plaintext snapshot is written. */
+    Path reserveBackup(UUID id) throws IOException {
+        create(id,maximumBytes,"0".repeat(64));
+        return locked(job(id),()->{Path work=job(id).resolve("work");Files.createDirectory(work,PosixFilePermissions.asFileAttribute(DIRECTORY));sync(job(id));return work;});
+    }
+    /** Publish only a server-produced encrypted file from this job's working area. */
+    Upload publishBackup(UUID id,Path encrypted) throws IOException {
+        locked(job(id),()->{
+            Path job=job(id),work=job.resolve("work");directory(work);
+            if(!encrypted.toAbsolutePath().normalize().getParent().equals(work))throw invalid();file(encrypted);
+            try(var input=Files.newInputStream(encrypted,StandardOpenOption.READ,NOFOLLOW_LINKS)) {
+                if(!Arrays.equals(input.readNBytes(8),"TKIBK001".getBytes(java.nio.charset.StandardCharsets.US_ASCII)))throw invalid();
+            }
+            long length=Files.size(encrypted);if(length<40||length>maximumBytes)throw new IOException("INSTANCE_ARTIFACT_QUOTA");
+            var metadata=metadata(job);if(metadata.path("complete").asBoolean()||metadata.path("received").asLong()!=0)throw invalid();
+            String digest=sha256(encrypted);
+            try(var output=FileChannel.open(encrypted,StandardOpenOption.WRITE,NOFOLLOW_LINKS)){output.force(true);}
+            Files.move(encrypted,job.resolve("input.part"),StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);sync(job);
+            metadata.put("bytes",length).put("received",length).put("sha256",digest);save(job,metadata);
+            cleanWork(work);sync(job);return null;
+        });
+        return complete(id);
     }
     Upload status(UUID id) throws IOException {return locked(job(id),()->view(metadata(job(id))));}
     Upload append(UUID id,long offset,byte[] bytes) throws IOException {
@@ -98,20 +124,34 @@ final class InstanceArtifacts {
             locked(job,()->{
                 try(var paths=Files.list(job)) {
                     for(Path path:paths.toList()) {
+                        if(path.getFileName().toString().equals("work")){validateWork(path);continue;}
                         if(!Set.of(".lock","upload.json","input.part","archive.tki").contains(path.getFileName().toString())&&!path.getFileName().toString().matches("\\.receipt-[a-zA-Z0-9-]+"))throw unavailable();
                         file(path);
                     }
                 }
-                try(var paths=Files.list(job)){for(Path path:paths.toList())if(!path.getFileName().toString().equals(".lock"))Files.delete(path);}
+                try(var paths=Files.list(job)){for(Path path:paths.toList())if(!path.getFileName().toString().equals(".lock")) {
+                    if(path.getFileName().toString().equals("work"))cleanWork(path);else Files.delete(path);
+                }}
                 return null;
             });
             Files.delete(job.resolve(".lock"));Files.delete(job);sync(root);return null;
         });
     }
+    private static void validateWork(Path work) throws IOException {
+        directory(work);try(var paths=Files.walk(work)) {
+            for(Path path:paths.toList())if(Files.isDirectory(path,NOFOLLOW_LINKS))directory(path);else file(path);
+        }
+    }
+    private static void cleanWork(Path work) throws IOException {
+        validateWork(work);try(var paths=Files.walk(work)) {for(Path path:paths.sorted(Comparator.reverseOrder()).toList())Files.delete(path);}
+    }
     private UUID loadIdentity() throws IOException {
         Path marker=root.resolve(".identity");
         if(!Files.exists(marker,NOFOLLOW_LINKS)) {
             try(var paths=Files.list(root)){if(paths.anyMatch(path->!path.getFileName().toString().equals(".lock")))throw unavailable();}
+            // The configured parent must already exist. Persist its new root
+            // entry before publishing the identity used by database receipts.
+            sync(root.getParent());
             try(var output=createFile(marker)) {
                 var bytes=ByteBuffer.wrap((UUID.randomUUID()+"\n").getBytes(java.nio.charset.StandardCharsets.US_ASCII));while(bytes.hasRemaining())output.write(bytes);output.force(true);
             }

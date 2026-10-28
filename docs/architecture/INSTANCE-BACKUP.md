@@ -2,8 +2,9 @@
 
 This feature is being implemented for [#473](https://github.com/turesheim/eclipse-timekeeper/issues/473).
 The internal encrypted archive, configuration inventory, database-image and
-administrator-authority components exist. There is no administrator backup
-endpoint or restore UI yet. The acceptance criteria in the
+administrator-authority components exist. Administrator start/status/discard routes are integrated with durable backup
+jobs. Download, upload/review, restore activation and Administration UI remain
+unfinished. The acceptance criteria in the
 issue remain the delivery requirements; these foundations alone do not satisfy them.
 
 ## Encryption envelope
@@ -80,9 +81,39 @@ constructed from request data.
 installation, creates one encrypted archive from a repeatable-read transaction,
 then rechecks the original session and administrator role before publishing the
 result. Logout, password revocation or demotion prevents publication. Its
-passphrase array is cleared on success and failure. HTTP authorization, CSRF,
-operation receipts, download grants and audit handling still need integration;
-these service checks do not substitute for testing those routes.
+passphrase array is cleared on success and failure. Administrator start/status/discard HTTP routes enforce browser-only authority,
+CSRF and current password proof, with typed contract inputs and metadata-only
+replies. Download grants and restore routes still need integration.
+
+## Connected backup jobs and HTTP entry points
+
+`InstanceBackupJobs` owns asynchronous work, private working areas, publication,
+authorization rechecks and cleanup. The existing parent of the configured
+storage root must be provisioned first. The root entry is forced to disk before
+its identity is published. Capacity is reserved before a snapshot creates any
+plaintext ZIP. Each job stages under its UUID directory, so interrupted plaintext
+can be identified and removed without scanning unrelated temporary directories.
+Publication accepts only a private encrypted file from that working area, forces
+it before recording completion, and removes the working directory. Only then
+can a current, authorized worker transition its durable receipt to `READY`.
+
+A single bounded worker rejects overlapping starts rather than queuing another
+passphrase. The caller's array is cleared before returning its initial receipt;
+the worker owns and clears its copy. A separate renewal task checks the original
+account session and renews the lease every minute. Loss of authority or lease
+prevents publication. Failed work is marked `FAILED` when its lease still belongs
+to that worker, and all its files are removed. An expired lease remains available
+for interruption recovery. A subsequent authorized start records abandonment and
+cleans failed/interrupted/expired jobs before reserving more capacity. Audit
+records remain in the database.
+
+The administrator API starts a backup, returns status and discards a completed
+artifact. HTTP tests exercise real browser cookies and CSRF, reject wrong proof,
+unknown input fields, foreign origins, ordinary users, bearer tokens and
+token-exchanged sessions, and validate the status reply against OpenAPI. Internal
+archive reads also require fresh proof and recheck authorization and `READY`
+after their integrity check. Native browser download grants, upload/review and
+restore activation have not yet been exposed. See [API policy](API-V1.md).
 
 ## Durable operation records and schema 9
 
@@ -135,9 +166,9 @@ Existing store handles also reject a removed/replaced identity marker. A full
 restore must explicitly rebind this deployment-specific identity to the target
 root, interrupt source jobs, and retain audit records. Input files and existing
 backup downloads are transient operation artifacts, not recursively included
-in subsequent backups. The storage component does not authorize requests, make
-uploaded bytes trusted, validate archive semantics, or activate a restore. Its
-service, HTTP and recovery-cleanup integration remains in progress.
+in subsequent backups. The storage component itself does not authorize requests, make
+uploaded bytes trusted, validate archive semantics, or activate a restore. Its backup job service now supplies those authorization and recovery-cleanup
+boundaries; upload/download HTTP integration remains in progress.
 
 ## Complete database image
 
@@ -176,10 +207,11 @@ staging is damaged after preflight or an insertion fails.
 
 ## Verification and remaining integration
 
-The current local server reactor passes 343 application tests and the shared
+The current local server reactor passes 351 application tests and the shared
 module suites. The new checks include real-runtime configuration capture, complete archive integrity,
 unsafe/duplicate ZIP and JSON rejection, decompression budgets, scoped credential
-proof, revocation/configuration-change publication guards, randomized multi-segment encryption,
+proof, HTTP browser-only/CSRF boundaries, asynchronous backup lifecycle,
+revocation/configuration-change publication guards, randomized multi-segment encryption,
 failure cleanup, all-table credential fidelity, missing-state detection,
 concurrent snapshot consistency, operation leases and audit rollback, interrupted
 schema-9 upgrade recovery, and damage after validation with destination
@@ -187,8 +219,8 @@ rollback. A real PostgreSQL 17 fixture verifies H2 → PostgreSQL → H2 using
 byte-identical images, including Unicode and nanosecond timestamps. Both
 PostgreSQL CI jobs include these tests.
 
-Delivery still requires protected durable artifact storage and audit integration,
-HTTP upload/download and validation APIs, Administration UI,
+Delivery still requires native download grants and uploaded-archive validation APIs,
+Administration UI,
 exclusive restart-safe activation, semantic authentication/configuration validation,
 deployment and hostname remapping,
 Synology/Docker/standalone integration, full restored-access tests and operator
