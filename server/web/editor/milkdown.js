@@ -89,7 +89,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
       }},
       // Ordinary clicks edit text. A platform modifier opens only web links,
       // including authenticated journal attachments, without changing the draft.
-      handleClick:(_view,_pos,event)=>{
+      handleDOMEvents:{click:(_view,event)=>{
         const link=event.target.closest('a[href]');if(!link)return false;
         event.preventDefault();const href=link.getAttribute('href');
         if(event.button===0&&(event.metaKey||event.ctrlKey)&&safeLink(href)){
@@ -97,7 +97,7 @@ export async function createMarkdownEditor({root,value,label,taskLabel,escape,ch
           if(['http:','https:'].includes(url.protocol))window.open(url.href,'_blank','noopener,noreferrer');
         }
         return true;
-      },
+      }},
       // Prototype accepts pasted text only, so HTML/images cannot fetch remote
       // assets or introduce nodes outside the evaluated Markdown schema.
       handlePaste:(view,event)=>{const text=event.clipboardData?.getData('text/plain');if(text===undefined)return false;event.preventDefault();view.dispatch(view.state.tr.insertText(text));return true;},

@@ -96,8 +96,8 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     }
     for(const width of [1440,768,390]){
       await page.setViewportSize({width,height:1200});
-      const calendar=await page.locator('.today-month').boundingBox(),label=await dayLabel.boundingBox();
-      expect(label.y).toBeGreaterThan(calendar.y+calendar.height);expect(Math.abs(label.x-calendar.x)).toBeLessThan(1);
+      const position=await page.locator('.today-calendar').evaluate(root=>{const calendar=root.querySelector('.today-month').getBoundingClientRect(),label=root.querySelector('#today-day-label').getBoundingClientRect();return {gap:label.top-calendar.bottom,offset:label.left-calendar.left};});
+      expect(position.gap).toBeGreaterThan(0);expect(Math.abs(position.offset)).toBeLessThan(1);
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     }
     await page.setViewportSize({width:1440,height:1200});
