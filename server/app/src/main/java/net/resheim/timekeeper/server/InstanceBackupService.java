@@ -27,9 +27,10 @@ class InstanceBackupService {
             if(passphrase==null||passphrase.length<12||passphrase.length>1024)throw ApiFailure.validation();
             try(var configuration=InstanceConfiguration.captureRuntime()) {
                 try(var connection=datasource.getConnection()) {
-                    connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);connection.setAutoCommit(false);
+                    String backend=connection.getMetaData().getDatabaseProductName().equals("PostgreSQL")?"postgresql":"h2";
+                    connection.setTransactionIsolation(backend.equals("postgresql")?Connection.TRANSACTION_REPEATABLE_READ:Connection.TRANSACTION_SERIALIZABLE);connection.setAutoCommit(false);
                     try {
-                        var build=info.journalIdentity();String backend=connection.getMetaData().getDatabaseProductName().equals("PostgreSQL")?"postgresql":"h2";
+                        var build=info.journalIdentity();
                         var source=object().put("serverVersion",build.path("version").asText()).put("commit",build.path("commit").isTextual()?build.path("commit").asText():"unknown").put("databaseType",backend).put("packageId",packageId);
                         source.put("publicOrigin",origin.configured().equals("NONE")?null:origin.configured());
                         encrypted=InstanceBackupArchive.create(connection,configuration,source,passphrase,privateRoot);connection.commit();

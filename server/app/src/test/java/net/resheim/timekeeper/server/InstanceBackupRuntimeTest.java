@@ -22,7 +22,7 @@ class InstanceBackupRuntimeTest {
         try(var configuration=InstanceConfiguration.captureRuntime();var database=datasource.getConnection()) {
             assertEquals("h2",configuration.document().path("properties").path("quarkus.datasource.db-kind").asText());
             assertTrue(configuration.document().path("files").path("timekeeper.auth.tokens-file").size()>0);
-            database.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);database.setAutoCommit(false);
+            database.setTransactionIsolation(database.getMetaData().getDatabaseProductName().equals("PostgreSQL")?Connection.TRANSACTION_REPEATABLE_READ:Connection.TRANSACTION_SERIALIZABLE);database.setAutoCommit(false);
             var source=object().put("serverVersion","2.0.0-SNAPSHOT").put("commit","unknown").put("databaseType","h2").put("packageId","standalone").putNull("publicOrigin");
             Path encrypted=InstanceBackupArchive.create(database,configuration,source,passphrase,directory);database.commit();
             try(var verified=InstanceBackupArchive.open(encrypted,passphrase,directory,100_000_000)) {

@@ -49,10 +49,10 @@ final class InstanceDatabaseImage {
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
         .streamReadConstraints(StreamReadConstraints.builder().maxStringLength(128*1024*1024).build()).build();
 
-    /** Caller supplies one repeatable-read transaction covering every table. */
+    /** One cross-table snapshot: PostgreSQL repeatable-read, H2 serializable. */
     static void write(Connection snapshot,OutputStream output) throws SQLException,IOException {
-        if(snapshot.getAutoCommit()||!Set.of(Connection.TRANSACTION_REPEATABLE_READ,Connection.TRANSACTION_SERIALIZABLE).contains(snapshot.getTransactionIsolation()))
-            throw new SQLException("Instance snapshot requires repeatable read");
+        if(snapshot.getAutoCommit()||!(snapshot.getTransactionIsolation()==Connection.TRANSACTION_SERIALIZABLE||postgres(snapshot)&&snapshot.getTransactionIsolation()==Connection.TRANSACTION_REPEATABLE_READ))
+            throw new SQLException("Instance snapshot requires cross-table snapshot isolation");
         ServerSchema.validate(snapshot);verifyCoverage(snapshot);
         try(var json=JSON.createGenerator(output).disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET)) {
             json.writeStartObject();json.writeStringField("format",FORMAT);json.writeNumberField("schema",ServerSchema.CURRENT);json.writeArrayFieldStart("tables");

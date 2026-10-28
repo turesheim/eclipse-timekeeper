@@ -17,7 +17,7 @@ class InstanceDatabaseImageTest {
     private static final String NOW="2026-10-28T04:15:16.123456789Z";
     static Connection database() throws Exception {
         var connection=DriverManager.getConnection("jdbc:h2:mem:instance_"+UUID.randomUUID());ServerSchema.initializeOrValidate(connection);
-        connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);connection.setAutoCommit(false);return connection;
+        connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);connection.setAutoCommit(false);return connection;
     }
     private Path snapshot(Connection connection,String name) throws Exception {
         Path image=directory.resolve(name);try(var output=Files.newOutputStream(image)){InstanceDatabaseImage.write(connection,output);}return image;
@@ -140,6 +140,25 @@ class InstanceDatabaseImageTest {
         }
     }
 
+    @Test void firstReadOfIndependentTablesUsesTheSameCommittedSnapshot() throws Exception {
+        try(var source=database()) {
+            seed(source);Path before=snapshot(source,"before-independent.json");source.commit();var changed=new java.util.concurrent.atomic.AtomicBoolean();
+            var guarded=(Connection)java.lang.reflect.Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},(proxy,method,args)->{
+                try {
+                    if(method.getName().equals("prepareStatement")&&args[0].toString().contains(" FROM tk_service_settings ORDER BY ")&&changed.compareAndSet(false,true)) {
+                        try(var peer=DriverManager.getConnection(source.getMetaData().getURL())) {
+                            peer.setAutoCommit(false);execute(peer,"UPDATE tk_owner SET zone_id='UTC',version=version+1 WHERE id='a'");
+                            execute(peer,"UPDATE tk_service_settings SET version=version+1,saved_smtp_password='Concurrent private SMTP credential' WHERE id=1");peer.commit();
+                        }
+                    }
+                    return method.invoke(source,args);
+                }catch(java.lang.reflect.InvocationTargetException failure){throw failure.getCause();}
+            });
+            Path during=snapshot(guarded,"during-independent.json");assertTrue(changed.get());assertEquals(-1,Files.mismatch(before,during));
+            source.commit();assertNotEquals(-1,Files.mismatch(before,snapshot(source,"after-independent.json")));
+            source.commit();source.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);assertThrows(SQLException.class,()->snapshot(source,"rejected-weak-snapshot.json"));
+        }
+    }
     @Test void damagedStagingAfterPreflightRollsBackAllDestinationDeletes() throws Exception {
         try(var source=database();var target=database()) {
             seed(source);seed(target);Path image=snapshot(source,"source.json"),before=snapshot(target,"before.json");
