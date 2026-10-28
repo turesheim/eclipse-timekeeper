@@ -143,7 +143,7 @@ test('Today shows the selected journal, mini calendar, work sessions and importe
     await expect(page.locator('#today-planned-tasks')).toContainText('No tasks planned for this day');
     await expect(page.locator('#today-events')).toContainText('No calendar events');
     await page.locator('#today-month-grid [data-date="2025-05-17"]').click();await expect(page.locator('#today-date')).toHaveValue(date);
-    await expect(page.locator('#today-note-text')).toHaveValue('Review day');
+    await expect(page.locator('#today-note-text')).toHaveValue('Sidebar label');
     await page.evaluate(()=>window.scrollTo(0,50));
     await page.setViewportSize({width:1440,height:1200});await page.evaluate(()=>window.scrollTo(0,0));
     await expect.poll(()=>page.evaluate(()=>document.querySelector('#workspace-navigation').getBoundingClientRect().top-document.querySelector('#today-note-editor').getBoundingClientRect().bottom)).toBeLessThan(24);

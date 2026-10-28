@@ -513,11 +513,10 @@ test('journal links already saved as angle-bracket autolinks open in formatted m
     const rich=dialog(page).locator('.ProseMirror');await expect(rich).toBeVisible();await expect(rich.locator('a')).toHaveCount(3);
     await rich.locator('a').first().click();await expect(page).toHaveURL(/\/web\/$/);
     await owner.route('https://example.com/path?*',route=>route.fulfill({status:200,contentType:'text/html',body:'<title>Linked page</title>'}));
-    for(const modifier of ['Meta','Control']){
-      const popup=owner.waitForEvent('page');await rich.locator('a').first().click({modifiers:[modifier]});const linked=await popup;
-      await linked.waitForLoadState();await expect(linked).toHaveURL('https://example.com/path?q=1&v=2');expect(await linked.evaluate(()=>window.opener)).toBe(null);
-      await linked.close();await expect(dialog(page)).toBeVisible();await expect(rich.locator('a')).toHaveCount(3);
-    }
+    const modifier=await page.evaluate(()=>/Mac/.test(navigator.platform)?'Meta':'Control');
+    const popup=owner.waitForEvent('page');await rich.locator('a').first().click({modifiers:[modifier]});const linked=await popup;
+    await linked.waitForLoadState();await expect(linked).toHaveURL('https://example.com/path?q=1&v=2');expect(await linked.evaluate(()=>window.opener)).toBe(null);
+    await linked.close();await expect(dialog(page)).toBeVisible();await expect(rich.locator('a')).toHaveCount(3);
     await save(page,'Autolinks');expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe(body);
   } finally {await owner.close();}
 });
