@@ -1055,7 +1055,7 @@
   "journal.webdav.url_label": "WebDAV-adresse",
   "journal.webdav.credentials": "Bruk et personlig API-token med lese- og skrivetilgang som passord. Brukernavnet kan være hva som helst. Lag et eget token for hver klient.",
   "journal.webdav.tokens": "Administrer API-tokens",
-  "journal.webdav.naming": "Gi dagsnotater navnet ÅÅÅÅ-MM-DD.md og ukenotater ÅÅÅÅ-Wuu.md. Valgfri YAML-frontmatter med timekeeper-label angir kalenderetiketten for dagsnotater.",
+  "journal.webdav.naming": "Gi dagsnotater navnet ÅÅÅÅ-MM-DD.md og ukenotater ÅÅÅÅ-Wuu.md. Dagsetiketter håndteres separat i Timekeeper; Markdown-endringer verken setter eller fjerner dem.",
   "journal.webdav.concurrency": "Når klienten endrer eller sletter et eksisterende notat, må den sende notatets ETag med If-Match. Klienter uten betingede skrivinger kan ikke trygt overskrive notater.",
   "journal.webdav.guide": "Veiledning for WebDAV-tilkobling og kompatibilitet",
   "journal.webdav.error.https_required": "Koble til dagboken over HTTPS.",
@@ -1155,5 +1155,6 @@
   "backups.pending_restart": "Stopp alle serverprosesser tilkoblet måldatabasen, og start deretter én målserver. Oppstartshjelperen fullfører gjenopprettingen før HTTP åpnes. Andre API-operasjoner er utilgjengelige frem til gjenopprettingen er ferdig.",
   "backups.pending_recovery": "Hvis oppstart avbrytes, starter du serveren igjen for å fortsette. Før databasen erstattes kan en operatør avbryte frakoblet med det opprinnelige måladministratorpassordet. Etter erstatning må gjenopprettingen fortsettes. Behold det krypterte arkivet og passfrasen.",
   "backups.pending_destination": "Gjenopprettet offentlig adresse: {{origin}}",
-  "backups.check_restored": "Åpne gjenopprettet server"
+  "backups.check_restored": "Åpne gjenopprettet server",
+  "journal.webdav.client": "Obsidian med MySync 3.0.7 er testet for toveis synkronisering av dagboken. Bruk Nextcloud-tilkoblingen med serverens rotadresse, fjernsti / og et eget dagbokhvelv. Redigert tekst lastes opp med LF. Se veiledningen for oppsett og begrensninger."
 }

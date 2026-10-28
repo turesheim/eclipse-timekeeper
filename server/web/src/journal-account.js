@@ -14,6 +14,7 @@ export function renderJournal(view){
   const tokens=node('a',t('journal.webdav.tokens'),'btn btn-outline-secondary');
   tokens.href='#account/tokens';
   card.append(credentials,tokens,node('p',t('journal.webdav.naming'),'mt-3'),node('p',t('journal.webdav.concurrency'),'hint'));
+  card.append(node('p',t('journal.webdav.client'),'hint'));
   const guide=node('a',t('journal.webdav.guide'));
   guide.href='https://github.com/turesheim/eclipse-timekeeper/blob/main/docs/operations/JOURNAL-WEBDAV.md';
   guide.target='_blank';guide.rel='noopener noreferrer';

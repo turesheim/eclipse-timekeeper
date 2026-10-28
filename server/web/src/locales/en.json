@@ -1055,7 +1055,7 @@
   "journal.webdav.url_label": "WebDAV URL",
   "journal.webdav.credentials": "Use a personal API token with read and write permissions as the password. The username can be any name. Create a separate token for each client.",
   "journal.webdav.tokens": "Manage API tokens",
-  "journal.webdav.naming": "Name daily notes YYYY-MM-DD.md and weekly notes YYYY-Www.md. Optional timekeeper-label YAML frontmatter supplies a daily Calendar label.",
+  "journal.webdav.naming": "Name daily notes YYYY-MM-DD.md and weekly notes YYYY-Www.md. Day labels are managed separately in Timekeeper; Markdown changes never set or clear them.",
   "journal.webdav.concurrency": "When changing or deleting an existing note, the client must send its ETag with If-Match. Clients without conditional writes cannot safely overwrite notes.",
   "journal.webdav.guide": "WebDAV connection and compatibility guide",
   "journal.webdav.error.https_required": "Connect to the journal over HTTPS.",
@@ -1155,5 +1155,6 @@
   "backups.pending_restart": "Stop every server process connected to the destination database, then start one destination server. Its startup helper completes the restore before opening HTTP. Other API operations remain unavailable until recovery finishes.",
   "backups.pending_recovery": "If startup is interrupted, start the server again to resume. Before the database is replaced, an operator can cancel offline using the original destination administrator password. After replacement, resume recovery. Keep the encrypted archive and its passphrase.",
   "backups.pending_destination": "Restored public origin: {{origin}}",
-  "backups.check_restored": "Open restored server"
+  "backups.check_restored": "Open restored server",
+  "journal.webdav.client": "Obsidian with MySync 3.0.7 has verified bidirectional journal support. Use its Nextcloud backend with this server’s origin, remote path / and a dedicated journal vault. Edited text uploads use LF. See the guide for setup and limitations."
 }

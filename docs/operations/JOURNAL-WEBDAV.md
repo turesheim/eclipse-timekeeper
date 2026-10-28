@@ -51,11 +51,12 @@ without adding a Servlet stack or another authentication path.
 ## Client compatibility
 
 The following results come from actual clients against an isolated packaged
-Timekeeper server on loopback. The HTTP connection was limited to that local
-test; deployments must use HTTPS.
+Timekeeper server. MySync uses HTTPS with a trusted fixture CA; rclone and
+Cyberduck were tested over loopback HTTP. Deployments must use HTTPS.
 
 | Client | Verified behavior | Result |
 | --- | --- | --- |
+| Obsidian 1.14.5 with unmodified MySync 3.0.7 | Actual desktop clients over verified HTTPS: initial pull and push, daily and weekly notes, legacy records, empty files, guarded overwrite/delete, recreation, unchanged server bytes/ETags, two-device conflict resolution, offline retry, owner isolation and token revocation. | **Bidirectional journal synchronization verified** on Linux. Edited text uploads use LF; see setup and limits below. |
 | rclone 1.75.2, WebDAV vendor `other` | List, download, and create worked. Initial `bisync --resync` uploaded a note. A subsequent local edit led to an unconditional overwrite, which Timekeeper rejected with `428`; bisync aborted and requested another resync. | **No bidirectional support** with this version. Do not use `bisync` for this collection. |
 | Cyberduck CLI (`duck`) 9.5.4.45528 | List, upload a new note, and byte-exact download worked. Overwrite and delete omitted `If-Match` and received `428`. The overwrite command reported an error in its output yet exited with status 0. | **Read and create only**. Do not rely on its process exit status to detect a rejected overwrite. |
 
@@ -66,9 +67,64 @@ without a per-file `If-Match`. This suggests that it will not support the
 fixed, one-level journal collection or guarded updates without changes to the
 plugin. This is an inference from its source, not an interoperability result.
 
-No off-the-shelf client has yet passed the complete bidirectional and conflict
-test matrix. Do not configure automatic bidirectional synchronization until a
-client is verified to send conditional overwrite and delete requests. A `428`
-protects the current Calendar note; it does not mean that a client synchronized
-successfully. The endpoint remains usable for clients that send the current
-strong ETag in `If-Match`.
+### Obsidian with MySync
+
+Use a dedicated journal vault containing dated daily notes, ISO weekly notes,
+and an optional `assets/` folder. Arbitrary Obsidian vault synchronization is
+outside this endpoint's scope.
+
+1. Install [MySync 3.0.7](https://github.com/henriquemanduca/mysync-plugin/releases/tag/3.0.7)
+   in Obsidian and enable the community plugin.
+2. Select MySync's **Nextcloud** backend. Set its server URL to the Timekeeper
+   origin, for example `https://timekeeper.example.org`, without `/dav/journal/`.
+3. Set the remote path to `/`, select the vault root as the local sync folder,
+   and leave Obsidian configuration synchronization disabled.
+4. Use any username and a dedicated Timekeeper API token with `read` and `write`
+   permissions as the password. Pull the remote notes before editing an existing
+   journal on a new device, then use MySync's indexing and push/pull commands.
+5. Resolve reported conflicts in MySync before retrying. A rejected write is not
+   a successful synchronization. Keep both versions until choosing the intended
+   document.
+
+MySync constructs `/remote.php/webdav/` URLs. Timekeeper exposes that finite
+collection alias, including `assets/`, through exactly the same authenticated
+resources as `/dav/journal/`. Both paths share owner isolation, canonical data,
+ETags and conditional writes; no Nextcloud service or second document store is
+needed. Configure the reverse proxy to forward both prefixes to Timekeeper.
+This alias does not provide arbitrary Nextcloud APIs or vault directories.
+
+The tested releases use conditional writes and deletes. MySync normalizes text
+line endings to LF, including its local copy of a downloaded CRLF document.
+An unchanged synchronization retains the original server bytes and ETag; an
+actual client edit uploads LF. Unknown frontmatter and trailing spaces survive
+unchanged scans. MySync filters attachment types: PDFs were verified byte-for-byte; arbitrary
+`.bin` files are skipped by this release. Timekeeper itself retains arbitrary
+attachment bytes through its asset API and WebDAV. Choose an editor/client that preserves line endings if exact
+CRLF copies are required on every device. Calendar labels are independent of
+note files, including legacy `timekeeper-label` frontmatter.
+
+The acceptance run uses real released desktop binaries and the unmodified
+plugin, with a fresh private vault and trusted HTTPS certificate. It is Linux
+interoperability evidence, not a claim that every macOS, Windows or mobile
+release was exercised. Validate the relevant release before relying on automatic sync there.
+The server uses standard WebDAV and has no platform-specific client runtime.
+
+### Reproducing client acceptance
+
+With Docker and Python 3 available, build the normal PostgreSQL deployment
+image using `server/Dockerfile`, then run:
+
+```sh
+docker build -t timekeeper-mysync-client:obsidian-1.14.5-mysync-3.0.7 server/scripts/clients/mysync
+python3 server/scripts/mysync_acceptance.py --server-image timekeeper-server:test --expected-commit <source-commit>
+```
+
+The test image downloads checksum-verified official Obsidian and MySync releases;
+it is never shipped with Timekeeper. The driver controls real Obsidian file
+operations and MySync commands; it does not implement synchronization or replace
+the client's network transport. Separate disposable clients exercise conflicts,
+retry, isolation and revocation against PostgreSQL. No user vault or token is
+used. The default run cleans up its containers, private network and secrets and
+writes a credential-free receipt to `server/target/acceptance/mysync.json` only
+when every assertion succeeds. `--keep-fixture` retains only that run's private
+fixture for diagnosis; remove its containers, network and directory afterwards.
