@@ -4,8 +4,7 @@ This feature is being implemented for [#473](https://github.com/turesheim/eclips
 The internal encrypted archive, configuration inventory, database-image and
 administrator-authority components exist. Administrator start/status/discard routes are integrated with durable backup
 jobs, one-use native downloads and uploaded-archive review. The Administration
-interface supports these operations. Public restore confirmation and complete
-deployment integration remain unfinished; packaged JVM startup automatically runs the recovery coordinator. The acceptance criteria in the
+interface supports archive operations, asynchronous private restore preparation, destination review and explicit confirmation. Complete native deployment integration and migration acceptance remain unfinished; packaged JVM startup automatically runs the recovery coordinator. The acceptance criteria in the
 issue remain the delivery requirements; these foundations alone do not satisfy them.
 
 ## Administration workflow
@@ -43,7 +42,7 @@ After transfer, verify the archive using the current password and encryption
 passphrase. An incorrect phrase retains encrypted bytes for retry. A successful
 review shows source metadata and table counts, with an explicit warning that
 target readiness, authentication checks, deployment mapping and offline
-activation are still required. The current interface cannot activate a restore.
+activation are still required. When persistent restore storage is configured, the interface can prepare a private handoff and explicitly commit maintenance consent for exclusive startup recovery.
 **Check target database** requires fresh password proof and the upload's initiating
 session. It inspects a serializable database snapshot only after archive review.
 Only the sole bootstrap administrator, unchanged built-in labels and initial
@@ -53,8 +52,8 @@ modified/incomplete default labels and business history are blockers. Queries
 bound label payload reads and do not load attachment contents into browser or
 server memory. Unknown persisted tables or columns fail coverage.
 
-The result is advisory, carries the review's operation version, and keeps
-`restoreReady` false. It does not reserve the database or authorize replacement.
+The target-check result is advisory, carries the review's operation version, and keeps
+`restoreReady` false. It does not reserve the database or authorize replacement. The separate staging and confirmation endpoints bind their own reviewed version and generation.
 Activation must repeat the database check under an exclusive write fence and
 complete authentication/configuration, deployment mapping and offline checks.
 Existing business records remain intact when a target is rejected.
@@ -163,7 +162,7 @@ then rechecks the original session and administrator role before publishing the
 result. Logout, password revocation or demotion prevents publication. Its
 passphrase array is cleared on success and failure. Administrator start/status/discard HTTP routes enforce browser-only authority,
 CSRF and current password proof, with typed contract inputs and metadata-only
-replies. Native download grants are integrated; restore routes remain unfinished.
+replies. Native download grants and public restore staging/confirmation routes are integrated.
 
 ## Connected backup jobs and HTTP entry points
 
@@ -287,7 +286,7 @@ The safe review records source build/deployment metadata, archive UUID/time,
 logical schema and table counts. It explicitly returns `restoreReady: false`;
 archive verification alone does not prove empty-target readiness, usable restored
 authentication/configuration, correct deployment mapping or exclusive activation.
-Those are still required parts of this issue.
+The staging, confirmation and exclusive preboot phases check these additional boundaries. Native migration and full coverage acceptance remain release requirements.
 
 ## Complete database image
 
@@ -344,10 +343,7 @@ rollback. A real PostgreSQL 17 fixture verifies H2 → PostgreSQL → H2 using
 byte-identical images, including Unicode and nanosecond timestamps. Both
 PostgreSQL CI jobs include these tests.
 
-Delivery still requires public Administration confirmation/status/recovery controls,
-automatic launcher integration, complete deployment mapping review,
-Synology/Docker/standalone acceptance, full restored-access tests and operator
-documentation. The offline coordinator applies the database, installs mapped
+Administration preparation/confirmation/status controls, automatic JVM launch recovery and operator documentation are integrated. Delivery still requires complete native deployment integration, Synology/Docker/standalone migration acceptance and the remaining restored-access/security-material audit. The offline coordinator applies the database, installs mapped
 material, completes activation and resumes committed recovery phases. Deployment integration must still audit all recoverable inputs and applicable
 security material, including native maintenance backup coverage after a restore. No privileged host credentials may be granted to the web process to
 make that integration work.
@@ -418,8 +414,7 @@ The database control record remains `restorePending: true` with a
 `DATABASE_APPLIED` phase and fresh generation. This phase does **not** clear the
 gate or claim restore completion by itself. The recovery coordinator installs
 material, commits this database phase, publishes the active pointer and completes
-activation. Launch coordination and the final activation UI are still required
-before exposing restoration. H2 and PostgreSQL tests exercise
+activation. The packaged launcher and explicit Administration confirmation connect these phases without replacing a live database. H2 and PostgreSQL tests exercise
 actual image application, credential/data/audit preservation, checksum rejection,
 refusal of populated or stale targets, and full rollback without a commit.
 
@@ -461,7 +456,7 @@ one whose database phase has committed. Tests use actual administrator proof and
 PostgreSQL as well as H2; offline application uses an isolated synthetic clone,
 since a live application pool correctly prevents exclusive activation.
 
-These are internal components. There is still no public confirmation endpoint.
+The public staging and confirmation endpoints connect these components to the Administration workflow.
 The packaged launch-time caller resumes an already-authorized handoff.
 `InstanceRestoreMain` also provides a manual offline entry point; that mode does not start the HTTP server.
 Unreferenced or interrupted private staging must remain private until the recovery
@@ -509,11 +504,11 @@ uses only destination application JDBC credentials, refuses in-memory targets,
 and opens H2 with `IFEXISTS`. It suppresses private configuration/JDBC diagnostics
 and returns a fixed completion marker plus the recovered configuration location.
 It requires an authorized handoff and all other target database clients stopped.
-It is not yet exposed as an end-user restore workflow. Separate-JVM tests cover
+Its manual mode is an operator recovery interface; public confirmation uses automatic preboot. Separate-JVM tests cover
 H2 and a non-superuser PostgreSQL application role, repeated completion, recovery
 after database commit, partial cleanup, and refusal of populated targets.
 
-Public staging/confirmation and complete operator recovery guidance are still required.
+Complete native integration, coverage review and full migration acceptance are still required. See the operational guide for the implemented public workflow.
 Full package-identity migration and restored login/passkey/journal/attachment
 acceptance remain delivery requirements; SQL/password-hash checks alone do not
 prove those application flows.
@@ -577,8 +572,7 @@ does. Supply one JSON object on standard input with `username` and
 pipe or a mode-0600 file; credentials must not be placed in command arguments or
 shell history. A successful cancellation prints only `INSTANCE_RESTORE_CANCELLED`.
 The normal server can then be started again with its original configuration.
-This is an internal recovery interface until the full confirmation workflow and
-final operator guide are delivered.
+This interface is also used for operator recovery after public confirmation. See [the operational guide](../operations/INSTANCE-BACKUP.md).
 
 The offline connection requires exclusive access and the normal application DB
 role. It checks the original account's current password, enabled administrator
@@ -608,3 +602,51 @@ store reads its immutable identity without taking its global mutation lock;
 identity validation remains mandatory for each protected operation. A regression
 test holds that lock while opening another store handle, preventing upload-status
 polling from intermittently failing during unrelated storage work.
+
+
+## Public preparation and confirmation
+
+`POST /api/v1/admin/instance/uploads/{id}/staging` requires the initiating browser
+session, fresh password proof, the archive passphrase, current operation version
+and desired public-origin/passkey mapping. A single bounded worker claims a durable
+lease, rechecks bootstrap-only eligibility and copies the verified image and
+configuration into the private restore root. It installs and validates unpublished
+source security material before exposing READY. The destination package identity
+comes from the running destination configuration; DB credentials, listener and TLS
+settings stay with that destination. No live business data is replaced.
+
+`GET .../{id}/staging` reports NONE, PREPARING, READY or FAILED with bounded,
+non-secret destination metadata and the version/generation to review. Worker
+renewals retain the version reserved for the published stage. Passphrases exist
+only in the bounded worker and are cleared when work finishes. Lightweight staging
+avoids loading a second copy of all source/target configuration bytes.
+
+`POST .../{id}/confirm` requires fresh proof, the reviewed version/generation and
+literal `RESTORE <destination-package-id>`. It validates the exact current
+configuration and file digests against the staged target, rechecks the initiating
+session and bootstrap-only target in a serializable transaction, and commits the
+PREPARED intent and maintenance gate. Its response says PENDING_RESTART. The web
+process never restarts privileged host services or replaces its live database.
+All target processes must stop; starting one server invokes exclusive preboot
+recovery. No general authenticated bypass is added while the gate is active.
+
+The Administration page provides preparation fields, a destination review,
+consequences, explicit confirmation and restart/recovery guidance in English and
+Norwegian. The stage survives navigation/reload. HTTPS browser acceptance checks
+its narrow layouts and accessibility before committing confirmation.
+
+Before claiming a new staging worker, fresh administrator authority can reclaim
+unreferenced private generation directories and interrupted pointer/install files.
+The root lock excludes active writers, current database/material generations and
+published viable handoffs are protected, and cleanup is audited against the
+triggering operation. Obsolete failed stages can have only their matching
+unpublished material removed. Active or historical material is not swept blindly.
+
+The packaged public protocol fixture starts an empty dagsverk destination,
+creates its bootstrap account through the real API, uploads/validates a separate
+source archive, stages/confirms, verifies maintenance fencing, stops/restarts,
+and checks restored password/API-token access, client IDs/versions, daily and
+weekly journal bodies, independent labels and exact attachment bytes. Its source
+archive checksum must remain unchanged. This complements the database fidelity
+suite; native Synology migration and remaining security-material coverage still
+need their own acceptance evidence.

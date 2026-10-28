@@ -31,6 +31,7 @@ class InstanceAdministratorTest {
     @Inject InstanceBackupJobs jobs;
     @Inject InstanceDownloads downloads;
     @Inject InstanceRestoreUploads uploads;
+    @Inject InstanceRestoreActivation activation;
     @Inject ContractInputs contracts;
     @Inject RecoveryOrigin origin;
     @Inject BackendClock clock;
@@ -38,7 +39,7 @@ class InstanceAdministratorTest {
     @TempDir Path directory;
     TokenRegistry.Principal admin;Path output;
     @BeforeEach void setup() throws Exception {
-        ClientProxy.unwrap(store).stopMaintenance();ClientProxy.unwrap(administrators).clock=clock;ClientProxy.unwrap(jobs).restoreStorage="NONE";
+        ClientProxy.unwrap(store).stopMaintenance();ClientProxy.unwrap(administrators).clock=clock;ClientProxy.unwrap(jobs).restoreStorage="NONE";ClientProxy.unwrap(activation).storage="NONE";
         accounts.tx(c->{
             for(String table:List.of("tk_relation","tk_external_reference","tk_active","tk_receipt","tk_change","tk_auth_session","tk_passkey_ceremony","tk_passkey_credential","tk_recovery_link","tk_recovery_address","tk_auth_challenge","tk_api_token","tk_passkey_user","tk_locale","tk_account","tk_resource","tk_owner","tk_auth_throttle"))execute(c,"DELETE FROM "+table);
             execute(c,"DELETE FROM tk_instance WHERE kind<>'CONTROL'");
@@ -455,6 +456,59 @@ class InstanceAdministratorTest {
         var other=httpLogin("instance-admin");assertEquals(403,http(other,true,"POST",path,object().put("currentPassword",PASSWORD)).statusCode());assertTrue(Files.exists(root.resolve("prepared.json")));
         assertEquals(200,http(browser,true,"POST",path,object().put("currentPassword",PASSWORD)).statusCode());assertFalse(Files.exists(root.resolve("prepared.json")));assertFalse(Files.exists(root.resolve(spec.generation().toString())));
         assertEquals(200,http(browser,true,"POST",path,object().put("currentPassword",PASSWORD)).statusCode());assertNotNull(accounts.account(principal));
+    }
+    private String reviewedForActivation(Browser browser) throws Exception {
+        byte[] bytes;char[] phrase="public restore source passphrase".toCharArray();
+        try(var source=InstanceDatabaseImageTest.database();var config=InstanceConfiguration.capture(InstanceConfigurationTest.base(),Map.of())) {
+            InstanceAuthenticationPreflightTest.seed(source);
+            var encrypted=InstanceBackupArchive.create(source,config,object().put("serverVersion","2.0.0").put("commit","0".repeat(40)).put("databaseType","h2").put("packageId","timekeeper").put("publicOrigin","https://source.example"),phrase,directory);bytes=Files.readAllBytes(encrypted);
+        }
+        String id=createUpload(browser,bytes,cipherDigest(bytes));assertEquals(200,chunk(browser,true,id,0,bytes).statusCode());
+        assertEquals(202,http(browser,true,"POST","/admin/instance/uploads/"+id+"/validate",object().put("currentPassword",PASSWORD).put("passphrase","public restore source passphrase")).statusCode());awaitUpload(browser,id,"REVIEW");
+        String root=directory.resolve("activation-intents").toString();ClientProxy.unwrap(activation).storage=root;ClientProxy.unwrap(jobs).restoreStorage=root;return id;
+    }
+    private com.fasterxml.jackson.databind.node.ObjectNode stageInput(Browser browser,String id) {
+        var reply=http(browser,false,"GET","/admin/instance/uploads/"+id+"/staging",null);assertEquals(200,reply.statusCode(),reply.asString());contracts.validate("InstanceRestoreStage",parse(reply.asString()));
+        return object().put("currentPassword",PASSWORD).put("passphrase","public restore source passphrase").put("operationVersion",parse(reply.asString()).path("operationVersion").asLong()).put("publicOrigin","NONE").put("passkeyRpId","AUTO").put("passkeysEnabled",false);
+    }
+    private com.fasterxml.jackson.databind.JsonNode awaitStage(Browser browser,String id,String phase) throws Exception {
+        long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(30);
+        do{var reply=http(browser,false,"GET","/admin/instance/uploads/"+id+"/staging",null);assertEquals(200,reply.statusCode(),reply.asString());var value=parse(reply.asString());contracts.validate("InstanceRestoreStage",value);if(value.path("phase").asText().equals(phase))return value;Thread.sleep(20);}while(System.nanoTime()<deadline);fail("Restore stage did not reach "+phase);return null;
+    }
+    private com.fasterxml.jackson.databind.node.ObjectNode confirmation(com.fasterxml.jackson.databind.JsonNode stage) {
+        return object().put("currentPassword",PASSWORD).put("operationVersion",stage.path("operationVersion").asLong()).put("generation",stage.path("generation").asText()).put("confirmation","RESTORE "+stage.path("target").path("packageId").asText());
+    }
+    @Test void publicStagingRetriesAndRequiresOriginalSessionExplicitConsentAndAnEmptyTarget() throws Exception {
+        var browser=httpLogin("instance-admin");String id=reviewedForActivation(browser),path="/admin/instance/uploads/"+id;
+        var input=stageInput(browser,id);assertEquals(403,http(browser,false,"POST",path+"/staging",input).statusCode());
+        var other=httpLogin("instance-admin");assertEquals(403,http(other,true,"POST",path+"/staging",input).statusCode());
+        var wrong=input.deepCopy().put("passphrase","Wrong public staging passphrase");assertEquals(202,http(browser,true,"POST",path+"/staging",wrong).statusCode());awaitStage(browser,id,"FAILED");
+        assertEquals(202,http(browser,true,"POST",path+"/staging",stageInput(browser,id)).statusCode());var ready=awaitStage(browser,id,"READY");
+        assertFalse(ready.toString().contains(PASSWORD));assertFalse(ready.toString().contains(directory.toString()));assertFalse(parse(originalInstanceControl()).path("restorePending").asBoolean());
+        assertEquals(422,http(browser,true,"POST",path+"/confirm",confirmation(ready).put("confirmation","RESTORE wrong-package")).statusCode());
+        assertEquals(412,http(browser,true,"POST",path+"/confirm",confirmation(ready).put("generation",UUID.randomUUID().toString())).statusCode());
+        assertEquals(403,http(other,true,"POST",path+"/confirm",confirmation(ready)).statusCode());
+        assertEquals(201,http(browser,true,"POST","/clients",object().put("name","Retain target client").put("color","#123456")).statusCode());
+        var blocked=http(browser,true,"POST",path+"/confirm",confirmation(ready));assertEquals(409,blocked.statusCode(),blocked.asString());assertFalse(parse(originalInstanceControl()).path("restorePending").asBoolean());
+        assertEquals(200,http(browser,true,"POST","/admin/instance/operations/"+id+"/discard",object().put("currentPassword",PASSWORD)).statusCode());assertFalse(Files.exists(directory.resolve("activation-intents/prepared.json")));
+    }
+    @Test void publicConfirmationCommitsOnlyTheReviewedHandoffAndBlocksRuntimeUntilExclusiveRecovery() throws Exception {
+        var browser=httpLogin("instance-admin");String id=reviewedForActivation(browser),path="/admin/instance/uploads/"+id;String before=originalInstanceControl();
+        assertEquals(202,http(browser,true,"POST",path+"/staging",stageInput(browser,id)).statusCode());var ready=awaitStage(browser,id,"READY");
+        assertEquals(403,http(browser,false,"POST",path+"/confirm",confirmation(ready)).statusCode());
+        try {
+            var reply=http(browser,true,"POST",path+"/confirm",confirmation(ready));assertEquals(202,reply.statusCode(),reply.asString());contracts.validate("InstanceRestoreConfirmation",parse(reply.asString()));assertEquals("PENDING_RESTART",parse(reply.asString()).path("phase").asText());
+            assertEquals("INSTANCE_RESTORE_PENDING",assertThrows(ApiFailure.class,()->accounts.account(admin)).code);
+            try(var c=datasource.getConnection();var prepared=new InstanceRestoreIntent(directory.resolve("activation-intents"),100_000_000).open()){assertEquals("PREPARED",prepared.phase(c));}
+        }finally{try(var c=datasource.getConnection()){execute(c,"UPDATE tk_instance SET payload=? WHERE kind='CONTROL'",before);}}
+    }
+    @Test void orphanCleanupRemovesOnlyUnreferencedPrivateStagesAndKeepsThePublishedHandoff() throws Exception {
+        var proof=administrators.verify(admin,PASSWORD);Path root;UUID protectedGeneration,operation;
+        try(var prepared=preparedIntent(proof)){root=prepared.storage();protectedGeneration=prepared.spec().generation();operation=prepared.spec().operation();}
+        Path orphan=root.resolve(UUID.randomUUID().toString());Files.createDirectory(orphan,java.nio.file.attribute.PosixFilePermissions.asFileAttribute(java.nio.file.attribute.PosixFilePermissions.fromString("rwx------")));Files.writeString(orphan.resolve("private-incomplete-image"),"Private interrupted bytes");
+        Path pointer=root.resolve(".pointer-"+UUID.randomUUID());Files.writeString(pointer,"Private incomplete pointer");Files.setPosixFilePermissions(pointer,java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+        var intent=new InstanceRestoreIntent(root,100_000_000);int removed=accounts.tx(c->{try{c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);return intent.cleanupOrphans(c,administrators,proof,operation,clock.now());}catch(java.sql.SQLException|java.io.IOException failure){throw new AssertionError(failure);}});
+        assertEquals(2,removed);assertFalse(Files.exists(orphan));assertFalse(Files.exists(pointer));assertTrue(Files.exists(root.resolve(protectedGeneration.toString())));try(var prepared=intent.open()){assertEquals(protectedGeneration,prepared.spec().generation());}
     }
     @Test void rewritingTheIntentAndPointerCannotReusePreviouslyCommittedConsent() throws Exception {
         var proof=administrators.verify(admin,PASSWORD);InstanceRestoreIntent.Spec spec;

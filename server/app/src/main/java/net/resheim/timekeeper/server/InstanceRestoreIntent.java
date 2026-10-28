@@ -56,21 +56,7 @@ final class InstanceRestoreIntent {
         @Override public String toString(){return "Private prepared instance restore";}
         /** Caller owns its serializable account transaction and commits authorization. */
         long authorize(Connection c,InstanceAdministrator administrators,InstanceAdministrator.Proof proof,Instant now) throws SQLException {
-            if(closed||c.getAutoCommit()||c.getTransactionIsolation()!=Connection.TRANSACTION_SERIALIZABLE)throw new SQLException("Restore intent authorization requires a serializable transaction");
-            if(proof==null||proof.verifiedAt().isBefore(now.minusSeconds(300))||proof.verifiedAt().isAfter(now.plusSeconds(5)))throw new ApiFailure(422,"INSTANCE_PROOF_REQUIRED");
-            lock(c);administrators.check(c,proof.principal());targetBinding(c);if(!spec.actor().equals(proof.principal().owner()))throw new ApiFailure(403,"FORBIDDEN");
-            var control=control(c,true);String previous=control.hasNonNull("restoreGeneration")?control.path("restoreGeneration").asText():null;
-            if(control.path("restorePending").asBoolean()||!Objects.equals(previous,spec.previousGeneration()==null?null:spec.previousGeneration().toString()))throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
-            if(!control.path("artifactRootId").asText().equals(spec.artifactRoot().toString()))throw new ApiFailure(503,"INSTANCE_STORAGE_MISMATCH");
-            if(!InstanceRestoreTarget.inspect(c,spec.actor()).databaseEligible())throw new ApiFailure(409,"INSTANCE_TARGET_NOT_EMPTY");
-            var operation=operation(c,true);var payload=(ObjectNode)operation.get("payload");
-            if(operation.path("version").asLong()!=spec.reviewVersion())throw new ApiFailure(412,"STALE_VERSION");
-            if(!operation.path("actor").asText().equals(spec.actor())||!payload.path("type").asText().equals("RESTORE")||!payload.path("state").asText().equals("REVIEW")||!payload.path("upload").path("session").asText().equals(proof.principal().digest()))throw new ApiFailure(403,"FORBIDDEN");
-            payload.put("restorePhase","PREPARED");payload.set("restoreIntent",binding());control.set("restoreIntent",binding());control.put("restorePending",true);
-            execute(c,"UPDATE tk_instance SET version=version+1,occurred_at=?,payload=? WHERE id=?",now.toString(),payload.toString(),spec.operation());
-            execute(c,"UPDATE tk_instance SET version=version+1,payload=? WHERE id=?",control.toString(),CONTROL);
-            execute(c,"INSERT INTO tk_instance(id,kind,version,operation_id,actor_owner,occurred_at,payload) VALUES(?,'AUDIT',1,?,?,?,?)",UUID.randomUUID(),spec.operation(),spec.actor(),now.toString(),object().put("type","RESTORE").put("state","REVIEW").put("action","RESTORE_PREPARED").toString());
-            return spec.reviewVersion()+1;
+            if(closed)throw new SQLException("Restore intent is closed");return authorizeIntent(spec,digest,target.document(),c,administrators,proof,now);
         }
         /** Offline recovery must prove the database committed this exact private intent. */
         String phase(Connection c) throws SQLException {
@@ -95,14 +81,7 @@ final class InstanceRestoreIntent {
             execute(c,"UPDATE tk_instance SET version=version+1,occurred_at=?,payload=? WHERE id=?",now.toString(),payload.toString(),spec.operation());
             execute(c,"INSERT INTO tk_instance(id,kind,version,operation_id,actor_owner,occurred_at,payload) VALUES(?,'AUDIT',1,?,?,?,?)",UUID.randomUUID(),spec.operation(),spec.actor(),now.toString(),object().put("type","RESTORE").put("state","RESTORED").put("action","RESTORE_COMPLETED").toString());
         }
-        void targetBinding(Connection c) throws SQLException {
-            var properties=target.document().path("properties");String configured=properties.path("quarkus.datasource.jdbc.url").asText(),actual=c.getMetaData().getURL();
-            try{DatabaseConfiguration.validate(configured);}catch(IllegalArgumentException invalid){throw new ApiFailure(409,"INSTANCE_TARGET_CONFIGURATION_CHANGED");}
-            boolean postgres=c.getMetaData().getDatabaseProductName().equals("PostgreSQL");
-            boolean url=postgres?configured.equals(actual):h2Location(configured).equals(h2Location(actual));
-            String user=properties.path("quarkus.datasource.username").asText(),connected=c.getMetaData().getUserName();
-            if(!url||!properties.path("quarkus.datasource.db-kind").asText().equals(postgres?"postgresql":"h2")||!(postgres?user.equals(connected):user.equalsIgnoreCase(connected)))throw new ApiFailure(409,"INSTANCE_TARGET_CONFIGURATION_CHANGED");
-        }
+        void targetBinding(Connection c) throws SQLException {InstanceRestoreIntent.targetBinding(c,target.document());}
         private ObjectNode binding(){return object().put("generation",spec.generation().toString()).put("sha256",digest);}
         private ObjectNode operation(Connection c,boolean locked) throws SQLException {
             try(var s=query(c,"SELECT version,actor_owner,payload FROM tk_instance WHERE id=? AND kind='OPERATION'"+(locked?" FOR UPDATE":""),spec.operation());var r=s.executeQuery()) {
@@ -111,7 +90,63 @@ final class InstanceRestoreIntent {
         }
         public void close() throws IOException {if(closed)return;closed=true;try{try{archive.close();}finally{target.close();}}finally{held.close();}}
     }
+    private static ObjectNode binding(Spec spec,String digest){return object().put("generation",spec.generation().toString()).put("sha256",digest);}
+    private static ObjectNode operation(Connection c,UUID id,boolean locked) throws SQLException {
+        try(var statement=query(c,"SELECT version,actor_owner,payload FROM tk_instance WHERE id=? AND kind='OPERATION'"+(locked?" FOR UPDATE":""),id);var rows=statement.executeQuery()) {
+            if(!rows.next())throw new ApiFailure(409,"INSTANCE_RESTORE_NOT_AUTHORIZED");var result=object().put("version",rows.getLong(1)).put("actor",rows.getString(2));result.set("payload",parse(rows.getString(3)));return result;
+        }
+    }
+    private static void targetBinding(Connection c,JsonNode targetDocument) throws SQLException {
+            var properties=targetDocument.path("properties");String configured=properties.path("quarkus.datasource.jdbc.url").asText(),actual=c.getMetaData().getURL();
+            try{DatabaseConfiguration.validate(configured);}catch(IllegalArgumentException invalid){throw new ApiFailure(409,"INSTANCE_TARGET_CONFIGURATION_CHANGED");}
+            boolean postgres=c.getMetaData().getDatabaseProductName().equals("PostgreSQL");
+            boolean url=postgres?configured.equals(actual):h2Location(configured).equals(h2Location(actual));
+            String user=properties.path("quarkus.datasource.username").asText(),connected=c.getMetaData().getUserName();
+            if(!url||!properties.path("quarkus.datasource.db-kind").asText().equals(postgres?"postgresql":"h2")||!(postgres?user.equals(connected):user.equalsIgnoreCase(connected)))throw new ApiFailure(409,"INSTANCE_TARGET_CONFIGURATION_CHANGED");
+    }
+    private static long authorizeIntent(Spec spec,String digest,JsonNode targetDocument,Connection c,InstanceAdministrator administrators,InstanceAdministrator.Proof proof,Instant now) throws SQLException {
+            if(c.getAutoCommit()||c.getTransactionIsolation()!=Connection.TRANSACTION_SERIALIZABLE)throw new SQLException("Restore intent authorization requires a serializable transaction");
+            if(proof==null||proof.verifiedAt().isBefore(now.minusSeconds(300))||proof.verifiedAt().isAfter(now.plusSeconds(5)))throw new ApiFailure(422,"INSTANCE_PROOF_REQUIRED");
+            lock(c);administrators.check(c,proof.principal());targetBinding(c,targetDocument);if(!spec.actor().equals(proof.principal().owner()))throw new ApiFailure(403,"FORBIDDEN");
+            var control=control(c,true);String previous=control.hasNonNull("restoreGeneration")?control.path("restoreGeneration").asText():null;
+            if(control.path("restorePending").asBoolean()||!Objects.equals(previous,spec.previousGeneration()==null?null:spec.previousGeneration().toString()))throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
+            if(!control.path("artifactRootId").asText().equals(spec.artifactRoot().toString()))throw new ApiFailure(503,"INSTANCE_STORAGE_MISMATCH");
+            if(!InstanceRestoreTarget.inspect(c,spec.actor()).databaseEligible())throw new ApiFailure(409,"INSTANCE_TARGET_NOT_EMPTY");
+            var operation=operation(c,spec.operation(),true);var payload=(ObjectNode)operation.get("payload");
+            if(operation.path("version").asLong()!=spec.reviewVersion())throw new ApiFailure(412,"STALE_VERSION");
+            if(!operation.path("actor").asText().equals(spec.actor())||!payload.path("type").asText().equals("RESTORE")||!payload.path("state").asText().equals("REVIEW")||!payload.path("upload").path("session").asText().equals(proof.principal().digest()))throw new ApiFailure(403,"FORBIDDEN");
+            if(payload.has("restorePhase")&&(!payload.path("restorePhase").asText().equals("STAGED")||!payload.path("restoreIntent").equals(binding(spec,digest))))throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
+            payload.put("restorePhase","PREPARED");payload.set("restoreIntent",binding(spec,digest));control.set("restoreIntent",binding(spec,digest));control.put("restorePending",true);
+            execute(c,"UPDATE tk_instance SET version=version+1,occurred_at=?,payload=? WHERE id=?",now.toString(),payload.toString(),spec.operation());
+            execute(c,"UPDATE tk_instance SET version=version+1,payload=? WHERE id=?",control.toString(),CONTROL);
+            execute(c,"INSERT INTO tk_instance(id,kind,version,operation_id,actor_owner,occurred_at,payload) VALUES(?,'AUDIT',1,?,?,?,?)",UUID.randomUUID(),spec.operation(),spec.actor(),now.toString(),object().put("type","RESTORE").put("state","REVIEW").put("action","RESTORE_PREPARED").toString());
+            return spec.reviewVersion()+1;
+    }
+    /** Lightweight published staging; no duplicate source/target file arrays. */
+    final class Staged implements AutoCloseable {
+        private final Held held;private final Spec spec;private final String digest;private boolean closed;
+        Staged(Held held,Spec spec,String digest){this.held=held;this.spec=spec;this.digest=digest;}
+        Spec spec(){return spec;}String digest(){return digest;}Path storage(){if(closed)throw new IllegalStateException("Staging is closed");return root;}
+        long authorize(Connection c,InstanceAdministrator administrators,InstanceAdministrator.Proof proof,InstanceConfiguration.Snapshot current,Instant now) throws SQLException,IOException {
+            if(closed)throw invalid();var reference=reference();if(!reference.spec().equals(spec)||!reference.digest().equals(digest))throw invalid();
+            Path path=reference.stage().resolve("target-configuration.json");var expected=reference.metadata().path("entries").path("target-configuration.json");file(path);
+            if(Files.size(path)!=expected.path("bytes").asLong()||!sha256(path).equals(expected.path("sha256").asText()))throw invalid();var target=read(path,4_000_000);
+            if(!target.equals(current.document()))throw new ApiFailure(409,"INSTANCE_TARGET_CONFIGURATION_CHANGED");
+            for(var entry:current.files().entrySet()) {
+                var receipt=reference.metadata().path("entries").path("target/"+entry.getKey());
+                String actual;try{actual=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(entry.getValue()));}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException();}
+                if(!receipt.path("sha256").asText().equals(actual)||receipt.path("bytes").asLong()!=entry.getValue().length)throw new ApiFailure(409,"INSTANCE_TARGET_CONFIGURATION_CHANGED");
+            }
+            return authorizeIntent(spec,digest,target,c,administrators,proof,now);
+        }
+        public void close() throws IOException {if(closed)return;closed=true;held.close();}
+    }
+    Staged staged() throws IOException {Held held=new Held();boolean success=false;try{var value=reference();var result=new Staged(held,value.spec(),value.digest());success=true;return result;}finally{if(!success)held.close();}}
     Prepared prepare(Spec spec,InstanceBackupArchive.Verified archive,InstanceConfiguration.Snapshot target,Instant now) throws IOException {
+        var staged=stage(spec,archive,target,now);boolean success=false;
+        try{var result=load(staged.held);staged.closed=true;success=true;return result;}finally{if(!success)staged.close();}
+    }
+    Staged stage(Spec spec,InstanceBackupArchive.Verified archive,InstanceConfiguration.Snapshot target,Instant now) throws IOException {
         Held held=new Held();Path stage=null;boolean complete=false;
         try {
             if(Files.exists(root.resolve("prepared.json"),NOFOLLOW_LINKS))throw new IOException("INSTANCE_RESTORE_BUSY");
@@ -126,7 +161,7 @@ final class InstanceRestoreIntent {
             InstanceRestoreDatabase.verifyArchive(archive);byte[] bytes=MAPPER.writeValueAsBytes(metadata);if(bytes.length>131072)throw invalid();
             write(stage,"intent.json",bytes,null);sync(stage);sync(root);String digest=sha256(stage.resolve("intent.json"));
             savePointer(object().put("format",FORMAT).put("generation",spec.generation().toString()).put("sha256",digest));
-            var result=load(held);complete=true;return result;
+            var result=new Staged(held,spec,digest);complete=true;return result;
         }catch(IOException|RuntimeException failure){throw failure;}
         finally{if(!complete){try{if(stage!=null&&!Files.exists(root.resolve("prepared.json"),NOFOLLOW_LINKS))InstanceBackupArchive.remove(stage);}finally{held.close();}}}
     }
@@ -147,13 +182,38 @@ final class InstanceRestoreIntent {
             Path stage=root.resolve(active.generation().toString());if(Files.exists(stage,NOFOLLOW_LINKS)){directory(stage);InstanceBackupArchive.remove(stage);sync(root);}
         }
     }
+    /** Unreferenced private plaintext cannot authorize a restore and can be reclaimed. */
+    int cleanupOrphans(Connection c,InstanceAdministrator administrators,InstanceAdministrator.Proof proof,UUID operation,Instant now) throws SQLException,IOException {
+        try(var held=new Held()) {
+            lock(c);administrators.check(c,proof.principal());if(proof.verifiedAt().isBefore(now.minusSeconds(300))||proof.verifiedAt().isAfter(now.plusSeconds(5)))throw new ApiFailure(422,"INSTANCE_PROOF_REQUIRED");
+            var control=control(c,true);if(control.path("restorePending").asBoolean())throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");var protectedIds=new HashSet<UUID>();
+            if(control.hasNonNull("restoreGeneration"))protectedIds.add(uuid(control.path("restoreGeneration").asText()));
+            if(Files.exists(root.resolve("active.json"),NOFOLLOW_LINKS))protectedIds.add(InstanceRestoreMaterial.active(root).generation());
+            Path pointer=root.resolve("prepared.json");
+            if(Files.exists(pointer,NOFOLLOW_LINKS)) {
+                var reference=reference();boolean obsolete=false;
+                try{var receipt=operation(c,reference.spec().operation(),true);obsolete=Set.of("FAILED","INTERRUPTED","EXPIRED").contains(receipt.path("payload").path("state").asText())||receipt.path("payload").path("restorePhase").asText().equals("STAGE_FAILED");}catch(ApiFailure missing){if(missing.status!=409)throw missing;obsolete=true;}
+                if(obsolete){if(protectedIds.contains(reference.spec().generation()))throw invalid();InstanceRestoreMaterial.discardUnpublished(root,reference.spec().generation(),reference.digest());Files.delete(pointer);sync(root);}else protectedIds.add(reference.spec().generation());
+            }
+            int removed=0;Path materials=root.resolve("material");
+            if(Files.exists(materials,NOFOLLOW_LINKS)){directory(materials);try(var entries=Files.list(materials)){for(Path path:entries.toList())if(path.getFileName().toString().matches("\\.install-[a-f0-9-]{36}")){directory(path);InstanceBackupArchive.remove(path);removed++;}}sync(materials);}
+            try(var entries=Files.list(root)) {
+                for(Path path:entries.toList()) {
+                    String name=path.getFileName().toString();
+                    if(name.matches("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}")&&!protectedIds.contains(UUID.fromString(name))){directory(path);InstanceBackupArchive.remove(path);removed++;}
+                    else if(name.matches("\\.pointer-[a-f0-9-]{36}")){file(path);Files.delete(path);removed++;}
+                }
+            }
+            if(removed>0){sync(root);execute(c,"INSERT INTO tk_instance(id,kind,version,operation_id,actor_owner,occurred_at,payload) VALUES(?,'AUDIT',1,?,?,?,?)",UUID.randomUUID(),operation,proof.principal().owner(),now.toString(),object().put("type","RESTORE").put("state","EXPIRED").put("action","RESTORE_STAGING_CLEANED").put("count",removed).toString());}return removed;
+        }
+    }
     Prepared open() throws IOException {Held held=new Held();boolean complete=false;try{var result=load(held);complete=true;return result;}finally{if(!complete)held.close();}}
     /** Cancellation reads only the small handoff header, never decrypted business data. */
     final class Cancellation implements AutoCloseable {
         private final Held held;private final UUID operation,generation;private final String digest,actor;private final Spec spec;private boolean closed;
         Cancellation(Held held,Connection c,UUID operation) throws IOException,SQLException {
             this.held=held;this.operation=operation;var row=cancellationOperation(c,false);var payload=row.path("payload");actor=row.path("actor").asText();
-            if(payload.path("state").asText().equals("EXPIRED")&&payload.path("restorePhase").asText().equals("CANCELLED")||payload.path("state").asText().equals("REVIEW")&&payload.path("restorePhase").asText().equals("PREPARED")) {
+            if(payload.path("state").asText().equals("EXPIRED")&&payload.path("restorePhase").asText().equals("CANCELLED")||payload.path("state").asText().equals("REVIEW")&&Set.of("PREPARED","STAGED").contains(payload.path("restorePhase").asText())) {
                 var binding=payload.path("restoreIntent");fields(binding,Set.of("generation","sha256"));generation=uuid(binding.path("generation").asText());digest=binding.path("sha256").asText();if(!digest.matches("[a-f0-9]{64}"))throw invalid();spec=null;
             }else {
                 var reference=reference();spec=reference.spec();generation=spec.generation();digest=reference.digest();
@@ -210,8 +270,12 @@ final class InstanceRestoreIntent {
             // Committed consent is authoritative even if its staged header or
             // decrypted image was damaged. Cancellation never applies that image.
             if(pendingAllowed&&payload.path("state").asText().equals("REVIEW")&&control.path("restorePending").asBoolean()&&payload.path("restorePhase").asText().equals("PREPARED")&&payload.path("restoreIntent").equals(binding())&&control.path("restoreIntent").equals(binding()))return;
-            if(spec==null||!control.path("artifactRootId").asText().equals(spec.artifactRoot().toString())||!Objects.equals(control.hasNonNull("restoreGeneration")?control.path("restoreGeneration").asText():null,spec.previousGeneration()==null?null:spec.previousGeneration().toString())||!payload.path("state").asText().equals("REVIEW"))throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
-            if(!control.path("restorePending").asBoolean()&&!payload.has("restorePhase")&&row.path("version").asLong()==spec.reviewVersion())return;
+            if(!control.path("restorePending").asBoolean()&&payload.path("state").asText().equals("REVIEW")&&payload.path("restorePhase").asText().equals("STAGED")&&payload.path("restoreIntent").equals(binding()))return;
+            if(spec==null||!control.path("artifactRootId").asText().equals(spec.artifactRoot().toString())||!Objects.equals(control.hasNonNull("restoreGeneration")?control.path("restoreGeneration").asText():null,spec.previousGeneration()==null?null:spec.previousGeneration().toString()))throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
+            if(!control.path("restorePending").asBoolean()) {
+                if(payload.path("state").asText().equals("REVIEW")&&!payload.has("restorePhase")&&row.path("version").asLong()==spec.reviewVersion())return;
+                if(Set.of("REVIEW","INTERRUPTED","FAILED").contains(payload.path("state").asText())&&Set.of("STAGING","STAGE_FAILED").contains(payload.path("restorePhase").asText())&&payload.path("restoreStageGeneration").asText().equals(generation.toString())&&row.path("version").asLong()>=spec.reviewVersion()-1&&row.path("version").asLong()<=spec.reviewVersion())return;
+            }
             throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
         }
         /** Call only after committing cancellation. Partial deletion can be retried from the receipt. */
@@ -245,7 +309,7 @@ final class InstanceRestoreIntent {
         Held held=new Held();boolean complete=false;
         try {
             boolean cancelled=false;try(var statement=query(c,"SELECT payload FROM tk_instance WHERE id=? AND kind='OPERATION'",operation);var rows=statement.executeQuery()) {
-                if(rows.next()){var payload=parse(rows.getString(1));cancelled=payload.path("type").asText().equals("RESTORE")&&payload.path("state").asText().equals("EXPIRED")&&payload.path("restorePhase").asText().equals("CANCELLED");}
+                if(rows.next()){var payload=parse(rows.getString(1));cancelled=payload.path("type").asText().equals("RESTORE")&&payload.path("state").asText().equals("EXPIRED")&&payload.path("restorePhase").asText().equals("CANCELLED")||payload.path("type").asText().equals("RESTORE")&&payload.path("state").asText().equals("REVIEW")&&payload.path("restorePhase").asText().equals("STAGED");}
             }
             if(!cancelled&&(!Files.exists(root.resolve("prepared.json"),NOFOLLOW_LINKS)||!reference().spec().operation().equals(operation)))return null;
             var result=new Cancellation(held,c,operation);complete=true;return result;

@@ -30,6 +30,7 @@ def main():
     parser.add_argument('--https', action='store_true', help='Use a loopback HTTPS reverse proxy with a test-only certificate')
     parser.add_argument('--mail', action='store_true', help='Exercise delivery with a loopback-only SMTP capture fixture (requires --https)')
     parser.add_argument('--passkeys', action='store_true', help='Use the HTTPS localhost RP for virtual WebAuthn browser tests (requires --https)')
+    parser.add_argument('--restore', action='store_true', help='Enable private restore staging for isolated confirmation acceptance')
     args = parser.parse_args()
     if args.mail and not args.https:parser.error('--mail requires --https')
     if args.passkeys and not args.https:parser.error('--passkeys requires --https')
@@ -57,7 +58,7 @@ def main():
         fixture = RecoveryFixture(data,port,https=args.https,mail=args.mail,hostname='localhost' if args.passkeys else '127.0.0.1',calendars=True)
         base = fixture.base
         environment = {**os.environ, 'TIMEKEEPER_SERVER_DB_URL':'jdbc:h2:' + str(data / 'database'), 'TIMEKEEPER_SERVER_TOKENS_FILE':str(registry), 'TIMEKEEPER_SERVER_SETUP_FILE':str(data / 'setup.json'),
-                       'TIMEKEEPER_INSTANCE_BACKUP_STORAGE':str(data / 'instance-backups'), 'TIMEKEEPER_PUBLIC_ORIGIN':base if args.https else 'NONE', 'TIMEKEEPER_DEPLOYED_AT':'2026-10-13T08:30:00Z', 'TIMEKEEPER_WEB_BUILD_COMMIT':manifest['commit'], 'TIMEKEEPER_SPK_VERSION':'1.99.0-146', **fixture.environment}
+                       'TIMEKEEPER_INSTANCE_BACKUP_STORAGE':str(data / 'instance-backups'), 'TIMEKEEPER_INSTANCE_RESTORE_STORAGE':str(data / 'instance-restore') if args.restore else 'NONE', 'TIMEKEEPER_PUBLIC_ORIGIN':base if args.https else 'NONE', 'TIMEKEEPER_DEPLOYED_AT':'2026-10-13T08:30:00Z', 'TIMEKEEPER_WEB_BUILD_COMMIT':manifest['commit'], 'TIMEKEEPER_SPK_VERSION':'1.99.0-146', **fixture.environment}
         server_log = ROOT / 'server/web/target/server.log'
         server_log.parent.mkdir(parents=True, exist_ok=True)
         with server_log.open('w') as log:
@@ -87,7 +88,7 @@ def main():
                 command = ['npm', 'run', 'test:browser'] + (['--',*options] if options else [])
                 # Retain per-test limits and the bounded suite runtime, with
                 # browser setup/HTTPS headroom in the 25-minute CI job.
-                result = subprocess.run(command, cwd=ROOT / 'server/web', env={**environment, 'TIMEKEEPER_WEB_URL':base, 'TIMEKEEPER_WEB_TOKEN':tokens[0], 'TIMEKEEPER_WEB_READ_TOKEN':tokens[1], 'TIMEKEEPER_WEB_REGISTRY':str(registry), 'TIMEKEEPER_WEB_SETUP_CODE':code, 'TIMEKEEPER_WEB_PASSWORD':password, 'TIMEKEEPER_WEB_BROWSER':args.browser,'TIMEKEEPER_WEB_PASSKEY_FIXTURE':'true' if args.passkeys else 'false'}, timeout=720)
+                result = subprocess.run(command, cwd=ROOT / 'server/web', env={**environment, 'TIMEKEEPER_WEB_URL':base, 'TIMEKEEPER_WEB_TOKEN':tokens[0], 'TIMEKEEPER_WEB_READ_TOKEN':tokens[1], 'TIMEKEEPER_WEB_REGISTRY':str(registry), 'TIMEKEEPER_WEB_SETUP_CODE':code, 'TIMEKEEPER_WEB_PASSWORD':password, 'TIMEKEEPER_WEB_BROWSER':args.browser,'TIMEKEEPER_WEB_RESTORE_FIXTURE':'true' if args.restore else 'false','TIMEKEEPER_WEB_PASSKEY_FIXTURE':'true' if args.passkeys else 'false'}, timeout=720)
                 if result.returncode: raise RuntimeError('Browser acceptance failed')
                 (output / 'acceptance.json').write_text(json.dumps({'distributionSha256':digest, 'sourceCommit':manifest['commit'], 'serverPid':process.pid, 'browser':args.browser, 'https':args.https,'loopbackSmtp':args.mail,'virtualPasskeys':args.passkeys,'passed':True}, indent=2) + '\n')
             finally:

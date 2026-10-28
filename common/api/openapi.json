@@ -15594,6 +15594,282 @@
           }
         }
       }
+    },
+    "/admin/instance/uploads/{id}/staging": {
+      "get": {
+        "operationId": "getInstanceRestoreStage",
+        "summary": "Read the initiating session’s restore preparation status",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator browser-account session with write access and original upload session required. No secrets, file paths or consent capabilities are returned.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "200": {
+            "description": "Prepare private restore files and review destination mapping",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreStage"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "stageInstanceRestore",
+        "summary": "Prepare private restore files and review destination mapping",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Requires fresh administrator password proof, browser CSRF/owner binding and the original upload session. Staging validates and copies private data without applying it. Confirmation rechecks the empty target and exact staged version/generation, commits maintenance consent, and requires all target processes to be stopped and one restarted for exclusive preboot recovery. Other API calls remain gated while pending; no privileged host restart is performed.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "202": {
+            "description": "Prepare private restore files and review destination mapping",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreStage"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceRestoreStageInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/instance/uploads/{id}/confirm": {
+      "post": {
+        "operationId": "confirmInstanceRestore",
+        "summary": "Commit explicit restore consent and enter maintenance until restart",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Requires fresh administrator password proof, browser CSRF/owner binding and the original upload session. Staging validates and copies private data without applying it. Confirmation rechecks the empty target and exact staged version/generation, commits maintenance consent, and requires all target processes to be stopped and one restarted for exclusive preboot recovery. Other API calls remain gated while pending; no privileged host restart is performed.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "202": {
+            "description": "Commit explicit restore consent and enter maintenance until restart",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreConfirmation"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceRestoreConfirmInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -28855,6 +29131,9 @@
                 }
               }
             }
+          },
+          "restoreStorageConfigured": {
+            "type": "boolean"
           }
         }
       },
@@ -28911,6 +29190,203 @@
               "DEPLOYMENT_MAPPING",
               "OFFLINE_ACTIVATION"
             ]
+          }
+        }
+      },
+      "InstanceRestoreStageInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "currentPassword",
+          "passphrase",
+          "operationVersion",
+          "publicOrigin",
+          "passkeyRpId",
+          "passkeysEnabled"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "writeOnly": true,
+            "format": "password"
+          },
+          "passphrase": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 1024,
+            "writeOnly": true,
+            "format": "password",
+            "description": "Encryption passphrase; never retained in an operation receipt."
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740986
+          },
+          "publicOrigin": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "passkeyRpId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          },
+          "passkeysEnabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "InstanceRestoreConfirmInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "currentPassword",
+          "operationVersion",
+          "generation",
+          "confirmation"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "writeOnly": true,
+            "format": "password"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740986
+          },
+          "generation": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "confirmation": {
+            "type": "string",
+            "maxLength": 80,
+            "pattern": "^RESTORE [a-z][a-z0-9_-]{0,63}$"
+          }
+        }
+      },
+      "InstanceRestoreDeployment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "packageId",
+          "publicOrigin",
+          "passkeyRpId",
+          "passkeysEnabled",
+          "databaseType",
+          "httpHost",
+          "httpPort",
+          "httpsPort"
+        ],
+        "properties": {
+          "packageId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+          },
+          "publicOrigin": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "passkeyRpId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          },
+          "passkeysEnabled": {
+            "type": "boolean"
+          },
+          "databaseType": {
+            "enum": [
+              "h2",
+              "postgresql"
+            ]
+          },
+          "httpHost": {
+            "type": "string"
+          },
+          "httpPort": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "httpsPort": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535
+          }
+        }
+      },
+      "InstanceRestoreStage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "operationVersion",
+          "phase"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "phase": {
+            "enum": [
+              "NONE",
+              "PREPARING",
+              "READY",
+              "FAILED"
+            ]
+          },
+          "generation": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target": {
+            "$ref": "#/components/schemas/InstanceRestoreDeployment"
+          }
+        }
+      },
+      "InstanceRestoreConfirmation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "generation",
+          "operationVersion",
+          "phase",
+          "publicOrigin"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "generation": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "phase": {
+            "const": "PENDING_RESTART"
+          },
+          "publicOrigin": {
+            "type": "string"
           }
         }
       }

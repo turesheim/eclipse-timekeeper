@@ -571,7 +571,7 @@ class ContractTest(unittest.TestCase):
             'passkeyProofOptions', 'verifyPasskeyProof', 'renamePasskey', 'removePasskey',
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
-            'getInstanceBackupSummary', 'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup', 'createInstanceRestoreUpload', 'getInstanceRestoreUpload', 'appendInstanceRestoreUpload', 'validateInstanceRestoreUpload', 'checkInstanceRestoreTarget',
+            'getInstanceBackupSummary', 'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup', 'createInstanceRestoreUpload', 'getInstanceRestoreUpload', 'appendInstanceRestoreUpload', 'validateInstanceRestoreUpload', 'checkInstanceRestoreTarget', 'getInstanceRestoreStage', 'stageInstanceRestore', 'confirmInstanceRestore',
             'getAdministrationSettings', 'updateAdministrationSettings', 'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()

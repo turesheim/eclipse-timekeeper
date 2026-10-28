@@ -14,6 +14,7 @@ import java.util.Arrays;
 public class InstanceRestoreUploadResource {
     @Inject InstanceAdministrator administrators;
     @Inject InstanceRestoreUploads uploads;
+    @Inject InstanceRestoreActivation activation;
     @Inject RequestIdentity identity;
     @Inject ContractInputs inputs;
     @Context UriInfo uri;
@@ -40,4 +41,20 @@ public class InstanceRestoreUploadResource {
         try{var proof=administrators.verify(identity.principal(),input.path("currentPassword").asText());phrase=input.path("passphrase").asText().toCharArray();return reply(202,uploads.startValidation(proof,ContractInputs.pathId(id),phrase),true);}
         finally{if(phrase!=null)Arrays.fill(phrase,'\0');((ObjectNode)input).remove(java.util.List.of("currentPassword","passphrase"));}
     }
+    @GET @Path("/{id}/staging") public Response staging(@PathParam("id") String id) {
+        ContractInputs.queries(uri.getQueryParameters());return new ApiReplies(200,activation.get(identity.principal(),ContractInputs.pathId(id)),null,null).response();
+    }
+    @POST @Path("/{id}/staging") @Consumes("application/json") public Response stage(@PathParam("id") String id,JsonNode body) {
+        ContractInputs.queries(uri.getQueryParameters());administrators.require(identity.principal());var input=inputs.validate("InstanceRestoreStageInput",body);char[] phrase=null;
+        try {
+            var proof=administrators.verify(identity.principal(),input.path("currentPassword").asText());phrase=input.path("passphrase").asText().toCharArray();
+            return new ApiReplies(202,activation.start(proof,ContractInputs.pathId(id),input.path("operationVersion").asLong(),phrase,input.path("publicOrigin").asText(),input.path("passkeyRpId").asText(),input.path("passkeysEnabled").asBoolean()),null,null).response();
+        }finally{if(phrase!=null)Arrays.fill(phrase,'\0');((ObjectNode)input).remove(java.util.List.of("currentPassword","passphrase"));}
+    }
+    @POST @Path("/{id}/confirm") @Consumes("application/json") public Response confirm(@PathParam("id") String id,JsonNode body) {
+        ContractInputs.queries(uri.getQueryParameters());administrators.require(identity.principal());var input=inputs.validate("InstanceRestoreConfirmInput",body);
+        try{return new ApiReplies(202,activation.confirm(administrators.verify(identity.principal(),input.path("currentPassword").asText()),ContractInputs.pathId(id),input.path("operationVersion").asLong(),ContractInputs.pathId(input.path("generation").asText()),input.path("confirmation").asText()),null,null).response();}
+        finally{((ObjectNode)input).remove("currentPassword");}
+    }
+
 }

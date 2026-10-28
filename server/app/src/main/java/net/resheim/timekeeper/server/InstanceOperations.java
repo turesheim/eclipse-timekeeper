@@ -75,6 +75,36 @@ final class InstanceOperations {
         advance(connection,lease,State.VALIDATING,State.REVIEW,now);var row=read(connection,lease.id(),true);
         row.payload().remove("validationCode");row.payload().set("review",review.deepCopy());update(connection,row,now,row.payload());
     }
+    static ObjectNode stagingInfo(Connection c,UUID id,TokenRegistry.Principal principal) {
+        var row=uploadRow(c,id,principal);String phase=row.payload().path("restorePhase").asText();
+        var result=object().put("id",id.toString()).put("operationVersion",row.status().version()).put("phase",switch(phase){case "STAGING"->row.status().state()==State.REVIEW?"PREPARING":"FAILED";case "STAGED"->row.status().state()==State.REVIEW?"READY":"NONE";case "STAGE_FAILED"->"FAILED";default->"NONE";});
+        if(row.payload().has("stageSummary"))result.set("target",row.payload().get("stageSummary").deepCopy());
+        if(row.payload().has("restoreStageGeneration"))result.set("generation",row.payload().get("restoreStageGeneration"));return result;
+    }
+    static Lease beginStaging(Connection c,UUID id,TokenRegistry.Principal principal,long version,UUID generation,ObjectNode summary,Instant now) {
+        lockControl(c);var row=uploadRow(c,id,principal);
+        if(row.status().version()!=version)throw new ApiFailure(412,"STALE_VERSION");
+        if(row.status().state()!=State.REVIEW||!Set.of("","STAGE_FAILED").contains(row.payload().path("restorePhase").asText()))throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
+        var lease=new Lease(id,UUID.randomUUID());row.payload().put("restorePhase","STAGING").put("restoreStageGeneration",generation.toString()).put("worker",lease.worker().toString()).put("leaseUntil",now.plus(LEASE).toString());row.payload().set("stageSummary",summary.deepCopy());
+        update(c,row,now,row.payload());return lease;
+    }
+    /** Private renewal does not invalidate the version reserved for the published stage. */
+    static void renewStaging(Connection c,Lease lease,Instant now) {
+        lockControl(c);var row=read(c,lease.id(),true);requireStaging(row,lease,now);row.payload().put("leaseUntil",now.plus(LEASE).toString());
+        execute(c,"UPDATE tk_instance SET payload=? WHERE id=? AND version=?",row.payload().toString(),lease.id(),row.status().version());
+    }
+    static void finishStaging(Connection c,Lease lease,long version,UUID generation,String digest,Instant now) {
+        lockControl(c);var row=read(c,lease.id(),true);requireStaging(row,lease,now);
+        if(row.status().version()+1!=version||!row.payload().path("restoreStageGeneration").asText().equals(generation.toString()))throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
+        row.payload().put("restorePhase","STAGED");row.payload().putObject("restoreIntent").put("generation",generation.toString()).put("sha256",digest);row.payload().remove(List.of("worker","leaseUntil"));update(c,row,now,row.payload());
+        insert(c,UUID.randomUUID(),"AUDIT",lease.id(),row.actor(),now,object().put("type","RESTORE").put("state","REVIEW").put("action","RESTORE_STAGED"));
+    }
+    static void failStaging(Connection c,Lease lease,Instant now) {
+        lockControl(c);var row=read(c,lease.id(),true);requireStaging(row,lease,now);row.payload().put("restorePhase","STAGE_FAILED").remove(List.of("worker","leaseUntil"));update(c,row,now,row.payload());
+    }
+    private static void requireStaging(Row row,Lease lease,Instant now) {
+        requireLease(row.payload(),lease,State.REVIEW,now);if(!row.payload().path("restorePhase").asText().equals("STAGING"))throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
+    }
     static void issueDownload(Connection connection,UUID id,TokenRegistry.Principal principal,String digest,Instant verifiedAt,Instant expires,long bytes,Instant now) {
         lockControl(connection);var row=read(connection,id,true);readyBackup(row);
         if(verifiedAt.isBefore(now.minusSeconds(300))||verifiedAt.isAfter(now.plusSeconds(5))||!expires.isAfter(now)||expires.isAfter(now.plusSeconds(120))||bytes<1)throw new ApiFailure(403,"INSTANCE_DOWNLOAD_REQUIRED");

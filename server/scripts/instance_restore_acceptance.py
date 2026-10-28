@@ -20,6 +20,8 @@ import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
 
+from public_restore_acceptance import verify_public_restore
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -157,8 +159,10 @@ def main():
         if (cancelled_fixture / 'intents, café/prepared.json').exists():
             raise ValueError('Cancelled recovery retained its plaintext handoff')
         verify_http_recovery(app, cancelled_fixture, environment, restored=False)
+        verify_public_restore(ROOT, app, stage / 'public-fixture', fixture_classpath,
+                              {key: value for key, value in environment.items() if not key.startswith('TIMEKEEPER_')})
         evidence = {'sourceCommit': manifest['commit'], 'distributionSha256': digest,
-                    'packagedRuntimeOnly': True, 'automaticPreboot': True, 'restoredPasswordLogin': True, 'restoredClientRead': True, 'httpRestart': True, 'missingMaterialRejectedBeforeHttp': True, 'fileBackedCredentials': True, 'completedRetry': True, 'plaintextStagingRemoved': True, 'offlineCancellation': True, 'cancelledStartup': True}
+                    'packagedRuntimeOnly': True, 'automaticPreboot': True, 'restoredPasswordLogin': True, 'restoredClientRead': True, 'httpRestart': True, 'missingMaterialRejectedBeforeHttp': True, 'fileBackedCredentials': True, 'completedRetry': True, 'plaintextStagingRemoved': True, 'offlineCancellation': True, 'cancelledStartup': True, 'publicStageConfirm': True, 'restoredJournalLabelAsset': True, 'sourceArchiveUnchanged': True}
         output = ROOT / 'server/target/acceptance'
         output.mkdir(parents=True, exist_ok=True)
         (output / 'instance-restore.json').write_text(json.dumps(evidence, indent=2) + '\n')

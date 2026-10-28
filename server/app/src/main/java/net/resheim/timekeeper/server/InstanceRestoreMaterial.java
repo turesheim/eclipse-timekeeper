@@ -23,14 +23,16 @@ final class InstanceRestoreMaterial {
         Path configuration(){return directory.resolve("application.properties");}
         @Override public String toString(){return "Private recovered instance material";}
     }
-    static Installed install(InstanceRestoreIntent.Prepared prepared) throws IOException {
-        Path root=prepared.storage();directory(root);var spec=prepared.spec();Path material=root.resolve("material");mkdir(material);sync(root);
+    static Installed install(InstanceRestoreIntent.Prepared prepared) throws IOException {return install(prepared.storage(),prepared.spec(),prepared.digest(),prepared.archive());}
+    static Installed install(InstanceRestoreIntent.Staged staged,InstanceBackupArchive.Verified archive) throws IOException {return install(staged.storage(),staged.spec(),staged.digest(),archive);}
+    private static Installed install(Path root,InstanceRestoreIntent.Spec spec,String intentDigest,InstanceBackupArchive.Verified archive) throws IOException {
+        directory(root);Path material=root.resolve("material");mkdir(material);sync(root);
         Path destination=material.resolve(spec.generation().toString());
-        if(Files.exists(destination,NOFOLLOW_LINKS))return expected(read(root,spec.generation(),null),prepared);
+        if(Files.exists(destination,NOFOLLOW_LINKS))return expected(read(root,spec.generation(),null),spec,intentDigest);
         Path stage=material.resolve(".install-"+UUID.randomUUID());mkdir(stage);boolean renamed=false;
         try {
-            InstanceRestoreDatabase.verifyArchive(prepared.archive());var source=prepared.archive().configuration();
-            var metadata=object().put("format",FORMAT).put("generation",spec.generation().toString()).put("operation",spec.operation().toString()).put("intentDigest",prepared.digest());var entries=metadata.putObject("entries");
+            InstanceRestoreDatabase.verifyArchive(archive);var source=archive.configuration();
+            var metadata=object().put("format",FORMAT).put("generation",spec.generation().toString()).put("operation",spec.operation().toString()).put("intentDigest",intentDigest);var entries=metadata.putObject("entries");
             byte[] configuration=MAPPER.writeValueAsBytes(source.document());try{write(stage,"source-configuration.json",configuration,entries);}finally{Arrays.fill(configuration,(byte)0);}
             var inventory=new ArrayList<String>();inventory.add(destination.resolve("source-configuration.json").toString());
             for(var entry:new TreeMap<>(source.files()).entrySet()) {
@@ -52,7 +54,7 @@ final class InstanceRestoreMaterial {
             values.setProperty("timekeeper.instance-restored.files",literal(String.join(",",inventory.stream().map(InstanceRestoreMaterial::csv).toList())));
             var output=new ByteArrayOutputStream();values.store(output,"Recovered instance bindings; database and listener settings stay with the destination");byte[] bytes=output.toByteArray();try{write(stage,"application.properties",bytes,entries);}finally{Arrays.fill(bytes,(byte)0);}
             byte[] receipt=MAPPER.writeValueAsBytes(metadata);write(stage,"material.json",receipt,null);sync(stage);Files.move(stage,destination,StandardCopyOption.ATOMIC_MOVE);renamed=true;sync(material);
-            return expected(read(root,spec.generation(),null),prepared);
+            return expected(read(root,spec.generation(),null),spec,intentDigest);
         }finally{if(!renamed&&Files.exists(stage,NOFOLLOW_LINKS))InstanceBackupArchive.remove(stage);}
     }
     /** A published pointer never makes an uncommitted database phase active. */
@@ -68,8 +70,14 @@ final class InstanceRestoreMaterial {
         if(!pointer.path("format").asText().equals(FORMAT)||!pointer.path("sha256").isTextual()||!pointer.path("sha256").asText().matches("[a-f0-9]{64}"))throw invalid();
         return read(root,uuid(pointer.path("generation")),pointer.path("sha256").asText());
     }
-    private static Installed expected(Installed material,InstanceRestoreIntent.Prepared prepared) throws IOException {
-        if(!material.generation().equals(prepared.spec().generation())||!material.operation().equals(prepared.spec().operation())||!material.intentDigest().equals(prepared.digest()))throw invalid();return material;
+    static void discardUnpublished(Path root,UUID generation,String intentDigest) throws IOException {
+        if(Files.exists(root.resolve("active.json"),NOFOLLOW_LINKS)&&active(root).generation().equals(generation))throw invalid();
+        Path parent=root.resolve("material"),path=parent.resolve(generation.toString());if(!Files.exists(parent,NOFOLLOW_LINKS))return;directory(parent);if(!Files.exists(path,NOFOLLOW_LINKS))return;
+        var value=read(root,generation,null);if(!value.intentDigest().equals(intentDigest))throw invalid();InstanceBackupArchive.remove(path);sync(parent);
+    }
+    private static Installed expected(Installed material,InstanceRestoreIntent.Prepared prepared) throws IOException {return expected(material,prepared.spec(),prepared.digest());}
+    private static Installed expected(Installed material,InstanceRestoreIntent.Spec spec,String digest) throws IOException {
+        if(!material.generation().equals(spec.generation())||!material.operation().equals(spec.operation())||!material.intentDigest().equals(digest))throw invalid();return material;
     }
     private static Installed read(Path root,UUID generation,String expected) throws IOException {
         try {

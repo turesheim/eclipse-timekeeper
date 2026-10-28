@@ -113,7 +113,7 @@ class InstanceBackupJobs {
     com.fasterxml.jackson.databind.node.ObjectNode summary(TokenRegistry.Principal principal) {
         return accounts.tx(c->{lock(c);administrators.check(c,principal);
             var result=JsonValues.object().put("storageConfigured",storage!=null&&!storage.isBlank()&&!storage.equals("NONE"))
-                .put("maximumArchiveBytes",maximumBytes).put("chunkBytes",InstanceArtifacts.CHUNK_BYTES);
+                .put("restoreStorageConfigured",restoreStorage!=null&&!restoreStorage.isBlank()&&!restoreStorage.equals("NONE")).put("maximumArchiveBytes",maximumBytes).put("chunkBytes",InstanceArtifacts.CHUNK_BYTES);
             result.set("items",recent(c,principal));return result;
         });
     }
