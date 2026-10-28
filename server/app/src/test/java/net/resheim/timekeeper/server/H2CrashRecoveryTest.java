@@ -24,7 +24,7 @@ class H2CrashRecoveryTest {
         String url="jdbc:h2:"+directory.resolve("existing")+";IFEXISTS=TRUE";
         String payload;
         try(var connection=DriverManager.getConnection(url,"sa", "");var statement=connection.createStatement()) {
-            ServerSchema.initializeOrValidate(connection);
+            ServerSchema.initializeOrValidate(connection,true);
             try(var row=statement.executeQuery("SELECT version,payload FROM tk_resource WHERE owner_id='compatibility-owner'")) {
                 org.junit.jupiter.api.Assertions.assertTrue(row.next());
                 assertEquals(9,row.getLong(1));payload=row.getString(2);

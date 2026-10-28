@@ -22,7 +22,7 @@ final class AccountArchiveImport {
         try {
             var parsed=AccountArchiveInput.readVerified(file.file(),upload.path("mediaType").asText());var value=parsed.data();
             for(String name:DomainTransfer.TYPES.keySet()) if(value.path("work").path(name).size()>250000) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
-            if(value.path("dayNotes").size()>250000 || value.path("weekNotes").size()>250000 || value.path("journalAssets").size()>10000
+            if(value.path("dayLabels").size()>250000 || value.path("dayNotes").size()>250000 || value.path("weekNotes").size()>250000 || value.path("journalAssets").size()>10000
                     || value.path("importHistory").size()>1000000) throw new ApiFailure(413,"PAYLOAD_TOO_LARGE");
             inputs.validate("AccountArchiveSnapshot",value);
             upload.put("verifiedArchiveId",value.path("archiveId").asText()).put("verifiedArchiveDigest",parsed.sha256());return new Document(file,value);
@@ -30,12 +30,13 @@ final class AccountArchiveImport {
     }
     private void restoreJournals(Document document){
         var archive=document.data();
+        new DayLabels(store).restore(archive.path("dayLabels"));
         new DayNotes(store).restore(archive.path("dayNotes"));new WeekNotes(store).restore(archive.path("weekNotes"));new JournalAssets(store).restore(archive.path("journalAssets"));
-        if(archive.path("journalFiles").size()>0)ArchiveJournalFiles.restore(document.file().file(),archive.path("journalFiles"),store);
+        if(archive.path("journalFiles").size()>0)ArchiveJournalFiles.restore(document.file().file(),archive.path("journalFiles"),store,archive.has("dayLabels"));
     }
     private void importWork(Document document){
         var archive=document.data();
-        if(archive.path("format").asText().equals(AccountArchive.FORMAT)&&archive.path("work").path("taskAttachments").size()>0){
+        if(!archive.path("format").asText().equals(AccountArchive.LEGACY_FORMAT)&&archive.path("work").path("taskAttachments").size()>0){
             try(var reader=new ArchiveJournalFiles.TaskReader(document.file().file(),archive.path("journalFiles"))){new DomainTransfer(store).importRecords(archive.path("work"),reader::data);}
         }else new DomainTransfer(store).importRecords(archive.path("work"));
     }

@@ -69,21 +69,21 @@ class JournalDavHttpTest {
         var rest=client("test-a").get("/api/v1/day-notes/"+day); // Basic credentials are reserved for WebDAV.
         assertEquals(401,rest.statusCode());
         rest=given().header("Authorization","Bearer test-a").get("/api/v1/day-notes/"+day);
-        assertEquals("Planning",rest.jsonPath().getString("text"));assertEquals("# Body\r\n  spaces  \r\n",rest.jsonPath().getString("body"));
+        assertEquals("",rest.jsonPath().getString("text"));assertEquals("# Body\r\n  spaces  \r\n",rest.jsonPath().getString("body"));
         assertFalse(rest.asString().contains("custom"));assertFalse(rest.asString().contains("modifiedAt"));
         var calendar=given().header("Authorization","Bearer test-a").header("If-Match",rest.header("ETag"))
                 .contentType("application/json").body("{\"text\":\"Updated\"}").put("/api/v1/day-notes/"+day);
         assertEquals(200,calendar.statusCode());
-        assertEquals(412,client("test-a").header("If-Match",firstTag).body(source).put(file).statusCode());
-        assertEquals(412,client("test-a").header("If-Match",firstTag).delete(file).statusCode());
         assertEquals(428,client("test-a").header("If-Match","*").body(source).put(file).statusCode());
         String afterCalendar=client("test-a").get(file).asString();assertTrue(afterCalendar.contains("custom: first"));
         assertTrue(afterCalendar.endsWith("# Body\r\n  spaces  \r\n"));
-        String secondTag=client("test-a").head(file).header("ETag");assertNotEquals(firstTag,secondTag);
+        String secondTag=client("test-a").head(file).header("ETag");assertEquals(firstTag,secondTag);
         String metadataOnly=afterCalendar.replace("custom: first","custom: second");
         var metadata=client("test-a").header("If-Match",secondTag).contentType("text/markdown").body(metadataOnly).put(file);
         assertEquals(204,metadata.statusCode());assertNotEquals(secondTag,metadata.header("ETag"));
         assertEquals(metadataOnly,client("test-a").get(file).asString());
+        assertEquals(412,client("test-a").header("If-Match",firstTag).body(source).put(file).statusCode());
+        assertEquals(412,client("test-a").header("If-Match",firstTag).delete(file).statusCode());
         assertEquals(calendar.jsonPath().getLong("version")+1,given().header("Authorization","Bearer test-a").get("/api/v1/day-notes/"+day).jsonPath().getLong("version"));
         assertEquals(412,client("test-a").header("If-None-Match","*").body("overwrite").put(file).statusCode());
         assertEquals(428,client("test-a").delete(file).statusCode());

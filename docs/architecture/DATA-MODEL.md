@@ -557,7 +557,7 @@ The time-overlap calculation does not create a persistent association.
 ## Server day notes and WebDAV
 
 The server has a separate physical schema from embedded Eclipse storage
-(`ServerSchema.CURRENT` is 6). Day notes and their deletion markers reuse
+(`ServerSchema.CURRENT` is 7). Day notes and their deletion markers reuse
 `tk_resource(owner_id, entity_type, id, version, payload)` in both H2 and
 PostgreSQL. Its primary key is `(owner_id, entity_type, id)`; `payload` is JSON.
 These are logical row types, not extra SQL tables or Eclipse JPA entities.
@@ -566,32 +566,39 @@ their JSON payloads and are validated within owner-scoped server transactions.
 
 | `entity_type` | Identity and purpose |
 | --- | --- |
-| `DAY_NOTE` | One deterministic UUID per civil `YYYY-MM-DD` date and owner. Stores `date`, a canonical complete UTF-8 `markdown` document, derived short `text` label and Markdown `body`, an internal `modifiedAt` timestamp, and an optimistic `version`. A note is independent of activities and work sessions. An untouched date has no row and reads as version zero. |
+| `DAY_LABEL` | Independent date-keyed label with its own `text`, `version` and modification time. Clearing retains a versioned empty value. It neither requires a note nor shares its version, Markdown bytes or deletion lifecycle. |
+| `DAY_NOTE` | Date-keyed Markdown document with canonical UTF-8 `markdown`, projected `body`, internal `modifiedAt`, and its own optimistic `version`. An untouched date has no row and reads as version zero. Legacy `text` is retained only as private compatibility metadata; public labels come from `DAY_LABEL`. `labelIndependent` marks newly written note content; legacy fields may remain privately in migrated records. An existing `DAY_LABEL` row prevents legacy label resurrection. |
 | `JOURNAL_DELETE` | Date-keyed deletion marker with the `DAY_NOTE` version it applies to. Deleting keeps an empty, versioned note row so stale editors cannot recreate it with an old ETag. |
 | `WEEK_NOTE` | One deterministic UUID per ISO week Monday and owner. Stores the ISO week key (`YYYY-Www`), exact Markdown `body`, an internal modification time and optimistic `version`. The ISO week-based year may differ from the calendar year at New Year. |
 | `WEEK_NOTE_DELETE` | Week-keyed deletion marker tied to the `WEEK_NOTE` version. A deleted weekly file remains versioned so stale writes fail. |
 | `JOURNAL_ASSET` | One deterministic UUID per account and safe filename under `assets/`. The JSON payload contains the filename, base64 binary data, byte length, derived safe media type, modification time, deletion flag and optimistic version. Deleted rows retain their version so old ETags cannot be reused. |
 
-`DAY_NOTE` writes use conditional versions and publish a content-free profile
+`DAY_NOTE` and `DAY_LABEL` writes use independent conditional versions and publish a content-free profile
 invalidation through `tk_change`. Calendar range reads return only the label
 and `hasBody`, not the Markdown body. Active notes are included in account
 archives, including canonical Markdown even for empty but present notes.
-Version 2 account archives store daily and weekly notes as separate
+Version 3 account archives store labels separately and daily and weekly notes as separate
 `YYYY-MM-DD.md` and `YYYY-Www.md` files, with a checksummed `journalFiles` index.
 Journal assets use `assets/`; task attachment bytes use `assets/task attachments/` and
-retain their metadata in the task graph. Legacy version 1 archives with inline
+retain their metadata in the task graph. `archive.json.dayLabels` backs up labels separately, including explicit clears and labels on deleted-note dates. Legacy version 2 file archives and version 1 archives with inline
 `dayNotes`, `weekNotes` and `journalAssets` remain readable. Daily and weekly notes are independent.
 Active journal assets are also included; empty deletion markers are not.
 Historical rows from the retired SSH synchronization
 implementation are ignored; no data migration is required.
 
-Calendar and REST responses omit the internal `markdown` field. Existing
-`DAY_NOTE` rows without that field are reconstructed with `JournalMarkdown.render`
-when a complete document is requested; reading does not change their version.
-An actual edit stores the complete document and its label/body projections in
-one row update. A change only to unknown YAML metadata still increments the
-same version. An explicitly empty document is stored as `markdown: ""`; an
-absent property identifies a legacy row.
+Calendar and REST responses omit internal `markdown`, `modifiedAt` and migration
+markers. Legacy combined reads expose `text` and `labelVersion` alongside the
+note version; independent content reads omit both label fields. The editor
+command checks each changed resource's version and commits atomically. Deleting
+a note preserves its label, and clearing a label preserves the document.
+
+Schema 7 fences out older binaries. Startup migrates old label projections in
+owner-scoped transactions before serving requests, copying cleared values too.
+Existing canonical bytes and note versions stay unchanged. A virtual old document
+is materialized once, so later label changes cannot alter it. Existing
+`timekeeper-label` YAML is preserved as opaque metadata; new labels are never
+projected into new note documents. Older archives use an explicit legacy import
+adapter; current archives restore labels independently from Markdown files.
 
 The note bodies and complete Markdown documents are readable to the server.
 Protect their database, temporary files, backups and exports as described in

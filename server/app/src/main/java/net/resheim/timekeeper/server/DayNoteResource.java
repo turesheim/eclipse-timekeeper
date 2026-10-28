@@ -30,4 +30,17 @@ public class DayNoteResource {
         ContractInputs.queries(uri.getQueryParameters());var day=DayNotes.date(date);
         return tx(()->{var value=new DayNotes(store).delete(day,match);return new ApiReplies(204,null,JsonValues.etag(value),null);});
     }
+    @GET @Path("/{date}/content") public Response content(@PathParam("date")String date){
+        ContractInputs.queries(uri.getQueryParameters());var day=DayNotes.date(date);
+        return tx(()->ApiReplies.resource(200,new DayNotes(store).getContent(day),null));
+    }
+    @PUT @Path("/{date}/content") public Response content(@PathParam("date")String date,@HeaderParam("If-Match")String match,JsonNode body){
+        ContractInputs.queries(uri.getQueryParameters());var day=DayNotes.date(date);var input=inputs.validate("DayNoteContentInput",body);
+        return tx(()->ApiReplies.resource(200,new DayNotes(store).saveContent(day,match,input),null));
+    }
+    @DELETE @Path("/{date}/content") public Response deleteContent(@PathParam("date")String date,@HeaderParam("If-Match")String match){
+        ContractInputs.queries(uri.getQueryParameters());var day=DayNotes.date(date);
+        return tx(()->{var value=new DayNotes(store).deleteContent(day,match);return new ApiReplies(204,null,JsonValues.etag(value),null);});
+    }
+
 }

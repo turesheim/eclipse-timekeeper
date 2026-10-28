@@ -28,13 +28,16 @@ final class DayNotes {
         // Bind private tombstones to a precise version so an older replica's
         // later save cannot retain a stale deletion marker.
         boolean deleted=store.find(JournalState.Kind.JOURNAL_DELETE.name(),id(date))
-                .map(marker->marker.path("noteVersion").asLong()==value.path("version").asLong()&&!hasContent(value)).orElse(false);
+                .map(marker->marker.path("noteVersion").asLong()==value.path("version").asLong()&&emptyForDeletion(value)).orElse(false);
         value.put("deleted",deleted);
         return value.put("hasBody",!value.path("body").asText().isEmpty());
     }
+    /** Legacy combined read model; labelVersion protects its composite ETag. */
     ObjectNode get(LocalDate date){
-        return publicValue(record(date));
+        var result=getContent(date);var label=new DayLabels(store).get(date);
+        return result.put("text",label.path("text").asText()).put("labelVersion",label.path("version").asLong());
     }
+    ObjectNode getContent(LocalDate date){var result=publicValue(record(date));result.remove("text");return result;}
     Instant modifiedAt(LocalDate date){
         var value=record(date);
         return value.hasNonNull("modifiedAt")?Instant.parse(value.path("modifiedAt").asText()):Instant.EPOCH;
@@ -44,7 +47,7 @@ final class DayNotes {
         for(var marker:store.list(JournalState.Kind.JOURNAL_DELETE.name()))deleted.put(uuid(marker.path("id")),marker.path("noteVersion").asLong());
         var dates=new ArrayList<LocalDate>();
         for(var value:store.list(TYPE)){
-            if(value.path("version").asLong()>0&&!(deleted.getOrDefault(uuid(value.path("id")),-1L)==value.path("version").asLong()&&!hasContent(value)))
+            if(value.path("version").asLong()>0&&!(deleted.getOrDefault(uuid(value.path("id")),-1L)==value.path("version").asLong()&&emptyForDeletion(value)))
                 dates.add(date(value.path("date").asText()));
         }
         return dates;
@@ -60,55 +63,62 @@ final class DayNotes {
         return JournalMarkdown.render(date+".md",null,value.path("text").asText(),value.path("body").asText());
     }
     static boolean hasContent(JsonNode note){return !note.path("text").asText().isEmpty()||!note.path("body").asText().isEmpty();}
+    static boolean emptyForDeletion(JsonNode note){return note.path("labelIndependent").asBoolean()?note.path("body").asText().isEmpty():!hasContent(note);}
     ObjectNode list(LocalDate first,LocalDate last){
-        long days=ChronoUnit.DAYS.between(first,last);if(days<0 || days>=62)throw ApiFailure.validation();
+        long days=ChronoUnit.DAYS.between(first,last);if(days<0||days>=62)throw ApiFailure.validation();
+        var dates=new TreeSet<LocalDate>();
+        for(String type:List.of(TYPE,DayLabels.TYPE))for(var value:store.list(type,id(first),id(last)))dates.add(date(value.path("date").asText()));
         var result=object().put("revision",store.revision());var items=result.putArray("items");
-        for(var value:store.list(TYPE,id(first),id(last)))if(hasContent(value)){
-            var summary=((ObjectNode)value).deepCopy();summary.remove(List.of("body","markdown","modifiedAt"));summary.put("hasBody",!value.path("body").asText().isEmpty());items.add(summary);
-        }
+        for(var day:dates){var value=get(day);if(hasContent(value)){value.remove("body");items.add(value);}}
         return result;
     }
-    ObjectNode save(LocalDate date,String match,String text){
-        return save(date,match,object().put("text",text));
-    }
-    ObjectNode save(LocalDate date,String match,JsonNode input){
-        return write(date,match,input,false,false);
-    }
-    ObjectNode present(LocalDate date,String match,JsonNode input){
-        return write(date,match,input,false,true);
+    ObjectNode save(LocalDate date,String match,String text){return save(date,match,object().put("text",text));}
+    /** Compatibility adapter; each supplied field updates its own resource. */
+    ObjectNode save(LocalDate date,String match,JsonNode input){return saveLegacy(date,match,input,false);}
+    ObjectNode present(LocalDate date,String match,JsonNode input){return saveLegacy(date,match,input,true);}
+    private ObjectNode saveLegacy(LocalDate date,String match,JsonNode input,boolean materialize){
+        ApiReplies.match(get(date),match);var labels=new DayLabels(store);labels.migrateDate(date);
+        if(input.has("text"))labels.save(date,etag(labels.get(date)),input.path("text").asText());
+        if(input.has("body"))writeBody(date,input.path("body").asText(),false,materialize);
+        return get(date);
     }
     ObjectNode delete(LocalDate date,String match){
-        return write(date,match,object().put("text","").put("body",""),true,true);
+        ApiReplies.match(get(date),match);deleteContent(date,etag(getContent(date)));return get(date);
     }
-    /** Store a validated external document and its Calendar projections in one version. */
+    ObjectNode saveContent(LocalDate date,String match,JsonNode input){
+        ApiReplies.match(getContent(date),match);writeBody(date,input.path("body").asText(),false,true);return getContent(date);
+    }
+    ObjectNode deleteContent(LocalDate date,String match){
+        ApiReplies.match(getContent(date),match);writeBody(date,"",true,true);return getContent(date);
+    }
+    /** External documents never change an independent Calendar label. */
     ObjectNode saveDocument(LocalDate date,String match,byte[] bytes){
-        var previous=record(date);ApiReplies.match(publicValue(previous),match);
+        ApiReplies.match(getContent(date),match);new DayLabels(store).migrateDate(date);
         final JournalMarkdown.Note parsed;
-        try{parsed=JournalMarkdown.parse(date+".md",bytes);}
-        catch(JournalMarkdown.Invalid invalid){throw ApiFailure.validation();}
-        if(!previous.path("deleted").asBoolean()&&previous.path("version").asLong()>0
-                &&Arrays.equals(document(date,previous),bytes))return publicValue(previous);
-        return persist(date,previous,parsed.label(),parsed.body(),new String(bytes,StandardCharsets.UTF_8),false);
+        try{parsed=JournalMarkdown.parseOpaque(date+".md",bytes);}catch(JournalMarkdown.Invalid invalid){throw ApiFailure.validation();}
+        var previous=record(date);
+        if(!previous.path("deleted").asBoolean()&&previous.path("version").asLong()>0&&Arrays.equals(document(date,previous),bytes))return getContent(date);
+        persist(date,previous,previous.path("text").asText(),parsed.body(),new String(bytes,StandardCharsets.UTF_8),false);return getContent(date);
     }
-    private ObjectNode write(LocalDate date,String match,JsonNode input,boolean deleted,boolean materialize){
-        var previous=record(date);ApiReplies.match(publicValue(previous),match);
-        String text=input.has("text")?input.get("text").asText().strip():previous.path("text").asText();
-        String body=input.has("body")?input.get("body").asText():previous.path("body").asText();
-        if(text.codePointCount(0,text.length())>80 || text.codePoints().anyMatch(Character::isISOControl))throw ApiFailure.validation();
+    private void writeBody(LocalDate date,String body,boolean deleted,boolean materialize){
+        new DayLabels(store).migrateDate(date);var previous=record(date);
         if(!StandardCharsets.UTF_8.newEncoder().canEncode(body)||body.getBytes(StandardCharsets.UTF_8).length>BODY_BYTES)throw ApiFailure.validation();
-        if(previous.path("text").asText().equals(text)&&previous.path("body").asText().equals(body)&&previous.path("deleted").asBoolean()==deleted&&(!materialize||previous.path("version").asLong()>0))return publicValue(previous);
-        final String markdown;
+        if(previous.path("body").asText().equals(body)&&previous.path("deleted").asBoolean()==deleted&&(!materialize||previous.path("version").asLong()>0))return;
         byte[] original=previous.path("deleted").asBoolean()||previous.path("version").asLong()==0?null:document(date,previous);
-        try{markdown=deleted?"":new String(JournalMarkdown.render(date+".md",original,text,body),StandardCharsets.UTF_8);}
-        catch(JournalMarkdown.Invalid invalid){throw ApiFailure.validation();}
-        return persist(date,previous,text,body,markdown,deleted);
+        final String markdown;
+        try{
+            // Reserved metadata in an old document is now opaque. Keep its
+            // original value; new independent labels never enter Markdown.
+            markdown=deleted?"":new String(JournalMarkdown.replaceBody(date+".md",original,body),StandardCharsets.UTF_8);
+        }catch(JournalMarkdown.Invalid invalid){throw ApiFailure.validation();}
+        persist(date,previous,previous.path("text").asText(),body,markdown,deleted);
     }
     private static ObjectNode publicValue(ObjectNode value){
-        var result=value.deepCopy();result.remove(List.of("markdown","modifiedAt"));return result;
+        var result=value.deepCopy();result.remove(List.of("markdown","modifiedAt","labelIndependent"));return result;
     }
     private ObjectNode persist(LocalDate date,ObjectNode previous,String text,String body,String markdown,boolean deleted){
         long version=previous.path("version").asLong();if(version>=9007199254740991L)throw ApiFailure.conflict();
-        var value=previous.deepCopy().put("version",version+1).put("text",text).put("body",body).put("markdown",markdown).put("modifiedAt",store.now().toString()).put("hasBody",!body.isEmpty()).put("deleted",deleted);
+        var value=previous.deepCopy().put("version",version+1).put("text",text).put("body",body).put("markdown",markdown).put("modifiedAt",store.now().toString()).put("hasBody",!body.isEmpty()).put("deleted",deleted).put("labelIndependent",true);
         var stored=value.deepCopy();stored.remove(List.of("hasBody","deleted"));
         if(version==0)store.update("INSERT INTO tk_resource(owner_id,entity_type,id,version,payload) VALUES(?,?,?,1,?)",store.owner(),TYPE,id(date),stored.toString());
         else if(store.update("UPDATE tk_resource SET version=?,payload=? WHERE owner_id=? AND entity_type=? AND id=? AND version=?",version+1,stored.toString(),store.owner(),TYPE,id(date),version)!=1)throw new ApiFailure(412,"STALE_VERSION");
@@ -120,7 +130,14 @@ final class DayNotes {
         // Empty values retain their version so deleting and recreating cannot
         // make an older editor's ETag valid again. Existing clients already
         // understand profile invalidations; no Eclipse/domain type is added.
-        store.change("PROFILE","UPDATED",store.owner());return publicValue(value);
+        store.change("PROFILE","UPDATED",store.owner());return get(date);
+    }
+    void restoreDocument(LocalDate date,byte[] bytes){
+        var current=getContent(date);
+        if(current.path("version").asLong()>0&&!current.path("deleted").asBoolean()){
+            if(Arrays.equals(document(date),bytes))return;throw ApiFailure.conflict();
+        }
+        saveDocument(date,etag(current),bytes);
     }
     void restore(JsonNode notes){
         var seen=new HashSet<LocalDate>();
@@ -138,7 +155,9 @@ final class DayNotes {
                     if(Arrays.equals(document(date),bytes))continue;
                     throw ApiFailure.conflict();
                 }
-                saveDocument(date,etag(current),bytes);continue;
+                var labels=new DayLabels(store);var label=labels.get(date);
+                if(label.path("version").asLong()>0&&!label.path("text").asText().equals(text))throw ApiFailure.conflict();
+                labels.save(date,etag(label),text);saveDocument(date,etag(getContent(date)),bytes);continue;
             }
             if(text.isEmpty()&&note.path("body").asText().isEmpty())throw ApiFailure.validation();
             if(hasContent(current)&&(!current.path("text").asText().equals(text)||!current.path("body").asText().equals(body)))throw ApiFailure.conflict();

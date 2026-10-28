@@ -79,7 +79,19 @@ class AccountArchiveImportTest {
                 }
             }
         }
-        archive.remove("journalFiles");return archive.put("format",AccountArchive.LEGACY_FORMAT);
+        // Construct a genuine v1 document: its label lived in each inline
+        // Markdown record. New v2 labels must be merged explicitly, including
+        // dates which now correctly have no note file at all.
+        var days=new java.util.TreeMap<String,ObjectNode>();
+        for(var note:archive.path("dayNotes"))days.put(note.path("date").asText(),(ObjectNode)note);
+        for(var label:archive.path("dayLabels")){
+            String date=label.path("date").asText(),text=label.path("text").asText();
+            if(text.isEmpty()&&!days.containsKey(date))continue;
+            var note=days.computeIfAbsent(date,key->object().put("date",key).put("body","").put("markdown",""));
+            note.put("text",text);note.put("markdown",new String(JournalMarkdown.render(date+".md",note.path("markdown").asText().getBytes(StandardCharsets.UTF_8),text,note.path("body").asText()),StandardCharsets.UTF_8));
+        }
+        var inline=archive.putArray("dayNotes");days.values().forEach(inline::add);
+        archive.remove(java.util.List.of("journalFiles","dayLabels"));return archive.put("format",AccountArchive.LEGACY_FORMAT);
     }
     private ObjectNode work() {return store.transaction("b",()->{var value=object();for(var entry:DomainTransfer.TYPES.entrySet()) {var items=value.putArray(entry.getKey());store.list(entry.getValue()).forEach(items::add);}value.set("profile",store.profile());return value;});}
     @Test void linkedTaskTombstonesSurvivePrivateArchiveRestore() throws Exception {
@@ -160,7 +172,7 @@ class AccountArchiveImportTest {
         byte[] image={(byte)0x89,'P','N','G',13,10,26,10,1,2,3,4};
         store.transaction("a",()->{
             var notes=new DayNotes(store);var date=DayNotes.date("2026-10-25");
-            notes.saveDocument(date,etag(notes.get(date)),markdown.getBytes(StandardCharsets.UTF_8));
+            notes.saveDocument(date,etag(notes.getContent(date)),markdown.getBytes(StandardCharsets.UTF_8));
             new JournalAssets(store).save("photo.png",null,image);return null;
         });
         ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=legacySnapshot(file.file());}
@@ -243,8 +255,28 @@ class AccountArchiveImportTest {
             assertEquals("dGVzdA==",attachment.path("data").asText());return null;
         });
     }
+    @Test void independentLabelsIncludingClearsSurviveDeletedNotesAndAccountRestore() throws Exception {
+        source();store.transaction("a",()->{
+            var labels=new DayLabels(store);var notes=new DayNotes(store);
+            var only=DayNotes.date("2026-11-01");labels.save(only,etag(labels.get(only)),"Label without note");
+            var deleted=DayNotes.date("2026-11-02");labels.save(deleted,etag(labels.get(deleted)),"Keep after deletion");
+            notes.saveContent(deleted,etag(notes.getContent(deleted)),object().put("body","Delete this body"));notes.deleteContent(deleted,etag(notes.getContent(deleted)));
+            var cleared=DayNotes.date("2026-11-03");labels.save(cleared,etag(labels.get(cleared)),"Old label");labels.save(cleared,etag(labels.get(cleared)),"");return null;
+        });
+        ObjectNode archive;try(var file=archives.download(tokens.authenticate("Bearer test-a"))){archive=AccountArchiveInput.read(file.file(),"application/zip");}
+        assertEquals(3,archive.path("dayLabels").size());assertEquals(0,archive.path("journalFiles").size());inputs.validate("AccountArchiveSnapshot",archive);
+        UUID id=stage(archive);var review=store.transaction("b",()->importer().preview(id,false));assertTrue(review.body().path("canImport").asBoolean());
+        store.transaction("b",()->importer().apply(id,false,review.etag()));
+        store.transaction("b",()->{
+            var labels=new DayLabels(store);var notes=new DayNotes(store);
+            assertEquals("Label without note",labels.get(DayNotes.date("2026-11-01")).path("text").asText());
+            assertEquals("Keep after deletion",labels.get(DayNotes.date("2026-11-02")).path("text").asText());
+            assertNull(notes.document(DayNotes.date("2026-11-02")));
+            var cleared=labels.get(DayNotes.date("2026-11-03"));assertEquals("",cleared.path("text").asText());assertTrue(cleared.path("version").asLong()>0);return null;
+        });
+    }
     @Test void olderAccountArchiveWithoutProviderCollectionsStillRestores() throws Exception {
-        var archive=source().put("format",AccountArchive.LEGACY_FORMAT);archive.remove("journalFiles");var work=(ObjectNode)archive.path("work");
+        var archive=source().put("format",AccountArchive.LEGACY_FORMAT);archive.remove(java.util.List.of("journalFiles","dayLabels"));var work=(ObjectNode)archive.path("work");
         work.remove("taskConnections");work.remove("taskLists");work.remove("taskListSections");work.remove("taskAttachments");
         inputs.validate("AccountArchiveSnapshot",archive);
         UUID id=stage(archive);var review=store.transaction("b",()->importer().preview(id,false));

@@ -12,9 +12,12 @@ access to that backend network, as in the supported Synology deployment.
 Week numbers use the ISO week-based year, so dates around New Year may belong to
 the previous or following year's weekly file. The collection supports `OPTIONS` and `PROPFIND`; note files support those
 methods plus `GET`, `HEAD`, `PUT`, and `DELETE`. A present empty note is listed
-as a zero-byte file. A deleted note is absent. Calendar and REST edits share
-the same version as WebDAV edits, so their changes invalidate previously issued
-WebDAV ETags.
+as a zero-byte file. A deleted note is absent. Note-body edits in Calendar and REST share the WebDAV version. Day-label edits
+have an independent version and do not invalidate WebDAV ETags. Replacing or
+deleting a Markdown file preserves the day label. Existing `timekeeper-label`
+frontmatter is inert legacy metadata, preserved byte-for-byte when untouched;
+changing it no longer sets or clears the independent Calendar label. Current
+account archives restore labels separately from note files.
 
 The `assets/` child collection holds images and other files referenced by
 Markdown. For example, an image link to `assets/photo.png` in `2026-10-25.md` resolves

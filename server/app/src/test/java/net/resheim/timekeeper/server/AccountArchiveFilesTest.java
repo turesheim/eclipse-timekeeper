@@ -26,9 +26,9 @@ class AccountArchiveFilesTest {
         byte[] asset=new byte[JournalAssets.MAX_BYTES],taskBytes=new byte[TaskAttachment.MAX_BYTES];new Random(467).nextBytes(asset);new Random(468).nextBytes(taskBytes);
         UUID attachmentId=UUID.randomUUID();
         store.transaction("a",()->{
-            var notes=new DayNotes(store);var date=DayNotes.date("2026-10-27");notes.saveDocument(date,etag(notes.get(date)),day.getBytes(StandardCharsets.UTF_8));
-            var empty=DayNotes.date("2026-10-28");notes.saveDocument(empty,etag(notes.get(empty)),new byte[0]);
-            var removed=DayNotes.date("2026-10-29");notes.saveDocument(removed,etag(notes.get(removed)),"deleted".getBytes(StandardCharsets.UTF_8));notes.delete(removed,etag(notes.get(removed)));
+            var notes=new DayNotes(store);var date=DayNotes.date("2026-10-27");notes.saveDocument(date,etag(notes.getContent(date)),day.getBytes(StandardCharsets.UTF_8));
+            var empty=DayNotes.date("2026-10-28");notes.saveDocument(empty,etag(notes.getContent(empty)),new byte[0]);
+            var removed=DayNotes.date("2026-10-29");notes.saveDocument(removed,etag(notes.getContent(removed)),"deleted".getBytes(StandardCharsets.UTF_8));notes.delete(removed,etag(notes.get(removed)));
             var weeks=new WeekNotes(store);var key=WeekNotes.week("2026-W44");weeks.saveDocument(key,etag(weeks.get(key)),week.getBytes(StandardCharsets.UTF_8));
             new JournalAssets(store).save("large.bin",null,asset);
             new JournalAssets(store).save("tasks",null,new byte[]{1});

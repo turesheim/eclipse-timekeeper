@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Restore a protected schema-2/3/4/5/6 dump and upgrade it in one offline transaction."""
+"""Restore a protected schema-2/3/4/5/6/7 dump and upgrade it in one offline transaction."""
 from pathlib import Path
 import re
 import subprocess
@@ -7,8 +7,8 @@ import sys
 import tempfile
 
 HERE=Path(__file__).resolve().parent
-CURRENT=6
-SUPPORTED=(2,3,4,5,6)
+CURRENT=7
+SUPPORTED=(2,3,4,5,6,7)
 
 
 def resources():
@@ -42,7 +42,7 @@ def restore(dump,client=compose_client,db_resources=None):
     # until its declared version is supported and the complete transaction exists.
     with Path(dump).open('rb') as source:
         metadata=client('pg_restore',['--data-only','--table=tk_schema','--file=-'],input=source)
-    match=re.search(r'COPY public\.tk_schema \(id, schema_version, state\) FROM stdin;\n1\t([23456])\tREADY\n\\\.\n',metadata)
+    match=re.search(r'COPY public\.tk_schema \(id, schema_version, state\) FROM stdin;\n1\t([234567])\tREADY\n\\\.\n',metadata)
     if not match:raise ValueError('Backup does not contain a supported ready Timekeeper schema')
     incoming=int(match[1])
     def query(sql):return client('psql',[*connection,'-X','-q','-A','-t','-v','ON_ERROR_STOP=1'],input=sql)
@@ -75,7 +75,7 @@ def restore(dump,client=compose_client,db_resources=None):
         sql.seek(0,2)
         after=schema_guard(directory,incoming)
         for version in range(incoming+1,CURRENT+1):
-            after+=(directory/{3:'recovery-v3.sql',4:'passkeys-v4.sql',5:'settings-v5.sql',6:'locale-v6.sql'}[version]).read_text()
+            after+=(directory/{3:'recovery-v3.sql',4:'passkeys-v4.sql',5:'settings-v5.sql',6:'locale-v6.sql',7:'day-labels-v7.sql'}[version]).read_text()
             after+=f'\nUPDATE public.tk_schema SET schema_version={version} WHERE id=1;\n'+schema_guard(directory,version)
         sql.write(after.encode());sql.seek(0)
         client('psql',[*connection,'-X','-q','--single-transaction','--file=-','-v','ON_ERROR_STOP=1'],input=sql,output=subprocess.DEVNULL)

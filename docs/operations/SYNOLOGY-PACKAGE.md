@@ -183,7 +183,7 @@ earlier pending codes; it never reopens completed account setup.
 Provisioning records an installation ID on its dedicated role/database so an
 interrupted operation can resume without taking over an unrelated object.
 Same-schema upgrades replace the pinned application image and record deployment
-time. Supported schema-2/3/4/5 → schema-6 upgrades run while the package is stopped:
+time. Supported schema-2/3/4/5/6 → schema-7 upgrades run while the package is stopped:
 the incoming installer validates the canonical schema, saves a native pre-upgrade
 backup, and adds the required recovery/passkey/settings/locale tables in one transaction. Pre-schema-4 browser sessions are ended; account passwords, API tokens and private data remain.
 An interruption keeps
@@ -273,7 +273,7 @@ databases or the shared PostgreSQL package.
 ## Migrating from containerized PostgreSQL 18
 
 The supported logical transfer is **PostgreSQL 18.6 → 17.11, canonical Timekeeper
-schema 2, 3, 4, 5 or 6** into a schema-6 package. Upgrade an older source using the explicit schema-upgrade procedure in
+schema 2, 3, 4, 5, 6 or 7** into a schema-7 package. Upgrade an older source using the explicit schema-upgrade procedure in
 [account operations](ACCOUNTS.md) and complete its first-administrator setup before
 exporting. Existing owners must be claimed by their explicit IDs. The exporter
 refuses an older/custom schema, unfinished account setup or connected API clients.
@@ -313,9 +313,9 @@ refuses an older/custom schema, unfinished account setup or connected API client
    The current dedicated database service role/password and DSM address/port are
    retained. The importer applies only source data to the canonical PostgreSQL 17
    schema, then compares fingerprints of **all source tables before committing**
-   (14 for schema 2, 17 for schema 3, 20 for schema 4, 21 for schema 5, 22 for schema 6). Older imports add empty
+   (14 for schema 2, 17 for schema 3, 20 for schema 4, 21 for schema 5, 22 for schema 6 or 7). Older imports add empty
    passkey state, retire browser sessions without origin/browser provenance, and
-   update the schema marker to 6 in that transaction. Schema-2 imports also add
+   update the schema marker to 7 in that transaction. Schema-2 imports also add
    empty recovery state. Schema-3/4 imports retain verified/pending email
    addresses and recovery state; schema 4/5 retains public credentials, opaque
    handles and revocation records. No UUID remapping

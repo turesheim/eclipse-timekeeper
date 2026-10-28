@@ -103,22 +103,26 @@ test('day notes can be added from the day menu, edited, canceled and removed wit
   }finally{await owner.close();}
 });
 
-test('deleting a day note is explicit, guarded, and distinct from clearing it',async({browser,request})=>{
+test('deleting a day note preserves its label, ignores unrelated label edits, and guards note conflicts',async({browser,request})=>{
   const owner=await context(browser),page=await owner.newPage(),date='2026-05-17';
   try{
-    await signIn(page,await fresh(request));const api=await apiFor(page);await month(page);
-    await menu(page);await save(page,'First note');
-    await note(page).click();const remove=dialog(page).getByRole('button',{name:'Delete note'});
+    await signIn(page,await fresh(request));const api=await apiFor(page);
+    const empty=await api('GET','/day-notes/'+date);await api('PUT','/day-notes/'+date,{text:'First label',body:'First body'},{'If-Match':empty.headers().etag});await month(page);
+    await menu(page);const remove=dialog(page).getByRole('button',{name:'Delete note'});
     await expect(remove).toBeEnabled();page.once('dialog',prompt=>prompt.dismiss());await remove.click();
     await expect(dialog(page)).toBeVisible();expect((await(await api('GET','/day-notes/'+date)).json()).deleted).toBe(false);
     page.once('dialog',prompt=>prompt.accept());await remove.click();await expect(dialog(page)).toBeHidden();
-    const deleted=await api('GET','/day-notes/'+date),deletedValue=await deleted.json();expect(deletedValue.deleted).toBe(true);expect(deletedValue.text).toBe('');
+    const deletedValue=await(await api('GET','/day-notes/'+date)).json();expect(deletedValue.deleted).toBe(true);expect(deletedValue.text).toBe('First label');await expect(note(page)).toContainText('First label');
     await note(page).click();await expect(dialog(page).getByRole('button',{name:'Delete note'})).toBeDisabled();
-    await save(page,'Restored note');const restored=await(await api('GET','/day-notes/'+date)).json();expect(restored.deleted).toBe(false);expect(restored.version).toBeGreaterThan(deletedValue.version);
-    await note(page).click();const current=await api('GET','/day-notes/'+date);await api('PUT','/day-notes/'+date,{text:'Changed elsewhere'},{'If-Match':current.headers().etag});
-    page.once('dialog',prompt=>prompt.accept());await dialog(page).getByRole('button',{name:'Delete note'}).click();
-    await expect(dialog(page).getByRole('alert')).toBeVisible();await expect(dialog(page).getByRole('button',{name:'Delete note'})).toBeDisabled();
-    expect((await(await api('GET','/day-notes/'+date)).json()).text).toBe('Changed elsewhere');
+    await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('Restored body');await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page)).toBeHidden();
+    const restored=await(await api('GET','/day-notes/'+date)).json();expect(restored.deleted).toBe(false);expect(restored.text).toBe('First label');expect(restored.version).toBeGreaterThan(deletedValue.version);
+    await note(page).click();let current=await api('GET','/day-labels/'+date);await api('PUT','/day-labels/'+date,{text:'Changed elsewhere'},{'If-Match':current.headers().etag});
+    page.once('dialog',prompt=>prompt.accept());await dialog(page).getByRole('button',{name:'Delete note'}).click();await expect(dialog(page)).toBeHidden();
+    expect((await(await api('GET','/day-labels/'+date)).json()).text).toBe('Changed elsewhere');
+    current=await api('GET','/day-notes/'+date+'/content');await api('PUT','/day-notes/'+date+'/content',{body:'New note'},{'If-Match':current.headers().etag});await note(page).click();await expect(dialog(page).getByRole('button',{name:'Delete note'})).toBeEnabled();
+    current=await api('GET','/day-notes/'+date+'/content');await api('PUT','/day-notes/'+date+'/content',{body:'Peer body'},{'If-Match':current.headers().etag});
+    page.once('dialog',prompt=>prompt.accept());await dialog(page).getByRole('button',{name:'Delete note'}).click();await expect(dialog(page).getByRole('alert')).toBeVisible();
+    expect((await(await api('GET','/day-notes/'+date+'/content')).json()).body).toBe('Peer body');
   }finally{await owner.close();}
 });
 
@@ -196,7 +200,7 @@ test('day notes keep a stale draft and require review after an unconfirmed save'
     await signIn(page,await fresh(request));const api=await apiFor(page);await month(page);await test.step('Open initial editor',()=>menu(page));await page.locator('#track-note-text').fill('My draft');await test.step('Save from another client',()=>put(api,'2026-05-17','Peer update'));
     await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page).getByRole('alert')).toContainText('changed');await expect(page.locator('#track-note-text')).toHaveValue('My draft');await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeDisabled();
     await discard(page,()=>dialog(page).getByRole('button',{name:'Cancel',exact:true}).click());await menu(page);await expect(page.locator('#track-note-text')).toHaveValue('Peer update');
-    let writes=0;await page.route('**/api/v1/day-notes/2026-05-17',async route=>{if(route.request().method()!=='PUT'){await route.continue();return;}writes++;await route.fetch();await route.abort('failed');});
+    let writes=0;await page.route('**/api/v1/day-entries/2026-05-17',async route=>{if(route.request().method()!=='POST'){await route.continue();return;}writes++;await route.fetch();await route.abort('failed');});
     await page.locator('#track-note-text').fill('Committed once');await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page).getByRole('alert')).toContainText('could not be confirmed');await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeDisabled();expect(writes).toBe(1);
     await discard(page,()=>dialog(page).getByRole('button',{name:'Cancel',exact:true}).click());await menu(page);await expect(page.locator('#track-note-text')).toHaveValue('Committed once');expect(writes).toBe(1);
   }finally{await owner.close();}
@@ -323,7 +327,7 @@ test('journal retains both drafts on conflicts, confirms dismissal and reload, a
     await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page).getByRole('alert')).toContainText('changed');await expect(dialog(page).getByRole('alert')).toBeInViewport();await expect(page.locator('#journal-body')).toHaveValue('Private body draft');await expect(page.locator('#track-note-text')).toHaveValue('Draft label');
     page.once('dialog',prompt=>prompt.dismiss());await dialog(page).getByRole('button',{name:'Reload saved note',exact:true}).click();await expect(page.locator('#journal-body')).toHaveValue('Private body draft');
     await discard(page,()=>dialog(page).getByRole('button',{name:'Reload saved note',exact:true}).click());await expect(page.locator('#track-note-text')).toHaveValue('Peer label');await expect(page.locator('#journal-formatted .ProseMirror')).toHaveText('Peer body');
-    let writes=0;await page.route('**/api/v1/day-notes/2026-05-17',async route=>{if(route.request().method()!=='PUT'){await route.continue();return;}writes++;await route.fetch();await route.abort('failed');});
+    let writes=0;await page.route('**/api/v1/day-entries/2026-05-17',async route=>{if(route.request().method()!=='POST'){await route.continue();return;}writes++;await route.fetch();await route.abort('failed');});
     await dialog(page).getByRole('button',{name:'Markdown source',exact:true}).click();await page.locator('#journal-body').fill('Committed body once');await page.locator('#track-note-text').fill('Committed label once');await dialog(page).getByRole('button',{name:'Save',exact:true}).click();await expect(dialog(page).getByRole('alert')).toContainText('could not be confirmed');
     await dialog(page).getByRole('button',{name:'Check saved result',exact:true}).click();await expect(dialog(page)).toBeHidden();expect(writes).toBe(1);expect((await(await api('GET','/day-notes/2026-05-17')).json()).body).toBe('Committed body once');
   }finally{await owner.close();}
@@ -366,7 +370,7 @@ test('journal keeps source usable after an editor load failure and protects a dr
   try{
     let fail=true,failRead=true;await page.route('**/assets/milkdown/milkdown.js*',route=>fail?route.abort('failed'):route.continue());
     await signIn(page,await fresh(request));const api=await apiFor(page),initial=await api('GET','/day-notes/2026-05-17');await api('PUT','/day-notes/2026-05-17',{body:'Original source'},{'If-Match':initial.headers().etag});
-    await page.route('**/api/v1/day-notes/2026-05-17',route=>failRead&&route.request().method()==='GET'?route.fulfill({status:503,contentType:'application/problem+json',body:JSON.stringify({code:'UNAVAILABLE'})}):route.continue());
+    await page.route('**/api/v1/day-entries/2026-05-17',route=>failRead&&route.request().method()==='GET'?route.fulfill({status:503,contentType:'application/problem+json',body:JSON.stringify({code:'UNAVAILABLE'})}):route.continue());
     await month(page);await note(page).click();await expect(dialog(page).getByRole('alert')).toBeVisible();await expect(page.locator('#track-note-text')).toBeDisabled();await expect(dialog(page).getByRole('button',{name:'Save',exact:true})).toBeDisabled();failRead=false;
     await dialog(page).getByRole('button',{name:'Reload saved note',exact:true}).click();await expect(dialog(page)).toContainText('could not be loaded');await expect(page.locator('#journal-body')).toHaveValue('Original source');
     await page.locator('#journal-body').fill('Retained source draft');await page.evaluate(()=>{location.hash='#account/profile';});await expect.poll(()=>page.evaluate(()=>location.hash)).toBe('');await expect(dialog(page)).toBeVisible();await expect(page.locator('#account-page')).toBeHidden();

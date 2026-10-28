@@ -157,8 +157,12 @@ long press, preserving scrolling and month swipes.
 Labels accept up to 80 characters. The API independently stores a Markdown body
 (up to 200,000 UTF-8 bytes), with a lightweight body-presence marker in calendar
 summaries. Label-only edits preserve that body, and clearing a label leaves a
-body-only note discoverable. The expanded day-note dialog edits the short label
-and Markdown body independently. **Formatted** provides paragraphs, headings,
+body-only note discoverable. The shared day editor edits independent label and note resources, each with
+its own version. Saves send only changed fields; if both change, the editor
+command commits both or neither. **Delete note** preserves the day label and
+keeps an unsaved label draft open. A concurrent label change still requires
+review before that draft can be saved.
+The expanded day-note dialog edits the short label and Markdown body independently. **Formatted** provides paragraphs, headings,
 bold, italic, strikethrough, inline/fenced code, bulleted/numbered/task lists,
 links, quotations, tables and undo/redo. Link addresses are validated; activating
 a rendered link does not navigate. **Markdown source**

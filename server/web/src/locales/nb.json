@@ -1045,7 +1045,7 @@
   "today.planned_tasks": "Planlagte oppgaver",
   "today.no_planned_tasks": "Ingen oppgaver er planlagt denne dagen.",
   "journal.delete_note": "Slett notat",
-  "journal.delete_confirm": "Slette det lagrede notatet for {{date}} og forkaste ulagrede endringer? Det fjernes også fra WebDAV-klienter.",
+  "journal.delete_confirm": "Slett det lagrede notatet for {{date}} og forkast ulagrede notatendringer? Dagsetiketten beholdes. Notatet fjernes også fra WebDAV-klienter.",
   "journal.deleting": "Sletter…",
   "journal.webdav.title": "Dagbok",
   "journal.webdav.intro": "Koble en WebDAV-klient til dagsnotatene dine.",
@@ -1062,5 +1062,7 @@
   "markdown.attachment": "Vedlegg",
   "markdown.uploading": "Laster opp vedlegg…",
   "markdown.upload_failed": "Vedlegget kunne ikke lastes opp. Prøv igjen.",
-  "markdown.asset_too_large": "Vedlegg kan være opptil 5 MB."
+  "markdown.asset_too_large": "Vedlegg kan være opptil 5 MB.",
+  "day_labels.stale": "Dagsetiketten er endret et annet sted. Utkastet ditt er beholdt; kontroller den lagrede etiketten før du prøver igjen.",
+  "week_notes.delete_confirm": "Slett det lagrede ukenotatet for {{week}} og forkast ulagrede notatendringer? Notatet fjernes også fra WebDAV-klienter."
 }

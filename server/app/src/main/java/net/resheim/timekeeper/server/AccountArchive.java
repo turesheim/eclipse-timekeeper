@@ -20,7 +20,8 @@ import jakarta.inject.Inject;
 /** Explicit account-data allowlist; neither database dumps nor authentication authority are portable. */
 @ApplicationScoped
 class AccountArchive {
-    static final String FORMAT="timekeeper-account-v2";
+    static final String FORMAT="timekeeper-account-v3";
+    static final String FILE_LEGACY_FORMAT="timekeeper-account-v2";
     static final String LEGACY_FORMAT="timekeeper-account-v1";
     static final Map<String,String> WORK=DomainTransfer.TYPES;
     private static final List<String> HISTORY=List.of("IMPORT_JOB","IMPORT_BATCH","IMPORT_ITEM","IMPORT_MAP","IMPORT_KEY","IMPORT_ORIGIN","IMPORT_UNDO","IMPORT_USE","ARCHIVE_AUDIT","ARCHIVE_IMPORT","CAL_LINK");
@@ -92,6 +93,7 @@ class AccountArchive {
         records(c,owner,JournalState.Kind.JOURNAL_DELETE.name(),value->deletedNotes.put(value.path("id").asText(),value.path("noteVersion").asLong()));
         final long[] noteCount={0};records(c,owner,DayNotes.TYPE,value->{if(presentNote(value,deletedNotes))noteCount[0]++;});
         if(noteCount[0]>0)counts.put("dayNotes",noteCount[0]);
+        counts.put("dayLabels",count(c,owner,DayLabels.TYPE));
         var deletedWeeks=new HashMap<String,Long>();
         records(c,owner,JournalState.Kind.WEEK_NOTE_DELETE.name(),value->deletedWeeks.put(value.path("id").asText(),value.path("noteVersion").asLong()));
         final long[] weekCount={0};records(c,owner,WeekNotes.TYPE,value->{if(presentWeek(value,deletedWeeks))weekCount[0]++;});
@@ -102,7 +104,7 @@ class AccountArchive {
         var manifest=object().put("format",FORMAT).put("archiveId",archiveId).put("generatedAt",generatedAt);
         manifest.set("counts",counts);var files=manifest.putObject("files");
         files.put("archive.json","Private account snapshot and checksummed journal file index. Restore work and selected preferences; account and credential metadata are informational.");
-        files.put("YYYY-MM-DD.md","Exact daily Markdown files, including calendar labels in frontmatter.");
+        files.put("YYYY-MM-DD.md","Exact daily Markdown files. Independent day labels are stored in archive.json.");
         files.put("YYYY-Www.md","Exact ISO weekly Markdown files.");
         files.put("assets/*","Binary journal attachments referenced by Markdown.");
         files.put("README.txt","Format, privacy and CSV notes.");
@@ -114,6 +116,9 @@ class AccountArchive {
             json.writeStartObject();json.writeStringField("format",FORMAT);json.writeStringField("archiveId",archiveId);json.writeStringField("generatedAt",generatedAt);
             json.writeArrayFieldStart("journalFiles");
             journalFiles(c,owner,deletedNotes,deletedWeeks,(path,bytes)->json.writeTree(ArchiveJournalFiles.metadata(path,bytes)));
+            json.writeEndArray();
+            json.writeArrayFieldStart("dayLabels");
+            records(c,owner,DayLabels.TYPE,value->json.writeTree(object().put("date",value.path("date").asText()).put("text",value.path("text").asText())));
             json.writeEndArray();
             json.writeObjectField("account",metadata);json.writeObjectField("preferences",profile);
             json.writeFieldName("work");json.writeStartObject();json.writeStringField("format","timekeeper-domain-v3");json.writeStringField("zoneId",profile.path("zoneId").asText());
@@ -143,7 +148,7 @@ class AccountArchive {
                 }csv(zip,cells);});zip.closeEntry();
             }
             entry(zip,"README.txt");zip.write(("Timekeeper private account archive\n\n"
-                +"Keep this ZIP intact for account import. archive.json contains the versioned work snapshot and a journalFiles index with byte lengths and SHA-256 checksums. manifest.json describes record counts and file groups.\n"
+                +"Keep this ZIP intact for account import. archive.json contains the versioned work snapshot and a journalFiles index with byte lengths and SHA-256 checksums. manifest.json describes record counts and file groups. Day labels are independent metadata in archive.json; Markdown document replacement does not change them.\n"
                 +"Daily notes are separate YYYY-MM-DD.md files; weekly notes use ISO names such as 2026-W44.md. Exact Markdown and frontmatter are preserved. Binary attachments are under assets/, so relative Markdown links remain usable after extraction.\n"
                 +"This ZIP is not encrypted. Protect downloads and temporary files on encrypted private storage; see the journal storage and key-management deployment requirements.\n"
                 +"All records belong to the signed-in account. Administrator access does not include another account's data.\n"
@@ -171,7 +176,7 @@ class AccountArchive {
     }
     private static void entry(ZipOutputStream zip,String name) throws IOException {zip.putNextEntry(new ZipEntry(name));}
     private static boolean presentNote(ObjectNode value,Map<String,Long> deleted){
-        return !(deleted.getOrDefault(value.path("id").asText(),-1L)==value.path("version").asLong()&&!DayNotes.hasContent(value));
+        return !(deleted.getOrDefault(value.path("id").asText(),-1L)==value.path("version").asLong()&&DayNotes.emptyForDeletion(value));
     }
     private static boolean presentWeek(ObjectNode value,Map<String,Long> deleted){
         return !(deleted.getOrDefault(value.path("id").asText(),-1L)==value.path("version").asLong()&&value.path("body").asText().isEmpty());

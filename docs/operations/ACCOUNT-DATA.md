@@ -14,7 +14,8 @@ signed-in account. Administrator access does not include anyone else's records.
 
 The snapshot includes all work records, project/client links, task relationships,
 labels, descriptions, external references, exact timestamps, running intervals,
-time-zone preferences and import audit history. Version 2 archives keep day notes
+time-zone preferences and import audit history. Version 3 archives store day labels independently in `archive.json.dayLabels`,
+including labels on days without a note and explicitly cleared labels. They keep day notes
 as separate `YYYY-MM-DD.md` files and weekly notes as `YYYY-Www.md`, including
 notes without timed work or a visible Calendar label. Markdown and frontmatter
 are preserved exactly. Journal attachments are binary files under `assets/`, so
@@ -41,7 +42,7 @@ management](JOURNAL-STORAGE.md) for database, temporary-file and backup protecti
 
 ## Review and restore
 
-1. Select the original Timekeeper ZIP. A version 2 archive with separate files
+1. Select the original Timekeeper ZIP. A version 2 or 3 archive with separate files
    requires the complete ZIP; its extracted `archive.json` alone is rejected.
    Legacy version 1 ZIPs and standalone JSON archives remain supported.
 2. Choose whether to restore the archived time zone. The default keeps your

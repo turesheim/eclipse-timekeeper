@@ -9184,8 +9184,673 @@
             "$ref": "#/components/parameters/Csrf"
           }
         ],
-        "description": "Retain a versioned tombstone distinct from clearing content. Repeated deletion with its current ETag is a no-op; a later conditional save deliberately restores the note."
+        "description": "Compatibility operation: deletes the daily Markdown document and preserves the independent day label. The combined ETag guards legacy clients; new clients use /day-notes/{date}/content."
       }
+    },
+    "/day-labels": {
+      "get": {
+        "operationId": "listDayLabels",
+        "summary": "List independent day labels",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "Nonempty label-only, body-only or combined notes in the inclusive date range. Never includes body text.",
+            "headers": {},
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayLabelList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "name": "fromDate",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Inclusive range boundary; ranges contain at most 62 dates."
+          },
+          {
+            "name": "toDate",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Inclusive range boundary; ranges contain at most 62 dates."
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "description": "Account-private nonempty labels for an inclusive civil-date range of at most 62 dates. Does not depend on note existence or content."
+      }
+    },
+    "/day-labels/{date}": {
+      "parameters": [
+        {
+          "name": "date",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getDayLabel",
+        "summary": "Read an independent day label",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "The day note, including an empty version-zero note for an untouched date.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayLabel"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "description": "Owner-scoped label with its own version and ETag. Clearing it never changes Markdown, note existence, note version or WebDAV bytes. If-Match guards mutations, including explicit clearing."
+      },
+      "put": {
+        "operationId": "saveDayLabel",
+        "summary": "Save an independent day label",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "The day note, including an empty version-zero note for an untouched date.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayLabel"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DayLabelInput"
+              }
+            }
+          }
+        },
+        "description": "Owner-scoped label with its own version and ETag. Clearing it never changes Markdown, note existence, note version or WebDAV bytes. If-Match guards mutations, including explicit clearing."
+      },
+      "delete": {
+        "operationId": "clearDayLabel",
+        "summary": "Clear only the day label",
+        "x-required-permission": "write",
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "204": {
+            "description": "The note is empty. Its retained ETag prevents stale recreation; an already empty note is unchanged.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "description": "Owner-scoped label with its own version and ETag. Clearing it never changes Markdown, note existence, note version or WebDAV bytes. If-Match guards mutations, including explicit clearing."
+      }
+    },
+    "/day-notes/{date}/content": {
+      "parameters": [
+        {
+          "name": "date",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getDayNoteContent",
+        "summary": "Read only the daily note",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "The day note, including an empty version-zero note for an untouched date.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayNoteContent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "description": "Independent Markdown resource and ETag. Empty body preserves the day label; DELETE removes the document, including its WebDAV presence, and preserves the label. Legacy timekeeper-label frontmatter is opaque metadata and never updates the independent label."
+      },
+      "put": {
+        "operationId": "saveDayNoteContent",
+        "summary": "Save only the daily note",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "The day note, including an empty version-zero note for an untouched date.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayNoteContent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DayNoteContentInput"
+              }
+            }
+          }
+        },
+        "description": "Independent Markdown resource and ETag. Empty body preserves the day label; DELETE removes the document, including its WebDAV presence, and preserves the label. Legacy timekeeper-label frontmatter is opaque metadata and never updates the independent label."
+      },
+      "delete": {
+        "operationId": "deleteDayNoteContent",
+        "summary": "Delete only the daily note",
+        "x-required-permission": "write",
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "204": {
+            "description": "The note is empty. Its retained ETag prevents stale recreation; an already empty note is unchanged.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "description": "Independent Markdown resource and ETag. Empty body preserves the day label; DELETE removes the document, including its WebDAV presence, and preserves the label. Legacy timekeeper-label frontmatter is opaque metadata and never updates the independent label."
+      }
+    },
+    "/day-entries/{date}": {
+      "get": {
+        "operationId": "getDayEntry",
+        "summary": "Read the day editor projection",
+        "x-required-permission": "read",
+        "responses": {
+          "200": {
+            "description": "The day note, including an empty version-zero note for an untouched date.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          }
+        ],
+        "description": "Combined UI projection of independent note and label versions, with each resource ETag. This projection does not couple their lifecycles."
+      },
+      "post": {
+        "operationId": "editDayEntry",
+        "summary": "Atomically edit independently changed day resources",
+        "x-required-permission": "write",
+        "responses": {
+          "200": {
+            "description": "The day note, including an empty version-zero note for an untouched date.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "412": {
+            "$ref": "#/components/responses/412"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "428": {
+            "$ref": "#/components/responses/428"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DayEntryInput"
+              }
+            }
+          }
+        },
+        "description": "Atomic UI edit command containing only independently changed resources. Each supplied resource has its own expected version. A concurrent change to an omitted resource does not block the command. Conflicts roll back the whole command."
+      },
+      "parameters": [
+        {
+          "name": "date",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      ]
     },
     "/tasks/{id}/checklist": {
       "parameters": [
@@ -18798,6 +19463,9 @@
           },
           {
             "$ref": "#/components/schemas/AccountArchiveFileSnapshot"
+          },
+          {
+            "$ref": "#/components/schemas/AccountArchiveLegacyFileSnapshot"
           }
         ]
       },
@@ -18928,6 +19596,10 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 250000
+          },
+          "dayLabels": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -22180,7 +22852,9 @@
           },
           "text": {
             "type": "string",
-            "maxLength": 80
+            "maxLength": 80,
+            "description": "Compatibility projection of the independent day label. New clients use /day-labels; note deletion and Markdown replacement preserve this label.",
+            "deprecated": true
           },
           "version": {
             "$ref": "#/components/schemas/Version"
@@ -22198,6 +22872,11 @@
             "type": "boolean",
             "readOnly": true,
             "description": "Versioned deletion marker. Clearing label/body leaves this false; DELETE sets it true. A deliberate save restores the note, including an explicitly empty file. Never-seen dates have version zero and deleted false."
+          },
+          "labelVersion": {
+            "$ref": "#/components/schemas/Version",
+            "readOnly": true,
+            "description": "Independent day-label version in this deprecated combined projection. It participates in the combined ETag."
           }
         }
       },
@@ -22245,7 +22924,9 @@
           },
           "text": {
             "type": "string",
-            "maxLength": 80
+            "maxLength": 80,
+            "description": "Compatibility projection of the independent day label. New clients use /day-labels; note deletion and Markdown replacement preserve this label.",
+            "deprecated": true
           },
           "version": {
             "$ref": "#/components/schemas/Version"
@@ -22258,9 +22939,265 @@
             "type": "boolean",
             "readOnly": true,
             "description": "Versioned deletion marker. Clearing label/body leaves this false; DELETE sets it true. A deliberate save restores the note, including an explicitly empty file. Never-seen dates have version zero and deleted false."
+          },
+          "labelVersion": {
+            "$ref": "#/components/schemas/Version",
+            "readOnly": true,
+            "description": "Independent day-label version in this deprecated combined projection. It participates in the combined ETag."
           }
         },
         "description": "Private calendar metadata only. Fetch /day-notes/{date} with its ETag to read or change the complete note."
+      },
+      "DayLabel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ownerId",
+          "date",
+          "text",
+          "version"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 80,
+            "description": "Independent civil-date label. Empty string explicitly clears the label without changing a journal note."
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          }
+        }
+      },
+      "DayLabelInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 80
+          }
+        }
+      },
+      "DayLabelList": {
+        "type": "object",
+        "required": [
+          "items",
+          "revision"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 62,
+            "items": {
+              "$ref": "#/components/schemas/DayLabel"
+            }
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Version"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DayNoteContent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ownerId",
+          "date",
+          "version",
+          "body",
+          "hasBody"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 200000,
+            "description": "Exact UTF-8 Markdown, limited to 200,000 encoded bytes. Whitespace and line endings are preserved. Empty string clears only the body; omission preserves it. Null and invalid Unicode are rejected."
+          },
+          "hasBody": {
+            "type": "boolean",
+            "description": "Whether the Markdown body contains any bytes, including whitespace."
+          },
+          "deleted": {
+            "type": "boolean",
+            "readOnly": true,
+            "description": "Versioned deletion marker. Clearing label/body leaves this false; DELETE sets it true. A deliberate save restores the note, including an explicitly empty file. Never-seen dates have version zero and deleted false."
+          }
+        }
+      },
+      "DayNoteContentInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "body"
+        ],
+        "properties": {
+          "body": {
+            "type": "string",
+            "maxLength": 200000,
+            "description": "Exact UTF-8 Markdown, limited to 200,000 encoded bytes. Whitespace and line endings are preserved. Empty string clears only the body; omission preserves it. Null and invalid Unicode are rejected."
+          }
+        }
+      },
+      "DayEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ownerId",
+          "date",
+          "text",
+          "version",
+          "body",
+          "hasBody",
+          "labelVersion",
+          "noteEtag",
+          "labelEtag"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ownerId": {
+            "$ref": "#/components/schemas/OwnerId"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 80,
+            "description": "Current independent day label in the editor projection. Its conflict version is labelVersion."
+          },
+          "version": {
+            "$ref": "#/components/schemas/Version"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 200000,
+            "description": "Exact UTF-8 Markdown, limited to 200,000 encoded bytes. Whitespace and line endings are preserved. Empty string clears only the body; omission preserves it. Null and invalid Unicode are rejected."
+          },
+          "hasBody": {
+            "type": "boolean",
+            "description": "Whether the Markdown body contains any bytes, including whitespace."
+          },
+          "deleted": {
+            "type": "boolean",
+            "readOnly": true,
+            "description": "Versioned deletion marker. Clearing label/body leaves this false; DELETE sets it true. A deliberate save restores the note, including an explicitly empty file. Never-seen dates have version zero and deleted false."
+          },
+          "labelVersion": {
+            "$ref": "#/components/schemas/Version",
+            "readOnly": true,
+            "description": "Independent day-label version in this deprecated combined projection. It participates in the combined ETag."
+          },
+          "noteEtag": {
+            "type": "string",
+            "readOnly": true,
+            "description": "ETag of /day-notes/{date}/content, independent of the label."
+          },
+          "labelEtag": {
+            "type": "string",
+            "readOnly": true,
+            "description": "ETag of /day-labels/{date}, independent of the note."
+          }
+        }
+      },
+      "DayEntryInput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "text",
+              "labelVersion"
+            ],
+            "properties": {
+              "text": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "labelVersion": {
+                "$ref": "#/components/schemas/Version"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "body",
+              "noteVersion"
+            ],
+            "properties": {
+              "body": {
+                "type": "string",
+                "maxLength": 200000,
+                "description": "Exact UTF-8 Markdown, limited to 200,000 encoded bytes. Whitespace and line endings are preserved. Empty string clears only the body; omission preserves it. Null and invalid Unicode are rejected."
+              },
+              "noteVersion": {
+                "$ref": "#/components/schemas/Version"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "text",
+              "labelVersion",
+              "body",
+              "noteVersion"
+            ],
+            "properties": {
+              "text": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "labelVersion": {
+                "$ref": "#/components/schemas/Version"
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 200000,
+                "description": "Exact UTF-8 Markdown, limited to 200,000 encoded bytes. Whitespace and line endings are preserved. Empty string clears only the body; omission preserves it. Null and invalid Unicode are rejected."
+              },
+              "noteVersion": {
+                "$ref": "#/components/schemas/Version"
+              }
+            }
+          }
+        ],
+        "description": "Atomic UI edit command containing only independently changed resources. Each supplied resource has its own expected version. A concurrent change to an omitted resource does not block the command. Conflicts roll back the whole command."
       },
       "ArchiveDayNote": {
         "type": "object",
@@ -25755,6 +26692,82 @@
         ]
       },
       "AccountArchiveFileSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "timekeeper-account-v3"
+          },
+          "archiveId": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "generatedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "account": {
+            "$ref": "#/components/schemas/ArchiveAccountMetadata"
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/ArchivePreferences"
+          },
+          "work": {
+            "$ref": "#/components/schemas/ArchiveWorkFiles"
+          },
+          "importHistory": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArchiveAuditRecord"
+            },
+            "maxItems": 1000000
+          },
+          "journalFiles": {
+            "type": "array",
+            "maxItems": 760000,
+            "items": {
+              "$ref": "#/components/schemas/ArchiveJournalFile"
+            },
+            "description": "Checksummed separate Markdown and binary ZIP entries. Nonempty indexes require the complete ZIP for restore."
+          },
+          "dayLabels": {
+            "type": "array",
+            "maxItems": 250000,
+            "items": {
+              "$ref": "#/components/schemas/ArchivedDayLabel"
+            },
+            "description": "Independent day labels, including explicitly cleared values. Markdown frontmatter is opaque and does not own these labels."
+          }
+        },
+        "required": [
+          "format",
+          "archiveId",
+          "generatedAt",
+          "account",
+          "preferences",
+          "work",
+          "importHistory",
+          "journalFiles",
+          "dayLabels"
+        ]
+      },
+      "ArchivedDayLabel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "date",
+          "text"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 80
+          }
+        }
+      },
+      "AccountArchiveLegacyFileSnapshot": {
         "type": "object",
         "additionalProperties": false,
         "properties": {

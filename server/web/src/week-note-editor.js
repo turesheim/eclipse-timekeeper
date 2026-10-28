@@ -79,7 +79,7 @@ export class WeekNoteEditor {
   }
   async remove(){
     if(!this.note?.version||this.note.deleted||this.busy||this.stale||!this.writable)return;
-    if(!confirm(t('journal.delete_confirm',{date:this.week})))return;
+    if(!confirm(t('week_notes.delete_confirm',{week:this.week})))return;
     this.busy=true;this.controls();const generation=this.generation;
     try{
       await this.session.request('/week-notes/'+this.week,{method:'DELETE',etag:this.note.etag});

@@ -96,7 +96,7 @@ public class ServerStore {
             while(rows.next()) owners.add(rows.getString(1));
         } catch(SQLException failure) {throw databaseFailure(failure);}
         for (String owner : owners) {
-            transaction(owner,() -> { initializeDefaultLabels(); migrateClientDetails(); migrateWorkSessionDescriptions(); retireSessionLinks(); return null; });
+            transaction(owner,() -> { initializeDefaultLabels(); migrateClientDetails(); migrateWorkSessionDescriptions(); retireSessionLinks(); new DayLabels(this).migrate(); return null; });
         }
     }
     private void initializeDefaultLabels() {

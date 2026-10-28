@@ -45,7 +45,7 @@ class AccountArchiveHttpTest {
         var empty=call("test-a","GET","/day-notes/"+date,null,null,null);
         call("test-a","PUT","/day-notes/"+date,object().put("body",journal),empty.header("ETag"),null).then().statusCode(200);
         String canonical="---\r\ntimekeeper-label: Planning\r\ncustom: preserved\r\n---\r\n"+journal;
-        store.transaction("a",()->{var notes=new DayNotes(store);var day=DayNotes.date(date);notes.saveDocument(day,etag(notes.get(day)),canonical.getBytes(StandardCharsets.UTF_8));return null;});
+        store.transaction("a",()->{var notes=new DayNotes(store);var day=DayNotes.date(date);notes.saveDocument(day,etag(notes.getContent(day)),canonical.getBytes(StandardCharsets.UTF_8));return null;});
         String week="2026-W32",weekly="# Weekly private plan\r\n";
         var emptyWeek=call("test-a","GET","/week-notes/"+week,null,null,null);
         call("test-a","PUT","/week-notes/"+week,object().put("body",weekly),emptyWeek.header("ETag"),null).then().statusCode(200);

@@ -16,6 +16,28 @@ use `Cache-Control: private, no-store`; calendar summaries contain a label and
 metadata, not note contents. The client clears its note metadata and editor
 state when the authenticated account changes or signs out.
 
+## Independent labels and notes
+
+The day label has its own record, version and conditional API operations.
+Clearing or deleting a note preserves its label; clearing a label preserves the
+note. The shared editor sends only changed resources and checks their separate
+versions. A combined save commits both changes or neither. A label-only day can
+remain visible in Calendar after its note has been deleted. Today calendar dots
+indicate note body content, independently of labels.
+
+Before the schema-7 upgrade, stop all older API replicas and make a protected
+backup. Explicitly authorize the upgrade using the deployment's existing schema
+upgrade procedure. The SQL table shape is unchanged, but the model version gates
+older binaries. Startup copies legacy labels in owner transactions and preserves
+existing Markdown bytes and note versions. Roll back through a protected backup;
+do not reopen the migrated database using an older server binary.
+
+Account archives store labels in `archive.json.dayLabels`, independently of
+Markdown files. Preserve the complete ZIP when restoring. Legacy archives remain
+supported; current label conflicts are surfaced for review rather than replaced.
+See [read-only API diagnostics](API-DIAGNOSTICS.md) for inspecting the independent
+records without changing live data.
+
 ## At-rest protection and trust boundary
 
 Timekeeper processes **readable Markdown**. It stores note text in the existing
