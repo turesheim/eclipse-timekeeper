@@ -8,6 +8,7 @@ import java.util.List;
 
 /** Transactional, serialized bootstrap and canonical validation of PostgreSQL storage. */
 public final class PostgresSchema {
+    static final long MAINTENANCE_LOCK=92751638246L;
     private PostgresSchema() { }
 
     private static String resource(String name) throws SQLException {
@@ -20,11 +21,15 @@ public final class PostgresSchema {
     public static void initializeOrValidate(Connection connection) throws SQLException {initializeOrValidate(connection,false);}
     public static void initializeOrValidate(Connection connection,boolean allowUpgrade) throws SQLException {
         if (!connection.getAutoCommit()) throw new SQLException("Schema bootstrap requires its own transaction");
+        // A ready-schema validation is a reader. Taking the exclusive upgrade
+        // lock here would queue live requests behind a replica starting while
+        // a long-running snapshot holds its shared restore fence.
+        if(validateReadyUnderSharedLock(connection))return;
         connection.setAutoCommit(false);
         try {
             try (var statement = connection.createStatement()) {
                 // Two server replicas may start against the same new database at once.
-                statement.execute("SELECT pg_advisory_xact_lock(92751638246)");
+                statement.execute("SELECT pg_advisory_xact_lock("+MAINTENANCE_LOCK+")");
                 if (shape(connection).isEmpty()) {
                     statement.execute(resource("schema-v1-postgresql.sql"));statement.execute(resource("auth-v2.sql"));statement.execute(resource("recovery-v3.sql"));statement.execute(resource("passkeys-v4.sql"));statement.execute(resource("settings-v5.sql"));statement.execute(resource("locale-v6.sql"));statement.execute(resource("instance-v9.sql"));
                     validateShape(connection);
@@ -84,6 +89,23 @@ public final class PostgresSchema {
         } finally { connection.setAutoCommit(true); }
     }
 
+    private static boolean validateReadyUnderSharedLock(Connection connection) throws SQLException {
+        boolean held=false;
+        try {
+            try(var statement=connection.createStatement()){statement.execute("SELECT pg_advisory_lock_shared("+MAINTENANCE_LOCK+")");held=true;}
+            boolean exists;
+            try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT to_regclass('public.tk_schema') IS NOT NULL")){exists=rows.next()&&rows.getBoolean(1);}
+            if(!exists)return false;
+            try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT schema_version,state FROM public.tk_schema WHERE id=1")) {
+                if(!rows.next()||rows.getInt(1)!=ServerSchema.CURRENT||!"READY".equals(rows.getString(2)))return false;
+            }
+            validate(connection);return true;
+        }finally{
+            if(held)try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT pg_advisory_unlock_shared("+MAINTENANCE_LOCK+")")) {
+                if(!rows.next()||!rows.getBoolean(1))throw new SQLException("Schema read fence was lost");
+            }
+        }
+    }
     public static void validate(Connection connection) throws SQLException {
         validateShape(connection);
         ServerSchema.validateInstanceControl(connection);

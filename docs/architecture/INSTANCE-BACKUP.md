@@ -351,3 +351,31 @@ Synology/Docker/standalone integration, full restored-access tests and operator
 documentation. Deployment integration must still audit all recoverable inputs and applicable
 security material, including native maintenance backup coverage after a restore. No privileged host credentials may be granted to the web process to
 make that integration work.
+
+## Runtime maintenance and restore fence
+
+Account and owner transactions, archive snapshots, calendar refresh reads and
+readiness checks now check the installation control record before doing work.
+A pending restore returns `503 INSTANCE_RESTORE_PENDING`; a changed restore
+generation returns `503 INSTANCE_RESTART_REQUIRED`. A running process cannot
+refresh its captured generation. Invalid control metadata fails closed with
+`INSTANCE_FENCE_UNAVAILABLE`. These internal fields are not an activation API.
+
+On PostgreSQL, requests hold a shared session advisory lock across their complete
+transaction, acquired before opening a repeatable-read snapshot. Ready-schema
+startup validation also uses a shared lock; schema upgrades retain the exclusive
+transaction lock. A five-second request lock timeout returns
+`INSTANCE_MAINTENANCE_ACTIVE` and discards the connection to prevent pooled locks.
+
+The offline exclusive helper requires a fresh connection and refuses any other
+connected database client. PostgreSQL uses the matching exclusive advisory lock;
+H2 uses non-forcing `SET EXCLUSIVE 1`. It never terminates another client or
+rolls back its work. All target replicas must be stopped before activation.
+Closing the helper rolls back unfinished work before releasing exclusivity,
+including on H2 where changing exclusive mode otherwise commits a transaction.
+See [H2 exclusive mode](https://h2database.com/html/commands.html#set_exclusive)
+and [PostgreSQL advisory locks](https://www.postgresql.org/docs/17/functions-admin.html#FUNCTIONS-ADVISORY-LOCKS).
+
+This fence is an activation prerequisite. Durable restore intent, deployment
+mapping, launch-time application and interruption recovery remain unfinished;
+the Administration page continues to report `restoreReady: false`.

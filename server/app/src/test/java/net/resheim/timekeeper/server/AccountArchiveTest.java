@@ -27,7 +27,7 @@ class AccountArchiveTest {
 
     /** Commit an authentication change after the archive's MVCC snapshot starts. */
     private AccountArchive racingArchive(String owner,Runnable change,java.util.concurrent.atomic.AtomicInteger attempts) {
-        var archive=new AccountArchive();archive.accounts=accounts;archive.tokens=tokens;
+        var archive=new AccountArchive();archive.accounts=accounts;archive.tokens=tokens;archive.restoreFence=io.quarkus.arc.ClientProxy.unwrap(archives).restoreFence;
         archive.datasource=(io.agroal.api.AgroalDataSource)java.lang.reflect.Proxy.newProxyInstance(
             getClass().getClassLoader(),new Class<?>[]{io.agroal.api.AgroalDataSource.class},(proxy,method,args)->{
                 try {

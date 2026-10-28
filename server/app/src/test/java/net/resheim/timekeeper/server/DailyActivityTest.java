@@ -72,7 +72,7 @@ class DailyActivityTest {
             var task=api.createTask(new CreateTask(Optional.empty(),"Replica daily tracking",Optional.empty()));
             var original=api.startActivity(new StartActivity(task.id(),OwnerId.LOCAL,"Concurrent tracking",Set.of()));
             clock.set(start.plus(Duration.ofDays(2)));
-            var replica=new ServerStore();replica.datasource=store.datasource;replica.clock=clock;replica.jdbcUrl=store.jdbcUrl;replica.tokens=store.tokens;
+            var replica=new ServerStore();replica.datasource=store.datasource;replica.restoreFence=store.restoreFence;replica.clock=clock;replica.jdbcUrl=store.jdbcUrl;replica.tokens=store.tokens;
             var ready=new CountDownLatch(2);var release=new CountDownLatch(1);
             try(var workers=Executors.newFixedThreadPool(2)) {
                 var futures=new ArrayList<Future<?>>();

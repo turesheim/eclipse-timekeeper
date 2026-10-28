@@ -17,6 +17,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 class CalendarRefresh {
     @Inject ServerStore store;
     @Inject AgroalDataSource datasource;
+    @Inject InstanceRestoreFence restoreFence;
     @Inject BackendClock clock;
     @ConfigProperty(name="timekeeper.calendars.trusted-origins") Optional<String> trustedOrigins;
     @ConfigProperty(name="timekeeper.calendars.automatic",defaultValue="true") boolean automatic;
@@ -54,7 +55,7 @@ class CalendarRefresh {
         if(closed||capacity.availablePermits()==0)return;
         try{
             var due=new ArrayList<Due>();Instant now=clock.now();
-            try(var connection=datasource.getConnection();var query=connection.prepareStatement("SELECT r.owner_id,r.id,r.payload FROM tk_resource r JOIN tk_account a ON a.owner_id=r.owner_id WHERE r.entity_type='CAL_SUB' AND a.state<>'DISABLED'");var rows=query.executeQuery()){
+            try(var connection=datasource.getConnection();var held=restoreFence.enter(connection);var query=connection.prepareStatement("SELECT r.owner_id,r.id,r.payload FROM tk_resource r JOIN tk_account a ON a.owner_id=r.owner_id WHERE r.entity_type='CAL_SUB' AND a.state<>'DISABLED'");var rows=query.executeQuery()){
                 while(rows.next()){
                     var value=JsonValues.parse(rows.getString(3));Instant next=Instant.parse(value.path("nextRefresh").asText());
                     if(!next.isAfter(now))due.add(new Due(rows.getString(1),rows.getObject(2,UUID.class),next));

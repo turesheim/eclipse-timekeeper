@@ -18,6 +18,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 public class AccountStore {
     @Inject AgroalDataSource datasource;
     @Inject TokenRegistry registry;
+    @Inject InstanceRestoreFence restoreFence;
     @Inject PasskeyRealm realm;
     @ConfigProperty(name="timekeeper.auth.setup-file",defaultValue="NONE") String setupFile;
     @ConfigProperty(name="quarkus.datasource.jdbc.url") String jdbcUrl;
@@ -31,7 +32,7 @@ public class AccountStore {
     static Set<String> permissions(String value) {return value.equals("READ_WRITE") ? Set.of("read","write") : Set.of("read");}
     static String permissions(Set<String> values) {return values.contains("write") ? "READ_WRITE" : "READ";}
     <T> T tx(Function<Connection,T> work) {
-        try(var connection=datasource.getConnection()) {
+        try(var connection=datasource.getConnection();var held=restoreFence.enter(connection)) {
             connection.setAutoCommit(false);
             try {var result=work.apply(connection);connection.commit();return result;}
             catch(Throwable failure) {try {connection.rollback();}catch(SQLException rollback) {failure.addSuppressed(rollback);}throw failure;}

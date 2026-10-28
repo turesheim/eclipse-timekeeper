@@ -59,7 +59,7 @@ class WorkSessionStoreTest {
         var parts=store.transaction(owner,()->store.service().activities(new net.resheim.eclipse.timekeeper.service.Queries.ActivityQuery(
                 from,end.plusSeconds(1),Optional.of(identity),Optional.of(task.id()),Optional.empty(),ZoneId.of("UTC"))).activities());
         var live=store.transaction(owner,()->store.workSessionService().startWorkSession(new StartWorkSession(identity,"Independent running session")));
-        var replica=new ServerStore();var actual=io.quarkus.arc.ClientProxy.unwrap(store);replica.datasource=actual.datasource;replica.tokens=actual.tokens;replica.jdbcUrl=actual.jdbcUrl;replica.clock=actual.clock;
+        var replica=new ServerStore();var actual=io.quarkus.arc.ClientProxy.unwrap(store);replica.datasource=actual.datasource;replica.restoreFence=actual.restoreFence;replica.tokens=actual.tokens;replica.jdbcUrl=actual.jdbcUrl;replica.clock=actual.clock;
         var report=replica.transaction(owner,()->replica.workSessionService().workSessionReport(session.id()));
         assertEquals(session,report.session());assertEquals(new HashSet<>(parts),new HashSet<>(report.activities()));
         assertEquals(Duration.ofHours(26),report.time().duration());assertEquals(Duration.ZERO,report.time().unallocatedTime());
@@ -97,7 +97,7 @@ class WorkSessionStoreTest {
     }
     @Test void concurrentSessionsUseTheSameOwnerDatabaseLockAcrossInstances() throws Exception {
         String owner="session-concurrent-"+UUID.randomUUID();store.transaction(owner,()->null);
-        var actual=io.quarkus.arc.ClientProxy.unwrap(store);var replica=new ServerStore();replica.datasource=actual.datasource;replica.tokens=actual.tokens;replica.jdbcUrl=actual.jdbcUrl;replica.clock=actual.clock;
+        var actual=io.quarkus.arc.ClientProxy.unwrap(store);var replica=new ServerStore();replica.datasource=actual.datasource;replica.restoreFence=actual.restoreFence;replica.tokens=actual.tokens;replica.jdbcUrl=actual.jdbcUrl;replica.clock=actual.clock;
         var ready=new CountDownLatch(2);var go=new CountDownLatch(1);
         try(var workers=Executors.newFixedThreadPool(2)) {
             var futures=new ArrayList<Future<Boolean>>();

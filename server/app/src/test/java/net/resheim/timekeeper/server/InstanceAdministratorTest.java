@@ -195,6 +195,23 @@ class InstanceAdministratorTest {
         assertEquals(400,http(browser,false,"GET","/admin/instance?path=private",null).statusCode());
         ClientProxy.unwrap(jobs).storage="NONE";assertFalse(parse(http(browser,false,"GET","/admin/instance",null).asString()).path("storageConfigured").asBoolean());
     }
+    @Test void restoreFenceRejectsHttpAndOwnerProvisioningWithoutChangingExistingData() throws Exception {
+        var browser=httpLogin("instance-admin");var created=http(browser,true,"POST","/clients",object().put("name","Keep existing data behind the fence").put("color","#123456"));assertEquals(201,created.statusCode());
+        try(var c=datasource.getConnection()) {
+            String previous;try(var statement=c.createStatement();var rows=statement.executeQuery("SELECT payload FROM tk_instance WHERE kind='CONTROL'")){assertTrue(rows.next());previous=rows.getString(1);}
+            try {
+                execute(c,"UPDATE tk_instance SET payload=? WHERE kind='CONTROL'",object().put("restorePending",true).toString());
+                var pending=http(browser,false,"GET","/clients",null);assertEquals(503,pending.statusCode(),pending.asString());assertEquals("INSTANCE_RESTORE_PENDING",parse(pending.asString()).path("code").asText());
+                assertEquals(503,io.restassured.RestAssured.get("/q/health/ready").statusCode());
+                var failure=assertThrows(ApiFailure.class,()->store.transaction("never-provision-during-restore",()->{throw new AssertionError("Fenced owner work executed");}));assertEquals("INSTANCE_RESTORE_PENDING",failure.code);
+                try(var statement=query(c,"SELECT COUNT(*) FROM tk_owner WHERE id='never-provision-during-restore'");var rows=statement.executeQuery()){assertTrue(rows.next());assertEquals(0,rows.getInt(1));}
+                execute(c,"UPDATE tk_instance SET payload=? WHERE kind='CONTROL'",object().put("restoreGeneration",UUID.randomUUID().toString()).toString());
+                var stale=http(browser,false,"GET","/clients",null);assertEquals(503,stale.statusCode(),stale.asString());assertEquals("INSTANCE_RESTART_REQUIRED",parse(stale.asString()).path("code").asText());
+                try(var statement=query(c,"SELECT payload FROM tk_resource WHERE entity_type='CLIENT' AND id=?",UUID.fromString(parse(created.asString()).path("id").asText()));var rows=statement.executeQuery()){assertTrue(rows.next());assertEquals(parse(created.asString()),parse(rows.getString(1)));}
+            }finally{execute(c,"UPDATE tk_instance SET payload=? WHERE kind='CONTROL'",previous);}
+        }
+        assertEquals(200,http(browser,false,"GET","/clients",null).statusCode());
+    }
     @Test void httpRegularAndTokenExchangedAccountsCannotReachInstanceJobs() {
         var token=accounts.createToken(admin,"Forbidden instance token",Set.of("read","write"),null).path("token").asText();
         var input=object().put("currentPassword",PASSWORD).put("passphrase","private forbidden API passphrase");

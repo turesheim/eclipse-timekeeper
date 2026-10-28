@@ -15,6 +15,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 class InstanceBackupService {
     @Inject InstanceAdministrator administrators;
     @Inject AgroalDataSource datasource;
+    @Inject InstanceRestoreFence restoreFence;
     @Inject RecoveryOrigin origin;
     @Inject ServerInfo info;
     @ConfigProperty(name="timekeeper.package-id",defaultValue="timekeeper") String packageId;
@@ -26,7 +27,7 @@ class InstanceBackupService {
             administrators.requireFresh(proof);
             if(passphrase==null||passphrase.length<12||passphrase.length>1024)throw ApiFailure.validation();
             try(var configuration=InstanceConfiguration.captureRuntime()) {
-                try(var connection=datasource.getConnection()) {
+                try(var connection=datasource.getConnection();var held=restoreFence.enter(connection)) {
                     String backend=connection.getMetaData().getDatabaseProductName().equals("PostgreSQL")?"postgresql":"h2";
                     connection.setTransactionIsolation(backend.equals("postgresql")?Connection.TRANSACTION_REPEATABLE_READ:Connection.TRANSACTION_SERIALIZABLE);connection.setAutoCommit(false);
                     try {

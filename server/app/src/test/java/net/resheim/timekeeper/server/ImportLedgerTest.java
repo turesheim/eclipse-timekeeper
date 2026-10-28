@@ -34,7 +34,7 @@ class ImportLedgerTest {
         }));
         // Simulate a new server instance after a lost transport reply. No new command key is needed to reconcile.
         var actual=io.quarkus.arc.ClientProxy.unwrap(store);var replica=new ServerStore();
-        replica.datasource=actual.datasource;replica.tokens=actual.tokens;replica.jdbcUrl=actual.jdbcUrl;replica.clock=actual.clock;
+        replica.datasource=actual.datasource;replica.restoreFence=actual.restoreFence;replica.tokens=actual.tokens;replica.jdbcUrl=actual.jdbcUrl;replica.clock=actual.clock;
         var replay=replica.transaction(owner,()->new ImportLedger(replica).batch(id,0,input,false,state->{throw new AssertionError("Batch replay executed writes");}));
         assertEquals(outcome.toString(),replay.toString());assertEquals(1,executions.get());
         store.transaction(owner,()->{

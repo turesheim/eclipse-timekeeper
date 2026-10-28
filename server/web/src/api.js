@@ -3,6 +3,10 @@ import {getLocale} from './i18n.js';
 import { t as i18nText } from "./i18n.js";const nameOrder = new Intl.Collator(getLocale(), { numeric: true, sensitivity: 'base' });
 const sortedNames = (values) => [...values].sort((a, b) => nameOrder.compare(a.name, b.name) || a.id.localeCompare(b.id));
 const messages = {
+  INSTANCE_RESTORE_PENDING: 'backups.error_restore_pending',
+  INSTANCE_RESTART_REQUIRED: 'backups.error_restart_required',
+  INSTANCE_MAINTENANCE_ACTIVE: 'backups.error_maintenance',
+  INSTANCE_FENCE_UNAVAILABLE: 'backups.error_fence',
   INSTANCE_UPLOAD_FILE_MISMATCH: 'backups.error_file_mismatch',
   INSTANCE_UPLOAD_PROGRESS_INVALID: 'backups.error_progress',
   INSTANCE_OPERATION_IN_PROGRESS: 'backups.error_in_progress',
