@@ -67,7 +67,7 @@ def verify_http_recovery(app, fixture, environment):
                 with urllib.request.urlopen(request, timeout=10) as response:
                     data = json.load(response)
                 clients = data['items']
-                if len(clients) != 1 or clients[0]['name'] != 'Restored client æ' or clients[0]['version'] != 17:
+                if len(clients) != 1 or clients[0]['id'] != '11111111-1111-4111-8111-111111111111' or clients[0]['name'] != 'Restored client æ' or clients[0]['version'] != 17:
                     raise ValueError('Restored client data was not preserved by packaged startup')
             finally:
                 process.terminate()

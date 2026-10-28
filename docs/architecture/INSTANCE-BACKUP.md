@@ -4,8 +4,8 @@ This feature is being implemented for [#473](https://github.com/turesheim/eclips
 The internal encrypted archive, configuration inventory, database-image and
 administrator-authority components exist. Administrator start/status/discard routes are integrated with durable backup
 jobs, one-use native downloads and uploaded-archive review. The Administration
-interface supports these operations. Public restore confirmation and automatic
-launcher integration remain unfinished; the offline recovery coordinator exists. The acceptance criteria in the
+interface supports these operations. Public restore confirmation and complete
+deployment integration remain unfinished; packaged JVM startup automatically runs the recovery coordinator. The acceptance criteria in the
 issue remain the delivery requirements; these foundations alone do not satisfy them.
 
 ## Administration workflow
@@ -461,9 +461,9 @@ one whose database phase has committed. Tests use actual administrator proof and
 PostgreSQL as well as H2; offline application uses an isolated synthetic clone,
 since a live application pool correctly prevents exclusive activation.
 
-These are internal components. There is still no public confirmation endpoint or
-automatic launch-time caller. `InstanceRestoreMain` is a manual offline entry
-point for an already-authorized handoff; it does not start the HTTP server.
+These are internal components. There is still no public confirmation endpoint.
+The packaged launch-time caller resumes an already-authorized handoff.
+`InstanceRestoreMain` also provides a manual offline entry point; that mode does not start the HTTP server.
 Unreferenced or interrupted private staging must remain private until the recovery
 workflow can safely discard it; files must never be interpreted as consent by a
 launcher. Launcher integration must resolve the current runtime configuration
@@ -513,8 +513,7 @@ It is not yet exposed as an end-user restore workflow. Separate-JVM tests cover
 H2 and a non-superuser PostgreSQL application role, repeated completion, recovery
 after database commit, partial cleanup, and refusal of populated targets.
 
-Public staging/confirmation, cancellation of uncommitted staging, automatic
-pre-start invocation and returning to the web application are still required.
+Public staging/confirmation and cancellation of uncommitted staging are still required.
 Full package-identity migration and restored login/passkey/journal/attachment
 acceptance remain delivery requirements; SQL/password-hash checks alone do not
 prove those application flows.
@@ -530,3 +529,31 @@ retry against a password-protected target using its credential file, from the
 actual distribution without test libraries in its runtime
 classpath. The normal Server CI job runs this check after packaging and retains
 checksum/commit-bound evidence alongside the other acceptance reports.
+
+
+## Packaged startup recovery
+
+The fast-jar `Main-Class` is `InstancePreboot`, a JDK-only wrapper installed by
+Maven after Quarkus packaging. Before loading framework classes, it launches a
+short-lived helper using the shipped application, main and boot libraries. JVM
+configuration properties travel through a private stdin pipe; recovered
+configuration locations and file-backed credential aliases return through stdout.
+Private provider diagnostics are suppressed and failures produce a fixed error.
+The helper has no HTTP listener. Normal startup never creates a missing H2
+database and leaves schema initialization/upgrades to the existing server path.
+
+A committed pending handoff is recovered exclusively before framework startup.
+For completed restores, startup verifies the database-bound active material and
+adds its configuration overlay before initializing TLS, HTTP or scheduled jobs.
+Missing or damaged required material stops startup. The original framework
+entry point runs only after successful verification; a launcher shutdown also
+stops its recovery child. Ordinary ready replicas do not acquire the exclusive
+restore lock.
+
+Distribution verification rejects a missing or bypassed wrapper and class bytes
+that differ from the application build. Packaged acceptance starts with pending
+consent, verifies restored password login and the original client ID/version,
+restarts and repeats the authenticated read, then checks that missing required
+material prevents framework startup. This loopback protocol check explicitly
+forwards the Secure session cookie; it does not replace HTTPS browser acceptance
+or the remaining passkey, journal, attachment and native migration requirements.

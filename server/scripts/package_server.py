@@ -15,23 +15,35 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def verify_build_identity(app, commit):
     """The embedded runtime identity must agree with the distribution manifest."""
-    entry = 'net/resheim/timekeeper/server/InstancePreboot.class'
-    with zipfile.ZipFile(app / 'quarkus-run.jar') as runner:
-        manifest = runner.read('META-INF/MANIFEST.MF').decode().replace('\r\n ', '')
-        if 'Main-Class: net.resheim.timekeeper.server.InstancePreboot' not in manifest:
-            raise ValueError('Packaged server must run restore recovery before framework startup')
-        bootstrap = runner.read(entry)
     identities = []
     for jar in (app / 'app').glob('*.jar'):
         with zipfile.ZipFile(jar) as archive:
-            if entry in archive.namelist() and archive.read(entry) != bootstrap:
-                raise ValueError('Packaged startup recovery class differs from application build')
             if 'timekeeper-build.properties' in archive.namelist():
                 properties = dict(line.split('=', 1) for line in archive.read('timekeeper-build.properties').decode().splitlines()
                                   if '=' in line and not line.startswith('#'))
                 identities.append(properties)
     if len(identities) != 1 or identities[0].get('commit') != commit or identities[0].get('dirty') != 'false':
         raise ValueError('Packaged server build identity must match the exact clean source commit; rebuild before packaging')
+
+
+def verify_preboot(app):
+    """Every distribution must retain the recovery hook produced by Maven."""
+    entry = 'net/resheim/timekeeper/server/InstancePreboot.class'
+    try:
+        with zipfile.ZipFile(app / 'quarkus-run.jar') as runner:
+            manifest = runner.read('META-INF/MANIFEST.MF').decode().replace('\r\n ', '')
+            if 'Main-Class: net.resheim.timekeeper.server.InstancePreboot' not in manifest.splitlines():
+                raise ValueError('Packaged server must run restore recovery before framework startup')
+            bootstrap = runner.read(entry)
+        copies = []
+        for jar in (app / 'app').glob('*.jar'):
+            with zipfile.ZipFile(jar) as archive:
+                if entry in archive.namelist():
+                    copies.append(archive.read(entry))
+        if copies != [bootstrap]:
+            raise ValueError('Packaged startup recovery class differs from application build')
+    except (OSError, KeyError, zipfile.BadZipFile) as failure:
+        raise ValueError('Packaged startup recovery is missing or invalid') from failure
 
 
 def package(output, tag, commit):
@@ -51,6 +63,7 @@ def package(output, tag, commit):
         if not path.exists():
             raise ValueError('Build the complete Quarkus JVM distribution before packaging')
     verify_build_identity(app, commit)
+    verify_preboot(app)
     output.mkdir(parents=True, exist_ok=True)
     archive = output / 'timekeeper-server.zip'
     manifest = {'format': 1, 'kind': 'candidate' if tag is None else 'release', 'tag': tag, 'commit': commit, 'java': 21,
