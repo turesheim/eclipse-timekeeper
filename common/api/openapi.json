@@ -15500,6 +15500,100 @@
           }
         }
       }
+    },
+    "/admin/instance/uploads/{id}/target": {
+      "post": {
+        "operationId": "checkInstanceRestoreTarget",
+        "summary": "Inspect whether the target database contains only bootstrap data",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Fresh administrator password proof and the initiating upload session are required. The archive must already be in REVIEW. Uses a consistent, read-only inspection; reports other accounts, business records, API tokens and business history as blockers. Unmodified built-in labels are bootstrap data. This advisory result is not a restore authorization: activation must recheck under an exclusive fence. No data is replaced.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "200": {
+            "description": "Advisory database eligibility and blockers; no activation authority.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreTarget"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceOperationProofInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -28756,6 +28850,62 @@
                 }
               }
             }
+          }
+        }
+      },
+      "InstanceRestoreTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "operationVersion",
+          "databaseEligible",
+          "restoreReady",
+          "checkedAt",
+          "blockers",
+          "requiredSteps"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "databaseEligible": {
+            "type": "boolean"
+          },
+          "restoreReady": {
+            "const": false
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "blockers": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 4,
+            "items": {
+              "type": "string",
+              "enum": [
+                "TARGET_OTHER_ACCOUNTS",
+                "TARGET_BUSINESS_DATA",
+                "TARGET_API_TOKENS",
+                "TARGET_BUSINESS_HISTORY"
+              ]
+            }
+          },
+          "requiredSteps": {
+            "const": [
+              "OFFLINE_TARGET_RECHECK",
+              "AUTHENTICATION_CONFIGURATION",
+              "DEPLOYMENT_MAPPING",
+              "OFFLINE_ACTIVATION"
+            ]
           }
         }
       }

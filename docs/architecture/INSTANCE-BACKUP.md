@@ -44,6 +44,21 @@ passphrase. An incorrect phrase retains encrypted bytes for retry. A successful
 review shows source metadata and table counts, with an explicit warning that
 target readiness, authentication checks, deployment mapping and offline
 activation are still required. The current interface cannot activate a restore.
+**Check target database** requires fresh password proof and the upload's initiating
+session. It inspects a serializable database snapshot only after archive review.
+Only the sole bootstrap administrator, unchanged built-in labels and initial
+profile/label change events are disposable bootstrap data. Other owners/accounts,
+business resources, command receipts, API tokens (including revoked records),
+modified/incomplete default labels and business history are blockers. Queries
+bound label payload reads and do not load attachment contents into browser or
+server memory. Unknown persisted tables or columns fail coverage.
+
+The result is advisory, carries the review's operation version, and keeps
+`restoreReady` false. It does not reserve the database or authorize replacement.
+Activation must repeat the database check under an exclusive write fence and
+complete authentication/configuration, deployment mapping and offline checks.
+Existing business records remain intact when a target is rejected.
+
 Discard removes the staged archive and work files while retaining its audit.
 
 The checksum library is pinned, bundled locally and included in the About license

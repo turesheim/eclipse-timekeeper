@@ -295,6 +295,27 @@ class InstanceAdministratorTest {
         var retained=http(browser,false,"GET","/clients/"+client.path("id").asText(),null);assertEquals(200,retained.statusCode(),retained.asString());assertEquals(client,parse(retained.asString()));
         assertEquals(200,http(browser,true,"POST","/admin/instance/operations/"+id+"/discard",object().put("currentPassword",PASSWORD)).statusCode());assertFalse(Files.exists(output.resolve("private").resolve(id)));
     }
+    @Test void targetReviewRequiresFreshInitiatingSessionProofAndNeverReplacesExistingData() throws Exception {
+        byte[] bytes=uploadFixture();var browser=httpLogin("instance-admin");String id=createUpload(browser,bytes,cipherDigest(bytes));String path="/admin/instance/uploads/"+id;
+        var proof=object().put("currentPassword",PASSWORD);
+        assertEquals(409,http(browser,true,"POST",path+"/target",proof).statusCode());
+        assertEquals(200,chunk(browser,true,id,0,bytes).statusCode());
+        assertEquals(202,http(browser,true,"POST",path+"/validate",proof.deepCopy().put("passphrase","upload review source passphrase")).statusCode());
+        long version=awaitUpload(browser,id,"REVIEW").path("operation").path("version").asLong();
+        assertEquals(403,http(browser,false,"POST",path+"/target",proof).statusCode());
+        assertEquals(422,http(browser,true,"POST",path+"/target",object().put("currentPassword","wrong password")).statusCode());
+        assertEquals(400,http(browser,true,"POST",path+"/target",proof.deepCopy().put("path","/private/target")).statusCode());
+        assertEquals(403,http(httpLogin("instance-admin"),true,"POST",path+"/target",proof).statusCode());
+        // The normal owner initialization creates the eight built-in labels.
+        assertEquals(200,http(browser,false,"GET","/labels",null).statusCode());
+        var initial=http(browser,true,"POST",path+"/target",proof);assertEquals(200,initial.statusCode(),initial.asString());var empty=parse(initial.asString());contracts.validate("InstanceRestoreTarget",empty);
+        assertTrue(empty.path("databaseEligible").asBoolean(),initial.asString());assertFalse(empty.path("restoreReady").asBoolean());assertTrue(empty.path("blockers").isEmpty());assertEquals(version,empty.path("operationVersion").asLong());
+        var created=http(browser,true,"POST","/clients",object().put("name","Existing target data").put("color","#123456"));assertEquals(201,created.statusCode());
+        var populated=http(browser,true,"POST",path+"/target",proof);assertEquals(200,populated.statusCode(),populated.asString());var blocked=parse(populated.asString());contracts.validate("InstanceRestoreTarget",blocked);
+        assertFalse(blocked.path("databaseEligible").asBoolean());assertTrue(blocked.path("blockers").toString().contains("TARGET_BUSINESS_DATA"));assertFalse(blocked.toString().contains(PASSWORD));assertFalse(blocked.toString().contains(output.toString()));
+        var retained=http(browser,false,"GET","/clients/"+parse(created.asString()).path("id").asText(),null);assertEquals(200,retained.statusCode());assertEquals(parse(created.asString()),parse(retained.asString()));
+        assertEquals(version,awaitUpload(browser,id,"REVIEW").path("operation").path("version").asLong());
+    }
     @Test void uploadRejectsOtherSessionsTokensOversizedChunksAndWrongChecksums() throws Exception {
         byte[] bytes=uploadFixture();var browser=httpLogin("instance-admin");String id=createUpload(browser,bytes,"0".repeat(64));String path="/admin/instance/uploads/"+id;var other=httpLogin("instance-admin");
         assertEquals(403,http(other,false,"GET",path,null).statusCode());assertEquals(403,chunk(other,true,id,0,bytes).statusCode());

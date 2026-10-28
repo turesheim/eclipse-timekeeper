@@ -54,6 +54,13 @@ class ContractTest(unittest.TestCase):
         self.assertTrue(validator('InstanceRestoreUploadInput').is_valid({'currentPassword':'private proof','bytes':1024,'sha256':'a'*64}))
         self.assertFalse(validator('InstanceRestoreUploadInput').is_valid({'currentPassword':'private proof','bytes':1024,'sha256':'a'*64,'path':'/outside'}))
 
+    def test_target_review_is_advisory_and_requires_password_proof(self):
+        operation=CONTRACT['paths']['/admin/instance/uploads/{id}/target']['post']
+        self.assertEqual([{'browserSession':[]}],operation['security'])
+        self.assertEqual({'$ref':'#/components/schemas/InstanceOperationProofInput'},operation['requestBody']['content']['application/json']['schema'])
+        self.assertFalse(CONTRACT['components']['schemas']['InstanceRestoreTarget']['properties']['restoreReady']['const'])
+        self.assertTrue(CONTRACT['components']['schemas']['InstanceRestoreTarget']['properties']['blockers']['uniqueItems'])
+
     def test_all_private_operations_require_authentication_and_permission(self):
         self.assertEqual([{'bearerAuth': []}, {'browserSession': []}], CONTRACT['security'])
         ids = []
@@ -563,7 +570,7 @@ class ContractTest(unittest.TestCase):
             'passkeyProofOptions', 'verifyPasskeyProof', 'renamePasskey', 'removePasskey',
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
-            'getInstanceBackupSummary', 'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup', 'createInstanceRestoreUpload', 'getInstanceRestoreUpload', 'appendInstanceRestoreUpload', 'validateInstanceRestoreUpload',
+            'getInstanceBackupSummary', 'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup', 'createInstanceRestoreUpload', 'getInstanceRestoreUpload', 'appendInstanceRestoreUpload', 'validateInstanceRestoreUpload', 'checkInstanceRestoreTarget',
             'getAdministrationSettings', 'updateAdministrationSettings', 'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()

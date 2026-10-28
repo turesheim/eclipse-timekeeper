@@ -85,6 +85,18 @@ export async function renderInstanceBackups(view) {
           details.append(node('p',t('backups.archive_source',{build:review.source.serverVersion,backend:review.source.databaseType,schema:review.schema})));
         }
       }
+      if(op.state==='REVIEW'){
+        const target=action('backups.check_target',async({value})=>{
+          const body={currentPassword:targetProof.value};clear(targetProof);view.clean(value);
+          let reply;try{reply=await view.session.request(base+'/uploads/'+key+'/target',{method:'POST',body,timeout:45000});}finally{body.currentPassword='';}
+          if(!view.valid()||cards.get(key)?.root!==root)return;
+          targetResult.replaceChildren(node('p',t(reply.data.databaseEligible?'backups.target_eligible':'backups.target_blocked'),reply.data.databaseEligible?'alert alert-info':'alert alert-warning'));
+          const labels={TARGET_OTHER_ACCOUNTS:'backups.target_accounts',TARGET_BUSINESS_DATA:'backups.target_data',TARGET_API_TOKENS:'backups.target_tokens',TARGET_BUSINESS_HISTORY:'backups.target_history'};
+          const blockers=node('ul');for(const code of reply.data.blockers)blockers.append(node('li',t(labels[code]||'backups.target_blocked')));if(reply.data.blockers.length)targetResult.append(blockers);
+          targetResult.append(node('p',t('backups.target_advisory'),'hint'));
+        });
+        const targetProof=credential(target.value,'backups.password',true),targetResult=node('div');target.value.append(targetResult);target.finish();
+      }
       if(op.state==='UPLOADING'){
         const resume=button(t('backups.resume'),()=>void view.run(async()=>{
           if(!selected||!digest)throw new Error(t('backups.choose_file'));

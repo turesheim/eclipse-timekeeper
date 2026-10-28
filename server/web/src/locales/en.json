@@ -1118,5 +1118,13 @@
   "backups.error_size": "The archive exceeds the configured storage or size limit.",
   "backups.error_conflict": "Uploaded bytes conflict with the staged archive. Select the original file or discard this upload.",
   "backups.error_state": "The operation changed. Refresh its status before continuing.",
-  "backups.error_download": "The download authorization expired or was already used. Authorize a new download."
+  "backups.error_download": "The download authorization expired or was already used. Authorize a new download.",
+  "backups.check_target": "Check target database",
+  "backups.target_eligible": "The database contains only bootstrap data. Further restore checks are still required.",
+  "backups.target_blocked": "This database contains existing data and cannot be replaced as an empty target.",
+  "backups.target_accounts": "Other accounts or owners exist.",
+  "backups.target_data": "Business records or modified bootstrap labels exist.",
+  "backups.target_tokens": "API token records exist, including any revoked tokens.",
+  "backups.target_history": "Business changes or command receipts exist.",
+  "backups.target_advisory": "This check does not reserve the database or authorize a restore. Activation must repeat it while writes are stopped, and complete authentication and deployment checks."
 }

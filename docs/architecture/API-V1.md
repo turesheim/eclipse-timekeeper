@@ -884,6 +884,7 @@ being implemented. The current draft adds these routes under the separate
 | POST | `/uploads` | Verify `currentPassword`, declare ciphertext `bytes` and `sha256`, and reserve a session-bound upload. |
 | GET | `/uploads/{id}` | Read transfer progress, validation result and a safe archive review. |
 | PUT | `/uploads/{id}/content?offset=…` | Append at most 1 MiB of binary ciphertext, or retry an acknowledged range with identical bytes. |
+| POST | `/uploads/{id}/target` | Re-verify `currentPassword` and inspect the target database for existing accounts, business data, tokens and history. Requires archive REVIEW and the initiating session; returns advisory `databaseEligible`, blockers and `restoreReady: false`. Activation must recheck under an exclusive fence. |
 | POST | `/uploads/{id}/validate` | Re-verify `currentPassword`, consume `passphrase`, and return `202` before full-file verification. |
 
 The Administration **Backup & Restore** page uses these routes. It polls recent

@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
+import {browserRequest} from './browser-request.js';
 const phrase='Separate encrypted instance backup passphrase';
 const card=(page,title)=>page.getByRole('heading',{name:title,exact:true}).locator('..');
 async function password(section){await section.getByLabel('Current administrator password',{exact:true}).fill(process.env.TIMEKEEPER_WEB_PASSWORD);}
@@ -22,6 +23,10 @@ test('instance backup Administration supports native encrypted download and uplo
   const validate=card(page,'Verify uploaded archive');await expect(validate).toBeVisible();await password(validate);await validate.getByLabel('Backup encryption passphrase',{exact:true}).fill('Incorrect encryption passphrase');await validate.getByRole('button',{name:'Verify uploaded archive',exact:true}).click();await expect(card(page,'Restore review')).toContainText('Verification failed',{timeout:60000});
   await password(validate);await validate.getByLabel('Backup encryption passphrase',{exact:true}).fill(phrase);await validate.getByRole('button',{name:'Verify uploaded archive',exact:true}).click();await expect(card(page,'Restore review')).toContainText('restore activation is not yet available',{timeout:60000});
   await page.reload();await expect(card(page,'Restore review')).toContainText('restore activation is not yet available');await expect(card(page,'Restore review')).toContainText('tk_account');
+  const target=card(page,'Check target database');await password(target);await target.getByRole('button',{name:'Check target database',exact:true}).click();await expect(target).toContainText('The database contains only bootstrap data');
+  const client=await browserRequest(page).post('/api/v1/clients',{data:{name:'Preserve existing target client',color:'#123456'}});expect(client.status()).toBe(201);const saved=await client.json();
+  await password(target);await target.getByRole('button',{name:'Check target database',exact:true}).click();await expect(target).toContainText('This database contains existing data');
+  expect((await browserRequest(page).get('/api/v1/clients/'+saved.id)).status()).toBe(200);
   for(const width of [1440,390,320]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(audit.violations.map(value=>value.id)).toEqual([]);await page.screenshot({path:testInfo.outputPath('instance-backups-'+width+'.png'),fullPage:true});}
   const discard=card(page,'Restore review').getByRole('heading',{name:'Discard server artifact',exact:true}).locator('..');await password(discard);await discard.getByRole('button',{name:'Discard server artifact',exact:true}).click();await expect(card(page,'Restore review')).toContainText('Artifact discarded');
 });

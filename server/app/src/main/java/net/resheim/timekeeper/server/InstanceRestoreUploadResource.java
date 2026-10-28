@@ -30,6 +30,11 @@ public class InstanceRestoreUploadResource {
         ContractInputs.queries(uri.getQueryParameters(),"offset");administrators.require(identity.principal());
         return reply(200,uploads.append(identity.principal(),ContractInputs.pathId(id),ContractInputs.sequence(uri.getQueryParameters().getFirst("offset")),body),false);
     }
+    @POST @Path("/{id}/target") @Consumes("application/json") public Response target(@PathParam("id") String id,JsonNode body) {
+        ContractInputs.queries(uri.getQueryParameters());administrators.require(identity.principal());var input=inputs.validate("InstanceOperationProofInput",body);
+        try{return new ApiReplies(200,uploads.target(administrators.verify(identity.principal(),input.path("currentPassword").asText()),ContractInputs.pathId(id)),null,null).response();}
+        finally{((ObjectNode)input).remove("currentPassword");}
+    }
     @POST @Path("/{id}/validate") @Consumes("application/json") public Response validate(@PathParam("id") String id,JsonNode body) {
         ContractInputs.queries(uri.getQueryParameters());administrators.require(identity.principal());var input=inputs.validate("InstanceBackupCreateInput",body);char[] phrase=null;
         try{var proof=administrators.verify(identity.principal(),input.path("currentPassword").asText());phrase=input.path("passphrase").asText().toCharArray();return reply(202,uploads.startValidation(proof,ContractInputs.pathId(id),phrase),true);}

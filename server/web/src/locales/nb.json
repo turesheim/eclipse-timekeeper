@@ -1118,5 +1118,13 @@
   "backups.error_size": "Arkivet overskrider den konfigurerte lagrings- eller størrelsesgrensen.",
   "backups.error_conflict": "Opplastede byte er i konflikt med det klargjorte arkivet. Velg den opprinnelige filen eller forkast opplastingen.",
   "backups.error_state": "Operasjonen er endret. Oppdater status før du fortsetter.",
-  "backups.error_download": "Nedlastingstillatelsen er utløpt eller allerede brukt. Godkjenn en ny nedlasting."
+  "backups.error_download": "Nedlastingstillatelsen er utløpt eller allerede brukt. Godkjenn en ny nedlasting.",
+  "backups.check_target": "Kontroller måldatabasen",
+  "backups.target_eligible": "Databasen inneholder bare oppstartsdata. Flere kontroller kreves før gjenoppretting.",
+  "backups.target_blocked": "Denne databasen inneholder eksisterende data og kan ikke erstattes som en tom måldatabase.",
+  "backups.target_accounts": "Andre kontoer eller eiere finnes.",
+  "backups.target_data": "Forretningsdata eller endrede oppstartsetiketter finnes.",
+  "backups.target_tokens": "API-token finnes, også eventuelle tilbakekalte token.",
+  "backups.target_history": "Endringshistorikk eller kommandokvitteringer finnes.",
+  "backups.target_advisory": "Denne kontrollen reserverer ikke databasen og godkjenner ikke gjenoppretting. Aktivering må gjenta kontrollen mens skriving er stanset, og fullføre autentiserings- og installasjonskontrollene."
 }

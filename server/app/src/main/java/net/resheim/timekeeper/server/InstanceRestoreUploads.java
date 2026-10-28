@@ -61,6 +61,22 @@ class InstanceRestoreUploads {
             var progress=files.status(id);return result.put("received",progress.received()).put("complete",progress.received()==progress.bytes());
         }catch(IOException failure){throw io(failure);}
     }
+    /** Advisory target check; never changes application data or authorizes activation. */
+    ObjectNode target(InstanceAdministrator.Proof proof,UUID id) {
+        administrators.requireFresh(proof);
+        return accounts.tx(c->{
+            try {c.setTransactionIsolation(java.sql.Connection.TRANSACTION_SERIALIZABLE);}
+            catch(java.sql.SQLException failure){throw new ApiFailure(503,"INSTANCE_TARGET_UNAVAILABLE");}
+            lock(c);administrators.check(c,proof.principal());uploadInfo(c,id,proof.principal());var operation=status(c,id);
+            if(operation.state()!=State.REVIEW)throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
+            try {
+                var check=InstanceRestoreTarget.inspect(c,proof.principal().owner());
+                var result=object().put("id",id.toString()).put("operationVersion",operation.version()).put("databaseEligible",check.databaseEligible()).put("restoreReady",false).put("checkedAt",clock.now().toString());
+                var blockers=result.putArray("blockers");check.blockers().forEach(value->blockers.add(value.name()));
+                result.putArray("requiredSteps").add("OFFLINE_TARGET_RECHECK").add("AUTHENTICATION_CONFIGURATION").add("DEPLOYMENT_MAPPING").add("OFFLINE_ACTIVATION");return result;
+            }catch(java.sql.SQLException failure){throw new ApiFailure(503,"INSTANCE_TARGET_UNAVAILABLE");}
+        });
+    }
     ObjectNode append(TokenRegistry.Principal principal,UUID id,long offset,InputStream body) {
         administrators.require(principal);if(offset<0)throw ApiFailure.validation();
         var lease=accounts.tx(c->{lock(c);administrators.check(c,principal);return uploadLease(c,id,principal,clock.now());});
