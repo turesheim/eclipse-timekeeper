@@ -20,6 +20,19 @@ final class InstanceOperations {
     }
     record Status(UUID id,Type type,State state,long version,Instant updatedAt) { }
 
+    /** Fail closed when replicas use different mounts for the same installation. */
+    static void bindStorage(Connection connection,UUID root) {
+        if(root==null)throw ApiFailure.validation();lockControl(connection);
+        try(var statement=query(connection,"SELECT payload FROM tk_instance WHERE id=?",CONTROL);var rows=statement.executeQuery()) {
+            if(!rows.next())throw unavailable();var value=(ObjectNode)parse(rows.getString(1));
+            if(value.has("artifactRootId")) {
+                if(!value.path("artifactRootId").asText().equals(root.toString()))throw new ApiFailure(503,"INSTANCE_STORAGE_MISMATCH");
+            } else {
+                value.put("artifactRootId",root.toString());
+                execute(connection,"UPDATE tk_instance SET version=version+1,payload=? WHERE id=?",value.toString(),CONTROL);
+            }
+        }catch(SQLException failure){throw unavailable();}
+    }
     static Lease begin(Connection connection,String actor,Type type,Instant now) {
         if(actor==null||actor.isBlank()||actor.length()>400||type==null||now==null)throw ApiFailure.validation();
         lockControl(connection);

@@ -72,6 +72,16 @@ class InstanceOperationsTest {
             assertEquals(1,interruptAbandoned(c,NOW.plusSeconds(1100)));c.commit();
         }
     }
+    @Test void differentReplicaMountCannotSilentlyBindTheSameDatabase() throws Exception {
+        initialize();var original=new InstanceArtifacts(directory.resolve("mount-a"),8,16,2);
+        var different=new InstanceArtifacts(directory.resolve("mount-b"),8,16,2);UUID root=original.identity();
+        try(var c=open()){c.setAutoCommit(false);bindStorage(c,root);c.commit();}
+        try(var c=open()) {
+            c.setAutoCommit(false);bindStorage(c,root);
+            assertEquals("INSTANCE_STORAGE_MISMATCH",assertThrows(ApiFailure.class,()->bindStorage(c,different.identity())).code);c.rollback();
+            bindStorage(c,root);c.commit();
+        }
+    }
     @Test void databaseRollbackCannotLeaveAnAuditClaimingAnUncommittedOperation() throws Exception {
         initialize();UUID id;try(var c=open()){c.setAutoCommit(false);id=begin(c,"administrator",Type.BACKUP,NOW).id();c.rollback();}
         try(var c=open();var q=c.createStatement();var rows=q.executeQuery("SELECT count(*) FROM tk_instance WHERE kind<>'CONTROL'")){rows.next();assertEquals(0,rows.getInt(1));assertEquals(404,assertThrows(ApiFailure.class,()->status(c,id)).status);}

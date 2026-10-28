@@ -108,6 +108,37 @@ component: artifact cleanup, administrator routing and offline restore activatio
 are still being integrated. Its interrupted status never claims to have repaired
 application data or completed a restore.
 
+## Protected artifact staging
+
+`InstanceArtifacts` provides bounded resumable input staging on a private POSIX
+filesystem. Each operation uses a UUID directory and 0600 files under a 0700
+root. Metadata is small, strictly parsed JSON. The configured retained-byte
+budget reserves each input's full declared length before accepting chunks;
+job count and per-archive limits apply independently. It rejects symlinks,
+hard-linked files, broad permissions and unknown root entries instead of
+following or silently removing them. Errors contain stable codes without paths
+or underlying causes.
+
+Chunks are at most 1 MiB. Data is forced to disk before an atomic, forced
+receipt update acknowledges its offset. Retrying acknowledged bytes is
+idempotent only when their content matches; an unacknowledged tail is truncated
+before a retry. Completion requires the declared length and SHA-256. A crash
+between the final rename and metadata commit can be completed idempotently.
+Reads recheck the hash before invoking the streaming consumer. A per-job
+filesystem lock prevents discard during streaming, including through another
+store instance. Cleanup validates all entries before removing an operation and
+forces the parent directory update.
+
+A persistent private root UUID can be bound to the database control row using
+`InstanceOperations.bindStorage`. A replica with a different root identity is rejected.
+Existing store handles also reject a removed/replaced identity marker. A full
+restore must explicitly rebind this deployment-specific identity to the target
+root, interrupt source jobs, and retain audit records. Input files and existing
+backup downloads are transient operation artifacts, not recursively included
+in subsequent backups. The storage component does not authorize requests, make
+uploaded bytes trusted, validate archive semantics, or activate a restore. Its
+service, HTTP and recovery-cleanup integration remains in progress.
+
 ## Complete database image
 
 `InstanceDatabaseImage` writes `timekeeper-instance-database-v1`. Its header
@@ -145,7 +176,7 @@ staging is damaged after preflight or an insertion fails.
 
 ## Verification and remaining integration
 
-The current local server reactor passes 335 application tests and the shared
+The current local server reactor passes 343 application tests and the shared
 module suites. The new checks include real-runtime configuration capture, complete archive integrity,
 unsafe/duplicate ZIP and JSON rejection, decompression budgets, scoped credential
 proof, revocation/configuration-change publication guards, randomized multi-segment encryption,
