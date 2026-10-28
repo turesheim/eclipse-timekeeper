@@ -15,7 +15,8 @@ import jakarta.ws.rs.core.Response;
 /** WebDAV collection for Markdown-relative journal attachments. */
 @Path("/dav/journal/assets") @Blocking
 public class JournalAssetDavResource {
-    private static final String ROOT="/dav/journal/assets/";
+    @jakarta.ws.rs.core.Context jakarta.ws.rs.core.UriInfo uri;
+    private String root(){return JournalDavPaths.root(uri)+"assets/";}
     private static final String FILE_ALLOW="OPTIONS, PROPFIND, GET, HEAD, PUT, DELETE";
     private static final String ROOT_ALLOW="OPTIONS, PROPFIND";
     private static final DateTimeFormatter HTTP_DATE=DateTimeFormatter.RFC_1123_DATE_TIME.withZone(ZoneOffset.UTC);
@@ -36,7 +37,7 @@ public class JournalAssetDavResource {
     @PROPFIND @Produces("application/xml") public Response collection(@HeaderParam("Depth")String depth){
         return tx(()->{
             int level=depth(depth);var xml=new StringBuilder("<?xml version=\"1.0\" encoding=\"utf-8\"?><D:multistatus xmlns:D=\"DAV:\">");
-            xml.append("<D:response><D:href>").append(ROOT).append("</D:href><D:propstat><D:prop>")
+            xml.append("<D:response><D:href>").append(root()).append("</D:href><D:propstat><D:prop>")
                     .append("<D:displayname>assets</D:displayname><D:resourcetype><D:collection/></D:resourcetype>")
                     .append("<D:supportedlock/><D:lockdiscovery/></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>");
             if(level!=0)for(var value:new JournalAssets(store).list())file(xml,value);
@@ -61,9 +62,9 @@ public class JournalAssetDavResource {
         throw ApiFailure.badRequest();
     }
 
-    private static void file(StringBuilder xml,com.fasterxml.jackson.databind.JsonNode value){
+    private void file(StringBuilder xml,com.fasterxml.jackson.databind.JsonNode value){
         var filename=value.path("filename").asText();var modified=Instant.parse(value.path("modifiedAt").asText());
-        xml.append("<D:response><D:href>").append(ROOT).append(filename).append("</D:href><D:propstat><D:prop>")
+        xml.append("<D:response><D:href>").append(root()).append(filename).append("</D:href><D:propstat><D:prop>")
                 .append("<D:displayname>").append(filename).append("</D:displayname><D:resourcetype/>")
                 .append("<D:getcontenttype>").append(value.path("mediaType").asText()).append("</D:getcontenttype>")
                 .append("<D:getcontentlength>").append(value.path("byteLength").asInt()).append("</D:getcontentlength>")
