@@ -180,6 +180,37 @@ keys were never held by the server. Keep password access available during migrat
 security material are required for normal startup and subsequent full backups.
 A completed database without its matching material will refuse startup.
 
+## Compose maintenance after an instance restore
+
+Use the shipped `backup.sh` and `restore.sh` together with their
+`instance_material.py` helper. Maintenance operations use a kernel lock on the
+shared private volume, so a second operator cannot interleave backup and restore.
+The normal web application has no Docker access; these are operator commands.
+
+`backup.sh` checks the exact dump's instance control record and retains only its
+committed active material generation in `instance-material.tar`. It verifies all
+paths, private modes, sizes and checksums. Uploaded archives, plaintext workspaces,
+prepared handoffs and process locks are excluded. A pending instance restore or a
+completed database without matching material causes backup to fail.
+
+Keep the complete backup directory, including `instance-material.tar`, database,
+token registry and mail files. This maintenance directory contains credentials in
+plaintext and requires private storage. Use Administration's encrypted full
+instance archive for portable migration and encrypted off-machine storage.
+
+`restore.sh` stops both replicas, validates the material against the dump, sets a
+durable maintenance marker and installs immutable files before replacing SQL data.
+The database transaction checks its material binding before committing. Only then
+does the helper publish the active pointer and remove the marker. Configuration
+files are restored before startup is allowed. If interrupted, keep replicas stopped
+and rerun `restore.sh` with the same complete backup; do not remove the marker.
+Missing material or a mismatched database rolls back SQL replacement. Older backups
+without an active restored generation remain supported.
+
+The named volume must be backed up and retained; a database dump alone is
+insufficient after a full instance restore. If the volume is lost, the complete
+maintenance backup can reconstruct its committed material before normal startup.
+
 ## Interrupted recovery and cancellation
 
 If startup is interrupted, start one destination server again with the same

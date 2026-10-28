@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Restore a protected schema-2/3/4/5/6/7 dump and upgrade it in one offline transaction."""
+"""Restore a protected schema-2–9 dump and upgrade it in one offline transaction."""
 from pathlib import Path
 import re
 import subprocess
@@ -7,6 +7,9 @@ import sys
 import tempfile
 
 HERE=Path(__file__).resolve().parent
+sys.path.insert(0,str(HERE))
+from instance_material import guard_sql, read_archive, ARCHIVE
+
 CURRENT=9
 SUPPORTED=(2,3,4,5,6,7,8,9)
 
@@ -36,7 +39,7 @@ def schema_guard(directory,version):
         f"IF (SELECT count(*) FROM public.tk_schema WHERE id=1 AND schema_version={version} AND state='READY')<>1 OR (SELECT count(*) FROM public.tk_schema)<>1 THEN RAISE EXCEPTION 'Incomplete Timekeeper schema'; END IF; "+control+"END $timekeeper_schema$;\n")
 
 
-def restore(dump,client=compose_client,db_resources=None):
+def restore(dump,client=compose_client,db_resources=None,material=None):
     directory=Path(db_resources or resources())
     connection=['-h','postgres','-U','timekeeper','-d','timekeeper','--no-password']
     # Decode only the tiny schema record first. No SQL from the archive executes
@@ -80,6 +83,7 @@ def restore(dump,client=compose_client,db_resources=None):
         for version in range(incoming+1,CURRENT+1):
             after+=(directory/{3:'recovery-v3.sql',4:'passkeys-v4.sql',5:'settings-v5.sql',6:'locale-v6.sql',7:'day-labels-v7.sql',8:'day-note-history-v8.sql',9:'instance-v9.sql'}[version]).read_text()
             after+=f'\nUPDATE public.tk_schema SET schema_version={version} WHERE id=1;\n'+schema_guard(directory,version)
+        after+=guard_sql(material)
         sql.write(after.encode());sql.seek(0)
         client('psql',[*connection,'-X','-q','--single-transaction','--file=-','-v','ON_ERROR_STOP=1'],input=sql,output=subprocess.DEVNULL)
 
@@ -87,6 +91,6 @@ def restore(dump,client=compose_client,db_resources=None):
 if __name__=='__main__':
     try:
         if len(sys.argv)!=2:raise ValueError('Usage: restore-database.py /absolute/path/to/database.dump')
-        restore(sys.argv[1])
+        dump=Path(sys.argv[1]);restore(dump,material=read_archive(dump.parent/ARCHIVE))
     except (ValueError,RuntimeError,OSError) as failure:
         print(str(failure),file=sys.stderr);raise SystemExit(1)
