@@ -130,6 +130,7 @@ final class DayNotes {
         // Empty values retain their version so deleting and recreating cannot
         // make an older editor's ETag valid again. Existing clients already
         // understand profile invalidations; no Eclipse/domain type is added.
+        new DayNoteHistory(store).note(date,previous,value);
         store.change("PROFILE","UPDATED",store.owner());return get(date);
     }
     void restoreDocument(LocalDate date,byte[] bytes){

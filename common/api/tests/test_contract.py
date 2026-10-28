@@ -476,6 +476,20 @@ class ContractTest(unittest.TestCase):
         for path in ['../outside', '/absolute.md', 'assets/../outside', 'assets/nested/file.png']:
             self.assertFalse(validator('ArchiveJournalFile').is_valid({'path': path, 'bytes': 0, 'sha256': 'a' * 64}))
 
+    def test_diagnostic_history_rejects_body_and_credential_fields(self):
+        event={'id':ID,'sequence':1,'occurredAt':'2026-10-28T00:00:00Z','resource':'LABEL','operation':'CREATE',
+               'source':'REST_LABEL','previousNoteVersion':0,'noteVersion':0,'previousLabelVersion':0,'labelVersion':1,
+               'previousLabel':'','newLabel':'Planning','hadBody':False,'hasBody':False,'noteDeleted':False,
+               'previousModifiedAt':None,'changedFields':['text','presence'],
+               'client':{'authentication':'API_TOKEN','tokenId':ID},'build':{'version':'2.0.0','commit':None,'dirty':False}}
+        validator('DayNoteHistoryEvent').validate(event)
+        for field in ['body','markdown','digest','csrf','token']:
+            invalid=copy.deepcopy(event);invalid[field]='private'
+            self.assertFalse(validator('DayNoteHistoryEvent').is_valid(invalid))
+        invalid=copy.deepcopy(event);invalid['client']['digest']='secret hash'
+        self.assertFalse(validator('DayNoteHistoryEvent').is_valid(invalid))
+        self.assertEqual('read',CONTRACT['paths']['/day-notes/{date}/history']['get']['x-required-permission'])
+
     def test_day_entry_commands_validate_only_independently_changed_resources(self):
         for value in [{'text':'Label','labelVersion':0}, {'body':'','noteVersion':2},
                       {'text':'','labelVersion':3,'body':'Note','noteVersion':4}]:
@@ -490,7 +504,7 @@ class ContractTest(unittest.TestCase):
         expected = {
             'listDayNotes', 'getDayNote', 'saveDayNote', 'deleteDayNote',
             'listDayLabels', 'getDayLabel', 'saveDayLabel', 'clearDayLabel',
-            'getDayNoteContent', 'saveDayNoteContent', 'deleteDayNoteContent', 'getDayEntry', 'editDayEntry',
+            'getDayNoteHistory', 'getDayNoteContent', 'saveDayNoteContent', 'deleteDayNoteContent', 'getDayEntry', 'editDayEntry',
             'listWeekNotes', 'getWeekNote', 'saveWeekNote', 'deleteWeekNote', 'downloadWeekNote',
             'getJournalAsset', 'putJournalAsset', 'deleteJournalAsset',
             'downloadAccountArchive', 'createAccountArchiveUpload', 'listPendingAccountArchives',

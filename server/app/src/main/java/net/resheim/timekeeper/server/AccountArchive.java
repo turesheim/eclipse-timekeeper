@@ -24,7 +24,7 @@ class AccountArchive {
     static final String FILE_LEGACY_FORMAT="timekeeper-account-v2";
     static final String LEGACY_FORMAT="timekeeper-account-v1";
     static final Map<String,String> WORK=DomainTransfer.TYPES;
-    private static final List<String> HISTORY=List.of("IMPORT_JOB","IMPORT_BATCH","IMPORT_ITEM","IMPORT_MAP","IMPORT_KEY","IMPORT_ORIGIN","IMPORT_UNDO","IMPORT_USE","ARCHIVE_AUDIT","ARCHIVE_IMPORT","CAL_LINK");
+    private static final List<String> HISTORY=List.of("IMPORT_JOB","IMPORT_BATCH","IMPORT_ITEM","IMPORT_MAP","IMPORT_KEY","IMPORT_ORIGIN","IMPORT_UNDO","IMPORT_USE","ARCHIVE_AUDIT","ARCHIVE_IMPORT","CAL_LINK","DAY_NOTE_HISTORY");
     @Inject AgroalDataSource datasource;
     @Inject AccountStore accounts;
     @Inject TokenRegistry tokens;
@@ -132,7 +132,8 @@ class AccountArchive {
                 var copy=value.deepCopy();copy.remove("ownerId");
                 ObjectNode audit=copy;
                 if(type.equals("CAL_LINK")){audit=object().put("kind","CALENDAR_ACTIVITY_SOURCE");audit.set("source",copy);}
-                json.writeStartObject();json.writeStringField("entityType",type.equals("CAL_LINK")?"ARCHIVE_AUDIT":type);json.writeObjectField("data",audit);json.writeEndObject();
+                if(type.equals(DayNoteHistory.TYPE)){audit=object().put("kind",DayNoteHistory.TYPE);audit.set("source",copy);}
+                json.writeStartObject();json.writeStringField("entityType",(type.equals("CAL_LINK")||type.equals(DayNoteHistory.TYPE))?"ARCHIVE_AUDIT":type);json.writeObjectField("data",audit);json.writeEndObject();
             });
             json.writeEndArray();json.writeEndObject();json.close();zip.closeEntry();
             journalFiles(c,owner,deletedNotes,deletedWeeks,(path,bytes)->{entry(zip,path);zip.write(bytes);zip.closeEntry();});

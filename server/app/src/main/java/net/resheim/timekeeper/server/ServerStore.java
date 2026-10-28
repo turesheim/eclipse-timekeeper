@@ -37,6 +37,7 @@ public class ServerStore {
     @Inject RecoveryMail recoveryMail;
     @Inject PasskeyRealm passkeyRealm;
     @Inject ServiceSettings serviceSettings;
+    @Inject ServerInfo serverInfo;
     private final java.util.concurrent.ConcurrentMap<String,String> partitionDates=new java.util.concurrent.ConcurrentHashMap<>();
     private java.util.concurrent.ScheduledExecutorService maintenance;
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="quarkus.datasource.jdbc.url") String jdbcUrl;
@@ -44,6 +45,8 @@ public class ServerStore {
     private static final org.jboss.logging.Logger TIMINGS=org.jboss.logging.Logger.getLogger(ServerStore.class);
     private final ThreadLocal<Context> context = new ThreadLocal<>();
     private final ThreadLocal<UUID> creationClient = new ThreadLocal<>();
+    private final ThreadLocal<TokenRegistry.Principal> journalPrincipal = new ThreadLocal<>();
+    private final ThreadLocal<DayNoteHistory.Source> journalSource = new ThreadLocal<>();
     record Context(String owner, Connection connection, Instant now) { }
     @org.eclipse.microprofile.config.inject.ConfigProperty(name="timekeeper.schema.allow-upgrade",defaultValue="false") boolean allowSchemaUpgrade;
     void start(@Observes StartupEvent event) throws Exception {
@@ -157,8 +160,33 @@ public class ServerStore {
         }
     }
     public <T> T authenticated(RequestIdentity identity,Supplier<T> work) {
-        return transaction(identity.owner(),()->{identity.guard(current().connection());return work.get();});
+        return transaction(identity.owner(),()->{
+            identity.guard(current().connection());
+            var previous=journalPrincipal.get();journalPrincipal.set(identity.principal());
+            try{return work.get();}finally{if(previous==null)journalPrincipal.remove();else journalPrincipal.set(previous);}
+        });
     }
+    /** Whitelist public client identity; never persist principal/session digests. */
+    private ObjectNode safeJournalClient(TokenRegistry.Principal principal) {
+        var result=object().put("authentication",principal.kind().equals("SESSION")?"BROWSER_SESSION":"API_TOKEN").putNull("tokenId");
+        String digest=principal.digest();
+        if(principal.kind().equals("SESSION")) {
+            try(var query=statement("SELECT parent_digest FROM tk_auth_session WHERE owner_id=? AND digest=?",owner(),digest);var rows=query.executeQuery()) {
+                digest=rows.next()?rows.getString(1):null;
+            }catch(SQLException failure){throw databaseFailure(failure);}
+        }
+        if(digest!=null)try(var query=statement("SELECT id FROM tk_api_token WHERE owner_id=? AND digest=?",owner(),digest);var rows=query.executeQuery()) {
+            if(rows.next())result.put("tokenId",rows.getObject(1,UUID.class).toString());
+        }catch(SQLException failure){throw databaseFailure(failure);}
+        return result;
+    }
+    <T> T withJournalSource(DayNoteHistory.Source source,Supplier<T> work) {
+        var previous=journalSource.get();journalSource.set(source);
+        try{return work.get();}finally{if(previous==null)journalSource.remove();else journalSource.set(previous);}
+    }
+    DayNoteHistory.Source journalSource(){return Optional.ofNullable(journalSource.get()).orElse(DayNoteHistory.Source.INTERNAL);}
+    ObjectNode journalClient(){var value=journalPrincipal.get();return value==null?object().put("authentication","INTERNAL").putNull("tokenId"):safeJournalClient(value);}
+    ObjectNode journalBuild(){return serverInfo.journalIdentity();}
     private RuntimeException databaseFailure(SQLException e) {
         if ("23505".equals(e.getSQLState()) || "23503".equals(e.getSQLState()) || "23506".equals(e.getSQLState())) return ApiFailure.conflict();
         String state=e.getSQLState();

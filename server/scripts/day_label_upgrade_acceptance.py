@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify schema-6 -> schema-7 label separation across actual packaged H2 JVMs.
+"""Verify schema-6/7 -> schema-8 label separation and prospective history across actual packaged H2 JVMs.
 
 Both distributions and all credentials/data are local disposable fixtures.
 No request is made to a user's server. Supply a checksum-verified older package.
@@ -36,7 +36,7 @@ def main():
                 identities[key]=json.loads(archive.read('timekeeper-server/timekeeper-release.json'))
                 archive.extractall(target)
             packages[key]=target/'timekeeper-server/quarkus-run.jar'
-        if identities['old']['serverSchema']!=6 or identities['new']['serverSchema']!=7:raise AssertionError('Expected schema-6 and schema-7 packages')
+        if identities['old']['serverSchema'] not in (6,7) or identities['new']['serverSchema']!=8:raise AssertionError('Expected schema-6/7 and schema-8 packages')
         token=secrets.token_urlsafe(32);registry=root/'tokens.json'
         registry.write_text(json.dumps([{'ownerId':'label-upgrade','sha256':hashlib.sha256(token.encode()).hexdigest(),'permissions':['read','write']}]))
         registry.chmod(0o600)
@@ -90,6 +90,8 @@ def main():
             start('old');retained,_=request(legacy)
             if retained['text']!='Migration label' or retained['version']!=original['version']:raise AssertionError('Rejected upgrade changed old labels')
             start('new',upgrade=True);migrated,label_tag=request(label);note,note_tag=request(content)
+            history_path=legacy+'/history';initial_history,_=request(history_path)
+            if initial_history['items'] or not initial_history['legacyGap']:raise AssertionError('Upgrade fabricated history for existing notes')
             if migrated['text']!='Migration label' or note['body']!=original['body'] or note['version']!=original['version']:raise AssertionError('Authorized upgrade changed a label, note or note version')
             if request(dav,dav=True)[0]!=document:raise AssertionError('Migration changed canonical Markdown bytes')
             changed,new_label_tag=request(label,'PUT',{'text':'Independent label'},label_tag)
@@ -99,10 +101,13 @@ def main():
             request(content,'DELETE',etag=cleared_tag,status=204)
             if request(label)[0]['text']!='Independent label':raise AssertionError('Deleting a note removed the label')
             request(dav,dav=True,status=404)
+            history_before,_=request(history_path)
+            if len(history_before['items'])!=3:raise AssertionError('Actual label, body-clear and delete changes were not recorded')
             start('new');after,_=request(label)
+            if request(history_path)[0]['items']!=history_before['items']:raise AssertionError('Restart changed diagnostic events')
             if after!=changed or not request(content)[0]['deleted']:raise AssertionError('Restart changed independent state')
             start('old',blocked=True)
-            print(json.dumps({'oldCommit':identities['old']['commit'],'newCommit':identities['new']['commit'],'schema6RequiresAuthorization':True,'schema7RejectsOldBinary':True,'labelAndNotePreservedDuringMigration':True,'canonicalMarkdownPreserved':True,'independentEtags':True,'bodyClearAndNoteDeleteRetainLabel':True,'restartPreservesState':True,'passed':True}))
+            print(json.dumps({'oldCommit':identities['old']['commit'],'newCommit':identities['new']['commit'],'sourceSchema':identities['old']['serverSchema'],'targetSchema':8,'upgradeRequiresAuthorization':True,'oldBinaryRejected':True,'historyDoesNotFabricateLegacyEvents':True,'historySurvivesRestart':True,'labelAndNotePreservedDuringMigration':True,'canonicalMarkdownPreserved':True,'independentEtags':True,'bodyClearAndNoteDeleteRetainLabel':True,'restartPreservesState':True,'passed':True}))
         finally:stop()
 
 

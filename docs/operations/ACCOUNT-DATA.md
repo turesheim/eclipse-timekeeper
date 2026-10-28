@@ -103,3 +103,10 @@ Use [protected deployment backups](DEPLOYMENT.md) or the
 [Synology backup workflow](SYNOLOGY-PACKAGE.md) for disaster recovery, including
 account credentials and service configuration. For Toggl CSV, use the separate
 [Toggl Track import](TOGGL-IMPORT.md).
+
+Day-label/note diagnostic history is included as private `ARCHIVE_AUDIT`
+evidence in `importHistory`, with `data.kind: DAY_NOTE_HISTORY`, without bodies or authentication secrets. Restoring
+an archive keeps source evidence as inert audit copies and records new local
+restore events. Supplied event identities or client claims are never installed
+as locally authenticated history. See [API diagnostics](API-DIAGNOSTICS.md) for
+retention, legacy gaps and inspecting source versus local evidence.

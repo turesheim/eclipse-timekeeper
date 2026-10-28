@@ -13,7 +13,7 @@ import org.h2.tools.RunScript;
 public final class ServerSchema {
     private ServerSchema() { }
     private static final Set<String> LEGACY_TABLES=Set.of("TK_SCHEMA","TK_OWNER","TK_RESOURCE","TK_RELATION","TK_EXTERNAL_REFERENCE","TK_ACTIVE","TK_RECEIPT","TK_CHANGE");
-    public static final int CURRENT=7;
+    public static final int CURRENT=8;
     private static final Set<String> AUTH_TABLES;
     private static final Set<String> RECOVERY_TABLES;
     private static final Set<String> PASSKEY_TABLES;
@@ -104,13 +104,12 @@ public final class ServerSchema {
             if(version<2) applyAuth(connection);if(version<3) applyRecovery(connection);if(version<4) applyPasskeys(connection);if(version<5) applySettings(connection);applyLocale(connection);validateShape(connection);
             try(var statement=connection.createStatement()) {statement.executeUpdate("UPDATE tk_schema SET schema_version="+CURRENT+",state='READY' WHERE id=1");}
         }
-        // Schema 7 fences older binaries before the owner-scoped label model
-        // migration. The physical resource-table shape is unchanged.
+        // Fence older label/history models; the physical table shape is unchanged.
         validateShape(connection);
         try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT schema_version,state FROM tk_schema WHERE id=1")){
-            if(rows.next()&&rows.getInt(1)==6&&"READY".equals(rows.getString(2))){
+            if(rows.next()&&rows.getInt(1)>=6&&rows.getInt(1)<CURRENT&&"READY".equals(rows.getString(2))){
                 if(!allowUpgrade)throw new SQLException("Schema upgrade requires explicit operator authorization after stopping older server replicas");
-                try(var update=connection.createStatement()){update.executeUpdate("UPDATE tk_schema SET schema_version=7 WHERE id=1 AND schema_version=6 AND state='READY'");}
+                try(var update=connection.createStatement()){update.executeUpdate("UPDATE tk_schema SET schema_version="+CURRENT+" WHERE id=1 AND schema_version="+rows.getInt(1)+" AND state='READY'");}
             }
         }
         validate(connection);

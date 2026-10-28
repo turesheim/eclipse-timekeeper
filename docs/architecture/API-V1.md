@@ -792,12 +792,12 @@ label version, while the response `version` still describes the note. Legacy
 the independent routes. Range summaries contain labels and `hasBody`, never
 body content; label-only days remain visible after a note is deleted.
 
-Schema 7 is a compatibility fence even though no physical SQL table is added.
+Schema 8 is the current compatibility fence; it includes label separation introduced in schema 7 and prospective diagnostics, without adding a physical SQL table.
 After an authorized offline upgrade, the server copies old label projections
 into `DAY_LABEL` records in owner-scoped transactions before serving requests.
 Old note versions, deletion markers and existing Markdown bytes are preserved;
 virtual legacy documents are materialized without changing their note version.
-Older server binaries must remain stopped and cannot reopen schema 7.
+Older server binaries must remain stopped and cannot reopen schema 8.
 
 New Markdown documents contain no managed day label. An existing
 `timekeeper-label` property is now inert legacy metadata: byte-exact reads and
@@ -841,3 +841,28 @@ required deployment encryption, temporary/backup storage, key management and
 readable-server trust boundary. The database and private account archive remain
 authoritative. The [WebDAV collection](../operations/JOURNAL-WEBDAV.md) uses
 the same owner, authorization and conditional-write rules.
+
+### Private day-label and note diagnostics
+
+`GET /day-notes/{date}/history?limit=50&cursor=...` returns current-state metadata
+and prospective change history for the independent label and note. The route
+requires only the owner's read permission. It excludes Markdown bodies,
+attachments and authentication secrets; all responses are private and noncached.
+See `DayNoteHistoryPage` and its client/build/event schemas in OpenAPI.
+
+Events identify their independent resource and versions, operation/source,
+changed-field names, previous/new label, available previous modification time,
+authenticated client kind/public token ID, and the writing build. No-op and
+failed/stale writes create no history. Archive preview and failed combined saves
+roll back all evidence with their data. Note deletion preserves both its label
+and retained diagnostics; recreation continues the event sequence.
+
+Pages contain at most 100 events, default 50, from the latest 1,000 per date.
+Signed cursors bind owner/date/account revision; any account change requires
+restarting pagination after `409 CURSOR_EXPIRED`. History sequence numbers are
+not write guards for either independent resource. Gap/retention flags and an
+available current modification time distinguish missing legacy evidence from
+recorded mutations. Source diagnostics in account archives remain inert audit
+copies on import; actual local restoration emits new `ARCHIVE_RESTORE` events.
+See [API diagnostics](../operations/API-DIAGNOSTICS.md) for a read-only workflow,
+privacy boundaries, portability and the coordinated schema-8 upgrade.

@@ -606,3 +606,27 @@ Protect their database, temporary files, backups and exports as described in
 [day-note API](API-V1.md#private-day-labels-and-markdown-bodies) and
 [WebDAV guide](../operations/JOURNAL-WEBDAV.md) for write,
 conflict and authorization behavior.
+
+### Prospective day-label/note history
+
+`DAY_NOTE_HISTORY` is owner-private metadata in `tk_resource`, keyed by the same
+civil-date UUID as the independent `DAY_LABEL` and `DAY_NOTE`, under its distinct
+entity type. Its version is a monotonically increasing diagnostic sequence,
+never a shared optimistic write version for labels and notes. The bounded JSON
+record retains the latest 1,000 events plus its recording start and legacy-gap
+flag. Deleting/recreating a note does not remove this record or its label.
+
+Events are persisted in the same owner transaction as actual label/note changes.
+They store independent before/after versions, field names, previous/new label,
+body-presence booleans, deletion state, available previous modification time,
+operation/source and whitelisted client/build identity. Markdown bodies, binary
+attachments, credentials and authentication digests are excluded. Old records
+are not converted into fictional changes. A read exposes their actual current
+metadata and available modification time; failed/no-op mutations produce no
+history. Retention truncation remains explicit.
+
+Account archives carry this evidence in `importHistory`; imported evidence is
+kept as inert, provenance-tagged `ARCHIVE_AUDIT` copies. New local restore events
+record the actual importer, independently of any source claims. Full database
+backups retain local history unchanged. Schema 8 gates older binaries to prevent
+writes that bypass prospective recording; the physical table shape is unchanged.

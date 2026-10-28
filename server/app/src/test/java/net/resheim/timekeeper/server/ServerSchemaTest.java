@@ -30,7 +30,15 @@ class ServerSchemaTest {
             try(var statement=connection.createStatement()){statement.executeUpdate("UPDATE tk_schema SET schema_version=6 WHERE id=1");}
             assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(connection));
             ServerSchema.initializeOrValidate(connection,true);ServerSchema.validate(connection);
-            try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT schema_version FROM tk_schema WHERE id=1")){rows.next();assertEquals(7,rows.getInt(1));}
+            try(var statement=connection.createStatement();var rows=statement.executeQuery("SELECT schema_version FROM tk_schema WHERE id=1")){rows.next();assertEquals(ServerSchema.CURRENT,rows.getInt(1));}
+        }
+    }
+    @Test void diagnosticHistoryModelRequiresCoordinatedUpgrade() throws Exception {
+        try(var connection=DriverManager.getConnection(url())){
+            ServerSchema.initializeOrValidate(connection);
+            try(var statement=connection.createStatement()){statement.executeUpdate("UPDATE tk_schema SET schema_version=7 WHERE id=1");}
+            var before=snapshot(connection);assertThrows(SQLException.class,()->ServerSchema.initializeOrValidate(connection));assertEquals(before,snapshot(connection));
+            ServerSchema.initializeOrValidate(connection,true);ServerSchema.validate(connection);
         }
     }
     @ParameterizedTest @ValueSource(strings={

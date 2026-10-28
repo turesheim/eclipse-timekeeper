@@ -123,13 +123,20 @@ class AccountArchiveImportTest {
         assertEquals("",archive.path("dayNotes").get(0).path("body").asText());
         assertTrue(archive.path("dayNotes").get(0).path("markdown").asText().contains("timekeeper-label: Ferie"));
         assertEquals(1,archive.path("dayNotes").size());inputs.validate("AccountArchiveSnapshot",archive);
+        assertTrue(java.util.stream.StreamSupport.stream(archive.path("importHistory").spliterator(),false).anyMatch(value->value.path("data").path("kind").asText().equals(DayNoteHistory.TYPE)));
         // A note-only archive remains useful when there are no timed records.
         for(String name:DomainTransfer.TYPES.keySet())((ObjectNode)archive.path("work")).putArray(name);
         UUID id=stage(archive);var review=store.transaction("b",()->importer().preview(id,false));
         assertTrue(review.body().path("canImport").asBoolean());assertEquals(1,review.body().path("counts").path("dayNotes").asInt());
-        store.transaction("b",()->{assertTrue(store.list(DayNotes.TYPE).isEmpty());return null;});
+        store.transaction("b",()->{assertTrue(store.list(DayNotes.TYPE).isEmpty());assertTrue(store.list(DayNoteHistory.TYPE).isEmpty(),"Preview must roll back diagnostic history too");return null;});
         store.transaction("b",()->importer().apply(id,false,review.etag()));
-        store.transaction("b",()->{assertEquals("Ferie",new DayNotes(store).get(DayNotes.date("2026-05-17")).path("text").asText());assertTrue(store.list("WORK_SESSION").isEmpty());return null;});
+        store.transaction("b",()->{
+            var date=DayNotes.date("2026-05-17");assertEquals("Ferie",new DayNotes(store).get(date).path("text").asText());assertTrue(store.list("WORK_SESSION").isEmpty());
+            var history=store.find(DayNoteHistory.TYPE,DayNotes.id(date)).orElseThrow();assertEquals(2,history.path("events").size());
+            for(var event:history.path("events")){assertEquals("ARCHIVE_RESTORE",event.path("source").asText());assertEquals("RESTORE",event.path("operation").asText());}
+            assertTrue(history.path("legacyGap").asBoolean());
+            assertTrue(store.list("ARCHIVE_AUDIT").stream().anyMatch(value->value.path("data").path("kind").asText().equals(DayNoteHistory.TYPE)),"Source diagnostics remain portable inert evidence");return null;
+        });
         var conflicting=archive.deepCopy().put("archiveId",UUID.randomUUID().toString());
         ((ObjectNode)conflicting.path("dayNotes").get(0)).put("text","Avspasering")
                 .put("markdown","---\ntimekeeper-label: Avspasering\n---\n");
@@ -154,7 +161,7 @@ class AccountArchiveImportTest {
         assertEquals("",archive.path("dayNotes").get(3).path("markdown").asText());
         for(String name:DomainTransfer.TYPES.keySet())((ObjectNode)archive.path("work")).putArray(name);
         UUID id=stage(archive);var review=store.transaction("b",()->importer().preview(id,false));assertTrue(review.body().path("canImport").asBoolean());
-        store.transaction("b",()->{assertTrue(store.list(DayNotes.TYPE).isEmpty());return null;});
+        store.transaction("b",()->{assertTrue(store.list(DayNotes.TYPE).isEmpty());assertTrue(store.list(DayNoteHistory.TYPE).isEmpty(),"Preview must roll back diagnostic history too");return null;});
         store.transaction("b",()->importer().apply(id,false,review.etag()));
         store.transaction("b",()->{var notes=new DayNotes(store);assertEquals(markdown,notes.get(DayNotes.date("2026-10-01")).path("body").asText());assertEquals("Planning",notes.get(DayNotes.date("2026-10-01")).path("text").asText());assertEquals(3,notes.list(DayNotes.date("2026-10-01"),DayNotes.date("2026-10-04")).path("items").size());return null;});
         var legacy=archive.deepCopy().put("archiveId",UUID.randomUUID().toString());var legacyNotes=legacy.putArray("dayNotes");legacyNotes.add(object().put("date","2026-10-01").put("text","Planning"));legacyNotes.add(object().put("date","2026-10-03").put("text","Legacy label"));

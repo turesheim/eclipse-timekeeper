@@ -29,7 +29,7 @@ public class JournalDavResource {
     @Inject RequestIdentity identity;
 
     private Response tx(Supplier<Response> action){
-        return store.authenticated(identity,()->Response.fromResponse(action.get()).header("Cache-Control","private, no-store").build());
+        return store.authenticated(identity,()->store.withJournalSource(DayNoteHistory.Source.WEBDAV,()->Response.fromResponse(action.get()).header("Cache-Control","private, no-store").build()));
     }
     private interface NoteFile {
         String filename();

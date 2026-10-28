@@ -21,7 +21,7 @@ TABLES=SETTINGS_TABLES+('tk_locale',)
 
 
 def tables(schema):
-    if schema not in (2,3,4,5,6,7):raise ValueError('Unsupported server schema')
+    if schema not in (2,3,4,5,6,7,8):raise ValueError('Unsupported server schema')
     return BASE_TABLES if schema==2 else RECOVERY_TABLES if schema==3 else PASSKEY_TABLES if schema==4 else SETTINGS_TABLES if schema==5 else TABLES
 
 
@@ -53,7 +53,7 @@ def export(output, client=compose_client, state=None, db_resources=None):
     def query(sql):return client('psql',['-X','-q','-A','-t','-w','-v','ON_ERROR_STOP=1','-h','postgres','-U','timekeeper','-d','timekeeper'],sql=sql)
     def guard():
         value=query("SELECT current_setting('server_version_num')::int/10000; SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid(); SELECT schema_version||'|'||state FROM public.tk_schema WHERE id=1; SELECT bootstrap_completed FROM public.tk_auth_control WHERE id=1;")
-        if value not in tuple(f'18\n0\n{version}|READY\nt' for version in (2,3,4,5,6,7)):
+        if value not in tuple(f'18\n0\n{version}|READY\nt' for version in (2,3,4,5,6,7,8)):
             raise ValueError('Stop ALL source API replicas, use supported schema 2/3/4/5/6/7 and complete first-administrator setup before export')
         return int(value.splitlines()[2].split('|')[0])
     schema=guard();exported_tables=tables(schema)
