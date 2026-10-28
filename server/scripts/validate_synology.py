@@ -94,7 +94,7 @@ def validate(path):
             raise ValueError('DSM payload checksum mismatch')
         with tarfile.open(fileobj=io.BytesIO(payload),mode='r:gz') as inner:
             contents=safe_members(inner)
-            if not {'ui/config','project/compose.yaml','image.tar.gz','README.md','ACCOUNTS.md','TAILSCALE.md','private','private/config','private/secrets','scripts/release.json'}.issubset(contents):
+            if not {'ui/config','project/compose.yaml','image.tar.gz','README.md','ACCOUNTS.md','INSTANCE-BACKUP.md','TAILSCALE.md','private','private/config','private/secrets','scripts/release.json'}.issubset(contents):
                 raise ValueError('Incomplete payload/Open configuration')
             if json.load(inner.extractfile('scripts/release.json')) != release:
                 raise ValueError('Incoming DSM payload release identity differs from the control scripts')
@@ -109,6 +109,13 @@ def validate(path):
             project=json.load(inner.extractfile('project/compose.yaml'))
             if set(project.get('services',{}))!={'server'} or project['services']['server'].get('image')!=release['image']:
                 raise ValueError('Container Manager needs the complete pinned project before postinst')
+            service=project['services']['server']
+            state=[mount for mount in service.get('volumes',[]) if mount.get('target')=='/state']
+            if len(state)!=1 or state[0]!={'type':'bind','source':'/var/packages/timekeeper/var','target':'/state','read_only':False}:
+                raise ValueError('Native instance state must use retained package appdata')
+            environment=service.get('environment',{})
+            if environment.get('TIMEKEEPER_INSTANCE_BACKUP_STORAGE')!='/state/server/instance-backup' or environment.get('TIMEKEEPER_INSTANCE_RESTORE_STORAGE')!='/state/server/instance-restore':
+                raise ValueError('Native full instance backup and restore need private persistent storage')
             launch=json.load(inner.extractfile('ui/config'))
             if launch['.url']['net.resheim.timekeeper']['type']!='url':
                 raise ValueError('Invalid DSM launcher')

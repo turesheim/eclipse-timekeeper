@@ -43,9 +43,13 @@ installation and keep its original archive until the restored system is verified
 For a package migration, configure the destination's actual package identity,
 database, ports, TLS/proxy and persistent directories first. The restore uses the
 running destination identity; it does not rename a source package in place.
-Source filesystem paths are never extraction destinations. Native deployment
-procedures must also retain the active restore material during later maintenance
-backups; verify that support before relying on a native recovery path.
+Source filesystem paths are never extraction destinations. Synology
+native maintenance backups preserve the active restore material and validate its
+database binding. See [Native backup and restore](SYNOLOGY-PACKAGE.md#native-backup-and-restore).
+The DSM project uses permanent appdata at `/state/server` with the package account's
+numeric UID/GID. It configures private `instance-backup` and `instance-restore`
+roots there without granting the application Docker or privileged host access.
+End-to-end migration acceptance remains a release requirement.
 
 ## Create and download an archive
 

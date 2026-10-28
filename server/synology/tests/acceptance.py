@@ -12,6 +12,7 @@ import secrets
 import subprocess
 import tempfile
 import time
+from native_material import verify as verify_material
 
 ROOT = Path(__file__).resolve().parents[3]
 DB = ROOT/'server/app/src/main/resources/db'
@@ -76,7 +77,7 @@ def main():
                     'printf \'version="24.0.2-1432"\n\' > /var/packages/ContainerManager/INFO; '
                     'printf \'version="1.99.0-146"\n\' > /var/packages/timekeeper/INFO; '
                     'for tool in psql pg_dump pg_restore; do ln -s /usr/lib/postgresql/17/bin/$tool /var/packages/postgresql/target/bin/$tool; done; '
-                    'chown -R 10001:10001 /var/packages/timekeeper /volume1/@appdata/timekeeper')
+                    'chown -R 37017:37017 /var/packages/timekeeper /volume1/@appdata/timekeeper')
             command('docker','cp',str(binary),name+':/var/packages/timekeeper/scripts/timekeeper-dsm')
             command('docker','cp',str(release),name+':/var/packages/timekeeper/scripts/release.json')
             command('docker','exec',name,'mkdir','-p','/var/packages/timekeeper/scripts/migration')
@@ -85,15 +86,17 @@ def main():
             # DSM stages package.tgz separately from its SPK control scripts.
             # Leave the incoming identity absent first to reproduce the real
             # NAS preinst failure, then supply the payload copy shipped by SPK.
-            command('docker','exec',name,'mkdir','-p','/tmp/timekeeper-incoming-payload/scripts')
+            command('docker','exec',name,'mkdir','-p','/tmp/timekeeper-incoming-payload/scripts','/tmp/timekeeper-incoming-payload/project')
             blueprint=folder/'compose.yaml'
             blueprint.write_text((ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',json.loads(release.read_text())['image']))
             command('docker','exec',name,'mkdir','-p','/var/packages/timekeeper/target/project')
             command('docker','cp',str(blueprint),name+':/var/packages/timekeeper/target/project/compose.yaml')
+            command('docker','cp',str(blueprint),name+':/tmp/timekeeper-incoming-payload/project/compose.yaml')
+            command('docker','exec',name,'chown','-R','37017:37017','/tmp/timekeeper-incoming-payload')
             command('docker','exec',name,'chmod','755','/var/packages/timekeeper/scripts/timekeeper-dsm')
 
             def helper(action, *arguments, expected=0):
-                result = command('docker','exec','--user','10001:10001','--env-file',str(env_file),name,
+                result = command('docker','exec','--user','37017:37017','--env-file',str(env_file),name,
                                  '/var/packages/timekeeper/scripts/timekeeper-dsm',action,*arguments,check=False)
                 if (result.returncode == 0) != (expected == 0):
                     raise AssertionError('Installer action returned unexpected status: '+action)
@@ -118,12 +121,12 @@ def main():
             bad_env=folder/'wrong-password.env'
             bad_env.write_text(''.join(key+'='+(wrong_password if key=='wizard_database_admin_password' else value)+'\n' for key,value in variables.items()))
             bad_env.chmod(0o600)
-            failure=command('docker','exec','--user','10001:10001','--env-file',str(bad_env),
+            failure=command('docker','exec','--user','37017:37017','--env-file',str(bad_env),
                             '-e','SYNOPKG_TEMP_LOGFILE=/tmp/timekeeper-dsm-visible-error',name,
                             '/var/packages/timekeeper/scripts/timekeeper-dsm','validate',check=False)
             if failure.returncode==0:
                 raise AssertionError('Wrong PostgreSQL password was accepted')
-            visible=command('docker','exec','--user','10001:10001',name,'cat','/tmp/timekeeper-dsm-visible-error').stdout
+            visible=command('docker','exec','--user','37017:37017',name,'cat','/tmp/timekeeper-dsm-visible-error').stdout
             if 'PostgreSQL rejected the username or password' not in visible:
                 raise AssertionError('Wrong PostgreSQL password did not produce a useful DSM error')
             if any(secret in failure.stdout+failure.stderr+visible for secret in (wrong_password,master_password,code)):
@@ -132,11 +135,15 @@ def main():
             # DSM moves the incoming payload to target before postinst. The
             # staging variable can still point at its now-missing old location.
             command('docker','exec',name,'sh','-ec',
+                    'cp /tmp/timekeeper-incoming-payload/project/compose.yaml /var/packages/timekeeper/target/project/compose.yaml; '
+                    'rm -r /tmp/timekeeper-incoming-payload/project; '
                     'mv /tmp/timekeeper-incoming-payload/scripts /var/packages/timekeeper/target/scripts; '
                     'rmdir /tmp/timekeeper-incoming-payload')
             helper('install')
-            command('docker','exec',name,'mkdir','-p','/tmp/timekeeper-incoming-payload/scripts')
+            command('docker','exec',name,'mkdir','-p','/tmp/timekeeper-incoming-payload/scripts','/tmp/timekeeper-incoming-payload/project')
             command('docker','cp',str(release),name+':/tmp/timekeeper-incoming-payload/scripts/release.json')
+            command('docker','cp',str(blueprint),name+':/tmp/timekeeper-incoming-payload/project/compose.yaml')
+            command('docker','exec',name,'chown','-R','37017:37017','/tmp/timekeeper-incoming-payload')
             command('docker','exec',name,'sh','-ec','test ! -e /var/packages/timekeeper/shares; test "$(stat -c %a /var/packages/timekeeper/var/server)" = 700')
             if helper('status',expected=1).returncode!=3:raise AssertionError('Stopped package does not return DSM status 3')
             helper('prestart')
@@ -147,9 +154,9 @@ def main():
             selected_port=settings['httpPort']
             if not 1024<=selected_port<=65535 or selected_port==5433:
                 raise AssertionError('Installer did not select a valid local HTTP port automatically')
-            runtime_port=command('docker','exec','--user','10001:10001',name,'cat','/var/packages/timekeeper/target/private/config/http-port').stdout.strip()
+            runtime_port=command('docker','exec','--user','37017:37017',name,'cat','/var/packages/timekeeper/target/private/config/http-port').stdout.strip()
             if runtime_port!=str(selected_port):raise AssertionError('Health check does not use the automatically selected port')
-            runtime_properties=command('docker','exec','--user','10001:10001',name,'cat','/var/packages/timekeeper/target/private/config/runtime.properties').stdout
+            runtime_properties=command('docker','exec','--user','37017:37017',name,'cat','/var/packages/timekeeper/target/private/config/runtime.properties').stdout
             if 'timekeeper.spk-version=1.99.0-146\n' not in runtime_properties:raise AssertionError('Installed SPK version was not supplied from canonical DSM INFO')
             challenge=json.loads(read('config/account-setup.json'))
             if challenge['sha256']!=hashlib.sha256(code.encode()).hexdigest() or code in json.dumps(challenge):
@@ -197,8 +204,10 @@ def main():
             command('docker','exec',name,'sh','-ec',
                     'ln -s /volume1/@appdata/timekeeper /var/packages/timekeeper/var; '
                     'mkdir -p /var/packages/timekeeper/target/project; '
-                    'chown -R 10001:10001 /var/packages/timekeeper/target')
+                    'chown -R 37017:37017 /var/packages/timekeeper/target')
             command('docker','cp',str(blueprint),name+':/var/packages/timekeeper/target/project/compose.yaml')
+            command('docker','cp',str(blueprint),name+':/tmp/timekeeper-incoming-payload/project/compose.yaml')
+            command('docker','exec',name,'chown','-R','37017:37017','/tmp/timekeeper-incoming-payload')
             helper('install');helper('upgrade');helper('prestart')
             after_upgrade=json.loads(read('settings.json'))
             for key in ('installationId','database','role','ownerId','httpPort','publicOrigin'):
@@ -233,7 +242,7 @@ def main():
             settings=json.loads(read('settings.json'));settings['phase']='PROVISIONING'
             pending=folder/'pending.json';pending.write_text(json.dumps(settings));pending.chmod(0o600)
             command('docker','cp',str(pending),name+':/var/packages/timekeeper/var/server/settings.json')
-            command('docker','exec',name,'chown','10001:10001','/var/packages/timekeeper/var/server/settings.json')
+            command('docker','exec',name,'chown','37017:37017','/var/packages/timekeeper/var/server/settings.json')
             helper('validate'); helper('install')
             if read('secrets/database_password').decode().strip()!=application_password:
                 raise AssertionError('Interrupted provisioning replaced the application credential')
@@ -245,14 +254,17 @@ def main():
             helper('restore',backup_path)
             value=command('docker','exec',name,'psql','-U','postgres','-p','5433','-d','timekeeper_fixture','-Atc',owned_data).stdout.strip()
             if value!='owned private data':raise AssertionError('Native backup restore lost retained data')
+            def material_sql(query):
+                return command('docker','exec','-i',name,'psql','-X','-q','-A','-t','-U','postgres','-p','5433','-d','timekeeper_fixture','-v','ON_ERROR_STOP=1',input=query).stdout.strip()
+            material_evidence=verify_material(command,name,folder,helper,read,material_sql,'37017:37017')
             # A separate malformed backup is refused without replacing restored data.
-            command('docker','exec',name,'sh','-ec',"printf corrupt > /var/packages/timekeeper/var/server/backups/corrupt.tar; chown 10001:10001 /var/packages/timekeeper/var/server/backups/corrupt.tar")
+            command('docker','exec',name,'sh','-ec',"printf corrupt > /var/packages/timekeeper/var/server/backups/corrupt.tar; chown 37017:37017 /var/packages/timekeeper/var/server/backups/corrupt.tar")
             helper('restore','/var/packages/timekeeper/var/server/backups/corrupt.tar',expected=1)
             log=command('docker','logs',name).stdout+command('docker','logs',name).stderr
             if any(secret in log for secret in (master_password,application_password,code)):
                 raise AssertionError('PostgreSQL statement log contains a plaintext credential')
             print(json.dumps({'postgresql':args.postgres_image,'architecture':architecture,'serverSchema':9,'canonicalSchemaFixture':True,
-                              'unprivilegedInstaller':True,'dedicatedNonSuperuser':True,'permanentAppdataBeforeResourceStartup':True,
+                              **material_evidence,'packageAccountUid':37017,'unprivilegedInstaller':True,'dedicatedNonSuperuser':True,'permanentAppdataBeforeResourceStartup':True,
                               'upgradeSurvivesRemovedPackageLinks':True,'missingUpgradeStateRefused':True,
                               'reinstallPreservesCredentials':True,'renewIncompleteSetupWithoutResettingAccounts':True,'interruptedProvisioningPreservesData':True,
                               'nativeBackupRestore':True,'corruptRestoreRefused':True,'noPlaintextCredentialsInStatementLog':True}))

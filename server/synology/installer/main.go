@@ -200,7 +200,13 @@ func run(action, root, target, releasePath string, env func(string) string, argu
 			if err := containerManagerAt("/var/packages/ContainerManager/INFO"); err != nil {
 				return err
 			}
-			return validate(root, w, release, filepath.Join(releasePath, "migration"))
+			if err := validate(root, w, release, filepath.Join(releasePath, "migration")); err != nil {
+				return err
+			}
+			if incoming := env("SYNOPKG_PKGINST_TEMP_DIR"); incoming != "" {
+				return prepareInstanceProject(incoming, root)
+			}
+			return nil
 		}
 		if err := install(root, target, w, release, filepath.Join(releasePath, "migration")); err != nil {
 			return err

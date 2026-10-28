@@ -101,6 +101,14 @@ func backup(root string) (string, error) {
 	if _, err = os.Stat(filepath.Join(root, "config/maintenance-pending.json")); !errors.Is(err, os.ErrNotExist) {
 		return "", errors.New("Complete the interrupted maintenance operation before making a new backup")
 	}
+	material, err := nativeMaterialControl(root, s, password)
+	if err != nil {
+		return "", err
+	}
+	files := backupFilesFor(s.Release.Schema)
+	if material != nil {
+		files = append(files, material.Files...)
+	}
 	base := filepath.Join(root, "backups")
 	if err = os.MkdirAll(base, 0700); err != nil {
 		return "", err
@@ -123,8 +131,12 @@ func backup(root string) (string, error) {
 	if closeErr != nil {
 		return "", closeErr
 	}
-	manifest := backupManifest{Format: 1, ServerSchema: s.Release.Schema, PostgreSQLMajor: 17, CreatedAt: time.Now().UTC().Format(time.RFC3339Nano), Files: map[string]string{}}
-	for _, name := range backupFilesFor(s.Release.Schema) {
+	format := 1
+	if material != nil {
+		format = 2
+	}
+	manifest := backupManifest{Format: format, ServerSchema: s.Release.Schema, PostgreSQLMajor: 17, CreatedAt: time.Now().UTC().Format(time.RFC3339Nano), Files: map[string]string{}}
+	for _, name := range files {
 		source := filepath.Join(root, name)
 		if name == "database.dump" {
 			source = filepath.Join(stage, name)
@@ -158,7 +170,7 @@ func backup(root string) (string, error) {
 	if _, err = writer.Write(content); err != nil {
 		return "", err
 	}
-	for _, name := range backupFilesFor(s.Release.Schema) {
+	for _, name := range files {
 		source := filepath.Join(root, name)
 		if name == "database.dump" {
 			source = filepath.Join(stage, name)
@@ -203,6 +215,7 @@ func unpackBackup(path, stage string) (backupManifest, error) {
 	defer f.Close()
 	reader := tar.NewReader(f)
 	seen := map[string]bool{}
+	var materialBytes int64
 	for {
 		header, err := reader.Next()
 		if err == io.EOF {
@@ -211,7 +224,25 @@ func unpackBackup(path, stage string) (backupManifest, error) {
 		if err != nil {
 			return manifest, err
 		}
-		if !allowed[header.Name] || seen[header.Name] || header.Typeflag != tar.TypeReg || (header.Name != "database.dump" && header.Size > 1048576) {
+		limit := int64(1048576)
+		if validNativeMaterialMember(header.Name) {
+			limit = 20_000_000
+			switch {
+			case header.Name == "instance-restore/active.json":
+				limit = 1024
+			case strings.HasSuffix(header.Name, "/material.json"):
+				limit = 131072
+			case strings.HasSuffix(header.Name, "/application.properties"):
+				limit = 1_000_000
+			case strings.HasSuffix(header.Name, "/source-configuration.json"):
+				limit = 4_000_000
+			}
+			if header.Size < 0 || header.Size > 70_133_096-materialBytes {
+				return manifest, errors.New("Native instance material is too large")
+			}
+			materialBytes += header.Size
+		}
+		if (!allowed[header.Name] && !validNativeMaterialMember(header.Name)) || len(seen) >= 80 || seen[header.Name] || header.Typeflag != tar.TypeReg || header.Size < 0 || (header.Name != "database.dump" && header.Size > limit) {
 			return manifest, errors.New("Invalid Timekeeper backup member")
 		}
 		seen[header.Name] = true
@@ -224,6 +255,9 @@ func unpackBackup(path, stage string) (backupManifest, error) {
 			return manifest, err
 		}
 		_, err = io.Copy(out, reader)
+		if err == nil {
+			err = out.Sync()
+		}
 		closeErr := out.Close()
 		if err != nil {
 			return manifest, err
@@ -236,10 +270,20 @@ func unpackBackup(path, stage string) (backupManifest, error) {
 		return manifest, err
 	}
 	files := backupFilesFor(manifest.ServerSchema)
-	if manifest.Format != 1 || !supportedSchema(manifest.ServerSchema) || manifest.PostgreSQLMajor != 17 || len(manifest.Files) != len(files) {
+	if (manifest.Format != 1 && manifest.Format != 2) || !supportedSchema(manifest.ServerSchema) || manifest.PostgreSQLMajor != 17 {
 		return manifest, errors.New("Unsupported Timekeeper backup version")
 	}
-	if len(seen) != len(files)+1 {
+	material, err := nativeMaterialInventory(stage)
+	if err != nil {
+		return manifest, err
+	}
+	if material != nil {
+		if manifest.Format != 2 || manifest.ServerSchema < 9 {
+			return manifest, errors.New("Unsupported native instance material")
+		}
+		files = append(files, material.Files...)
+	}
+	if len(manifest.Files) != len(files) || len(seen) != len(files)+1 {
 		return manifest, errors.New("Incomplete Timekeeper backup")
 	}
 	for _, name := range files {
@@ -247,7 +291,7 @@ func unpackBackup(path, stage string) (backupManifest, error) {
 		if err != nil {
 			return manifest, err
 		}
-		if digest != manifest.Files[name] {
+		if !seen[name] || digest != manifest.Files[name] {
 			return manifest, errors.New("Timekeeper backup checksum mismatch")
 		}
 	}
@@ -269,6 +313,13 @@ func restore(root, path, resources string) error {
 	}
 	if manifest.ServerSchema > s.Release.Schema {
 		return errors.New("Install a package compatible with this newer backup before restoring")
+	}
+	material, err := nativeMaterialInventory(stage)
+	if err != nil {
+		return err
+	}
+	if err = installNativeMaterial(root, stage, material); err != nil {
+		return err
 	}
 	if err = beginMaintenance(root, path, "native-restore"); err != nil {
 		return err
@@ -307,7 +358,7 @@ func restore(root, path, resources string) error {
 	if err != nil {
 		return err
 	}
-	before, after := offlineSchemaSQL+cleanup, "\nSET search_path=public;\n"+upgrade
+	before, after := offlineSchemaSQL+cleanup, "\nSET search_path=public;\n"+upgrade+nativeMaterialRestoreSQL(material, s.Release.Schema)
 	if err = pgRun(nativePSQL, s.DatabasePort, s.Role, password, s.Database,
 		[]string{"-X", "-q", "-w", "--single-transaction", "--file=-", "-v", "ON_ERROR_STOP=1"},
 		io.MultiReader(strings.NewReader(before), reader, strings.NewReader(after)), io.Discard); err != nil {
@@ -329,6 +380,9 @@ func restore(root, path, resources string) error {
 		if err = atomic(filepath.Join(root, name), content, mode); err != nil {
 			return err
 		}
+	}
+	if err = publishNativeMaterial(root, stage, material); err != nil {
+		return err
 	}
 	return finishMaintenance(root, s)
 }

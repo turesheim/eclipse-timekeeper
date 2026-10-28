@@ -95,6 +95,11 @@ def main():
                 assert sql(fingerprints)==before
                 assert command('docker','exec',container,'find','/var/packages/timekeeper/var/server/backups','-type','f').stdout.strip()==''
                 command('docker','exec',container,'cp','-R','/var/packages/timekeeper/scripts/migration','/tmp/timekeeper-incoming/package/scripts/migration')
+                command('docker','exec',container,'mkdir','-p','/tmp/timekeeper-incoming/package/project')
+                blueprint=folder/'compose.yaml'
+                blueprint.write_text((ROOT/'server/synology/project/compose.json').read_text())
+                command('docker','cp',str(blueprint),container+':/tmp/timekeeper-incoming/package/project/compose.yaml')
+                command('docker','exec',container,'chown','-R','10001:10001','/tmp/timekeeper-incoming/package/project')
                 helper('validate')
                 assert sql('SELECT schema_version FROM tk_schema')==str(source_schema)
                 assert command('docker','exec',container,'find','/var/packages/timekeeper/var/server/backups','-type','f').stdout.strip()==''

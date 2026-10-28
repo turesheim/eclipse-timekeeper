@@ -32,18 +32,20 @@ def archive(files, compressed=False, extra=None):
 
 
 class SynologyPackageTest(unittest.TestCase):
-    def candidate(self, *, image_tag=IMAGE, architecture='amd64', missing_launcher=False, missing_staged_release=False, staged_commit=COMMIT, missing_staged_migration=None, changed_staged_migration=None, empty_project=False, elevated=False, late_share=False, install_type=None, outer_extra=None, checksum=None):
+    def candidate(self, *, invalid_instance_storage=False, image_tag=IMAGE, architecture='amd64', missing_launcher=False, missing_staged_release=False, staged_commit=COMMIT, missing_staged_migration=None, changed_staged_migration=None, empty_project=False, elevated=False, late_share=False, install_type=None, outer_extra=None, checksum=None):
         image=archive({'manifest.json':json.dumps([{'RepoTags':[image_tag],'Config':'config.json','Layers':[]}]).encode(),
                        'config.json':json.dumps({'architecture':architecture,'os':'linux'}).encode()},True)
         payload={'image.tar.gz':image,'project/compose.yaml':(ROOT/'server/synology/project/compose.json').read_text().replace('@TIMEKEEPER_IMAGE@',IMAGE).encode(),
                  'private':None,'private/config':None,'private/secrets':None,
-                 **{name:b'guide' for name in ('README.md','ACCOUNTS.md','TAILSCALE.md')}}
+                 **{name:b'guide' for name in ('README.md','ACCOUNTS.md','INSTANCE-BACKUP.md','TAILSCALE.md')}}
         if not missing_staged_release:
             payload['scripts/release.json']=json.dumps({'commit':staged_commit,'image':IMAGE,'serverSchema':9}).encode()
         migrations={name:(ROOT/'server/app/src/main/resources/db'/Path(name).name).read_bytes() for name in MIGRATION_FILES}
         payload.update({name:value for name,value in migrations.items() if name!=missing_staged_migration})
         if changed_staged_migration:payload[changed_staged_migration]+=b'\nchanged\n'
         if not missing_launcher:payload['ui/config']=(ROOT/'server/synology/ui/config').read_bytes()
+        if invalid_instance_storage:
+            project=json.loads(payload['project/compose.yaml']);project['services']['server']['environment']['TIMEKEEPER_INSTANCE_RESTORE_STORAGE']='NONE';payload['project/compose.yaml']=json.dumps(project).encode()
         if empty_project:payload['project/compose.yaml']=b'{"services":{}}'
         payload=archive(payload,True)
         info={'package':'timekeeper','arch':'r1000','os_min_ver':'7.2.2-72806','version':'1.99.0-1',
@@ -104,7 +106,7 @@ class SynologyPackageTest(unittest.TestCase):
             with self.subTest(overrides=overrides),self.assertRaises(ValueError):self.check(self.candidate(**overrides))
 
     def test_missing_launcher_privileged_controller_or_corrupted_payload_is_rejected(self):
-        for overrides in ({'missing_launcher':True},{'empty_project':True},{'elevated':True},{'late_share':True},{'install_type':'system'},{'checksum':'0'*32}):
+        for overrides in ({'invalid_instance_storage':True},{'missing_launcher':True},{'empty_project':True},{'elevated':True},{'late_share':True},{'install_type':'system'},{'checksum':'0'*32}):
             with self.subTest(overrides=overrides),self.assertRaises(ValueError):self.check(self.candidate(**overrides))
 
     def test_parent_path_and_symlink_escape_is_rejected(self):

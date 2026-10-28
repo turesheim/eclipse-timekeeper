@@ -26,8 +26,16 @@ def verify(command,database_container,folder,image):
     # Only adapt the fixture's image, host namespace and bind sources. The static
     # service environment, health check and all container restrictions stay intact.
     service['image']=image;service['network_mode']='container:'+database_container;service['container_name']=name
+    state_volume=database_container+'-instance-state'
+    identity=service.get('user','10001:10001')
+    if not re.fullmatch(r'[1-9][0-9]*:[1-9][0-9]*',identity):raise AssertionError('Native container needs an explicit non-root package identity')
+    command('docker','volume','create',state_volume)
+    command('docker','run','--rm','--network','none','--user','0:0','--entrypoint','sh','-v',state_volume+':/state',image,'-ec','mkdir -p /state/server; chown -R '+identity+' /state; chmod 700 /state/server')
     for volume in service['volumes']:
-        volume['source']=str(config if volume['target']=='/config' else secrets)
+        if volume['target']=='/state':
+            volume['type']='volume';volume['source']=state_volume
+        else:volume['source']=str(config if volume['target']=='/config' else secrets)
+    definition['volumes']={state_volume:{'external':True}}
     project.write_text(json.dumps(definition))
     compose=['docker','compose','-p',database_container+'-app','-f',str(project)]
     def create():command(*compose,'create','--no-build')
@@ -80,8 +88,9 @@ def verify(command,database_container,folder,image):
             if json.loads(response.stdout)['ownerId']!=owner:raise AssertionError('Migrated login changed data ownership')
         status=json.loads(command('docker','exec',name,'curl','-fsS',endpoint+'/api/v1/auth/status').stdout)
         if status['setupRequired']:raise AssertionError('Restored server reopened administrator setup')
-        return {'projectCreatedBeforeRuntimeConfiguration':True,'renderedNativeServerReady':True,'selectedRuntimePortHealthcheck':True,
+        return {'projectCreatedBeforeRuntimeConfiguration':True,'renderedNativeServerReady':True,'packageAccountContainerIdentity':identity,'selectedRuntimePortHealthcheck':True,
                 'migratedPasswordsAuthenticateAsOriginalOwners':True,'actualContainerRefusesPendingMaintenance':True,
                 'publicReverseProxyHostServesWebClient':True,'unconfiguredHostsRejected':True}
     finally:
         command(*compose,'down',check=False)
+        command('docker','volume','rm',state_volume,check=False)

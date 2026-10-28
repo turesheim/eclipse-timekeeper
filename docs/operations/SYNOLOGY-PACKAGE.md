@@ -51,8 +51,11 @@ required for browser sign-in. The selected HTTP port is also used by the contain
 health check. The installer allows the public origin's hostname in Quarkus's HTTP
 Host validation, alongside localhost for health checks. Other hostnames remain
 blocked; forwarding through Tailscale Serve does not require trusting forwarded
-headers or disabling Host validation. The application runs as UID 10001 with a
-read-only filesystem.
+headers or disabling Host validation. The application runs as the dedicated DSM package account's numeric UID/GID
+with a read-only image filesystem. During incoming-payload validation, the
+unprivileged installer records that identity and the permanent appdata path in
+the project before Container Manager creates it. No Docker socket or host
+administrator credentials are exposed to the application.
 
 When moving from an earlier preview that generated the container name
 `timekeeper-server-server-1`, uninstall the old Timekeeper package before manually
@@ -69,7 +72,10 @@ The complete Compose project and empty bind directories ship in `package.tgz`:
 DSM acquires the project **before** `postinst`. The installer then copies retained
 configuration into those existing directories under a mode-0700 package-private
 parent. Quarkus reads runtime properties after container start, so project creation
-needs neither database credentials nor install-time environment substitution.
+needs no database credentials. The incoming project's `/state` bind uses
+permanent appdata, independent of temporary package links and replacement of the
+installed payload. The server creates private instance backup and restore roots
+under `/state/server`; these survive package upgrades.
 `prestart` synchronizes retained files and checks maintenance state before startup;
 `start` waits for application readiness after the worker starts the container.
 Stopped status uses DSM exit code 3. See Synology's [resource timing](https://help.synology.com/developer-guide/resource_acquisition/timing.html)
@@ -240,6 +246,23 @@ directory. The mode-0600 archive contains a consistent native `pg_dump`, setup/t
 configuration, retained settings and the database service credential. Keep the
 archive private and copy it to your normal backup destination. The manifest records
 SHA-256 for every member. No PostgreSQL administrator credential is included.
+
+After a full-instance restore, native archive format 2 additionally preserves the
+active pointer and its complete immutable security-material generation. Every
+file is checked against the material inventory and the database's generation,
+operation and digest bindings. Uncommitted stages, temporary plaintext and upload
+files are excluded. Backups without active recovered material retain format 1
+compatibility. Native restore verifies material before replacement and checks its
+binding inside the same SQL transaction; a missing or mismatched inventory rolls
+the transaction back. Immutable files are installed before commit and the active
+pointer is published afterwards, while the maintenance marker blocks startup.
+Keep the package stopped until recovery succeeds. If existing material is damaged,
+retain that directory separately before restoring a verified native archive;
+recovery refuses to overwrite a conflicting immutable generation.
+
+For encrypted portable archives and migration to another installation/package,
+use [Full-instance backup and restore](INSTANCE-BACKUP.md). The native maintenance
+archive above is a private host recovery artifact and is not a web download.
 
 To restore, keep Timekeeper stopped and run a task with the absolute backup path:
 

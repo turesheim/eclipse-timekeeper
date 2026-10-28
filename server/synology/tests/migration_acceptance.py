@@ -161,7 +161,7 @@ def main():
             command('docker','exec',target,'sh','-ec',
                 'mkdir -p /var/packages/timekeeper/scripts/migration /var/packages/timekeeper/target /var/packages/timekeeper/var /var/packages/postgresql/target/bin; '
                 'for tool in psql pg_dump pg_restore; do ln -s /usr/lib/postgresql/17/bin/$tool /var/packages/postgresql/target/bin/$tool; done; '
-                'chown -R 10001:10001 /var/packages/timekeeper')
+                'chown -R 37017:37017 /var/packages/timekeeper')
             command('docker','cp',str(binary),target+':/var/packages/timekeeper/scripts/timekeeper-dsm')
             release=folder/'release.json';release.write_text(json.dumps({'commit':'a'*40,'image':'ghcr.io/turesheim/eclipse-timekeeper-server:sha-'+'a'*40,'serverSchema':9}))
             command('docker','cp',str(release),target+':/var/packages/timekeeper/scripts/release.json')
@@ -171,14 +171,21 @@ def main():
             command('docker','cp',str(blueprint),target+':/var/packages/timekeeper/target/project/compose.yaml')
             for file in ('postgresql-shape.sql','schema-v2-postgresql.shape','schema-v3-postgresql.shape','schema-v4-postgresql.shape','schema-v5-postgresql.shape','schema-v6-postgresql.shape','schema-v7-postgresql.shape','schema-v8-postgresql.shape','schema-v9-postgresql.shape','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql','day-labels-v7.sql','day-note-history-v8.sql','instance-v9.sql'):
                 command('docker','cp',str(DB/file),target+':/var/packages/timekeeper/scripts/migration/'+file)
-            env={'SYNOPKG_PKGNAME':'timekeeper','SYNOPKG_PKGDEST':'/var/packages/timekeeper/target','wizard_database':'timekeeper_fixture','wizard_database_role':'timekeeper_fixture_app',
+            env={'SYNOPKG_PKGINST_TEMP_DIR':'/tmp/timekeeper-migration-incoming','SYNOPKG_PKGNAME':'timekeeper','SYNOPKG_PKGDEST':'/var/packages/timekeeper/target','wizard_database':'timekeeper_fixture','wizard_database_role':'timekeeper_fixture_app',
                  'wizard_database_port':'5433','wizard_http_port':'8098','wizard_public_origin':'https://timekeeper.example.invalid','wizard_owner':'',
                  'wizard_database_admin':'postgres','wizard_database_admin_password':'synthetic-trust-only-fixture','wizard_setup_code':secrets.token_urlsafe(32)}
             env_file=folder/'wizard.env';env_file.write_text(''.join(key+'='+value+'\n' for key,value in env.items()));env_file.chmod(0o600)
             def helper(action,*arguments,expected=0):
-                result=command('docker','exec','--user','10001:10001','--env-file',str(env_file),target,'/var/packages/timekeeper/scripts/timekeeper-dsm',action,*arguments,check=False)
+                result=command('docker','exec','--user','37017:37017','--env-file',str(env_file),target,'/var/packages/timekeeper/scripts/timekeeper-dsm',action,*arguments,check=False)
                 if (result.returncode==0)!=(expected==0):raise AssertionError('Native migration action failed: '+action+' '+result.stderr)
                 return result
+            command('docker','exec',target,'mkdir','-p','/tmp/timekeeper-migration-incoming/project','/tmp/timekeeper-migration-incoming/scripts','/var/packages/ContainerManager')
+            command('docker','exec',target,'sh','-ec',"printf 'version=\"24.0.2-1432\"\n' > /var/packages/ContainerManager/INFO")
+            command('docker','cp',str(blueprint),target+':/tmp/timekeeper-migration-incoming/project/compose.yaml')
+            command('docker','cp',str(release),target+':/tmp/timekeeper-migration-incoming/scripts/release.json')
+            command('docker','exec',target,'chown','-R','37017:37017','/tmp/timekeeper-migration-incoming')
+            helper('validate')
+            command('docker','exec','--user','37017:37017',target,'cp','/tmp/timekeeper-migration-incoming/project/compose.yaml','/var/packages/timekeeper/target/project/compose.yaml')
             helper('install')
             ddl=''.join((DB/name).read_text() for name in ('schema-v1-postgresql.sql','auth-v2.sql','recovery-v3.sql','passkeys-v4.sql','settings-v5.sql','locale-v6.sql','instance-v9.sql'))+"UPDATE tk_schema SET schema_version=9,state='READY';"
             canonical="SET ROLE timekeeper_fixture_app; "+ddl
@@ -224,10 +231,10 @@ def main():
             # Disaster recovery uses a freshly provisioned dedicated role/database;
             # business ownership must not depend on the old PostgreSQL service role.
             native_backup=helper('backup').stdout.strip()
-            command('docker','exec','--user','10001:10001',target,'cp',native_backup,'/var/packages/timekeeper/native-recovery.tar')
+            command('docker','exec','--user','37017:37017',target,'cp',native_backup,'/var/packages/timekeeper/native-recovery.tar')
             previous_password=folder/'previous-password'
             command('docker','cp',target+':/var/packages/timekeeper/var/server/secrets/database_password',str(previous_password))
-            command('docker','exec','--user','10001:10001',target,'mv','/var/packages/timekeeper/var/server','/var/packages/timekeeper/var/retained-before-recovery')
+            command('docker','exec','--user','37017:37017',target,'mv','/var/packages/timekeeper/var/server','/var/packages/timekeeper/var/retained-before-recovery')
             env['wizard_database']='timekeeper_recovered';env['wizard_database_role']='timekeeper_recovered_app'
             env_file.write_text(''.join(key+'='+value+'\n' for key,value in env.items()))
             helper('install')
@@ -246,7 +253,7 @@ def main():
                 # Operators must carry forward the source origin epoch too.
                 # Importing data must never silently lower this shared fence.
                 if args.source_schema>=3:
-                    command('docker','exec','--user','10001:10001',target,'sh','-ec',
+                    command('docker','exec','--user','37017:37017',target,'sh','-ec',
                         "sed -i 's/timekeeper.auth.origin-epoch=1/timekeeper.auth.origin-epoch=7/' /var/packages/timekeeper/var/server/config/mail.properties")
                     helper('prestart')
                 from native_server import verify
