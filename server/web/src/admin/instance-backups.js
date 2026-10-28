@@ -70,7 +70,7 @@ export async function renderInstanceBackups(view) {
         if(!view.valid())return;
         const expected='/api/v1'+base+'/operations/'+key+'/content';if(reply.data.downloadUrl!==expected)throw new Error(t('backups.download_failed'));
         // Native attachment navigation streams directly to the browser's download manager.
-        const anchor=node('a');anchor.href=expected;anchor.download='';root.append(anchor);anchor.click();anchor.remove();
+        const anchor=node('a');anchor.href=expected;anchor.referrerPolicy='origin';anchor.download='';root.append(anchor);anchor.click();anchor.remove();
         download.feedback.textContent=t('backups.download_started');
       });
       const downloadProof=credential(download.value,'backups.password',true);download.finish();
