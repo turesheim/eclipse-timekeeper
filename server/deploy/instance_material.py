@@ -202,11 +202,13 @@ def matches_control(control, material):
 PRIVATE = '''
 check() {
   path=/instance/restore/$1
-  test ! -L "$path" && test -f "$path"
+  test ! -L "$path"
+  test -f "$path"
   test "$(stat -c '%a:%h' "$path")" = '600:1'
   path=$(dirname "$path")
   while :; do
-    test ! -L "$path" && test -d "$path"
+    test ! -L "$path"
+    test -d "$path"
     test "$(stat -c '%a' "$path")" = 700
     test "$path" != /instance || break
     path=$(dirname "$path")
@@ -229,7 +231,8 @@ def volume(script, arguments=(), *, input=None, output=None, missing=False):
 def backup(directory, client):
     control = dump_control(directory / 'database.dump', client)
     raw = volume(PRIVATE + '''
-test ! -e /instance/maintenance.pending && test ! -L /instance/maintenance.pending
+test ! -e /instance/maintenance.pending
+test ! -L /instance/maintenance.pending
 if test ! -e /instance/restore/active.json && test ! -L /instance/restore/active.json; then exit 3; fi
 check active.json
 test "$(stat -c '%s' /instance/restore/active.json)" -le 1024
@@ -267,7 +270,8 @@ def prepare(directory):
     matches_control(dump_control(directory / 'database.dump', restorer.compose_client), material)
     volume('''
 umask 077
-test ! -L /instance && test "$(stat -c '%a' /instance)" = 700
+test ! -L /instance
+test "$(stat -c '%a' /instance)" = 700
 test ! -L /instance/maintenance.pending
 tmp=$(mktemp /instance/.maintenance.XXXXXXXX)
 printf '%s\n' 'Compose database maintenance is incomplete' > "$tmp"
@@ -293,7 +297,8 @@ umask 077
 for path in /instance/restore /instance/restore/material; do
   test ! -L "$path"
   if test ! -e "$path"; then mkdir "$path"; fi
-  test -d "$path" && test "$(stat -c '%a' "$path")" = 700
+  test -d "$path"
+  test "$(stat -c '%a' "$path")" = 700
 done
 stage=$(mktemp -d /instance/restore/material/.maintenance.XXXXXXXX)
 trap 'rm -rf "$stage"' EXIT
@@ -302,7 +307,8 @@ sync -f /instance
 path=/instance/restore/material/$1
 test ! -L "$path"
 if test -e "$path"; then
-  test -d "$path" && test "$(stat -c '%a' "$path")" = 700
+  test -d "$path"
+  test "$(stat -c '%a' "$path")" = 700
   diff -r "$stage" "$path" > /dev/null
 else
   mv -T "$stage" "$path"
@@ -318,7 +324,8 @@ def finish(directory):
     raw = b'' if material is None else json.dumps(material['pointer'], separators=(',', ':')).encode()
     volume('''
 umask 077
-test -f /instance/maintenance.pending && test ! -L /instance/maintenance.pending
+test -f /instance/maintenance.pending
+test ! -L /instance/maintenance.pending
 for path in /instance/restore /instance/restore/active.json /instance/restore/prepared.json; do test ! -L "$path"; done
 if test "$1" = active; then
   tmp=$(mktemp /instance/restore/.active.XXXXXXXX)
@@ -341,7 +348,8 @@ def locked(command):
     script = '''umask 077
 test ! -L /instance/maintenance.lock
 if test -e /instance/maintenance.lock; then
-  test -f /instance/maintenance.lock && test "$(stat -c '%a:%h' /instance/maintenance.lock)" = '600:1'
+  test -f /instance/maintenance.lock
+  test "$(stat -c '%a:%h' /instance/maintenance.lock)" = '600:1'
 fi
 exec 9>>/instance/maintenance.lock
 flock -n 9

@@ -2,8 +2,11 @@
 import hashlib
 from io import BytesIO
 import json
+import os
 from pathlib import Path
 import sys
+import subprocess
+from unittest.mock import patch
 import tarfile
 import tempfile
 import unittest
@@ -46,6 +49,43 @@ class InstanceMaterialTest(unittest.TestCase):
     def setUp(self):
         directory = tempfile.TemporaryDirectory(); self.addCleanup(directory.cleanup)
         self.path = Path(directory.name) / material.ARCHIVE
+
+    def test_private_shell_checks_reject_file_and_directory_symlinks(self):
+        root = self.path.parent / 'volume'; root.mkdir(mode=0o700)
+        directory = root / 'material'; directory.mkdir(mode=0o700)
+        secret = directory / 'secret'; secret.write_text('private fixture'); secret.chmod(0o600)
+        (root / 'linked-file').symlink_to(secret)
+        (root / 'linked-directory').symlink_to(directory, target_is_directory=True)
+        script = material.PRIVATE.replace('/instance/restore', str(root)).replace('/instance', str(root))
+        # The production helper runs in Debian. Adapt only GNU stat's output on
+        # macOS so this regression still exercises the real shell and filesystem.
+        binary = self.path.parent / 'bin'; binary.mkdir()
+        stat = binary / 'stat'
+        stat.write_text('#!' + sys.executable + '\nimport os, stat, sys\nvalue=os.stat(sys.argv[3])\nprint(sys.argv[2].replace("%a",format(stat.S_IMODE(value.st_mode),"o")).replace("%h",str(value.st_nlink)))\n')
+        stat.chmod(0o755)
+        environment = {**os.environ, 'PATH': str(binary) + os.pathsep + os.environ['PATH']}
+
+        for name in ['material/secret', 'linked-file', 'linked-directory/secret']:
+            result = subprocess.run(['sh', '-ec', script + 'check "$1"', 'test', name], capture_output=True, env=environment)
+            if name == 'material/secret':
+                self.assertEqual(0, result.returncode)
+            else:
+                self.assertNotEqual(0, result.returncode, name)
+
+    def test_pending_maintenance_marker_refuses_a_backup_without_active_material(self):
+        root = self.path.parent / 'volume'; root.mkdir(mode=0o700)
+        (root / 'maintenance.pending').touch(mode=0o600)
+        def volume(script, arguments=(), *, input=None, output=None, missing=False):
+            result = subprocess.run(['sh', '-ec', script.replace('/instance', str(root)), 'test', *arguments],
+                                    input=input, capture_output=True)
+            if missing and result.returncode == 3:
+                return None
+            if result.returncode:
+                raise RuntimeError(material.ERROR)
+            return result.stdout
+        with patch.object(material, 'dump_control', return_value={}), patch.object(material, 'volume', side_effect=volume):
+            with self.assertRaisesRegex(RuntimeError, 'material is missing'):
+                material.backup(self.path.parent, None)
 
     def test_complete_inventory_and_dump_binding_are_required(self):
         files, control = fixture()
