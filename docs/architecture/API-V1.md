@@ -879,7 +879,11 @@ being implemented. The current draft adds these routes under the separate
 | GET | `/operations/{id}` | Return the operation's ID, type, state, version and UTC update time. |
 | POST | `/operations/{id}/download-grant` | Verify `currentPassword` and issue one private, session-bound download cookie lasting two minutes. |
 | GET | `/operations/{id}/content` | Consume that cookie and stream the encrypted archive as a native attachment. |
-| POST | `/operations/{id}/discard` | Verify `currentPassword`, expire a completed artifact or restore review, and remove its private files. |
+| POST | `/operations/{id}/discard` | Verify `currentPassword`, expire a completed artifact, pending upload, failed job or review, and remove its private files. |
+| POST | `/uploads` | Verify `currentPassword`, declare ciphertext `bytes` and `sha256`, and reserve a session-bound upload. |
+| GET | `/uploads/{id}` | Read transfer progress, validation result and a safe archive review. |
+| PUT | `/uploads/{id}/content?offset=…` | Append at most 1 MiB of binary ciphertext, or retry an acknowledged range with identical bytes. |
+| POST | `/uploads/{id}/validate` | Re-verify `currentPassword`, consume `passphrase`, and return `202` before full-file verification. |
 
 Only current administrator browser-account sessions with write permission are
 authorized. Managed or legacy API tokens, token-exchanged browser sessions,
@@ -912,5 +916,33 @@ Interrupted transfers require a new password-verified grant.
 
 The audit records `DOWNLOAD_AUTHORIZED` and `DOWNLOAD_STARTED` without cookies,
 digests, passwords or paths. The started event records consumption of authority,
-not a claim that a browser saved the file. Upload/review, restore activation and
-the Administration UI remain unfinished parts of #473.
+not a claim that a browser saved the file. Upload and archive-only review are implemented. Restore activation and the
+Administration UI remain unfinished parts of #473.
+
+Uploads are bound to their initiating administrator account session. The status
+reply includes the original ciphertext checksum for safe resume. Chunk writes use
+an explicit offset and immutable byte comparison rather than a resource ETag;
+a changed retry returns `409 INSTANCE_UPLOAD_CONFLICT`. Gaps and malformed ranges
+are rejected. Accepted chunks renew the ten-minute inactivity lease. Reloading
+the page can resume through the status URL while that session and lease remain
+valid. A new sign-in cannot take over the old upload. A freshly verified
+administrator can discard a pending upload; the audit records the actual actor.
+
+`complete` means all declared ciphertext bytes have arrived. It does not claim
+checksum verification, decryption, or restore readiness. Once all bytes arrive,
+validation accepts fresh password proof and the backup passphrase. The background
+worker verifies the full ciphertext checksum, authenticated encryption, manifest,
+format and relational image before publishing a review. Plaintext stays in the
+private job working area and is removed before `REVIEW`. Wrong passphrases,
+invalid archives and expansion-budget rejection return to `UPLOADING` with
+`validationCode: INVALID_INSTANCE_BACKUP`; the same encrypted upload can be
+validated again without retransmission. The passphrase is never retained.
+
+Reviews expose only source deployment/build metadata, archive identity, time,
+schema and per-table counts. `archiveVerified: true` describes those archive
+checks. `restoreReady: false` remains explicit until target readiness,
+authentication/configuration semantics, deployment mapping and offline activation
+are implemented and checked. No restore endpoint currently applies this image to
+the active database. The expanded-data budget defaults to 16 GiB and can be set
+with `timekeeper.instance-backup.maximum-expanded-bytes`; raising it requires
+corresponding private staging capacity.

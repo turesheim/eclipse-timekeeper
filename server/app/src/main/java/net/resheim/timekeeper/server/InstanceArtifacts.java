@@ -21,6 +21,7 @@ final class InstanceArtifacts {
     private final Path root;private final UUID identity;private final long maximumBytes,retainedBytes;private final int maximumJobs;
     record Upload(long bytes,long received,boolean complete) { }
     @FunctionalInterface interface Reader<T> {T read(InputStream input,long bytes) throws IOException;}
+    @FunctionalInterface interface PrivateReader<T> {T read(Path file,long bytes) throws IOException;}
     InstanceArtifacts(Path root,long maximumBytes,long retainedBytes,int maximumJobs) throws IOException {
         if(maximumBytes<1||retainedBytes<maximumBytes||maximumJobs<1)throw invalid();
         this.root=root.toAbsolutePath().normalize();this.maximumBytes=maximumBytes;this.retainedBytes=retainedBytes;this.maximumJobs=maximumJobs;
@@ -85,9 +86,9 @@ final class InstanceArtifacts {
             try(var output=FileChannel.open(input,StandardOpenOption.READ,StandardOpenOption.WRITE,NOFOLLOW_LINKS)) {
                 if(output.size()<received)throw unavailable();
                 if(offset<received) {
-                    if(bytes.length>received-offset)throw invalid();
+                    if(bytes.length>received-offset)throw new IOException("INSTANCE_ARTIFACT_CONFLICT");
                     byte[] previous=new byte[bytes.length];readFully(output,ByteBuffer.wrap(previous),offset);
-                    if(!MessageDigest.isEqual(bytes,previous))throw invalid();return view(metadata);
+                    if(!MessageDigest.isEqual(bytes,previous))throw new IOException("INSTANCE_ARTIFACT_CONFLICT");return view(metadata);
                 }
                 if(metadata.path("complete").asBoolean())throw invalid();
                 // A crash can leave fsynced bytes beyond the last durable receipt.
@@ -109,14 +110,26 @@ final class InstanceArtifacts {
             metadata.put("complete",true);save(job,metadata);return view(metadata);
         });
     }
-    <T> T read(UUID id,Reader<T> reader) throws IOException {
+    Path validationWork(UUID id) throws IOException {
+        return locked(job(id),()->{
+            if(!metadata(job(id)).path("complete").asBoolean())throw invalid();Path work=job(id).resolve("work");
+            Files.createDirectory(work,PosixFilePermissions.asFileAttribute(DIRECTORY));sync(job(id));return work;
+        });
+    }
+    void clearWork(UUID id) throws IOException {
+        locked(job(id),()->{Path work=job(id).resolve("work");if(Files.exists(work,NOFOLLOW_LINKS)){cleanWork(work);sync(job(id));}return null;});
+    }
+    <T> T inspect(UUID id,PrivateReader<T> reader) throws IOException {
         return locked(job(id),()->{
             Path job=job(id);var metadata=metadata(job);if(!metadata.path("complete").asBoolean())throw invalid();
             Path archive=job.resolve("archive.tki");file(archive);if(Files.size(archive)!=metadata.path("bytes").asLong()||!sha256(archive).equals(metadata.path("sha256").asText()))throw unavailable();
-            // The job lock remains held until streaming has finished; discard
-            // cannot unlink a download while its reader is still active.
-            try(var input=Files.newInputStream(archive,StandardOpenOption.READ,NOFOLLOW_LINKS)){return reader.read(input,metadata.path("bytes").asLong());}
+            return reader.read(archive,metadata.path("bytes").asLong());
         });
+    }
+    <T> T read(UUID id,Reader<T> reader) throws IOException {
+        // Hold the per-job lock for the whole stream, including through another
+        // store instance. Discard cannot unlink an active download.
+        return inspect(id,(archive,bytes)->{try(var input=Files.newInputStream(archive,StandardOpenOption.READ,NOFOLLOW_LINKS)){return reader.read(input,bytes);}});
     }
     void remove(UUID id) throws IOException {
         locked(root,()->{
@@ -196,7 +209,7 @@ final class InstanceArtifacts {
                 if(held==null)throw new IOException("INSTANCE_ARTIFACT_BUSY");return work.run();
             }
         }catch(OverlappingFileLockException failure){throw new IOException("INSTANCE_ARTIFACT_BUSY");}
-        catch(IOException failure){if(Set.of("INVALID_INSTANCE_ARTIFACT","INSTANCE_ARTIFACT_QUOTA","INSTANCE_ARTIFACT_BUSY").contains(failure.getMessage()))throw failure;throw unavailable();}
+        catch(IOException failure){if(Set.of("INVALID_INSTANCE_ARTIFACT","INSTANCE_ARTIFACT_QUOTA","INSTANCE_ARTIFACT_BUSY","INSTANCE_ARTIFACT_CONFLICT").contains(failure.getMessage()))throw failure;throw unavailable();}
         catch(RuntimeException failure){throw unavailable();}
     }
     private static FileChannel createFile(Path file) throws IOException {return FileChannel.open(file,Set.of(StandardOpenOption.CREATE_NEW,StandardOpenOption.READ,StandardOpenOption.WRITE,NOFOLLOW_LINKS),PosixFilePermissions.asFileAttribute(FILE));}

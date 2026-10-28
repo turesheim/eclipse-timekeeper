@@ -45,6 +45,15 @@ class ContractTest(unittest.TestCase):
         self.assertEqual('cookie',CONTRACT['components']['securitySchemes']['instanceDownloadGrant']['in'])
         self.assertEqual({'id','downloadUrl','expiresAt'},set(CONTRACT['components']['schemas']['InstanceDownload']['properties']))
 
+    def test_instance_upload_has_bounded_immutable_chunks_and_cannot_claim_restore_readiness(self):
+        op=CONTRACT['paths']['/admin/instance/uploads/{id}/content']['put']
+        self.assertTrue(any(p.get('name')=='offset' and p.get('required') for p in op['parameters']))
+        self.assertEqual(1048576,op['requestBody']['content']['application/octet-stream']['schema']['maxLength'])
+        self.assertIn('409',op['responses'])
+        self.assertFalse(CONTRACT['components']['schemas']['InstanceArchiveReview']['properties']['restoreReady']['const'])
+        self.assertTrue(validator('InstanceRestoreUploadInput').is_valid({'currentPassword':'private proof','bytes':1024,'sha256':'a'*64}))
+        self.assertFalse(validator('InstanceRestoreUploadInput').is_valid({'currentPassword':'private proof','bytes':1024,'sha256':'a'*64,'path':'/outside'}))
+
     def test_all_private_operations_require_authentication_and_permission(self):
         self.assertEqual([{'bearerAuth': []}, {'browserSession': []}], CONTRACT['security'])
         ids = []
@@ -60,7 +69,7 @@ class ContractTest(unittest.TestCase):
                     self.assertEqual([], operation['security'])
                     continue
                 if path.startswith('/admin/instance/'):
-                    self.assertEqual([{'browserSession': [], 'instanceDownloadGrant': []}] if path.endswith('/content') else [{'browserSession': []}], operation['security'])
+                    self.assertEqual([{'browserSession': [], 'instanceDownloadGrant': []}] if path == '/admin/instance/operations/{id}/content' else [{'browserSession': []}], operation['security'])
                 else:
                     self.assertNotIn('security', operation)
                 self.assertEqual(('write' if path.startswith('/admin/') else 'read') if method == 'get' else ('read' if path in ('/auth/logout', '/auth/token-login') else 'write'),
@@ -399,7 +408,7 @@ class ContractTest(unittest.TestCase):
             for method in ('put', 'delete'):
                 # Chunks are immutable: index plus exact content identifies a
                 # write, and conflicting bytes return 409 instead of overwriting.
-                if method in item and path not in ('/auth/tokens/{id}', '/data/account/uploads/{id}/chunks/{index}'):
+                if method in item and path not in ('/auth/tokens/{id}', '/data/account/uploads/{id}/chunks/{index}', '/admin/instance/uploads/{id}/content'):
                     op = item[method]
                     if path == '/journal-assets/{filename}' and method == 'put':
                         self.assertIn({'$ref': '#/components/parameters/IfMatchOptional'}, op['parameters'])
@@ -554,7 +563,7 @@ class ContractTest(unittest.TestCase):
             'passkeyProofOptions', 'verifyPasskeyProof', 'renamePasskey', 'removePasskey',
             'listImportJobs', 'previewTogglImport', 'createTogglImportJob', 'getImportJob', 'listImportItems',
             'previewTogglImportBatch', 'commitTogglImportBatch', 'beginImportUndo', 'previewImportUndoBatch', 'commitImportUndoBatch',
-            'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup',
+            'createInstanceBackup', 'getInstanceOperation', 'discardInstanceArtifact', 'authorizeInstanceDownload', 'downloadInstanceBackup', 'createInstanceRestoreUpload', 'getInstanceRestoreUpload', 'appendInstanceRestoreUpload', 'validateInstanceRestoreUpload',
             'getAdministrationSettings', 'updateAdministrationSettings', 'getProfile', 'updateProfile', 'exportData', 'importData', 'listChanges', 'getOpenApi', 'getServerInformation',
         }
         operations = {v['operationId'] for item in CONTRACT['paths'].values()

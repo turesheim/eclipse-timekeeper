@@ -49,7 +49,7 @@ class InstanceBackupJobs {
         for(Runnable work:workers.shutdownNow())((Pending)work).cancel();
         try{workers.awaitTermination(5,TimeUnit.SECONDS);}catch(InterruptedException stopped){Thread.currentThread().interrupt();}
     }
-    private InstanceArtifacts artifacts() throws IOException {
+    InstanceArtifacts artifacts() throws IOException {
         if(storage==null||storage.isBlank()||storage.equals("NONE"))throw new ApiFailure(503,"INSTANCE_STORAGE_REQUIRED");
         return new InstanceArtifacts(Path.of(storage),maximumBytes,retainedBytes,maximumJobs);
     }
@@ -95,7 +95,7 @@ class InstanceBackupJobs {
             }
         }
     }
-    private void cleanup(InstanceAdministrator.Proof proof,InstanceArtifacts files) throws IOException {
+    void cleanup(InstanceAdministrator.Proof proof,InstanceArtifacts files) throws IOException {
         var obsolete=accounts.tx(c->{
             lock(c);administrators.check(c,proof.principal());bindStorage(c,files.identity());interruptAbandoned(c,clock.now());
             var ids=new ArrayList<UUID>();
@@ -123,7 +123,7 @@ class InstanceBackupJobs {
         administrators.requireFresh(proof);
         try {
             var files=artifacts();Status expired=accounts.tx(c->{lock(c);administrators.check(c,proof.principal());bindStorage(c,files.identity());var current=status(c,id);
-                if(current.state()==State.EXPIRED)return current;return expire(c,id,clock.now());});
+                if(current.state()==State.EXPIRED)return current;return expire(c,id,proof.principal().owner(),clock.now());});
             files.remove(id);return expired;
         }catch(IOException failure){throw new ApiFailure(503,"INSTANCE_BACKUP_CLEANUP_FAILED");}
     }

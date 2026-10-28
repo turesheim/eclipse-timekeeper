@@ -30,6 +30,7 @@ class InstanceAdministratorTest {
     @Inject InstanceBackupService backups;
     @Inject InstanceBackupJobs jobs;
     @Inject InstanceDownloads downloads;
+    @Inject InstanceRestoreUploads uploads;
     @Inject ContractInputs contracts;
     @Inject RecoveryOrigin origin;
     @Inject BackendClock clock;
@@ -49,7 +50,7 @@ class InstanceAdministratorTest {
         admin=accounts.session(issued.secret());output=Files.createDirectory(directory.resolve("operations"));
         var worker=ClientProxy.unwrap(jobs);worker.storage=output.resolve("private").toString();worker.maximumBytes=5_000_000;worker.retainedBytes=10_000_000;worker.maximumJobs=2;
     }
-    @AfterEach void reset(){ClientProxy.unwrap(accounts).setupFile="NONE";ClientProxy.unwrap(administrators).clock=clock;ClientProxy.unwrap(backups).datasource=datasource;ClientProxy.unwrap(jobs).storage="NONE";ClientProxy.unwrap(downloads).clock=clock;}
+    @AfterEach void reset(){ClientProxy.unwrap(accounts).setupFile="NONE";ClientProxy.unwrap(administrators).clock=clock;ClientProxy.unwrap(backups).datasource=datasource;ClientProxy.unwrap(jobs).storage="NONE";ClientProxy.unwrap(downloads).clock=clock;ClientProxy.unwrap(uploads).maximumExpandedBytes=17_179_869_184L;}
 
     @Test void administratorMustProveCurrentCredentialAndReceivesOnlyEncryptedArchive() throws Exception {
         var proof=administrators.verify(admin,PASSWORD);administrators.requireFresh(proof);assertFalse(proof.toString().contains(admin.digest()));
@@ -243,6 +244,70 @@ class InstanceAdministratorTest {
         var job=readyBackup();Path file=output.resolve("private").resolve(job.id().toString()).resolve("archive.tki");byte[] encrypted=Files.readAllBytes(file);encrypted[0]^=1;Files.write(file,encrypted,StandardOpenOption.TRUNCATE_EXISTING);
         var browser=httpLogin("instance-admin");var response=http(browser,true,"POST","/admin/instance/operations/"+job.id()+"/download-grant",object().put("currentPassword",PASSWORD));
         assertEquals(503,response.statusCode());assertFalse(response.asString().contains(output.toString()));assertFalse(response.asString().contains(PASSWORD));assertNull(response.cookie(InstanceDownloads.COOKIE));
+    }
+    private byte[] uploadFixture() throws Exception {
+        var proof=administrators.verify(admin,PASSWORD);var job=jobs.create(proof,"upload review source passphrase".toCharArray());return jobs.read(proof,job.id(),(input,length)->input.readAllBytes());
+    }
+    private String cipherDigest(byte[] bytes) throws Exception {return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));}
+    private String createUpload(Browser browser,byte[] bytes,String digest) {
+        var response=http(browser,true,"POST","/admin/instance/uploads",object().put("currentPassword",PASSWORD).put("bytes",bytes.length).put("sha256",digest));
+        assertEquals(201,response.statusCode(),response.asString());var value=parse(response.asString());contracts.validate("InstanceRestoreUpload",value);String id=value.path("operation").path("id").asText();
+        assertEquals("/api/v1/admin/instance/uploads/"+id,response.header("Location"));return id;
+    }
+    private io.restassured.response.Response chunk(Browser browser,boolean csrf,String id,long offset,byte[] bytes) {
+        var request=io.restassured.RestAssured.given().header("Cookie",browser.cookie()).contentType("application/octet-stream").body(bytes);if(csrf)request.header("X-CSRF-Token",browser.csrf());if(!origin.configured().equals("NONE"))request.header("Origin",origin.configured());
+        return request.put("/api/v1/admin/instance/uploads/"+id+"/content?offset="+offset);
+    }
+    private com.fasterxml.jackson.databind.JsonNode awaitUpload(Browser browser,String id,String expected) throws Exception {
+        long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(30);com.fasterxml.jackson.databind.JsonNode value;
+        do{var response=http(browser,false,"GET","/admin/instance/uploads/"+id,null);assertEquals(200,response.statusCode(),response.asString());value=parse(response.asString());contracts.validate("InstanceRestoreUpload",value);if(value.path("operation").path("state").asText().equals(expected))return value;Thread.sleep(20);}while(System.nanoTime()<deadline);
+        fail("Upload did not reach "+expected);return value;
+    }
+    @Test void httpUploadResumesRejectsChangedRetriesAndReviewsWithoutRestoringData() throws Exception {
+        byte[] bytes=uploadFixture();var browser=httpLogin("instance-admin");
+        var live=http(browser,true,"POST","/clients",object().put("name","Keep this target client").put("color","#123456"));assertEquals(201,live.statusCode(),live.asString());var client=parse(live.asString());
+        String id=createUpload(browser,bytes,cipherDigest(bytes));String path="/admin/instance/uploads/"+id;int split=bytes.length/2;
+        var first=Arrays.copyOf(bytes,split);assertEquals(403,chunk(browser,false,id,0,first).statusCode());
+        var uploaded=chunk(browser,true,id,0,first);assertEquals(200,uploaded.statusCode(),uploaded.asString());assertEquals(split,parse(uploaded.asString()).path("received").asLong());
+        assertEquals(200,chunk(browser,true,id,0,first).statusCode());var changed=first.clone();changed[0]^=1;assertEquals(409,chunk(browser,true,id,0,changed).statusCode());
+        assertEquals(422,http(browser,true,"POST",path+"/validate",object().put("currentPassword",PASSWORD).put("passphrase","upload review source passphrase")).statusCode());
+        assertEquals(200,chunk(browser,true,id,split,Arrays.copyOfRange(bytes,split,bytes.length)).statusCode());
+        var wrong=http(browser,true,"POST",path+"/validate",object().put("currentPassword",PASSWORD).put("passphrase","incorrect backup passphrase"));assertEquals(202,wrong.statusCode(),wrong.asString());
+        var rejected=awaitUpload(browser,id,"UPLOADING");assertEquals("INVALID_INSTANCE_BACKUP",rejected.path("validationCode").asText());assertTrue(rejected.path("complete").asBoolean());
+        var accepted=http(browser,true,"POST",path+"/validate",object().put("currentPassword",PASSWORD).put("passphrase","upload review source passphrase"));assertEquals(202,accepted.statusCode(),accepted.asString());
+        var review=awaitUpload(browser,id,"REVIEW");assertTrue(review.path("review").path("archiveVerified").asBoolean());assertFalse(review.path("review").path("restoreReady").asBoolean());assertEquals(23,review.path("review").path("counts").size());
+        assertFalse(review.toString().contains(PASSWORD));assertFalse(review.toString().contains("saved_smtp_password"));assertFalse(review.toString().contains(output.toString()));
+        assertFalse(Files.exists(output.resolve("private").resolve(id).resolve("work")));
+        int accountCount=accounts.tx(c->{try(var statement=query(c,"SELECT count(*) FROM tk_account");var rows=statement.executeQuery()){rows.next();return rows.getInt(1);}catch(Exception failure){throw new AssertionError(failure);}});assertEquals(1,accountCount);
+        var retained=http(browser,false,"GET","/clients/"+client.path("id").asText(),null);assertEquals(200,retained.statusCode(),retained.asString());assertEquals(client,parse(retained.asString()));
+        assertEquals(200,http(browser,true,"POST","/admin/instance/operations/"+id+"/discard",object().put("currentPassword",PASSWORD)).statusCode());assertFalse(Files.exists(output.resolve("private").resolve(id)));
+    }
+    @Test void uploadRejectsOtherSessionsTokensOversizedChunksAndWrongChecksums() throws Exception {
+        byte[] bytes=uploadFixture();var browser=httpLogin("instance-admin");String id=createUpload(browser,bytes,"0".repeat(64));String path="/admin/instance/uploads/"+id;var other=httpLogin("instance-admin");
+        assertEquals(403,http(other,false,"GET",path,null).statusCode());assertEquals(403,chunk(other,true,id,0,bytes).statusCode());
+        assertEquals(413,chunk(browser,true,id,0,new byte[InstanceArtifacts.CHUNK_BYTES+1]).statusCode());
+        assertEquals(200,chunk(browser,true,id,0,bytes).statusCode());assertEquals(202,http(browser,true,"POST",path+"/validate",object().put("currentPassword",PASSWORD).put("passphrase","upload review source passphrase")).statusCode());
+        assertEquals("INVALID_INSTANCE_BACKUP",awaitUpload(browser,id,"UPLOADING").path("validationCode").asText());
+        assertFalse(Files.exists(output.resolve("private").resolve(id).resolve("work")));
+        var token=accounts.createToken(admin,"Forbidden upload token",Set.of("read","write"),null).path("token").asText();
+        assertEquals(403,io.restassured.RestAssured.given().header("Authorization","Bearer "+token).get("/api/v1"+path).statusCode());
+        assertEquals(200,http(browser,true,"POST","/admin/instance/operations/"+id+"/discard",object().put("currentPassword",PASSWORD)).statusCode());
+        accounts.tx(c->{assertEquals(0,InstanceOperations.interruptAbandoned(c,clock.now().plusSeconds(601)));assertEquals(InstanceOperations.State.EXPIRED,InstanceOperations.status(c,UUID.fromString(id)).state());return null;});
+    }
+    @Test void uploadReviewEnforcesExpansionBudgetAndAllowsRetryWithoutUploadingAgain() throws Exception {
+        byte[] bytes=uploadFixture();var browser=httpLogin("instance-admin");String id=createUpload(browser,bytes,cipherDigest(bytes));assertEquals(200,chunk(browser,true,id,0,bytes).statusCode());String path="/admin/instance/uploads/"+id;
+        ClientProxy.unwrap(uploads).maximumExpandedBytes=256;
+        assertEquals(202,http(browser,true,"POST",path+"/validate",object().put("currentPassword",PASSWORD).put("passphrase","upload review source passphrase")).statusCode());
+        var rejected=awaitUpload(browser,id,"UPLOADING");assertEquals("INVALID_INSTANCE_BACKUP",rejected.path("validationCode").asText());assertFalse(Files.exists(output.resolve("private").resolve(id).resolve("work")));
+        ClientProxy.unwrap(uploads).maximumExpandedBytes=17_179_869_184L;
+        assertEquals(202,http(browser,true,"POST",path+"/validate",object().put("currentPassword",PASSWORD).put("passphrase","upload review source passphrase")).statusCode());assertFalse(awaitUpload(browser,id,"REVIEW").has("validationCode"));
+    }
+    @Test void cancellingAnotherAdministratorsUploadRecordsTheActualActor() throws Exception {
+        byte[] bytes=uploadFixture();var uploader=httpLogin("instance-admin");String id=createUpload(uploader,bytes,cipherDigest(bytes));
+        String owner=accounts.createUser(admin,"second-administrator",PASSWORD,"Second administrator",true).path("ownerId").asText();var other=httpLogin("second-administrator");
+        assertEquals(200,http(other,true,"POST","/admin/instance/operations/"+id+"/discard",object().put("currentPassword",PASSWORD)).statusCode());
+        accounts.tx(c->{try(var statement=query(c,"SELECT actor_owner,payload FROM tk_instance WHERE kind='AUDIT' AND operation_id=?",UUID.fromString(id));var rows=statement.executeQuery()){boolean found=false;while(rows.next())if(parse(rows.getString(2)).path("state").asText().equals("EXPIRED")){found=true;assertEquals(owner,rows.getString(1));}assertTrue(found);}catch(Exception failure){throw new AssertionError(failure);}return null;});
+        assertEquals("EXPIRED",awaitUpload(uploader,id,"EXPIRED").path("operation").path("state").asText());
     }
     private AgroalDataSource afterCommit(Runnable action) {
         var guarded=(AgroalDataSource)java.lang.reflect.Proxy.newProxyInstance(AgroalDataSource.class.getClassLoader(),new Class<?>[]{AgroalDataSource.class},(proxy,method,args)->{

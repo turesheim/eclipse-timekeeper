@@ -47,6 +47,33 @@ final class InstanceOperations {
         insert(connection,lease.id(),"OPERATION",lease.id(),actor,now,value);
         audit(connection,lease.id(),actor,now,type,state(value));return lease;
     }
+    static Lease beginUpload(Connection connection,TokenRegistry.Principal principal,long bytes,String digest,Instant now) {
+        var lease=begin(connection,principal.owner(),Type.RESTORE,now);var row=read(connection,lease.id(),true);
+        row.payload().putObject("upload").put("session",principal.digest()).put("bytes",bytes).put("sha256",digest);update(connection,row,now,row.payload());return lease;
+    }
+    private static Row uploadRow(Connection connection,UUID id,TokenRegistry.Principal principal) {
+        var row=read(connection,id,true);
+        if(row.status().type()!=Type.RESTORE||!row.actor().equals(principal.owner())||!row.payload().path("upload").path("session").asText().equals(principal.digest()))throw new ApiFailure(403,"FORBIDDEN");
+        return row;
+    }
+    static Lease uploadLease(Connection connection,UUID id,TokenRegistry.Principal principal,Instant now) {
+        lockControl(connection);var row=uploadRow(connection,id,principal);
+        if(row.status().state()!=State.UPLOADING)throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
+        var lease=new Lease(id,UUID.fromString(row.payload().path("worker").asText()));requireLease(row.payload(),lease,State.UPLOADING,now);return lease;
+    }
+    static ObjectNode uploadInfo(Connection connection,UUID id,TokenRegistry.Principal principal) {
+        var row=uploadRow(connection,id,principal);var result=object().put("bytes",row.payload().path("upload").path("bytes").asLong()).put("sha256",row.payload().path("upload").path("sha256").asText());
+        if(row.payload().has("validationCode"))result.set("validationCode",row.payload().get("validationCode"));
+        if(row.payload().has("review"))result.set("review",row.payload().get("review").deepCopy());return result;
+    }
+    static void rejectValidation(Connection connection,Lease lease,Instant now) {
+        advance(connection,lease,State.VALIDATING,State.UPLOADING,now);var row=read(connection,lease.id(),true);
+        row.payload().put("validationCode","INVALID_INSTANCE_BACKUP");update(connection,row,now,row.payload());
+    }
+    static void finishReview(Connection connection,Lease lease,ObjectNode review,Instant now) {
+        advance(connection,lease,State.VALIDATING,State.REVIEW,now);var row=read(connection,lease.id(),true);
+        row.payload().remove("validationCode");row.payload().set("review",review.deepCopy());update(connection,row,now,row.payload());
+    }
     static void issueDownload(Connection connection,UUID id,TokenRegistry.Principal principal,String digest,Instant verifiedAt,Instant expires,long bytes,Instant now) {
         lockControl(connection);var row=read(connection,id,true);readyBackup(row);
         if(verifiedAt.isBefore(now.minusSeconds(300))||verifiedAt.isAfter(now.plusSeconds(5))||!expires.isAfter(now)||expires.isAfter(now.plusSeconds(120))||bytes<1)throw new ApiFailure(403,"INSTANCE_DOWNLOAD_REQUIRED");
@@ -72,12 +99,12 @@ final class InstanceOperations {
         boolean allowed=switch(expected) {
             case PREPARING -> next==State.READY||next==State.FAILED;
             case UPLOADING -> next==State.VALIDATING||next==State.FAILED;
-            case VALIDATING -> next==State.REVIEW||next==State.FAILED;
+            case VALIDATING -> next==State.REVIEW||next==State.FAILED||next==State.UPLOADING;
             default -> false;
         };
         if(!allowed)throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
-        value.put("state",next.name());
-        if(next==State.VALIDATING)value.put("leaseUntil",now.plus(LEASE).toString());
+        value.put("state",next.name());if(next==State.VALIDATING)value.remove("validationCode");
+        if(next==State.VALIDATING||next==State.UPLOADING)value.put("leaseUntil",now.plus(LEASE).toString());
         else value.remove(List.of("worker","leaseUntil"));
         update(connection,row,now,value);audit(connection,lease.id(),row.actor(),now,row.status().type(),next);
         return status(connection,lease.id());
@@ -87,18 +114,18 @@ final class InstanceOperations {
         row.payload().put("leaseUntil",now.plus(LEASE).toString());update(connection,row,now,row.payload());
     }
     /** Explicitly discard a completed artifact or a restore review, retaining its audit. */
-    static Status expire(Connection connection,UUID id,Instant now) {
+    static Status expire(Connection connection,UUID id,String actor,Instant now) {
         lockControl(connection);var row=read(connection,id,true);var previous=row.status().state();
-        if(previous!=State.READY&&previous!=State.REVIEW)throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
-        row.payload().remove("download");row.payload().put("state",State.EXPIRED.name());update(connection,row,now,row.payload());
-        audit(connection,id,row.actor(),now,row.status().type(),State.EXPIRED);return status(connection,id);
+        if(!Set.of(State.READY,State.REVIEW,State.UPLOADING,State.FAILED,State.INTERRUPTED).contains(previous))throw new ApiFailure(409,"INSTANCE_OPERATION_STATE");
+        row.payload().remove(List.of("download","worker","leaseUntil"));row.payload().put("state",State.EXPIRED.name());update(connection,row,now,row.payload());
+        audit(connection,id,actor,now,row.status().type(),State.EXPIRED);return status(connection,id);
     }
     static int interruptAbandoned(Connection connection,Instant now) {
         lockControl(connection);var abandoned=new ArrayList<UUID>();
         try(var statement=query(connection,"SELECT id,payload FROM tk_instance WHERE kind='OPERATION'");var rows=statement.executeQuery()) {
             while(rows.next()) {
                 var value=(ObjectNode)parse(rows.getString(2));
-                if(value.has("leaseUntil")&&!Instant.parse(value.path("leaseUntil").asText()).isAfter(now))abandoned.add(UUID.fromString(rows.getString(1)));
+                if(!terminal(state(value))&&value.has("leaseUntil")&&!Instant.parse(value.path("leaseUntil").asText()).isAfter(now))abandoned.add(UUID.fromString(rows.getString(1)));
             }
         }catch(SQLException failure){throw unavailable();}
         for(UUID id:abandoned) {

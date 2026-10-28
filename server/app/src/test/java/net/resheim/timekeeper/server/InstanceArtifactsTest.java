@@ -26,7 +26,7 @@ class InstanceArtifactsTest {
         assertEquals(first.length,store.append(id,0,first).received());
         store=store();assertEquals(first.length,store.append(id,0,first).received());
         byte[] changed=first.clone();changed[0]^=1;
-        assertEquals("INVALID_INSTANCE_ARTIFACT",assertThrows(IOException.class,()->store().append(id,0,changed)).getMessage());
+        assertEquals("INSTANCE_ARTIFACT_CONFLICT",assertThrows(IOException.class,()->store().append(id,0,changed)).getMessage());
         for(int offset=first.length;offset<bytes.length;offset+=InstanceArtifacts.CHUNK_BYTES)store.append(id,offset,Arrays.copyOfRange(bytes,offset,Math.min(bytes.length,offset+InstanceArtifacts.CHUNK_BYTES)));
         assertTrue(store.complete(id).complete());assertTrue(store().complete(id).complete());
         assertArrayEquals(bytes,store().read(id,(input,length)->{assertEquals(bytes.length,length);return input.readAllBytes();}));

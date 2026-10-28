@@ -15038,6 +15038,390 @@
           }
         }
       }
+    },
+    "/admin/instance/uploads": {
+      "post": {
+        "operationId": "createInstanceRestoreUpload",
+        "summary": "Create a session-bound encrypted backup upload",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator browser-account session only, bound to the session that created this upload. Inactive uploads expire after ten minutes; accepted chunks renew the lease. Archive validation checks complete authentication, manifest integrity and relational data, and removes plaintext before publishing REVIEW. It does not establish destination readiness or activate a restore. Wrong passphrase or invalid archive returns to UPLOADING with a safe validationCode, allowing retry without re-upload.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "201": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Upload progress/review URL."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreUpload"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceRestoreUploadInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/instance/uploads/{id}": {
+      "get": {
+        "operationId": "getInstanceRestoreUpload",
+        "summary": "Read upload progress and archive-only review",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator browser-account session only, bound to the session that created this upload. Inactive uploads expire after ten minutes; accepted chunks renew the lease. Archive validation checks complete authentication, manifest integrity and relational data, and removes plaintext before publishing REVIEW. It does not establish destination readiness or activate a restore. Wrong passphrase or invalid archive returns to UPLOADING with a safe validationCode, allowing retry without re-upload.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "200": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreUpload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/instance/uploads/{id}/content": {
+      "put": {
+        "operationId": "appendInstanceRestoreUpload",
+        "summary": "Append or retry at most 1 MiB of ciphertext",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator browser-account session only, bound to the session that created this upload. Inactive uploads expire after ten minutes; accepted chunks renew the lease. Archive validation checks complete authentication, manifest integrity and relational data, and removes plaintext before publishing REVIEW. It does not establish destination readiness or activate a restore. Wrong passphrase or invalid archive returns to UPLOADING with a safe validationCode, allowing retry without re-upload.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "200": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreUpload"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 1048576
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/instance/uploads/{id}/validate": {
+      "post": {
+        "operationId": "validateInstanceRestoreUpload",
+        "summary": "Authenticate the complete archive and prepare a safe review",
+        "tags": [
+          "Accounts"
+        ],
+        "security": [
+          {
+            "browserSession": []
+          }
+        ],
+        "x-required-permission": "write",
+        "description": "Administrator browser-account session only, bound to the session that created this upload. Inactive uploads expire after ten minutes; accepted chunks renew the lease. Archive validation checks complete authentication, manifest integrity and relational data, and removes plaintext before publishing REVIEW. It does not establish destination readiness or activate a restore. Wrong passphrase or invalid archive returns to UPLOADING with a safe validationCode, allowing retry without re-upload.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerBinding"
+          },
+          {
+            "$ref": "#/components/parameters/Id"
+          },
+          {
+            "$ref": "#/components/parameters/Csrf"
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "202": {
+            "description": "Durable operation status.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store"
+                },
+                "description": "Authentication responses must not be cached."
+              },
+              "X-Timekeeper-Owner": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                "description": "Canonical unpadded base64url UTF-8 authenticated owner ID, available even for empty pages and 204 responses. Bind subsequent session requests to this owner."
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Upload progress/review URL."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceRestoreUpload"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceBackupCreateInput"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -28092,6 +28476,166 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "InstanceRestoreUploadInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "currentPassword",
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "writeOnly": true,
+            "format": "password"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 40,
+            "maximum": 9007199254740991
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "InstanceArchiveReview": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "archiveVerified",
+          "restoreReady",
+          "archiveId",
+          "createdAt",
+          "schema",
+          "source",
+          "counts",
+          "requiredSteps"
+        ],
+        "properties": {
+          "archiveVerified": {
+            "const": true
+          },
+          "restoreReady": {
+            "const": false
+          },
+          "archiveId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "serverVersion",
+              "commit",
+              "databaseType",
+              "packageId",
+              "publicOrigin"
+            ],
+            "properties": {
+              "serverVersion": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              },
+              "databaseType": {
+                "enum": [
+                  "h2",
+                  "postgresql"
+                ]
+              },
+              "packageId": {
+                "type": "string"
+              },
+              "publicOrigin": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "counts": {
+            "type": "object",
+            "propertyNames": {
+              "pattern": "^tk_[a-z_]+$"
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "requiredSteps": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "TARGET_READINESS",
+                "AUTHENTICATION_CONFIGURATION",
+                "DEPLOYMENT_MAPPING",
+                "OFFLINE_ACTIVATION"
+              ]
+            },
+            "uniqueItems": true
+          }
+        }
+      },
+      "InstanceRestoreUpload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation",
+          "bytes",
+          "received",
+          "complete",
+          "chunkBytes",
+          "sha256"
+        ],
+        "properties": {
+          "operation": {
+            "$ref": "#/components/schemas/InstanceOperation"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 40,
+            "maximum": 9007199254740991
+          },
+          "received": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "All declared ciphertext bytes have been received. This does not claim checksum, archive authentication, or destination readiness."
+          },
+          "chunkBytes": {
+            "const": 1048576
+          },
+          "validationCode": {
+            "const": "INVALID_INSTANCE_BACKUP"
+          },
+          "review": {
+            "$ref": "#/components/schemas/InstanceArchiveReview"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
           }
         }
       }

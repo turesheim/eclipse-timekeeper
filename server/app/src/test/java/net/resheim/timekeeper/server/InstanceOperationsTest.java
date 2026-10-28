@@ -60,7 +60,7 @@ class InstanceOperationsTest {
         try(var c=open()) {
             c.setAutoCommit(false);assertEquals(0,interruptAbandoned(c,NOW.plusSeconds(1200)));
             assertEquals("INSTANCE_OPERATION_IN_PROGRESS",assertThrows(ApiFailure.class,()->begin(c,"other",Type.BACKUP,NOW.plusSeconds(1200))).code);
-            expire(c,id,NOW.plusSeconds(1201));begin(c,"other",Type.BACKUP,NOW.plusSeconds(1202));c.commit();
+            expire(c,id,"other-administrator",NOW.plusSeconds(1201));begin(c,"other",Type.BACKUP,NOW.plusSeconds(1202));c.commit();
         }
     }
     @Test void leaseRenewalKeepsLongOperationAliveButCannotReviveExpiredWorker() throws Exception {

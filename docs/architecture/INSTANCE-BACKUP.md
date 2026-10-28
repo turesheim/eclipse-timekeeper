@@ -3,7 +3,7 @@
 This feature is being implemented for [#473](https://github.com/turesheim/eclipse-timekeeper/issues/473).
 The internal encrypted archive, configuration inventory, database-image and
 administrator-authority components exist. Administrator start/status/discard routes are integrated with durable backup
-jobs, including one-use native browser downloads. Upload/review, restore activation and Administration UI remain
+jobs, one-use native downloads and uploaded-archive review. Restore activation and Administration UI remain
 unfinished. The acceptance criteria in the
 issue remain the delivery requirements; these foundations alone do not satisfy them.
 
@@ -118,7 +118,7 @@ separate native GET consumes it atomically, records a safe started audit event,
 and streams encrypted bytes directly to the browser. No secret enters the URL or
 JSON response, and the client need not accumulate a Blob. Simultaneous requests
 can consume the grant only once. Replacement, expiry, wrong job/session and
-logout invalidate access. Upload/review and restore activation remain unfinished.
+logout invalidate access. Uploaded archive validation/review is integrated. Restore activation remains unfinished.
 See [API policy](API-V1.md).
 
 ## Durable operation records and schema 9
@@ -174,7 +174,40 @@ root, interrupt source jobs, and retain audit records. Input files and existing
 backup downloads are transient operation artifacts, not recursively included
 in subsequent backups. The storage component itself does not authorize requests, make
 uploaded bytes trusted, validate archive semantics, or activate a restore. Its backup job service now supplies those authorization and recovery-cleanup
-boundaries; native download HTTP is integrated and upload HTTP remains in progress.
+boundaries; native download and session-bound upload HTTP are integrated.
+
+## Session-bound uploads and archive review
+
+`InstanceRestoreUploads` uses the same private root, limits and durable receipts
+as backup creation. A current password proof reserves the declared ciphertext
+length and SHA-256. The originating account session is stored privately and is
+required for append, progress and validation. Binary chunks are bounded to 1 MiB;
+an acknowledged range can only be retried with identical content. Lease renewal
+follows accepted writes. Cancellation removes the worker capability and lease so
+an expired receipt cannot later be mistaken for abandoned active work. The audit
+attributes explicit discard to the administrator who requested it.
+
+Validation returns its durable `VALIDATING` receipt before reading the whole
+file. A renewable background worker verifies transfer checksum, complete AEAD,
+manifest, supported format and the relational image. It creates no active-domain
+records. Decrypted ZIP/database/configuration staging stays under the operation's
+working directory and is removed before `REVIEW`. The worker clears its owned
+passphrase on success, rejection and shutdown. Status polling during validation
+reads durable metadata without competing for the long-held archive file lock.
+
+Invalid input returns to `UPLOADING` with an opaque validation code, retaining the
+encrypted bytes for retry after another fresh password proof. No plaintext is
+retained between reviews. The configurable expanded-data budget defaults to
+16 GiB. Tests exercise partial transfer/resume, changed retry rejection,
+incomplete input, incorrect checksum, wrong-passphrase retry, expansion limits,
+session/token isolation and explicit cancellation. A real target client created
+after the source backup remains unchanged by validation.
+
+The safe review records source build/deployment metadata, archive UUID/time,
+logical schema and table counts. It explicitly returns `restoreReady: false`;
+archive verification alone does not prove empty-target readiness, usable restored
+authentication/configuration, correct deployment mapping or exclusive activation.
+Those are still required parts of this issue.
 
 ## Complete database image
 
@@ -219,7 +252,7 @@ staging is damaged after preflight or an insertion fails.
 
 ## Verification and remaining integration
 
-The current local server reactor passes 356 application tests and the shared
+The current local server reactor passes 360 application tests and the shared
 module suites. The new checks include real-runtime configuration capture, complete archive integrity,
 unsafe/duplicate ZIP and JSON rejection, decompression budgets, scoped credential
 proof, HTTP browser-only/CSRF boundaries, asynchronous backup lifecycle,
@@ -231,8 +264,7 @@ rollback. A real PostgreSQL 17 fixture verifies H2 → PostgreSQL → H2 using
 byte-identical images, including Unicode and nanosecond timestamps. Both
 PostgreSQL CI jobs include these tests.
 
-Delivery still requires uploaded-archive validation/review APIs,
-Administration UI,
+Delivery still requires the Administration UI,
 exclusive restart-safe activation, semantic authentication/configuration validation,
 deployment and hostname remapping,
 Synology/Docker/standalone integration, full restored-access tests and operator
