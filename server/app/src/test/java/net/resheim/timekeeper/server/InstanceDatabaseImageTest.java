@@ -63,6 +63,13 @@ class InstanceDatabaseImageTest {
                 seed(h2);Path original=snapshot(h2,"h2.json");InstanceDatabaseImage.replace(pg,original);pg.commit();
                 Path fromPg=snapshot(pg,"postgres.json");assertEquals(-1,Files.mismatch(original,fromPg));
                 InstanceDatabaseImage.replace(h2,fromPg);h2.commit();assertEquals(-1,Files.mismatch(original,snapshot(h2,"h2-again.json")));
+                String large=object().put("data","x".repeat(3_000_000)).toString();
+                for(int index=0;index<25;index++)execute(pg,"INSERT INTO tk_resource VALUES('a','JOURNAL_ASSET',?,1,?)",UUID.randomUUID(),large);pg.commit();
+                String javaExecutable=Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name").startsWith("Windows")?"java.exe":"java").toString();
+                Path log=directory.resolve("memory-probe.log");var command=new ProcessBuilder(javaExecutable,"-Xmx64m","-cp",System.getProperty("surefire.test.class.path",System.getProperty("java.class.path")),InstanceDatabaseImageMemoryProbe.class.getName());
+                command.environment().put("TIMEKEEPER_INSTANCE_PROBE_URL",url.substring(0,url.length()-8)+name);command.environment().remove("JAVA_TOOL_OPTIONS");command.environment().remove("JDK_JAVA_OPTIONS");command.redirectErrorStream(true).redirectOutput(log.toFile());
+                var process=command.start();if(!process.waitFor(30,java.util.concurrent.TimeUnit.SECONDS)){process.destroyForcibly();fail("Constrained export JVM did not finish");}
+                assertEquals(0,process.exitValue(),Files.readString(log));assertTrue(Files.readString(log).contains("INSTANCE_MEMORY_PROBE_OK"));
             }finally {admin.createStatement().execute("DROP DATABASE "+name+" WITH (FORCE)");}
         }
     }

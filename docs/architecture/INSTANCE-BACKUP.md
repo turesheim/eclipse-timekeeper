@@ -108,7 +108,10 @@ wrong column lists, incomplete rows, trailing documents and missing singleton
 controls. Preflight inserts the complete image into a disposable, private H2
 database with foreign keys, unique constraints and checks enabled. This tests
 the data before modifying a destination. Decoded strings are limited to 134,217,728 characters; the image is streamed
-by table and row and has no record-count limit.
+by table and row and has no record-count limit. PostgreSQL fetches one row at a
+time to avoid retaining batches of large attachment payloads. A child JVM with a
+64 MiB heap exports more than 75 MB of real PostgreSQL resource payloads in the
+cross-backend regression test.
 
 `replace` is an internal offline primitive. Its caller must establish exclusive
 maintenance and verify target readiness. It preflights the complete image,

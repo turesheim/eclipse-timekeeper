@@ -60,17 +60,20 @@ final class InstanceDatabaseImage {
                 for(String column:table.columns())json.writeString(column);json.writeEndArray();json.writeArrayFieldStart("rows");
                 String projection=table.projection()+(postgres(snapshot)&&table.name().equals("tk_external_reference")?",reference_key":"");
                 try(var statement=snapshot.prepareStatement("SELECT "+projection+" FROM "+table.name()+" ORDER BY "+primaryKey(snapshot,table))) {
-                    statement.setFetchSize(128);
+                    // A single resource/receipt may contain a large attachment.
+                    // Fetching a batch of these can exceed the whole JVM heap.
+                    statement.setFetchSize(1);
                     try(var rows=statement.executeQuery()) {
                         var metadata=rows.getMetaData();
                         while(rows.next()) {
                             if(postgres(snapshot)&&table.name().equals("tk_external_reference")&&!referenceKey(rows.getString(2),rows.getString(3),rows.getString(4)).equals(rows.getString(7)))throw new SQLException("Invalid external-reference index");
                             json.writeStartArray();
                             for(int column=1;column<=table.columns().size();column++) {
-                                if(rows.getObject(column)==null)json.writeNull();
-                                else if(Set.of(Types.BOOLEAN,Types.BIT).contains(metadata.getColumnType(column)))json.writeString(Boolean.toString(rows.getBoolean(column)));
-                                else if(metadata.getColumnType(column)==Types.TIMESTAMP_WITH_TIMEZONE)json.writeString(rows.getObject(column,OffsetDateTime.class).toInstant().toString());
-                                else try(var reader=rows.getCharacterStream(column)){json.writeString(reader,-1);}
+                                if(Set.of(Types.BOOLEAN,Types.BIT).contains(metadata.getColumnType(column))) {
+                                    boolean value=rows.getBoolean(column);if(rows.wasNull())json.writeNull();else json.writeString(Boolean.toString(value));
+                                }else if(metadata.getColumnType(column)==Types.TIMESTAMP_WITH_TIMEZONE) {
+                                    var value=rows.getObject(column,OffsetDateTime.class);if(value==null)json.writeNull();else json.writeString(value.toInstant().toString());
+                                }else try(var reader=rows.getCharacterStream(column)){if(reader==null)json.writeNull();else json.writeString(reader,-1);}
                             }
                             json.writeEndArray();
                         }
